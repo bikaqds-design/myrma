@@ -48,9 +48,11 @@ export default function Announcements({ currentUserEmail }) {
       if (editing) {
         await db.announcements.update(editing.id, payload)
         toast.success('Announcement updated')
+        db.auditLog.log(currentUserEmail, 'announcement_updated', `Updated announcement "${form.title}"`).catch(() => {})
       } else {
         await db.announcements.create({ ...payload, created_by: currentUserEmail, created_date: new Date().toISOString() })
         toast.success('Announcement created')
+        db.auditLog.log(currentUserEmail, 'announcement_created', `Created announcement "${form.title}"`).catch(() => {})
       }
       setShowModal(false)
       load()
@@ -59,12 +61,21 @@ export default function Announcements({ currentUserEmail }) {
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this announcement?')) return
-    try { await db.announcements.delete(id); toast.success('Deleted'); load() }
+    try {
+      await db.announcements.delete(id)
+      toast.success('Deleted')
+      db.auditLog.log(currentUserEmail, 'announcement_deleted', `Deleted announcement ${id}`).catch(() => {})
+      load()
+    }
     catch (err) { toast.error(err.message) }
   }
 
   const handleToggle = async (a) => {
-    try { await db.announcements.update(a.id, { is_active: !a.is_active }); load() }
+    try {
+      await db.announcements.update(a.id, { is_active: !a.is_active })
+      db.auditLog.log(currentUserEmail, 'announcement_status_changed', `${!a.is_active ? 'Activated' : 'Deactivated'} announcement "${a.title}"`).catch(() => {})
+      load()
+    }
     catch (err) { toast.error(err.message) }
   }
 

@@ -501,6 +501,16 @@ export const db = {
   },
 
   auditLog: {
+    async log(userEmail, actionType, details) {
+      try {
+        await supabase.from('user_activity_log').insert([{
+          user_email: userEmail || 'system',
+          action_type: actionType,
+          action_details: details || null,
+          created_date: new Date().toISOString(),
+        }])
+      } catch {}
+    },
     async listAll(limit = 300) {
       try {
         const { data, error } = await supabase.from('user_activity_log').select('*').order('created_date', { ascending: false }).limit(limit)

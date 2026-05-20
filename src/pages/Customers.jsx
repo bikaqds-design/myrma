@@ -184,6 +184,7 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
         try {
           await db.customers.bulkDelete(selectedCustomers)
           toast.success(`Deleted ${selectedCustomers.length} customers`)
+          db.auditLog.log(currentUserEmail, 'customer_bulk_deleted', `Deleted ${selectedCustomers.length} customers`).catch(() => {})
           setSelectedCustomers([])
           loadAll()
         } catch { toast.error('Failed to delete customers') }
@@ -195,6 +196,7 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
     try {
       await db.customers.bulkUpdateStatus(selectedCustomers, status)
       toast.success(`Updated ${selectedCustomers.length} customers`)
+      db.auditLog.log(currentUserEmail, 'customer_bulk_status_changed', `Changed status to "${status}" for ${selectedCustomers.length} customers`).catch(() => {})
       setSelectedCustomers([])
       loadAll()
     } catch { toast.error('Failed to update status') }
@@ -252,6 +254,7 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
           createdBy: currentUserEmail, targetRoles: ['admin', 'super_admin'], targetEmails: []
         }).catch(() => {})
         toast.success('Customer updated')
+        db.auditLog.log(currentUserEmail, 'customer_updated', `Updated customer ${payload.contact_person}${payload.company_name ? ` (${payload.company_name})` : ''}`).catch(() => {})
       } else {
         const newCustomer = await db.customers.create({
           ...payload,
@@ -267,6 +270,7 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
           createdBy: currentUserEmail, targetRoles: ['admin', 'super_admin'], targetEmails: []
         }).catch(() => {})
         toast.success('Customer created')
+        db.auditLog.log(currentUserEmail, 'customer_created', `Created customer ${payload.contact_person}${payload.company_name ? ` (${payload.company_name})` : ''}`).catch(() => {})
       }
       setShowAddCustomer(false)
       resetForm()
@@ -313,6 +317,7 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
             createdBy: currentUserEmail, targetRoles: ['admin', 'super_admin'], targetEmails: []
           }).catch(() => {})
           toast.success('Customer deleted')
+          db.auditLog.log(currentUserEmail, 'customer_deleted', `Deleted customer ${customer.contact_person}${customer.company_name ? ` (${customer.company_name})` : ''}`).catch(() => {})
           loadAll()
         } catch { toast.error('Failed to delete customer') }
       }
@@ -337,6 +342,7 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
     a.href = url; a.download = `customers-${new Date().toISOString().split('T')[0]}.csv`
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
     toast.success(`Exported ${filteredCustomers.length} customers`)
+    db.auditLog.log(currentUserEmail, 'customers_exported', `Exported ${filteredCustomers.length} customers to CSV`).catch(() => {})
   }
 
   const handleDownloadTemplate = () => {
@@ -412,6 +418,7 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
 
       await db.customers.bulkCreate(toImport)
       toast.success(`Successfully imported ${toImport.length} customers`)
+      db.auditLog.log(currentUserEmail, 'customers_imported', `Imported ${toImport.length} customers from CSV`).catch(() => {})
       if (errors.length > 0) {
         toast.error(`${errors.length} rows had errors — check console`)
         console.error('Import errors:', errors)

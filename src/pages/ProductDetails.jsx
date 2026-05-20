@@ -132,6 +132,7 @@ export default function ProductDetails({ productId, currentUserRole, currentUser
 
       await db.products.update(productId, productData)
       toast.success('Product updated successfully')
+      db.auditLog.log(currentUserEmail, 'product_updated', `Updated product ${productData.product_name} (${productData.sku})`).catch(() => {})
       setEditMode(false)
       setImageFile(null)
       loadProductDetails()
@@ -150,6 +151,7 @@ export default function ProductDetails({ productId, currentUserRole, currentUser
         try {
           await db.products.delete(productId)
           toast.success('Product deleted')
+          db.auditLog.log(currentUserEmail, 'product_deleted', `Deleted product ${product.product_name} (${product.sku})`).catch(() => {})
           onBack()
         } catch (error) {
           console.error('Error deleting product:', error)

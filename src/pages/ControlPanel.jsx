@@ -112,7 +112,7 @@ export default function ControlPanel({ currentUserRole, currentUserEmail }) {
       {section === 'users'       && <UserManagement currentUserRole={currentUserRole} currentUserEmail={currentUserEmail} />}
       {section === 'appearance'  && <BrandingSettings key="appearance" currentUserRole={currentUserRole} currentUserEmail={currentUserEmail} initialTab="branding" visibleTabs={['branding']} />}
       {section === 'email'       && <BrandingSettings key="email" currentUserRole={currentUserRole} currentUserEmail={currentUserEmail} initialTab="email-settings" visibleTabs={['email-settings', 'notifications', 'templates']} />}
-      {section === 'backup'      && <BackupRestore currentUserRole={currentUserRole} />}
+      {section === 'backup'      && <BackupRestore currentUserRole={currentUserRole} currentUserEmail={currentUserEmail} />}
       {section === 'announcements' && <Announcements currentUserEmail={currentUserEmail} />}
       {section === 'broadcast'     && <SendAlert currentUserEmail={currentUserEmail} />}
       {section === 'audit'       && <AuditLog />}
@@ -163,6 +163,7 @@ function SendAlert({ currentUserEmail }) {
         targetEmails: target === 'email' ? [specificEmail.trim()] : [],
       })
       toast.success('Alert sent')
+      db.auditLog.log(currentUserEmail, 'alert_sent', `Sent alert "${title.trim()}" to ${target}`).catch(() => {})
       setSent(true)
       setTitle(''); setMessage(''); setSpecificEmail('')
       setTimeout(() => setSent(false), 3000)

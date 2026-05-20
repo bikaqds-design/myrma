@@ -102,6 +102,7 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
       setPendingFiles([])
       setIsEditing(false)
       toast.success('Customer updated successfully')
+      db.auditLog.log(currentUserEmail, 'customer_updated', `Updated customer ${editForm.contact_person}${editForm.company_name ? ` (${editForm.company_name})` : ''}`).catch(() => {})
     } catch (error) {
       toast.error(`Failed to update: ${error.message}`)
     }
@@ -116,6 +117,7 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
         try {
           await db.customers.delete(customerId)
           toast.success('Customer deleted')
+          db.auditLog.log(currentUserEmail, 'customer_deleted', `Deleted customer ${customer.contact_person}${customer.company_name ? ` (${customer.company_name})` : ''}`).catch(() => {})
           onBack()
         } catch (error) {
           toast.error('Failed to delete customer')
@@ -138,6 +140,7 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
       setNotes(prev => [created, ...prev])
       setNewNote('')
       toast.success('Note added')
+      db.auditLog.log(currentUserEmail, 'customer_note_added', `Added note on customer ${customer?.contact_person}`).catch(() => {})
     } catch (error) {
       toast.error('Failed to add note')
     } finally {
@@ -156,6 +159,7 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
       setEditingNote(null)
       setEditNoteText('')
       toast.success('Note updated')
+      db.auditLog.log(currentUserEmail, 'customer_note_updated', `Updated note ${noteId} on customer ${customer?.contact_person}`).catch(() => {})
     } catch (error) {
       toast.error('Failed to update note')
     }
@@ -171,6 +175,7 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
           await db.customerNotes.delete(noteId)
           setNotes(prev => prev.filter(n => n.id !== noteId))
           toast.success('Note deleted')
+          db.auditLog.log(currentUserEmail, 'customer_note_deleted', `Deleted note ${noteId} on customer ${customer?.contact_person}`).catch(() => {})
         } catch (error) {
           toast.error('Failed to delete note')
         }

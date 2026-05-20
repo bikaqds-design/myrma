@@ -301,7 +301,7 @@ function InvSortBtn({ label, sortKey, activeSortKey, activeSortDir, onSort }) {
 }
 
 // ─── Product Status Tab (Received / Under Repair / Repaired / Can't Repair / RMA Stock) ──
-function ProductStatusTab({ products, showTypeCol, brandMap = {}, onNavigateToTicket, warehouses = [], units = [], canTransfer = false, onReload }) {
+function ProductStatusTab({ products, showTypeCol, brandMap = {}, onNavigateToTicket, warehouses = [], units = [], canTransfer = false, userEmail, onReload }) {
   const [search, setSearch]                               = useState('')
   const [filterProduct, setFilterProduct]                 = useState('')
   const [filterBrand, setFilterBrand]                     = useState('')
@@ -366,6 +366,7 @@ function ProductStatusTab({ products, showTypeCol, brandMap = {}, onNavigateToTi
     try {
       await db.inventory.transferUnits(selectedUnitIds, warehouseId)
       toast.success(`${selectedUnitIds.length} unit${selectedUnitIds.length !== 1 ? 's' : ''} transferred`)
+      db.auditLog.log(userEmail, 'inventory_units_transferred', `Transferred ${selectedUnitIds.length} unit${selectedUnitIds.length !== 1 ? 's' : ''} to warehouse ${warehouseId}`).catch(() => {})
       setSelectedGroups([])
       setShowTransfer(false)
       onReload?.()
@@ -803,7 +804,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
       {tab === 'under-repair' && <ProductStatusTab products={underRepairProds} brandMap={brandMap} onNavigateToTicket={onNavigateToTicket} />}
       {tab === 'repaired'     && <ProductStatusTab products={repairedProds} brandMap={brandMap} onNavigateToTicket={onNavigateToTicket} />}
       {tab === 'cant-repair'  && <ProductStatusTab products={cantRepairProds} brandMap={brandMap} onNavigateToTicket={onNavigateToTicket} />}
-      {tab === 'rma-stock'    && <ProductStatusTab products={rmaStockProds} showTypeCol brandMap={brandMap} onNavigateToTicket={onNavigateToTicket} warehouses={warehouses} units={units} canTransfer={canDo('transfer')} onReload={loadAll} />}
+      {tab === 'rma-stock'    && <ProductStatusTab products={rmaStockProds} showTypeCol brandMap={brandMap} onNavigateToTicket={onNavigateToTicket} warehouses={warehouses} units={units} canTransfer={canDo('transfer')} userEmail={userEmail} onReload={loadAll} />}
       {tab === 'warehouses'   && <WarehousesTab units={units} warehouses={warehouses} whMissing={whMissing} brands={brands} brandMap={brandMap} userEmail={userEmail} canManage={canDo('manage_warehouses')} canTransfer={canDo('transfer')} onReload={loadAll} />}
     </div>
   )
@@ -1094,6 +1095,7 @@ function CompanyStockTab({ groups, brands, warehouses, userEmail, canManageBatch
     try {
       await db.inventory.transferUnits(selectedUnitIds, warehouseId)
       toast.success(`${selectedUnitIds.length} unit${selectedUnitIds.length !== 1 ? 's' : ''} transferred`)
+      db.auditLog.log(userEmail, 'inventory_units_transferred', `Transferred ${selectedUnitIds.length} unit${selectedUnitIds.length !== 1 ? 's' : ''} to warehouse ${warehouseId}`).catch(() => {})
       setSelectedRows([])
       setShowTransfer(false)
       onReload()
@@ -1109,6 +1111,7 @@ function CompanyStockTab({ groups, brands, warehouses, userEmail, canManageBatch
     try {
       await db.inventory.createBatch(selectedUnitIds, brandName, userEmail)
       toast.success(`Batch created with ${selectedUnitIds.length} unit${selectedUnitIds.length !== 1 ? 's' : ''}`)
+      db.auditLog.log(userEmail, 'inventory_batch_created', `Created batch with ${selectedUnitIds.length} unit${selectedUnitIds.length !== 1 ? 's' : ''} for ${brandName}`).catch(() => {})
       setSelectedRows([])
       setShowBatch(false)
       onReload()
@@ -1350,13 +1353,23 @@ function ProductDetailModal({ group, mode, warehouses, canManageBatches, canTran
   const toggleAll  = () => setSelected(selected.length === stockUnits.length ? [] : stockUnits.map(u=>u.id))
 
   const handleCreateBatch = async (brandName) => {
-    try { await db.inventory.createBatch(selected, brandName, userEmail); toast.success('Batch created!'); setSelected([]); setShowBatch(false); onClose(); onReload() }
+    try {
+      await db.inventory.createBatch(selected, brandName, userEmail)
+      toast.success('Batch created!')
+      db.auditLog.log(userEmail, 'inventory_batch_created', `Created batch with ${selected.length} unit${selected.length !== 1 ? 's' : ''} for ${brandName}`).catch(() => {})
+      setSelected([]); setShowBatch(false); onClose(); onReload()
+    }
     catch { toast.error('Failed to create batch') }
   }
 
   const handleTransfer = async (warehouseId) => {
     const ids = selected.length > 0 ? selected : group.units.map(u=>u.id)
-    try { await db.inventory.transferUnits(ids, warehouseId); toast.success(`${ids.length} unit(s) transferred`); setSelected([]); setShowTransfer(false); onReload() }
+    try {
+      await db.inventory.transferUnits(ids, warehouseId)
+      toast.success(`${ids.length} unit(s) transferred`)
+      db.auditLog.log(userEmail, 'inventory_units_transferred', `Transferred ${ids.length} unit(s) to warehouse ${warehouseId}`).catch(() => {})
+      setSelected([]); setShowTransfer(false); onReload()
+    }
     catch { toast.error('Transfer failed') }
   }
 
@@ -1613,7 +1626,12 @@ function WarehousesTab({ units, warehouses, whMissing, brands, brandMap, userEma
       `Delete warehouse "${wh.name}"? Units will become unassigned.`,
       async () => {
         closeConfirm(); setDeleting(wh.id)
-        try { await db.warehouses.delete(wh.id); toast.success('Warehouse deleted'); onReload() }
+        try {
+          await db.warehouses.delete(wh.id)
+          toast.success('Warehouse deleted')
+          db.auditLog.log(userEmail, 'warehouse_deleted', `Deleted warehouse ${wh.name}`).catch(() => {})
+          onReload()
+        }
         catch { toast.error('Failed to delete warehouse') }
         finally { setDeleting(null) }
       }
@@ -1740,6 +1758,7 @@ function WarehousesTab({ units, warehouses, whMissing, brands, brandMap, userEma
           warehouses={warehouses}
           brandMap={brandMap}
           canTransfer={canTransfer}
+          userEmail={userEmail}
           onClose={() => setSelectedWh(null)}
           onReload={() => { setSelectedWh(null); onReload() }}
         />
@@ -1747,7 +1766,7 @@ function WarehousesTab({ units, warehouses, whMissing, brands, brandMap, userEma
       {showCreate && (
         <CreateWarehouseModal
           warehouses={warehouses}
-          onSave={async d => { await db.warehouses.create({ ...d, created_by: userEmail, created_date: new Date().toISOString() }); toast.success('Warehouse created!'); setShowCreate(false); onReload() }}
+          onSave={async d => { await db.warehouses.create({ ...d, created_by: userEmail, created_date: new Date().toISOString() }); toast.success('Warehouse created!'); db.auditLog.log(userEmail, 'warehouse_created', `Created warehouse ${d.name}`).catch(() => {}); setShowCreate(false); onReload() }}
           onClose={() => setShowCreate(false)}
         />
       )}
@@ -1755,7 +1774,7 @@ function WarehousesTab({ units, warehouses, whMissing, brands, brandMap, userEma
         <CreateWarehouseModal
           initialData={editingWh}
           warehouses={warehouses}
-          onSave={async d => { await db.warehouses.update(editingWh.id, d); toast.success('Warehouse updated!'); setEditingWh(null); onReload() }}
+          onSave={async d => { await db.warehouses.update(editingWh.id, d); toast.success('Warehouse updated!'); db.auditLog.log(userEmail, 'warehouse_updated', `Updated warehouse ${d.name || editingWh.name}`).catch(() => {}); setEditingWh(null); onReload() }}
           onClose={() => setEditingWh(null)}
         />
       )}
@@ -1765,7 +1784,7 @@ function WarehousesTab({ units, warehouses, whMissing, brands, brandMap, userEma
 }
 
 // ─── Warehouse Detail Modal ────────────────────────────────────────────────────
-function WarehouseDetailModal({ wh, units, warehouses, brandMap, canTransfer, onClose, onReload }) {
+function WarehouseDetailModal({ wh, units, warehouses, brandMap, canTransfer, userEmail, onClose, onReload }) {
   const [selected, setSelected]       = useState([])
   const [showTransfer, setShowTransfer] = useState(false)
   const [search, setSearch]           = useState('')
@@ -1800,7 +1819,12 @@ function WarehouseDetailModal({ wh, units, warehouses, brandMap, canTransfer, on
 
   const handleTransfer = async (warehouseId) => {
     const ids = selected.length > 0 ? selected : filtered.map(u => u.id)
-    try { await db.inventory.transferUnits(ids, warehouseId); toast.success(`${ids.length} unit(s) transferred`); setSelected([]); setShowTransfer(false); onReload() }
+    try {
+      await db.inventory.transferUnits(ids, warehouseId)
+      toast.success(`${ids.length} unit(s) transferred`)
+      db.auditLog.log(userEmail, 'inventory_units_transferred', `Transferred ${ids.length} unit(s) from ${wh.name} to warehouse ${warehouseId}`).catch(() => {})
+      setSelected([]); setShowTransfer(false); onReload()
+    }
     catch { toast.error('Transfer failed') }
   }
 

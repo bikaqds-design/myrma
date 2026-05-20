@@ -461,6 +461,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             createdBy: userEmail, targetRoles: ['admin', 'super_admin'], targetEmails: []
           }).catch(() => {})
           toast.success(`${selectedTickets.length} ticket(s) deleted`)
+          db.auditLog.log(userEmail, 'ticket_bulk_deleted', `Deleted ${selectedTickets.length} tickets`).catch(() => {})
           setSelectedTickets([])
           loadData()
         } catch { toast.error('Failed to delete tickets') }
@@ -486,6 +487,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         createdBy: userEmail, targetRoles: ['admin', 'super_admin'], targetEmails: []
       }).catch(() => {})
       toast.success(`Status updated to "${bulkTicketStatus}" for ${selectedTickets.length} ticket(s)`)
+      db.auditLog.log(userEmail, 'ticket_bulk_status_changed', `Changed ${selectedTickets.length} tickets to "${bulkTicketStatus}"`).catch(() => {})
       setSelectedTickets([])
       setBulkTicketStatus('')
       loadData()
@@ -509,6 +511,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         })
       }))
       toast.success(`Product status updated to "${bulkProductStatus}" for ${selectedTickets.length} ticket(s)`)
+      db.auditLog.log(userEmail, 'ticket_bulk_product_status_changed', `Changed product status to "${bulkProductStatus}" for ${selectedTickets.length} tickets`).catch(() => {})
       setSelectedTickets([])
       setBulkProductStatus('')
       loadData()
@@ -564,6 +567,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         }).catch(() => {})
       }
       setNewComment('')
+      db.auditLog.log(userEmail, 'ticket_comment_added', `Added comment on ticket ${selectedTicket?.rma_number}`).catch(() => {})
       setCommentFiles([])
       setReplyingTo(null)
     } catch (err) {
@@ -577,6 +581,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     try {
       await db.ticketComments.delete(commentId)
       setTicketComments(prev => prev.filter(c => c.id !== commentId))
+      db.auditLog.log(userEmail, 'ticket_comment_deleted', `Deleted comment ${commentId}`).catch(() => {})
     } catch {
       toast.error('Failed to delete comment')
     }
@@ -744,6 +749,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       <script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>
       </body></html>`)
     w.document.close()
+    db.auditLog.log(userEmail, 'ticket_exported_pdf', `Exported ticket ${ticket.rma_number} to PDF`).catch(() => {})
   }
 
   const handleExport = () => {
@@ -756,6 +762,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
     a.download = `rma-tickets-${Date.now()}.csv`; a.click()
     toast.success('Exported!')
+    db.auditLog.log(userEmail, 'tickets_exported', `Exported ${filteredTickets.length} tickets to CSV`).catch(() => {})
   }
 
   const resetForm = () => {

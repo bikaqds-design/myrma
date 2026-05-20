@@ -87,6 +87,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
         targetRoles: ['super_admin'], targetEmails: []
       }).catch(() => {})
       toast.success(`User created! Email: ${newUserEmail}`)
+      db.auditLog.log(currentUserEmail, 'user_created', `Created user ${newUserEmail} with role ${newUserRole}`).catch(() => {})
       setNewUserEmail('')
       setNewUserRole('technician')
       setNewUserPassword('')
@@ -109,6 +110,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
         targetRoles: ['super_admin'], targetEmails: [email]
       }).catch(() => {})
       toast.success('Role updated successfully!')
+      db.auditLog.log(currentUserEmail, 'user_role_changed', `Changed role of ${email} to ${newRole}`).catch(() => {})
       loadData()
     } catch (error) {
       console.error('Error updating role:', error)
@@ -126,6 +128,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
         currentUserEmail
       )
       toast.success('Custom role created successfully!')
+      db.auditLog.log(currentUserEmail, 'custom_role_created', `Created custom role ${newRoleName}`).catch(() => {})
       setNewRoleName('')
       setNewRoleDescription('')
       setNewRolePermissions(getDefaultPermissions())
@@ -164,6 +167,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
         try {
           await db.userRoles.deleteCustomRole(roleId)
           toast.success('Custom role deleted successfully!')
+          db.auditLog.log(currentUserEmail, 'custom_role_deleted', `Deleted custom role ${roleId}`).catch(() => {})
           loadData()
         } catch (error) {
           console.error('Error deleting role:', error)
@@ -204,6 +208,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
             targetRoles: ['super_admin'], targetEmails: [selectedUser.user_email]
           }).catch(() => {})
           toast.success('User suspended successfully')
+          db.auditLog.log(currentUserEmail, 'user_suspended', `Suspended ${selectedUser.user_email}: ${controlReason}`).catch(() => {})
           break
 
         case 'activate':
@@ -216,6 +221,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
             targetRoles: ['super_admin'], targetEmails: [selectedUser.user_email]
           }).catch(() => {})
           toast.success('User activated successfully')
+          db.auditLog.log(currentUserEmail, 'user_activated', `Activated ${selectedUser.user_email}`).catch(() => {})
           break
 
         case 'lock':
@@ -261,6 +267,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
                   targetRoles: ['super_admin'], targetEmails: []
                 }).catch(() => {})
                 toast.success('User deleted successfully')
+                db.auditLog.log(currentUserEmail, 'user_deleted', `Deleted user ${deletedEmail}`).catch(() => {})
                 setShowUserControlModal(false)
                 setSelectedUser(null)
                 loadData()
@@ -311,6 +318,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
     try {
       await db.userRoles.updatePassword(selectedUser.user_email, resetPassword)
       toast.success('Password updated successfully!')
+      db.auditLog.log(currentUserEmail, 'user_password_reset', `Reset password for ${selectedUser.user_email}`).catch(() => {})
       setShowPasswordModal(false)
       setSelectedUser(null)
       setResetPassword('')

@@ -197,6 +197,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
       setAvatarFile(null)
       onProfileUpdate(user)
       toast.success('Profile updated!')
+      db.auditLog.log(currentUser?.email, 'user_profile_updated', `Updated profile for ${currentUser?.email}`).catch(() => {})
     } catch (err) {
       toast.error(err.message || 'Failed to update profile')
     } finally {
@@ -213,6 +214,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
       setNewPassword('')
       setConfirmPassword('')
       toast.success('Password updated!')
+      db.auditLog.log(currentUser?.email, 'user_password_changed', `Changed password for ${currentUser?.email}`).catch(() => {})
     } catch (err) {
       toast.error(err.message || 'Failed to update password')
     } finally {
@@ -224,6 +226,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
     try {
       await auth.signOutAll()
       toast.success('Signed out from all devices')
+      db.auditLog.log(currentUser?.email, 'user_signed_out_all_devices', `Signed out all devices for ${currentUser?.email}`).catch(() => {})
     } catch { toast.error('Failed to sign out all devices') }
   }
 
@@ -232,6 +235,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
     try {
       await notifications.updatePreferences(currentUser.email, notifPrefs)
       toast.success('Preferences saved!')
+      db.auditLog.log(currentUser?.email, 'user_notification_preferences_updated', `Updated notification preferences for ${currentUser?.email}`).catch(() => {})
     } catch { toast.error('Failed to save preferences') }
     finally { setNotifSaving(false) }
   }

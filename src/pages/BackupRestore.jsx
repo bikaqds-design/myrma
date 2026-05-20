@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
-import { backup as backupAPI } from '../api/supabaseClient'
+import { backup as backupAPI, db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 
-export default function BackupRestore({ currentUserRole }) {
+export default function BackupRestore({ currentUserRole, currentUserEmail }) {
   const [loading, setLoading] = useState(false)
   const [restoring, setRestoring] = useState(false)
 
@@ -24,6 +24,7 @@ export default function BackupRestore({ currentUserRole }) {
       const data = await backupAPI.exportProducts()
       downloadJSON(data, `products-backup-${new Date().toISOString().split('T')[0]}.json`)
       toast.success(`Exported ${data.length} products successfully!`)
+      db.auditLog.log(currentUserEmail, 'backup_exported', `Exported ${data.length} products backup`).catch(() => {})
     } catch (error) {
       console.error('Export products error:', error)
       toast.error('Failed to export products')
@@ -38,6 +39,7 @@ export default function BackupRestore({ currentUserRole }) {
       const data = await backupAPI.exportCustomers()
       downloadJSON(data, `customers-backup-${new Date().toISOString().split('T')[0]}.json`)
       toast.success(`Exported ${data.length} customers successfully!`)
+      db.auditLog.log(currentUserEmail, 'backup_exported', `Exported ${data.length} customers backup`).catch(() => {})
     } catch (error) {
       console.error('Export customers error:', error)
       toast.error('Failed to export customers')
@@ -52,6 +54,7 @@ export default function BackupRestore({ currentUserRole }) {
       const data = await backupAPI.exportTickets()
       downloadJSON(data, `tickets-backup-${new Date().toISOString().split('T')[0]}.json`)
       toast.success(`Exported ${data.length} tickets successfully!`)
+      db.auditLog.log(currentUserEmail, 'backup_exported', `Exported ${data.length} tickets backup`).catch(() => {})
     } catch (error) {
       console.error('Export tickets error:', error)
       toast.error('Failed to export tickets')
@@ -66,6 +69,7 @@ export default function BackupRestore({ currentUserRole }) {
       const data = await backupAPI.exportAll()
       downloadJSON(data, `myrma-full-backup-${new Date().toISOString().split('T')[0]}.json`)
       toast.success('Complete backup exported successfully!')
+      db.auditLog.log(currentUserEmail, 'backup_exported', 'Exported complete system backup').catch(() => {})
     } catch (error) {
       console.error('Export all error:', error)
       toast.error('Failed to export complete backup')
@@ -154,7 +158,8 @@ export default function BackupRestore({ currentUserRole }) {
           if (successCount > 0) {
             let message = `Restored: ${results.products} products, ${results.customers} customers, ${results.tickets} tickets`
             toast.success(message)
-            
+            db.auditLog.log(currentUserEmail, 'backup_imported', `Restored ${results.products} products, ${results.customers} customers, ${results.tickets} tickets from backup`).catch(() => {})
+
             if (results.errors.length > 0) {
               console.warn('Some errors occurred:', results.errors)
               toast.error('Some data could not be restored. Check console for details.')

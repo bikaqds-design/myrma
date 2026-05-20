@@ -42,6 +42,7 @@ export default function RMAConfig({ currentUserEmail }) {
         db.rmaConfig.set('default_settings', settings, currentUserEmail),
       ])
       toast.success('Configuration saved')
+      db.auditLog.log(currentUserEmail, 'rma_config_updated', 'Updated RMA configuration (SLA rules, assignment rules, default settings)').catch(() => {})
     } catch (err) { toast.error(err.message) } finally { setSaving(false) }
   }
 

@@ -292,6 +292,7 @@ export default function Products({ currentUserRole, currentUserEmail, currentUse
         try {
           await db.products.bulkDelete(selectedProducts)
           toast.success(`Deleted ${selectedProducts.length} products`)
+          db.auditLog.log(currentUserEmail, 'product_bulk_deleted', `Deleted ${selectedProducts.length} products`).catch(() => {})
           setSelectedProducts([])
           loadData()
         } catch (error) {
@@ -311,6 +312,7 @@ export default function Products({ currentUserRole, currentUserEmail, currentUse
     try {
       await db.products.bulkUpdateStatus(selectedProducts, status)
       toast.success(`Updated ${selectedProducts.length} products to ${status}`)
+      db.auditLog.log(currentUserEmail, 'product_bulk_status_changed', `Changed status to "${status}" for ${selectedProducts.length} products`).catch(() => {})
       setSelectedProducts([])
       loadData()
     } catch (error) {
@@ -344,6 +346,7 @@ export default function Products({ currentUserRole, currentUserEmail, currentUse
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
     toast.success(`Exported ${filteredProducts.length} products`)
+    db.auditLog.log(currentUserEmail, 'products_exported', `Exported ${filteredProducts.length} products to CSV`).catch(() => {})
   }
 
   const handleDownloadTemplate = () => {
@@ -447,7 +450,8 @@ export default function Products({ currentUserRole, currentUserEmail, currentUse
 
       await db.products.bulkCreate(productsToImport)
       toast.success(`Successfully imported ${productsToImport.length} products`)
-      
+      db.auditLog.log(currentUserEmail, 'products_imported', `Imported ${productsToImport.length} products from CSV`).catch(() => {})
+
       if (errors.length > 0) {
         toast.error(`${errors.length} rows had errors. Check console for details.`)
         console.error('Import errors:', errors)
@@ -537,6 +541,7 @@ export default function Products({ currentUserRole, currentUserEmail, currentUse
           createdBy: currentUserEmail, targetRoles: ['admin', 'super_admin'], targetEmails: []
         }).catch(() => {})
         toast.success('Product updated successfully')
+        db.auditLog.log(currentUserEmail, 'product_updated', `Updated product ${productData.product_name} (${productData.sku})`).catch(() => {})
       } else {
         const newProduct = await db.products.create({
           ...productData,
@@ -551,6 +556,7 @@ export default function Products({ currentUserRole, currentUserEmail, currentUse
           createdBy: currentUserEmail, targetRoles: ['admin', 'super_admin'], targetEmails: []
         }).catch(() => {})
         toast.success('Product added successfully')
+        db.auditLog.log(currentUserEmail, 'product_created', `Created product ${productData.product_name} (${productData.sku})`).catch(() => {})
       }
 
       setShowAddProduct(false)
@@ -587,9 +593,11 @@ export default function Products({ currentUserRole, currentUserEmail, currentUse
       if (editingBrand) {
         await db.brands.update(editingBrand.id, brandData)
         toast.success('Brand updated successfully')
+        db.auditLog.log(currentUserEmail, 'brand_updated', `Updated brand ${brandData.brand_name}`).catch(() => {})
       } else {
         await db.brands.create(brandData)
         toast.success('Brand added successfully')
+        db.auditLog.log(currentUserEmail, 'brand_created', `Created brand ${brandData.brand_name}`).catch(() => {})
       }
 
       setShowAddBrand(false)
@@ -620,9 +628,11 @@ export default function Products({ currentUserRole, currentUserEmail, currentUse
       if (editingCategory) {
         await db.categories.update(editingCategory.id, categoryData)
         toast.success('Category updated successfully')
+        db.auditLog.log(currentUserEmail, 'category_updated', `Updated category ${categoryData.category_name}`).catch(() => {})
       } else {
         await db.categories.create(categoryData)
         toast.success('Category added successfully')
+        db.auditLog.log(currentUserEmail, 'category_created', `Created category ${categoryData.category_name}`).catch(() => {})
       }
 
       setShowAddCategory(false)
@@ -650,6 +660,7 @@ export default function Products({ currentUserRole, currentUserEmail, currentUse
             createdBy: currentUserEmail, targetRoles: ['admin', 'super_admin'], targetEmails: []
           }).catch(() => {})
           toast.success('Product deleted')
+          db.auditLog.log(currentUserEmail, 'product_deleted', `Deleted product ${product.product_name} (${product.sku})`).catch(() => {})
           loadData()
         } catch (error) {
           console.error('Error deleting product:', error)
@@ -668,6 +679,7 @@ export default function Products({ currentUserRole, currentUserEmail, currentUse
         try {
           await db.brands.delete(brand.id)
           toast.success('Brand deleted')
+          db.auditLog.log(currentUserEmail, 'brand_deleted', `Deleted brand ${brand.brand_name}`).catch(() => {})
           setOpenBrandMenu(null)
           loadData()
         } catch (error) {
@@ -687,6 +699,7 @@ export default function Products({ currentUserRole, currentUserEmail, currentUse
         try {
           await db.categories.delete(category.id)
           toast.success('Category deleted')
+          db.auditLog.log(currentUserEmail, 'category_deleted', `Deleted category ${category.category_name}`).catch(() => {})
           loadData()
         } catch (error) {
           console.error('Error deleting category:', error)
