@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd d:\\\\myrma-app; $env:NODE_OPTIONS=\"--max-old-space-size=4096\"; npx vite build 2>&1 | Select-Object -Last 6)",
+      "PowerShell(cd d:\\\\myrma-app; $env:NODE_OPTIONS=\"--max-old-space-size=4096\"; npx vite build 2>&1 | Select-Object -Last 5)",
+      "PowerShell(cd d:\\\\myrma-app; $env:NODE_OPTIONS=\"--max-old-space-size=4096\"; npx vite build 2>&1 | Select-Object -Last 4)",
+      "PowerShell(cd d:\\\\myrma-app; $env:NODE_OPTIONS=\"--max-old-space-size=4096\"; npx vite build 2>&1 | Select-Object -Last 8)",
+      "WebSearch",
+      "PowerShell(cd d:\\\\myrma-app; $r = node node_modules/vite/bin/vite.js build 2>&1; $r | Where-Object { $_ -match 'error|Error|✗' } | Select-Object -First 20)",
+      "PowerShell(cd d:\\\\myrma-app; $env:NODE_OPTIONS='--max-old-space-size=4096'; npm run build 2>&1 | Select-Object -Last 15)"
+    ]
+  }
+}

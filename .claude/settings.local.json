@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(\\(Get-Content \"d:\\\\myrma-app\\\\src\\\\pages\\\\Customers.jsx\"\\).Count)",
+      "PowerShell(cd d:\\\\myrma-app; $env:NODE_OPTIONS=\"--max-old-space-size=4096\"; npx vite build 2>&1 | Select-Object -Last 30)",
+      "PowerShell(cd d:\\\\myrma-app; $env:NODE_OPTIONS=\"--max-old-space-size=4096\"; npx vite build 2>&1 | Select-Object -Last 20)",
+      "PowerShell(cd d:\\\\myrma-app; $env:NODE_OPTIONS=\"--max-old-space-size=4096\"; npx vite build 2>&1 | Select-Object -Last 40)",
+      "PowerShell(cd d:\\\\myrma-app; $env:NODE_OPTIONS=\"--max-old-space-size=4096\"; npx vite build 2>&1 | Select-Object -Last 15)",
+      "PowerShell(cd d:\\\\myrma-app; $env:NODE_OPTIONS=\"--max-old-space-size=4096\"; npx vite build 2>&1 | Select-Object -Last 10)",
+      "PowerShell(cd d:\\\\myrma-app; $env:NODE_OPTIONS=\"--max-old-space-size=4096\"; npx vite build 2>&1 | Select-Object -Last 8)",
+      "PowerShell(cd d:\\\\myrma-app; $env:NODE_OPTIONS=\"--max-old-space-size=4096\"; npx vite build 2>&1 | Select-Object -Last 6)",
+      "PowerShell(cd d:\\\\myrma-app; $env:NODE_OPTIONS=\"--max-old-space-size=4096\"; npx vite build 2>&1 | Select-Object -Last 5)"
+    ]
+  }
+}
