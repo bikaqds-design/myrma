@@ -290,10 +290,28 @@ export const db = {
       return data?.[0]
     },
     async delete(id) {
+      const { data: tickets } = await supabase.from('rma_tickets').select('id').eq('customer_id', id)
+      const ticketIds = (tickets || []).map(t => t.id)
+      if (ticketIds.length) {
+        await supabase.from('inventory_units').delete().in('rma_ticket_id', ticketIds)
+        await supabase.from('ticket_comments').delete().in('ticket_id', ticketIds)
+        await supabase.from('ticket_activity').delete().in('ticket_id', ticketIds)
+        await supabase.from('rma_tickets').delete().in('id', ticketIds)
+      }
+      await supabase.from('customer_notes').delete().eq('customer_id', id)
       const { error } = await supabase.from('customers').delete().eq('id', id)
       if (error) throw error
     },
     async bulkDelete(ids) {
+      const { data: tickets } = await supabase.from('rma_tickets').select('id').in('customer_id', ids)
+      const ticketIds = (tickets || []).map(t => t.id)
+      if (ticketIds.length) {
+        await supabase.from('inventory_units').delete().in('rma_ticket_id', ticketIds)
+        await supabase.from('ticket_comments').delete().in('ticket_id', ticketIds)
+        await supabase.from('ticket_activity').delete().in('ticket_id', ticketIds)
+        await supabase.from('rma_tickets').delete().in('id', ticketIds)
+      }
+      await supabase.from('customer_notes').delete().in('customer_id', ids)
       const { error } = await supabase.from('customers').delete().in('id', ids)
       if (error) throw error
     },
@@ -360,6 +378,9 @@ export const db = {
       return data?.[0]
     },
     async delete(id) {
+      await supabase.from('inventory_units').delete().eq('rma_ticket_id', id)
+      await supabase.from('ticket_comments').delete().eq('ticket_id', id)
+      await supabase.from('ticket_activity').delete().eq('ticket_id', id)
       const { error } = await supabase.from('rma_tickets').delete().eq('id', id)
       if (error) throw error
     }
