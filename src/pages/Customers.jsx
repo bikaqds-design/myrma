@@ -386,11 +386,13 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
       if (lines.length < 2) { toast.error('CSV file is empty or invalid'); return }
 
       const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase())
-      const requiredFields = ['contact_person', 'mobile']
-      const missing = requiredFields.filter(f => !headers.includes(f))
+      const requiredColumns = ['company_name', 'contact_person']
+      const missing = requiredColumns.filter(f => !headers.includes(f))
       if (missing.length > 0) { toast.error(`Missing required columns: ${missing.join(', ')}`); return }
 
       const existingMobiles = new Set(customers.map(c => c.mobile?.trim().toLowerCase()).filter(Boolean))
+      const existingCompanies = new Set(customers.map(c => c.company_name?.trim().toLowerCase()).filter(Boolean))
+      const existingContacts = new Set(customers.map(c => c.contact_person?.trim().toLowerCase()).filter(Boolean))
 
       const toImport = []
       const errors = []
@@ -401,29 +403,34 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
         const row = {}
         headers.forEach((h, idx) => { row[h] = values[idx] || '' })
 
-        if (!row.contact_person || !row.mobile) {
-          errors.push(`Row ${i + 1}: contact_person and mobile are required`)
-          continue
-        }
-
-        if (existingMobiles.has(row.mobile.trim().toLowerCase())) {
-          skippedCount++
-          continue
-        }
         const type = ['B2B', 'B2C'].includes((row.customer_type || '').toUpperCase())
           ? row.customer_type.toUpperCase() : 'B2C'
+
         if (type === 'B2B' && !row.company_name) {
           errors.push(`Row ${i + 1}: company_name is required for B2B`)
           continue
         }
+        if (type === 'B2C' && !row.contact_person) {
+          errors.push(`Row ${i + 1}: contact_person is required for B2C`)
+          continue
+        }
+
+        const mobile = row.mobile?.trim().toLowerCase()
+        const company = row.company_name?.trim().toLowerCase()
+        const contact = row.contact_person?.trim().toLowerCase()
+
+        if (mobile && existingMobiles.has(mobile)) { skippedCount++; continue }
+        if (!mobile && type === 'B2B' && company && existingCompanies.has(company)) { skippedCount++; continue }
+        if (!mobile && type === 'B2C' && contact && existingContacts.has(contact)) { skippedCount++; continue }
+
         const status = ['Active', 'Inactive'].includes(row.customer_status) ? row.customer_status : 'Active'
         toImport.push({
           customer_type:   type,
           customer_status: status,
           company_name:    row.company_name    || null,
-          contact_person:  row.contact_person,
+          contact_person:  row.contact_person  || null,
           account_manager: row.account_manager || null,
-          mobile:          row.mobile,
+          mobile:          row.mobile          || null,
           landline:        row.landline         || null,
           email:           row.email            || null,
           address:         row.address          || null,
@@ -999,7 +1006,7 @@ function BulkUploadCustomersModal({ onClose, onUpload, onDownloadTemplate }) {
             <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
               <li>Download the CSV template first</li>
               <li>Fill in your customer data following the template format</li>
-              <li>Required fields: <strong>contact_person, mobile</strong></li>
+              <li>Required fields: <strong>company_name</strong> (B2B) or <strong>contact_person</strong> (B2C) — mobile is optional</li>
               <li><strong>company_name</strong> is required when customer_type is B2B</li>
               <li>Valid customer_type values: <strong>B2B</strong>, <strong>B2C</strong></li>
               <li>Valid customer_status values: <strong>Active</strong>, <strong>Inactive</strong></li>
