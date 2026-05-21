@@ -448,9 +448,23 @@ export default function Products({ currentUserRole, currentUserEmail, currentUse
         return
       }
 
-      await db.products.bulkCreate(productsToImport)
-      toast.success(`Successfully imported ${productsToImport.length} products`)
-      db.auditLog.log(currentUserEmail, 'products_imported', `Imported ${productsToImport.length} products from CSV`).catch(() => {})
+      const existingSkus = new Set(products.map(p => p.sku?.toLowerCase()))
+      const newProducts = productsToImport.filter(p => !existingSkus.has(p.sku?.toLowerCase()))
+      const skippedCount = productsToImport.length - newProducts.length
+
+      if (newProducts.length === 0) {
+        toast.error(`All ${skippedCount} product${skippedCount !== 1 ? 's' : ''} already exist in the system — nothing to import.`)
+        return
+      }
+
+      await db.products.bulkCreate(newProducts)
+
+      if (skippedCount > 0) {
+        toast.success(`Imported ${newProducts.length} new product${newProducts.length !== 1 ? 's' : ''}. Skipped ${skippedCount} duplicate${skippedCount !== 1 ? 's' : ''}.`)
+      } else {
+        toast.success(`Successfully imported ${newProducts.length} product${newProducts.length !== 1 ? 's' : ''}.`)
+      }
+      db.auditLog.log(currentUserEmail, 'products_imported', `Imported ${newProducts.length} products, skipped ${skippedCount} duplicates`).catch(() => {})
 
       if (errors.length > 0) {
         toast.error(`${errors.length} rows had errors. Check console for details.`)
