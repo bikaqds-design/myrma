@@ -381,7 +381,7 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
 
   const handleBulkUploadCustomers = async (file) => {
     try {
-      const text = await file.text()
+      const text = (await file.text()).replace(/^﻿/, '')
       const lines = text.split('\n').filter(line => line.trim())
       if (lines.length < 2) { toast.error('CSV file is empty or invalid'); return }
 
