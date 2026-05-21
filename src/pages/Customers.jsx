@@ -359,27 +359,55 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
     toast.success('Template downloaded')
   }
 
+  const parseCSVLine = (line) => {
+    const result = []
+    let current = ''
+    let inQuotes = false
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i]
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
+        else { inQuotes = !inQuotes }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim())
+        current = ''
+      } else {
+        current += char
+      }
+    }
+    result.push(current.trim())
+    return result
+  }
+
   const handleBulkUploadCustomers = async (file) => {
     try {
       const text = await file.text()
       const lines = text.split('\n').filter(line => line.trim())
       if (lines.length < 2) { toast.error('CSV file is empty or invalid'); return }
 
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+      const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase())
       const requiredFields = ['contact_person', 'mobile']
       const missing = requiredFields.filter(f => !headers.includes(f))
       if (missing.length > 0) { toast.error(`Missing required columns: ${missing.join(', ')}`); return }
 
+      const existingMobiles = new Set(customers.map(c => c.mobile?.trim().toLowerCase()).filter(Boolean))
+
       const toImport = []
       const errors = []
+      let skippedCount = 0
 
       for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim())
+        const values = parseCSVLine(lines[i])
         const row = {}
         headers.forEach((h, idx) => { row[h] = values[idx] || '' })
 
         if (!row.contact_person || !row.mobile) {
           errors.push(`Row ${i + 1}: contact_person and mobile are required`)
+          continue
+        }
+
+        if (existingMobiles.has(row.mobile.trim().toLowerCase())) {
+          skippedCount++
           continue
         }
         const type = ['B2B', 'B2C'].includes((row.customer_type || '').toUpperCase())
@@ -411,14 +439,22 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
       }
 
       if (toImport.length === 0) {
-        toast.error('No valid customers to import')
-        if (errors.length > 0) console.error('Import errors:', errors)
+        if (skippedCount > 0) {
+          toast.error(`All ${skippedCount} customer${skippedCount !== 1 ? 's' : ''} already exist in the system — nothing to import.`)
+        } else {
+          toast.error('No valid customers to import')
+          if (errors.length > 0) console.error('Import errors:', errors)
+        }
         return
       }
 
       await db.customers.bulkCreate(toImport)
-      toast.success(`Successfully imported ${toImport.length} customers`)
-      db.auditLog.log(currentUserEmail, 'customers_imported', `Imported ${toImport.length} customers from CSV`).catch(() => {})
+      if (skippedCount > 0) {
+        toast.success(`Imported ${toImport.length} new customer${toImport.length !== 1 ? 's' : ''}. Skipped ${skippedCount} duplicate${skippedCount !== 1 ? 's' : ''}.`)
+      } else {
+        toast.success(`Successfully imported ${toImport.length} customer${toImport.length !== 1 ? 's' : ''}`)
+      }
+      db.auditLog.log(currentUserEmail, 'customers_imported', `Imported ${toImport.length} customers from CSV${skippedCount ? `, skipped ${skippedCount} duplicates` : ''}`).catch(() => {})
       if (errors.length > 0) {
         toast.error(`${errors.length} rows had errors — check console`)
         console.error('Import errors:', errors)
