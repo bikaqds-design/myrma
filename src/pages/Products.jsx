@@ -368,17 +368,37 @@ export default function Products({ currentUserRole, currentUserEmail, currentUse
     toast.success('Template downloaded')
   }
 
+  const parseCSVLine = (line) => {
+    const result = []
+    let current = ''
+    let inQuotes = false
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i]
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
+        else { inQuotes = !inQuotes }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim())
+        current = ''
+      } else {
+        current += char
+      }
+    }
+    result.push(current.trim())
+    return result
+  }
+
   const handleBulkUpload = async (file) => {
     try {
       const text = await file.text()
       const lines = text.split('\n').filter(line => line.trim())
-      
+
       if (lines.length < 2) {
         toast.error('CSV file is empty or invalid')
         return
       }
 
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+      const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase())
       const requiredFields = ['sku', 'product_name', 'brand_name']
       const missingFields = requiredFields.filter(f => !headers.includes(f))
       
@@ -391,7 +411,7 @@ export default function Products({ currentUserRole, currentUserEmail, currentUse
       const errors = []
 
       for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim())
+        const values = parseCSVLine(lines[i])
         const row = {}
         headers.forEach((h, idx) => row[h] = values[idx] || '')
 
