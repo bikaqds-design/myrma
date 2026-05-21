@@ -1348,6 +1348,21 @@ function getRoleTemplates() {
       }
     },
     {
+      key: 'manager',
+      name: 'Manager',
+      icon: '👔',
+      description: 'Team lead with full operational access but limited system settings',
+      permissions: {
+        products: { view: true, create: true, edit: true, delete: false, export: true, import: true },
+        customers: { view: true, create: true, edit: true, delete: false, export: true, import: true, view_history: true },
+        rma_tickets: { view_all: true, view_assigned: true, create: true, edit_all: true, edit_assigned: true, delete: false, assign: true, change_status: true, change_priority: true, add_comments: true, delete_comments: false, view_activity: true, attach_files: true, delete_files: false, print_labels: true, export: true },
+        inventory: { view: true, resolve_units: true, manage_batches: true, delete: false, export: true, manage_warehouses: false, transfer: true },
+        dashboard: { view_dashboard: true, view_analytics: true, view_reports: true, export_reports: true, customize_dashboard: true },
+        user_management: { view_users: true, create_users: false, edit_users: false, delete_users: false, assign_roles: false, manage_permissions: false, create_roles: false, delete_roles: false },
+        settings: { view_settings: true, edit_company_info: false, edit_branding: false, manage_email_templates: false, manage_statuses: true, manage_priorities: true, manage_categories: true, view_audit_logs: true }
+      }
+    },
+    {
       key: 'technician',
       name: 'Technician',
       icon: '🔧',
