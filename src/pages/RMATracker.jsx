@@ -121,7 +121,7 @@ export default function RMATracker() {
       setCommentFiles([])
       setReplyingTo(null)
     } catch (err) {
-      alert('Failed to send message. Please try again.')
+      alert('Failed to send message: ' + (err?.message || JSON.stringify(err)))
     } finally { setSubmitting(false); setUploadingFiles(false) }
   }
 
