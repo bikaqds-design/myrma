@@ -75,16 +75,36 @@ const ROLE_DEFAULT_PERMISSIONS = {
   }
 }
 
+function pathToPage(path) {
+  if (!path || path === '/' || path === '/dashboard') return { page: 'dashboard' }
+  if (path === '/products') return { page: 'products' }
+  if (path.startsWith('/products/')) return { page: 'product-details', id: path.split('/')[2] }
+  if (path === '/customers') return { page: 'customers' }
+  if (path.startsWith('/customers/')) return { page: 'customer-details', id: path.split('/')[2] }
+  if (path === '/rma-tickets') return { page: 'rma-tickets' }
+  if (path === '/inventory') return { page: 'inventory' }
+  if (path === '/account') return { page: 'account' }
+  if (path === '/control-panel') return { page: 'control-panel' }
+  return { page: 'dashboard' }
+}
+
+function pageToPath(page, id = null) {
+  if (page === 'product-details' && id) return `/products/${id}`
+  if (page === 'customer-details' && id) return `/customers/${id}`
+  if (page === 'dashboard') return '/'
+  return `/${page}`
+}
+
 export default function App() {
   const { sidebarCompact, updateAppearance } = useAppearance()
   const [currentUser, setCurrentUser] = useState(null)
   const [currentUserRole, setCurrentUserRole] = useState(null)
   const [currentUserPermissions, setCurrentUserPermissions] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [currentPage, setCurrentPage] = useState('dashboard')
+  const [currentPage, setCurrentPage] = useState(() => pathToPage(window.location.pathname).page)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [selectedProductId, setSelectedProductId] = useState(null)
-  const [selectedCustomerId, setSelectedCustomerId] = useState(null)
+  const [selectedProductId, setSelectedProductId] = useState(() => pathToPage(window.location.pathname).id || null)
+  const [selectedCustomerId, setSelectedCustomerId] = useState(() => pathToPage(window.location.pathname).id || null)
   const [selectedTicketId, setSelectedTicketId] = useState(null)
   const [resetPasswordMode, setResetPasswordMode] = useState(false)
   const [companyName, setCompanyName] = useState('')
@@ -214,9 +234,11 @@ export default function App() {
     setCurrentUserRole(null)
     setCurrentUserPermissions(null)
     setCurrentPage('dashboard')
+    window.history.replaceState({}, '', '/')
   }
 
   const handleNavigate = (page) => {
+    window.history.pushState({ page }, '', pageToPath(page))
     setCurrentPage(page)
     setSelectedProductId(null)
     setSelectedCustomerId(null)
@@ -225,23 +247,27 @@ export default function App() {
   }
 
   const handleNavigateToProduct = (productId) => {
+    window.history.pushState({ page: 'product-details', id: productId }, '', `/products/${productId}`)
     setSelectedProductId(productId)
     setCurrentPage('product-details')
     setSidebarOpen(false)
   }
 
   const handleBackFromProductDetails = () => {
+    window.history.pushState({ page: 'products' }, '', '/products')
     setSelectedProductId(null)
     setCurrentPage('products')
   }
 
   const handleNavigateToCustomer = (customerId) => {
+    window.history.pushState({ page: 'customer-details', id: customerId }, '', `/customers/${customerId}`)
     setSelectedCustomerId(customerId)
     setCurrentPage('customer-details')
     setSidebarOpen(false)
   }
 
   const handleBackFromCustomerDetails = () => {
+    window.history.pushState({ page: 'customers' }, '', '/customers')
     setSelectedCustomerId(null)
     setCurrentPage('customers')
   }
@@ -250,13 +276,28 @@ export default function App() {
     setCurrentUser(updatedUser)
   }
 
+  useEffect(() => {
+    const onPopState = () => {
+      const { page, id } = pathToPage(window.location.pathname)
+      setCurrentPage(page)
+      setSelectedTicketId(null)
+      if (page === 'product-details') { setSelectedProductId(id || null); setSelectedCustomerId(null) }
+      else if (page === 'customer-details') { setSelectedCustomerId(id || null); setSelectedProductId(null) }
+      else { setSelectedProductId(null); setSelectedCustomerId(null) }
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
   const handleNavigateToTicket = (ticketId) => {
+    window.history.pushState({ page: 'rma-tickets' }, '', '/rma-tickets')
     setSelectedTicketId(ticketId)
     setCurrentPage('rma-tickets')
     setSidebarOpen(false)
   }
 
   const handleCmdSelectTicket = useCallback((ticket) => {
+    window.history.pushState({ page: 'rma-tickets' }, '', '/rma-tickets')
     setSelectedTicketId(ticket.id)
     setCurrentPage('rma-tickets')
     setSidebarOpen(false)
