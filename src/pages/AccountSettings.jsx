@@ -3,6 +3,7 @@ import { auth, db, storage, notifications } from '../api/supabaseClient'
 import { WIDGET_CATALOG } from './Dashboard'
 import toast from 'react-hot-toast'
 import { Spinner, PageHeader } from '../components/ui'
+import { useURLTab } from '../hooks/useURLTab'
 
 function EyeIcon({ visible }) {
   return visible ? (
@@ -78,7 +79,7 @@ const SYSTEM_NOTIF_CATEGORIES = [
 export default function AccountSettings({ currentUser, currentUserRole, onProfileUpdate }) {
   const isAdmin = currentUserRole === 'admin' || currentUserRole === 'super_admin'
   const tabs = ['Profile', 'Security', 'Notifications', 'Appearance', ...(isAdmin ? ['Activity'] : [])]
-  const [activeTab, setActiveTab] = useState('Profile')
+  const [activeTab, setActiveTab] = useURLTab('tab', 'Profile')
 
   // Appearance — widget prefs
   const widgetStorageKey = `dashboard_widgets_${currentUser?.email}`

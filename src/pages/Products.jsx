@@ -4,10 +4,11 @@ import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { PageSkeleton } from '../components/Skeleton'
 import { Button, Spinner, PageHeader } from '../components/ui'
+import { useURLTab } from '../hooks/useURLTab'
 
 export default function Products({ currentUserRole, currentUserEmail, currentUserPermissions, onNavigateToProduct }) {
   const searchRef = useRef(null)
-  const [activeTab, setActiveTab] = useState('products')
+  const [activeTab, setActiveTab] = useURLTab('tab', 'products')
   const [loading, setLoading] = useState(true)
   
   const [products, setProducts] = useState([])

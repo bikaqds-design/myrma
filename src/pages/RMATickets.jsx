@@ -142,7 +142,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     const handler = (e) => {
       const tag = e.target.tagName
       const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable
-      if (e.key === 'Escape') { setShowModal(false); setShowDetailsModal(false); return }
+      if (e.key === 'Escape') { setShowModal(false); handleCloseDetails(); return }
       if (typing) return
       if (e.key === 'n' || e.key === 'N') { e.preventDefault(); handleAddNew() }
       if (e.key === '/') { e.preventDefault(); searchInputRef.current?.focus() }
@@ -197,10 +197,22 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   }
 
   useEffect(() => {
-    if (!initialTicketId || !tickets.length) return
-    const t = tickets.find(tk => tk.id === initialTicketId)
+    if (!tickets.length) return
+    const urlTicketId = new URLSearchParams(window.location.search).get('ticket')
+    const targetId = initialTicketId || urlTicketId
+    if (!targetId) return
+    const t = tickets.find(tk => tk.id === targetId)
     if (t) { setSelectedTicket(t); setShowDetailsModal(true) }
   }, [initialTicketId, tickets])
+
+  useEffect(() => {
+    const onPop = () => {
+      const ticketId = new URLSearchParams(window.location.search).get('ticket')
+      if (!ticketId) { setShowDetailsModal(false); setSelectedTicket(null) }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
 
   const handleSearchAndSort = () => {
     let filtered = [...tickets]
@@ -522,7 +534,16 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const toggleSelectTicket = (id) => setSelectedTickets(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   const toggleSelectAll = () => setSelectedTickets(selectedTickets.length === paginatedTickets.length ? [] : paginatedTickets.map(t => t.id))
 
+  const handleCloseDetails = () => {
+    const params = new URLSearchParams(window.location.search)
+    params.delete('ticket')
+    const qs = params.toString()
+    window.history.replaceState({}, '', '/rma-tickets' + (qs ? `?${qs}` : ''))
+    setShowDetailsModal(false)
+  }
+
   const handleViewDetails = (ticket) => {
+    window.history.pushState({ ticket: ticket.id }, '', `/rma-tickets?ticket=${ticket.id}`)
     setSelectedTicket(ticket)
     setShowDetailsModal(true)
     setTicketComments([])
@@ -1472,7 +1493,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                   Export PDF
                 </button>
-                <button onClick={() => setShowDetailsModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100">
+                <button onClick={handleCloseDetails} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
@@ -1769,11 +1790,11 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
             <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200">
               {(canDo('edit_all') || canDo('edit_assigned')) && (
-                <Button onClick={() => { setShowDetailsModal(false); handleEdit(selectedTicket) }}>
+                <Button onClick={() => { handleCloseDetails(); handleEdit(selectedTicket) }}>
                   Edit Ticket
                 </Button>
               )}
-              <Button variant="secondary" onClick={() => setShowDetailsModal(false)}>
+              <Button variant="secondary" onClick={handleCloseDetails}>
                 Close
               </Button>
             </div>

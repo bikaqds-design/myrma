@@ -3,9 +3,10 @@ import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { Spinner, Button } from '../components/ui'
+import { useURLTab } from '../hooks/useURLTab'
 
 export default function UserManagement({ currentUserRole, currentUserEmail }) {
-  const [activeTab, setActiveTab] = useState('users')
+  const [activeTab, setActiveTab] = useURLTab('umtab', 'users')
   const [users, setUsers] = useState([])
   const [customRoles, setCustomRoles] = useState([])
   const [loading, setLoading] = useState(true)

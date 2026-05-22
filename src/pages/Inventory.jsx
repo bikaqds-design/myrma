@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useURLTab } from '../hooks/useURLTab'
 import { supabase, db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -645,7 +646,7 @@ function ProductStatusTab({ products, showTypeCol, brandMap = {}, onNavigateToTi
 export default function Inventory({ userRole, userEmail, userPermissions, onNavigateToTicket }) {
   const canDo = a => (userRole === 'admin' || userRole === 'super_admin') ? true : userPermissions?.inventory?.[a] === true
 
-  const [tab, setTab]                   = useState('overview')
+  const [tab, setTab]                   = useURLTab('tab', 'overview')
   const [units, setUnits]               = useState([])
   const [batches, setBatches]           = useState([])
   const [brands, setBrands]             = useState([])

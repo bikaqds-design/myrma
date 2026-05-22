@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useURLTab } from '../hooks/useURLTab'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { Spinner } from '../components/ui'
@@ -67,7 +68,7 @@ const COLOR_MAP = {
 }
 
 export default function ControlPanel({ currentUserRole, currentUserEmail }) {
-  const [section, setSection] = useState(null)
+  const [section, setSection] = useURLTab('section', null, true)
 
   if (currentUserRole !== 'admin' && currentUserRole !== 'super_admin') {
     return (

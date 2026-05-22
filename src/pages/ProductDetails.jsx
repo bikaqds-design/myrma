@@ -4,12 +4,13 @@ import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { CardSkeleton } from '../components/Skeleton'
 import { Button } from '../components/ui'
+import { useURLTab } from '../hooks/useURLTab'
 
 export default function ProductDetails({ productId, currentUserRole, currentUserEmail, currentUserPermissions, onBack, onNavigateToTicket }) {
   const [loading, setLoading] = useState(true)
   const [product, setProduct] = useState(null)
   const [relatedTickets, setRelatedTickets] = useState([])
-  const [activeTab, setActiveTab] = useState('details')
+  const [activeTab, setActiveTab] = useURLTab('tab', 'details')
   const [editMode, setEditMode] = useState(false)
 
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null })

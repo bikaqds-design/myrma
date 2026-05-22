@@ -5,13 +5,14 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { CardSkeleton } from '../components/Skeleton'
 import AttachmentsField from '../components/AttachmentsField'
 import { Button, Spinner } from '../components/ui'
+import { useURLTab } from '../hooks/useURLTab'
 
 export default function CustomerDetails({ customerId, currentUserRole, currentUserEmail, currentUserPermissions, onBack, onNavigateToTicket }) {
   const [customer, setCustomer] = useState(null)
   const [tickets, setTickets] = useState([])
   const [notes, setNotes] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('profile')
+  const [activeTab, setActiveTab] = useURLTab('tab', 'profile')
   const [isEditing, setIsEditing] = useState(false)
   const [editForm, setEditForm] = useState({})
   const [pendingFiles, setPendingFiles] = useState([])
