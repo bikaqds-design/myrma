@@ -51,8 +51,12 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
 
   // Sorting
   const [sortConfig, setSortConfig] = useState(() => {
-    const saved = localStorage.getItem('customersSortConfig')
-    return saved ? JSON.parse(saved) : { key: 'created_date', direction: 'desc' }
+    try {
+      const saved = localStorage.getItem('customersSortConfig')
+      return saved ? JSON.parse(saved) : { key: 'created_date', direction: 'desc' }
+    } catch {
+      return { key: 'created_date', direction: 'desc' }
+    }
   })
 
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null })

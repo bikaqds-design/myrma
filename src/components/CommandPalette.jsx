@@ -47,17 +47,20 @@ export default function CommandPalette({ open, onClose, onSelectTicket, onSelect
 
   const search = useCallback(async (q) => {
     if (!q.trim()) { setResults([]); setLoading(false); return }
+    if (q.length > 100) { setResults([]); setLoading(false); return }
     setLoading(true)
     try {
+      const safe = q.replace(/[%,()]/g, ' ').trim()
+      if (!safe) { setResults([]); setLoading(false); return }
       const [tickets, customers, products] = await Promise.all([
-        db.supabase.from('rma_tickets').select('id,ticket_number,status,customer_name,product_name').or(`ticket_number.ilike.%${q}%,customer_name.ilike.%${q}%,product_name.ilike.%${q}%`).limit(5),
-        db.supabase.from('customers').select('id,name,email,phone').or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`).limit(5),
-        db.supabase.from('products').select('id,name,sku,brand').or(`name.ilike.%${q}%,sku.ilike.%${q}%,brand.ilike.%${q}%`).limit(5),
+        db.supabase.from('rma_tickets').select('id,rma_number,ticket_status,customer_name').or(`rma_number.ilike.%${safe}%,customer_name.ilike.%${safe}%`).limit(5),
+        db.supabase.from('customers').select('id,company_name,contact_person,email,mobile').or(`company_name.ilike.%${safe}%,contact_person.ilike.%${safe}%,email.ilike.%${safe}%,mobile.ilike.%${safe}%`).limit(5),
+        db.supabase.from('products').select('id,product_name,sku,brand:brands(brand_name)').or(`product_name.ilike.%${safe}%,sku.ilike.%${safe}%`).limit(5),
       ])
       const r = [
-        ...(tickets.data || []).map(t => ({ type: 'ticket', id: t.id, primary: t.ticket_number, secondary: `${t.customer_name} · ${t.product_name}`, badge: t.status, raw: t })),
-        ...(customers.data || []).map(c => ({ type: 'customer', id: c.id, primary: c.name, secondary: c.email || c.phone || '', raw: c })),
-        ...(products.data || []).map(p => ({ type: 'product', id: p.id, primary: p.name, secondary: `${p.brand || ''} ${p.sku ? '· ' + p.sku : ''}`.trim(), raw: p })),
+        ...(tickets.data || []).map(t => ({ type: 'ticket', id: t.id, primary: t.rma_number, secondary: t.customer_name || '', badge: t.ticket_status, raw: t })),
+        ...(customers.data || []).map(c => ({ type: 'customer', id: c.id, primary: c.company_name || c.contact_person || '—', secondary: c.email || c.mobile || '', raw: c })),
+        ...(products.data || []).map(p => ({ type: 'product', id: p.id, primary: p.product_name, secondary: `${p.brand?.brand_name || ''} ${p.sku ? '· ' + p.sku : ''}`.trim(), raw: p })),
       ]
       setResults(r)
       setActiveIndex(0)

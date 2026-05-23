@@ -1,4 +1,7 @@
 import React from 'react'
+import toast from 'react-hot-toast'
+
+const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25 MB
 
 const ClipIcon = () => (
   <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -20,7 +23,13 @@ const XIcon = () => (
 export default function AttachmentsField({ savedAttachments = [], onSavedChange, pendingFiles = [], onPendingChange }) {
   const handleFileSelect = (e) => {
     if (!e.target.files?.length) return
-    onPendingChange([...pendingFiles, ...Array.from(e.target.files)])
+    const incoming = Array.from(e.target.files)
+    const oversize = incoming.filter(f => f.size > MAX_FILE_SIZE)
+    const valid = incoming.filter(f => f.size <= MAX_FILE_SIZE)
+    if (oversize.length) {
+      toast.error(`${oversize.length} file${oversize.length !== 1 ? 's' : ''} exceeded 25 MB and were skipped`)
+    }
+    if (valid.length) onPendingChange([...pendingFiles, ...valid])
     e.target.value = ''
   }
 

@@ -9,10 +9,10 @@ export function useURLTab(paramName, defaultValue, pushHistory = false) {
 
   const setValueAndURL = (newVal) => {
     const params = new URLSearchParams(window.location.search)
-    if (newVal !== null && newVal !== '' && newVal !== undefined) {
-      params.set(paramName, newVal)
-    } else {
+    if (newVal === null || newVal === undefined || newVal === '') {
       params.delete(paramName)
+    } else {
+      params.set(paramName, String(newVal))
     }
     const qs = params.toString()
     const newURL = window.location.pathname + (qs ? `?${qs}` : '')

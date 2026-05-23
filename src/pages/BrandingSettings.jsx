@@ -432,9 +432,13 @@ function BrandingTab({ branding, setBranding, logoPreview, handleLogoChange, rem
   const handleFaviconUpload = (e) => {
     const file = e.target.files[0]
     if (!file) return
-    if (file.size > 1024 * 1024) { return }
+    if (file.size > 1024 * 1024) { toast.error('Favicon must be under 1 MB'); return }
     const reader = new FileReader()
-    reader.onloadend = () => update({ faviconUrl: reader.result })
+    reader.onloadend = () => {
+      update({ faviconUrl: reader.result })
+      toast.success('Favicon updated')
+    }
+    reader.onerror = () => toast.error('Failed to read favicon')
     reader.readAsDataURL(file)
   }
 

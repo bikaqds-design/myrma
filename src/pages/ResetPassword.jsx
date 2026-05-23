@@ -25,8 +25,12 @@ export default function ResetPassword({ onDone }) {
     e.preventDefault()
     setError('')
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters')
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters')
+      return
+    }
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      setError('Password must include uppercase, lowercase, and a number')
       return
     }
     if (password !== confirm) {
@@ -57,6 +61,7 @@ export default function ResetPassword({ onDone }) {
           </div>
           <h1 className="text-3xl font-bold text-gray-900">myRMA</h1>
           <p className="text-gray-600 mt-2">Set a new password</p>
+          <p className="text-xs text-gray-400 mt-3">You're here because someone requested a password reset for your account. If that wasn't you, you can safely close this page — your current password will remain unchanged until you submit a new one.</p>
         </div>
 
         {success ? (

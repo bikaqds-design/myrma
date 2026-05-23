@@ -153,8 +153,8 @@ export default function RMATracker() {
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-10 space-y-8">
 
-        {/* Schema notice */}
-        {!schemaOk && (
+        {/* Schema notice (dev-only — never shown to customers) */}
+        {!schemaOk && import.meta.env.DEV && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
             <strong>Database migration required.</strong> Run this SQL in your Supabase editor to enable replies and attachments:
             <pre className="mt-2 text-xs bg-amber-100 rounded p-3 overflow-x-auto whitespace-pre">{SCHEMA_SQL}</pre>

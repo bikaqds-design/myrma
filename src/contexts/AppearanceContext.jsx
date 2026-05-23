@@ -73,6 +73,10 @@ export function AppearanceProvider({ children }) {
     document.title = s.tabTitle || 'myRMA'
     if (s.fontFamily && s.fontFamily !== 'system' && GOOGLE_FONTS[s.fontFamily]) {
       const id = `gfont-${s.fontFamily}`
+      // Remove any previously injected Google Font links other than the current one
+      document.querySelectorAll('link[id^="gfont-"]').forEach(el => {
+        if (el.id !== id) el.remove()
+      })
       if (!document.getElementById(id)) {
         const link = document.createElement('link')
         link.id = id
@@ -80,6 +84,9 @@ export function AppearanceProvider({ children }) {
         link.href = `https://fonts.googleapis.com/css2?family=${GOOGLE_FONTS[s.fontFamily]}&display=swap`
         document.head.appendChild(link)
       }
+    } else {
+      // Switched to system font — clean up any leftover gfont links
+      document.querySelectorAll('link[id^="gfont-"]').forEach(el => el.remove())
     }
     if (s.faviconUrl) {
       let favicon = document.querySelector("link[rel*='icon']")

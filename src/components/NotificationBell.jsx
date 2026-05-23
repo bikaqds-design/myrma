@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 
 const TYPE_META = {
@@ -57,8 +57,13 @@ export default function NotificationBell({
   const btnRef = useRef(null)
   const panelRef = useRef(null)
 
-  const normalizedEmail = currentUserEmail?.toLowerCase()
-  const unread = notifications.filter(n => !n.read_by?.map(e => e.toLowerCase()).includes(normalizedEmail)).length
+  const normalizedEmail = useMemo(() => currentUserEmail?.toLowerCase() || '', [currentUserEmail])
+  const readSets = useMemo(
+    () => new Map(notifications.map(n => [n.id, new Set((n.read_by || []).map(e => e.toLowerCase()))])),
+    [notifications]
+  )
+  const isRead = (n) => readSets.get(n.id)?.has(normalizedEmail) || false
+  const unread = notifications.filter(n => !isRead(n)).length
 
   // Close on outside click
   useEffect(() => {
@@ -162,7 +167,7 @@ export default function NotificationBell({
           </div>
         ) : (
           notifications.map(n => {
-            const isUnread = !n.read_by?.map(e => e.toLowerCase()).includes(normalizedEmail)
+            const isUnread = !isRead(n)
             const meta = TYPE_META[n.type] || { icon: '🔔', color: 'bg-gray-100 text-gray-700' }
             const clickable = n.entity_type === 'ticket' && n.entity_id
             return (

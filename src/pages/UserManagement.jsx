@@ -5,6 +5,14 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { Spinner, Button } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
 
+function validatePasswordStrength(pw) {
+  if (!pw || pw.length < 8) return 'Password must be at least 8 characters'
+  if (!/[A-Z]/.test(pw)) return 'Password must contain an uppercase letter'
+  if (!/[a-z]/.test(pw)) return 'Password must contain a lowercase letter'
+  if (!/[0-9]/.test(pw)) return 'Password must contain a number'
+  return null
+}
+
 export default function UserManagement({ currentUserRole, currentUserEmail }) {
   const [activeTab, setActiveTab] = useURLTab('umtab', 'users')
   const [users, setUsers] = useState([])
@@ -73,10 +81,8 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       return
     }
 
-    if (newUserPassword.length < 6) {
-      toast.error('Password must be at least 6 characters')
-      return
-    }
+    const pwError = validatePasswordStrength(newUserPassword)
+    if (pwError) { toast.error(pwError); return }
 
     try {
       await db.userRoles.createRole(newUserEmail, newUserRole, newUserPassword)

@@ -954,7 +954,7 @@ export const notifications = {
     }
   },
   async sendEmail(recipientEmail, templateName, variables) {
-    const response = await fetch('https://ohkynosgscfygtjxbpxq.supabase.co/functions/v1/send-email', {
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseKey}` },
       body: JSON.stringify({ recipientEmail, templateName, variables })
@@ -1000,13 +1000,25 @@ export const backup = {
   async importAll(backupData) {
     if (!backupData.data) throw new Error('Invalid backup file')
     const { data } = backupData
-    await Promise.all([
-      data.products?.length && supabase.from('products').upsert(data.products),
-      data.customers?.length && supabase.from('customers').upsert(data.customers),
-      data.tickets?.length && supabase.from('rma_tickets').upsert(data.tickets),
-      data.comments?.length && supabase.from('ticket_comments').upsert(data.comments),
-      data.activity?.length && supabase.from('ticket_activity').upsert(data.activity)
-    ])
-    return { success: true }
+    const targets = [
+      ['products', data.products, 'products'],
+      ['customers', data.customers, 'customers'],
+      ['tickets', data.tickets, 'rma_tickets'],
+      ['comments', data.comments, 'ticket_comments'],
+      ['activity', data.activity, 'ticket_activity']
+    ]
+    const results = await Promise.all(
+      targets.map(async ([label, rows, table]) => {
+        if (!rows?.length) return { label, skipped: true }
+        const { error } = await supabase.from(table).upsert(rows)
+        return { label, count: rows.length, error: error?.message || null }
+      })
+    )
+    const failures = results.filter(r => r.error)
+    if (failures.length) {
+      const msg = failures.map(f => `${f.label}: ${f.error}`).join('; ')
+      throw new Error(`Import partially failed — ${msg}`)
+    }
+    return { success: true, results }
   }
 }

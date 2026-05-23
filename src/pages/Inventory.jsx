@@ -345,28 +345,30 @@ function ProductStatusTab({ products, showTypeCol, brandMap = {}, onNavigateToTi
   }, [products])
 
   // Match selected product groups to inventory_units rows for transfer
-  const selectedUnitIds = useMemo(() => {
-    if (!canTransfer || !units.length) return []
+  const { selectedUnitIds, expectedUnitCount } = useMemo(() => {
+    if (!canTransfer || !units.length) return { selectedUnitIds: [], expectedUnitCount: 0 }
     const unitMap = {}
     for (const u of units) {
       const key = `${u.rma_ticket_id}||${u.serial_number || u.product_name}`
       unitMap[key] = u.id
     }
-    return grouped
+    const targetItems = grouped
       .filter(g => selectedGroups.includes(g.product_name))
-      .flatMap(g => g.items.map(p => {
-        const key = `${p.ticket_id}||${p.serial_number || p.product_name}`
-        return unitMap[key]
-      }))
+      .flatMap(g => g.items)
+    const ids = targetItems
+      .map(p => unitMap[`${p.ticket_id}||${p.serial_number || p.product_name}`])
       .filter(Boolean)
+    return { selectedUnitIds: ids, expectedUnitCount: targetItems.length }
   }, [selectedGroups, grouped, units, canTransfer])
 
   const handleBulkTransfer = async (warehouseId) => {
     if (!selectedUnitIds.length) { toast.error('No matching units found in inventory'); return }
+    const skipped = expectedUnitCount - selectedUnitIds.length
+    if (skipped > 0 && !window.confirm(`${skipped} of ${expectedUnitCount} selected unit${expectedUnitCount !== 1 ? 's' : ''} are not tracked in inventory and will be skipped. Transfer the remaining ${selectedUnitIds.length}?`)) return
     setTransferring(true)
     try {
       await db.inventory.transferUnits(selectedUnitIds, warehouseId)
-      toast.success(`${selectedUnitIds.length} unit${selectedUnitIds.length !== 1 ? 's' : ''} transferred`)
+      toast.success(`${selectedUnitIds.length} unit${selectedUnitIds.length !== 1 ? 's' : ''} transferred${skipped > 0 ? ` (${skipped} skipped)` : ''}`)
       db.auditLog.log(userEmail, 'inventory_units_transferred', `Transferred ${selectedUnitIds.length} unit${selectedUnitIds.length !== 1 ? 's' : ''} to warehouse ${warehouseId}`).catch(() => {})
       setSelectedGroups([])
       setShowTransfer(false)
