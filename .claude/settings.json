@@ -24,7 +24,10 @@
       "PowerShell($env:PYTHONUTF8=1; $env:NO_COLOR=1; specify help 2>&1)",
       "PowerShell(claude --version 2>&1)",
       "PowerShell($env:PYTHONUTF8=1; $env:NO_COLOR=1; specify init . --force --integration claude --no-git 2>&1)",
-      "Bash(git reset *)"
+      "Bash(git reset *)",
+      "Bash(npm run *)",
+      "Bash(vercel --version)",
+      "PowerShell(vercel --version 2>&1)"
     ]
   }
 }

@@ -801,6 +801,284 @@ export const db = {
         ))
       } catch {}
     }
+  },
+
+  // ── Time Tracking ──────────────────────────────────────────────────────────
+  timeEntries: {
+    async list(ticketId) {
+      try {
+        const { data, error } = await supabase.from('time_entries').select('*').eq('ticket_id', ticketId).order('created_date', { ascending: false })
+        if (error) { if (error.code === '42P01') return { missing: true, data: [] }; throw error }
+        return { missing: false, data: data || [] }
+      } catch { return { missing: true, data: [] } }
+    },
+    async listAll() {
+      try {
+        const { data, error } = await supabase.from('time_entries').select('*, ticket:rma_tickets(rma_number, customer_name)').order('created_date', { ascending: false })
+        if (error) { if (error.code === '42P01') return { missing: true, data: [] }; throw error }
+        return { missing: false, data: data || [] }
+      } catch { return { missing: true, data: [] } }
+    },
+    async create(entry) {
+      const { data, error } = await supabase.from('time_entries').insert([{ ...entry, created_date: new Date().toISOString() }]).select()
+      if (error) throw error
+      return data?.[0]
+    },
+    async update(id, updates) {
+      const { data, error } = await supabase.from('time_entries').update(updates).eq('id', id).select()
+      if (error) throw error
+      return data?.[0]
+    },
+    async delete(id) {
+      const { error } = await supabase.from('time_entries').delete().eq('id', id)
+      if (error) throw error
+    },
+    async getTotalMinutes(ticketId) {
+      try {
+        const { data, error } = await supabase.from('time_entries').select('duration_min').eq('ticket_id', ticketId).not('duration_min', 'is', null)
+        if (error) return 0
+        return (data || []).reduce((sum, e) => sum + (e.duration_min || 0), 0)
+      } catch { return 0 }
+    }
+  },
+
+  // ── Parts / Components Inventory ───────────────────────────────────────────
+  parts: {
+    async list() {
+      try {
+        const { data, error } = await supabase.from('parts').select('*').order('part_name', { ascending: true })
+        if (error) { if (error.code === '42P01') return { missing: true, data: [] }; throw error }
+        return { missing: false, data: data || [] }
+      } catch { return { missing: true, data: [] } }
+    },
+    async get(id) {
+      const { data, error } = await supabase.from('parts').select('*').eq('id', id).single()
+      if (error) throw error
+      return data
+    },
+    async create(part) {
+      const { data, error } = await supabase.from('parts').insert([{ ...part, created_date: new Date().toISOString(), updated_date: new Date().toISOString() }]).select()
+      if (error) throw error
+      return data?.[0]
+    },
+    async update(id, part) {
+      const { data, error } = await supabase.from('parts').update({ ...part, updated_date: new Date().toISOString() }).eq('id', id).select()
+      if (error) throw error
+      return data?.[0]
+    },
+    async delete(id) {
+      const { error } = await supabase.from('parts').delete().eq('id', id)
+      if (error) throw error
+    },
+    async adjustQuantity(id, delta) {
+      const { data: part } = await supabase.from('parts').select('quantity').eq('id', id).single()
+      const newQty = Math.max(0, (part?.quantity || 0) + delta)
+      const { data, error } = await supabase.from('parts').update({ quantity: newQty, updated_date: new Date().toISOString() }).eq('id', id).select()
+      if (error) throw error
+      return data?.[0]
+    }
+  },
+
+  ticketParts: {
+    async list(ticketId) {
+      try {
+        const { data, error } = await supabase.from('ticket_parts').select('*, part:parts(part_name, part_number)').eq('ticket_id', ticketId).order('created_date', { ascending: true })
+        if (error) { if (error.code === '42P01') return { missing: true, data: [] }; throw error }
+        return { missing: false, data: data || [] }
+      } catch { return { missing: true, data: [] } }
+    },
+    async add(ticketId, partId, quantity, unitCost, notes, addedBy) {
+      // Deduct from parts inventory
+      await db.parts.adjustQuantity(partId, -quantity)
+      const { data, error } = await supabase.from('ticket_parts').insert([{
+        ticket_id: ticketId, part_id: partId,
+        quantity, unit_cost: unitCost,
+        notes: notes || null, added_by: addedBy || null,
+        created_date: new Date().toISOString()
+      }]).select('*, part:parts(part_name, part_number)')
+      if (error) throw error
+      return data?.[0]
+    },
+    async remove(id, partId, quantity) {
+      // Restore quantity to inventory
+      await db.parts.adjustQuantity(partId, quantity)
+      const { error } = await supabase.from('ticket_parts').delete().eq('id', id)
+      if (error) throw error
+    }
+  },
+
+  // ── Invoices / Quotes ──────────────────────────────────────────────────────
+  invoices: {
+    async list() {
+      try {
+        const { data, error } = await supabase.from('invoices').select('*').order('created_date', { ascending: false })
+        if (error) { if (error.code === '42P01') return { missing: true, data: [] }; throw error }
+        return { missing: false, data: data || [] }
+      } catch { return { missing: true, data: [] } }
+    },
+    async get(id) {
+      const { data, error } = await supabase.from('invoices').select('*').eq('id', id).single()
+      if (error) throw error
+      return data
+    },
+    async create(invoice) {
+      const now = new Date().toISOString()
+      const { data, error } = await supabase.from('invoices').insert([{ ...invoice, created_date: now, updated_date: now }]).select()
+      if (error) throw error
+      return data?.[0]
+    },
+    async update(id, updates) {
+      const { data, error } = await supabase.from('invoices').update({ ...updates, updated_date: new Date().toISOString() }).eq('id', id).select()
+      if (error) throw error
+      return data?.[0]
+    },
+    async delete(id) {
+      const { error } = await supabase.from('invoices').delete().eq('id', id)
+      if (error) throw error
+    },
+    async generateNumber(existingInvoices = []) {
+      const now = new Date()
+      const prefix = `INV-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-`
+      const serials = existingInvoices.map(i => i.invoice_number).filter(n => n?.startsWith(prefix))
+        .map(n => parseInt(n.replace(prefix, ''), 10)).filter(n => !isNaN(n))
+      const next = serials.length > 0 ? Math.max(...serials) + 1 : 1
+      return `${prefix}${String(next).padStart(4, '0')}`
+    }
+  },
+
+  // ── SLA Policies (stored in rma_config) ────────────────────────────────────
+  slaConfig: {
+    DEFAULT: {
+      enabled: false,
+      pauseOnHold: true,
+      policies: [
+        { priority: 'Critical', hours: 24 },
+        { priority: 'High',     hours: 48 },
+        { priority: 'Medium',   hours: 72 },
+        { priority: 'Low',      hours: 168 },
+      ]
+    },
+    async get() {
+      try {
+        const { data, error } = await supabase.from('rma_config').select('config_value').eq('config_key', 'sla_config').single()
+        if (error) return db.slaConfig.DEFAULT
+        return { ...db.slaConfig.DEFAULT, ...(data?.config_value || {}) }
+      } catch { return db.slaConfig.DEFAULT }
+    },
+    async save(config, userEmail) {
+      return db.rmaConfig.set('sla_config', config, userEmail)
+    },
+    computeDueDate(priority, config) {
+      if (!config?.enabled) return null
+      const policy = (config.policies || []).find(p => p.priority === priority)
+      if (!policy) return null
+      const d = new Date()
+      d.setHours(d.getHours() + policy.hours)
+      return d.toISOString().split('T')[0]
+    }
+  },
+
+  // ── Outbound Webhooks (stored in rma_config) ───────────────────────────────
+  webhooks: {
+    async list() {
+      try {
+        const { data, error } = await supabase.from('rma_config').select('config_value').eq('config_key', 'webhooks').single()
+        if (error) return []
+        return data?.config_value || []
+      } catch { return [] }
+    },
+    async save(hooks, userEmail) {
+      return db.rmaConfig.set('webhooks', hooks, userEmail)
+    },
+    async dispatch(eventType, payload) {
+      try {
+        const hooks = await db.webhooks.list()
+        const active = hooks.filter(h => h.enabled && (!h.events?.length || h.events.includes(eventType)))
+        if (!active.length) return
+        await Promise.allSettled(active.map(h =>
+          fetch(h.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(h.secret ? { 'X-myRMA-Secret': h.secret } : {}) },
+            body: JSON.stringify({ event: eventType, timestamp: new Date().toISOString(), data: payload })
+          }).catch(() => {})
+        ))
+      } catch {}
+    }
+  },
+
+  // ── Automation Rules (stored in rma_config) ────────────────────────────────
+  automationRules: {
+    async list() {
+      try {
+        const { data, error } = await supabase.from('rma_config').select('config_value').eq('config_key', 'automation_rules').single()
+        if (error) return []
+        return data?.config_value || []
+      } catch { return [] }
+    },
+    async save(rules, userEmail) {
+      return db.rmaConfig.set('automation_rules', rules, userEmail)
+    },
+    // Run all matching rules against a ticket event. Returns list of applied rule names.
+    async evaluate(eventType, ticket, allTickets = []) {
+      try {
+        const rules = await db.automationRules.list()
+        const active = rules.filter(r => r.enabled && r.trigger === eventType)
+        const applied = []
+        for (const rule of active) {
+          if (!evaluateConditions(rule.conditions || [], ticket)) continue
+          await applyActions(rule.actions || [], ticket)
+          applied.push(rule.name)
+        }
+        return applied
+      } catch { return [] }
+    }
+  },
+
+  // ── Device Serial History ──────────────────────────────────────────────────
+  serialHistory: {
+    async getBySerial(serialNumber) {
+      if (!serialNumber?.trim()) return []
+      try {
+        const { data, error } = await supabase.from('rma_tickets').select('id, rma_number, customer_name, ticket_status, priority, assigned_technician, created_date, due_date, products')
+          .order('created_date', { ascending: false })
+        if (error) return []
+        // Filter client-side: scan products JSONB for matching serial
+        return (data || []).filter(t =>
+          (t.products || []).some(p => p.serial_number?.toLowerCase() === serialNumber.trim().toLowerCase())
+        )
+      } catch { return [] }
+    }
+  }
+}
+
+// ── Automation rule helpers (module-private) ──────────────────────────────────
+function evaluateConditions(conditions, ticket) {
+  if (!conditions.length) return true
+  return conditions.every(c => {
+    const val = String(ticket[c.field] || '').toLowerCase()
+    const cv  = String(c.value || '').toLowerCase()
+    switch (c.op) {
+      case 'equals':      return val === cv
+      case 'not_equals':  return val !== cv
+      case 'contains':    return val.includes(cv)
+      case 'starts_with': return val.startsWith(cv)
+      default: return true
+    }
+  })
+}
+async function applyActions(actions, ticket) {
+  for (const a of actions) {
+    try {
+      if (a.type === 'change_status') {
+        await supabase.from('rma_tickets').update({ ticket_status: a.value, updated_date: new Date().toISOString() }).eq('id', ticket.id)
+      } else if (a.type === 'change_priority') {
+        await supabase.from('rma_tickets').update({ priority: a.value, updated_date: new Date().toISOString() }).eq('id', ticket.id)
+      } else if (a.type === 'assign_technician') {
+        await supabase.from('rma_tickets').update({ assigned_technician: a.value, updated_date: new Date().toISOString() }).eq('id', ticket.id)
+      } else if (a.type === 'create_notification') {
+        await db.notifications.create({ type: 'custom_alert', title: a.title || 'Automation', message: a.value, createdBy: 'system', targetRoles: ['admin', 'super_admin'] })
+      }
+    } catch {}
   }
 }
 

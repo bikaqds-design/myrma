@@ -35,8 +35,13 @@ const EMPTY_PRODUCT = {
   serial_number: '',
   product_status: 'Received',
   warranty_status: 'In Warranty',
+  warranty_expiry_date: '',
+  vendor_name: '',
+  vendor_warranty_expiry: '',
   issue_description: ''
 }
+
+const CARRIERS = ['', 'FedEx', 'UPS', 'DHL', 'USPS', 'Australia Post', 'Royal Mail', 'Other']
 
 function SortableHeader({ label, sortKey, sortConfig, onSort }) {
   const isActive = sortConfig.key === sortKey
@@ -123,8 +128,29 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     general_description: '',
     accessories_received: '',
     attachments: [],
-    products: [{ ...EMPTY_PRODUCT }]
+    products: [{ ...EMPTY_PRODUCT }],
+    // Shipping
+    carrier: '',
+    tracking_number: '',
+    shipping_label_url: '',
   })
+  // Time-tracking state for the detail panel
+  const [timeEntries, setTimeEntries]         = useState([])
+  const [timeEntriesMissing, setTimeEntriesMissing] = useState(false)
+  const [timerRunning, setTimerRunning]       = useState(false)
+  const [timerStart, setTimerStart]           = useState(null)
+  const [timerNotes, setTimerNotes]           = useState('')
+  const [manualHours, setManualHours]         = useState('')
+  const [manualMins, setManualMins]           = useState('')
+  const [manualNotes, setManualNotes]         = useState('')
+  const [addingManual, setAddingManual]       = useState(false)
+  const [timeTab, setTimeTab]                 = useState('log')
+  // Serial history
+  const [serialHistory, setSerialHistory]     = useState([])
+  const [serialHistorySerial, setSerialHistorySerial] = useState('')
+  // Parts on ticket
+  const [ticketParts, setTicketParts]         = useState([])
+  const [ticketPartsMissing, setTicketPartsMissing] = useState(false)
 
   useEffect(() => { loadData() }, [])
 
@@ -329,12 +355,22 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
       const allAttachments = [...(formData.attachments || []), ...newAttachments]
 
+      // Auto-set due date from SLA policy when creating a new ticket
+      let computedDueDate = formData.due_date || null
+      if (!editingTicket) {
+        try {
+          const sla = await db.slaConfig.get()
+          const slaDue = db.slaConfig.computeDueDate(formData.priority, sla)
+          if (slaDue) computedDueDate = slaDue
+        } catch {}
+      }
+
       const ticketData = {
         customer_name: formData.customer_name,
         priority: formData.priority,
         ticket_status: formData.ticket_status,
         assigned_technician: formData.assigned_technician,
-        due_date: formData.due_date || null,
+        due_date: computedDueDate,
         general_description: formData.general_description || null,
         accessories_received: formData.accessories_received || null,
         attachments: allAttachments.length > 0 ? allAttachments : null,
@@ -342,6 +378,10 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           ...p,
           status_date: p.status_date || new Date().toISOString(),
         })),
+        // Shipping
+        carrier: formData.carrier || null,
+        tracking_number: formData.tracking_number || null,
+        shipping_label_url: formData.shipping_label_url || null,
         rma_number: rmaNumber,
         updated_by: userEmail,
         updated_date: new Date().toISOString(),
@@ -377,6 +417,17 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           }).catch(() => {})
         }
         toast.success('Ticket updated successfully!')
+        // Fire automation rules + webhook on update
+        db.automationRules.evaluate('ticket_updated', { ...editingTicket, ...ticketData }).catch(() => {})
+        db.webhooks.dispatch('ticket_updated', { id: editingTicket.id, rma_number: editingTicket.rma_number, ...ticketData }).catch(() => {})
+        if (ticketData.ticket_status !== editingTicket.ticket_status) {
+          db.automationRules.evaluate('ticket_status_changed', { ...editingTicket, ...ticketData }).catch(() => {})
+          db.webhooks.dispatch('ticket_status_changed', { id: editingTicket.id, rma_number: editingTicket.rma_number, old_status: editingTicket.ticket_status, new_status: ticketData.ticket_status }).catch(() => {})
+        }
+        if (ticketData.assigned_technician !== editingTicket.assigned_technician) {
+          db.automationRules.evaluate('ticket_assigned', { ...editingTicket, ...ticketData }).catch(() => {})
+          db.webhooks.dispatch('ticket_assigned', { id: editingTicket.id, rma_number: editingTicket.rma_number, technician: ticketData.assigned_technician }).catch(() => {})
+        }
       } else {
         const newTicket = await db.rmaTickets.create({ ...ticketData, created_by: userEmail, created_date: new Date().toISOString() })
         if (newTicket?.id) {
@@ -390,6 +441,9 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             entityType: 'ticket', entityId: newTicket.id, entityRef: rmaNumber,
             createdBy: userEmail, targetRoles: ['admin', 'super_admin'], targetEmails: techEmails
           }).catch(() => {})
+          // Fire automation rules + webhook on create
+          db.automationRules.evaluate('ticket_created', newTicket).catch(() => {})
+          db.webhooks.dispatch('ticket_created', { id: newTicket.id, rma_number: rmaNumber, customer_name: ticketData.customer_name, priority: ticketData.priority, status: ticketData.ticket_status }).catch(() => {})
         }
         db.userActivity.create(userEmail, 'ticket_created', `Created ticket ${rmaNumber} for ${ticketData.customer_name}`).catch(() => {})
         toast.success('Ticket created successfully!')
@@ -424,7 +478,10 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       general_description: ticket.general_description || '',
       accessories_received: ticket.accessories_received || '',
       attachments: ticket.attachments || [],
-      products: prods
+      products: prods,
+      carrier: ticket.carrier || '',
+      tracking_number: ticket.tracking_number || '',
+      shipping_label_url: ticket.shipping_label_url || '',
     })
     setCustomerSearch(ticket.customer_name || '')
     setProductSearches(prods.map(p => p.product_name || ''))
@@ -548,10 +605,24 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     setShowDetailsModal(true)
     setTicketComments([])
     setNewComment('')
+    setTimerRunning(false)
+    setTimerStart(null)
+    setSerialHistory([])
+    setSerialHistorySerial('')
     setCommentsLoading(true)
     db.ticketComments.list(ticket.id).then(res => {
       if (!res.missing) setTicketComments(res.data)
     }).catch(() => {}).finally(() => setCommentsLoading(false))
+    // Load time entries
+    db.timeEntries.list(ticket.id).then(res => {
+      if (res.missing) { setTimeEntriesMissing(true); setTimeEntries([]) }
+      else { setTimeEntriesMissing(false); setTimeEntries(res.data) }
+    }).catch(() => {})
+    // Load parts used on this ticket
+    db.ticketParts.list(ticket.id).then(res => {
+      if (res.missing) { setTicketPartsMissing(true); setTicketParts([]) }
+      else { setTicketPartsMissing(false); setTicketParts(res.data) }
+    }).catch(() => {})
   }
 
   const handleAddComment = async (parentCommentId = null) => {
@@ -1372,6 +1443,21 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                             <option>Extended Warranty</option>
                           </select>
                         </div>
+                        <div>
+                          <label className={lbl}>Warranty Expiry</label>
+                          <input type="date" value={product.warranty_expiry_date || ''} onChange={e => updateProduct(idx, 'warranty_expiry_date', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm" />
+                        </div>
+                        <div>
+                          <label className={lbl}>Vendor / Supplier</label>
+                          <input type="text" value={product.vendor_name || ''} onChange={e => updateProduct(idx, 'vendor_name', e.target.value)}
+                            className={inp} placeholder="e.g. Samsung, Apple" />
+                        </div>
+                        <div>
+                          <label className={lbl}>Vendor Warranty Expiry</label>
+                          <input type="date" value={product.vendor_warranty_expiry || ''} onChange={e => updateProduct(idx, 'vendor_warranty_expiry', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm" />
+                        </div>
                       </div>
                       <div className="mt-3">
                         <label className={lbl}>Issue Description <span className="text-red-500">*</span></label>
@@ -1398,6 +1484,38 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                     onChange={(e) => setFormData({ ...formData, accessories_received: e.target.value })}
                     placeholder="List any accessories received with the device..."
                     className={inp} rows={3} />
+                </div>
+
+                {/* Shipping Information */}
+                <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50/50">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Shipping Information</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={lbl}>Carrier</label>
+                      <select value={formData.carrier} onChange={e => setFormData(f => ({ ...f, carrier: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm bg-white">
+                        {CARRIERS.map(c => <option key={c} value={c}>{c || '— Select carrier —'}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={lbl}>Tracking Number</label>
+                      <input type="text" value={formData.tracking_number} onChange={e => setFormData(f => ({ ...f, tracking_number: e.target.value }))}
+                        className={inp} placeholder="e.g. 1Z999AA10123456784" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={lbl}>Shipping Label URL <span className="text-gray-400 font-normal">(optional)</span></label>
+                    <input type="url" value={formData.shipping_label_url} onChange={e => setFormData(f => ({ ...f, shipping_label_url: e.target.value }))}
+                      className={inp} placeholder="https://..." />
+                  </div>
+                  {formData.tracking_number && formData.carrier && (
+                    <a href={`https://www.google.com/search?q=${encodeURIComponent(formData.carrier + ' tracking ' + formData.tracking_number)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                      Track shipment
+                    </a>
+                  )}
                 </div>
 
                 {/* Attachments */}
@@ -1537,14 +1655,198 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   <div key={i} className="border border-gray-200 rounded-xl p-4 mb-3">
                     <h4 className="font-semibold text-gray-800 text-sm mb-3">Product {i + 1} — {p.product_name}</h4>
                     <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div><p className="text-xs text-gray-500">Serial Number</p><p className="font-mono font-medium">{p.serial_number || '—'}</p></div>
+                      <div><p className="text-xs text-gray-500">Serial Number</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-mono font-medium">{p.serial_number || '—'}</p>
+                          {p.serial_number && (
+                            <button onClick={async () => { const h = await db.serialHistory.getBySerial(p.serial_number); setSerialHistory(h); setSerialHistorySerial(p.serial_number) }}
+                              className="text-xs text-indigo-500 hover:text-indigo-700 underline">History</button>
+                          )}
+                        </div>
+                      </div>
                       <div><p className="text-xs text-gray-500">Product Status</p><p className="font-medium">{p.product_status}</p></div>
-                      <div><p className="text-xs text-gray-500">Warranty Status</p><p className="font-medium">{p.warranty_status}</p></div>
+                      <div><p className="text-xs text-gray-500">Warranty</p>
+                        <p className="font-medium">{p.warranty_status}
+                          {p.warranty_expiry_date && <span className="text-xs text-gray-400 ml-1">· exp {p.warranty_expiry_date}</span>}
+                        </p>
+                      </div>
+                      {p.vendor_name && <div><p className="text-xs text-gray-500">Vendor</p><p className="font-medium">{p.vendor_name}{p.vendor_warranty_expiry && <span className="text-xs text-gray-400 ml-1">· vendor exp {p.vendor_warranty_expiry}</span>}</p></div>}
                       <div className="col-span-2"><p className="text-xs text-gray-500">Issue Description</p><p className="font-medium">{p.issue_description}</p></div>
                     </div>
                   </div>
                 ))}
               </div>
+
+              {/* Serial History Panel */}
+              {serialHistory.length > 0 && (
+                <div className="border border-indigo-200 rounded-xl p-4 bg-indigo-50/50">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-semibold text-indigo-700 uppercase tracking-wider">Serial History — {serialHistorySerial}</h3>
+                    <button onClick={() => { setSerialHistory([]); setSerialHistorySerial('') }} className="text-xs text-indigo-500 hover:text-indigo-700">✕ Close</button>
+                  </div>
+                  <div className="space-y-2">
+                    {serialHistory.map(t => (
+                      <div key={t.id} className={`flex items-center justify-between p-2 bg-white rounded-lg border text-xs ${t.id === selectedTicket.id ? 'border-indigo-300' : 'border-gray-200'}`}>
+                        <span className="font-mono font-medium text-indigo-700">{t.rma_number}</span>
+                        <span className="text-gray-600">{t.customer_name}</span>
+                        <span className={`px-2 py-0.5 rounded-full font-medium ${getStatusColor(t.ticket_status)}`}>{t.ticket_status}</span>
+                        <span className="text-gray-400">{t.created_date ? new Date(t.created_date).toLocaleDateString() : '—'}</span>
+                        {t.id !== selectedTicket.id && <button onClick={() => handleViewDetails(t)} className="text-indigo-500 hover:text-indigo-700 underline">Open</button>}
+                        {t.id === selectedTicket.id && <span className="text-indigo-500 italic">Current</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Time Tracking ── */}
+              {!timeEntriesMissing && (
+                <div className="border-t border-gray-200 pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Time Tracking</h3>
+                    <span className="text-xs text-indigo-600 font-medium">
+                      Total: {Math.floor(timeEntries.reduce((sum, e) => sum + (e.duration_min || 0), 0) / 60)}h {timeEntries.reduce((sum, e) => sum + (e.duration_min || 0), 0) % 60}m
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {/* Timer controls */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {!timerRunning ? (
+                        <button
+                          onClick={() => { setTimerRunning(true); setTimerStart(Date.now()) }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                          Start Timer
+                        </button>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            const mins = Math.max(1, Math.round((Date.now() - timerStart) / 60000))
+                            setTimerRunning(false)
+                            try {
+                              const entry = await db.timeEntries.create({
+                                ticket_id: selectedTicket.id,
+                                user_email: userEmail,
+                                started_at: new Date(timerStart).toISOString(),
+                                ended_at: new Date().toISOString(),
+                                duration_min: mins,
+                                notes: timerNotes || null,
+                              })
+                              setTimeEntries(prev => [...prev, entry])
+                              setTimerNotes('')
+                              toast.success(`Logged ${Math.floor(mins / 60)}h ${mins % 60}m`)
+                            } catch { toast.error('Failed to save time entry') }
+                            setTimerStart(null)
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition-colors">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg>
+                          Stop &amp; Save
+                        </button>
+                      )}
+                      {timerRunning && (
+                        <input value={timerNotes} onChange={e => setTimerNotes(e.target.value)}
+                          placeholder="Timer notes (optional)"
+                          className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 outline-none" />
+                      )}
+                      {!timerRunning && (
+                        <button onClick={() => setAddingManual(v => !v)}
+                          className="text-xs text-indigo-500 hover:text-indigo-700 underline transition-colors">
+                          {addingManual ? 'Cancel' : '+ Manual entry'}
+                        </button>
+                      )}
+                    </div>
+                    {/* Manual entry form */}
+                    {addingManual && !timerRunning && (
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <input type="number" min="0" max="99" value={manualHours} onChange={e => setManualHours(e.target.value)}
+                            placeholder="0" className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-center focus:ring-1 focus:ring-indigo-400 outline-none" />
+                          <span className="text-xs text-gray-500 font-medium">h</span>
+                          <input type="number" min="0" max="59" value={manualMins} onChange={e => setManualMins(e.target.value)}
+                            placeholder="0" className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-center focus:ring-1 focus:ring-indigo-400 outline-none" />
+                          <span className="text-xs text-gray-500 font-medium">m</span>
+                          <input value={manualNotes} onChange={e => setManualNotes(e.target.value)}
+                            placeholder="Notes (optional)" className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 outline-none" />
+                          <button
+                            onClick={async () => {
+                              const mins = parseInt(manualHours || 0) * 60 + parseInt(manualMins || 0)
+                              if (!mins) { toast.error('Enter hours or minutes'); return }
+                              try {
+                                const now = new Date().toISOString()
+                                const entry = await db.timeEntries.create({
+                                  ticket_id: selectedTicket.id,
+                                  user_email: userEmail,
+                                  started_at: now,
+                                  ended_at: now,
+                                  duration_min: mins,
+                                  notes: manualNotes || null,
+                                })
+                                setTimeEntries(prev => [...prev, entry])
+                                setManualHours(''); setManualMins(''); setManualNotes('')
+                                setAddingManual(false)
+                                toast.success(`Logged ${Math.floor(mins / 60)}h ${mins % 60}m`)
+                              } catch { toast.error('Failed to log time') }
+                            }}
+                            className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors">
+                            Log
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {/* Time log list */}
+                    {timeEntries.length > 0 ? (
+                      <div className="space-y-1.5 max-h-44 overflow-y-auto">
+                        {[...timeEntries].reverse().map(entry => (
+                          <div key={entry.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs group">
+                            <span className="text-gray-500 shrink-0">{entry.user_email}</span>
+                            <span className="font-semibold text-gray-800 shrink-0">{Math.floor((entry.duration_min || 0) / 60)}h {(entry.duration_min || 0) % 60}m</span>
+                            {entry.notes && <span className="text-gray-400 flex-1 truncate">{entry.notes}</span>}
+                            {!entry.notes && <span className="flex-1" />}
+                            <span className="text-gray-400 shrink-0">{entry.created_date ? new Date(entry.created_date).toLocaleDateString() : '—'}</span>
+                            {(userRole === 'admin' || userRole === 'super_admin' || entry.user_email === userEmail) && (
+                              <button onClick={async () => {
+                                try { await db.timeEntries.delete(entry.id); setTimeEntries(prev => prev.filter(e => e.id !== entry.id)); toast.success('Entry deleted') }
+                                catch { toast.error('Failed to delete') }
+                              }} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all shrink-0">×</button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">No time entries yet.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Parts Used ── */}
+              {!ticketPartsMissing && (
+                <div className="border-t border-gray-200 pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Parts Used ({ticketParts.length})</h3>
+                    {ticketParts.length > 0 && (
+                      <span className="text-xs text-indigo-600 font-medium">
+                        Cost: ${ticketParts.reduce((sum, p) => sum + (p.quantity * p.unit_cost), 0).toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                  {ticketParts.length > 0 ? (
+                    <div className="space-y-2">
+                      {ticketParts.map(tp => (
+                        <div key={tp.id} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg text-xs">
+                          <span className="font-medium text-gray-800 flex-1">{tp.parts?.part_name || '—'}</span>
+                          {tp.parts?.part_number && <span className="text-gray-400 font-mono">{tp.parts.part_number}</span>}
+                          <span className="text-gray-500">×{tp.quantity}</span>
+                          <span className="font-semibold text-gray-700">${(tp.quantity * tp.unit_cost).toFixed(2)}</span>
+                          {tp.notes && <span className="text-gray-400 truncate max-w-[8rem]">{tp.notes}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">No parts recorded on this ticket.</p>
+                  )}
+                </div>
+              )}
 
               {/* Accessories */}
               {selectedTicket.accessories_received && (

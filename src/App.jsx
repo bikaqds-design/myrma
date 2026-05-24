@@ -38,6 +38,10 @@ const CustomerDetails = React.lazy(() => import('./pages/CustomerDetails'))
 const RMATickets      = React.lazy(() => import('./pages/RMATickets'))
 const Inventory       = React.lazy(() => import('./pages/Inventory'))
 const ControlPanel    = React.lazy(() => import('./pages/ControlPanel'))
+const TechCalendar    = React.lazy(() => import('./pages/TechCalendar'))
+const Invoices        = React.lazy(() => import('./pages/Invoices'))
+const PartsInventory  = React.lazy(() => import('./pages/PartsInventory'))
+const Reports         = React.lazy(() => import('./pages/Reports'))
 
 const PageSpinner = () => (
   <div className="flex items-center justify-center h-64">
@@ -53,7 +57,12 @@ const ROLE_DEFAULT_PERMISSIONS = {
     inventory: { view: true, resolve_units: true, manage_batches: true, delete: false, export: true, manage_warehouses: false, transfer: false },
     dashboard: { view_dashboard: true, view_analytics: true, view_reports: true, export_reports: true, customize_dashboard: false },
     user_management: { view_users: true, create_users: false, edit_users: false, delete_users: false, assign_roles: false, manage_permissions: false, create_roles: false, delete_roles: false },
-    settings: { view_settings: true, edit_company_info: false, edit_branding: false, manage_email_templates: false, manage_statuses: false, manage_priorities: false, manage_categories: false, view_audit_logs: false }
+    settings: { view_settings: true, edit_company_info: false, edit_branding: false, manage_email_templates: false, manage_statuses: false, manage_priorities: false, manage_categories: false, view_audit_logs: false },
+    invoices: { view: true, create: true, edit: true, delete: false },
+    time_tracking: { log: true, view_all: true, delete: false },
+    parts: { view: true, create: true, edit: true, delete: false },
+    calendar: { view: true },
+    reports: { view: true, export: true },
   },
   technician: {
     products: { view: true, create: false, edit: false, delete: false, export: false, import: false },
@@ -62,7 +71,12 @@ const ROLE_DEFAULT_PERMISSIONS = {
     inventory: { view: true, resolve_units: true, manage_batches: false, delete: false, export: false, manage_warehouses: false, transfer: false },
     dashboard: { view_dashboard: true, view_analytics: false, view_reports: false, export_reports: false, customize_dashboard: false },
     user_management: { view_users: false, create_users: false, edit_users: false, delete_users: false, assign_roles: false, manage_permissions: false, create_roles: false, delete_roles: false },
-    settings: { view_settings: false, edit_company_info: false, edit_branding: false, manage_email_templates: false, manage_statuses: false, manage_priorities: false, manage_categories: false, view_audit_logs: false }
+    settings: { view_settings: false, edit_company_info: false, edit_branding: false, manage_email_templates: false, manage_statuses: false, manage_priorities: false, manage_categories: false, view_audit_logs: false },
+    invoices: { view: true, create: false, edit: false, delete: false },
+    time_tracking: { log: true, view_all: false, delete: false },
+    parts: { view: true, create: false, edit: false, delete: false },
+    calendar: { view: true },
+    reports: { view: false, export: false },
   },
   viewer: {
     products: { view: true, create: false, edit: false, delete: false, export: false, import: false },
@@ -71,7 +85,12 @@ const ROLE_DEFAULT_PERMISSIONS = {
     inventory: { view: true, resolve_units: false, manage_batches: false, delete: false, export: true, manage_warehouses: false, transfer: false },
     dashboard: { view_dashboard: true, view_analytics: false, view_reports: false, export_reports: false, customize_dashboard: false },
     user_management: { view_users: false, create_users: false, edit_users: false, delete_users: false, assign_roles: false, manage_permissions: false, create_roles: false, delete_roles: false },
-    settings: { view_settings: false, edit_company_info: false, edit_branding: false, manage_email_templates: false, manage_statuses: false, manage_priorities: false, manage_categories: false, view_audit_logs: false }
+    settings: { view_settings: false, edit_company_info: false, edit_branding: false, manage_email_templates: false, manage_statuses: false, manage_priorities: false, manage_categories: false, view_audit_logs: false },
+    invoices: { view: true, create: false, edit: false, delete: false },
+    time_tracking: { log: false, view_all: false, delete: false },
+    parts: { view: true, create: false, edit: false, delete: false },
+    calendar: { view: true },
+    reports: { view: false, export: false },
   }
 }
 
@@ -85,6 +104,10 @@ function pathToPage(path) {
   if (path === '/inventory') return { page: 'inventory' }
   if (path === '/account') return { page: 'account' }
   if (path === '/control-panel') return { page: 'control-panel' }
+  if (path === '/calendar') return { page: 'calendar' }
+  if (path === '/invoices') return { page: 'invoices' }
+  if (path === '/parts') return { page: 'parts' }
+  if (path === '/reports') return { page: 'reports' }
   return { page: 'dashboard' }
 }
 
@@ -523,6 +546,10 @@ export default function App() {
             { page: 'customers', label: 'Customers', active: isCustomersActive, icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
             { page: 'rma-tickets', label: 'RMA Tickets', active: currentPage === 'rma-tickets', icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z' },
             { page: 'inventory',   label: 'Inventory',   active: currentPage === 'inventory',   icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
+            { page: 'calendar',    label: 'Calendar',    active: currentPage === 'calendar',    icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+            { page: 'invoices',    label: 'Invoices',    active: currentPage === 'invoices',    icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
+            { page: 'parts',       label: 'Parts',       active: currentPage === 'parts',       icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
+            { page: 'reports',     label: 'Reports',     active: currentPage === 'reports',     icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
           ].map(({ page, label, active, icon }) => (
             <button key={page} onClick={() => handleNavigate(page)} title={sidebarCompact ? label : undefined}
               className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3'} rounded-lg transition-colors ${active ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}>
@@ -671,6 +698,35 @@ export default function App() {
             <ControlPanel
               currentUserRole={currentUserRole}
               currentUserEmail={currentUser?.email}
+            />
+          )}
+          {currentPage === 'calendar' && (
+            <TechCalendar
+              userRole={currentUserRole}
+              userEmail={currentUser?.email}
+              userPermissions={currentUserPermissions}
+              onNavigateToTicket={handleNavigateToTicket}
+            />
+          )}
+          {currentPage === 'invoices' && (
+            <Invoices
+              userRole={currentUserRole}
+              userEmail={currentUser?.email}
+              userPermissions={currentUserPermissions}
+            />
+          )}
+          {currentPage === 'parts' && (
+            <PartsInventory
+              userRole={currentUserRole}
+              userEmail={currentUser?.email}
+              userPermissions={currentUserPermissions}
+            />
+          )}
+          {currentPage === 'reports' && (
+            <Reports
+              userRole={currentUserRole}
+              userEmail={currentUser?.email}
+              userPermissions={currentUserPermissions}
             />
           )}
           </Suspense>
