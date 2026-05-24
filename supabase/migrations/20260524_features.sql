@@ -83,9 +83,6 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON time_entries  TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON parts         TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ticket_parts  TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON invoices      TO anon, authenticated;
-GRANT USAGE ON SEQUENCE              -- sequences auto-managed by UUID defaults, nothing to grant
-  -- no sequences needed (UUID PKs)
-  ;  -- keep statement valid
 
 -- ── 6. Auto-update updated_date triggers ────────────────────────────────────
 CREATE OR REPLACE FUNCTION set_updated_date()
