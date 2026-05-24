@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   invoice_number  TEXT NOT NULL UNIQUE,
   ticket_id       UUID REFERENCES rma_tickets(id) ON DELETE SET NULL,
-  customer_id     UUID REFERENCES customers(id)   ON DELETE SET NULL,
+  customer_id     UUID,
   customer_name   TEXT,
   customer_email  TEXT,
   status          TEXT NOT NULL DEFAULT 'draft',  -- draft | sent | paid | void
@@ -75,7 +75,6 @@ CREATE TABLE IF NOT EXISTS invoices (
   updated_date    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS invoices_ticket_idx   ON invoices(ticket_id);
-CREATE INDEX IF NOT EXISTS invoices_customer_idx ON invoices(customer_id);
 CREATE INDEX IF NOT EXISTS invoices_status_idx   ON invoices(status);
 
 -- ── 5. Grant access to app roles ────────────────────────────────────────────
