@@ -35,9 +35,6 @@ const EMPTY_PRODUCT = {
   serial_number: '',
   product_status: 'Received',
   warranty_status: 'In Warranty',
-  warranty_expiry_date: '',
-  vendor_name: '',
-  vendor_warranty_expiry: '',
   issue_description: ''
 }
 
@@ -1443,21 +1440,6 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                             <option>Extended Warranty</option>
                           </select>
                         </div>
-                        <div>
-                          <label className={lbl}>Warranty Expiry</label>
-                          <input type="date" value={product.warranty_expiry_date || ''} onChange={e => updateProduct(idx, 'warranty_expiry_date', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm" />
-                        </div>
-                        <div>
-                          <label className={lbl}>Vendor / Supplier</label>
-                          <input type="text" value={product.vendor_name || ''} onChange={e => updateProduct(idx, 'vendor_name', e.target.value)}
-                            className={inp} placeholder="e.g. Samsung, Apple" />
-                        </div>
-                        <div>
-                          <label className={lbl}>Vendor Warranty Expiry</label>
-                          <input type="date" value={product.vendor_warranty_expiry || ''} onChange={e => updateProduct(idx, 'vendor_warranty_expiry', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm" />
-                        </div>
                       </div>
                       <div className="mt-3">
                         <label className={lbl}>Issue Description <span className="text-red-500">*</span></label>
@@ -1667,10 +1649,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                       <div><p className="text-xs text-gray-500">Product Status</p><p className="font-medium">{p.product_status}</p></div>
                       <div><p className="text-xs text-gray-500">Warranty</p>
                         <p className="font-medium">{p.warranty_status}
-                          {p.warranty_expiry_date && <span className="text-xs text-gray-400 ml-1">· exp {p.warranty_expiry_date}</span>}
                         </p>
                       </div>
-                      {p.vendor_name && <div><p className="text-xs text-gray-500">Vendor</p><p className="font-medium">{p.vendor_name}{p.vendor_warranty_expiry && <span className="text-xs text-gray-400 ml-1">· vendor exp {p.vendor_warranty_expiry}</span>}</p></div>}
                       <div className="col-span-2"><p className="text-xs text-gray-500">Issue Description</p><p className="font-medium">{p.issue_description}</p></div>
                     </div>
                   </div>
