@@ -192,12 +192,33 @@ export default function App() {
     }
   }, [currentUser?.email, currentUserRole, notifMissing])
 
-  // Re-filter when user changes notification preferences
+  // Re-filter when user changes notification preferences (same-tab and cross-tab)
   useEffect(() => {
     const handler = () => loadNotifsRef.current?.()
     window.addEventListener('notif-system-prefs-changed', handler)
-    return () => window.removeEventListener('notif-system-prefs-changed', handler)
-  }, [])
+
+    // Cross-tab sync via BroadcastChannel (supported in all modern browsers)
+    let bc = null
+    if (typeof BroadcastChannel !== 'undefined') {
+      bc = new BroadcastChannel('notif_system_prefs')
+      bc.onmessage = (e) => {
+        if (e.data?.type === 'notif-system-prefs-changed') {
+          // Write the fresh prefs into localStorage so applyPrefs() picks them up
+          if (e.data.prefs && currentUser?.email) {
+            try {
+              localStorage.setItem(`notif_system_prefs_${currentUser.email}`, JSON.stringify(e.data.prefs))
+            } catch {}
+          }
+          loadNotifsRef.current?.()
+        }
+      }
+    }
+
+    return () => {
+      window.removeEventListener('notif-system-prefs-changed', handler)
+      try { bc?.close() } catch {}
+    }
+  }, [currentUser?.email])
 
   const markAllNotifsRead = useCallback(async () => {
     if (!currentUser?.email || !currentUserRole) return

@@ -139,11 +139,25 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
     catch { return {} }
   })
 
+  // BroadcastChannel for cross-tab pref sync (falls back to no-op if unsupported)
+  const notifChannel = useRef(
+    typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('notif_system_prefs') : null
+  )
+  useEffect(() => {
+    const ch = notifChannel.current
+    return () => { try { ch?.close() } catch {} }
+  }, [])
+
+  const broadcastPrefs = (prefs) => {
+    window.dispatchEvent(new Event('notif-system-prefs-changed'))
+    try { notifChannel.current?.postMessage({ type: 'notif-system-prefs-changed', prefs }) } catch {}
+  }
+
   const toggleSysNotif = (key) => {
     setSysNotifPrefs(prev => {
       const next = { ...prev, [key]: prev[key] === false ? true : false }
       localStorage.setItem(sysPrefsKey, JSON.stringify(next))
-      window.dispatchEvent(new Event('notif-system-prefs-changed'))
+      broadcastPrefs(next)
       return next
     })
   }
@@ -152,7 +166,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
     SYSTEM_NOTIF_CATEGORIES.forEach(c => c.items.forEach(i => { next[i.key] = enabled }))
     setSysNotifPrefs(next)
     localStorage.setItem(sysPrefsKey, JSON.stringify(next))
-    window.dispatchEvent(new Event('notif-system-prefs-changed'))
+    broadcastPrefs(next)
   }
 
   // Activity

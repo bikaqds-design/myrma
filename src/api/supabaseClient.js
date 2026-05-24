@@ -290,6 +290,14 @@ export const db = {
       return data?.[0]
     },
     async delete(id) {
+      // Prefer the atomic server-side RPC (migration: 20260524_customer_cascade_delete.sql).
+      // Falls back to sequential client-side deletes if the function hasn't been deployed yet.
+      const { error: rpcErr } = await supabase.rpc('delete_customer_cascade', { p_customer_id: id })
+      if (!rpcErr) return
+      if (rpcErr.code !== 'PGRST202') throw rpcErr  // PGRST202 = function not found
+
+      // Fallback: sequential deletes (non-atomic)
+      console.warn('delete_customer_cascade RPC not found — using sequential fallback. Run supabase/migrations/20260524_customer_cascade_delete.sql to enable atomic deletes.')
       const { data: tickets } = await supabase.from('rma_tickets').select('id').eq('customer_id', id)
       const ticketIds = (tickets || []).map(t => t.id)
       if (ticketIds.length) {
@@ -303,6 +311,13 @@ export const db = {
       if (error) throw error
     },
     async bulkDelete(ids) {
+      // Prefer the atomic server-side RPC (migration: 20260524_customer_cascade_delete.sql).
+      const { error: rpcErr } = await supabase.rpc('delete_customers_cascade', { p_customer_ids: ids })
+      if (!rpcErr) return
+      if (rpcErr.code !== 'PGRST202') throw rpcErr
+
+      // Fallback: sequential deletes (non-atomic)
+      console.warn('delete_customers_cascade RPC not found — using sequential fallback. Run supabase/migrations/20260524_customer_cascade_delete.sql to enable atomic deletes.')
       const { data: tickets } = await supabase.from('rma_tickets').select('id').in('customer_id', ids)
       const ticketIds = (tickets || []).map(t => t.id)
       if (ticketIds.length) {

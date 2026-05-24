@@ -1,5 +1,46 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase, db, storage, branding as brandingAPI } from '../api/supabaseClient'
+
+// ── Client-side brute-force protection ──────────────────────────────────────
+// Tracks "not found" attempts in localStorage. After MAX_FAILS failures within
+// WINDOW_MS the tracker is locked for LOCKOUT_MS. This is a UX-layer defence;
+// real rate-limiting requires a server-side edge function.
+const RL_KEY = 'tracker_rl'
+const MAX_FAILS = 10
+const WINDOW_MS  = 5  * 60 * 1000  // 5-minute sliding window
+const LOCKOUT_MS = 15 * 60 * 1000  // 15-minute lockout
+
+function getRLState() {
+  try { return JSON.parse(localStorage.getItem(RL_KEY) || '{}') } catch { return {} }
+}
+function saveRLState(s) {
+  try { localStorage.setItem(RL_KEY, JSON.stringify(s)) } catch {}
+}
+/** Returns { locked: true, secsLeft } or { locked: false } */
+function checkRateLimit() {
+  const s = getRLState()
+  if (s.lockedUntil && Date.now() < s.lockedUntil) {
+    return { locked: true, secsLeft: Math.ceil((s.lockedUntil - Date.now()) / 1000) }
+  }
+  return { locked: false }
+}
+/** Call when a "not found" response is received. Returns updated RL state. */
+function recordFailure() {
+  const now = Date.now()
+  let s = getRLState()
+  // Reset window if it has expired
+  if (!s.windowStart || now - s.windowStart > WINDOW_MS) {
+    s = { windowStart: now, count: 0 }
+  }
+  s.count = (s.count || 0) + 1
+  if (s.count >= MAX_FAILS) s.lockedUntil = now + LOCKOUT_MS
+  saveRLState(s)
+  return s
+}
+/** Clears the lockout (call on successful lookup). */
+function clearFailures() {
+  try { localStorage.removeItem(RL_KEY) } catch {}
+}
 
 const PRODUCT_STATUS_COLORS = {
   'Received':     'bg-blue-100 text-blue-700',
@@ -56,6 +97,10 @@ export default function RMATracker() {
   const [notFound, setNotFound] = useState(false)
   const [comments, setComments] = useState([])
   const [schemaOk, setSchemaOk] = useState(true)
+  // Rate-limit state
+  const [rlLocked, setRlLocked] = useState(() => checkRateLimit().locked)
+  const [rlSecsLeft, setRlSecsLeft] = useState(0)
+  const lastSearchRef = useRef(0)  // timestamp of last search attempt
 
   // New comment state
   const [authorName, setAuthorName] = useState('')
@@ -67,6 +112,20 @@ export default function RMATracker() {
   const [submitting, setSubmitting] = useState(false)
   const fileInputRef = useRef(null)
 
+  // Countdown ticker while rate-limit lockout is active
+  useEffect(() => {
+    const rl = checkRateLimit()
+    if (!rl.locked) { setRlLocked(false); return }
+    setRlLocked(true)
+    setRlSecsLeft(rl.secsLeft)
+    const id = setInterval(() => {
+      const updated = checkRateLimit()
+      if (!updated.locked) { setRlLocked(false); clearInterval(id) }
+      else setRlSecsLeft(updated.secsLeft)
+    }, 1000)
+    return () => clearInterval(id)
+  }, [rlLocked])
+
   useEffect(() => {
     brandingAPI.getBranding().then(setBranding).catch(() => {})
     // Pre-fill RMA from URL ?rma=...
@@ -75,23 +134,39 @@ export default function RMATracker() {
     if (rma) { setQuery(rma); handleSearch(rma) }
   }, [])
 
-  const handleSearch = async (overrideQuery) => {
+  const handleSearch = useCallback(async (overrideQuery) => {
     const q = (overrideQuery || query).trim()
     if (!q) return
+
+    // Enforce rate limit
+    const rl = checkRateLimit()
+    if (rl.locked) { setRlLocked(true); setRlSecsLeft(rl.secsLeft); return }
+
+    // Throttle: at least 800 ms between searches
+    const now = Date.now()
+    if (now - lastSearchRef.current < 800) return
+    lastSearchRef.current = now
+
     setLoading(true)
     setNotFound(false)
     setTicket(null)
     setComments([])
     try {
       const found = await db.rmaTracker.getTicketByRmaNumber(q)
-      if (!found) { setNotFound(true); return }
+      if (!found) {
+        setNotFound(true)
+        const s = recordFailure()
+        if (s.lockedUntil) { setRlLocked(true); setRlSecsLeft(Math.ceil((s.lockedUntil - Date.now()) / 1000)) }
+        return
+      }
+      clearFailures()
       setTicket(found)
       const c = await db.rmaTracker.getPublicComments(found.id)
       setComments(c)
       // Check if schema has new columns
       if (c.length > 0 && !('parent_comment_id' in c[0])) setSchemaOk(false)
     } finally { setLoading(false) }
-  }
+  }, [query])
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files)
@@ -173,16 +248,25 @@ export default function RMATracker() {
             onChange={e => setQuery(e.target.value)}
             placeholder="e.g. RMA-15052025-0001"
             className="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent shadow-sm"
+            disabled={rlLocked}
           />
-          <button type="submit" disabled={loading || !query.trim()}
+          <button type="submit" disabled={loading || !query.trim() || rlLocked}
             className="px-6 py-3 rounded-xl text-white text-sm font-semibold shadow-sm disabled:opacity-50 transition-colors hover:opacity-90"
             style={{ backgroundColor: primaryColor }}>
             {loading ? <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" /> : 'Track'}
           </button>
         </form>
 
+        {/* Rate-limit lockout banner */}
+        {rlLocked && (
+          <div className="max-w-xl mx-auto bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 text-center space-y-1">
+            <p className="font-semibold">Too many failed lookups</p>
+            <p>Please wait <span className="font-mono font-bold">{Math.floor(rlSecsLeft / 60)}:{String(rlSecsLeft % 60).padStart(2, '0')}</span> before trying again.</p>
+          </div>
+        )}
+
         {/* Not found */}
-        {notFound && (
+        {notFound && !rlLocked && (
           <div className="text-center py-10 space-y-2">
             <div className="text-5xl">🔍</div>
             <p className="text-gray-700 font-medium">No ticket found for <span className="font-mono text-indigo-600">"{query}"</span></p>
