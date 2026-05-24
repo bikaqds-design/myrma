@@ -7,7 +7,24 @@
       "PowerShell(cd d:\\\\myrma-app; $env:NODE_OPTIONS=\"--max-old-space-size=4096\"; npx vite build 2>&1 | Select-Object -Last 8)",
       "WebSearch",
       "PowerShell(cd d:\\\\myrma-app; $r = node node_modules/vite/bin/vite.js build 2>&1; $r | Where-Object { $_ -match 'error|Error|✗' } | Select-Object -First 20)",
-      "PowerShell(cd d:\\\\myrma-app; $env:NODE_OPTIONS='--max-old-space-size=4096'; npm run build 2>&1 | Select-Object -Last 15)"
+      "PowerShell(cd d:\\\\myrma-app; $env:NODE_OPTIONS='--max-old-space-size=4096'; npm run build 2>&1 | Select-Object -Last 15)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "PowerShell(git push origin main)",
+      "PowerShell(uv tool list)",
+      "PowerShell(uv tool install specify-cli --from \"git+https://github.com/github/spec-kit.git@v0.11.16\" -v 2>&1)",
+      "PowerShell(uv tool install specify-cli --from \"git+https://github.com/github/spec-kit.git@v0.11.16\" --python 3.12 2>&1)",
+      "Bash(gh api *)",
+      "WebFetch(domain:github.com)",
+      "PowerShell(uv tool install specify-cli --from \"git+https://github.com/github/spec-kit.git@v0.8.13\" 2>&1)",
+      "PowerShell(specify --version 2>&1)",
+      "PowerShell(specify --help 2>&1)",
+      "PowerShell($env:PYTHONUTF8=1; $env:NO_COLOR=1; specify 2>&1)",
+      "PowerShell($env:PYTHONUTF8=1; $env:NO_COLOR=1; specify help 2>&1)",
+      "PowerShell(claude --version 2>&1)",
+      "PowerShell($env:PYTHONUTF8=1; $env:NO_COLOR=1; specify init . --force --integration claude --no-git 2>&1)",
+      "Bash(git reset *)"
     ]
   }
 }
