@@ -85,7 +85,10 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
     if (pwError) { toast.error(pwError); return }
 
     try {
-      await db.userRoles.createRole(newUserEmail, newUserRole, newUserPassword)
+      // Create the Supabase Auth account first (requires service-role key)
+      await auth.adminCreateUser(newUserEmail, newUserPassword)
+      // Then record the role in user_roles
+      await db.userRoles.createRole(newUserEmail, newUserRole)
       db.userActivity.create(currentUserEmail, 'user_created', `Created user ${newUserEmail} with role ${newUserRole}`).catch(() => {})
       db.notifications.create({
         type: 'user_created', title: 'New User Added',
@@ -93,7 +96,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
         entityType: 'user', createdBy: currentUserEmail,
         targetRoles: ['super_admin'], targetEmails: []
       }).catch(() => {})
-      toast.success(`User created! Email: ${newUserEmail}`)
+      toast.success(`User created! ${newUserEmail} can now log in.`)
       db.auditLog.log(currentUserEmail, 'user_created', `Created user ${newUserEmail} with role ${newUserRole}`).catch(() => {})
       setNewUserEmail('')
       setNewUserRole('technician')

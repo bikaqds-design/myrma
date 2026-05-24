@@ -46,12 +46,26 @@ export const auth = {
   // Requires VITE_SUPABASE_SERVICE_KEY in .env (get it from Supabase Dashboard → Settings → API).
   async adminSetPassword(targetEmail, newPassword) {
     if (!supabaseAdmin) throw new Error('VITE_SUPABASE_SERVICE_KEY is not set in .env')
-    // Find the auth user ID by email
     const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
     if (listError) throw listError
     const target = users.find(u => u.email === targetEmail)
-    if (!target) throw new Error(`No auth user found for ${targetEmail}`)
+    if (!target) {
+      // No auth account exists yet — create one with the supplied password
+      const { error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email: targetEmail, password: newPassword, email_confirm: true
+      })
+      if (createError) throw createError
+      return
+    }
     const { error } = await supabaseAdmin.auth.admin.updateUserById(target.id, { password: newPassword })
+    if (error) throw error
+  },
+  // Create a Supabase Auth account for a new user (super_admin only).
+  async adminCreateUser(email, password) {
+    if (!supabaseAdmin) throw new Error('VITE_SUPABASE_SERVICE_KEY is not set in .env')
+    const { error } = await supabaseAdmin.auth.admin.createUser({
+      email, password, email_confirm: true
+    })
     if (error) throw error
   },
   async updateProfile(metadata) {
