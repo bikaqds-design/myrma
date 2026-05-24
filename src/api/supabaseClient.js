@@ -2,8 +2,15 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_KEY
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
+
+// Admin client — only created when VITE_SUPABASE_SERVICE_KEY is set.
+// Used exclusively for super_admin operations (e.g. direct password reset).
+const supabaseAdmin = supabaseServiceKey
+  ? createClient(supabaseUrl, supabaseServiceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+  : null
 
 export const auth = {
   async signUp(email, password) {
@@ -35,14 +42,17 @@ export const auth = {
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     if (error) throw error
   },
-  // Super-admin direct password set via Edge Function (uses service_role server-side)
+  // Super-admin direct password set using the service-role admin client.
+  // Requires VITE_SUPABASE_SERVICE_KEY in .env (get it from Supabase Dashboard → Settings → API).
   async adminSetPassword(targetEmail, newPassword) {
-    const { data, error } = await supabase.functions.invoke('admin-reset-password', {
-      body: { targetEmail, newPassword }
-    })
+    if (!supabaseAdmin) throw new Error('VITE_SUPABASE_SERVICE_KEY is not set in .env')
+    // Find the auth user ID by email
+    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
+    if (listError) throw listError
+    const target = users.find(u => u.email === targetEmail)
+    if (!target) throw new Error(`No auth user found for ${targetEmail}`)
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(target.id, { password: newPassword })
     if (error) throw error
-    if (data?.error) throw new Error(data.error)
-    return data
   },
   async updateProfile(metadata) {
     const { data, error } = await supabase.auth.updateUser({ data: metadata })
