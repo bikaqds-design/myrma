@@ -318,15 +318,24 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
 
   const handleResetPassword = async () => {
     try {
-      await auth.resetPassword(selectedUser.user_email)
-      toast.success(`Password reset email sent to ${selectedUser.user_email}`)
-      db.auditLog.log(currentUserEmail, 'user_password_reset', `Sent password reset email to ${selectedUser.user_email}`).catch(() => {})
+      if (currentUserRole === 'super_admin') {
+        // Direct password set via Edge Function (super_admin only)
+        if (resetPassword.length < 6) { toast.error('Password must be at least 6 characters'); return }
+        await auth.adminSetPassword(selectedUser.user_email, resetPassword)
+        toast.success(`Password updated for ${selectedUser.user_email}`)
+        db.auditLog.log(currentUserEmail, 'user_password_reset', `Directly reset password for ${selectedUser.user_email}`).catch(() => {})
+      } else {
+        // Admin: send a reset email link instead
+        await auth.resetPassword(selectedUser.user_email)
+        toast.success(`Password reset email sent to ${selectedUser.user_email}`)
+        db.auditLog.log(currentUserEmail, 'user_password_reset', `Sent password reset email to ${selectedUser.user_email}`).catch(() => {})
+      }
       setShowPasswordModal(false)
       setSelectedUser(null)
       setResetPassword('')
     } catch (error) {
-      console.error('Error sending reset email:', error)
-      toast.error('Failed to send reset email: ' + (error?.message || 'unknown error'))
+      console.error('Error resetting password:', error)
+      toast.error('Failed to reset password: ' + (error?.message || 'unknown error'))
     }
   }
 
@@ -497,6 +506,9 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       {showPasswordModal && selectedUser && (
         <PasswordResetModal
           user={selectedUser}
+          isSuperAdmin={currentUserRole === 'super_admin'}
+          password={resetPassword}
+          onPasswordChange={setResetPassword}
           onSubmit={handleResetPassword}
           onClose={() => {
             setShowPasswordModal(false)
@@ -713,42 +725,83 @@ function AddUserModal({ email, password, role, onEmailChange, onPasswordChange, 
   )
 }
 
-function PasswordResetModal({ user, onSubmit, onClose }) {
+function PasswordResetModal({ user, isSuperAdmin, password, onPasswordChange, onSubmit, onClose }) {
+  const [showPassword, setShowPassword] = useState(false)
+
+  const generatePassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*'
+    let pass = ''
+    for (let i = 0; i < 12; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length))
+    onPasswordChange(pass)
+    setShowPassword(true)
+    toast.success('Password generated! Copy it before closing.')
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
-            <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
+        <h2 className="text-xl font-bold text-gray-900 mb-1">Reset Password</h2>
+        <p className="text-sm text-gray-500 mb-4">User: <strong className="text-gray-800">{user.user_email}</strong></p>
+
+        {isSuperAdmin ? (
+          /* Super-admin: set password directly via Edge Function */
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">New Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => onPasswordChange(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent pr-10 text-sm"
+                  placeholder="Min 6 characters"
+                  minLength={6}
+                  autoFocus
+                />
+                <button type="button" onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPassword ? '🙈' : '👁️'}
+                </button>
+              </div>
+              <button type="button" onClick={generatePassword}
+                className="mt-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+                🎲 Generate Strong Password
+              </button>
+            </div>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <p className="text-sm text-yellow-800">⚠️ The user will be able to log in immediately with this new password.</p>
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button onClick={onClose}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button onClick={onSubmit} disabled={password.length < 6}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium">
+                Set Password
+              </button>
+            </div>
           </div>
-          <h2 className="text-xl font-bold text-gray-900">Send Password Reset</h2>
-        </div>
-
-        <p className="text-gray-600 mb-1">A password reset link will be emailed to:</p>
-        <p className="font-semibold text-gray-900 mb-4">{user.user_email}</p>
-
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-5">
-          <p className="text-sm text-blue-800">
-            The user will receive an email with a secure link to set their own new password. The link expires after 1 hour.
-          </p>
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onSubmit}
-            className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
-          >
-            Send Reset Email
-          </button>
-        </div>
+        ) : (
+          /* Admin: send a reset email link */
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-blue-800">
+                A password reset link will be emailed to the user. The link expires after 1 hour.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={onClose}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button onClick={onSubmit}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium">
+                Send Reset Email
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

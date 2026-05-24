@@ -35,6 +35,15 @@ export const auth = {
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     if (error) throw error
   },
+  // Super-admin direct password set via Edge Function (uses service_role server-side)
+  async adminSetPassword(targetEmail, newPassword) {
+    const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+      body: { targetEmail, newPassword }
+    })
+    if (error) throw error
+    if (data?.error) throw new Error(data.error)
+    return data
+  },
   async updateProfile(metadata) {
     const { data, error } = await supabase.auth.updateUser({ data: metadata })
     if (error) throw error
