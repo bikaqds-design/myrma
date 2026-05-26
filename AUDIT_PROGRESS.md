@@ -25,7 +25,7 @@
 | ✅ | H-2 | N+1 query in `markAllRead` | supabaseClient.js:820-836 | **Done 2026-05-26.** RPC `mark_notifications_read(p_email, p_ids)` — single batched UPDATE replaces N queries. |
 | ✅ | H-3 | Race condition in `parts.adjustQuantity` (read-modify-write) | supabaseClient.js:906-912 | **Done 2026-05-26.** RPC `adjust_part_quantity(p_id, p_delta)` — atomic `GREATEST(0, quantity + delta)` in one SQL statement. |
 | ☐ | H-4 | All list endpoints return full tables, no pagination | `rmaTickets.list`, `customers.list`, `products.list` | Server-side `.range(from, to)` + TanStack `useInfiniteQuery` |
-| ☐ | H-5 | Notifications filtered client-side after fetching all rows (privacy leak) | supabaseClient.js:796-808 | Move filter to SQL via RPC or RLS |
+| ✅ | H-5 | Notifications filtered client-side after fetching all rows (privacy leak) | supabaseClient.js:796-808 | **Done 2026-05-26.** Removed client-side filter — RLS policy `user_read_targeted` handles it server-side. `markRead` now uses `mark_notifications_read` RPC (atomic, no read-then-write). |
 | ☐ | H-6 | Backup export includes plaintext SMTP/SendGrid API keys | `backup` namespace | Strip `email_settings` secrets from export, or encrypt with user passphrase |
 | ☐ | H-7 | Webhook secret sent as plaintext header (no HMAC) | Webhook delivery | HMAC-SHA256 signature: `X-Signature-256: sha256=<hex>` |
 | ☐ | H-8 | Customer bulk delete fallback is non-atomic sequential | supabaseClient.js | Require RPC or wrap fallback in transactional Postgres function |
@@ -127,3 +127,6 @@ _Mark each item with ✅ and date as you complete it._
 - **2026-05-26** — ✅ CRIT-1: `admin-reset-password` Edge Function deployed. `VITE_SUPABASE_SERVICE_KEY` deleted from Vercel. App redeployed.
 - **2026-05-26** — ✅ CRIT-2: RLS migration applied via SQL editor (helper functions moved to public schema to bypass auth schema restriction). All 4 P0 critical findings resolved.
 - **2026-05-26** — Verified `npm run build` succeeds clean after all changes. Bundle contains zero references to `VITE_SUPABASE_SERVICE_KEY` or `supabaseAdmin`.
+- **2026-05-26** — ✅ H-2: `markAllRead` batched via `mark_notifications_read` RPC — N queries → 1.
+- **2026-05-26** — ✅ H-3: `adjustQuantity` replaced with atomic `adjust_part_quantity` RPC — no more race condition.
+- **2026-05-26** — ✅ H-5: client-side notification filter removed — RLS `user_read_targeted` policy handles it server-side. `markRead` now atomic via RPC.
