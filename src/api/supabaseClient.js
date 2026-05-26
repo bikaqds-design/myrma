@@ -807,18 +807,21 @@ export const db = {
 
     async markAllRead(email, role) {
       try {
+        // Fetch unread IDs only — single SELECT, filter client-side for role/email targeting
         const { data } = await supabase
           .from('notifications')
           .select('id, read_by, target_roles, target_emails')
           .order('created_date', { ascending: false })
           .limit(50)
-        const unread = (data || []).filter(n =>
-          (n.target_roles?.includes(role) || n.target_emails?.includes(email)) &&
-          !n.read_by?.includes(email)
-        )
-        await Promise.all(unread.map(n =>
-          supabase.from('notifications').update({ read_by: [...(n.read_by || []), email] }).eq('id', n.id)
-        ))
+        const ids = (data || [])
+          .filter(n =>
+            (n.target_roles?.includes(role) || n.target_emails?.includes(email)) &&
+            !n.read_by?.includes(email)
+          )
+          .map(n => n.id)
+        if (!ids.length) return
+        // Single batched UPDATE via RPC — replaces N individual updates (H-2 fix)
+        await supabase.rpc('mark_notifications_read', { p_email: email, p_ids: ids })
       } catch {}
     }
   },
@@ -891,9 +894,8 @@ export const db = {
       if (error) throw error
     },
     async adjustQuantity(id, delta) {
-      const { data: part } = await supabase.from('parts').select('quantity').eq('id', id).single()
-      const newQty = Math.max(0, (part?.quantity || 0) + delta)
-      const { data, error } = await supabase.from('parts').update({ quantity: newQty, updated_date: new Date().toISOString() }).eq('id', id).select()
+      // Atomic RPC — no read-modify-write race condition (H-3 fix)
+      const { data, error } = await supabase.rpc('adjust_part_quantity', { p_id: id, p_delta: delta })
       if (error) throw error
       return data?.[0]
     }
