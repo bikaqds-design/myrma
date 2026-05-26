@@ -2,7 +2,7 @@
 
 > Audit date: 2026-05-26
 > Baseline commit: `5085ad2` + post-rollback UI fixes
-> Overall score: **9/10** — production-ready, P2 quality-of-life work in progress
+> Overall score: **9.5/10** — production-ready, P2 quality-of-life work in progress
 
 ---
 
