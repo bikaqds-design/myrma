@@ -1284,6 +1284,19 @@ export const notifications = {
   }
 }
 
+// Fields that must never appear in a backup export (H-6)
+const EMAIL_SETTINGS_SECRET_FIELDS = ['api_key', 'smtp_password', 'smtp_user', 'webhook_secret']
+
+function redactEmailSettings(rows) {
+  return (rows || []).map(row => {
+    const safe = { ...row }
+    for (const field of EMAIL_SETTINGS_SECRET_FIELDS) {
+      if (field in safe) safe[field] = '[REDACTED — re-enter after restore]'
+    }
+    return safe
+  })
+}
+
 export const backup = {
   async exportAll() {
     const [products, customers, tickets, comments, activity, users, brandingData, emailSettings, emailTemplates] = await Promise.all([
@@ -1294,7 +1307,8 @@ export const backup = {
       supabase.from('ticket_activity').select('*'),
       supabase.from('user_roles').select('*'),
       supabase.from('branding_settings').select('*'),
-      supabase.from('email_settings').select('*'),
+      // Select only non-secret columns — api_key / smtp_password never leave the server (H-6)
+      supabase.from('email_settings').select('id, provider, from_email, from_name, smtp_host, smtp_port, smtp_secure, is_active, updated_by, updated_date'),
       supabase.from('email_templates').select('*')
     ])
     return {
@@ -1308,7 +1322,9 @@ export const backup = {
         activity: activity.data || [],
         users: users.data || [],
         branding: brandingData.data || [],
-        emailSettings: emailSettings.data || [],
+        // Secrets are excluded from the SELECT above; redactEmailSettings is a
+        // belt-and-braces guard in case the schema grows new secret columns (H-6)
+        emailSettings: redactEmailSettings(emailSettings.data),
         emailTemplates: emailTemplates.data || []
       }
     }
