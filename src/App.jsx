@@ -140,6 +140,8 @@ export default function App() {
 
   useEffect(() => {
     brandingAPI.getBranding().then(b => { if (b?.company_name) setCompanyName(b.company_name) }).catch(() => {})
+    // H-9: flush any audit events that failed to write in a previous session
+    db.auditLog.flushQueue().catch(() => {})
   }, [])
 
   useEffect(() => {

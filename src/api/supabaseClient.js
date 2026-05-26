@@ -70,6 +70,44 @@ export const auth = {
   }
 }
 
+// ─── Audit log helpers (H-9) ─────────────────────────────────────────────────
+// Resilient fire-and-log: retry once, then queue to localStorage.
+// Queued entries are flushed on next successful write or app start.
+const AUDIT_QUEUE_KEY = 'mrma_audit_queue'
+const AUDIT_QUEUE_MAX = 50
+
+function _auditEnqueue(entry) {
+  try {
+    const q = JSON.parse(localStorage.getItem(AUDIT_QUEUE_KEY) || '[]')
+    q.push(entry)
+    if (q.length > AUDIT_QUEUE_MAX) q.splice(0, q.length - AUDIT_QUEUE_MAX)
+    localStorage.setItem(AUDIT_QUEUE_KEY, JSON.stringify(q))
+  } catch {}
+}
+
+async function auditFlushQueue() {
+  try {
+    const q = JSON.parse(localStorage.getItem(AUDIT_QUEUE_KEY) || '[]')
+    if (!q.length) return
+    const { error } = await supabase.from('user_activity_log').insert(q)
+    if (!error) localStorage.removeItem(AUDIT_QUEUE_KEY)
+  } catch {}
+}
+
+async function auditInsert(entry) {
+  const doInsert = () => supabase.from('user_activity_log').insert([entry])
+  const { error } = await doInsert()
+  if (!error) { auditFlushQueue().catch(() => {}); return }
+  // First attempt failed — retry once after 600ms
+  await new Promise(r => setTimeout(r, 600))
+  const { error: retryErr } = await doInsert()
+  if (!retryErr) { auditFlushQueue().catch(() => {}); return }
+  // Both failed — queue for next session and surface to console
+  console.error('[auditLog] Failed to write audit event (queued):', entry.action_type, retryErr?.message)
+  _auditEnqueue(entry)
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const db = {
 
   userRoles: {
@@ -151,9 +189,13 @@ export const db = {
       } catch { return [] }
     },
     async create(email, actionType, actionDetails) {
-      const { data, error } = await supabase.from('user_activity_log').insert([{ user_email: email, action_type: actionType, action_details: actionDetails }]).select()
-      if (error) throw error
-      return data?.[0]
+      // H-9: use resilient auditInsert (retry + queue) instead of bare insert
+      await auditInsert({
+        user_email: email,
+        action_type: actionType,
+        action_details: actionDetails,
+        created_date: new Date().toISOString(),
+      })
     }
   },
 
@@ -579,14 +621,16 @@ export const db = {
 
   auditLog: {
     async log(userEmail, actionType, details) {
-      try {
-        await supabase.from('user_activity_log').insert([{
-          user_email: userEmail || 'system',
-          action_type: actionType,
-          action_details: details || null,
-          created_date: new Date().toISOString(),
-        }])
-      } catch {}
+      const entry = {
+        user_email: userEmail || 'system',
+        action_type: actionType,
+        action_details: details || null,
+        created_date: new Date().toISOString(),
+      }
+      await auditInsert(entry) // H-9: retry + queue on failure
+    },
+    async flushQueue() {
+      await auditFlushQueue()
     },
     async listAll(limit = 300) {
       try {
