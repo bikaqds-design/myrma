@@ -28,7 +28,7 @@
 | ✅ | H-5 | Notifications filtered client-side after fetching all rows (privacy leak) | supabaseClient.js:796-808 | **Done 2026-05-26.** Removed client-side filter — RLS policy `user_read_targeted` handles it server-side. `markRead` now uses `mark_notifications_read` RPC (atomic, no read-then-write). |
 | ✅ | H-6 | Backup export includes plaintext SMTP/SendGrid API keys | `backup` namespace | **Done 2026-05-26.** `exportAll()` now selects only non-secret columns from `email_settings`. `redactEmailSettings()` guard replaces known secret fields with `[REDACTED]` as belt-and-braces. User must re-enter API keys after restore. |
 | ✅ | H-7 | Webhook secret sent as plaintext header (no HMAC) | Webhook delivery | **Done 2026-05-26.** `dispatch()` now signs request body with `crypto.subtle` HMAC-SHA256, sends `X-Signature-256: sha256=<hex>`. Secret never travels over the wire. |
-| ☐ | H-8 | Customer bulk delete fallback is non-atomic sequential | supabaseClient.js | Require RPC or wrap fallback in transactional Postgres function |
+| ✅ | H-8 | Customer bulk delete fallback is non-atomic sequential | supabaseClient.js | **Done 2026-05-26.** Both `delete()` and `bulkDelete()` now call RPC exclusively — no sequential fallback. Throws clear error if RPC missing. |
 | ☐ | H-9 | Fire-and-forget audit logging silently drops events | App.jsx:274, 287 | Surface failures + retry; or DB-trigger-based audit log |
 | ✅ | A-2 | No global ErrorBoundary — any render error = white screen | [main.jsx](src/main.jsx) | **Done 2026-05-26.** Added [src/components/ErrorBoundary.jsx](src/components/ErrorBoundary.jsx) with fallback UI (reload/home), dev-only stack trace, dark mode support. Wraps `<App>` in main.jsx. |
 
@@ -153,3 +153,4 @@ _Mark each item with ✅ and date as you complete it._
 - **2026-05-26** — ✅ H-4: `.limit(500)` cap on `rmaTickets/customers/products.list()`. `listPaged()` added to all three. Warning banner in UI when cap is hit.
 - **2026-05-26** — ✅ H-6: backup export strips `api_key`/`smtp_password` from `email_settings`. `redactEmailSettings()` guard added.
 - **2026-05-26** — ✅ H-7: webhook dispatch uses HMAC-SHA256 (`X-Signature-256`) via `crypto.subtle`. Plaintext secret header removed.
+- **2026-05-26** — ✅ H-8: `customers.delete()` and `bulkDelete()` now use atomic RPC only. Non-atomic sequential fallback removed.
