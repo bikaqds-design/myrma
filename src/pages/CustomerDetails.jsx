@@ -577,7 +577,7 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                           {customer.address}
                         </div>
                       ) : (
-                        <p className="text-gray-400 text-sm">No address on file</p>
+                        <p className="text-gray-500 text-sm">No address on file</p>
                       )}
                     </div>
 
@@ -602,11 +602,11 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                               rel="noopener noreferrer"
                               className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-indigo-50 hover:border-indigo-300 transition-colors group"
                             >
-                              <svg className="w-5 h-5 text-gray-400 group-hover:text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-5 h-5 text-gray-500 group-hover:text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                               </svg>
                               <span className="text-sm text-gray-700 group-hover:text-indigo-700 flex-1 truncate">{att.name}</span>
-                              {att.size && <span className="text-xs text-gray-400 flex-shrink-0">{(att.size / 1024).toFixed(0)} KB</span>}
+                              {att.size && <span className="text-xs text-gray-500 flex-shrink-0">{(att.size / 1024).toFixed(0)} KB</span>}
                               <svg className="w-4 h-4 text-gray-300 group-hover:text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                               </svg>
@@ -859,7 +859,7 @@ function DetailRow({ icon, label, value }) {
       <span className="text-lg flex-shrink-0">{icon}</span>
       <div>
         <p className="text-xs font-medium text-gray-500">{label}</p>
-        <div className="text-sm text-gray-900">{value || <span className="text-gray-400">—</span>}</div>
+        <div className="text-sm text-gray-900">{value || <span className="text-gray-500">—</span>}</div>
       </div>
     </div>
   )

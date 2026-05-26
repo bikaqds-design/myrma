@@ -232,7 +232,7 @@ function SendAlert({ currentUserEmail }) {
             className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent resize-none"
             placeholder="Describe the alert in detail..."
           />
-          <p className="text-xs text-gray-400 text-right mt-1">{message.length}/500</p>
+          <p className="text-xs text-gray-500 text-right mt-1">{message.length}/500</p>
         </div>
 
         {/* Target */}
@@ -309,7 +309,7 @@ function HomeView({ onNavigate, currentUserEmail }) {
             <div key={c.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
               <div className={`text-2xl font-bold ${colorStat[c.color].split(' ')[1]}`}>{c.value}</div>
               <div className="text-sm font-medium text-gray-700 mt-0.5">{c.label}</div>
-              <div className="text-xs text-gray-400">{c.sub}</div>
+              <div className="text-xs text-gray-500">{c.sub}</div>
             </div>
           ))}
         </div>
@@ -425,7 +425,7 @@ function SLAPolicies({ currentUserEmail }) {
                     className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
                   />
                   <span className="text-sm text-gray-500">hours</span>
-                  <span className="text-xs text-gray-400 ml-2">({policy.hours >= 24 ? `${(policy.hours / 24).toFixed(1)}d` : `${policy.hours}h`})</span>
+                  <span className="text-xs text-gray-500 ml-2">({policy.hours >= 24 ? `${(policy.hours / 24).toFixed(1)}d` : `${policy.hours}h`})</span>
                 </div>
               </div>
             )
@@ -545,11 +545,11 @@ function AutomationRules({ currentUserEmail }) {
           {/* Conditions */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Conditions <span className="font-normal text-gray-400">(all must match)</span></label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Conditions <span className="font-normal text-gray-500">(all must match)</span></label>
               <button onClick={() => setEditing(r => ({ ...r, conditions: [...r.conditions, { field: 'priority', op: 'equals', value: 'Critical' }] }))}
                 className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">+ Add Condition</button>
             </div>
-            {editing.conditions.length === 0 && <p className="text-xs text-gray-400 italic">No conditions — rule runs on all tickets</p>}
+            {editing.conditions.length === 0 && <p className="text-xs text-gray-500 italic">No conditions — rule runs on all tickets</p>}
             {editing.conditions.map((c, i) => (
               <div key={i} className="flex gap-2 items-center mb-2">
                 <select value={c.field} onChange={e => setEditing(r => { const conds = [...r.conditions]; conds[i] = { ...conds[i], field: e.target.value }; return { ...r, conditions: conds } })}
@@ -572,7 +572,7 @@ function AutomationRules({ currentUserEmail }) {
           {/* Actions */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions <span className="font-normal text-gray-400">(executed in order)</span></label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions <span className="font-normal text-gray-500">(executed in order)</span></label>
               <button onClick={() => setEditing(r => ({ ...r, actions: [...r.actions, { type: 'create_notification', title: 'Alert', value: '' }] }))}
                 className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">+ Add Action</button>
             </div>
@@ -631,7 +631,7 @@ function AutomationRules({ currentUserEmail }) {
         <div className="bg-white rounded-xl border border-dashed border-gray-300 p-10 text-center">
           <svg className="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
           <p className="text-sm text-gray-500">No automation rules yet</p>
-          <p className="text-xs text-gray-400 mt-1">Rules automatically act on tickets when events occur</p>
+          <p className="text-xs text-gray-500 mt-1">Rules automatically act on tickets when events occur</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -774,7 +774,7 @@ function WebhooksConfig({ currentUserEmail }) {
       {hooks.length === 0 ? (
         <div className="bg-white rounded-xl border border-dashed border-gray-300 p-10 text-center">
           <p className="text-sm text-gray-500">No webhooks configured</p>
-          <p className="text-xs text-gray-400 mt-1">Push ticket events to Slack, QuickBooks, Zapier, and more</p>
+          <p className="text-xs text-gray-500 mt-1">Push ticket events to Slack, QuickBooks, Zapier, and more</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -786,7 +786,7 @@ function WebhooksConfig({ currentUserEmail }) {
                     <span className="font-semibold text-sm text-gray-900">{h.name}</span>
                     <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${h.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{h.enabled ? 'Active' : 'Disabled'}</span>
                   </div>
-                  <div className="text-xs text-gray-400 font-mono mt-0.5 truncate">{h.url}</div>
+                  <div className="text-xs text-gray-500 font-mono mt-0.5 truncate">{h.url}</div>
                   {h.events.length > 0 && <div className="flex flex-wrap gap-1 mt-1.5">{h.events.map(e => <span key={e} className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">{e}</span>)}</div>}
                 </div>
                 <div className="flex gap-2 flex-shrink-0">

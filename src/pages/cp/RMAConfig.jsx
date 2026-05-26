@@ -141,7 +141,7 @@ export default function RMAConfig({ currentUserEmail }) {
           </button>
         </div>
         {rules.length === 0 && (
-          <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
+          <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
             No auto-assignment rules. Click "Add Rule" to create one.
           </div>
         )}

@@ -59,7 +59,7 @@ function KpiCard({ label, value, icon, color = 'indigo', sub }) {
       <div className="min-w-0">
         <p className={`text-2xl font-bold ${c.val} leading-none`}>{value}</p>
         <p className="text-sm text-gray-500 mt-1">{label}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+        {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
       </div>
     </div>
   )
@@ -180,7 +180,7 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
           <option value="">All Technicians</option>
           {technicians.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
-        <span className="text-sm text-gray-400">{filtered.length} ticket{filtered.length !== 1 ? 's' : ''}</span>
+        <span className="text-sm text-gray-500">{filtered.length} ticket{filtered.length !== 1 ? 's' : ''}</span>
         <button onClick={handleExport} className="ml-auto flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
           Export CSV
@@ -190,7 +190,7 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
       {/* Table */}
       {filtered.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-          <p className="text-sm text-gray-400">No tickets match the selected filters</p>
+          <p className="text-sm text-gray-500">No tickets match the selected filters</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -231,7 +231,7 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
                       <td className="px-4 py-3 text-xs">
                         {hrs !== null
                           ? <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium">{hrs}h</span>
-                          : <span className="text-gray-400">Open</span>}
+                          : <span className="text-gray-500">Open</span>}
                       </td>
                     </tr>
                   )
@@ -304,7 +304,7 @@ function CustomersTab({ customers, tickets, formatDate }) {
 
       {enriched.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-          <p className="text-sm text-gray-400">No customer data in range</p>
+          <p className="text-sm text-gray-500">No customer data in range</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -413,7 +413,7 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate }
 
       {stats.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-          <p className="text-sm text-gray-400">No assigned tickets in range</p>
+          <p className="text-sm text-gray-500">No assigned tickets in range</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -473,7 +473,7 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
     pending:  'bg-yellow-100 text-yellow-700',
     overdue:  'bg-red-100 text-red-700',
     draft:    'bg-gray-100 text-gray-600',
-    voided:   'bg-gray-100 text-gray-400',
+    voided:   'bg-gray-100 text-gray-500',
   }
 
   const totalInvoiced = invoices.reduce((s, i) => s + (i.total_amount || i.amount || 0), 0)
@@ -521,7 +521,7 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
 
       {invoices.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-          <p className="text-sm text-gray-400">No invoices in the selected date range</p>
+          <p className="text-sm text-gray-500">No invoices in the selected date range</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -666,9 +666,9 @@ export default function Reports({ currentUserRole, currentUserEmail, currentUser
 
       {/* Date Range Bar */}
       <div className="flex items-center gap-3 flex-wrap bg-white rounded-xl border border-gray-200 px-4 py-3">
-        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
         <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} max={toDate} className={inputCls} />
-        <span className="text-gray-400 text-sm">to</span>
+        <span className="text-gray-500 text-sm">to</span>
         <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} min={fromDate} max={today} className={inputCls} />
         <div className="flex items-center gap-1.5 flex-wrap ml-2">
           <button onClick={() => applyPreset(7)}  className={presetCls(isPreset7 && toDate === today)}>Last 7 days</button>

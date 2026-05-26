@@ -63,7 +63,7 @@ export default function EmptyState({ preset, icon, title, description, action, a
         </div>
       )}
       <p className="text-sm font-semibold text-gray-700 mb-1">{resolvedTitle}</p>
-      {resolvedDescription && <p className="text-sm text-gray-400 max-w-xs">{resolvedDescription}</p>}
+      {resolvedDescription && <p className="text-sm text-gray-500 max-w-xs">{resolvedDescription}</p>}
       {action && actionLabel && (
         <Button className="mt-5" onClick={action}>{actionLabel}</Button>
       )}

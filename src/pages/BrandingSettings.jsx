@@ -477,7 +477,7 @@ function BrandingTab({ branding, setBranding, logoPreview, handleLogoChange, rem
                 onChange={e => setBranding({ ...branding, company_name: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                 placeholder="myRMA" />
-              <p className="text-xs text-gray-400 mt-1">Shown in sidebar and login page</p>
+              <p className="text-xs text-gray-500 mt-1">Shown in sidebar and login page</p>
             </div>
           </div>
 
@@ -507,7 +507,7 @@ function BrandingTab({ branding, setBranding, logoPreview, handleLogoChange, rem
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 <p className="text-sm text-gray-500 group-hover:text-indigo-600">Click to upload logo</p>
-                <p className="text-xs text-gray-400 mt-0.5">PNG, JPG, SVG · Max 2MB</p>
+                <p className="text-xs text-gray-500 mt-0.5">PNG, JPG, SVG · Max 2MB</p>
                 <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
               </label>
             )}
@@ -534,7 +534,7 @@ function BrandingTab({ branding, setBranding, logoPreview, handleLogoChange, rem
                     <input type="text" value={branding[key]}
                       onChange={e => setBranding({ ...branding, [key]: e.target.value })}
                       className="w-full text-xs font-mono text-gray-600 bg-transparent border-0 p-0 focus:outline-none focus:text-indigo-700" />
-                    <p className="text-xs text-gray-400">{hint}</p>
+                    <p className="text-xs text-gray-500">{hint}</p>
                   </div>
                 </div>
               ))}
@@ -551,7 +551,7 @@ function BrandingTab({ branding, setBranding, logoPreview, handleLogoChange, rem
                 {logoPreview && <img src={logoPreview} alt="" className="w-10 h-10 object-contain rounded-lg border border-gray-100" />}
                 <div>
                   <p className="font-bold text-lg leading-none" style={{ color: branding.primary_color }}>{branding.company_name || 'myRMA'}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">RMA Management</p>
+                  <p className="text-xs text-gray-500 mt-0.5">RMA Management</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -618,7 +618,7 @@ function BrandingTab({ branding, setBranding, logoPreview, handleLogoChange, rem
         </div>
 
         <BRow label="Sidebar Position" desc="Coming soon — left or right sidebar" border={false}>
-          <span className="text-xs px-2 py-1 bg-gray-100 text-gray-400 rounded-full font-medium">Soon</span>
+          <span className="text-xs px-2 py-1 bg-gray-100 text-gray-500 rounded-full font-medium">Soon</span>
         </BRow>
       </BCard>
 
@@ -766,7 +766,7 @@ function BrandingTab({ branding, setBranding, logoPreview, handleLogoChange, rem
         </div>
       </BCard>
 
-      <p className="text-xs text-gray-400 text-center pb-2">
+      <p className="text-xs text-gray-500 text-center pb-2">
         Display settings apply immediately for all users · Branding requires Save
       </p>
     </div>
@@ -1010,7 +1010,7 @@ function TemplateModal({ template, onTemplateChange, saving, onSave, onClose }) 
           <h2 className="text-2xl font-bold text-gray-900">Edit Email Template</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-500 hover:text-gray-600"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

@@ -113,7 +113,7 @@ export default function Integrations({ currentUserEmail }) {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {webhooks.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-12 text-center text-gray-400">No webhooks configured yet</td></tr>
+              <tr><td colSpan={5} className="px-4 py-12 text-center text-gray-500">No webhooks configured yet</td></tr>
             )}
             {webhooks.map(w => (
               <tr key={w.id} className="hover:bg-gray-50">
@@ -131,7 +131,7 @@ export default function Integrations({ currentUserEmail }) {
                 </td>
                 <td className="px-4 py-3 relative action-menu">
                   <button onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === w.id ? null : w.id) }}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                    className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors">
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
                   </button>
                   {openMenuId === w.id && (
@@ -142,7 +142,7 @@ export default function Integrations({ currentUserEmail }) {
                         {testing === w.id ? 'Sending...' : 'Test Webhook'}
                       </button>
                       <button onClick={() => { openEdit(w); setOpenMenuId(null) }} className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5">
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                         Edit
                       </button>
                       <button onClick={() => { handleDelete(w.id); setOpenMenuId(null) }} className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2.5">
@@ -164,7 +164,7 @@ export default function Integrations({ currentUserEmail }) {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-bold text-gray-900">{editing ? 'Edit Webhook' : 'Add Webhook'}</h3>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setShowModal(false)} className="text-gray-500 hover:text-gray-600">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -178,7 +178,7 @@ export default function Integrations({ currentUserEmail }) {
                 <input type="url" value={form.url} onChange={e => setForm({...form, url: e.target.value})} className={inp} placeholder="https://hooks.example.com/..." required />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Secret Key <span className="text-xs text-gray-400">(optional)</span></label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Secret Key <span className="text-xs text-gray-500">(optional)</span></label>
                 <input value={form.secret_key} onChange={e => setForm({...form, secret_key: e.target.value})} className={inp} placeholder="Sent as X-Webhook-Secret header" />
               </div>
               <div>

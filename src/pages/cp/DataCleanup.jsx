@@ -109,7 +109,7 @@ export default function DataCleanup() {
               <div>
                 <span className="text-2xl font-bold text-gray-900">{staleCompleted.length}</span>
                 <p className="text-sm text-gray-600">Stale completed tickets</p>
-                <p className="text-xs text-gray-400">Completed &gt;{completedDays} days ago</p>
+                <p className="text-xs text-gray-500">Completed &gt;{completedDays} days ago</p>
               </div>
               <span className="text-3xl">✅</span>
             </div>
@@ -123,7 +123,7 @@ export default function DataCleanup() {
               <div>
                 <span className="text-2xl font-bold text-gray-900">{staleCancelled.length}</span>
                 <p className="text-sm text-gray-600">Stale cancelled tickets</p>
-                <p className="text-xs text-gray-400">Cancelled &gt;{cancelledDays} days ago</p>
+                <p className="text-xs text-gray-500">Cancelled &gt;{cancelledDays} days ago</p>
               </div>
               <span className="text-3xl">❌</span>
             </div>
@@ -144,7 +144,7 @@ export default function DataCleanup() {
               <div>
                 <span className="text-2xl font-bold text-gray-900">{orphanCustomers.length}</span>
                 <p className="text-sm text-gray-600">Customers with no tickets</p>
-                <p className="text-xs text-gray-400">Have never submitted an RMA</p>
+                <p className="text-xs text-gray-500">Have never submitted an RMA</p>
               </div>
               <span className="text-3xl">👤</span>
             </div>
@@ -159,7 +159,7 @@ export default function DataCleanup() {
               <div>
                 <span className="text-2xl font-bold text-amber-600">{duplicateGroups.length}</span>
                 <p className="text-sm text-gray-600">Potential duplicate groups</p>
-                <p className="text-xs text-gray-400">Same company or contact name</p>
+                <p className="text-xs text-gray-500">Same company or contact name</p>
               </div>
               <span className="text-3xl">⚠️</span>
             </div>
@@ -179,7 +179,7 @@ export default function DataCleanup() {
             <h3 className="text-base font-semibold text-gray-900">
               {preview.type === 'orphans' ? `Customers with no tickets (${preview.items.length})` : `Duplicate groups (${preview.items.length})`}
             </h3>
-            <button onClick={() => setPreview(null)} className="text-gray-400 hover:text-gray-600">
+            <button onClick={() => setPreview(null)} className="text-gray-500 hover:text-gray-600">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
@@ -187,7 +187,7 @@ export default function DataCleanup() {
             {preview.type === 'orphans' && preview.items.map(c => (
               <div key={c.id} className="flex items-center justify-between py-1.5 px-3 rounded hover:bg-gray-50 text-sm">
                 <span className="text-gray-800">{c.company_name || c.contact_person}</span>
-                <span className="text-xs text-gray-400">{c.customer_type} · {c.customer_status}</span>
+                <span className="text-xs text-gray-500">{c.customer_type} · {c.customer_status}</span>
               </div>
             ))}
             {preview.type === 'duplicates' && preview.items.map((group, i) => (
@@ -199,7 +199,7 @@ export default function DataCleanup() {
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-400 mt-3">To merge or delete records, go to the Customers page and edit them directly.</p>
+          <p className="text-xs text-gray-500 mt-3">To merge or delete records, go to the Customers page and edit them directly.</p>
         </div>
       )}
     </div>

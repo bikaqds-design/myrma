@@ -127,7 +127,7 @@ function Pagination({ total, page, itemsPerPage, setItemsPerPage, onPage }) {
               if (i > 0 && p - arr[i-1] > 1) acc.push('…')
               acc.push(p); return acc
             }, []).map((p, i) => p === '…'
-              ? <span key={`e${i}`} className="px-1 text-gray-400 text-xs">…</span>
+              ? <span key={`e${i}`} className="px-1 text-gray-500 text-xs">…</span>
               : <button key={p} onClick={() => onPage(p)} className={`px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${p === page ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{p}</button>
             )}
             <button onClick={() => onPage(Math.min(pages, page + 1))} disabled={page === pages}
@@ -145,12 +145,12 @@ function StatusBadge({ status }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${m.cls}`}>{m.label}</span>
 }
 function ResolutionBadge({ type }) {
-  if (!type) return <span className="text-gray-400 text-xs">—</span>
+  if (!type) return <span className="text-gray-500 text-xs">—</span>
   const m = RESOLUTION_META[type] || { label: type, cls: 'bg-gray-100 text-gray-600' }
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${m.cls}`}>{m.label}</span>
 }
 function WarrantyBadge({ status }) {
-  if (!status) return <span className="text-gray-400 text-xs">—</span>
+  if (!status) return <span className="text-gray-500 text-xs">—</span>
   const cls = status === 'In Warranty' ? 'bg-green-100 text-green-700' : status === 'Unknown' ? 'bg-gray-100 text-gray-500' : 'bg-red-100 text-red-700'
   return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>{status}</span>
 }
@@ -268,14 +268,14 @@ function ExportMenu({ units, batches, warehouses, brandMap }) {
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl border border-gray-200 shadow-xl z-30 py-1 overflow-hidden">
-          <p className="px-3 py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Export as CSV</p>
+          <p className="px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Export as CSV</p>
           {options.map(o => (
             <button key={o.label} onClick={o.fn}
               className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-indigo-50 transition-colors text-left">
               <svg className="w-4 h-4 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={o.icon}/></svg>
               <div>
                 <div className="text-sm font-medium text-gray-800">{o.label}</div>
-                <div className="text-[11px] text-gray-400">{o.sub}</div>
+                <div className="text-[11px] text-gray-500">{o.sub}</div>
               </div>
             </button>
           ))}
@@ -425,7 +425,7 @@ function ProductStatusTab({ products, showTypeCol, brandMap = {}, onNavigateToTi
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search product, RMA#, customer, serial…"
             className="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-          <svg className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <svg className="w-4 h-4 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
         </div>
         <button onClick={() => setShowFilters(f => !f)}
           className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm transition-colors ${showFilters || activeFilterCount > 0 ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
@@ -522,7 +522,7 @@ function ProductStatusTab({ products, showTypeCol, brandMap = {}, onNavigateToTi
 
       {filtered.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-          <p className="text-gray-400 text-sm">{search || activeFilterCount ? 'No products match your filters' : 'No products in this category'}</p>
+          <p className="text-gray-500 text-sm">{search || activeFilterCount ? 'No products match your filters' : 'No products in this category'}</p>
         </div>
       ) : (
         <>
@@ -539,7 +539,7 @@ function ProductStatusTab({ products, showTypeCol, brandMap = {}, onNavigateToTi
                         )}
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
                     </th>
-                    <th className="w-8 px-2 py-2 text-center text-gray-400 font-semibold border-b border-r border-gray-200">#</th>
+                    <th className="w-8 px-2 py-2 text-center text-gray-500 font-semibold border-b border-r border-gray-200">#</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600 border-b border-r border-gray-200">
                       <InvSortBtn label="Product" sortKey="product_name" activeSortKey={sortKey} activeSortDir={sortDir} onSort={handleSort}/>
                     </th>
@@ -569,10 +569,10 @@ function ProductStatusTab({ products, showTypeCol, brandMap = {}, onNavigateToTi
                             <input type="checkbox" checked={isSelected} onChange={() => {}}
                               className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"/>
                           </td>
-                          <td className="px-2 py-1.5 text-center text-gray-400 tabular-nums border-r border-gray-100">{startIndex + idx + 1}</td>
+                          <td className="px-2 py-1.5 text-center text-gray-500 tabular-nums border-r border-gray-100">{startIndex + idx + 1}</td>
                           <td className="px-3 py-1.5 font-medium text-gray-900 border-r border-gray-100">
                             <div className="flex items-center gap-1.5">
-                              <svg className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
+                              <svg className={`w-3 h-3 text-gray-500 flex-shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
                               {g.product_name}
                             </div>
                           </td>
@@ -598,7 +598,7 @@ function ProductStatusTab({ products, showTypeCol, brandMap = {}, onNavigateToTi
                               </div>
                             </td>
                           )}
-                          <td className="px-3 py-1.5 text-gray-400 whitespace-nowrap">
+                          <td className="px-3 py-1.5 text-gray-500 whitespace-nowrap">
                             {fmtDate(g.latest_date)}
                           </td>
                         </tr>
@@ -616,8 +616,8 @@ function ProductStatusTab({ products, showTypeCol, brandMap = {}, onNavigateToTi
                                   : <span className="text-gray-300">—</span>}
                                 <span className="text-gray-700">{p.customer_name || '—'}</span>
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${TICKET_STATUS_CLS[p.ticket_status] || 'bg-gray-100 text-gray-500'}`}>{p.ticket_status || '—'}</span>
-                                {p.assigned_technician && <span className="text-gray-400">{p.assigned_technician}</span>}
-                                <span className="text-gray-400">{fmtDate(p.status_date || p.created_date)}</span>
+                                {p.assigned_technician && <span className="text-gray-500">{p.assigned_technician}</span>}
+                                <span className="text-gray-500">{fmtDate(p.status_date || p.created_date)}</span>
                               </div>
                             </td>
                           </tr>
@@ -827,13 +827,13 @@ function OverviewTab({ stats, units, brands, brandMap, onNavigate }) {
     <div className="space-y-4">
       {Object.keys(perBrand).length === 0 ? (
         <div className="text-center py-20 bg-white rounded-lg border border-gray-200">
-          <p className="text-gray-400 text-sm">No inventory data yet</p>
+          <p className="text-gray-500 text-sm">No inventory data yet</p>
         </div>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-gray-700">Stock by Brand</h3>
-            <span className="text-xs text-gray-400">{units.length} total units</span>
+            <span className="text-xs text-gray-500">{units.length} total units</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -917,7 +917,7 @@ function ByProductTab({ groups, brands, warehouses, canResolve, canTransfer, use
             <input ref={searchRef} type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search by product name or brand... (Press / to focus)"
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent" />
-            <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <svg className="w-5 h-5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
           </div>
           <button onClick={() => setShowFilters(f => !f)}
             className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || activeFilterCount > 0 ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
@@ -977,11 +977,11 @@ function ByProductTab({ groups, brands, warehouses, canResolve, canTransfer, use
       {filtered.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-lg border border-gray-200 flex flex-col items-center gap-3">
           <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+            <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
           </div>
           <div>
             <p className="font-semibold text-gray-600 text-sm">No products found</p>
-            <p className="text-xs text-gray-400 mt-0.5">{search || filterBrand || filterStatus || filterProduct ? 'Try adjusting your filters' : 'Products appear here once inventory units are added via RMA tickets'}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{search || filterBrand || filterStatus || filterProduct ? 'Try adjusting your filters' : 'Products appear here once inventory units are added via RMA tickets'}</p>
           </div>
         </div>
       ) : (
@@ -994,7 +994,7 @@ function ByProductTab({ groups, brands, warehouses, canResolve, canTransfer, use
                     <th className="w-9 px-3 py-2 border-b border-r border-gray-200 text-center">
                       <input type="checkbox" checked={paginated.length > 0 && selectedRows.filter(r => paginated.some(g => g.product_name === r)).length === paginated.length} onChange={e => setSelectedRows(e.target.checked ? paginated.map(g => g.product_name) : [])} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
                     </th>
-                    <th className="w-8 px-2 py-2 text-center text-gray-400 font-semibold border-b border-r border-gray-200">#</th>
+                    <th className="w-8 px-2 py-2 text-center text-gray-500 font-semibold border-b border-r border-gray-200">#</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600 border-b border-r border-gray-200">Brand</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600 border-b border-r border-gray-200">Product</th>
                     <th className="px-3 py-2 text-center font-semibold text-gray-600 border-b border-r border-gray-200 whitespace-nowrap">Active RMA</th>
@@ -1011,7 +1011,7 @@ function ByProductTab({ groups, brands, warehouses, canResolve, canTransfer, use
                     return (
                     <tr key={g.product_name} className={`${rowBg} border-b border-gray-100 transition-colors cursor-pointer hover:bg-indigo-50/40`} onClick={() => setSelectedProduct(g)}>
                       <td className="px-3 py-1.5 text-center border-r border-gray-100" onClick={e => { e.stopPropagation(); setSelectedRows(r => r.includes(g.product_name) ? r.filter(x => x !== g.product_name) : [...r, g.product_name]) }}><input type="checkbox" checked={isSelected} onChange={() => {}} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" /></td>
-                      <td className="px-2 py-1.5 text-center text-gray-400 tabular-nums border-r border-gray-100">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
+                      <td className="px-2 py-1.5 text-center text-gray-500 tabular-nums border-r border-gray-100">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                       <td className="px-3 py-1.5 border-r border-gray-100 text-gray-600 font-medium">{g.brand||'—'}</td>
                       <td className="px-3 py-1.5 font-semibold text-gray-900 border-r border-gray-100">{g.product_name}</td>
                       <td className="px-3 py-1.5 text-center border-r border-gray-100">{g.active_rma > 0 ? <span className="px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700">{g.active_rma}</span> : <span className="text-gray-300">—</span>}</td>
@@ -1129,7 +1129,7 @@ function CompanyStockTab({ groups, brands, warehouses, userEmail, canManageBatch
       </div>
       <div>
         <p className="font-semibold text-gray-600 text-sm">No company stock yet</p>
-        <p className="text-xs text-gray-400 mt-0.5">Units resolved as "Company Stock" from RMA tickets will appear here</p>
+        <p className="text-xs text-gray-500 mt-0.5">Units resolved as "Company Stock" from RMA tickets will appear here</p>
       </div>
     </div>
   )
@@ -1143,7 +1143,7 @@ function CompanyStockTab({ groups, brands, warehouses, userEmail, canManageBatch
             <input ref={searchRef} type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search by product name or brand... (Press / to focus)"
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent" />
-            <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <svg className="w-5 h-5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
           </div>
           <button onClick={() => setShowFilters(f => !f)}
             className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || activeFilterCount > 0 ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
@@ -1225,7 +1225,7 @@ function CompanyStockTab({ groups, brands, warehouses, userEmail, canManageBatch
         </div>
       )}
 
-      {filtered.length === 0 ? <div className="text-center py-16 bg-white rounded-lg border border-gray-200"><p className="text-gray-400 text-sm">No products match filter</p></div> : (
+      {filtered.length === 0 ? <div className="text-center py-16 bg-white rounded-lg border border-gray-200"><p className="text-gray-500 text-sm">No products match filter</p></div> : (
         <>
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
@@ -1233,7 +1233,7 @@ function CompanyStockTab({ groups, brands, warehouses, userEmail, canManageBatch
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-4 py-3 w-10"><input type="checkbox" checked={paginated.length > 0 && selectedRows.filter(r => paginated.some(g => g.product_name === r)).length === paginated.length} onChange={e => setSelectedRows(e.target.checked ? paginated.map(g => g.product_name) : [])} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" /></th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider w-10">#</th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-10">#</th>
                     {['Brand','Product','Replacement','Credit Note','Other','Total',''].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>)}
                   </tr>
                 </thead>
@@ -1241,7 +1241,7 @@ function CompanyStockTab({ groups, brands, warehouses, userEmail, canManageBatch
                   {paginated.map((g, idx) => { const other = g.units.length - g.replacement - g.credit_note; return (
                     <tr key={g.product_name} className={`hover:bg-amber-50/30 transition-colors cursor-pointer ${selectedRows.includes(g.product_name) ? 'bg-amber-50/50' : ''}`} onClick={() => setSelectedProduct(g)}>
                       <td className="px-4 py-3" onClick={e => { e.stopPropagation(); setSelectedRows(r => r.includes(g.product_name) ? r.filter(x => x !== g.product_name) : [...r, g.product_name]) }}><input type="checkbox" checked={selectedRows.includes(g.product_name)} onChange={() => {}} className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" /></td>
-                      <td className="px-3 py-3 text-xs text-gray-400 tabular-nums">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
+                      <td className="px-3 py-3 text-xs text-gray-500 tabular-nums">{(currentPage - 1) * itemsPerPage + idx + 1}</td>
                       <td className="px-4 py-3"><div className="flex items-center gap-2"><BrandAvatar name={g.brand||'?'} size="sm"/><span className="text-xs text-gray-500 font-medium">{g.brand||'—'}</span></div></td>
                       <td className="px-4 py-3 text-gray-900 font-semibold">{g.product_name}</td>
                       <td className="px-4 py-3">{g.replacement > 0 ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">{g.replacement}</span> : <span className="text-gray-300 text-xs">—</span>}</td>
@@ -1285,22 +1285,22 @@ function TicketPreviewModal({ rmaNumber, onClose, onOpenFull }) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <div>
-            <p className="text-xs text-gray-400 font-mono mb-0.5">{rmaNumber}</p>
+            <p className="text-xs text-gray-500 font-mono mb-0.5">{rmaNumber}</p>
             <h3 className="text-base font-bold text-gray-900">{loading ? 'Loading…' : ticket?.products?.[0]?.product_name || 'Ticket Details'}</h3>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-600">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
         <div className="p-5">
           {loading && (
-            <div className="flex items-center justify-center py-8 gap-2 text-gray-400">
+            <div className="flex items-center justify-center py-8 gap-2 text-gray-500">
               <Spinner size="sm" />
               <span className="text-sm">Loading ticket…</span>
             </div>
           )}
           {!loading && !ticket && (
-            <p className="text-center text-sm text-gray-400 py-6">Ticket not found for {rmaNumber}</p>
+            <p className="text-center text-sm text-gray-500 py-6">Ticket not found for {rmaNumber}</p>
           )}
           {!loading && ticket && (
             <div className="space-y-3">
@@ -1309,10 +1309,10 @@ function TicketPreviewModal({ rmaNumber, onClose, onOpenFull }) {
                 {ticket.priority      && <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${priorityColor[ticket.priority]||'bg-gray-100 text-gray-500'}`}>{ticket.priority}</span>}
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <div><p className="text-xs text-gray-400">Customer</p><p className="font-medium text-gray-800">{ticket.customer_name||'—'}</p></div>
-                <div><p className="text-xs text-gray-400">Assigned To</p><p className="font-medium text-gray-800">{ticket.assigned_to||'—'}</p></div>
-                <div><p className="text-xs text-gray-400">Created</p><p className="font-medium text-gray-800">{fmt(ticket.created_date)}</p></div>
-                <div><p className="text-xs text-gray-400">Due Date</p><p className="font-medium text-gray-800">{fmt(ticket.due_date)}</p></div>
+                <div><p className="text-xs text-gray-500">Customer</p><p className="font-medium text-gray-800">{ticket.customer_name||'—'}</p></div>
+                <div><p className="text-xs text-gray-500">Assigned To</p><p className="font-medium text-gray-800">{ticket.assigned_to||'—'}</p></div>
+                <div><p className="text-xs text-gray-500">Created</p><p className="font-medium text-gray-800">{fmt(ticket.created_date)}</p></div>
+                <div><p className="text-xs text-gray-500">Due Date</p><p className="font-medium text-gray-800">{fmt(ticket.due_date)}</p></div>
               </div>
               {ticket.general_description && (
                 <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-700 line-clamp-3">{ticket.general_description}</div>
@@ -1406,7 +1406,7 @@ function ProductDetailModal({ group, mode, warehouses, canManageBatches, canTran
                 Transfer{selected.length > 0 ? ` (${selected.length})` : ' All'}
               </button>
             )}
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-600">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
@@ -1440,7 +1440,7 @@ function ProductDetailModal({ group, mode, warehouses, canManageBatches, canTran
 
         {/* Units table */}
         <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-          {loadingTickets && <div className="flex items-center gap-2 text-sm text-gray-400 mb-2"><Spinner size="sm" />Loading RMA details...</div>}
+          {loadingTickets && <div className="flex items-center gap-2 text-sm text-gray-500 mb-2"><Spinner size="sm" />Loading RMA details...</div>}
 
           <div className="rounded-xl border border-gray-200 overflow-hidden">
             {isStock && stockUnits.length>0 && <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">Pending Batch ({stockUnits.length})</div>}
@@ -1476,7 +1476,7 @@ function ProductDetailModal({ group, mode, warehouses, canManageBatches, canTran
                     <td className="px-4 py-3"><span className={`text-xs font-semibold ${age>30?'text-red-600':age>14?'text-amber-600':'text-gray-500'}`}>{age}d</span></td>
                   </tr>
                 )})}
-                {unitRows.length===0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400 text-sm">No units</td></tr>}
+                {unitRows.length===0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-500 text-sm">No units</td></tr>}
               </tbody>
             </table>
           </div>
@@ -1666,7 +1666,7 @@ function WarehousesTab({ units, warehouses, whMissing, brands, brandMap, userEma
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm text-gray-500">
           {warehouses.length} warehouse{warehouses.length !== 1 ? 's' : ''}
-          {warehouses.length > 0 && <span className="ml-2 text-gray-400">· {warehouses.reduce((n, w) => n + whUnits(w.id).length, 0)} total units</span>}
+          {warehouses.length > 0 && <span className="ml-2 text-gray-500">· {warehouses.reduce((n, w) => n + whUnits(w.id).length, 0)} total units</span>}
         </p>
         {canManage && !whMissing && (
           <button onClick={() => setShowCreate(true)}
@@ -1679,14 +1679,14 @@ function WarehousesTab({ units, warehouses, whMissing, brands, brandMap, userEma
 
       {/* Warehouse table */}
       {whMissing ? (
-        <div className="rounded-2xl border border-dashed border-gray-300 p-8 text-center text-gray-400 text-sm">Run the SQL above to enable custom warehouses</div>
+        <div className="rounded-2xl border border-dashed border-gray-300 p-8 text-center text-gray-500 text-sm">Run the SQL above to enable custom warehouses</div>
       ) : warehouses.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-300 p-16 text-center space-y-3">
           <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto">
-            <svg className="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            <svg className="w-7 h-7 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
           </div>
           <p className="text-gray-500 font-medium text-sm">No warehouses yet</p>
-          <p className="text-gray-400 text-xs">Create a warehouse to start transferring RMA stock units</p>
+          <p className="text-gray-500 text-xs">Create a warehouse to start transferring RMA stock units</p>
           {canManage && (
             <button onClick={() => setShowCreate(true)}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 mt-1">
@@ -1722,23 +1722,23 @@ function WarehousesTab({ units, warehouses, whMissing, brands, brandMap, userEma
                       </td>
                       <td className="px-4 py-2.5 border-r border-gray-100 font-medium text-gray-900">{wh.name}</td>
                       <td className="px-4 py-2.5 border-r border-gray-100 text-gray-500">{wh.location || '—'}</td>
-                      <td className="px-4 py-2.5 border-r border-gray-100 text-gray-400 max-w-[200px] truncate">{wh.description || '—'}</td>
+                      <td className="px-4 py-2.5 border-r border-gray-100 text-gray-500 max-w-[200px] truncate">{wh.description || '—'}</td>
                       <td className="px-4 py-2.5 border-r border-gray-100 text-center">
-                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${cnt > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-400'}`}>{cnt}</span>
+                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${cnt > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}>{cnt}</span>
                       </td>
                       <td className="px-4 py-2.5 border-r border-gray-100 text-center">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${wh.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                           {wh.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 border-r border-gray-100 text-gray-400">{wh.created_date ? new Date(wh.created_date).toLocaleDateString() : '—'}</td>
+                      <td className="px-4 py-2.5 border-r border-gray-100 text-gray-500">{wh.created_date ? new Date(wh.created_date).toLocaleDateString() : '—'}</td>
                       {canManage && (
                         <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center gap-1 justify-center">
-                            <button onClick={() => setEditingWh(wh)} className="p-1 text-gray-400 hover:text-indigo-600 rounded hover:bg-indigo-50 transition-colors">
+                            <button onClick={() => setEditingWh(wh)} className="p-1 text-gray-500 hover:text-indigo-600 rounded hover:bg-indigo-50 transition-colors">
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                             </button>
-                            <button onClick={() => handleDelete(wh)} disabled={deleting === wh.id} className="p-1 text-gray-400 hover:text-red-600 rounded hover:bg-red-50 transition-colors disabled:opacity-40">
+                            <button onClick={() => handleDelete(wh)} disabled={deleting === wh.id} className="p-1 text-gray-500 hover:text-red-600 rounded hover:bg-red-50 transition-colors disabled:opacity-40">
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             </button>
                           </div>
@@ -1845,7 +1845,7 @@ function WarehouseDetailModal({ wh, units, warehouses, brandMap, canTransfer, us
               <h3 className="text-lg font-bold text-gray-900">{wh.name}</h3>
               {!wh.isSystem && wh.is_active === false && <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">Inactive</span>}
             </div>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-gray-500 mt-1">
               {units.length} unit{units.length !== 1 ? 's' : ''}
               {wh.location ? ` · ${wh.location}` : ''}
               {wh.description ? ` · ${wh.description}` : ''}
@@ -1871,7 +1871,7 @@ function WarehouseDetailModal({ wh, units, warehouses, brandMap, canTransfer, us
                 Transfer{selected.length > 0 ? ` (${selected.length})` : ''}
               </button>
             )}
-            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+            <button onClick={onClose} className="p-1.5 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
@@ -1883,14 +1883,14 @@ function WarehouseDetailModal({ wh, units, warehouses, brandMap, canTransfer, us
             <input value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search product, serial, RMA#, customer…"
               className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"/>
-            <svg className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <svg className="w-4 h-4 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
           </div>
         </div>
 
         {/* Table */}
         <div className="flex-1 overflow-auto">
           {filtered.length === 0 ? (
-            <div className="text-center py-16 text-gray-400 text-sm">{search ? 'No units match your search' : 'No units in this warehouse'}</div>
+            <div className="text-center py-16 text-gray-500 text-sm">{search ? 'No units match your search' : 'No units in this warehouse'}</div>
           ) : (
             <table className="w-full text-xs border-collapse">
               <thead className="bg-gray-100 sticky top-0 z-10">
@@ -1900,7 +1900,7 @@ function WarehouseDetailModal({ wh, units, warehouses, brandMap, canTransfer, us
                       <input type="checkbox" checked={filtered.length > 0 && selected.length === filtered.length} onChange={toggleAll} className="rounded border-gray-300 text-indigo-600 cursor-pointer"/>
                     </th>
                   )}
-                  <th className="w-8 px-2 py-2.5 border-b border-r border-gray-200 text-center text-gray-400 font-semibold">#</th>
+                  <th className="w-8 px-2 py-2.5 border-b border-r border-gray-200 text-center text-gray-500 font-semibold">#</th>
                   <th className="px-3 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200 min-w-[140px]">Product</th>
                   <th className="px-3 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200 w-24">Brand</th>
                   <th className="px-3 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200 w-28">Serial #</th>
@@ -1928,7 +1928,7 @@ function WarehouseDetailModal({ wh, units, warehouses, brandMap, canTransfer, us
                           <input type="checkbox" checked={isSelected} onChange={() => {}} className="rounded border-gray-300 text-indigo-600 cursor-pointer"/>
                         </td>
                       )}
-                      <td className="px-2 py-1.5 text-center text-gray-400 tabular-nums border-r border-gray-100">{idx + 1}</td>
+                      <td className="px-2 py-1.5 text-center text-gray-500 tabular-nums border-r border-gray-100">{idx + 1}</td>
                       <td className="px-3 py-1.5 font-medium text-gray-900 border-r border-gray-100 max-w-[160px] truncate" title={u.product_name || ''}>{u.product_name || '—'}</td>
                       <td className="px-3 py-1.5 text-gray-500 border-r border-gray-100">{brandMap[u.product_name] || '—'}</td>
                       <td className="px-3 py-1.5 font-mono text-gray-600 border-r border-gray-100">{u.serial_number || '—'}</td>
@@ -1942,7 +1942,7 @@ function WarehouseDetailModal({ wh, units, warehouses, brandMap, canTransfer, us
                           ? <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${TICKET_STATUS_CLS[tk.ticket_status] || 'bg-gray-100 text-gray-500'}`}>{tk.ticket_status}</span>
                           : <span className="text-gray-300">—</span>}
                       </td>
-                      <td className="px-3 py-1.5 text-gray-400 border-r border-gray-100">{fmtDate(u.created_date)}</td>
+                      <td className="px-3 py-1.5 text-gray-500 border-r border-gray-100">{fmtDate(u.created_date)}</td>
                       <td className="px-3 py-1.5 text-center">
                         <span className={`text-xs font-semibold ${age > 30 ? 'text-red-600' : age > 14 ? 'text-amber-600' : 'text-gray-500'}`}>{age}d</span>
                       </td>
@@ -1956,7 +1956,7 @@ function WarehouseDetailModal({ wh, units, warehouses, brandMap, canTransfer, us
 
         {/* Footer */}
         <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-gray-500">
             {search ? `${filtered.length} of ${units.length} units` : `${units.length} unit${units.length !== 1 ? 's' : ''} total`}
             {selected.length > 0 && <span className="ml-2 text-indigo-600 font-medium">{selected.length} selected</span>}
           </span>
@@ -2010,7 +2010,7 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
         <div className="p-6 border-b border-gray-100">
           <h3 className="text-lg font-semibold text-gray-900">{isEdit ? 'Edit Warehouse' : 'New Warehouse'}</h3>
-          {!isEdit && <p className="text-xs text-gray-400 mt-0.5">Auto-assigned code: <span className="font-mono font-semibold text-indigo-600">{autoCode}</span></p>}
+          {!isEdit && <p className="text-xs text-gray-500 mt-0.5">Auto-assigned code: <span className="font-mono font-semibold text-indigo-600">{autoCode}</span></p>}
         </div>
         <div className="p-6 space-y-4">
           <div>
@@ -2090,7 +2090,7 @@ function TransferModal({ units: unitIds, warehouses, currentWarehouseId, onConfi
             </label>
           ))}
           {warehouses.filter(w => w.is_active && w.id !== currentWarehouseId).length === 0 && warehouses.length === 0 && (
-            <p className="text-sm text-gray-400 text-center py-4">No custom warehouses available. Create one in the Warehouses tab.</p>
+            <p className="text-sm text-gray-500 text-center py-4">No custom warehouses available. Create one in the Warehouses tab.</p>
           )}
         </div>
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
@@ -2133,7 +2133,7 @@ function ManufacturerTab({ batches, units, brands, userEmail, canManageBatches, 
               <button key={brand.id} onClick={()=>setSelectedBrand(isA?null:brand.brand_name)}
                 className={`rounded-2xl border p-4 text-left transition-all ${isA?'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-300':'border-gray-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/40'}`}>
                 <BrandAvatar name={brand.brand_name} size="md"/>
-                <div className="mt-3"><div className="font-semibold text-sm text-gray-900 truncate">{brand.brand_name}</div><div className="text-xs text-gray-400 mt-0.5">{s.total} batch{s.total!==1?'es':''} · {s.units} unit{s.units!==1?'s':''}</div></div>
+                <div className="mt-3"><div className="font-semibold text-sm text-gray-900 truncate">{brand.brand_name}</div><div className="text-xs text-gray-500 mt-0.5">{s.total} batch{s.total!==1?'es':''} · {s.units} unit{s.units!==1?'s':''}</div></div>
                 {s.total>0 ? (
                   <div className="flex gap-1 mt-2 flex-wrap">
                     {s.draft>0    && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">{s.draft} draft</span>}
@@ -2148,7 +2148,7 @@ function ManufacturerTab({ batches, units, brands, userEmail, canManageBatches, 
             <button onClick={()=>setSelectedBrand(selectedBrand==='__other'?null:'__other')}
               className={`rounded-2xl border p-4 text-left transition-all ${selectedBrand==='__other'?'border-gray-400 bg-gray-50 ring-2 ring-gray-300':'border-dashed border-gray-300 bg-white hover:border-gray-400'}`}>
               <div className="w-9 h-9 bg-gray-200 rounded-xl flex items-center justify-center text-gray-500 text-base font-bold">?</div>
-              <div className="mt-3"><div className="font-semibold text-sm text-gray-900">Other</div><div className="text-xs text-gray-400 mt-0.5">{otherBatches.length} batch{otherBatches.length!==1?'es':''}</div></div>
+              <div className="mt-3"><div className="font-semibold text-sm text-gray-900">Other</div><div className="text-xs text-gray-500 mt-0.5">{otherBatches.length} batch{otherBatches.length!==1?'es':''}</div></div>
             </button>
           )}
         </div>
@@ -2158,7 +2158,7 @@ function ManufacturerTab({ batches, units, brands, userEmail, canManageBatches, 
         <div className="text-center py-16 bg-white rounded-2xl border border-gray-200 space-y-3">
           <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto"><svg className="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg></div>
           <p className="text-gray-600 font-medium">{selectedBrand?`No batches for ${selectedBrand} yet`:'No manufacturer batches yet'}</p>
-          <p className="text-gray-400 text-sm">Go to Company Stock, open a product, and select units to create a batch.</p>
+          <p className="text-gray-500 text-sm">Go to Company Stock, open a product, and select units to create a batch.</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
@@ -2185,8 +2185,8 @@ function ManufacturerTab({ batches, units, brands, userEmail, canManageBatches, 
                       <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sm.cls}`}>{sm.label}</span></td>
                       <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmt(b.sent_date)}</td>
                       <td className="px-4 py-3 font-mono text-xs text-gray-500">{b.tracking_number||'—'}</td>
-                      <td className="px-4 py-3">{resLabel?<span className={`px-2 py-0.5 rounded-full text-xs font-medium ${resLabel.cls}`}>{resLabel.label}</span>:<span className="text-gray-400 text-xs">—</span>}</td>
-                      <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{fmt(b.created_date)}</td>
+                      <td className="px-4 py-3">{resLabel?<span className={`px-2 py-0.5 rounded-full text-xs font-medium ${resLabel.cls}`}>{resLabel.label}</span>:<span className="text-gray-500 text-xs">—</span>}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmt(b.created_date)}</td>
                       <td className="px-4 py-3 text-right"><span className="text-xs text-indigo-600 hover:underline">View</span></td>
                     </tr>
                   )
@@ -2284,17 +2284,17 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
             <BrandAvatar name={batch.manufacturer_name} size="lg"/>
             <div><h3 className="text-lg font-bold text-gray-900 font-mono">{batch.batch_number}</h3><div className="flex items-center gap-3 mt-0.5"><span className="text-sm text-gray-600 font-medium">{batch.manufacturer_name}</span><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sm.cls}`}>{sm.label}</span></div></div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg></button>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-600"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
         {(batch.sent_date||batch.tracking_number) && (
           <div className="px-6 py-3 bg-gray-50 border-b border-gray-100 flex gap-6 text-sm">
-            {batch.sent_date && <div><span className="text-gray-400 text-xs">Sent:</span> <span className="font-medium text-gray-700">{fmt(batch.sent_date)}</span></div>}
-            {batch.tracking_number && <div><span className="text-gray-400 text-xs">Tracking:</span> <span className="font-mono font-medium text-gray-700">{batch.tracking_number}</span></div>}
+            {batch.sent_date && <div><span className="text-gray-500 text-xs">Sent:</span> <span className="font-medium text-gray-700">{fmt(batch.sent_date)}</span></div>}
+            {batch.tracking_number && <div><span className="text-gray-500 text-xs">Tracking:</span> <span className="font-mono font-medium text-gray-700">{batch.tracking_number}</span></div>}
           </div>
         )}
         <div className="p-6 border-b border-gray-100">
           <h4 className="text-sm font-semibold text-gray-700 mb-3">Units in Batch ({batchUnits.length})</h4>
-          {batchUnits.length===0 ? <p className="text-sm text-gray-400">No units.</p> : (
+          {batchUnits.length===0 ? <p className="text-sm text-gray-500">No units.</p> : (
             <div className="rounded-xl border border-gray-100 overflow-hidden">
               <table className="w-full text-sm"><thead className="bg-gray-50"><tr>{['Product','Serial #','Warranty','RMA Source','Resolution'].map(h=><th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500">{h}</th>)}</tr></thead>
                 <tbody className="divide-y divide-gray-50">{batchUnits.map(u=><tr key={u.id} className="hover:bg-gray-50"><td className="px-3 py-2.5 text-gray-900 font-medium">{u.product_name||'—'}</td><td className="px-3 py-2.5 font-mono text-xs text-gray-500">{u.serial_number||'—'}</td><td className="px-3 py-2.5"><WarrantyBadge status={u.warranty_status}/></td><td className="px-3 py-2.5 font-mono text-xs text-indigo-600">{u.rma_number||'—'}</td><td className="px-3 py-2.5"><ResolutionBadge type={u.resolution_type}/></td></tr>)}</tbody>

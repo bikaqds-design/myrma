@@ -281,7 +281,7 @@ export default function RMATracker() {
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-5">
               <div className="flex items-start justify-between flex-wrap gap-3">
                 <div>
-                  <div className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-1">RMA Number</div>
+                  <div className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">RMA Number</div>
                   <div className="text-2xl font-bold text-gray-900 font-mono">{ticket.rma_number}</div>
                 </div>
                 <span className={`px-4 py-1.5 rounded-full text-sm font-semibold text-white ${STATUS_COLORS[ticket.ticket_status] || 'bg-gray-400'}`}>
@@ -291,18 +291,18 @@ export default function RMATracker() {
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
                 <div>
-                  <div className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Received</div>
+                  <div className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">Received</div>
                   <div className="font-medium text-gray-800">{fmtDate(ticket.created_date)}</div>
                 </div>
                 {ticket.due_date && (
                   <div>
-                    <div className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Estimated Completion</div>
+                    <div className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">Estimated Completion</div>
                     <div className="font-medium text-gray-800">{fmtDate(ticket.due_date)}</div>
                   </div>
                 )}
                 {ticket.priority && (
                   <div>
-                    <div className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Priority</div>
+                    <div className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">Priority</div>
                     <div className="font-medium text-gray-800">{ticket.priority}</div>
                   </div>
                 )}
@@ -311,9 +311,9 @@ export default function RMATracker() {
               {/* Status timeline */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide font-medium">Progress</div>
+                  <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Progress</div>
                   <button onClick={() => handleSearch(ticket.rma_number)}
-                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-indigo-600 transition-colors px-2 py-1 rounded-lg hover:bg-indigo-50">
+                    className="flex items-center gap-1 text-xs text-gray-500 hover:text-indigo-600 transition-colors px-2 py-1 rounded-lg hover:bg-indigo-50">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     Refresh
                   </button>
@@ -338,7 +338,7 @@ export default function RMATracker() {
                               : null
                             }
                           </div>
-                          <span className={`text-[10px] font-medium leading-tight text-center max-w-[52px] ${active ? colors.text : done ? 'text-green-600' : 'text-gray-400'}`}>
+                          <span className={`text-[10px] font-medium leading-tight text-center max-w-[52px] ${active ? colors.text : done ? 'text-green-600' : 'text-gray-500'}`}>
                             {step}
                           </span>
                         </div>
@@ -398,12 +398,12 @@ export default function RMATracker() {
             {/* Messages */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-5">
-                Messages {comments.length > 0 && <span className="ml-1 text-gray-400">({comments.length})</span>}
+                Messages {comments.length > 0 && <span className="ml-1 text-gray-500">({comments.length})</span>}
               </h2>
 
               {/* Thread */}
               {comments.length === 0 ? (
-                <div className="text-center py-6 text-gray-400 text-sm">No messages yet. Send a message below to contact our team.</div>
+                <div className="text-center py-6 text-gray-500 text-sm">No messages yet. Send a message below to contact our team.</div>
               ) : (
                 <div className="space-y-4 mb-6">
                   {topComments.map(comment => (
@@ -447,10 +447,10 @@ export default function RMATracker() {
                     <div className="flex flex-wrap gap-2">
                       {commentFiles.map((f, i) => (
                         <div key={i} className="flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs text-gray-700">
-                          <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                          <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
                           <span className="max-w-[120px] truncate">{f.name}</span>
-                          <span className="text-gray-400">({fileSize(f.size)})</span>
-                          <button type="button" onClick={() => removeFile(i)} className="text-gray-400 hover:text-red-500 ml-0.5">✕</button>
+                          <span className="text-gray-500">({fileSize(f.size)})</span>
+                          <button type="button" onClick={() => removeFile(i)} className="text-gray-500 hover:text-red-500 ml-0.5">✕</button>
                         </div>
                       ))}
                     </div>
@@ -479,7 +479,7 @@ export default function RMATracker() {
         )}
       </main>
 
-      <footer className="border-t border-gray-200 mt-10 py-5 text-center text-xs text-gray-400">
+      <footer className="border-t border-gray-200 mt-10 py-5 text-center text-xs text-gray-500">
         Powered by <span className="font-semibold text-gray-500">myRMA</span> — Secure service request tracking
       </footer>
     </div>
@@ -535,7 +535,7 @@ function CommentBubble({ comment, isTeam, displayName, initials, attachments, sh
         <div className="flex items-center gap-2 flex-wrap mb-1">
           <span className="text-sm font-semibold text-gray-900">{displayName}</span>
           {isTeam && <span className="px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-full">Support Team</span>}
-          <span className="text-xs text-gray-400 ml-auto">{fmtDateTime(comment.created_date)}</span>
+          <span className="text-xs text-gray-500 ml-auto">{fmtDateTime(comment.created_date)}</span>
         </div>
         <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{comment.comment_text}</p>
         {attachments.length > 0 && (
@@ -550,7 +550,7 @@ function CommentBubble({ comment, isTeam, displayName, initials, attachments, sh
           </div>
         )}
         {showReplyBtn && (
-          <button onClick={onReply} className={`mt-2 text-xs font-medium transition-colors ${isReplying ? 'text-indigo-600' : 'text-gray-400 hover:text-indigo-500'}`}>
+          <button onClick={onReply} className={`mt-2 text-xs font-medium transition-colors ${isReplying ? 'text-indigo-600' : 'text-gray-500 hover:text-indigo-500'}`}>
             {isReplying ? '↩ Cancel reply' : '↩ Reply'}
           </button>
         )}

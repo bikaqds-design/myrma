@@ -108,7 +108,7 @@ export default function CommandPalette({ open, onClose, onSelectTicket, onSelect
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
-          <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
@@ -119,12 +119,12 @@ export default function CommandPalette({ open, onClose, onSelectTicket, onSelect
             className="flex-1 text-sm outline-none bg-transparent text-gray-900 placeholder-gray-400"
           />
           {loading && (
-            <svg className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 text-gray-500 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
             </svg>
           )}
-          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-xs text-gray-400 bg-gray-100 rounded border border-gray-200 font-mono">Esc</kbd>
+          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-xs text-gray-500 bg-gray-100 rounded border border-gray-200 font-mono">Esc</kbd>
         </div>
 
         {results.length > 0 && (
@@ -158,7 +158,7 @@ export default function CommandPalette({ open, onClose, onSelectTicket, onSelect
         )}
 
         {!query.trim() && (
-          <div className="px-4 py-3 flex items-center gap-4 text-xs text-gray-400">
+          <div className="px-4 py-3 flex items-center gap-4 text-xs text-gray-500">
             <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 bg-gray-100 rounded border border-gray-200 font-mono">↑↓</kbd> navigate</span>
             <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 bg-gray-100 rounded border border-gray-200 font-mono">↵</kbd> select</span>
             <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 bg-gray-100 rounded border border-gray-200 font-mono">Esc</kbd> close</span>

@@ -32,7 +32,8 @@
       "Bash(npm uninstall *)",
       "PowerShell(winget install Supabase.CLI)",
       "PowerShell(winget search supabase)",
-      "PowerShell(Set-Clipboard)"
+      "PowerShell(Set-Clipboard)",
+      "PowerShell(cd D:\\\\myrma-app; npm run lint 2>&1 | Select-String \"error|warning\" | Group-Object { \\($_ -split \"  \"\\)[1].Trim\\(\\) } | Sort-Object Count -Descending | Select-Object -First 15 | Format-Table Count, Name -AutoSize)"
     ]
   }
 }

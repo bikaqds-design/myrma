@@ -446,8 +446,8 @@ export default function App() {
               </div>
               <button
                 onClick={() => updateAppearance({ sidebarCompact: false }, currentUser?.email)}
-                title="Expand sidebar"
-                className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                title="Expand sidebar" aria-label="Expand sidebar"
+                className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-500 hover:text-white hover:bg-gray-700 transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
@@ -464,20 +464,20 @@ export default function App() {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold">myRMA</h1>
-                  <p className="text-xs text-gray-400">{companyName || 'RMA Management'}</p>
+                  <p className="text-xs text-gray-500">{companyName || 'RMA Management'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => updateAppearance({ sidebarCompact: true }, currentUser?.email)}
-                  title="Collapse sidebar"
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors lg:flex hidden"
+                  title="Collapse sidebar" aria-label="Collapse sidebar"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-white hover:bg-gray-700 transition-colors lg:flex hidden"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
                   </svg>
                 </button>
-                <button onClick={() => setSidebarOpen(false)} className="lg:hidden w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white">
+                <button onClick={() => setSidebarOpen(false)} className="lg:hidden w-8 h-8 flex items-center justify-center text-gray-500 hover:text-white">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -561,7 +561,7 @@ export default function App() {
             />
             <button
               onClick={() => handleNavigate('account')}
-              title="Account Settings"
+              title="Account Settings" aria-label="Account Settings"
               className={`w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white font-semibold text-sm uppercase flex-shrink-0 ${currentPage === 'account' ? 'ring-2 ring-indigo-400' : ''}`}
             >
               {(currentUser?.user_metadata?.display_name || currentUser?.email || '?')[0]}
@@ -598,7 +598,7 @@ export default function App() {
                 </div>
                 <div className="text-xs text-gray-500 capitalize mt-0.5">{currentUserRole}</div>
               </div>
-              <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
@@ -615,7 +615,7 @@ export default function App() {
                   onClick={() => { handleNavigate('account'); setUserMenuOpen(false) }}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
                 >
-                  <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                   Account Settings

@@ -70,7 +70,7 @@ export default function AuditLog() {
         <div className="relative flex-1 min-w-48">
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search user, action, details..."
             className={`w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent`} />
-          <svg className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          <svg className="w-4 h-4 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
         </div>
         <select value={filterUser} onChange={e => setFilterUser(e.target.value)} className={inp}>
           <option value="">All users</option>
@@ -100,7 +100,7 @@ export default function AuditLog() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 && (
-                <tr><td colSpan={4} className="px-4 py-12 text-center text-gray-400">No log entries match your filters</td></tr>
+                <tr><td colSpan={4} className="px-4 py-12 text-center text-gray-500">No log entries match your filters</td></tr>
               )}
               {filtered.map((l, i) => (
                 <tr key={l.id || i} className="hover:bg-gray-50 text-sm">

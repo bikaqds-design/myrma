@@ -701,7 +701,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
           >
             {tab}
             {tab !== 'All' && (
-              <span className="ml-1.5 text-xs text-gray-400">
+              <span className="ml-1.5 text-xs text-gray-500">
                 ({tab === 'Quotes'
                   ? invoices.filter(i => i.type === 'quote').length
                   : invoices.filter(i => i.status === tab.toLowerCase()).length})
@@ -808,7 +808,7 @@ function InvoiceRow({ inv, isAdmin, isManager, isTech, formatDate, onEdit, onExp
       </td>
       <td className="px-4 py-3">
         <p className="font-medium text-gray-800 truncate max-w-[160px]">{inv.customer_name || '—'}</p>
-        {inv.customer_email && <p className="text-xs text-gray-400 truncate max-w-[160px]">{inv.customer_email}</p>}
+        {inv.customer_email && <p className="text-xs text-gray-500 truncate max-w-[160px]">{inv.customer_email}</p>}
       </td>
       <td className="px-4 py-3 font-mono text-xs text-gray-500">{inv.rma_number_ref || '—'}</td>
       <td className="px-4 py-3">
@@ -818,13 +818,13 @@ function InvoiceRow({ inv, isAdmin, isManager, isTech, formatDate, onEdit, onExp
       </td>
       <td className="px-4 py-3 text-right font-semibold text-gray-800">${fmt(inv.total)}</td>
       <td className="px-4 py-3 text-gray-500 text-xs">{inv.due_date ? formatDate(inv.due_date) : '—'}</td>
-      <td className="px-4 py-3 text-gray-400 text-xs">{inv.created_at ? formatDate(inv.created_at) : '—'}</td>
+      <td className="px-4 py-3 text-gray-500 text-xs">{inv.created_at ? formatDate(inv.created_at) : '—'}</td>
       <td className="px-4 py-3">
         <div className="flex items-center justify-end gap-2 relative">
           <button
             onClick={onExportPDF}
-            title="Export PDF"
-            className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+            title="Export PDF" aria-label="Export PDF"
+            className="p-1.5 rounded-lg text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -835,7 +835,7 @@ function InvoiceRow({ inv, isAdmin, isManager, isTech, formatDate, onEdit, onExp
             <div className="relative">
               <button
                 onClick={() => setMenuOpen(o => !o)}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />

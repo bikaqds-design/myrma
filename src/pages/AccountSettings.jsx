@@ -332,7 +332,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                     Cancel
                   </button>
                 )}
-                <p className="text-xs text-gray-400 mt-2">JPG, PNG or GIF · Max 2MB</p>
+                <p className="text-xs text-gray-500 mt-2">JPG, PNG or GIF · Max 2MB</p>
               </div>
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
             </div>
@@ -359,9 +359,9 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                 type="email"
                 value={currentUser?.email || ''}
                 disabled
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-400 cursor-not-allowed"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
               />
-              <p className="text-xs text-gray-400 mt-1">Email cannot be changed here</p>
+              <p className="text-xs text-gray-500 mt-1">Email cannot be changed here</p>
             </div>
 
             <div>
@@ -403,7 +403,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                   className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
                   placeholder="••••••••"
                 />
-                <button type="button" onClick={() => setShowNew(v => !v)} tabIndex={-1} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <button type="button" onClick={() => setShowNew(v => !v)} tabIndex={-1} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600">
                   <EyeIcon visible={showNew} />
                 </button>
               </div>
@@ -419,7 +419,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                   className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
                   placeholder="••••••••"
                 />
-                <button type="button" onClick={() => setShowConfirm(v => !v)} tabIndex={-1} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <button type="button" onClick={() => setShowConfirm(v => !v)} tabIndex={-1} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600">
                   <EyeIcon visible={showConfirm} />
                 </button>
               </div>
@@ -478,7 +478,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                     <div key={key} className="flex items-center justify-between py-3.5">
                       <div>
                         <p className="text-sm font-medium text-gray-800">{label}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
                       </div>
                       <Toggle
                         checked={!!notifPrefs[key]}
@@ -520,13 +520,13 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
             <div className="space-y-6">
               {SYSTEM_NOTIF_CATEGORIES.map(({ cat, items }) => (
                 <div key={cat}>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{cat}</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{cat}</p>
                   <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-100">
                     {items.map(({ key, label, desc }) => (
                       <div key={key} className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
                         <div>
                           <p className="text-sm font-medium text-gray-800">{label}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
                         </div>
                         <Toggle
                           checked={sysNotifPrefs[key] !== false}
@@ -538,7 +538,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                 </div>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mt-4">Changes are saved automatically</p>
+            <p className="text-xs text-gray-500 mt-4">Changes are saved automatically</p>
           </div>
 
         </div>
@@ -574,7 +574,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                           {w.size === 'full' ? 'Full width' : 'Half width'}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-400 mt-0.5">{w.desc}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{w.desc}</p>
                     </div>
                     <Toggle
                       checked={widgetPrefs.includes(w.id)}
@@ -585,7 +585,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
               </div>
             </div>
 
-            <p className="text-xs text-gray-400 mt-4 text-center">
+            <p className="text-xs text-gray-500 mt-4 text-center">
               {widgetPrefs.length} of {WIDGET_CATALOG.length} widgets enabled · Changes apply instantly
             </p>
           </div>
@@ -607,11 +607,11 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
           ) : activity.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
               </div>
-              <p className="text-sm text-gray-400">No activity recorded yet</p>
+              <p className="text-sm text-gray-500">No activity recorded yet</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
@@ -627,12 +627,12 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                       {item.action_type?.replace(/_/g, ' ')}
                     </p>
                     {item.action_details && (
-                      <p className="text-xs text-gray-400 mt-0.5 truncate">
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">
                         {typeof item.action_details === 'string' ? item.action_details : JSON.stringify(item.action_details)}
                       </p>
                     )}
                   </div>
-                  <span className="text-xs text-gray-400 flex-shrink-0 mt-0.5">
+                  <span className="text-xs text-gray-500 flex-shrink-0 mt-0.5">
                     {new Date(item.created_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                   </span>
                 </div>

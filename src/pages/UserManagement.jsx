@@ -573,7 +573,7 @@ function UsersTab({ users, currentUserRole, currentUserEmail, onUpdateRole, onEd
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 {user.user_email === currentUserEmail ? (
-                  <span className="text-sm text-gray-400 italic">current user</span>
+                  <span className="text-sm text-gray-500 italic">current user</span>
                 ) : (
                   <select
                     value={user.role}
@@ -605,21 +605,21 @@ function UsersTab({ users, currentUserRole, currentUserEmail, onUpdateRole, onEd
               </td>
               <td className="px-6 py-4 relative action-menu">
                 <button onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === user.id ? null : user.id) }}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                  className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors">
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
                 </button>
                 {openMenuId === user.id && (
                   <div className="absolute right-0 top-9 z-30 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
                     <button onClick={() => { onUserControl(user); setOpenMenuId(null) }} className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5">
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                       Controls
                     </button>
                     <button onClick={() => { onResetPassword(user); setOpenMenuId(null) }} className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5">
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
                       Reset Password
                     </button>
                     <button onClick={() => { onViewActivity(user); setOpenMenuId(null) }} className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5">
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                       Activity
                     </button>
                   </div>
@@ -762,7 +762,7 @@ function PasswordResetModal({ user, isSuperAdmin, password, onPasswordChange, on
                   autoFocus
                 />
                 <button type="button" onClick={() => setShowPassword(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600">
                   {showPassword ? '🙈' : '👁️'}
                 </button>
               </div>
@@ -1069,7 +1069,7 @@ function RoleTemplatesTab({ currentUserRole, currentUserEmail }) {
                     <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{module.replace(/_/g, ' ')}</h4>
                     <div className="flex flex-wrap gap-1.5">
                       {enabled.length === 0
-                        ? <span className="text-xs text-gray-400 italic">No access</span>
+                        ? <span className="text-xs text-gray-500 italic">No access</span>
                         : enabled.map(p => (
                           <span key={p} className="px-1.5 py-0.5 bg-green-100 text-green-800 text-xs rounded font-medium">
                             {p.replace(/_/g, ' ')}
@@ -1093,7 +1093,7 @@ function RoleTemplatesTab({ currentUserRole, currentUserEmail }) {
                 <h3 className="text-lg font-bold text-gray-900">{editingRole.icon} Edit {editingRole.name} Template</h3>
                 <p className="text-sm text-gray-500 mt-0.5">These defaults apply when a user has no custom permissions set</p>
               </div>
-              <button onClick={() => setEditingRole(null)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setEditingRole(null)} className="text-gray-500 hover:text-gray-600">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
             </div>

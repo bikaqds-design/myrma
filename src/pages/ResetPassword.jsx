@@ -61,7 +61,7 @@ export default function ResetPassword({ onDone }) {
           </div>
           <h1 className="text-3xl font-bold text-gray-900">myRMA</h1>
           <p className="text-gray-600 mt-2">Set a new password</p>
-          <p className="text-xs text-gray-400 mt-3">You're here because someone requested a password reset for your account. If that wasn't you, you can safely close this page — your current password will remain unchanged until you submit a new one.</p>
+          <p className="text-xs text-gray-500 mt-3">You're here because someone requested a password reset for your account. If that wasn't you, you can safely close this page — your current password will remain unchanged until you submit a new one.</p>
         </div>
 
         {success ? (
@@ -91,7 +91,7 @@ export default function ResetPassword({ onDone }) {
                 <button
                   type="button"
                   onClick={() => setShowPassword(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
                   tabIndex={-1}
                 >
                   <EyeIcon visible={showPassword} />
@@ -113,7 +113,7 @@ export default function ResetPassword({ onDone }) {
                 <button
                   type="button"
                   onClick={() => setShowConfirm(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
                   tabIndex={-1}
                 >
                   <EyeIcon visible={showConfirm} />

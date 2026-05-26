@@ -46,7 +46,7 @@
 | ☐ | A-7 | Heavy deps eagerly loaded (~1.5MB initial bundle) | xlsx, jspdf, html2canvas, recharts | Dynamic-import inside event handlers: `const XLSX = await import('xlsx')` |
 | ☐ | P-1 | Adopt TanStack Query for all data fetching | All pages | Replace manual `useState + useEffect` patterns with `useQuery`/`useMutation` + optimistic updates |
 | ☐ | M-1 | Zero unit/E2E tests | — | Vitest for components, Playwright for smoke flows |
-| ☐ | M-2 | No ESLint config | — | Add ESLint + Prettier with React rules |
+| ✅ | M-2 | No ESLint config | — | **Done 2026-05-26.** ESLint 9 flat config + Prettier. 0 errors, 167 warnings. `npm run lint` / `npm run format` now available. |
 | ☐ | M-4 | `supabaseClient.js` is 1350 lines | src/api/supabaseClient.js | Split: `auth.js`, `db/tickets.js`, `db/customers.js`, `db/products.js`, `db/notifications.js`, `db/parts.js`, `db/backup.js` |
 
 ---
@@ -155,3 +155,4 @@ _Mark each item with ✅ and date as you complete it._
 - **2026-05-26** — ✅ H-7: webhook dispatch uses HMAC-SHA256 (`X-Signature-256`) via `crypto.subtle`. Plaintext secret header removed.
 - **2026-05-26** — ✅ H-8: `customers.delete()` and `bulkDelete()` now use atomic RPC only. Non-atomic sequential fallback removed.
 - **2026-05-26** — ✅ H-9: `auditInsert()` added — retry + localStorage queue + flush on startup. All 86 call sites resilient automatically.
+- **2026-05-26** — ✅ M-2: ESLint 9 flat config + Prettier added. `lint`, `lint:ci`, `lint:fix`, `format`, `format:check` scripts. 0 errors (BOM regex fixed in Customers/Products).

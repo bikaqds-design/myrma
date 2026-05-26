@@ -121,7 +121,7 @@ export default function CustomFields({ currentUserEmail }) {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {displayed.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-400">No custom fields defined yet</td></tr>
+              <tr><td colSpan={7} className="px-4 py-12 text-center text-gray-500">No custom fields defined yet</td></tr>
             )}
             {displayed.map(f => (
               <tr key={f.id} className={`hover:bg-gray-50 ${!f.is_active ? 'opacity-50' : ''}`}>
@@ -137,13 +137,13 @@ export default function CustomFields({ currentUserEmail }) {
                 </td>
                 <td className="px-4 py-3 relative action-menu">
                   <button onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === f.id ? null : f.id) }}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                    className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors">
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
                   </button>
                   {openMenuId === f.id && (
                     <div className="absolute right-0 top-9 z-30 w-40 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
                       <button onClick={() => { openEdit(f); setOpenMenuId(null) }} className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5">
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                         Edit
                       </button>
                       <button onClick={() => { handleDelete(f.id); setOpenMenuId(null) }} className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2.5">
@@ -165,7 +165,7 @@ export default function CustomFields({ currentUserEmail }) {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-8">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-bold text-gray-900">{editing ? 'Edit Field' : 'New Custom Field'}</h3>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setShowModal(false)} className="text-gray-500 hover:text-gray-600">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -176,7 +176,7 @@ export default function CustomFields({ currentUserEmail }) {
                   className={inp} placeholder="e.g. Customer PO Number" required />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Field key <span className="text-red-500">*</span> <span className="text-xs text-gray-400">(lowercase, no spaces)</span></label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Field key <span className="text-red-500">*</span> <span className="text-xs text-gray-500">(lowercase, no spaces)</span></label>
                 <input value={form.field_name} onChange={e => setForm({...form, field_name: e.target.value})} className={`${inp} font-mono`} placeholder="e.g. customer_po_number" disabled={!!editing} required />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -215,7 +215,7 @@ export default function CustomFields({ currentUserEmail }) {
                     {form.field_options.map((o, i) => (
                       <span key={i} className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded text-sm">
                         {o}
-                        <button type="button" onClick={() => removeOption(i)} className="text-gray-400 hover:text-red-500 ml-1">×</button>
+                        <button type="button" onClick={() => removeOption(i)} className="text-gray-500 hover:text-red-500 ml-1">×</button>
                       </span>
                     ))}
                   </div>

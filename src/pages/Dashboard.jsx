@@ -36,7 +36,7 @@ function WidgetCard({ title, icon, onClick, children, className = '' }) {
           {icon && <span className="text-indigo-600 dark:text-indigo-400">{icon}</span>}
           {title}
           {onClick && (
-            <svg className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500 ml-auto flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-gray-500 dark:text-slate-500 ml-auto flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           )}
@@ -296,7 +296,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
           </svg>
           <p className="text-gray-600 font-medium">No widgets enabled</p>
-          <p className="text-gray-400 text-sm mt-1">Go to Account Settings → Appearance to enable widgets</p>
+          <p className="text-gray-500 text-sm mt-1">Go to Account Settings → Appearance to enable widgets</p>
         </div>
       )}
 
@@ -366,7 +366,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
                 sublabel="of tickets"
               />
             </div>
-            <p className="text-center text-xs text-gray-400 mt-1">
+            <p className="text-center text-xs text-gray-500 mt-1">
               {ticketsWithDue.length - overdueActive} of {ticketsWithDue.length} tracked tickets on schedule
             </p>
           </WidgetCard>
@@ -385,7 +385,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
                 sublabel="resolved"
               />
             </div>
-            <p className="text-center text-xs text-gray-400 mt-1">
+            <p className="text-center text-xs text-gray-500 mt-1">
               {closedTickets} of {totalTickets} tickets resolved or closed
             </p>
           </WidgetCard>
@@ -397,14 +397,14 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>}
           >
             {recentTickets.length === 0 ? (
-              <p className="text-center text-gray-400 py-8 text-sm">No tickets yet</p>
+              <p className="text-center text-gray-500 py-8 text-sm">No tickets yet</p>
             ) : (
               <div className="divide-y divide-gray-100 -mx-2">
                 {recentTickets.map(t => (
                   <div key={t.id} className="flex items-center justify-between py-2.5 px-2 hover:bg-gray-50 rounded-lg">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-gray-900 truncate">{t.ticket_number || `#${String(t.id).slice(0, 8)}`}</p>
-                      <p className="text-xs text-gray-400 truncate">{t.customer_name || '—'}</p>
+                      <p className="text-xs text-gray-500 truncate">{t.customer_name || '—'}</p>
                     </div>
                     <div className="ml-3 flex-shrink-0">
                       <StatusBadge status={t.ticket_status} />
@@ -434,7 +434,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
                   <div key={t.id} className="flex items-center justify-between py-2.5 px-2 hover:bg-red-50 rounded-lg">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-gray-900 truncate">{t.ticket_number || `#${String(t.id).slice(0, 8)}`}</p>
-                      <p className="text-xs text-gray-400 truncate">{t.customer_name || '—'}</p>
+                      <p className="text-xs text-gray-500 truncate">{t.customer_name || '—'}</p>
                     </div>
                     <span className="ml-3 flex-shrink-0 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium">
                       {daysBetween(t.due_date)}d overdue
@@ -486,7 +486,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>}
           >
             {statusDist.length === 0 ? (
-              <p className="text-center text-gray-400 py-8 text-sm">No data</p>
+              <p className="text-center text-gray-500 py-8 text-sm">No data</p>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
@@ -510,7 +510,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"/></svg>}
           >
             {priorityDist.length === 0 ? (
-              <p className="text-center text-gray-400 py-8 text-sm">No data</p>
+              <p className="text-center text-gray-500 py-8 text-sm">No data</p>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
@@ -534,7 +534,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>}
           >
             {technicianPerformance.length === 0 ? (
-              <p className="text-center text-gray-400 py-8 text-sm">No assigned tickets</p>
+              <p className="text-center text-gray-500 py-8 text-sm">No assigned tickets</p>
             ) : (
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={technicianPerformance} layout="vertical" margin={{ left: 20 }}>
@@ -557,7 +557,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>}
           >
             {topIssues.length === 0 ? (
-              <p className="text-center text-gray-400 py-8 text-sm">No issues recorded yet</p>
+              <p className="text-center text-gray-500 py-8 text-sm">No issues recorded yet</p>
             ) : (
               <div className="space-y-4">
                 {topIssues.map((item, idx) => {

@@ -309,7 +309,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     }
     return pages.map((page, idx) =>
       page === '...'
-        ? <span key={`e-${idx}`} className="px-3 py-2 text-gray-400">...</span>
+        ? <span key={`e-${idx}`} className="px-3 py-2 text-gray-500">...</span>
         : <button key={page} onClick={() => handlePageChange(page)} className={`px-3 py-2 rounded transition-colors ${currentPage === page ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}>{page}</button>
     )
   }
@@ -912,7 +912,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const getPriorityColor = (p) => ({ Low: 'bg-gray-100 text-gray-800', Medium: 'bg-blue-100 text-blue-800', High: 'bg-orange-100 text-orange-800', Critical: 'bg-red-100 text-red-800' }[p] || 'bg-gray-100 text-gray-800')
   const fmt = (d) => d ? new Date(d).toLocaleDateString() : 'N/A'
   const SLABadge = ({ dueDate, status }) => {
-    if (!dueDate || ['Completed', 'Cancelled'].includes(status)) return <span className="text-gray-400 text-xs">{dueDate ? fmt(dueDate) : '—'}</span>
+    if (!dueDate || ['Completed', 'Cancelled'].includes(status)) return <span className="text-gray-500 text-xs">{dueDate ? fmt(dueDate) : '—'}</span>
     const days = Math.ceil((new Date(dueDate) - Date.now()) / 86400000)
     if (days < 0) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">Overdue {Math.abs(days)}d</span>
     if (days === 0) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">Due today</span>
@@ -946,7 +946,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             <input ref={searchInputRef} type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by RMA number, customer, status, priority... (Press / to focus)"
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent" />
-            <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            <svg className="w-5 h-5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           </div>
           <button onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || filterStatus || filterPriority || filterAssigned || filterCustomer ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
@@ -1022,7 +1022,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 />
                 {filterCustomer && (
                   <button type="button" onMouseDown={e => { e.preventDefault(); setFilterCustomer(''); setFilterCustomerSearch('') }}
-                    className="absolute right-2 text-gray-400 hover:text-gray-600">
+                    className="absolute right-2 text-gray-500 hover:text-gray-600">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 )}
@@ -1154,7 +1154,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   onChange={toggleSelectAll}
                   className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
               </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase w-10">#</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase w-10">#</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"><SortableHeader label="RMA Number" sortKey="rma_number" sortConfig={sortConfig} onSort={handleSort} /></th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"><SortableHeader label="Customer" sortKey="customer_name" sortConfig={sortConfig} onSort={handleSort} /></th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"><SortableHeader label="Status" sortKey="ticket_status" sortConfig={sortConfig} onSort={handleSort} /></th>
@@ -1171,7 +1171,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                       <input type="checkbox" checked={selectedTickets.includes(t.id)} onChange={() => toggleSelectTicket(t.id)}
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
                     </td>
-                    <td className="px-3 py-3 text-xs text-gray-400 tabular-nums">{startIndex + idx + 1}</td>
+                    <td className="px-3 py-3 text-xs text-gray-500 tabular-nums">{startIndex + idx + 1}</td>
                     <td className="px-4 py-3">
                       <button onClick={() => handleViewDetails(t)} className="font-mono text-sm font-medium text-indigo-600 hover:text-indigo-800">{t.rma_number}</button>
                     </td>
@@ -1182,23 +1182,23 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                     <td className="px-4 py-3 text-sm text-gray-600">{fmt(t.created_date)}</td>
                     <td className="px-4 py-3 relative action-menu">
                       <button onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === t.id ? null : t.id) }}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                        className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors">
                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
                       </button>
                       {openMenuId === t.id && (
                         <div className="absolute right-0 top-9 z-30 w-44 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
                           <button onClick={() => { handleViewDetails(t); setOpenMenuId(null) }} className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5">
-                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                             View
                           </button>
                           {(canDo('edit_all') || canDo('edit_assigned')) && (
                             <button onClick={() => { handleEdit(t); setOpenMenuId(null) }} className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5">
-                              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                               Edit
                             </button>
                           )}
                           <button onClick={() => { handleExportPDF(t); setOpenMenuId(null) }} className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5">
-                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                             Export PDF
                           </button>
                           {canDo('delete') && (
@@ -1216,13 +1216,13 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   <tr><td colSpan={9} className="px-4 py-20 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center">
-                        <svg className="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-7 h-7 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                         </svg>
                       </div>
                       <div>
                         <p className="font-semibold text-gray-700">No tickets found</p>
-                        <p className="text-sm text-gray-400 mt-0.5">
+                        <p className="text-sm text-gray-500 mt-0.5">
                           {tickets.length > 0 ? 'Try adjusting your filters or search term' : 'Create your first RMA ticket to get started'}
                         </p>
                       </div>
@@ -1270,7 +1270,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               <div>
                 <h2 className="text-xl font-bold text-gray-900">{editingTicket ? 'Edit RMA Ticket' : 'Create New RMA Ticket'}</h2>
                 <div className="flex items-center gap-3 mt-1">
-                  <p className="text-xs text-gray-400"><span className="text-red-500">*</span> Required fields</p>
+                  <p className="text-xs text-gray-500"><span className="text-red-500">*</span> Required fields</p>
                   {!editingTicket && (
                     <span className="text-xs font-mono font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
                       {previewRmaNumber}
@@ -1283,7 +1283,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   )}
                 </div>
               </div>
-              <button onClick={() => { setShowModal(false); setEditingTicket(null); resetForm() }} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100">
+              <button onClick={() => { setShowModal(false); setEditingTicket(null); resetForm() }} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -1368,7 +1368,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                     )}
                   </div>
                   <div>
-                    <label className={lbl}>Due Date <span className="text-xs text-gray-400 font-normal ml-1">auto +7 days</span></label>
+                    <label className={lbl}>Due Date <span className="text-xs text-gray-500 font-normal ml-1">auto +7 days</span></label>
                     <input type="date" value={formData.due_date}
                       onChange={(e) => setFormData({ ...formData, due_date: e.target.value })} className={inp} />
                   </div>
@@ -1497,7 +1497,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                     </div>
                   </div>
                   <div>
-                    <label className={lbl}>Shipping Label URL <span className="text-gray-400 font-normal">(optional)</span></label>
+                    <label className={lbl}>Shipping Label URL <span className="text-gray-500 font-normal">(optional)</span></label>
                     <input type="url" value={formData.shipping_label_url} onChange={e => setFormData(f => ({ ...f, shipping_label_url: e.target.value }))}
                       className={inp} placeholder="https://..." />
                   </div>
@@ -1515,7 +1515,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 <div>
                   <label className={lbl}>
                     Attachments
-                    <span className="text-xs text-gray-400 font-normal ml-2">({(formData.attachments?.length || 0) + pendingFiles.length}/10)</span>
+                    <span className="text-xs text-gray-500 font-normal ml-2">({(formData.attachments?.length || 0) + pendingFiles.length}/10)</span>
                   </label>
 
                   {/* Uploaded attachments */}
@@ -1531,7 +1531,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                           }
                           <div className="flex-1 min-w-0">
                             <a href={att.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-indigo-600 hover:underline truncate block">{att.name}</a>
-                            <p className="text-xs text-gray-400">{fmtBytes(att.size)}</p>
+                            <p className="text-xs text-gray-500">{fmtBytes(att.size)}</p>
                           </div>
                           <button type="button" onClick={() => handleDeleteAttachment(att, i)} className="text-red-400 hover:text-red-600 p-1 flex-shrink-0">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1564,9 +1564,9 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   {/* Drop zone */}
                   {(formData.attachments?.length || 0) + pendingFiles.length < 10 && (
                     <label className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-indigo-400 transition-colors block">
-                      <svg className="w-10 h-10 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                      <svg className="w-10 h-10 text-gray-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
                       <p className="text-sm font-medium text-indigo-600">Click to upload or drag and drop</p>
-                      <p className="text-xs text-gray-400 mt-1">Up to 10 files · Images, PDFs, documents</p>
+                      <p className="text-xs text-gray-500 mt-1">Up to 10 files · Images, PDFs, documents</p>
                       <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} className="hidden" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" />
                     </label>
                   )}
@@ -1604,7 +1604,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                   Export PDF
                 </button>
-                <button onClick={handleCloseDetails} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100">
+                <button onClick={handleCloseDetails} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
@@ -1681,7 +1681,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                         <span className="font-mono font-medium text-indigo-700">{t.rma_number}</span>
                         <span className="text-gray-600">{t.customer_name}</span>
                         <span className={`px-2 py-0.5 rounded-full font-medium ${getStatusColor(t.ticket_status)}`}>{t.ticket_status}</span>
-                        <span className="text-gray-400">{t.created_date ? new Date(t.created_date).toLocaleDateString() : '—'}</span>
+                        <span className="text-gray-500">{t.created_date ? new Date(t.created_date).toLocaleDateString() : '—'}</span>
                         {t.id !== selectedTicket.id && <button onClick={() => handleViewDetails(t)} className="text-indigo-500 hover:text-indigo-700 underline">Open</button>}
                         {t.id === selectedTicket.id && <span className="text-indigo-500 italic">Current</span>}
                       </div>
@@ -1791,9 +1791,9 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                           <div key={entry.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs group">
                             <span className="text-gray-500 shrink-0">{entry.user_email}</span>
                             <span className="font-semibold text-gray-800 shrink-0">{Math.floor((entry.duration_min || 0) / 60)}h {(entry.duration_min || 0) % 60}m</span>
-                            {entry.notes && <span className="text-gray-400 flex-1 truncate">{entry.notes}</span>}
+                            {entry.notes && <span className="text-gray-500 flex-1 truncate">{entry.notes}</span>}
                             {!entry.notes && <span className="flex-1" />}
-                            <span className="text-gray-400 shrink-0">{entry.created_date ? new Date(entry.created_date).toLocaleDateString() : '—'}</span>
+                            <span className="text-gray-500 shrink-0">{entry.created_date ? new Date(entry.created_date).toLocaleDateString() : '—'}</span>
                             {(userRole === 'admin' || userRole === 'super_admin' || entry.user_email === userEmail) && (
                               <button onClick={async () => {
                                 try { await db.timeEntries.delete(entry.id); setTimeEntries(prev => prev.filter(e => e.id !== entry.id)); toast.success('Entry deleted') }
@@ -1804,7 +1804,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-gray-400 italic">No time entries yet.</p>
+                      <p className="text-xs text-gray-500 italic">No time entries yet.</p>
                     )}
                   </div>
                 </div>
@@ -1826,15 +1826,15 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                       {ticketParts.map(tp => (
                         <div key={tp.id} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg text-xs">
                           <span className="font-medium text-gray-800 flex-1">{tp.parts?.part_name || '—'}</span>
-                          {tp.parts?.part_number && <span className="text-gray-400 font-mono">{tp.parts.part_number}</span>}
+                          {tp.parts?.part_number && <span className="text-gray-500 font-mono">{tp.parts.part_number}</span>}
                           <span className="text-gray-500">×{tp.quantity}</span>
                           <span className="font-semibold text-gray-700">${(tp.quantity * tp.unit_cost).toFixed(2)}</span>
-                          {tp.notes && <span className="text-gray-400 truncate max-w-[8rem]">{tp.notes}</span>}
+                          {tp.notes && <span className="text-gray-500 truncate max-w-[8rem]">{tp.notes}</span>}
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs text-gray-400 italic">No parts recorded on this ticket.</p>
+                    <p className="text-xs text-gray-500 italic">No parts recorded on this ticket.</p>
                   )}
                 </div>
               )}
@@ -1858,11 +1858,11 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                         {isImage(att.type)
                           ? <img src={att.url} alt={att.name} className="w-full h-24 object-cover rounded-lg mb-2" />
                           : <div className="w-full h-24 bg-gray-100 rounded-lg flex items-center justify-center mb-2">
-                              <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                              <svg className="w-10 h-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                             </div>
                         }
                         <p className="text-xs font-medium text-gray-700 group-hover:text-indigo-600 truncate w-full text-center">{att.name}</p>
-                        <p className="text-xs text-gray-400">{fmtBytes(att.size)}</p>
+                        <p className="text-xs text-gray-500">{fmtBytes(att.size)}</p>
                       </a>
                     ))}
                   </div>
@@ -1873,7 +1873,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               <div className="border-t border-gray-200 pt-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Comments & Communication</h3>
-                  <span className="text-xs text-gray-400">{ticketComments.length} comment{ticketComments.length !== 1 ? 's' : ''}</span>
+                  <span className="text-xs text-gray-500">{ticketComments.length} comment{ticketComments.length !== 1 ? 's' : ''}</span>
                 </div>
 
                 {commentsLoading ? (
@@ -1881,7 +1881,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                     <Spinner size="md" />
                   </div>
                 ) : ticketComments.filter(c => !c.parent_comment_id).length === 0 ? (
-                  <div className="text-center py-6 text-gray-400 text-sm">No comments yet. Start the conversation below.</div>
+                  <div className="text-center py-6 text-gray-500 text-sm">No comments yet. Start the conversation below.</div>
                 ) : (
                   <div className="space-y-3 mb-4">
                     {ticketComments.filter(c => !c.parent_comment_id).map(comment => {
@@ -1902,7 +1902,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                                 <span className="text-sm font-semibold text-gray-900">{displayName}</span>
                                 {comment.is_internal && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">Internal</span>}
                                 {comment.is_customer_comment && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">Customer</span>}
-                                <span className="text-xs text-gray-400">{dateStr} · {timeStr}</span>
+                                <span className="text-xs text-gray-500">{dateStr} · {timeStr}</span>
                               </div>
                               <p className="text-sm text-gray-700 whitespace-pre-wrap">{comment.comment_text}</p>
                               {comment.attachments?.length > 0 && (
@@ -1917,14 +1917,14 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                                 </div>
                               )}
                               <button onClick={() => { setReplyingTo(replyingTo === comment.id ? null : comment.id); setNewComment(''); setCommentFiles([]) }}
-                                className="mt-2 text-xs text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-1">
+                                className="mt-2 text-xs text-gray-500 hover:text-indigo-600 transition-colors flex items-center gap-1">
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
                                 Reply{replies.length > 0 ? ` (${replies.length})` : ''}
                               </button>
                             </div>
                             {(userRole === 'admin' || userRole === 'super_admin') && (
                               <button onClick={() => handleDeleteComment(comment.id)}
-                                className="text-gray-300 hover:text-red-500 flex-shrink-0 self-start p-1 transition-colors" title="Delete comment">
+                                className="text-gray-300 hover:text-red-500 flex-shrink-0 self-start p-1 transition-colors" title="Delete comment" aria-label="Delete comment">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                               </button>
                             )}
@@ -1945,7 +1945,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                                         <span className="text-xs font-semibold text-gray-900">{rName}</span>
                                         {reply.is_internal && <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">Internal</span>}
                                         {reply.is_customer_comment && <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">Customer</span>}
-                                        <span className="text-xs text-gray-400">
+                                        <span className="text-xs text-gray-500">
                                           {rTs.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {rTs.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                       </div>
@@ -1994,14 +1994,14 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                                   {commentFiles.map((f, i) => (
                                     <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">
                                       {f.name}
-                                      <button onClick={() => setCommentFiles(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500">×</button>
+                                      <button onClick={() => setCommentFiles(prev => prev.filter((_, j) => j !== i))} className="text-gray-500 hover:text-red-500">×</button>
                                     </span>
                                   ))}
                                 </div>
                               )}
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-3">
-                                  <button onClick={() => commentFileInputRef.current?.click()} className="text-gray-400 hover:text-indigo-600 transition-colors" title="Attach file">
+                                  <button onClick={() => commentFileInputRef.current?.click()} className="text-gray-500 hover:text-indigo-600 transition-colors" title="Attach file" aria-label="Attach file">
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                                   </button>
                                   <label className="flex items-center gap-1.5 cursor-pointer select-none">
@@ -2013,7 +2013,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                                   </label>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <button onClick={() => { setReplyingTo(null); setNewComment(''); setCommentFiles([]) }} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                                  <button onClick={() => { setReplyingTo(null); setNewComment(''); setCommentFiles([]) }} className="text-xs text-gray-500 hover:text-gray-600">Cancel</button>
                                   <button onClick={() => handleAddComment(comment.id)}
                                     disabled={!newComment.trim() || submittingComment}
                                     className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
@@ -2044,14 +2044,14 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                         {commentFiles.map((f, i) => (
                           <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">
                             {f.name}
-                            <button onClick={() => setCommentFiles(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500">×</button>
+                            <button onClick={() => setCommentFiles(prev => prev.filter((_, j) => j !== i))} className="text-gray-500 hover:text-red-500">×</button>
                           </span>
                         ))}
                       </div>
                     )}
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <button onClick={() => commentFileInputRef.current?.click()} className="text-gray-400 hover:text-indigo-600 transition-colors" title="Attach file">
+                        <button onClick={() => commentFileInputRef.current?.click()} className="text-gray-500 hover:text-indigo-600 transition-colors" title="Attach file" aria-label="Attach file">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                         </button>
                         <label className="flex items-center gap-2 cursor-pointer select-none">
