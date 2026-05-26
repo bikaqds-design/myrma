@@ -100,17 +100,6 @@ html.dark .border-indigo-200 { border-color: #312e81 !important; }
 html.dark code { background-color: #334155 !important; }
 html.dark pre  { background-color: #1e293b !important; }
 
-/* Rounded panels / cards */
-html.dark .rounded-xl { border-color: #334155; }
-html.dark .rounded-2xl { border-color: #334155; }
-
-/* Top bar user dropdown in dark mode */
-html.dark .bg-white.rounded-xl,
-html.dark .bg-white.rounded-2xl {
-  background-color: #1e293b !important;
-  border-color: #334155 !important;
-}
-
 /* ─── MODAL SCROLL LOCK ─────────────────────────────────────────────────── */
 
 /* Lock the main scroll container when any modal overlay is present */

@@ -54,7 +54,7 @@ function CircularGauge({ percent, color, label, sublabel }) {
   return (
     <div className="flex flex-col items-center py-2">
       <svg width="140" height="140" viewBox="0 0 120 120">
-        <circle cx="60" cy="60" r={r} fill="none" stroke="#e5e7eb" strokeWidth="10" />
+        <circle cx="60" cy="60" r={r} fill="none" stroke="currentColor" strokeWidth="10" className="text-gray-200" />
         <circle
           cx="60" cy="60" r={r}
           fill="none" stroke={color} strokeWidth="10"
@@ -63,8 +63,8 @@ function CircularGauge({ percent, color, label, sublabel }) {
           transform="rotate(-90 60 60)"
           style={{ transition: 'stroke-dasharray 0.6s ease' }}
         />
-        <text x="60" y="56" textAnchor="middle" style={{ fontSize: 22, fontWeight: 700, fill: '#111827' }}>{percent}%</text>
-        <text x="60" y="74" textAnchor="middle" style={{ fontSize: 10, fill: '#9ca3af' }}>{sublabel}</text>
+        <text x="60" y="56" textAnchor="middle" style={{ fontSize: 22, fontWeight: 700 }} fill="currentColor">{percent}%</text>
+        <text x="60" y="74" textAnchor="middle" style={{ fontSize: 10 }} fill="currentColor" opacity="0.5">{sublabel}</text>
       </svg>
       <p className="text-sm font-medium text-gray-700 mt-1 text-center">{label}</p>
     </div>
