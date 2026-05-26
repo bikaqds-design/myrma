@@ -55,10 +55,10 @@
 
 | ✅ | ID | Finding | Fix |
 |----|----|---------|-----|
-| ☐ | UX-1 | Modals don't trap focus | Use Radix Dialog (already installed) for all modals |
+| ✅ | UX-1 | Modals don't trap focus | **Done 2026-05-26.** `src/components/Modal.jsx` wrapping `@radix-ui/react-dialog`. 13 modals migrated: 7 in UserManagement, 2 in RMATickets, 4 in Products. Focus trap + Escape + scroll-lock + aria-labelledby on all. |
 | ✅ | UX-2 | Icon-only buttons missing `aria-label` | **Done 2026-05-26.** `aria-label` added to all icon-only buttons with `title=` across App.jsx, PartsInventory, RMATickets, Invoices, NotificationBell. |
 | ✅ | UX-3 | `text-gray-400` on white = WCAG ratio 2.85 (fails AA) | **Done 2026-05-26.** 318 replacements → `text-gray-500` (ratio 4.57, meets AA) across 32 files. |
-| ☐ | UX-4 | Mobile sidebar doesn't trap focus | Add `inert` to main when sidebar open |
+| ✅ | UX-4 | Mobile sidebar doesn't trap focus | **Done 2026-05-26.** `inert` attribute on main content when sidebar open. Escape key closes + returns focus to hamburger. aria-labels on open/close buttons. |
 | ✅ | UX-5 | No realtime toast for new notifications | **Done 2026-05-26.** Supabase realtime INSERT on `notifications` table → `toast()` with role/email targeting + pref check in App.jsx. |
 | ☐ | UX-6 | No optimistic UI on CRUD actions | TanStack `useMutation` with `onMutate`/`onError` |
 | ✅ | UX-7 | Empty states lack CTAs and illustrations | **Done 2026-05-26.** `<EmptyState>` component wired into RMATickets, Customers, Products, PartsInventory. Inline placeholder divs removed. |
@@ -84,7 +84,7 @@
 | ✅ | ID | Finding | Fix |
 |----|----|---------|-----|
 | ☐ | M-3 | No TypeScript despite `@types/react` installed | Incremental `.jsx` → `.tsx` migration |
-| ☐ | M-5 | Magic strings (`'super_admin'`, `'Closed'`, …) everywhere | Extract to enums/constants module |
+| ✅ | M-5 | Magic strings (`'super_admin'`, `'Closed'`, …) everywhere | **Done 2026-05-26.** `src/lib/constants.js` with ROLES, TICKET_STATUS, PRIORITY, INVENTORY_STATUS, NOTIF_TYPE, AUTOMATION_ACTION, CONFIG_KEY, STORAGE_KEY + helpers. `permissions.js` updated to use ROLES constants. `audit.js` and `system.js` consume CONFIG_KEY, AUTOMATION_ACTION, PRIORITY. |
 | ☐ | P-2 | No virtualization on long lists | `@tanstack/react-virtual` for tables >100 rows |
 | ☐ | P-3 | Image uploads not resized | Client-side resize to 1200px max before Storage upload |
 | ☐ | — | No service worker / PWA manifest | Add Vite PWA plugin + offline shell |
@@ -138,16 +138,16 @@
 | Security | 8/10 | 🟢 Unchanged — all P0 fixes still in place |
 | Architecture | 8/10 | 🟢 Permissions in lib, lazy heavy deps, Dashboard memoised |
 | Performance | 9/10 | 🟢 Dashboard O(1) rerenders, Inventory chunk -88%, realtime merges |
-| Accessibility | 6/10 | 🟡 `aria-label` + WCAG AA contrast done; focus traps + optimistic UI remain |
+| Accessibility | 8/10 | 🟢 Focus traps (UX-1 + UX-4) + aria-labels + WCAG AA contrast all done |
 | UX polish | 8/10 | 🟢 Dark mode charts/toasts fixed, contrast improved across all pages |
 | Dark mode | 10/10 | 🟢 Charts, tooltips, toasts, announcement banners all dark-aware |
-| Code quality | 7/10 | 🟡 ESLint + Prettier wired; 0 errors; tests still missing |
+| Code quality | 8/10 | 🟢 ESLint + Prettier + constants module; 0 errors; tests still missing |
 | Notifications | 9/10 | 🟢 Unchanged |
-| Mobile | 6/10 | 🟡 Unchanged — focus traps still P2 |
+| Mobile | 8/10 | 🟢 Sidebar inert + Escape + focus restore; modals fully focus-trapped |
 | Scalability | 9/10 | 🟢 Bundle size down, no eager heavy deps, realtime is incremental |
-| Maintainability | 9/10 | 🟢 Permissions in lib, linter active; supabaseClient split into 15 domain files |
+| Maintainability | 9/10 | 🟢 Constants module, permissions lib, linter active, 15-file API split |
 | Production readiness | 9/10 | 🟢 Unchanged |
-| **Overall** | **9.5/10** | 🟢 **Excellent shape. M-4 + UX-5/7 + A-3 + DM-banner complete. Remaining: focus traps, tests, Router.** |
+| **Overall** | **9.5/10** | 🟢 **UX-1+UX-4+M-5 complete. Next: F-1 (zod forms), F-2 (DB constraints), M-1 (tests).** |
 
 ---
 
@@ -186,3 +186,6 @@ _Mark each item with ✅ and date as you complete it._
 - **2026-05-26** — ✅ UX-7: `<EmptyState>` wired into RMATickets, Customers, Products, PartsInventory. Preset icons + CTAs now shown on empty lists.
 - **2026-05-26** — ✅ A-3: `db.userPreferences` namespace added. AccountSettings persists pref changes to DB. App.jsx seeds localStorage from DB on login. Falls back gracefully if table missing.
 - **2026-05-26** — ✅ M-4: `supabaseClient.js` (1424 lines) split into 15 domain files under `src/api/` + `src/api/db/`. Barrel re-export preserves 100% backward compat. Circular dep (automationRules → notifications) resolved by inlining supabase call. Build: ✅ clean, 0 warnings.
+- **2026-05-26** — ✅ M-5: `src/lib/constants.js` created — ROLES, TICKET_STATUS, PRIORITY, INVENTORY_STATUS, NOTIF_TYPE, AUTOMATION_ACTION, CONFIG_KEY, STORAGE_KEY. `permissions.js` updated (computed keys + canDo uses ROLES). `audit.js` + `system.js` consume constants.
+- **2026-05-26** — ✅ UX-4: `inert` attribute on main content when sidebar open. Escape key closes + returns focus to hamburger (`hamburgerRef`). aria-labels on both open/close buttons.
+- **2026-05-26** — ✅ UX-1: `src/components/Modal.jsx` wrapping `@radix-ui/react-dialog` — focus trap, Escape, scroll-lock, animations, aria-labelledby, dark mode. 13 modals migrated: 7 in UserManagement.jsx, 2 in RMATickets.jsx (create/edit + details), 4 in Products.jsx (product, brand, category, bulk upload). Build: ✅ clean.
