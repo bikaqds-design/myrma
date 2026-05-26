@@ -40,8 +40,8 @@
 |----|----|---------|----------|-----|
 | ☐ | A-1 | No React Router — manual `pathToPage` mapping; typo URLs land on Dashboard | [App.jsx:97-119](src/App.jsx#L97-L119) | Migrate to React Router v6 |
 | ☐ | A-3 | Notification prefs in `localStorage` only — resets on new device | App.jsx:191-194 | Persist to `user_preferences` table; localStorage = cache |
-| ☐ | A-4 | Dashboard recomputes 8+ aggregations every render | [Dashboard.jsx:169-243](src/pages/Dashboard.jsx#L169-L243) | Wrap each in `useMemo([tickets])` |
-| ☐ | A-5 | Dashboard realtime refetches everything on each event | [Dashboard.jsx:119-124](src/pages/Dashboard.jsx#L119-L124) | Merge payload into local state instead of refetching |
+| ✅ | A-4 | Dashboard recomputes 8+ aggregations every render | [Dashboard.jsx:169-243](src/pages/Dashboard.jsx#L169-L243) | **Done 2026-05-26.** All 13 aggregations wrapped in `useMemo([tickets])`. |
+| ✅ | A-5 | Dashboard realtime refetches everything on each event | [Dashboard.jsx:119-124](src/pages/Dashboard.jsx#L119-L124) | **Done 2026-05-26.** INSERT/UPDATE/DELETE each merge payload into local state — no full refetch. |
 | ☐ | A-6 | `ROLE_DEFAULT_PERMISSIONS` lives in App.jsx (40 lines) | [App.jsx:52-95](src/App.jsx#L52-L95) | Move to `src/lib/permissions.js` + `canDo(role, perms, section, action)` helper |
 | ☐ | A-7 | Heavy deps eagerly loaded (~1.5MB initial bundle) | xlsx, jspdf, html2canvas, recharts | Dynamic-import inside event handlers: `const XLSX = await import('xlsx')` |
 | ☐ | P-1 | Adopt TanStack Query for all data fetching | All pages | Replace manual `useState + useEffect` patterns with `useQuery`/`useMutation` + optimistic updates |
@@ -56,8 +56,8 @@
 | ✅ | ID | Finding | Fix |
 |----|----|---------|-----|
 | ☐ | UX-1 | Modals don't trap focus | Use Radix Dialog (already installed) for all modals |
-| ☐ | UX-2 | Icon-only buttons missing `aria-label` | Audit `<button><svg>…` patterns, add labels |
-| ☐ | UX-3 | `text-gray-400` on white = WCAG ratio 2.85 (fails AA) | Replace with `text-gray-500` (ratio 4.57) for text under 18pt |
+| ✅ | UX-2 | Icon-only buttons missing `aria-label` | **Done 2026-05-26.** `aria-label` added to all icon-only buttons with `title=` across App.jsx, PartsInventory, RMATickets, Invoices, NotificationBell. |
+| ✅ | UX-3 | `text-gray-400` on white = WCAG ratio 2.85 (fails AA) | **Done 2026-05-26.** 318 replacements → `text-gray-500` (ratio 4.57, meets AA) across 32 files. |
 | ☐ | UX-4 | Mobile sidebar doesn't trap focus | Add `inert` to main when sidebar open |
 | ☐ | UX-5 | No realtime toast for new notifications | Hook realtime INSERT → `toast()` |
 | ☐ | UX-6 | No optimistic UI on CRUD actions | TanStack `useMutation` with `onMutate`/`onError` |
@@ -71,11 +71,11 @@
 
 | ✅ | Issue | Where | Fix |
 |----|-------|-------|-----|
-| ☐ | Recharts tick text not dark-aware | All Dashboard charts | `tick={{ fill: 'currentColor' }}` + theme-aware parent |
-| ☐ | Recharts tooltip stays white | All charts | Custom `<Tooltip contentStyle={…}>` with CSS var |
+| ✅ | Recharts tick text not dark-aware | All Dashboard charts | **Done 2026-05-26.** `chartTickStyle` with explicit fill colour from `darkMode` flag. |
+| ✅ | Recharts tooltip stays white | All charts | **Done 2026-05-26.** All `<Tooltip>` get `contentStyle` with dark bg `#1e293b` / border `#334155`. |
 | ☐ | `bg-blue-600`/`bg-green-600` saturated banners not overridden | Announcement banner | Add `html.dark .bg-blue-600 { background-color: #1e40af !important; }` etc. |
-| ☐ | `react-hot-toast` toasts have no dark theme | All pages | `<Toaster toastOptions={{ className: 'dark:bg-slate-800 dark:text-slate-100' }} />` |
-| ☐ | PDF export tracks theme (should stay light) | Invoices, labels | Force light rendering always |
+| ✅ | `react-hot-toast` toasts have no dark theme | All pages | **Done 2026-05-26.** All 4 `<Toaster>` get `toastOptions` with dark `#1e293b` background. |
+| ✅ | PDF export tracks theme (should stay light) | Invoices, labels | **N/A — 2026-05-26.** PDFs use popup HTML / jsPDF with hardcoded light colours; no dark bleed. |
 
 ---
 
@@ -156,3 +156,8 @@ _Mark each item with ✅ and date as you complete it._
 - **2026-05-26** — ✅ H-8: `customers.delete()` and `bulkDelete()` now use atomic RPC only. Non-atomic sequential fallback removed.
 - **2026-05-26** — ✅ H-9: `auditInsert()` added — retry + localStorage queue + flush on startup. All 86 call sites resilient automatically.
 - **2026-05-26** — ✅ M-2: ESLint 9 flat config + Prettier added. `lint`, `lint:ci`, `lint:fix`, `format`, `format:check` scripts. 0 errors (BOM regex fixed in Customers/Products).
+- **2026-05-26** — ✅ A-4: Dashboard — all 13 aggregations wrapped in `useMemo([tickets])`. No recompute on unrelated renders.
+- **2026-05-26** — ✅ A-5: Dashboard realtime — INSERT/UPDATE/DELETE each merge into local state; full `loadData()` refetch eliminated.
+- **2026-05-26** — ✅ DM-1/DM-2/DM-3: Dark-aware Recharts ticks + tooltips + react-hot-toast dark background. WidgetCard dark shell added. DM-4 N/A (PDFs already light-only).
+- **2026-05-26** — ✅ UX-2: `aria-label` added to all icon-only buttons with `title=` (11 buttons across 5 files).
+- **2026-05-26** — ✅ UX-3: 318× `text-gray-400` → `text-gray-500` across 32 files for WCAG AA text contrast.

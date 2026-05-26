@@ -5,8 +5,7 @@ import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { StatCardSkeleton, CardSkeleton } from '../components/Skeleton'
 import { Spinner, PageHeader } from '../components/ui'
-import * as XLSX from 'xlsx'
-import jsPDF from 'jspdf'
+// xlsx and jspdf are loaded on-demand (A-7: lazy heavy deps)
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 const STATUS_META = {
@@ -1521,7 +1520,8 @@ function ProductDetailModal({ group, mode, warehouses, canManageBatches, canTran
 }
 
 // ─── Warehouse export helpers ──────────────────────────────────────────────────
-function exportWarehouseExcel(wh, units, brandMap, ticketMap) {
+async function exportWarehouseExcel(wh, units, brandMap, ticketMap) {
+  const XLSX = await import('xlsx')
   const rows = units.map((u, i) => ({
     '#': i + 1,
     'Warehouse Code': wh.code || '',
@@ -1545,7 +1545,8 @@ function exportWarehouseExcel(wh, units, brandMap, ticketMap) {
   toast.success(`Exported ${rows.length} rows to Excel`)
 }
 
-function exportWarehousePDF(wh, units, brandMap, ticketMap) {
+async function exportWarehousePDF(wh, units, brandMap, ticketMap) {
+  const { default: jsPDF } = await import('jspdf')
   const date = new Date().toLocaleDateString()
   const rows = units.map((u, i) => [
     i + 1,
