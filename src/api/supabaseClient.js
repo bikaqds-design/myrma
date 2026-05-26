@@ -782,26 +782,22 @@ export const db = {
 
     async listForUser(email, role) {
       try {
+        // RLS policy user_read_targeted already filters by target_roles/target_emails server-side.
+        // No client-side filter needed — what comes back is exactly what this user should see (H-5 fix).
         const { data, error } = await supabase
           .from('notifications')
           .select('*')
           .order('created_date', { ascending: false })
           .limit(50)
         if (error) { if (error.code === '42P01') return { missing: true, data: [] }; throw error }
-        const visible = (data || []).filter(n =>
-          n.target_roles?.includes(role) || n.target_emails?.includes(email)
-        )
-        return { missing: false, data: visible }
+        return { missing: false, data: data || [] }
       } catch { return { missing: true, data: [] } }
     },
 
     async markRead(id, email) {
       try {
-        const { data: n } = await supabase.from('notifications').select('read_by').eq('id', id).single()
-        if (!n) return
-        const current = n.read_by || []
-        if (current.includes(email)) return
-        await supabase.from('notifications').update({ read_by: [...current, email] }).eq('id', id)
+        // Reuse mark_notifications_read RPC — single atomic UPDATE, no read-then-write (H-5 fix)
+        await supabase.rpc('mark_notifications_read', { p_email: email, p_ids: [id] })
       } catch {}
     },
 

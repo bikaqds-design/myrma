@@ -22,8 +22,8 @@
 | ✅ | ID | Finding | Location | Fix |
 |----|----|---------|----------|-----|
 | ✅ | H-1 | Duplicate `db.webhooks` definition — second overwrites first | supabaseClient.js:527, :1015 | **Done 2026-05-26.** Merged: kept table-based CRUD (matches Integrations.jsx), added `dispatch` method, deleted duplicate rma_config-based block. Integrations page no longer silently broken. |
-| ☐ | H-2 | N+1 query in `markAllRead` | supabaseClient.js:820-836 | Single batched UPDATE with `.in('id', ids)` or RPC `mark_notifications_read(email, ids)` |
-| ☐ | H-3 | Race condition in `parts.adjustQuantity` (read-modify-write) | supabaseClient.js:906-912 | Atomic RPC `adjust_part_quantity(id uuid, delta int)` doing `UPDATE parts SET quantity = quantity + $1 RETURNING quantity` |
+| ✅ | H-2 | N+1 query in `markAllRead` | supabaseClient.js:820-836 | **Done 2026-05-26.** RPC `mark_notifications_read(p_email, p_ids)` — single batched UPDATE replaces N queries. |
+| ✅ | H-3 | Race condition in `parts.adjustQuantity` (read-modify-write) | supabaseClient.js:906-912 | **Done 2026-05-26.** RPC `adjust_part_quantity(p_id, p_delta)` — atomic `GREATEST(0, quantity + delta)` in one SQL statement. |
 | ☐ | H-4 | All list endpoints return full tables, no pagination | `rmaTickets.list`, `customers.list`, `products.list` | Server-side `.range(from, to)` + TanStack `useInfiniteQuery` |
 | ☐ | H-5 | Notifications filtered client-side after fetching all rows (privacy leak) | supabaseClient.js:796-808 | Move filter to SQL via RPC or RLS |
 | ☐ | H-6 | Backup export includes plaintext SMTP/SendGrid API keys | `backup` namespace | Strip `email_settings` secrets from export, or encrypt with user passphrase |
