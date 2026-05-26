@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { db, auth } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
+import Modal from '../components/Modal'
 import { Spinner, Button } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
 
@@ -648,9 +649,8 @@ function AddUserModal({ email, password, role, onEmailChange, onPasswordChange, 
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Add New User</h2>
+    <Modal open={true} onClose={onClose} title="Add New User" className="max-w-md" hideHeader>
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Add New User</h2>
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
@@ -723,8 +723,7 @@ function AddUserModal({ email, password, role, onEmailChange, onPasswordChange, 
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -741,9 +740,8 @@ function PasswordResetModal({ user, isSuperAdmin, password, onPasswordChange, on
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-1">Reset Password</h2>
+    <Modal open={true} onClose={onClose} title="Reset Password" className="max-w-md" hideHeader>
+      <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Reset Password</h2>
         <p className="text-sm text-gray-500 mb-4">User: <strong className="text-gray-800">{user.user_email}</strong></p>
 
         {isSuperAdmin ? (
@@ -805,16 +803,14 @@ function PasswordResetModal({ user, isSuperAdmin, password, onPasswordChange, on
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   )
 }
 
 function UserControlModal({ user, action, reason, notes, expiration, onActionChange, onReasonChange, onNotesChange, onExpirationChange, onSubmit, onClose }) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 m-4">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">User Controls: {user.user_email}</h2>
+    <Modal open={true} onClose={onClose} title={`User Controls: ${user.user_email}`} className="max-w-2xl" hideHeader>
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">User Controls: {user.user_email}</h2>
         
         <div className="space-y-4">
           <div className="bg-gray-50 p-4 rounded-lg">
@@ -909,16 +905,14 @@ function UserControlModal({ user, action, reason, notes, expiration, onActionCha
             Execute Action
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
 function ActivityModal({ user, activity, onClose }) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-6 m-4 max-h-[80vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Activity Log: {user.user_email}</h2>
+    <Modal open={true} onClose={onClose} title={`Activity Log: ${user.user_email}`} className="max-w-3xl" hideHeader>
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Activity Log: {user.user_email}</h2>
         
         {activity.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
@@ -954,8 +948,7 @@ function ActivityModal({ user, activity, onClose }) {
             Close
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -1086,8 +1079,8 @@ function RoleTemplatesTab({ currentUserRole, currentUserEmail }) {
       })}
 
       {editingRole && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh]">
+        <Modal open={true} onClose={() => setEditingRole(null)} title={`Edit ${editingRole.name} Template`} className="max-w-4xl" hideHeader>
+          <div className="flex flex-col max-h-[80vh]">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">{editingRole.icon} Edit {editingRole.name} Template</h3>
@@ -1116,7 +1109,7 @@ function RoleTemplatesTab({ currentUserRole, currentUserEmail }) {
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )
@@ -1174,9 +1167,8 @@ function CreateRoleModal({ roleName, roleDescription, permissions, onRoleNameCha
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl p-6 m-4 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Create Custom Role</h2>
+    <Modal open={true} onClose={onClose} title="Create Custom Role" className="max-w-4xl" hideHeader>
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Create Custom Role</h2>
         <form onSubmit={onSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Role Name</label>
@@ -1222,8 +1214,7 @@ function CreateRoleModal({ roleName, roleDescription, permissions, onRoleNameCha
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -1237,9 +1228,8 @@ function PermissionsModal({ user, onUserChange, onSave, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl p-6 m-4 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Edit Permissions: {user.user_email}</h2>
+    <Modal open={true} onClose={onClose} title={`Edit Permissions: ${user.user_email}`} className="max-w-4xl" hideHeader>
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Edit Permissions: {user.user_email}</h2>
         
         <PermissionMatrix 
           permissions={user.permissions || getDefaultPermissions()} 
@@ -1260,8 +1250,7 @@ function PermissionsModal({ user, onUserChange, onSave, onClose }) {
             Save Permissions
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 

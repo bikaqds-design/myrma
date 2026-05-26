@@ -6,9 +6,10 @@
  * `user_roles.permissions` is used when present; these defaults apply as
  * fallback when the column is null / the row is missing.
  */
+import { ROLES } from './constants.js'
 
 export const ROLE_DEFAULT_PERMISSIONS = {
-  manager: {
+  [ROLES.MANAGER]: {
     products: { view: true, create: true, edit: true, delete: false, export: true, import: false },
     customers: { view: true, create: true, edit: true, delete: false, export: true, import: false, view_history: true },
     rma_tickets: { view_all: true, view_assigned: true, create: true, edit_all: true, edit_assigned: true, delete: false, assign: true, change_status: true, change_priority: true, add_comments: true, delete_comments: false, view_activity: true, attach_files: true, delete_files: false, print_labels: true, export: true },
@@ -22,7 +23,7 @@ export const ROLE_DEFAULT_PERMISSIONS = {
     calendar: { view: true },
     reports: { view: true, export: true },
   },
-  technician: {
+  [ROLES.TECHNICIAN]: {
     products: { view: true, create: false, edit: false, delete: false, export: false, import: false },
     customers: { view: true, create: false, edit: false, delete: false, export: false, import: false, view_history: true },
     rma_tickets: { view_all: true, view_assigned: true, create: false, edit_all: false, edit_assigned: true, delete: false, assign: false, change_status: true, change_priority: false, add_comments: true, delete_comments: false, view_activity: true, attach_files: true, delete_files: false, print_labels: true, export: false },
@@ -36,7 +37,7 @@ export const ROLE_DEFAULT_PERMISSIONS = {
     calendar: { view: true },
     reports: { view: false, export: false },
   },
-  viewer: {
+  [ROLES.VIEWER]: {
     products: { view: true, create: false, edit: false, delete: false, export: false, import: false },
     customers: { view: true, create: false, edit: false, delete: false, export: false, import: false, view_history: true },
     rma_tickets: { view_all: true, view_assigned: false, create: false, edit_all: false, edit_assigned: false, delete: false, assign: false, change_status: false, change_priority: false, add_comments: false, delete_comments: false, view_activity: true, attach_files: false, delete_files: false, print_labels: false, export: false },
@@ -61,6 +62,6 @@ export const ROLE_DEFAULT_PERMISSIONS = {
  * For other roles, checks permissions[section][action].
  */
 export function canDo(role, permissions, section, action) {
-  if (role === 'super_admin' || role === 'admin') return true
+  if (role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN) return true
   return !!permissions?.[section]?.[action]
 }

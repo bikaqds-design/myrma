@@ -6,6 +6,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { PageSkeleton } from '../components/Skeleton'
 import { Button, Spinner, PageHeader } from '../components/ui'
 import EmptyState from '../components/EmptyState'
+import Modal from '../components/Modal'
 
 const generateRmaNumber = (existingTickets = []) => {
   const now = new Date()
@@ -1251,8 +1252,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
       {/* ─── CREATE / EDIT MODAL ─── */}
       {showModal && (
-        <div className="modal-overlay-bg fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto overscroll-contain">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-8">
+        <Modal open={true} onClose={() => { setShowModal(false); setEditingTicket(null) }} title={editingTicket ? 'Edit RMA Ticket' : 'Create New RMA Ticket'} className="max-w-4xl" noPadding hideHeader scrollable={false}>
+          <div className="w-full">
 
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
               <div>
@@ -1573,13 +1574,13 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* ─── DETAILS MODAL ─── */}
       {showDetailsModal && selectedTicket && (
-        <div className="modal-overlay-bg fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto overscroll-contain">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-8">
+        <Modal open={true} onClose={() => { setShowDetailsModal(false); setSelectedTicket(null) }} title="Ticket Details" className="max-w-4xl" noPadding hideHeader scrollable={false}>
+          <div className="w-full">
 
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
               <div>
@@ -2080,7 +2081,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               </Button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       <ConfirmDialog

@@ -1,5 +1,6 @@
 import { supabase } from '../client.js'
 import { auditInsert, auditFlushQueue } from './audit.js'
+import { PRIORITY, CONFIG_KEY, AUTOMATION_ACTION } from '../../lib/constants.js'
 
 export const announcements = {
   async list() {
@@ -161,21 +162,21 @@ export const slaConfig = {
     enabled: false,
     pauseOnHold: true,
     policies: [
-      { priority: 'Critical', hours: 24 },
-      { priority: 'High',     hours: 48 },
-      { priority: 'Medium',   hours: 72 },
-      { priority: 'Low',      hours: 168 },
+      { priority: PRIORITY.CRITICAL, hours: 24 },
+      { priority: PRIORITY.HIGH,     hours: 48 },
+      { priority: PRIORITY.MEDIUM,   hours: 72 },
+      { priority: PRIORITY.LOW,      hours: 168 },
     ]
   },
   async get() {
     try {
-      const { data, error } = await supabase.from('rma_config').select('config_value').eq('config_key', 'sla_config').single()
+      const { data, error } = await supabase.from('rma_config').select('config_value').eq('config_key', CONFIG_KEY.SLA_CONFIG).single()
       if (error) return slaConfig.DEFAULT
       return { ...slaConfig.DEFAULT, ...(data?.config_value || {}) }
     } catch { return slaConfig.DEFAULT }
   },
   async save(config, userEmail) {
-    return rmaConfig.set('sla_config', config, userEmail)
+    return rmaConfig.set(CONFIG_KEY.SLA_CONFIG, config, userEmail)
   },
   computeDueDate(priority, config) {
     if (!config?.enabled) return null
@@ -212,7 +213,7 @@ async function applyActions(actions, ticket) {
         await supabase.from('rma_tickets').update({ priority: a.value, updated_date: new Date().toISOString() }).eq('id', ticket.id)
       } else if (a.type === 'assign_technician') {
         await supabase.from('rma_tickets').update({ assigned_technician: a.value, updated_date: new Date().toISOString() }).eq('id', ticket.id)
-      } else if (a.type === 'create_notification') {
+      } else if (a.type === AUTOMATION_ACTION.CREATE_NOTIFICATION) {
         // Inline supabase call — avoids circular import between system.js and notifications.js
         await supabase.from('notifications').insert([{
           type: 'custom_alert',
@@ -234,13 +235,13 @@ async function applyActions(actions, ticket) {
 export const automationRules = {
   async list() {
     try {
-      const { data, error } = await supabase.from('rma_config').select('config_value').eq('config_key', 'automation_rules').single()
+      const { data, error } = await supabase.from('rma_config').select('config_value').eq('config_key', CONFIG_KEY.AUTOMATION_RULES).single()
       if (error) return []
       return data?.config_value || []
     } catch { return [] }
   },
   async save(rules, userEmail) {
-    return rmaConfig.set('automation_rules', rules, userEmail)
+    return rmaConfig.set(CONFIG_KEY.AUTOMATION_RULES, rules, userEmail)
   },
   // Run all matching rules against a ticket event. Returns list of applied rule names.
   async evaluate(eventType, ticket, allTickets = []) {

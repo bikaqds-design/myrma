@@ -6,6 +6,7 @@ import { PageSkeleton } from '../components/Skeleton'
 import { Button, Spinner, PageHeader } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
 import EmptyState from '../components/EmptyState'
+import Modal from '../components/Modal'
 
 export default function Products({ currentUserRole, currentUserEmail, currentUserPermissions, onNavigateToProduct }) {
   const searchRef = useRef(null)
@@ -1754,8 +1755,8 @@ function AddProductModal({
   const filteredSubcategories = subcategories.filter(s => s.category_id === productForm.category_id)
 
   return (
-    <div className="modal-overlay-bg fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto overscroll-contain">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl my-8">
+    <Modal open={true} onClose={onClose} title={editingProduct ? 'Edit Product' : 'Add New Product'} className="max-w-3xl" hideHeader noPadding scrollable={false}>
+      <div>
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
@@ -1947,7 +1948,7 @@ function AddProductModal({
           </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -1964,8 +1965,8 @@ function AddBrandModal({
   editingBrand
 }) {
   return (
-    <div className="modal-overlay-bg fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overscroll-contain">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+    <Modal open={true} onClose={onClose} title={editingBrand ? 'Edit Brand' : 'Add New Brand'} hideHeader noPadding scrollable={false}>
+      <div>
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-2xl font-bold text-gray-900">
             {editingBrand ? 'Edit Brand' : 'Add New Brand'}
@@ -2054,7 +2055,7 @@ function AddBrandModal({
           </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -2070,8 +2071,8 @@ function AddCategoryModal({
   editingCategory
 }) {
   return (
-    <div className="modal-overlay-bg fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overscroll-contain">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+    <Modal open={true} onClose={onClose} title={editingCategory ? 'Edit Category' : 'Add New Category'} hideHeader noPadding scrollable={false}>
+      <div>
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-2xl font-bold text-gray-900">
             {editingCategory ? 'Edit Category' : 'Add New Category'}
@@ -2144,7 +2145,7 @@ function AddCategoryModal({
           </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -2181,8 +2182,8 @@ function BulkUploadModal({ onClose, onUpload, onDownloadTemplate }) {
   }
 
   return (
-    <div className="modal-overlay-bg fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overscroll-contain">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl">
+    <Modal open={true} onClose={onClose} title="Bulk Upload Products" className="max-w-2xl" hideHeader noPadding scrollable={false}>
+      <div>
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-2xl font-bold text-gray-900">Bulk Upload Products</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-600">
@@ -2262,6 +2263,6 @@ function BulkUploadModal({ onClose, onUpload, onDownloadTemplate }) {
           </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }

@@ -1,9 +1,10 @@
 import { supabase } from '../client.js'
+import { STORAGE_KEY } from '../../lib/constants.js'
 
 // ─── Audit log helpers (H-9) ─────────────────────────────────────────────────
 // Resilient fire-and-log: retry once, then queue to localStorage.
 // Queued entries are flushed on next successful write or app start.
-const AUDIT_QUEUE_KEY = 'mrma_audit_queue'
+const AUDIT_QUEUE_KEY = STORAGE_KEY.AUDIT_QUEUE
 const AUDIT_QUEUE_MAX = 50
 
 export function _auditEnqueue(entry) {
