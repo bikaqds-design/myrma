@@ -28,6 +28,7 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
   const searchRef = useRef(null)
   const [customers, setCustomers] = useState([])
   const [filteredCustomers, setFilteredCustomers] = useState([])
+  const [customersTotalCount, setCustomersTotalCount] = useState(null)
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCustomers, setSelectedCustomers] = useState([])
@@ -116,6 +117,7 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
         db.customers.list(),
         db.userRoles.listAllRoles()
       ])
+      db.customers.listPaged(0, 1).then(r => setCustomersTotalCount(r.count)).catch(() => {})
       setCustomers(customersData)
       setUsersList(usersData)
     } catch (error) {
@@ -656,6 +658,14 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
               {(filterStatus || filterType || filterCompany) && (
                 <button onClick={() => { setFilterStatus(''); setFilterType(''); setFilterCompany('') }} className="text-sm text-red-600 hover:underline">Clear</button>
               )}
+            </div>
+          )}
+
+          {/* Cap warning banner (H-4) */}
+          {customersTotalCount !== null && customersTotalCount > customers.length && (
+            <div className="mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex items-center gap-2">
+              <span>⚠️</span>
+              <span>Showing first <strong>{customers.length}</strong> of <strong>{customersTotalCount}</strong> customers. Use filters or search to find specific records.</span>
             </div>
           )}
 

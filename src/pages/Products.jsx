@@ -13,6 +13,7 @@ export default function Products({ currentUserRole, currentUserEmail, currentUse
   
   const [products, setProducts] = useState([])
   const [filteredProducts, setFilteredProducts] = useState([])
+  const [productsTotalCount, setProductsTotalCount] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedProducts, setSelectedProducts] = useState([])
   
@@ -159,6 +160,7 @@ export default function Products({ currentUserRole, currentUserEmail, currentUse
         db.subcategories.list()
       ])
       
+      db.products.listPaged(0, 1).then(r => setProductsTotalCount(r.count)).catch(() => {})
       setProducts(productsData)
       setBrands(brandsData)
       setCategories(categoriesData)
@@ -1259,6 +1261,14 @@ function ProductsListTab({
           )}
         </div>
       </div>
+
+      {/* Cap warning banner (H-4) */}
+      {productsTotalCount !== null && productsTotalCount > products.length && (
+        <div className="mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex items-center gap-2">
+          <span>⚠️</span>
+          <span>Showing first <strong>{products.length}</strong> of <strong>{productsTotalCount}</strong> products. Use filters or search to find specific records.</span>
+        </div>
+      )}
 
       {/* Pagination Top Bar */}
       <div className="flex items-center justify-between text-sm text-gray-600">

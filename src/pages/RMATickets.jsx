@@ -59,6 +59,7 @@ function SortableHeader({ label, sortKey, sortConfig, onSort }) {
 export default function RMATickets({ userRole, userEmail, userPermissions, initialTicketId }) {
   const [tickets, setTickets] = useState([])
   const [filteredTickets, setFilteredTickets] = useState([])
+  const [ticketsTotalCount, setTicketsTotalCount] = useState(null)
   const [customers, setCustomers] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -207,6 +208,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         db.products.list(),
         db.userRoles.listAllRoles()
       ])
+      // Fetch total count alongside capped list (H-4)
+      db.rmaTickets.listPaged(0, 1).then(r => setTicketsTotalCount(r.count)).catch(() => {})
       setTickets(ticketsData)
       setFilteredTickets(ticketsData)
       setCustomers(customersData)
@@ -1048,6 +1051,14 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             <button onClick={() => { setFilterStatus(''); setFilterPriority(''); setFilterAssigned(''); setFilterCustomer(''); setFilterCustomerSearch('') }}
               className="text-sm text-red-600 hover:underline">Clear all</button>
           )}
+        </div>
+      )}
+
+      {/* Cap warning banner (H-4) */}
+      {ticketsTotalCount !== null && ticketsTotalCount > tickets.length && (
+        <div className="mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex items-center gap-2">
+          <span>⚠️</span>
+          <span>Showing first <strong>{tickets.length}</strong> of <strong>{ticketsTotalCount}</strong> tickets. Use filters or search to find specific tickets.</span>
         </div>
       )}
 

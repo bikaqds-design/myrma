@@ -235,9 +235,20 @@ export const db = {
 
   products: {
     async list() {
-      const { data, error } = await supabase.from('products').select('*, brand:brands(id, brand_name, brand_logo_url), category:categories(id, category_name), subcategory:subcategories(id, subcategory_name)').order('created_date', { ascending: false })
+      // Capped at 500 rows — use listPaged() for server-side pagination (H-4)
+      const { data, error } = await supabase.from('products').select('*, brand:brands(id, brand_name, brand_logo_url), category:categories(id, category_name), subcategory:subcategories(id, subcategory_name)').order('created_date', { ascending: false }).limit(500)
       if (error) throw error
       return data || []
+    },
+    async listPaged(page = 0, pageSize = 50) {
+      const from = page * pageSize
+      const { data, count, error } = await supabase
+        .from('products')
+        .select('*, brand:brands(id, brand_name, brand_logo_url), category:categories(id, category_name), subcategory:subcategories(id, subcategory_name)', { count: 'exact' })
+        .order('created_date', { ascending: false })
+        .range(from, from + pageSize - 1)
+      if (error) throw error
+      return { data: data || [], count: count || 0, page, pageSize, totalPages: Math.ceil((count || 0) / pageSize) }
     },
     async get(id) {
       const { data, error } = await supabase.from('products').select('*, brand:brands(id, brand_name, brand_logo_url), category:categories(id, category_name), subcategory:subcategories(id, subcategory_name)').eq('id', id).single()
@@ -286,9 +297,20 @@ export const db = {
 
   customers: {
     async list() {
-      const { data, error } = await supabase.from('customers').select('*').order('created_date', { ascending: false })
+      // Capped at 500 rows — use listPaged() for server-side pagination (H-4)
+      const { data, error } = await supabase.from('customers').select('*').order('created_date', { ascending: false }).limit(500)
       if (error) throw error
       return data || []
+    },
+    async listPaged(page = 0, pageSize = 50) {
+      const from = page * pageSize
+      const { data, count, error } = await supabase
+        .from('customers')
+        .select('*', { count: 'exact' })
+        .order('created_date', { ascending: false })
+        .range(from, from + pageSize - 1)
+      if (error) throw error
+      return { data: data || [], count: count || 0, page, pageSize, totalPages: Math.ceil((count || 0) / pageSize) }
     },
     async get(id) {
       const { data, error } = await supabase.from('customers').select('*').eq('id', id).single()
@@ -394,9 +416,20 @@ export const db = {
 
   rmaTickets: {
     async list() {
-      const { data, error } = await supabase.from('rma_tickets').select('*').order('created_date', { ascending: false })
+      // Capped at 500 rows — use listPaged() for server-side pagination (H-4)
+      const { data, error } = await supabase.from('rma_tickets').select('*').order('created_date', { ascending: false }).limit(500)
       if (error) throw error
       return data || []
+    },
+    async listPaged(page = 0, pageSize = 50) {
+      const from = page * pageSize
+      const { data, count, error } = await supabase
+        .from('rma_tickets')
+        .select('*', { count: 'exact' })
+        .order('created_date', { ascending: false })
+        .range(from, from + pageSize - 1)
+      if (error) throw error
+      return { data: data || [], count: count || 0, page, pageSize, totalPages: Math.ceil((count || 0) / pageSize) }
     },
     async get(id) {
       const { data, error } = await supabase.from('rma_tickets').select('*').eq('id', id).single()
