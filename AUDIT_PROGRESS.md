@@ -42,8 +42,8 @@
 | ☐ | A-3 | Notification prefs in `localStorage` only — resets on new device | App.jsx:191-194 | Persist to `user_preferences` table; localStorage = cache |
 | ✅ | A-4 | Dashboard recomputes 8+ aggregations every render | [Dashboard.jsx:169-243](src/pages/Dashboard.jsx#L169-L243) | **Done 2026-05-26.** All 13 aggregations wrapped in `useMemo([tickets])`. |
 | ✅ | A-5 | Dashboard realtime refetches everything on each event | [Dashboard.jsx:119-124](src/pages/Dashboard.jsx#L119-L124) | **Done 2026-05-26.** INSERT/UPDATE/DELETE each merge payload into local state — no full refetch. |
-| ☐ | A-6 | `ROLE_DEFAULT_PERMISSIONS` lives in App.jsx (40 lines) | [App.jsx:52-95](src/App.jsx#L52-L95) | Move to `src/lib/permissions.js` + `canDo(role, perms, section, action)` helper |
-| ☐ | A-7 | Heavy deps eagerly loaded (~1.5MB initial bundle) | xlsx, jspdf, html2canvas, recharts | Dynamic-import inside event handlers: `const XLSX = await import('xlsx')` |
+| ✅ | A-6 | `ROLE_DEFAULT_PERMISSIONS` lives in App.jsx (40 lines) | [App.jsx:52-95](src/App.jsx#L52-L95) | **Done 2026-05-26.** Moved to [src/lib/permissions.js](src/lib/permissions.js) + `canDo()` helper exported. App.jsx imports from lib. |
+| ✅ | A-7 | Heavy deps eagerly loaded (~1.5MB initial bundle) | xlsx, jspdf, html2canvas, recharts | **Done 2026-05-26.** `xlsx` + `jspdf` dynamic-imported in Inventory.jsx export handlers. Inventory chunk: 734 KB → 90 KB. |
 | ☐ | P-1 | Adopt TanStack Query for all data fetching | All pages | Replace manual `useState + useEffect` patterns with `useQuery`/`useMutation` + optimistic updates |
 | ☐ | M-1 | Zero unit/E2E tests | — | Vitest for components, Playwright for smoke flows |
 | ✅ | M-2 | No ESLint config | — | **Done 2026-05-26.** ESLint 9 flat config + Prettier. 0 errors, 167 warnings. `npm run lint` / `npm run format` now available. |
@@ -161,3 +161,5 @@ _Mark each item with ✅ and date as you complete it._
 - **2026-05-26** — ✅ DM-1/DM-2/DM-3: Dark-aware Recharts ticks + tooltips + react-hot-toast dark background. WidgetCard dark shell added. DM-4 N/A (PDFs already light-only).
 - **2026-05-26** — ✅ UX-2: `aria-label` added to all icon-only buttons with `title=` (11 buttons across 5 files).
 - **2026-05-26** — ✅ UX-3: 318× `text-gray-400` → `text-gray-500` across 32 files for WCAG AA text contrast.
+- **2026-05-26** — ✅ A-6: `ROLE_DEFAULT_PERMISSIONS` extracted to `src/lib/permissions.js`; `canDo()` helper added.
+- **2026-05-26** — ✅ A-7: `xlsx` + `jspdf` dynamic-imported in Inventory.jsx. Chunk 734 KB → 90 KB (-88%).
