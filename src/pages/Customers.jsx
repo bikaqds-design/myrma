@@ -6,6 +6,7 @@ import { PageSkeleton } from '../components/Skeleton'
 import AttachmentsField from '../components/AttachmentsField'
 import { Button, Spinner, PageHeader } from '../components/ui'
 import EmptyState from '../components/EmptyState'
+import { customerSchema, getFirstError } from '../lib/schemas'
 
 const EMPTY_FORM = {
   customer_type: 'B2B',
@@ -210,10 +211,11 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
   }
 
   const handleSaveCustomer = async () => {
-    if (!customerForm.contact_person.trim()) { toast.error('Contact person is required'); return }
-    if (!customerForm.mobile.trim()) { toast.error('Mobile number is required'); return }
-    if (customerForm.customer_type === 'B2B' && !customerForm.company_name.trim()) {
-      toast.error('Company name is required for B2B customers'); return
+    // F-1: zod schema validation — single source of truth for field rules
+    const validation = customerSchema.safeParse(customerForm)
+    if (!validation.success) {
+      toast.error(getFirstError(validation))
+      return
     }
 
     // Upload pending files

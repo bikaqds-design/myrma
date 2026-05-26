@@ -1,53 +1,56 @@
 import React, { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { auth } from '../api/supabaseClient'
 import { useAppearance } from '../contexts/AppearanceContext'
+import { loginSchema, forgotPasswordSchema } from '../lib/schemas'
 
 export default function Login({ onLogin }) {
   const { loginBg } = useAppearance()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [serverError, setServerError]   = useState('')
+  const [forgotMode, setForgotMode]     = useState(false)
+  const [forgotSent, setForgotSent]     = useState(false)
 
-  const [forgotMode, setForgotMode] = useState(false)
-  const [forgotEmail, setForgotEmail] = useState('')
-  const [forgotSent, setForgotSent] = useState(false)
-  const [forgotError, setForgotError] = useState('')
-  const [forgotLoading, setForgotLoading] = useState(false)
+  // ── Login form ──────────────────────────────────────────────────────────────
+  const {
+    register,
+    handleSubmit,
+    getValues,
+    formState: { errors, isSubmitting },
+  } = useForm({ resolver: zodResolver(loginSchema) })
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+  const onLoginSubmit = async ({ email, password }) => {
+    setServerError('')
     try {
       await onLogin(email, password)
     } catch (err) {
-      setError(err.message || 'Login failed')
-    } finally {
-      setLoading(false)
+      setServerError(err.message || 'Login failed')
     }
   }
 
-  const handleForgotSubmit = async (e) => {
-    e.preventDefault()
-    setForgotError('')
-    setForgotLoading(true)
+  // ── Forgot-password form ────────────────────────────────────────────────────
+  const {
+    register:       forgotRegister,
+    handleSubmit:   forgotHandleSubmit,
+    formState:      { errors: forgotErrors, isSubmitting: forgotSubmitting },
+    reset:          forgotReset,
+  } = useForm({ resolver: zodResolver(forgotPasswordSchema) })
+
+  const onForgotSubmit = async ({ email }) => {
     try {
-      await auth.resetPassword(forgotEmail)
+      await auth.resetPassword(email)
       setForgotSent(true)
     } catch (err) {
-      setForgotError(err.message || 'Failed to send reset email')
-    } finally {
-      setForgotLoading(false)
+      // Surface server-side error inside the form via a thrown error to rhf
+      throw new Error(err.message || 'Failed to send reset email')
     }
   }
 
   const backToLogin = () => {
     setForgotMode(false)
     setForgotSent(false)
-    setForgotEmail('')
-    setForgotError('')
+    forgotReset()
   }
 
   return (
@@ -66,17 +69,22 @@ export default function Login({ onLogin }) {
         </div>
 
         {!forgotMode ? (
-          <form onSubmit={handleSubmit} className="space-y-6">
+          /* ── Login ─────────────────────────────────────────────────────── */
+          <form onSubmit={handleSubmit(onLoginSubmit)} className="space-y-6" noValidate>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
               <input
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+                {...register('email')}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent ${
+                  errors.email ? 'border-red-400 bg-red-50' : 'border-gray-300'
+                }`}
                 placeholder="admin@example.com"
-                required
+                autoComplete="email"
               />
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+              )}
             </div>
 
             <div>
@@ -84,7 +92,7 @@ export default function Login({ onLogin }) {
                 <label className="block text-sm font-medium text-gray-700">Password</label>
                 <button
                   type="button"
-                  onClick={() => { setForgotMode(true); setForgotEmail(email) }}
+                  onClick={() => { setForgotMode(true) }}
                   className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
                 >
                   Forgot password?
@@ -93,17 +101,19 @@ export default function Login({ onLogin }) {
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+                  {...register('password')}
+                  className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent ${
+                    errors.password ? 'border-red-400 bg-red-50' : 'border-gray-300'
+                  }`}
                   placeholder="••••••••"
-                  required
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(v => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
                   tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,26 +127,30 @@ export default function Login({ onLogin }) {
                   )}
                 </button>
               </div>
+              {errors.password && (
+                <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
+              )}
             </div>
 
-            {error && (
-              <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">
-                {error}
+            {serverError && (
+              <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm" role="alert">
+                {serverError}
               </div>
             )}
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {isSubmitting ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
         ) : (
+          /* ── Forgot password ────────────────────────────────────────────── */
           <div className="space-y-6">
             {!forgotSent ? (
-              <form onSubmit={handleForgotSubmit} className="space-y-6">
+              <form onSubmit={forgotHandleSubmit(onForgotSubmit)} className="space-y-6" noValidate>
                 <p className="text-sm text-gray-600">
                   Enter your email address and we'll send you a link to reset your password.
                 </p>
@@ -144,27 +158,32 @@ export default function Login({ onLogin }) {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                   <input
                     type="email"
-                    value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+                    {...forgotRegister('email')}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent ${
+                      forgotErrors.email ? 'border-red-400 bg-red-50' : 'border-gray-300'
+                    }`}
                     placeholder="your@email.com"
-                    required
                     autoFocus
+                    autoComplete="email"
                   />
+                  {forgotErrors.email && (
+                    <p className="mt-1 text-sm text-red-600">{forgotErrors.email.message}</p>
+                  )}
                 </div>
 
-                {forgotError && (
-                  <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">
-                    {forgotError}
+                {/* rhf surfaces thrown errors from onForgotSubmit via formState.errors.root */}
+                {forgotErrors.root && (
+                  <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm" role="alert">
+                    {forgotErrors.root.message}
                   </div>
                 )}
 
                 <button
                   type="submit"
-                  disabled={forgotLoading}
+                  disabled={forgotSubmitting}
                   className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {forgotLoading ? 'Sending...' : 'Send Reset Link'}
+                  {forgotSubmitting ? 'Sending…' : 'Send Reset Link'}
                 </button>
 
                 <button
@@ -185,7 +204,7 @@ export default function Login({ onLogin }) {
                 <div>
                   <p className="text-gray-800 font-medium">Check your inbox</p>
                   <p className="text-sm text-gray-500 mt-1">
-                    A password reset link has been sent to <span className="font-medium">{forgotEmail}</span>
+                    A password reset link has been sent to your email address.
                   </p>
                 </div>
                 <button
