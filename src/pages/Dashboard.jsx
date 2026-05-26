@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { db, supabase } from '../api/supabaseClient'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { Spinner, PageHeader } from '../components/ui'
@@ -116,12 +116,21 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
 
   useEffect(() => { loadData() }, [loadData])
 
+  // A-5: merge realtime payload into local state instead of full refetch
   useEffect(() => {
     const channel = supabase.channel('dashboard-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rma_tickets' }, () => loadData())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rma_tickets' }, ({ new: row }) => {
+        setTickets(prev => [row, ...prev])
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rma_tickets' }, ({ new: row }) => {
+        setTickets(prev => prev.map(t => t.id === row.id ? row : t))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'rma_tickets' }, ({ old: row }) => {
+        setTickets(prev => prev.filter(t => t.id !== row.id))
+      })
       .subscribe()
     return () => supabase.removeChannel(channel)
-  }, [loadData])
+  }, [])
 
   // Re-read widget prefs when returning to this page (storageKey may differ per user)
   useEffect(() => {
@@ -146,27 +155,41 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
   const on = (id) => enabledWidgets.includes(id)
   const nav = (page) => () => onNavigate?.(page)
 
-  // ── Computed stats ──
-  const totalTickets = tickets.length
-  const openTickets = tickets.filter(t => !['Closed', 'Resolved', 'Cancelled'].includes(t.ticket_status)).length
-  const closedTickets = tickets.filter(t => ['Closed', 'Resolved'].includes(t.ticket_status)).length
+  // A-4: all aggregations memoised — only recompute when tickets changes
+  const totalTickets = useMemo(() => tickets.length, [tickets])
 
-  const overdueList = tickets.filter(t => {
-    if (!t.due_date || ['Closed', 'Resolved', 'Cancelled'].includes(t.ticket_status)) return false
-    return new Date(t.due_date) < new Date()
-  })
+  const openTickets = useMemo(
+    () => tickets.filter(t => !['Closed', 'Resolved', 'Cancelled'].includes(t.ticket_status)).length,
+    [tickets]
+  )
 
-  const ticketsWithDue = tickets.filter(t => t.due_date && t.ticket_status !== 'Cancelled')
-  const overdueActive = ticketsWithDue.filter(t =>
-    !['Closed', 'Resolved'].includes(t.ticket_status) && new Date(t.due_date) < new Date()
-  ).length
-  const slaPercent = ticketsWithDue.length > 0
-    ? Math.round(((ticketsWithDue.length - overdueActive) / ticketsWithDue.length) * 100)
-    : 100
-  const resolutionPercent = totalTickets > 0 ? Math.round((closedTickets / totalTickets) * 100) : 0
+  const closedTickets = useMemo(
+    () => tickets.filter(t => ['Closed', 'Resolved'].includes(t.ticket_status)).length,
+    [tickets]
+  )
 
-  // ── Chart data ──
-  const getWeeklyTrend = () => {
+  const overdueList = useMemo(
+    () => tickets.filter(t => {
+      if (!t.due_date || ['Closed', 'Resolved', 'Cancelled'].includes(t.ticket_status)) return false
+      return new Date(t.due_date) < new Date()
+    }),
+    [tickets]
+  )
+
+  const { slaPercent, resolutionPercent } = useMemo(() => {
+    const ticketsWithDue = tickets.filter(t => t.due_date && t.ticket_status !== 'Cancelled')
+    const overdueActive = ticketsWithDue.filter(t =>
+      !['Closed', 'Resolved'].includes(t.ticket_status) && new Date(t.due_date) < new Date()
+    ).length
+    return {
+      slaPercent: ticketsWithDue.length > 0
+        ? Math.round(((ticketsWithDue.length - overdueActive) / ticketsWithDue.length) * 100)
+        : 100,
+      resolutionPercent: tickets.length > 0 ? Math.round((closedTickets / tickets.length) * 100) : 0,
+    }
+  }, [tickets, closedTickets])
+
+  const weeklyTrend = useMemo(() => {
     const days = []
     for (let i = 6; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i)
@@ -177,9 +200,9 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       })
     }
     return days
-  }
+  }, [tickets])
 
-  const getMonthlyTrend = () => {
+  const monthlyTrend = useMemo(() => {
     const days = []
     for (let i = 29; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i)
@@ -191,22 +214,22 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       })
     }
     return days
-  }
+  }, [tickets])
 
-  const getStatusDist = () => {
+  const statusDist = useMemo(() => {
     const counts = {}
     tickets.forEach(t => { counts[t.ticket_status] = (counts[t.ticket_status] || 0) + 1 })
     return Object.entries(counts).map(([name, value]) => ({ name, value }))
-  }
+  }, [tickets])
 
-  const getPriorityDist = () => {
+  const priorityDist = useMemo(() => {
     const order = ['Critical', 'High', 'Medium', 'Low']
     const counts = {}
     tickets.forEach(t => { if (t.priority) counts[t.priority] = (counts[t.priority] || 0) + 1 })
     return order.filter(p => counts[p]).map(name => ({ name, value: counts[name] }))
-  }
+  }, [tickets])
 
-  const getTechnicianPerformance = () => {
+  const technicianPerformance = useMemo(() => {
     const stats = {}
     tickets.forEach(t => {
       const tech = t.assigned_technician || 'Unassigned'
@@ -221,9 +244,9 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       }))
       .sort((a, b) => b.closeRate - a.closeRate)
       .slice(0, 5)
-  }
+  }, [tickets])
 
-  const getTopIssues = () => {
+  const topIssues = useMemo(() => {
     const counts = {}
     tickets.forEach(t => {
       if (!Array.isArray(t.products)) return
@@ -236,11 +259,14 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       .map(([issue, count]) => ({ issue, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5)
-  }
+  }, [tickets])
 
-  const recentTickets = [...tickets]
-    .sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))
-    .slice(0, 10)
+  const recentTickets = useMemo(
+    () => [...tickets]
+      .sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))
+      .slice(0, 10),
+    [tickets]
+  )
 
   const daysBetween = (a) => Math.ceil((new Date() - new Date(a)) / 86400000)
 
@@ -420,7 +446,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>}
           >
             <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={getWeeklyTrend()}>
+              <LineChart data={weeklyTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
@@ -437,7 +463,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>}
           >
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={getMonthlyTrend()}>
+              <BarChart data={monthlyTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
@@ -453,17 +479,17 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
           <WidgetCard title="Status Distribution" onClick={nav('rma-tickets')}
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>}
           >
-            {getStatusDist().length === 0 ? (
+            {statusDist.length === 0 ? (
               <p className="text-center text-gray-400 py-8 text-sm">No data</p>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
                   <Pie
-                    data={getStatusDist()} cx="50%" cy="50%" outerRadius={85} dataKey="value"
+                    data={statusDist} cx="50%" cy="50%" outerRadius={85} dataKey="value"
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     labelLine={false}
                   >
-                    {getStatusDist().map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    {statusDist.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
                   <Tooltip />
                 </PieChart>
@@ -477,17 +503,17 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
           <WidgetCard title="Priority Distribution" onClick={nav('rma-tickets')}
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"/></svg>}
           >
-            {getPriorityDist().length === 0 ? (
+            {priorityDist.length === 0 ? (
               <p className="text-center text-gray-400 py-8 text-sm">No data</p>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
                   <Pie
-                    data={getPriorityDist()} cx="50%" cy="50%" outerRadius={85} dataKey="value"
+                    data={priorityDist} cx="50%" cy="50%" outerRadius={85} dataKey="value"
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     labelLine={false}
                   >
-                    {getPriorityDist().map((_, i) => <Cell key={i} fill={PRIORITY_COLORS[i % PRIORITY_COLORS.length]} />)}
+                    {priorityDist.map((_, i) => <Cell key={i} fill={PRIORITY_COLORS[i % PRIORITY_COLORS.length]} />)}
                   </Pie>
                   <Tooltip />
                 </PieChart>
@@ -501,11 +527,11 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
           <WidgetCard className="lg:col-span-2" title="Technician Performance" onClick={nav('rma-tickets')}
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>}
           >
-            {getTechnicianPerformance().length === 0 ? (
+            {technicianPerformance.length === 0 ? (
               <p className="text-center text-gray-400 py-8 text-sm">No assigned tickets</p>
             ) : (
               <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={getTechnicianPerformance()} layout="vertical" margin={{ left: 20 }}>
+                <BarChart data={technicianPerformance} layout="vertical" margin={{ left: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
                   <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
@@ -524,12 +550,12 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
           <WidgetCard className="lg:col-span-2" title="Top Issues" onClick={nav('rma-tickets')}
             icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>}
           >
-            {getTopIssues().length === 0 ? (
+            {topIssues.length === 0 ? (
               <p className="text-center text-gray-400 py-8 text-sm">No issues recorded yet</p>
             ) : (
               <div className="space-y-4">
-                {getTopIssues().map((item, idx) => {
-                  const max = getTopIssues()[0]?.count || 1
+                {topIssues.map((item, idx) => {
+                  const max = topIssues[0]?.count || 1
                   return (
                     <div key={idx} className="flex items-center gap-3">
                       <div className="w-7 h-7 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
