@@ -119,7 +119,11 @@ function pageToPath(page, id = null) {
 }
 
 export default function App() {
-  const { sidebarCompact, updateAppearance } = useAppearance()
+  const { sidebarCompact, updateAppearance, darkMode } = useAppearance()
+  // DM-3: dark-aware toast options
+  const toastOptions = darkMode
+    ? { style: { background: '#1e293b', color: '#f1f5f9', border: '1px solid #334155' } }
+    : undefined
   const [currentUser, setCurrentUser] = useState(null)
   const [currentUserRole, setCurrentUserRole] = useState(null)
   const [currentUserPermissions, setCurrentUserPermissions] = useState(null)
@@ -382,7 +386,7 @@ export default function App() {
           setResetPasswordMode(false)
           setCurrentUser(null)
         }} />
-        <Toaster position="top-right" />
+        <Toaster position="top-right" toastOptions={toastOptions} />
       </>
     )
   }
@@ -392,7 +396,7 @@ export default function App() {
     return (
       <>
         <RMATracker />
-        <Toaster position="top-right" />
+        <Toaster position="top-right" toastOptions={toastOptions} />
       </>
     )
   }
@@ -409,7 +413,7 @@ export default function App() {
     return (
       <>
         <Login onLogin={handleLogin} onSignup={handleSignup} />
-        <Toaster position="top-right" />
+        <Toaster position="top-right" toastOptions={toastOptions} />
       </>
     )
   }

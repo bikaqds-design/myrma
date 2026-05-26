@@ -29,14 +29,14 @@ function WidgetCard({ title, icon, onClick, children, className = '' }) {
   return (
     <div
       onClick={onClick}
-      className={`bg-white rounded-xl shadow-sm border border-gray-200 p-6 ${onClick ? 'cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all' : ''} ${className}`}
+      className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6 ${onClick ? 'cursor-pointer hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-500 transition-all' : ''} ${className}`}
     >
       {title && (
-        <h2 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          {icon && <span className="text-indigo-600">{icon}</span>}
+        <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+          {icon && <span className="text-indigo-600 dark:text-indigo-400">{icon}</span>}
           {title}
           {onClick && (
-            <svg className="w-3.5 h-3.5 text-gray-400 ml-auto flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500 ml-auto flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           )}
@@ -88,7 +88,13 @@ function StatusBadge({ status }) {
 }
 
 export default function Dashboard({ currentUserEmail, onNavigate }) {
-  const { dashboardWidgets } = useAppearance()
+  const { dashboardWidgets, darkMode } = useAppearance()
+  // DM-1/DM-2: chart theming derived from dark mode
+  const chartTickStyle = { fontSize: 11, fill: darkMode ? '#94a3b8' : '#6b7280' }
+  const chartGridColor = darkMode ? '#334155' : '#f3f4f6'
+  const chartTooltipStyle = darkMode
+    ? { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9' }
+    : { backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 8 }
   const storageKey = `dashboard_widgets_${currentUserEmail}`
 
   const [enabledWidgets, setEnabledWidgets] = useState(() => {
@@ -447,10 +453,10 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
           >
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={weeklyTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
+                <XAxis dataKey="date" tick={chartTickStyle} />
+                <YAxis tick={chartTickStyle} allowDecimals={false} />
+                <Tooltip contentStyle={chartTooltipStyle} />
                 <Line type="monotone" dataKey="tickets" stroke="#6366f1" strokeWidth={2} dot={{ fill: '#6366f1', r: 3 }} name="Tickets" />
               </LineChart>
             </ResponsiveContainer>
@@ -464,10 +470,10 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
           >
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={monthlyTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
+                <XAxis dataKey="date" tick={{ ...chartTickStyle, fontSize: 10 }} />
+                <YAxis tick={chartTickStyle} allowDecimals={false} />
+                <Tooltip contentStyle={chartTooltipStyle} labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''} />
                 <Bar dataKey="tickets" fill="#6366f1" radius={[2, 2, 0, 0]} name="Tickets" />
               </BarChart>
             </ResponsiveContainer>
@@ -491,7 +497,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
                   >
                     {statusDist.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip contentStyle={chartTooltipStyle} />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -515,7 +521,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
                   >
                     {priorityDist.map((_, i) => <Cell key={i} fill={PRIORITY_COLORS[i % PRIORITY_COLORS.length]} />)}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip contentStyle={chartTooltipStyle} />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -532,10 +538,10 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
             ) : (
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={technicianPerformance} layout="vertical" margin={{ left: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
-                  <Tooltip />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} horizontal={false} />
+                  <XAxis type="number" tick={chartTickStyle} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={chartTickStyle} width={110} />
+                  <Tooltip contentStyle={chartTooltipStyle} />
                   <Legend />
                   <Bar dataKey="total" fill="#6366f1" name="Total Tickets" radius={[0, 2, 2, 0]} />
                   <Bar dataKey="closed" fill="#10b981" name="Closed" radius={[0, 2, 2, 0]} />
