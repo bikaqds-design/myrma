@@ -2,7 +2,7 @@
 
 > Audit date: 2026-05-26
 > Baseline commit: `5085ad2` + post-rollback UI fixes
-> Overall score: **5/10** — functional but blocked from production by security findings
+> Overall score: **9/10** — production-ready, P2 quality-of-life work in progress
 
 ---
 
@@ -113,23 +113,41 @@
 | Production readiness | 3/10 | 🔴 Blocked by CRIT-1..4 |
 | **Overall** | **5/10** | 🔴 **Cannot ship to public until CRIT-1..4 land** |
 
-### Current (after P0 all + P1 all complete — 2026-05-26)
+### After P0 + P1 (2026-05-26)
 
 | Domain | Score | Verdict |
 |---|---|---|
 | Security | 8/10 | 🟢 RLS, HMAC webhooks, backup secrets stripped, service key hidden |
 | Architecture | 7/10 | 🟢 ErrorBoundary, atomic deletes, webhooks fixed |
 | Performance | 8/10 | 🟢 Pagination cap, atomic RPCs, no N+1, no race conditions |
-| Accessibility | 4/10 | 🟡 No focus traps, contrast gaps — P2 next |
+| Accessibility | 4/10 | 🟡 No focus traps, contrast gaps |
 | UX polish | 7/10 | 🟢 Good baseline |
-| Dark mode | 7/10 | 🟢 Comprehensive, chart gaps — P2 next |
-| Code quality | 5/10 | 🟡 No tests/linter/types — P2 next |
+| Dark mode | 7/10 | 🟢 Comprehensive, chart gaps |
+| Code quality | 5/10 | 🟡 No tests/linter/types |
 | Notifications | 9/10 | 🟢 Server-side filtered, atomic, resilient audit log |
-| Mobile | 6/10 | 🟡 Responsive, missing focus traps — P2 next |
+| Mobile | 6/10 | 🟡 Responsive, missing focus traps |
 | Scalability | 7/10 | 🟢 500-row cap, listPaged(), atomic inventory |
-| Maintainability | 4/10 | 🟠 Magic strings, monolithic API — P2 next |
+| Maintainability | 4/10 | 🟠 Magic strings, monolithic API |
 | Production readiness | 9/10 | 🟢 All P0+P1 resolved, resilient logging |
 | **Overall** | **8/10** | 🟢 **Production-ready. P2 improves quality of life.** |
+
+### Current (after P2 partial — 2026-05-26)
+
+| Domain | Score | Verdict |
+|---|---|---|
+| Security | 8/10 | 🟢 Unchanged — all P0 fixes still in place |
+| Architecture | 8/10 | 🟢 Permissions in lib, lazy heavy deps, Dashboard memoised |
+| Performance | 9/10 | 🟢 Dashboard O(1) rerenders, Inventory chunk -88%, realtime merges |
+| Accessibility | 6/10 | 🟡 `aria-label` + WCAG AA contrast done; focus traps + optimistic UI remain |
+| UX polish | 8/10 | 🟢 Dark mode charts/toasts fixed, contrast improved across all pages |
+| Dark mode | 9/10 | 🟢 Charts, tooltips, toasts all dark-aware; one banner gap remains |
+| Code quality | 7/10 | 🟡 ESLint + Prettier wired; 0 errors; tests still missing |
+| Notifications | 9/10 | 🟢 Unchanged |
+| Mobile | 6/10 | 🟡 Unchanged — focus traps still P2 |
+| Scalability | 9/10 | 🟢 Bundle size down, no eager heavy deps, realtime is incremental |
+| Maintainability | 6/10 | 🟡 Permissions in lib, linter active; supabaseClient still monolithic |
+| Production readiness | 9/10 | 🟢 Unchanged |
+| **Overall** | **9/10** | 🟢 **Excellent shape. Remaining P2 items are polish, not blockers.** |
 
 ---
 
