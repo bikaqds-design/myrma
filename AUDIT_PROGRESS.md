@@ -113,23 +113,23 @@
 | Production readiness | 3/10 | 🔴 Blocked by CRIT-1..4 |
 | **Overall** | **5/10** | 🔴 **Cannot ship to public until CRIT-1..4 land** |
 
-### Current (after P0 + P1 H-1..H-5 complete)
+### Current (after P0 all + P1 all complete — 2026-05-26)
 
 | Domain | Score | Verdict |
 |---|---|---|
-| Security | 7/10 | 🟢 RLS on, service key hidden, tracker rate-limited |
-| Architecture | 7/10 | 🟢 ErrorBoundary added, webhooks fixed |
-| Performance | 7/10 | 🟢 Pagination cap, atomic RPCs, no N+1 |
-| Accessibility | 4/10 | 🟡 No focus traps, contrast gaps |
+| Security | 8/10 | 🟢 RLS, HMAC webhooks, backup secrets stripped, service key hidden |
+| Architecture | 7/10 | 🟢 ErrorBoundary, atomic deletes, webhooks fixed |
+| Performance | 8/10 | 🟢 Pagination cap, atomic RPCs, no N+1, no race conditions |
+| Accessibility | 4/10 | 🟡 No focus traps, contrast gaps — P2 next |
 | UX polish | 7/10 | 🟢 Good baseline |
-| Dark mode | 7/10 | 🟢 Comprehensive, chart gaps |
-| Code quality | 5/10 | 🟡 No tests/linter/types |
-| Notifications | 8/10 | 🟢 Server-side filtered, atomic reads |
-| Mobile | 6/10 | 🟡 Responsive, missing focus traps |
-| Scalability | 6/10 | 🟡 500-row cap + listPaged() added |
-| Maintainability | 4/10 | 🟠 Magic strings, monolithic API |
-| Production readiness | 7/10 | 🟢 All P0 blockers resolved |
-| **Overall** | **7/10** | 🟢 **Safe to ship. P1 remainder improves stability.** |
+| Dark mode | 7/10 | 🟢 Comprehensive, chart gaps — P2 next |
+| Code quality | 5/10 | 🟡 No tests/linter/types — P2 next |
+| Notifications | 9/10 | 🟢 Server-side filtered, atomic, resilient audit log |
+| Mobile | 6/10 | 🟡 Responsive, missing focus traps — P2 next |
+| Scalability | 7/10 | 🟢 500-row cap, listPaged(), atomic inventory |
+| Maintainability | 4/10 | 🟠 Magic strings, monolithic API — P2 next |
+| Production readiness | 9/10 | 🟢 All P0+P1 resolved, resilient logging |
+| **Overall** | **8/10** | 🟢 **Production-ready. P2 improves quality of life.** |
 
 ---
 
