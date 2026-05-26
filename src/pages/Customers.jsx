@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, db, storage } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -28,10 +29,26 @@ const generateCustomerCode = () => `CB-${Math.floor(10000000 + Math.random() * 9
 
 export default function Customers({ currentUserRole, currentUserEmail, currentUserPermissions, onNavigateToCustomer }) {
   const searchRef = useRef(null)
-  const [customers, setCustomers] = useState([])
+  const queryClient = useQueryClient()
+
+  // P-1: TanStack Query — cached fetch; returning to this page shows stale data instantly
+  const { data: customers = [], isLoading: loading } = useQuery({
+    queryKey: ['customers'],
+    queryFn: () => db.customers.list(),
+    staleTime: 60_000,
+  })
+  const { data: usersList = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => db.userRoles.listAllRoles(),
+    staleTime: 5 * 60_000,
+  })
+  const { data: customersTotalCount = null } = useQuery({
+    queryKey: ['customers-count'],
+    queryFn: async () => { const r = await db.customers.listPaged(0, 1); return r.count },
+    staleTime: 60_000,
+  })
+
   const [filteredCustomers, setFilteredCustomers] = useState([])
-  const [customersTotalCount, setCustomersTotalCount] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCustomers, setSelectedCustomers] = useState([])
   const [showAddCustomer, setShowAddCustomer] = useState(false)
@@ -41,7 +58,7 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
   const [filterType, setFilterType] = useState('')
   const [filterCompany, setFilterCompany] = useState('')
   const [showFilters, setShowFilters] = useState(false)
-  const [usersList, setUsersList] = useState([])
+  // usersList now comes from useQuery above
   const [customerForm, setCustomerForm] = useState(EMPTY_FORM)
   const [pendingFiles, setPendingFiles] = useState([])
   const [showBulkUpload, setShowBulkUpload] = useState(false)
@@ -71,7 +88,6 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
     return currentUserPermissions?.customers?.[action] === true
   }
 
-  useEffect(() => { loadAll() }, [])
   useEffect(() => {
     const handler = (e) => { if (!e.target.closest('.action-menu')) setOpenMenuId(null) }
     document.addEventListener('mousedown', handler)
@@ -90,13 +106,16 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
     return () => document.removeEventListener('click', handleClickOutside)
   }, [showAddDropdown])
 
-  // Real-time: refresh when customers table changes
+  // Real-time: invalidate query cache when customers table changes
   useEffect(() => {
     const channel = supabase.channel('customers_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => loadAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['customers'] })
+        queryClient.invalidateQueries({ queryKey: ['customers-count'] })
+      })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [queryClient])
 
   // Keyboard shortcuts: / = focus search, N = add customer, Esc = close modal
   useEffect(() => {
@@ -111,23 +130,6 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [showAddCustomer])
-
-  const loadAll = async () => {
-    setLoading(true)
-    try {
-      const [customersData, usersData] = await Promise.all([
-        db.customers.list(),
-        db.userRoles.listAllRoles()
-      ])
-      db.customers.listPaged(0, 1).then(r => setCustomersTotalCount(r.count)).catch(() => {})
-      setCustomers(customersData)
-      setUsersList(usersData)
-    } catch (error) {
-      toast.error('Failed to load customers')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleSearchAndSort = () => {
     let filtered = [...customers]
@@ -194,7 +196,8 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
           toast.success(`Deleted ${selectedCustomers.length} customers`)
           db.auditLog.log(currentUserEmail, 'customer_bulk_deleted', `Deleted ${selectedCustomers.length} customers`).catch(() => {})
           setSelectedCustomers([])
-          loadAll()
+          queryClient.invalidateQueries({ queryKey: ['customers'] })
+          queryClient.invalidateQueries({ queryKey: ['customers-count'] })
         } catch { toast.error('Failed to delete customers') }
       }
     )
@@ -206,7 +209,7 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
       toast.success(`Updated ${selectedCustomers.length} customers`)
       db.auditLog.log(currentUserEmail, 'customer_bulk_status_changed', `Changed status to "${status}" for ${selectedCustomers.length} customers`).catch(() => {})
       setSelectedCustomers([])
-      loadAll()
+      queryClient.invalidateQueries({ queryKey: ['customers'] })
     } catch { toast.error('Failed to update status') }
   }
 
@@ -252,6 +255,15 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
       updated_date:    new Date().toISOString(),
     }
 
+    // UX-6 optimistic update: reflect the edit in the table immediately (edits only — creates need a server-generated ID)
+    let previousCustomers = null
+    if (editingCustomer) {
+      previousCustomers = queryClient.getQueryData(['customers'])
+      queryClient.setQueryData(['customers'], old =>
+        old?.map(c => c.id === editingCustomer.id ? { ...c, ...payload } : c) ?? []
+      )
+    }
+
     try {
       if (editingCustomer) {
         await db.customers.update(editingCustomer.id, payload)
@@ -283,8 +295,10 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
       }
       setShowAddCustomer(false)
       resetForm()
-      loadAll()
+      queryClient.invalidateQueries({ queryKey: ['customers'] })
+      queryClient.invalidateQueries({ queryKey: ['customers-count'] })
     } catch (error) {
+      if (previousCustomers !== null) queryClient.setQueryData(['customers'], previousCustomers) // rollback
       toast.error(`Failed to save: ${error.message}`)
     }
   }
@@ -316,6 +330,9 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
       `Delete ${customer.contact_person}? This action cannot be undone.`,
       async () => {
         closeConfirm()
+        // UX-6 optimistic: remove from list immediately; rollback if server call fails
+        const previousCustomers = queryClient.getQueryData(['customers'])
+        queryClient.setQueryData(['customers'], old => old?.filter(c => c.id !== customer.id) ?? [])
         try {
           await db.customers.delete(customer.id)
           db.userActivity.create(currentUserEmail, 'customer_deleted', `Deleted customer ${customer.contact_person}${customer.company_name ? ` (${customer.company_name})` : ''}`).catch(() => {})
@@ -327,8 +344,12 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
           }).catch(() => {})
           toast.success('Customer deleted')
           db.auditLog.log(currentUserEmail, 'customer_deleted', `Deleted customer ${customer.contact_person}${customer.company_name ? ` (${customer.company_name})` : ''}`).catch(() => {})
-          loadAll()
-        } catch { toast.error('Failed to delete customer') }
+          queryClient.invalidateQueries({ queryKey: ['customers'] })
+          queryClient.invalidateQueries({ queryKey: ['customers-count'] })
+        } catch {
+          queryClient.setQueryData(['customers'], previousCustomers) // rollback on error
+          toast.error('Failed to delete customer')
+        }
       }
     )
   }
@@ -476,7 +497,8 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
         console.error('Import errors:', errors)
       }
       setShowBulkUpload(false)
-      loadAll()
+      queryClient.invalidateQueries({ queryKey: ['customers'] })
+      queryClient.invalidateQueries({ queryKey: ['customers-count'] })
     } catch (error) {
       toast.error(`Failed to import: ${error.message}`)
     }

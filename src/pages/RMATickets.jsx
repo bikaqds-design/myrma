@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, db, storage, branding as brandingAPI } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import QRCode from 'qrcode'
@@ -59,12 +60,36 @@ function SortableHeader({ label, sortKey, sortConfig, onSort }) {
 }
 
 export default function RMATickets({ userRole, userEmail, userPermissions, initialTicketId }) {
-  const [tickets, setTickets] = useState([])
+  const queryClient = useQueryClient()
+
+  // P-1: TanStack Query — cached fetch; stale data renders instantly on re-visit
+  const { data: tickets = [], isLoading: loading } = useQuery({
+    queryKey: ['rma-tickets'],
+    queryFn: () => db.rmaTickets.list(),
+    staleTime: 60_000,
+  })
+  const { data: customers = [] } = useQuery({
+    queryKey: ['customers'],
+    queryFn: () => db.customers.list(),
+    staleTime: 60_000,
+  })
+  const { data: products = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => db.products.list(),
+    staleTime: 5 * 60_000,
+  })
+  const { data: users = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => db.userRoles.listAllRoles(),
+    staleTime: 5 * 60_000,
+  })
+  const { data: ticketsTotalCount = null } = useQuery({
+    queryKey: ['rma-tickets-count'],
+    queryFn: async () => { const r = await db.rmaTickets.listPaged(0, 1); return r.count },
+    staleTime: 60_000,
+  })
+
   const [filteredTickets, setFilteredTickets] = useState([])
-  const [ticketsTotalCount, setTicketsTotalCount] = useState(null)
-  const [customers, setCustomers] = useState([])
-  const [products, setProducts] = useState([])
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
 
   const [currentPage, setCurrentPage] = useState(1)
@@ -98,7 +123,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const fileInputRef = useRef(null)
   const searchInputRef = useRef(null)
 
-  const [users, setUsers] = useState([])
+  // users now comes from useQuery above
   const [openMenuId, setOpenMenuId] = useState(null)
 
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null })
@@ -152,8 +177,6 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const [ticketParts, setTicketParts]         = useState([])
   const [ticketPartsMissing, setTicketPartsMissing] = useState(false)
 
-  useEffect(() => { loadData() }, [])
-
   useEffect(() => {
     if (userEmail && !formData.assigned_technician) {
       setFormData(prev => ({ ...prev, assigned_technician: userEmail }))
@@ -191,37 +214,16 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   useEffect(() => {
     const channel = supabase.channel('rma_tickets_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rma_tickets' }, () => {
-        loadData()
+        queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
+        queryClient.invalidateQueries({ queryKey: ['rma-tickets-count'] })
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [queryClient])
 
   const canDo = (action) => {
     if (userRole === 'admin' || userRole === 'super_admin') return true
     return userPermissions?.rma_tickets?.[action] === true
-  }
-
-  const loadData = async () => {
-    try {
-      const [ticketsData, customersData, productsData, usersData] = await Promise.all([
-        db.rmaTickets.list(),
-        db.customers.list(),
-        db.products.list(),
-        db.userRoles.listAllRoles()
-      ])
-      // Fetch total count alongside capped list (H-4)
-      db.rmaTickets.listPaged(0, 1).then(r => setTicketsTotalCount(r.count)).catch(() => {})
-      setTickets(ticketsData)
-      setFilteredTickets(ticketsData)
-      setCustomers(customersData)
-      setProducts(productsData)
-      setUsers(usersData)
-    } catch (error) {
-      toast.error('Failed to load data')
-    } finally {
-      setLoading(false)
-    }
   }
 
   useEffect(() => {
@@ -454,7 +456,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       setShowModal(false)
       setEditingTicket(null)
       resetForm()
-      loadData()
+      queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
+      queryClient.invalidateQueries({ queryKey: ['rma-tickets-count'] })
     } catch (error) {
       toast.error(`Failed to save ticket: ${error.message}`)
     } finally {
@@ -499,6 +502,9 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       'Delete this ticket? This cannot be undone.',
       async () => {
         closeConfirm()
+        // UX-6 optimistic: remove from list immediately; rollback on error
+        const previousTickets = queryClient.getQueryData(['rma-tickets'])
+        queryClient.setQueryData(['rma-tickets'], old => old?.filter(t => t.id !== id) ?? [])
         try {
           await db.rmaTickets.delete(id)
           db.userActivity.create(userEmail, 'ticket_deleted', `Deleted ticket ID ${id}`).catch(() => {})
@@ -509,8 +515,12 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             createdBy: userEmail, targetRoles: ['admin', 'super_admin'], targetEmails: []
           }).catch(() => {})
           toast.success('Ticket deleted!')
-          loadData()
-        } catch { toast.error('Failed to delete ticket') }
+          queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
+          queryClient.invalidateQueries({ queryKey: ['rma-tickets-count'] })
+        } catch {
+          queryClient.setQueryData(['rma-tickets'], previousTickets) // rollback on error
+          toast.error('Failed to delete ticket')
+        }
       }
     )
   }
@@ -534,7 +544,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           toast.success(`${selectedTickets.length} ticket(s) deleted`)
           db.auditLog.log(userEmail, 'ticket_bulk_deleted', `Deleted ${selectedTickets.length} tickets`).catch(() => {})
           setSelectedTickets([])
-          loadData()
+          queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
+          queryClient.invalidateQueries({ queryKey: ['rma-tickets-count'] })
         } catch { toast.error('Failed to delete tickets') }
         finally { setBulkProcessing(false) }
       }
@@ -561,7 +572,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       db.auditLog.log(userEmail, 'ticket_bulk_status_changed', `Changed ${selectedTickets.length} tickets to "${bulkTicketStatus}"`).catch(() => {})
       setSelectedTickets([])
       setBulkTicketStatus('')
-      loadData()
+      queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
     } catch { toast.error('Failed to update status') }
     finally { setBulkProcessing(false) }
   }
@@ -585,7 +596,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       db.auditLog.log(userEmail, 'ticket_bulk_product_status_changed', `Changed product status to "${bulkProductStatus}" for ${selectedTickets.length} tickets`).catch(() => {})
       setSelectedTickets([])
       setBulkProductStatus('')
-      loadData()
+      queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
     } catch { toast.error('Failed to update product status') }
     finally { setBulkProcessing(false) }
   }

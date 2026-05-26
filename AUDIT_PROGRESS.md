@@ -2,7 +2,7 @@
 
 > Audit date: 2026-05-26 → 2026-05-27
 > Baseline commit: `5085ad2` + post-rollback UI fixes
-> Overall score: **9.5/10** — all P0/P1/P2 low-risk complete. Only large architectural items remain (see reassessment below).
+> Overall score: **9.5/10** — all P0/P1/P2 items complete (or consciously deferred). P-1 targeted + UX-6 done 2026-05-27. Remaining: P3 quick wins.
 
 ---
 
@@ -44,7 +44,7 @@
 | ✅ | A-5 | Dashboard realtime refetches everything on each event | [Dashboard.jsx:119-124](src/pages/Dashboard.jsx#L119-L124) | **Done 2026-05-26.** INSERT/UPDATE/DELETE each merge payload into local state — no full refetch. |
 | ✅ | A-6 | `ROLE_DEFAULT_PERMISSIONS` lives in App.jsx (40 lines) | [App.jsx:52-95](src/App.jsx#L52-L95) | **Done 2026-05-26.** Moved to [src/lib/permissions.js](src/lib/permissions.js) + `canDo()` helper exported. App.jsx imports from lib. |
 | ✅ | A-7 | Heavy deps eagerly loaded (~1.5MB initial bundle) | xlsx, jspdf, html2canvas, recharts | **Done 2026-05-26.** `xlsx` + `jspdf` dynamic-imported in Inventory.jsx export handlers. Inventory chunk: 734 KB → 90 KB. |
-| ⏸ | P-1 | Adopt TanStack Query for all data fetching | All pages | **Rescoped — targeted 3 pages only.** Full migration (all pages) = 8+ hrs high risk for diminishing returns. Targeted approach: RMATickets + Dashboard + Customers only (~2–3 hrs). Gives 80% of user-visible benefit (instant return-navigation, no repeat spinners) at 20% of the cost. UX-6 (optimistic UI) unlocked at the same time. |
+| ✅ | P-1 | Adopt TanStack Query for all data fetching | All pages | **Done 2026-05-27 (targeted).** `QueryClientProvider` in main.jsx. `useQuery` replaces `useState+useEffect` fetch in RMATickets, Dashboard, Customers. `staleTime: 60s` — return navigation shows cached data instantly, no repeat spinner. Realtime handlers updated to write to query cache instead of local state. All `loadData()`/`loadAll()` calls replaced with `queryClient.invalidateQueries`. |
 | ✅ | M-1 | Zero unit/E2E tests | — | **Done 2026-05-27.** Vitest + jsdom + RTL installed. 74 tests in 3 suites (schemas, permissions, constants). `npm test` / `npm run test:coverage`. All pass. |
 | ✅ | M-2 | No ESLint config | — | **Done 2026-05-26.** ESLint 9 flat config + Prettier. 0 errors, 167 warnings. `npm run lint` / `npm run format` now available. |
 | ✅ | M-4 | `supabaseClient.js` is 1350 lines | src/api/supabaseClient.js | **Done 2026-05-26.** Split into 15 domain files under `src/api/`. `supabaseClient.js` is now a 19-line barrel re-export. 100% backward compatible. Build clean. |
@@ -60,7 +60,7 @@
 | ✅ | UX-3 | `text-gray-400` on white = WCAG ratio 2.85 (fails AA) | **Done 2026-05-26.** 318 replacements → `text-gray-500` (ratio 4.57, meets AA) across 32 files. |
 | ✅ | UX-4 | Mobile sidebar doesn't trap focus | **Done 2026-05-26.** `inert` attribute on main content when sidebar open. Escape key closes + returns focus to hamburger. aria-labels on open/close buttons. |
 | ✅ | UX-5 | No realtime toast for new notifications | **Done 2026-05-26.** Supabase realtime INSERT on `notifications` table → `toast()` with role/email targeting + pref check in App.jsx. |
-| ⏸ | UX-6 | No optimistic UI on CRUD actions | Depends on P-1 targeted migration. Will be done alongside RMATickets + Customers `useMutation` work. |
+| ✅ | UX-6 | No optimistic UI on CRUD actions | **Done 2026-05-27.** Optimistic delete on tickets (RMATickets) and customers (Customers): cache updated before `await`, rollback via `setQueryData` on error. Optimistic update on customer edits: table row reflects changes instantly while network call is in-flight. |
 | ✅ | UX-7 | Empty states lack CTAs and illustrations | **Done 2026-05-26.** `<EmptyState>` component wired into RMATickets, Customers, Products, PartsInventory. Inline placeholder divs removed. |
 | ✅ | F-1 | `zod` + `react-hook-form` installed but used inconsistently | **Done 2026-05-27.** `src/lib/schemas.js` — central schemas for login, customer, ticket, product, addUser + `getFirstError`/`getFieldErrors` helpers. Login.jsx fully migrated to `useForm+zodResolver` (inline field errors, isSubmitting, noValidate, role=alert). Customers.jsx: `handleSaveCustomer` uses `customerSchema.safeParse`. |
 | ✅ | F-2 | No server-side validation visible | **Done 2026-05-27.** `supabase/migrations/20260526_check_constraints.sql` — CHECK constraints on 8 tables (ticket_status, priority, user role/status, invoice status/type, notification type, inventory/batch/product/customer statuses). All NOT VALID + idempotent. `validate_ticket_fields()` RPC returns JSON error list. |
@@ -156,15 +156,15 @@ After completing all other P2 items, A-1 and P-1 were re-evaluated against actua
 | Production readiness | 9/10 | 🟢 All P0+P1 resolved, resilient logging |
 | **Overall** | **8/10** | 🟢 **Production-ready. P2 improves quality of life.** |
 
-### Current (after P2 partial — 2026-05-26)
+### Current (after P2 complete — 2026-05-27)
 
 | Domain | Score | Verdict |
 |---|---|---|
 | Security | 8/10 | 🟢 Unchanged — all P0 fixes still in place |
-| Architecture | 8/10 | 🟢 Permissions in lib, lazy heavy deps, Dashboard memoised |
-| Performance | 9/10 | 🟢 Dashboard O(1) rerenders, Inventory chunk -88%, realtime merges |
+| Architecture | 9/10 | 🟢 Permissions in lib, lazy heavy deps, Dashboard memoised, TanStack Query on 3 key pages |
+| Performance | 9/10 | 🟢 Dashboard O(1) rerenders, Inventory chunk -88%, cached navigation (no repeat spinners) |
 | Accessibility | 8/10 | 🟢 Focus traps (UX-1 + UX-4) + aria-labels + WCAG AA contrast all done |
-| UX polish | 8/10 | 🟢 Dark mode charts/toasts fixed, contrast improved across all pages |
+| UX polish | 9/10 | 🟢 Optimistic delete/update on tickets + customers — mutations feel instant |
 | Dark mode | 10/10 | 🟢 Charts, tooltips, toasts, announcement banners all dark-aware |
 | Code quality | 9/10 | 🟢 ESLint + Prettier + constants + zod schemas + 74 unit tests |
 | Notifications | 9/10 | 🟢 Unchanged |
@@ -172,7 +172,7 @@ After completing all other P2 items, A-1 and P-1 were re-evaluated against actua
 | Scalability | 9/10 | 🟢 Bundle size down, no eager heavy deps, realtime is incremental |
 | Maintainability | 9/10 | 🟢 Constants module, permissions lib, linter active, 15-file API split |
 | Production readiness | 9/10 | 🟢 Unchanged |
-| **Overall** | **9.5/10** | 🟢 **All P2 low-risk items complete. A-1 deferred (low ROI). P-1 rescoped to 3 pages. Next: P-1 targeted + P3 quick wins.** |
+| **Overall** | **9.5/10** | 🟢 **All P2 items complete. A-1 deferred (low ROI). Remaining: P3 quick wins (P-3, P-2, CI/CD, Sentry, M-3).** |
 
 ---
 
@@ -216,6 +216,9 @@ _Mark each item with ✅ and date as you complete it._
 - **2026-05-26** — ✅ UX-1: `src/components/Modal.jsx` wrapping `@radix-ui/react-dialog` — focus trap, Escape, scroll-lock, animations, aria-labelledby, dark mode. 13 modals migrated: 7 in UserManagement.jsx, 2 in RMATickets.jsx (create/edit + details), 4 in Products.jsx (product, brand, category, bulk upload). Build: ✅ clean.
 - **2026-05-27** — ✅ F-2: `supabase/migrations/20260526_check_constraints.sql` — CHECK constraints on 8 tables. NOT VALID + idempotent. `validate_ticket_fields()` RPC added.
 - **2026-05-27** — ✅ F-1: `src/lib/schemas.js` with 8 zod schemas + helpers. Login.jsx fully migrated to react-hook-form + zodResolver. Customers.jsx: `handleSaveCustomer` uses `customerSchema.safeParse`.
+- **2026-05-27** — ✅ M-1: Vitest 4 + jsdom + RTL installed. 74 tests in 3 suites (schemas, permissions, constants). `npm test` passes.
+- **2026-05-27** — ✅ P-1 targeted: `QueryClientProvider` added to main.jsx (staleTime 60s, retry 1). `useQuery` in Dashboard, RMATickets, Customers replaces `useState+useEffect` fetch pattern. Shared query keys: `['rma-tickets']`, `['customers']`, `['products']`, `['users']`. Realtime handlers write to query cache via `setQueryData` / `invalidateQueries`.
+- **2026-05-27** — ✅ UX-6: Optimistic delete on tickets and customers — row removed from cache before `await`, rolled back via `setQueryData` on error. Optimistic update on customer edit — row updated in cache before `await`. Build + 74 tests: ✅ clean.
 - **2026-05-27** — ✅ M-1: Vitest + jsdom + RTL installed. 74 unit tests across 3 suites (schemas.test, permissions.test, constants.test). `npm test` → all pass in 2.1s.
 - **2026-05-27** — ⏸ A-1: Deferred. Custom routing works correctly; typo-URL gap is cosmetic for internal tool. Revisit if team grows or 10+ routes needed.
 - **2026-05-27** — ⏸ P-1: Rescoped from "all pages" to targeted 3 pages (RMATickets, Dashboard, Customers). Full migration has diminishing returns. Targeted approach = 80% benefit at 20% cost.

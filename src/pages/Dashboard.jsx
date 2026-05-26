@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, supabase } from '../api/supabaseClient'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { Spinner, PageHeader } from '../components/ui'
@@ -104,39 +105,34 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
     } catch { return dashboardWidgets || WIDGET_CATALOG.map(w => w.id) }
   })
 
-  const [tickets, setTickets] = useState([])
-  const [invStats, setInvStats] = useState(null)
-  const [loading, setLoading] = useState(true)
+  // P-1: TanStack Query — cached fetch; stale data renders instantly on re-visit
+  const queryClient = useQueryClient()
+  const { data: tickets = [], isLoading: loading } = useQuery({
+    queryKey: ['rma-tickets'],
+    queryFn: () => db.rmaTickets.list(),
+    staleTime: 60_000,
+  })
+  const { data: invStats = null } = useQuery({
+    queryKey: ['inv-stats'],
+    queryFn: () => db.inventory.getStats().catch(() => null),
+    staleTime: 2 * 60_000,
+  })
 
-  const loadData = useCallback(async () => {
-    try {
-      const [ticketsData, inv] = await Promise.all([
-        db.rmaTickets.list(),
-        db.inventory.getStats().catch(() => null),
-      ])
-      setTickets(ticketsData)
-      setInvStats(inv)
-    } catch {}
-    finally { setLoading(false) }
-  }, [])
-
-  useEffect(() => { loadData() }, [loadData])
-
-  // A-5: merge realtime payload into local state instead of full refetch
+  // A-5: merge realtime payload into query cache instead of local state
   useEffect(() => {
     const channel = supabase.channel('dashboard-rt')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rma_tickets' }, ({ new: row }) => {
-        setTickets(prev => [row, ...prev])
+        queryClient.setQueryData(['rma-tickets'], old => old ? [row, ...old] : [row])
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rma_tickets' }, ({ new: row }) => {
-        setTickets(prev => prev.map(t => t.id === row.id ? row : t))
+        queryClient.setQueryData(['rma-tickets'], old => old?.map(t => t.id === row.id ? row : t) ?? [row])
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'rma_tickets' }, ({ old: row }) => {
-        setTickets(prev => prev.filter(t => t.id !== row.id))
+        queryClient.setQueryData(['rma-tickets'], old => old?.filter(t => t.id !== row.id) ?? [])
       })
       .subscribe()
     return () => supabase.removeChannel(channel)
-  }, [])
+  }, [queryClient])
 
   // Re-read widget prefs when returning to this page (storageKey may differ per user)
   useEffect(() => {
