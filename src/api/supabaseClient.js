@@ -573,13 +573,29 @@ export const db = {
         if (result.missing) return
         const active = (result.data || []).filter(h => h.is_active && (!h.events?.length || h.events.includes(eventType)))
         if (!active.length) return
-        await Promise.allSettled(active.map(h =>
-          fetch(h.url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...(h.secret_key ? { 'X-Webhook-Secret': h.secret_key } : {}) },
-            body: JSON.stringify({ event: eventType, timestamp: new Date().toISOString(), data: payload })
-          }).catch(() => {})
-        ))
+
+        await Promise.allSettled(active.map(async h => {
+          const body = JSON.stringify({ event: eventType, timestamp: new Date().toISOString(), data: payload })
+          const headers = { 'Content-Type': 'application/json' }
+
+          // H-7: HMAC-SHA256 signature replaces plaintext X-Webhook-Secret.
+          // Receiver verifies: HMAC-SHA256(secret, raw_body) === X-Signature-256 value.
+          if (h.secret_key) {
+            try {
+              const enc = new TextEncoder()
+              const cryptoKey = await crypto.subtle.importKey(
+                'raw', enc.encode(h.secret_key),
+                { name: 'HMAC', hash: 'SHA-256' },
+                false, ['sign']
+              )
+              const sig = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(body))
+              const hex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('')
+              headers['X-Signature-256'] = `sha256=${hex}`
+            } catch { /* crypto unavailable — send unsigned */ }
+          }
+
+          return fetch(h.url, { method: 'POST', headers, body }).catch(() => {})
+        }))
       } catch {}
     }
   },
