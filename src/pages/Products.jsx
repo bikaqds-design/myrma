@@ -1754,7 +1754,7 @@ function AddProductModal({
   const filteredSubcategories = subcategories.filter(s => s.category_id === productForm.category_id)
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+    <div className="modal-overlay-bg fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto overscroll-contain">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl my-8">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
@@ -1964,7 +1964,7 @@ function AddBrandModal({
   editingBrand
 }) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="modal-overlay-bg fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overscroll-contain">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-2xl font-bold text-gray-900">
@@ -2070,7 +2070,7 @@ function AddCategoryModal({
   editingCategory
 }) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="modal-overlay-bg fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overscroll-contain">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-2xl font-bold text-gray-900">
@@ -2181,7 +2181,7 @@ function BulkUploadModal({ onClose, onUpload, onDownloadTemplate }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="modal-overlay-bg fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overscroll-contain">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-2xl font-bold text-gray-900">Bulk Upload Products</h2>

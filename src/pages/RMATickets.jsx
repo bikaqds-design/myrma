@@ -1252,7 +1252,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
       {/* ─── CREATE / EDIT MODAL ─── */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="modal-overlay-bg fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto overscroll-contain">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-8">
 
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
@@ -1579,7 +1579,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
       {/* ─── DETAILS MODAL ─── */}
       {showDetailsModal && selectedTicket && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="modal-overlay-bg fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto overscroll-contain">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-8">
 
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">

@@ -853,7 +853,7 @@ function AddCustomerModal({ form, setForm, editing, usersList, pendingFiles, set
   const set = (key, val) => setForm(prev => ({ ...prev, [key]: val }))
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+    <div className="modal-overlay-bg fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto overscroll-contain">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-8">
 
         {/* Header */}
@@ -992,7 +992,7 @@ function BulkUploadCustomersModal({ onClose, onUpload, onDownloadTemplate }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="modal-overlay-bg fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overscroll-contain">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl">
 
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
