@@ -39,7 +39,7 @@
 | ✅ | ID | Finding | Location | Fix |
 |----|----|---------|----------|-----|
 | ☐ | A-1 | No React Router — manual `pathToPage` mapping; typo URLs land on Dashboard | [App.jsx:97-119](src/App.jsx#L97-L119) | Migrate to React Router v6 |
-| ☐ | A-3 | Notification prefs in `localStorage` only — resets on new device | App.jsx:191-194 | Persist to `user_preferences` table; localStorage = cache |
+| ✅ | A-3 | Notification prefs in `localStorage` only — resets on new device | App.jsx:191-194 | **Done 2026-05-26.** `db.userPreferences` added. AccountSettings calls `persistPrefsToDb()` on every pref toggle. App.jsx seeds localStorage from DB on login. |
 | ✅ | A-4 | Dashboard recomputes 8+ aggregations every render | [Dashboard.jsx:169-243](src/pages/Dashboard.jsx#L169-L243) | **Done 2026-05-26.** All 13 aggregations wrapped in `useMemo([tickets])`. |
 | ✅ | A-5 | Dashboard realtime refetches everything on each event | [Dashboard.jsx:119-124](src/pages/Dashboard.jsx#L119-L124) | **Done 2026-05-26.** INSERT/UPDATE/DELETE each merge payload into local state — no full refetch. |
 | ✅ | A-6 | `ROLE_DEFAULT_PERMISSIONS` lives in App.jsx (40 lines) | [App.jsx:52-95](src/App.jsx#L52-L95) | **Done 2026-05-26.** Moved to [src/lib/permissions.js](src/lib/permissions.js) + `canDo()` helper exported. App.jsx imports from lib. |
@@ -47,7 +47,7 @@
 | ☐ | P-1 | Adopt TanStack Query for all data fetching | All pages | Replace manual `useState + useEffect` patterns with `useQuery`/`useMutation` + optimistic updates |
 | ☐ | M-1 | Zero unit/E2E tests | — | Vitest for components, Playwright for smoke flows |
 | ✅ | M-2 | No ESLint config | — | **Done 2026-05-26.** ESLint 9 flat config + Prettier. 0 errors, 167 warnings. `npm run lint` / `npm run format` now available. |
-| ☐ | M-4 | `supabaseClient.js` is 1350 lines | src/api/supabaseClient.js | Split: `auth.js`, `db/tickets.js`, `db/customers.js`, `db/products.js`, `db/notifications.js`, `db/parts.js`, `db/backup.js` |
+| ✅ | M-4 | `supabaseClient.js` is 1350 lines | src/api/supabaseClient.js | **Done 2026-05-26.** Split into 15 domain files under `src/api/`. `supabaseClient.js` is now a 19-line barrel re-export. 100% backward compatible. Build clean. |
 
 ---
 
@@ -59,9 +59,9 @@
 | ✅ | UX-2 | Icon-only buttons missing `aria-label` | **Done 2026-05-26.** `aria-label` added to all icon-only buttons with `title=` across App.jsx, PartsInventory, RMATickets, Invoices, NotificationBell. |
 | ✅ | UX-3 | `text-gray-400` on white = WCAG ratio 2.85 (fails AA) | **Done 2026-05-26.** 318 replacements → `text-gray-500` (ratio 4.57, meets AA) across 32 files. |
 | ☐ | UX-4 | Mobile sidebar doesn't trap focus | Add `inert` to main when sidebar open |
-| ☐ | UX-5 | No realtime toast for new notifications | Hook realtime INSERT → `toast()` |
+| ✅ | UX-5 | No realtime toast for new notifications | **Done 2026-05-26.** Supabase realtime INSERT on `notifications` table → `toast()` with role/email targeting + pref check in App.jsx. |
 | ☐ | UX-6 | No optimistic UI on CRUD actions | TanStack `useMutation` with `onMutate`/`onError` |
-| ☐ | UX-7 | Empty states lack CTAs and illustrations | Add `<EmptyState>` component |
+| ✅ | UX-7 | Empty states lack CTAs and illustrations | **Done 2026-05-26.** `<EmptyState>` component wired into RMATickets, Customers, Products, PartsInventory. Inline placeholder divs removed. |
 | ☐ | F-1 | `zod` + `react-hook-form` installed but used inconsistently | Standardize on `useForm({ resolver: zodResolver(schema) })` |
 | ☐ | F-2 | No server-side validation visible | Add Postgres CHECK constraints + RPC validation |
 
@@ -73,7 +73,7 @@
 |----|-------|-------|-----|
 | ✅ | Recharts tick text not dark-aware | All Dashboard charts | **Done 2026-05-26.** `chartTickStyle` with explicit fill colour from `darkMode` flag. |
 | ✅ | Recharts tooltip stays white | All charts | **Done 2026-05-26.** All `<Tooltip>` get `contentStyle` with dark bg `#1e293b` / border `#334155`. |
-| ☐ | `bg-blue-600`/`bg-green-600` saturated banners not overridden | Announcement banner | Add `html.dark .bg-blue-600 { background-color: #1e40af !important; }` etc. |
+| ✅ | `bg-blue-600`/`bg-green-600` saturated banners not overridden | Announcement banner | **Done 2026-05-26.** 4 CSS rules in `appearance.css` override all announcement colour variants in dark mode. |
 | ✅ | `react-hot-toast` toasts have no dark theme | All pages | **Done 2026-05-26.** All 4 `<Toaster>` get `toastOptions` with dark `#1e293b` background. |
 | ✅ | PDF export tracks theme (should stay light) | Invoices, labels | **N/A — 2026-05-26.** PDFs use popup HTML / jsPDF with hardcoded light colours; no dark bleed. |
 
@@ -140,14 +140,14 @@
 | Performance | 9/10 | 🟢 Dashboard O(1) rerenders, Inventory chunk -88%, realtime merges |
 | Accessibility | 6/10 | 🟡 `aria-label` + WCAG AA contrast done; focus traps + optimistic UI remain |
 | UX polish | 8/10 | 🟢 Dark mode charts/toasts fixed, contrast improved across all pages |
-| Dark mode | 9/10 | 🟢 Charts, tooltips, toasts all dark-aware; one banner gap remains |
+| Dark mode | 10/10 | 🟢 Charts, tooltips, toasts, announcement banners all dark-aware |
 | Code quality | 7/10 | 🟡 ESLint + Prettier wired; 0 errors; tests still missing |
 | Notifications | 9/10 | 🟢 Unchanged |
 | Mobile | 6/10 | 🟡 Unchanged — focus traps still P2 |
 | Scalability | 9/10 | 🟢 Bundle size down, no eager heavy deps, realtime is incremental |
-| Maintainability | 6/10 | 🟡 Permissions in lib, linter active; supabaseClient still monolithic |
+| Maintainability | 9/10 | 🟢 Permissions in lib, linter active; supabaseClient split into 15 domain files |
 | Production readiness | 9/10 | 🟢 Unchanged |
-| **Overall** | **9/10** | 🟢 **Excellent shape. Remaining P2 items are polish, not blockers.** |
+| **Overall** | **9.5/10** | 🟢 **Excellent shape. M-4 + UX-5/7 + A-3 + DM-banner complete. Remaining: focus traps, tests, Router.** |
 
 ---
 
@@ -181,3 +181,8 @@ _Mark each item with ✅ and date as you complete it._
 - **2026-05-26** — ✅ UX-3: 318× `text-gray-400` → `text-gray-500` across 32 files for WCAG AA text contrast.
 - **2026-05-26** — ✅ A-6: `ROLE_DEFAULT_PERMISSIONS` extracted to `src/lib/permissions.js`; `canDo()` helper added.
 - **2026-05-26** — ✅ A-7: `xlsx` + `jspdf` dynamic-imported in Inventory.jsx. Chunk 734 KB → 90 KB (-88%).
+- **2026-05-26** — ✅ DM-banner: 4 CSS overrides in `appearance.css` for announcement banner colours in dark mode.
+- **2026-05-26** — ✅ UX-5: Supabase realtime INSERT on `notifications` table → `toast()` in App.jsx. Role/email targeting + per-type localStorage pref check respected.
+- **2026-05-26** — ✅ UX-7: `<EmptyState>` wired into RMATickets, Customers, Products, PartsInventory. Preset icons + CTAs now shown on empty lists.
+- **2026-05-26** — ✅ A-3: `db.userPreferences` namespace added. AccountSettings persists pref changes to DB. App.jsx seeds localStorage from DB on login. Falls back gracefully if table missing.
+- **2026-05-26** — ✅ M-4: `supabaseClient.js` (1424 lines) split into 15 domain files under `src/api/` + `src/api/db/`. Barrel re-export preserves 100% backward compat. Circular dep (automationRules → notifications) resolved by inlining supabase call. Build: ✅ clean, 0 warnings.
