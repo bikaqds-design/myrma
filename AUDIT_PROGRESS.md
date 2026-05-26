@@ -29,7 +29,7 @@
 | ✅ | H-6 | Backup export includes plaintext SMTP/SendGrid API keys | `backup` namespace | **Done 2026-05-26.** `exportAll()` now selects only non-secret columns from `email_settings`. `redactEmailSettings()` guard replaces known secret fields with `[REDACTED]` as belt-and-braces. User must re-enter API keys after restore. |
 | ✅ | H-7 | Webhook secret sent as plaintext header (no HMAC) | Webhook delivery | **Done 2026-05-26.** `dispatch()` now signs request body with `crypto.subtle` HMAC-SHA256, sends `X-Signature-256: sha256=<hex>`. Secret never travels over the wire. |
 | ✅ | H-8 | Customer bulk delete fallback is non-atomic sequential | supabaseClient.js | **Done 2026-05-26.** Both `delete()` and `bulkDelete()` now call RPC exclusively — no sequential fallback. Throws clear error if RPC missing. |
-| ☐ | H-9 | Fire-and-forget audit logging silently drops events | App.jsx:274, 287 | Surface failures + retry; or DB-trigger-based audit log |
+| ✅ | H-9 | Fire-and-forget audit logging silently drops events | App.jsx:274, 287 | **Done 2026-05-26.** `auditInsert()` helper: retry after 600ms, then queue to localStorage (capped 50). Queue flushed on next success or app startup. All 86 call sites fixed automatically. |
 | ✅ | A-2 | No global ErrorBoundary — any render error = white screen | [main.jsx](src/main.jsx) | **Done 2026-05-26.** Added [src/components/ErrorBoundary.jsx](src/components/ErrorBoundary.jsx) with fallback UI (reload/home), dev-only stack trace, dark mode support. Wraps `<App>` in main.jsx. |
 
 ---
@@ -154,3 +154,4 @@ _Mark each item with ✅ and date as you complete it._
 - **2026-05-26** — ✅ H-6: backup export strips `api_key`/`smtp_password` from `email_settings`. `redactEmailSettings()` guard added.
 - **2026-05-26** — ✅ H-7: webhook dispatch uses HMAC-SHA256 (`X-Signature-256`) via `crypto.subtle`. Plaintext secret header removed.
 - **2026-05-26** — ✅ H-8: `customers.delete()` and `bulkDelete()` now use atomic RPC only. Non-atomic sequential fallback removed.
+- **2026-05-26** — ✅ H-9: `auditInsert()` added — retry + localStorage queue + flush on startup. All 86 call sites resilient automatically.
