@@ -2,15 +2,19 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-const supabaseServiceKey = import.meta.env.VITE_SUPABASE_SERVICE_KEY
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
 
-// Admin client — only created when VITE_SUPABASE_SERVICE_KEY is set.
-// Used exclusively for super_admin operations (e.g. direct password reset).
-const supabaseAdmin = supabaseServiceKey
-  ? createClient(supabaseUrl, supabaseServiceKey, { auth: { autoRefreshToken: false, persistSession: false } })
-  : null
+// Helper: invoke the admin-reset-password Edge Function (handles set + create-if-missing).
+// The Edge Function validates the caller's JWT and confirms super_admin role server-side.
+async function invokeAdminUserOp(targetEmail, newPassword) {
+  const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+    body: { targetEmail, newPassword }
+  })
+  if (error) throw new Error(error.message || 'Admin user operation failed')
+  if (data?.error) throw new Error(data.error)
+  return data
+}
 
 export const auth = {
   async signUp(email, password) {
@@ -42,31 +46,15 @@ export const auth = {
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     if (error) throw error
   },
-  // Super-admin direct password set using the service-role admin client.
-  // Requires VITE_SUPABASE_SERVICE_KEY in .env (get it from Supabase Dashboard → Settings → API).
+  // Super-admin direct password set. Runs server-side via Edge Function with JWT validation.
+  // The function creates a new auth user if one doesn't exist for the email.
   async adminSetPassword(targetEmail, newPassword) {
-    if (!supabaseAdmin) throw new Error('VITE_SUPABASE_SERVICE_KEY is not set in .env')
-    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
-    if (listError) throw listError
-    const target = users.find(u => u.email === targetEmail)
-    if (!target) {
-      // No auth account exists yet — create one with the supplied password
-      const { error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email: targetEmail, password: newPassword, email_confirm: true
-      })
-      if (createError) throw createError
-      return
-    }
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(target.id, { password: newPassword })
-    if (error) throw error
+    return invokeAdminUserOp(targetEmail, newPassword)
   },
   // Create a Supabase Auth account for a new user (super_admin only).
+  // Runs server-side via the same Edge Function (treats missing user as create).
   async adminCreateUser(email, password) {
-    if (!supabaseAdmin) throw new Error('VITE_SUPABASE_SERVICE_KEY is not set in .env')
-    const { error } = await supabaseAdmin.auth.admin.createUser({
-      email, password, email_confirm: true
-    })
-    if (error) throw error
+    return invokeAdminUserOp(email, password)
   },
   async updateProfile(metadata) {
     const { data, error } = await supabase.auth.updateUser({ data: metadata })
@@ -545,6 +533,21 @@ export const db = {
     async delete(id) {
       const { error } = await supabase.from('webhooks').delete().eq('id', id)
       if (error) throw error
+    },
+    async dispatch(eventType, payload) {
+      try {
+        const result = await db.webhooks.list()
+        if (result.missing) return
+        const active = (result.data || []).filter(h => h.is_active && (!h.events?.length || h.events.includes(eventType)))
+        if (!active.length) return
+        await Promise.allSettled(active.map(h =>
+          fetch(h.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(h.secret_key ? { 'X-Webhook-Secret': h.secret_key } : {}) },
+            body: JSON.stringify({ event: eventType, timestamp: new Date().toISOString(), data: payload })
+          }).catch(() => {})
+        ))
+      } catch {}
     }
   },
 
@@ -597,59 +600,43 @@ export const db = {
     }
   },
 
+  // Public tracker — all calls go through the public-track Edge Function.
+  // Anon role has NO direct DB access; the Edge Function uses service_role
+  // server-side and enforces rate limiting + input validation.
   rmaTracker: {
     async getTicketByRmaNumber(rmaNumber) {
       try {
-        const { data, error } = await supabase
-          .from('rma_tickets')
-          .select('id, rma_number, ticket_status, priority, created_date, due_date, general_description, customer_name, products, accessories_received')
-          .ilike('rma_number', rmaNumber.trim())
-          .single()
-        if (error) { if (error.code === 'PGRST116') return null; throw error }
-        return data
+        const { data, error } = await supabase.functions.invoke('public-track', {
+          body: { action: 'lookup', rmaNumber: rmaNumber.trim() }
+        })
+        if (error) return null
+        if (data?.error) return null
+        return data?.ticket || null
       } catch { return null }
     },
     async getPublicComments(ticketId) {
       try {
-        const { data, error } = await supabase
-          .from('ticket_comments')
-          .select('*')
-          .eq('ticket_id', ticketId)
-          .eq('is_internal', false)
-          .order('created_date', { ascending: true })
-        if (error) { if (error.code === '42P01') return []; throw error }
-        return data || []
+        const { data, error } = await supabase.functions.invoke('public-track', {
+          body: { action: 'comments', ticketId }
+        })
+        if (error || data?.error) return []
+        return data?.comments || []
       } catch { return [] }
     },
     async addComment(ticketId, authorName, authorEmail, commentText, parentCommentId = null, attachments = []) {
-      const fullPayload = {
-        ticket_id: ticketId,
-        comment_text: commentText,
-        user_email: authorEmail || null,
-        author_name: authorName,
-        is_internal: false,
-        is_customer_comment: true,
-        parent_comment_id: parentCommentId || null,
-        attachments: attachments || [],
-        created_date: new Date().toISOString(),
-      }
-      let { data, error } = await supabase.from('ticket_comments').insert([fullPayload]).select()
-      // If new columns don't exist yet (migration not run), retry with basic fields only
-      if (error && (error.code === '42703' || error.message?.includes('column'))) {
-        const basicPayload = {
-          ticket_id: ticketId,
-          comment_text: commentText,
-          user_email: authorEmail || null,
-          author_name: authorName,
-          is_internal: false,
-          created_date: new Date().toISOString(),
+      const { data, error } = await supabase.functions.invoke('public-track', {
+        body: {
+          action: 'addComment',
+          comment: {
+            ticketId, authorName, authorEmail,
+            commentText, parentCommentId,
+            attachments: attachments || []
+          }
         }
-        const result = await supabase.from('ticket_comments').insert([basicPayload]).select()
-        if (result.error) throw result.error
-        return result.data?.[0]
-      }
-      if (error) throw error
-      return data?.[0]
+      })
+      if (error) throw new Error(error.message || 'Failed to send message')
+      if (data?.error) throw new Error(data.error)
+      return data?.comment
     }
   },
 
@@ -1008,34 +995,6 @@ export const db = {
       const d = new Date()
       d.setHours(d.getHours() + policy.hours)
       return d.toISOString().split('T')[0]
-    }
-  },
-
-  // ── Outbound Webhooks (stored in rma_config) ───────────────────────────────
-  webhooks: {
-    async list() {
-      try {
-        const { data, error } = await supabase.from('rma_config').select('config_value').eq('config_key', 'webhooks').single()
-        if (error) return []
-        return data?.config_value || []
-      } catch { return [] }
-    },
-    async save(hooks, userEmail) {
-      return db.rmaConfig.set('webhooks', hooks, userEmail)
-    },
-    async dispatch(eventType, payload) {
-      try {
-        const hooks = await db.webhooks.list()
-        const active = hooks.filter(h => h.enabled && (!h.events?.length || h.events.includes(eventType)))
-        if (!active.length) return
-        await Promise.allSettled(active.map(h =>
-          fetch(h.url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...(h.secret ? { 'X-myRMA-Secret': h.secret } : {}) },
-            body: JSON.stringify({ event: eventType, timestamp: new Date().toISOString(), data: payload })
-          }).catch(() => {})
-        ))
-      } catch {}
     }
   },
 

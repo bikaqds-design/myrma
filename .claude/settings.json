@@ -28,7 +28,11 @@
       "Bash(npm run *)",
       "Bash(vercel --version)",
       "PowerShell(vercel --version 2>&1)",
-      "Bash(not exist *)"
+      "Bash(not exist *)",
+      "Bash(npm uninstall *)",
+      "PowerShell(winget install Supabase.CLI)",
+      "PowerShell(winget search supabase)",
+      "PowerShell(Set-Clipboard)"
     ]
   }
 }
