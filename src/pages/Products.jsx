@@ -5,6 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { PageSkeleton } from '../components/Skeleton'
 import { Button, Spinner, PageHeader } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
+import EmptyState from '../components/EmptyState'
 
 export default function Products({ currentUserRole, currentUserEmail, currentUserPermissions, onNavigateToProduct }) {
   const searchRef = useRef(null)
@@ -1329,24 +1330,13 @@ function ProductsListTab({
           <tbody className="bg-white divide-y divide-gray-200">
             {products.length === 0 ? (
               <tr>
-                <td colSpan="10" className="px-4 py-20 text-center">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center">
-                      <svg className="w-7 h-7 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-700">No products found</p>
-                      <p className="text-sm text-gray-500 mt-0.5">Add your first product to start managing your catalog</p>
-                    </div>
-                    {canCreate && (
-                      <button onClick={() => setShowAddProduct(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                        Add First Product
-                      </button>
-                    )}
-                  </div>
+                <td colSpan="10">
+                  <EmptyState
+                    preset="products"
+                    description="Add your first product to start managing your catalog"
+                    action={canCreate ? () => setShowAddProduct(true) : undefined}
+                    actionLabel="Add First Product"
+                  />
                 </td>
               </tr>
             ) : (

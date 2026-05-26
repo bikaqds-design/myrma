@@ -153,11 +153,18 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
     try { notifChannel.current?.postMessage({ type: 'notif-system-prefs-changed', prefs }) } catch {}
   }
 
+  // A-3: persist to DB (fire-and-forget; localStorage stays the fast path)
+  const persistPrefsToDb = (prefs) => {
+    if (!currentUser?.email) return
+    db.userPreferences.set(currentUser.email, { notifSystem: prefs }).catch(() => {})
+  }
+
   const toggleSysNotif = (key) => {
     setSysNotifPrefs(prev => {
       const next = { ...prev, [key]: prev[key] === false ? true : false }
       localStorage.setItem(sysPrefsKey, JSON.stringify(next))
       broadcastPrefs(next)
+      persistPrefsToDb(next)
       return next
     })
   }
@@ -167,6 +174,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
     setSysNotifPrefs(next)
     localStorage.setItem(sysPrefsKey, JSON.stringify(next))
     broadcastPrefs(next)
+    persistPrefsToDb(next)
   }
 
   // Activity

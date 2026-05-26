@@ -5,6 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { PageSkeleton } from '../components/Skeleton'
 import AttachmentsField from '../components/AttachmentsField'
 import { Button, Spinner, PageHeader } from '../components/ui'
+import EmptyState from '../components/EmptyState'
 
 const EMPTY_FORM = {
   customer_type: 'B2B',
@@ -700,24 +701,13 @@ export default function Customers({ currentUserRole, currentUserEmail, currentUs
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {paginatedCustomers.length === 0 ? (
-                  <tr><td colSpan="9" className="px-4 py-20 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center">
-                        <svg className="w-7 h-7 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-700">No customers found</p>
-                        <p className="text-sm text-gray-500 mt-0.5">
-                          {customers.length > 0 ? 'Try adjusting your filters or search term' : 'Add your first customer to get started'}
-                        </p>
-                      </div>
-                      {canDo('create') && customers.length === 0 && (
-                        <button onClick={() => setShowAddCustomer(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                          Add First Customer
-                        </button>
-                      )}
-                    </div>
+                  <tr><td colSpan="9">
+                    <EmptyState
+                      preset="customers"
+                      description={customers.length > 0 ? 'Try adjusting your filters or search term' : 'Add your first customer to get started'}
+                      action={canDo('create') && customers.length === 0 ? () => setShowAddCustomer(true) : undefined}
+                      actionLabel="Add First Customer"
+                    />
                   </td></tr>
                 ) : paginatedCustomers.map((c, idx) => (
                   <tr key={c.id} className="hover:bg-gray-50 transition-colors">

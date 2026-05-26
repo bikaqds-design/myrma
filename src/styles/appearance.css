@@ -100,6 +100,13 @@ html.dark .border-indigo-200 { border-color: #312e81 !important; }
 html.dark code { background-color: #334155 !important; }
 html.dark pre  { background-color: #1e293b !important; }
 
+/* ─── ANNOUNCEMENT BANNER DARK MODE ────────────────────────────────────── */
+/* Saturated coloured banners need a muted dark-mode equivalent            */
+html.dark .bg-blue-600   { background-color: #1e3a5f !important; }
+html.dark .bg-green-600  { background-color: #064e3b !important; }
+html.dark .bg-yellow-500 { background-color: #78350f !important; }
+html.dark .bg-red-600    { background-color: #7f1d1d !important; }
+
 /* ─── MODAL SCROLL LOCK ─────────────────────────────────────────────────── */
 
 /* Lock the main scroll container when any modal overlay is present */

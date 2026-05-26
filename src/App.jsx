@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react'
-import { Toaster } from 'react-hot-toast'
+import { Toaster, toast } from 'react-hot-toast'
 import { auth, db, branding as brandingAPI, supabase } from './api/supabaseClient'
 import { useAppearance } from './contexts/AppearanceContext'
 import { ROLE_DEFAULT_PERMISSIONS } from './lib/permissions'
@@ -163,11 +163,41 @@ export default function App() {
       setNotifications(applyPrefs(result.data))
     }
 
+    // A-3: seed localStorage from DB on first load (DB is source of truth; localStorage = cache)
+    db.userPreferences.get(currentUser.email).then(result => {
+      if (!result.missing && result.prefs?.notifSystem) {
+        try {
+          localStorage.setItem(`notif_system_prefs_${currentUser.email}`, JSON.stringify(result.prefs.notifSystem))
+        } catch {}
+      }
+    }).catch(() => {})
+
     loadNotifsRef.current = loadNotifs
     loadNotifs()
 
     const channel = supabase.channel('app_notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, () => loadNotifs())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
+        loadNotifs()
+        // UX-5: show a toast for notifications targeted at this user
+        const n = payload.new
+        if (!n) return
+        const myRole = currentUserRole
+        const myEmail = currentUser?.email
+        // Check targeting: null arrays = broadcast to all staff
+        const roleMatch = !n.target_roles?.length || n.target_roles.includes(myRole)
+        const emailMatch = n.target_emails?.length && n.target_emails.includes(myEmail)
+        if (!roleMatch && !emailMatch) return
+        // Respect per-type preferences
+        try {
+          const prefs = JSON.parse(localStorage.getItem(`notif_system_prefs_${myEmail}`) || '{}')
+          if (prefs[n.type] === false) return
+        } catch {}
+        const icons = { info: 'ℹ️', warning: '⚠️', success: '✅', error: '🚨', announcement: '📢' }
+        toast(`${icons[n.type] || '🔔'} ${n.title}`, {
+          duration: 5000,
+          style: { maxWidth: 380 },
+        })
+      })
       .subscribe()
     notifChannelRef.current = channel
 

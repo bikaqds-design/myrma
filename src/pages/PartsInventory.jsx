@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { Button, Spinner, PageHeader } from '../components/ui'
 import { useAppearance } from '../contexts/AppearanceContext'
+import EmptyState from '../components/EmptyState'
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
 function downloadCSV(rows, columns, filename) {
@@ -384,15 +385,14 @@ export default function PartsInventory({ currentUserRole, currentUserEmail, curr
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
-          <svg className="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-          <p className="text-sm text-gray-500">{search || showLowOnly ? 'No parts match your filters' : 'No parts in inventory yet'}</p>
-          {canAdd && !search && !showLowOnly && (
-            <button onClick={() => { setEditingPart(null); setShowModal(true) }}
-              className="mt-3 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-colors">
-              Add your first part
-            </button>
-          )}
+        <div className="bg-white rounded-xl border border-gray-200">
+          <EmptyState
+            preset="inventory"
+            title="No parts found"
+            description={search || showLowOnly ? 'No parts match your filters' : 'No parts in inventory yet'}
+            action={canAdd && !search && !showLowOnly ? () => { setEditingPart(null); setShowModal(true) } : undefined}
+            actionLabel="Add First Part"
+          />
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
