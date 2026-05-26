@@ -219,6 +219,5 @@ _Mark each item with ✅ and date as you complete it._
 - **2026-05-27** — ✅ M-1: Vitest 4 + jsdom + RTL installed. 74 tests in 3 suites (schemas, permissions, constants). `npm test` passes.
 - **2026-05-27** — ✅ P-1 targeted: `QueryClientProvider` added to main.jsx (staleTime 60s, retry 1). `useQuery` in Dashboard, RMATickets, Customers replaces `useState+useEffect` fetch pattern. Shared query keys: `['rma-tickets']`, `['customers']`, `['products']`, `['users']`. Realtime handlers write to query cache via `setQueryData` / `invalidateQueries`.
 - **2026-05-27** — ✅ UX-6: Optimistic delete on tickets and customers — row removed from cache before `await`, rolled back via `setQueryData` on error. Optimistic update on customer edit — row updated in cache before `await`. Build + 74 tests: ✅ clean.
-- **2026-05-27** — ✅ M-1: Vitest + jsdom + RTL installed. 74 unit tests across 3 suites (schemas.test, permissions.test, constants.test). `npm test` → all pass in 2.1s.
 - **2026-05-27** — ⏸ A-1: Deferred. Custom routing works correctly; typo-URL gap is cosmetic for internal tool. Revisit if team grows or 10+ routes needed.
-- **2026-05-27** — ⏸ P-1: Rescoped from "all pages" to targeted 3 pages (RMATickets, Dashboard, Customers). Full migration has diminishing returns. Targeted approach = 80% benefit at 20% cost.
+- **2026-05-27** — ✅ P-1 + UX-6: All 3 targeted pages migrated. Commit `5e45b80`.
