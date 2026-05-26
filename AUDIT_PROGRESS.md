@@ -26,7 +26,7 @@
 | ✅ | H-3 | Race condition in `parts.adjustQuantity` (read-modify-write) | supabaseClient.js:906-912 | **Done 2026-05-26.** RPC `adjust_part_quantity(p_id, p_delta)` — atomic `GREATEST(0, quantity + delta)` in one SQL statement. |
 | ✅ | H-4 | All list endpoints return full tables, no pagination | `rmaTickets.list`, `customers.list`, `products.list` | **Done 2026-05-26.** Added `.limit(500)` safety cap to all three `list()` calls. Added `listPaged(page, pageSize)` returning `{ data, count, totalPages }`. Warning banner shown in UI when total exceeds cap. |
 | ✅ | H-5 | Notifications filtered client-side after fetching all rows (privacy leak) | supabaseClient.js:796-808 | **Done 2026-05-26.** Removed client-side filter — RLS policy `user_read_targeted` handles it server-side. `markRead` now uses `mark_notifications_read` RPC (atomic, no read-then-write). |
-| ☐ | H-6 | Backup export includes plaintext SMTP/SendGrid API keys | `backup` namespace | Strip `email_settings` secrets from export, or encrypt with user passphrase |
+| ✅ | H-6 | Backup export includes plaintext SMTP/SendGrid API keys | `backup` namespace | **Done 2026-05-26.** `exportAll()` now selects only non-secret columns from `email_settings`. `redactEmailSettings()` guard replaces known secret fields with `[REDACTED]` as belt-and-braces. User must re-enter API keys after restore. |
 | ☐ | H-7 | Webhook secret sent as plaintext header (no HMAC) | Webhook delivery | HMAC-SHA256 signature: `X-Signature-256: sha256=<hex>` |
 | ☐ | H-8 | Customer bulk delete fallback is non-atomic sequential | supabaseClient.js | Require RPC or wrap fallback in transactional Postgres function |
 | ☐ | H-9 | Fire-and-forget audit logging silently drops events | App.jsx:274, 287 | Surface failures + retry; or DB-trigger-based audit log |
@@ -151,3 +151,4 @@ _Mark each item with ✅ and date as you complete it._
 - **2026-05-26** — ✅ H-3: `adjustQuantity` replaced with atomic `adjust_part_quantity` RPC — no more race condition.
 - **2026-05-26** — ✅ H-5: client-side notification filter removed — RLS `user_read_targeted` policy handles it server-side. `markRead` now atomic via RPC.
 - **2026-05-26** — ✅ H-4: `.limit(500)` cap on `rmaTickets/customers/products.list()`. `listPaged()` added to all three. Warning banner in UI when cap is hit.
+- **2026-05-26** — ✅ H-6: backup export strips `api_key`/`smtp_password` from `email_settings`. `redactEmailSettings()` guard added.
