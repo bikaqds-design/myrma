@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#4f46e5"/>
+  <!-- Subtle inner glow -->
+  <rect width="512" height="512" rx="96" fill="url(#glow)" opacity="0.3"/>
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#4f46e5" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- "R" lettermark -->
+  <text
+    x="256"
+    y="340"
+    font-family="system-ui, -apple-system, sans-serif"
+    font-size="280"
+    font-weight="800"
+    fill="white"
+    text-anchor="middle"
+    dominant-baseline="auto"
+    letter-spacing="-8"
+  >R</text>
+  <!-- Small "MA" subscript -->
+  <text
+    x="256"
+    y="420"
+    font-family="system-ui, -apple-system, sans-serif"
+    font-size="88"
+    font-weight="600"
+    fill="white"
+    fill-opacity="0.75"
+    text-anchor="middle"
+    letter-spacing="12"
+  >MA</text>
+</svg>

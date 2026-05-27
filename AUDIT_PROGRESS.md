@@ -2,7 +2,7 @@
 
 > Audit date: 2026-05-26 → 2026-05-27
 > Baseline commit: `5085ad2` + post-rollback UI fixes
-> Overall score: **10/10** — all P0/P1/P2 items complete (or consciously deferred). P3 quick wins done 2026-05-27: P-2 virtualization, P-3 image resize, CI/CD, Sentry, M-3 TypeScript.
+> Overall score: **10/10** — all P0/P1/P2/P3 items complete (or consciously deferred). PWA done 2026-05-27. Only deferral: A-1 React Router (cosmetic gap, low ROI).
 
 ---
 
@@ -112,7 +112,7 @@ After completing all other P2 items, A-1 and P-1 were re-evaluated against actua
 | ✅ | M-5 | Magic strings (`'super_admin'`, `'Closed'`, …) everywhere | **Done 2026-05-26.** `src/lib/constants.js` with ROLES, TICKET_STATUS, PRIORITY, INVENTORY_STATUS, NOTIF_TYPE, AUTOMATION_ACTION, CONFIG_KEY, STORAGE_KEY + helpers. `permissions.js` updated to use ROLES constants. `audit.js` and `system.js` consume CONFIG_KEY, AUTOMATION_ACTION, PRIORITY. |
 | ✅ | P-2 | No virtualization on long lists | **Done 2026-05-27.** `@tanstack/react-virtual` v3 installed. Customer dropdown in RMATickets virtualised with `useVirtualizer` (estimateSize 56px, overscan 3) + `customerDropdownRef`. Renders only visible rows regardless of dataset size — previously all 500+ customers rendered into DOM simultaneously. |
 | ✅ | P-3 | Image uploads not resized | **Done 2026-05-27.** `src/lib/resizeImage.js` — canvas-based downscale to 1200px max width (400px for avatars), JPEG quality 0.85, PNG passthrough. Wired into `storage.js`: `uploadFile`, `uploadProductImage`, `uploadAvatar`, `uploadCustomerAttachment`, `uploadCommentAttachment` all call `resizeImage()` before upload. No-op for non-image types. |
-| ☐ | — | No service worker / PWA manifest | Add Vite PWA plugin + offline shell |
+| ✅ | — | No service worker / PWA manifest | **Done 2026-05-27.** `vite-plugin-pwa` + Workbox `generateSW`. App-shell pre-caches all 42 static assets (`sw.js` + `workbox-*.js` emitted at build). Supabase API calls use NetworkFirst (10s timeout, falls back to cache). `public/icon.svg` → 5 PNG sizes + `favicon.ico` + `apple-touch-icon` via `@vite-pwa/assets-generator`. Manifest: `standalone` display, indigo theme `#4f46e5`, dark background `#0f172a`. `index.html` updated with correct `<link>` tags. |
 | ✅ | — | No error reporting | **Done 2026-05-27.** `src/lib/sentry.js` — `initSentry()` no-op guard (requires `VITE_SENTRY_DSN`), `captureException()` helper (logs to console in DEV, sends to Sentry in PROD). `ErrorBoundary.jsx` calls `captureException` in `componentDidCatch`. `initSentry()` called in `main.jsx`. `.env.example` documents `VITE_SENTRY_DSN`. |
 | ✅ | — | No CI/CD with test gating | **Done 2026-05-27.** `.github/workflows/ci.yml` — ubuntu-latest, Node 20, `npm ci --legacy-peer-deps`, then `npm test` → `npm run lint:ci` → `npm run build`. Runs on push to `main` and all PRs targeting `main`. Build step uses placeholder Supabase env vars so it succeeds without secrets. |
 
@@ -190,7 +190,7 @@ After completing all other P2 items, A-1 and P-1 were re-evaluated against actua
 | Scalability | 10/10 | 🟢 Virtual lists + image resize = no DOM bloat, no oversized uploads |
 | Maintainability | 10/10 | 🟢 Typed constants/permissions/schemas, full CI pipeline, error monitoring |
 | Production readiness | 10/10 | 🟢 CI/CD + Sentry + env.example — deployable with confidence |
-| **Overall** | **10/10** | 🟢 **Audit complete. Only remaining P3 item: PWA manifest (nice-to-have, not blocking).** |
+| **Overall** | **10/10** | 🟢 **Audit complete. All P3 items done. Only deferral: A-1 React Router (cosmetic gap, low ROI).** |
 
 ---
 
@@ -244,3 +244,4 @@ _Mark each item with ✅ and date as you complete it._
 - **2026-05-27** — ✅ Sentry: `src/lib/sentry.js` + `captureException` helper. `ErrorBoundary.componentDidCatch` reports to Sentry in PROD. `initSentry()` in `main.jsx`. `.env.example` documents `VITE_SENTRY_DSN`.
 - **2026-05-27** — ✅ P-2: `@tanstack/react-virtual` v3 — `useVirtualizer` on customer dropdown in RMATickets. Only visible rows rendered regardless of dataset size.
 - **2026-05-27** — ✅ M-3: `tsconfig.json` + `src/lib/constants.ts` / `permissions.ts` / `schemas.ts`. Old `.js` files deleted. Build ✅ + 74 tests ✅. Typed `Role`, `TicketStatus`, `Priority`, form data types all exported.
+- **2026-05-27** — ✅ PWA: `vite-plugin-pwa` + Workbox generateSW. App shell pre-caches 42 assets (`sw.js` emitted). Supabase calls NetworkFirst. `public/icon.svg` → 5 PNG sizes + favicon.ico + apple-touch-icon via `@vite-pwa/assets-generator`. `index.html` meta + link tags updated. Build ✅ + 74 tests ✅.
