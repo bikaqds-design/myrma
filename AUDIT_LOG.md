@@ -1,8 +1,8 @@
 # myRMA Enterprise — Audit Log
 
-> **Audit period:** 2026-05-26 → 2026-05-27
+> **Audit period:** 2026-05-26 → 2026-05-27 (initial) · 2026-05-27 (full system test)
 > **Baseline commit:** `5085ad2` + post-rollback UI fixes
-> **Final score:** 10/10 — all P0 → P3 complete. Zero open items.
+> **Latest score:** 6/10 (full system test 2026-05-27) — 14 new findings; CI broken; see [Full System Test section](#-full-system-test--2026-05-27)
 
 ---
 
@@ -12,6 +12,7 @@
 - [P1 — High findings](#-p1--high-data-integrity--architecture)
 - [P2 — Medium findings](#-p2--medium-frontend-architecture)
 - [P3 — Quarter findings](#-p3--quarter)
+- [Full System Test — 2026-05-27](#-full-system-test--2026-05-27)
 - [Scorecard](#-scorecard)
 - [Changelog](#-changelog)
 
@@ -405,6 +406,79 @@ Full migration (15+ pages, 8+ hrs) was too high risk. Targeted 3 pages instead.
 
 ---
 
+## 🧪 Full System Test — 2026-05-27
+
+**Report:** [SYSTEM_TEST_REPORT_20260527.md](SYSTEM_TEST_REPORT_20260527.md)  
+**Method:** Automated tests + full static analysis (Phases 1–3) + manual law compliance check (L-01 through L-15)
+
+### Test Run Results
+
+| Command | Result |
+|---------|--------|
+| `npm test` | ✅ 74/74 passed |
+| `npm run test:coverage` | ✅ 92.59% stmts / 77.77% branches |
+| `npm run lint:ci` | ❌ **FAIL** — 1 error + 162 warnings (163 problems) |
+| `npm run format:check` | ❌ **FAIL** — 66 files with Prettier violations |
+| `npm run build` | ⚠️ PASS with warning — `index` chunk 643 KB exceeds 500 KB threshold |
+
+### New Findings (2026-05-27 Full System Test)
+
+#### 🔴 Critical
+
+| ID | Finding | File | Status |
+|----|---------|------|--------|
+| CRIT-NEW-1 | CI pipeline broken — `lint:ci` fails (1 error + 162 warnings) and `format:check` fails (66 files) | `Login.jsx:46`, 66 files | **Open** |
+
+#### 🟠 High
+
+| ID | Finding | File | Status |
+|----|---------|------|--------|
+| HIGH-NEW-1 | Main vendor bundle 643 KB — exceeds 500 KB threshold | `vite.config.js` / `index` chunk | **Open** |
+| HIGH-NEW-2 | Dashboard 442 KB — Recharts statically imported at module level | `Dashboard.jsx:7` | **Open** |
+| HIGH-NEW-3 | `/control-panel` route has no auth redirect — non-admin direct URL access unblocked | `App.jsx:730` | **Open** |
+| HIGH-NEW-4 | 162 ESLint warnings across 41 files — signal-to-noise ratio degraded | 41 files | **Open** |
+
+#### 🟡 Medium
+
+| ID | Finding | File | Status |
+|----|---------|------|--------|
+| MED-NEW-1 | 52 `console.error/warn/log` in production code | 10+ page files | **Open** |
+| MED-NEW-2 | L-04: Hardcoded role strings (`=== 'admin'`) in 7+ pages — not using `ROLES.*` constant | 7 page files | **Open** |
+| MED-NEW-3 | L-03: Raw `<button>` (15+) and `<input>` (8+) in pages — not using `ui.jsx` | `AccountSettings.jsx`, `BrandingSettings.jsx` | **Open** |
+| MED-NEW-4 | 49 inline `style={{}}` in page components — bypasses dark mode overrides | throughout | **Open** |
+| MED-NEW-5 | Dark mode uses CSS `!important` overrides not Tailwind `dark:` prefix — deviates from §4.4 | `appearance.css` / all pages | **Open** |
+| MED-NEW-6 | `refetchOnWindowFocus: false` missing from QueryClient config | `main.jsx:15` | **Open** |
+| MED-NEW-7 | Magic status strings in `Inventory.jsx` and `Reports.jsx` — `BATCH_STATUS.*` not used | `Inventory.jsx:2117`, `Reports.jsx:481` | **Open** |
+
+#### 🟢 Low
+
+| ID | Finding | File | Status |
+|----|---------|------|--------|
+| LOW-NEW-1 | Two toast libraries installed (`react-hot-toast` + `sonner`) | `package.json` | **Open** |
+| LOW-NEW-2 | `PRODUCT_STATUS` constant defined but never used | `constants.ts` | **Open** |
+| LOW-NEW-3 | `NotFoundPage` inline in `App.jsx` rather than `src/pages/NotFoundPage.jsx` | `App.jsx:31` | **Open** |
+| LOW-NEW-4 | `Invoices.jsx` PDF generation path not confirmed as dynamic import | `Invoices.jsx` | **Open** |
+
+### Full System Test Scorecard
+
+| Domain | Initial Audit | Full Test | Delta |
+|--------|--------------|-----------|-------|
+| Security | 9/10 | **8/10** | -1 (console.error + unguarded route) |
+| Architecture | 10/10 | **7/10** | -3 (bundle, hardcoded roles, route guard) |
+| Performance | 8/10 | **6/10** | -2 (643 KB chunk, static Recharts) |
+| Accessibility | 8/10 | **4/10** | -4 (only 20 aria-labels for entire app) |
+| UX polish | 8/10 | **7/10** | -1 (raw buttons, inline styles) |
+| Dark mode | 8/10 | **6/10** | -2 (deviates from spec, inline style gaps) |
+| Code quality | 9/10 | **4/10** | -5 (CI broken, 162 warnings, 66 Prettier fails) |
+| Notifications | 8/10 | **8/10** | 0 |
+| Mobile | 8/10 | **6/10** | -2 (inline styles, arbitrary widths) |
+| Scalability | 8/10 | **7/10** | -1 (bundle size) |
+| Maintainability | 9/10 | **5/10** | -4 (warnings noise, magic strings, console.logs) |
+| Production readiness | 9/10 | **5/10** | -4 (CI broken, bundle warning) |
+| **Overall** | **10/10** | **6/10** | **-4** |
+
+---
+
 ## 📊 Scorecard
 
 ### Baseline (2026-05-26 start)
@@ -534,3 +608,7 @@ Full migration (15+ pages, 8+ hrs) was too high risk. Targeted 3 pages instead.
 - **2026-05-27** — 🔍 Cross-check pass 2 (DEPLOY_CRIT files): 5 issues found and fixed. (1) `admin-reset-password` Edge Function returned 404 for new users — added `createUser` path. (2) DEPLOY_CRIT2.md SQL used `auth.user_role()` — corrected to `public.rma_user_role()`. (3) Storage bucket policy was untracked — written as migration. (4) DEPLOY_CRIT1.md rollback updated to reference `auth.js`. (5) CRIT-3 location ref updated.
 - **2026-05-27** — ✅ CRIT-3 follow-up: `20260527_storage_bucket_policies.sql` — anon upload capped at 25 MB, JPEG/PNG/GIF/WebP/PDF only. Security: 8/10 → 9/10.
 - **2026-05-27** — ✅ Merged AUDIT_PROGRESS.md + DEPLOY_CRIT1/2/3.md into AUDIT_LOG.md. Old files removed.
+- **2026-05-27** — ✅ `CONSTITUTION.md` written: 18-section engineering constitution. 15 mandatory laws, component standards, AI agent rules, forbidden anti-patterns.
+- **2026-05-27** — ✅ `CLAUDE.md` fully updated: all routes, provider order, domain modules, Edge Functions, PWA, Sentry, RLS helpers, CI/CD, all npm scripts.
+- **2026-05-27** — ✅ `README.md` rewritten from stub: full feature table, tech stack, quick-start guide, architecture overview, all routes, testing docs.
+- **2026-05-27** — 🔍 Full system test run. 14 new findings: 1 critical, 4 high, 7 medium, 4 low. Overall score revised 10/10 → **6/10**. CI broken (lint:ci + format:check both fail). See [SYSTEM_TEST_REPORT_20260527.md](SYSTEM_TEST_REPORT_20260527.md).
