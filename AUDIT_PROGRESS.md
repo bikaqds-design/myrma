@@ -38,7 +38,7 @@
 
 | ✅ | ID | Finding | Location | Fix |
 |----|----|---------|----------|-----|
-| ✅ | A-1 | No React Router — manual `pathToPage` mapping; typo URLs land on Dashboard | [App.jsx](src/App.jsx) | **Done 2026-05-27.** Full React Router v6 migration: `BrowserRouter` in `main.jsx`; `useNavigate` + `useLocation` in App.jsx. All 13 routes declared with `<Routes>`/`<Route>`. `ProductDetailsRoute` + `CustomerDetailsRoute` wrapper components use `useParams()`. `NotFoundPage` catch-all `*` route — typo URLs now show 404 instead of silently landing on Dashboard. Removed `pathToPage()`, `pageToPath()`, `popstate` listener, `currentPage` state. Build ✅ + 74 tests ✅. |
+| ✅ | A-1 | No React Router — manual `pathToPage` mapping; typo URLs land on Dashboard | [App.jsx](src/App.jsx) | **Done 2026-05-27.** Full React Router v6 migration: `BrowserRouter` in `main.jsx`; `useNavigate` + `useLocation` in App.jsx. All 13 routes declared with `<Routes>`/`<Route>`. `ProductDetailsRoute` + `CustomerDetailsRoute` wrapper components use `useParams()`. `NotFoundPage` catch-all `*` route — typo URLs now show 404 instead of silently landing on Dashboard. Removed `pathToPage()`, `pageToPath()`, App.jsx `popstate` listener, `currentPage` state. Note: `RMATickets.jsx` retains one `window.history.pushState` call for within-route ticket deep-link URL sync (`?ticket=<id>`) — this is in-page state, not top-level routing. Build ✅ + 74 tests ✅. |
 | ✅ | A-3 | Notification prefs in `localStorage` only — resets on new device | App.jsx:191-194 | **Done 2026-05-26.** `db.userPreferences` added. AccountSettings calls `persistPrefsToDb()` on every pref toggle. App.jsx seeds localStorage from DB on login. |
 | ✅ | A-4 | Dashboard recomputes 8+ aggregations every render | [Dashboard.jsx:169-243](src/pages/Dashboard.jsx#L169-L243) | **Done 2026-05-26.** All 13 aggregations wrapped in `useMemo([tickets])`. |
 | ✅ | A-5 | Dashboard realtime refetches everything on each event | [Dashboard.jsx:119-124](src/pages/Dashboard.jsx#L119-L124) | **Done 2026-05-26.** INSERT/UPDATE/DELETE each merge payload into the **query cache** via `queryClient.setQueryData(['rma-tickets'], …)` — no full refetch. (After P-1 migrated Dashboard to TanStack Query, realtime handlers write to the cache, not local state.) |
@@ -174,7 +174,7 @@ After completing all other P2 items, A-1 and P-1 were re-evaluated against actua
 | Scalability | 9/10 | 🟢 Bundle size down, no eager heavy deps, realtime is incremental |
 | Maintainability | 9/10 | 🟢 Constants module, permissions lib, linter active, 15-file API split |
 | Production readiness | 9/10 | 🟢 All P0+P1 resolved, resilient logging |
-| **Overall** | **9.5/10** | 🟢 **All P2 items complete. A-1 deferred (low ROI). Remaining: P3 quick wins.** |
+| **Overall** | **9.5/10** | 🟢 **All P2 items complete. A-1 deferred at this point (later done same day). Remaining: P3 quick wins.** |
 
 ### Final (after P3 + A-1 complete — 2026-05-27)
 
@@ -220,7 +220,7 @@ _Mark each item with ✅ and date as you complete it._
 - **2026-05-26** — ✅ H-9: `auditInsert()` added — retry + localStorage queue + flush on startup. All 86 call sites resilient automatically.
 - **2026-05-26** — ✅ M-2: ESLint 9 flat config + Prettier added. `lint`, `lint:ci`, `lint:fix`, `format`, `format:check` scripts. 0 errors (BOM regex fixed in Customers/Products).
 - **2026-05-26** — ✅ A-4: Dashboard — all 13 aggregations wrapped in `useMemo([tickets])`. No recompute on unrelated renders.
-- **2026-05-26** — ✅ A-5: Dashboard realtime — INSERT/UPDATE/DELETE each merge into local state; full `loadData()` refetch eliminated.
+- **2026-05-26** — ✅ A-5: Dashboard realtime — full `loadData()` refetch eliminated; events now update the **query cache** via `queryClient.setQueryData(['rma-tickets'], …)` (corrected from original "local state" description after P-1 migrated Dashboard to TanStack Query).
 - **2026-05-26** — ✅ DM-1/DM-2/DM-3: Dark-aware Recharts ticks + tooltips + react-hot-toast dark background. WidgetCard dark shell added. DM-4 N/A (PDFs already light-only).
 - **2026-05-26** — ✅ UX-2: `aria-label` added to all icon-only buttons with `title=` (11 buttons across 5 files).
 - **2026-05-26** — ✅ UX-3: 318× `text-gray-400` → `text-gray-500` across 32 files for WCAG AA text contrast.

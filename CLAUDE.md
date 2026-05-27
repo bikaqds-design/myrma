@@ -5,12 +5,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev        # start dev server (Vite, port 5173)
-npm run build      # production build
-npm run preview    # preview production build
+npm run dev            # start dev server (Vite, port 5173)
+npm run build          # production build
+npm run preview        # preview production build
+npm test               # Vitest unit tests (74 tests, 3 suites)
+npm run test:coverage  # test with coverage report
+npm run lint           # ESLint (0 errors target)
+npm run lint:ci        # ESLint strict for CI (used in CI)
+npm run format         # Prettier write
 ```
-
-No test runner or linter is configured — there are no `test` or `lint` scripts.
 
 ## Environment
 
@@ -24,11 +27,15 @@ Both variables must be prefixed with `VITE_` to be visible in Vite.
 
 ## Architecture
 
-### Single-page app with manual routing
+### React Router v6
 
-The app uses **no React Router**. Navigation is managed entirely in `src/App.jsx` via `useState` (`currentPage`, `selectedProductId`, `selectedCustomerId`) combined with `window.history.pushState` / `popstate`. URL paths map to page names via `pathToPage()` and `pageToPath()` helpers at the top of `App.jsx`.
+The app uses **React Router v6** (`react-router-dom`). `BrowserRouter` wraps the app in `src/main.jsx`. Navigation is handled via `useNavigate` and `useLocation` hooks in `src/App.jsx`.
 
-All top-level pages are lazy-loaded with `React.lazy`. `App.jsx` renders the correct page component based on `currentPage` state, passing down `currentUserRole`, `currentUserEmail`, and `currentUserPermissions` as props.
+All top-level pages are lazy-loaded with `React.lazy`. `App.jsx` declares routes with `<Routes>` / `<Route>`. Parameterized routes (`/products/:id`, `/customers/:id`) are served by thin wrapper components (`ProductDetailsRoute`, `CustomerDetailsRoute`) that call `useParams()` and pass the id prop to the underlying page component. A catch-all `*` route renders `NotFoundPage`. Active sidebar state is derived from `location.pathname`.
+
+Props passed to every page component: `currentUserRole`, `currentUserEmail`, `currentUserPermissions`.
+
+`/tracker` is the only unauthenticated route — detected via `pathname === '/tracker'` before the auth check renders.
 
 ### Data layer
 
@@ -48,9 +55,9 @@ Many optional tables (e.g. `announcements`, `custom_field_definitions`, `invento
 
 Roles: `super_admin`, `admin`, `manager`, `technician`, `viewer`.
 
-`super_admin` and `admin` bypass all permission checks. Other roles carry a `permissions` JSON object loaded from the `user_roles` table and passed down from `App.jsx` as `currentUserPermissions`. Default permission sets for `manager`, `technician`, and `viewer` are defined in `ROLE_DEFAULT_PERMISSIONS` in `App.jsx`.
+`super_admin` and `admin` bypass all permission checks. Other roles carry a `permissions` JSON object loaded from the `user_roles` table and passed down from `App.jsx` as `currentUserPermissions`. Default permission sets for `manager`, `technician`, and `viewer` are defined in `ROLE_DEFAULT_PERMISSIONS` in **`src/lib/permissions.ts`** (not App.jsx). The `canDo(role, permissions, section, action)` helper is exported from the same file.
 
-Use the `canDo` pattern when gating UI actions — check `currentUserRole === 'super_admin' || currentUserRole === 'admin' || currentUserPermissions?.section?.action`.
+Use the `canDo` pattern when gating UI actions — import `canDo` from `src/lib/permissions` and call `canDo(currentUserRole, currentUserPermissions, 'section', 'action')`.
 
 ### URL tab state
 
@@ -79,7 +86,7 @@ The Products and Customers pages support bulk CSV import. A custom `parseCSVLine
 
 ### Notifications
 
-Real-time notifications use a single Supabase Realtime channel (`app_notifications`) subscribed in `App.jsx`. Notification visibility is filtered client-side by `target_roles` and `target_emails`. Per-type preferences are stored in `localStorage` under `notif_system_prefs_<email>` and applied via a `notif-system-prefs-changed` window event.
+Real-time notifications use a single Supabase Realtime channel (`app_notifications`) subscribed in `App.jsx`. Notification visibility is filtered **server-side** via RLS policy `user_read_targeted` (H-5 fix) — the query only returns rows the current user is allowed to see. Per-type preferences are stored in `localStorage` under `notif_system_prefs_<email>` and also persisted to `db.userPreferences` (synced on login). Changes propagate via a `notif-system-prefs-changed` window event.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
