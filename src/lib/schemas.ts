@@ -1,5 +1,5 @@
 /**
- * schemas.js — Zod validation schemas for all user-facing forms.
+ * schemas.ts — Zod validation schemas for all user-facing forms.
  *
  * Import the schema and use with react-hook-form:
  *   import { loginSchema } from '../lib/schemas'
@@ -10,13 +10,12 @@
  * Or validate manually before a submit handler:
  *   const result = customerSchema.safeParse(formData)
  *   if (!result.success) {
- *     const errors = result.error.flatten().fieldErrors
- *     toast.error(Object.values(errors).flat()[0])
+ *     toast.error(getFirstError(result))
  *     return
  *   }
  */
 import { z } from 'zod'
-import { ROLES, CUSTOMER_STATUS, PRODUCT_STATUS } from './constants.js'
+import { ROLES } from './constants.js'
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -107,21 +106,28 @@ export const resetPasswordSchema = z.object({
   path:    ['confirmPassword'],
 })
 
+// ── Derived types ─────────────────────────────────────────────────────────────
+
+export type LoginFormData          = z.infer<typeof loginSchema>
+export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>
+export type ChangePasswordFormData = z.infer<typeof changePasswordSchema>
+export type CustomerFormData       = z.infer<typeof customerSchema>
+export type TicketFormData         = z.infer<typeof ticketSchema>
+export type ProductFormData        = z.infer<typeof productSchema>
+export type AddUserFormData        = z.infer<typeof addUserSchema>
+
 // ── Shared helpers ────────────────────────────────────────────────────────────
+
+type SafeParseResult = z.SafeParseReturnType<unknown, unknown>
 
 /**
  * getFirstError(result) — extract the first error message from a
  * zod SafeParseReturnType for use in toast.error() calls.
- *
- * Usage:
- *   const result = customerSchema.safeParse(form)
- *   if (!result.success) { toast.error(getFirstError(result)); return }
  */
-export function getFirstError(safeParseResult) {
+export function getFirstError(safeParseResult: SafeParseResult): string | null {
   if (safeParseResult.success) return null
   const flat = safeParseResult.error.flatten()
-  // fieldErrors first, then formErrors
-  const fieldMsgs = Object.values(flat.fieldErrors).flat()
+  const fieldMsgs = Object.values(flat.fieldErrors).flat() as string[]
   if (fieldMsgs.length) return fieldMsgs[0]
   if (flat.formErrors.length) return flat.formErrors[0]
   return 'Validation failed'
@@ -130,15 +136,11 @@ export function getFirstError(safeParseResult) {
 /**
  * getFieldErrors(result) — return a flat { fieldName: firstMessage } map
  * for wiring into per-field error display.
- *
- * Usage:
- *   const errs = getFieldErrors(customerSchema.safeParse(form))
- *   <p>{errs.email}</p>
  */
-export function getFieldErrors(safeParseResult) {
+export function getFieldErrors(safeParseResult: SafeParseResult): Record<string, string> {
   if (safeParseResult.success) return {}
   return Object.fromEntries(
     Object.entries(safeParseResult.error.flatten().fieldErrors)
-      .map(([k, msgs]) => [k, msgs?.[0] ?? ''])
+      .map(([k, msgs]) => [k, (msgs as string[])?.[0] ?? '']),
   )
 }

@@ -1,6 +1,9 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { initSentry } from './lib/sentry.js'
+
+initSentry() // no-op if VITE_SENTRY_DSN is not set
 import App from './App.jsx'
 import './index.css'
 import './styles/appearance.css'
