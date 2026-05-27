@@ -479,6 +479,85 @@ Full migration (15+ pages, 8+ hrs) was too high risk. Targeted 3 pages instead.
 
 ---
 
+## 🔧 Fix Plan — Post Full System Test (2026-05-27)
+
+> **Current overall score: 6/10**  
+> **Target after Sprint 1: 8.5/10** | **Target after Sprint 2: 9.5/10**  
+> All findings from the 2026-05-27 full system test. Ordered by priority.  
+> Full detail: [SYSTEM_TEST_REPORT_20260527.md](SYSTEM_TEST_REPORT_20260527.md)
+
+---
+
+### 🔴 Sprint 0 — Unblock CI (Do today, ~2 hours total)
+
+> CI is broken. No PR can be merged until these are fixed. These are prerequisites for everything else.
+
+| # | ID | Task | File(s) | Effort |
+|---|-----|------|---------|--------|
+| 1 | CRIT-NEW-1a | Fix ESLint error: wrap rethrown `Error` with `{ cause: err }` | `src/pages/Login.jsx:46` | 5 min |
+| 2 | CRIT-NEW-1b | Run `npm run format` to auto-fix all 66 Prettier violations | all 66 files | 10 min |
+| 3 | CRIT-NEW-1c | Fix top ESLint warning categories to reach 0 warnings for CI: (a) remove unused `React` imports (ESLint auto-detects with new JSX transform — 32 instances), (b) remove or prefix unused vars with `_` (55 instances), (c) fix React display-name warnings (13 instances) | 41 files | 90 min |
+| 4 | MED-NEW-6 | Add `refetchOnWindowFocus: false` to QueryClient defaultOptions | `src/main.jsx:18` | 2 min |
+
+**Acceptance criteria:** `npm test && npm run lint:ci && npm run format:check && npm run build` all pass with zero errors/warnings.
+
+---
+
+### 🟠 Sprint 1 — Security & Architecture (This sprint, ~5 hours)
+
+| # | ID | Task | File(s) | Effort |
+|---|-----|------|---------|--------|
+| 5 | HIGH-NEW-3 | **Security fix:** Add role guard to `/control-panel` route. Redirect non-admin to `/` inside the `<Route element>`. Use `currentUserRole` prop check against `ROLES.ADMIN` / `ROLES.SUPER_ADMIN`. | `src/App.jsx:730` | 20 min |
+| 6 | MED-NEW-2 | Replace all hardcoded role strings with `ROLES.*` constants in 7 pages. Files: `AccountSettings.jsx:80`, `CustomerDetails.jsx:28`, `Customers.jsx:87`, `Invoices.jsx:481,483`, `PartsInventory.jsx:161,166`, `Products.jsx:90`, `Reports.jsx:570,574,575`, `RMATickets.jsx:227,1379` | 7 page files | 60 min |
+| 7 | MED-NEW-7 | Add `INVOICE_STATUS` constant to `constants.ts`. Replace `i.status === 'pending'` / `'overdue'` in `Reports.jsx:481`. Replace `b.status==='draft'/'sent'/'resolved'` in `Inventory.jsx:2117` with `BATCH_STATUS.*`. | `src/lib/constants.ts`, `Reports.jsx`, `Inventory.jsx` | 30 min |
+| 8 | LOW-NEW-1 | Audit which toast library is actually primary. Remove the unused one. If `react-hot-toast` is primary (Recharts tooltips use it), uninstall `sonner`. Update all `import` statements. | `package.json`, all toast usages | 30 min |
+| 9 | LOW-NEW-2 | Remove unused `PRODUCT_STATUS` export from `constants.ts` or add it to ESLint ignore with a TODO comment for future use. | `src/lib/constants.ts` | 5 min |
+
+---
+
+### 🟡 Sprint 2 — Code Quality & Performance (Next sprint, ~8 hours)
+
+| # | ID | Task | File(s) | Effort |
+|---|-----|------|---------|--------|
+| 10 | MED-NEW-1 | Replace `console.error` in all 52 catch blocks with `captureException(err)` from `src/lib/sentry.js`. Priority files: `BackupRestore.jsx` (7 calls), `BrandingSettings.jsx` (8 calls), `CustomerDetails.jsx` (6 calls). | 10+ page files | 90 min |
+| 11 | MED-NEW-3 | Replace raw `<button>` with `<Button variant="ghost">` (or appropriate variant) from `ui.jsx` in `AccountSettings.jsx` (6 instances) and `BrandingSettings.jsx` (10+ instances). Replace raw `<input type="text">` with `<Input>` from `ui.jsx` in `BrandingSettings.jsx` (8 instances). | `AccountSettings.jsx`, `BrandingSettings.jsx` | 90 min |
+| 12 | HIGH-NEW-1 | Add `build.rollupOptions.output.manualChunks` to `vite.config.js` to split the 643 KB vendor chunk: separate React/ReactDOM, Radix UI, framer-motion, and TanStack into named chunks. Target: no chunk above 400 KB (180 KB gzipped). | `vite.config.js` | 60 min |
+| 13 | HIGH-NEW-2 | Lazy-load Recharts in Dashboard: wrap chart components in `React.lazy(() => import('./DashboardCharts'))` or use dynamic `await import('recharts')` inside chart render. Target: Dashboard chunk < 100 KB. | `src/pages/Dashboard.jsx:7` | 60 min |
+| 14 | LOW-NEW-3 | Extract `NotFoundPage` from `App.jsx` into `src/pages/NotFoundPage.jsx`. Import and use it in `App.jsx`. | `src/App.jsx:31-46`, new file | 15 min |
+| 15 | LOW-NEW-4 | Verify Invoices.jsx PDF generation. If jsPDF is statically imported, convert to `const { default: jsPDF } = await import('jspdf')` inside the export handler. | `src/pages/Invoices.jsx` | 30 min |
+
+---
+
+### 🟢 Sprint 3 — Polish & Technical Debt (Backlog)
+
+| # | ID | Task | File(s) | Effort |
+|---|-----|------|---------|--------|
+| 16 | MED-NEW-4 | Audit all 49 inline `style={{}}` in page components. Convert fixed pixel values to Tailwind equivalents. Replace inline color values with Tailwind utility classes. | throughout | 3–4 hours |
+| 17 | MED-NEW-5 | Document dark mode architecture: update `CONSTITUTION.md §4.4` to reflect the CSS-override approach (or commit to a full Tailwind `dark:` migration — one page at a time). Audit `appearance.css` for gaps. | `CONSTITUTION.md`, `appearance.css` | 1 hour doc / 8+ hours full migration |
+| 18 | — | Accessibility pass: add `aria-label` to all icon-only buttons (estimated 40+ missing across 19 pages). Add `role="status"` to all `<Spinner>` usages. Add form `<legend>` to all fieldset groups. | all pages | 4–8 hours |
+
+---
+
+### Projected Scorecard After Each Sprint
+
+| Domain | Now | After Sprint 0 | After Sprint 1 | After Sprint 2 | After Sprint 3 |
+|--------|-----|----------------|----------------|----------------|----------------|
+| Security | 8 | 8 | **9** | 9 | 9 |
+| Architecture | 7 | 7 | **8** | **9** | 9 |
+| Performance | 6 | 6 | 6 | **8** | 8 |
+| Accessibility | 4 | 4 | 4 | 4 | **7** |
+| UX polish | 7 | 7 | 7 | **8** | **9** |
+| Dark mode | 6 | 6 | 6 | 6 | **8** |
+| Code quality | 4 | **8** | **9** | **9** | 9 |
+| Notifications | 8 | 8 | 8 | 8 | 8 |
+| Mobile | 6 | 6 | 6 | 6 | **7** |
+| Scalability | 7 | 7 | 7 | **9** | 9 |
+| Maintainability | 5 | **7** | **8** | **9** | 9 |
+| Production readiness | 5 | **8** | **9** | 9 | 9 |
+| **Overall** | **6** | **7.2** | **8.0** | **8.6** | **9.1** |
+
+---
+
 ## 📊 Scorecard
 
 ### Baseline (2026-05-26 start)
@@ -612,3 +691,4 @@ Full migration (15+ pages, 8+ hrs) was too high risk. Targeted 3 pages instead.
 - **2026-05-27** — ✅ `CLAUDE.md` fully updated: all routes, provider order, domain modules, Edge Functions, PWA, Sentry, RLS helpers, CI/CD, all npm scripts.
 - **2026-05-27** — ✅ `README.md` rewritten from stub: full feature table, tech stack, quick-start guide, architecture overview, all routes, testing docs.
 - **2026-05-27** — 🔍 Full system test run. 14 new findings: 1 critical, 4 high, 7 medium, 4 low. Overall score revised 10/10 → **6/10**. CI broken (lint:ci + format:check both fail). See [SYSTEM_TEST_REPORT_20260527.md](SYSTEM_TEST_REPORT_20260527.md).
+- **2026-05-27** — 📋 Fix plan added to AUDIT_LOG.md. 18 tasks across 4 sprints. Sprint 0 unblocks CI (~2 hrs). Sprint 1 fixes security/architecture (~5 hrs). Sprint 2 fixes performance/code quality (~8 hrs). Sprint 3 polish/a11y backlog.
