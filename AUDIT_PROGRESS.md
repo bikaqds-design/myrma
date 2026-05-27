@@ -2,7 +2,7 @@
 
 > Audit date: 2026-05-26 → 2026-05-27
 > Baseline commit: `5085ad2` + post-rollback UI fixes
-> Overall score: **10/10** — all P0/P1/P2/P3 items complete. PWA done 2026-05-27. A-1 React Router migration done 2026-05-27. Zero open items.
+> Overall score: **10/10** — all P0/P1/P2/P3 items complete. PWA + A-1 React Router done 2026-05-27. **1 open human action:** `rma-attachments` bucket anon-upload policy (Supabase Dashboard — see CRIT-3 / DEPLOY_CRIT3.md Step 5).
 
 ---
 
@@ -29,7 +29,7 @@
 | ✅ | H-6 | Backup export includes plaintext SMTP/SendGrid API keys | `backup` namespace | **Done 2026-05-26.** `exportAll()` now selects only non-secret columns from `email_settings`. `redactEmailSettings()` guard replaces known secret fields with `[REDACTED]` as belt-and-braces. User must re-enter API keys after restore. |
 | ✅ | H-7 | Webhook secret sent as plaintext header (no HMAC) | Webhook delivery | **Done 2026-05-26.** `dispatch()` now signs request body with `crypto.subtle` HMAC-SHA256, sends `X-Signature-256: sha256=<hex>`. Secret never travels over the wire. |
 | ✅ | H-8 | Customer bulk delete fallback is non-atomic sequential | supabaseClient.js | **Done 2026-05-26.** Both `delete()` and `bulkDelete()` now call RPC exclusively — no sequential fallback. Throws clear error if RPC missing. |
-| ✅ | H-9 | Fire-and-forget audit logging silently drops events | App.jsx:274, 287 | **Done 2026-05-26.** `auditInsert()` helper: retry after 600ms, then queue to localStorage (capped 50). Queue flushed on next success or app startup. All 86 call sites fixed automatically. |
+| ✅ | H-9 | Fire-and-forget audit logging silently drops events | App.jsx (was lines 274, 287) | **Done 2026-05-26.** `auditInsert()` helper in [src/api/db/audit.js](src/api/db/audit.js): retry after 600ms, then queue to localStorage (capped 50). Queue flushed on next success or app startup. All 86 call sites fixed automatically. |
 | ✅ | A-2 | No global ErrorBoundary — any render error = white screen | [main.jsx](src/main.jsx) | **Done 2026-05-26.** Added [src/components/ErrorBoundary.jsx](src/components/ErrorBoundary.jsx) with fallback UI (reload/home), dev-only stack trace, dark mode support. Wraps `<App>` in main.jsx. |
 
 ---
@@ -42,7 +42,7 @@
 | ✅ | A-3 | Notification prefs in `localStorage` only — resets on new device | App.jsx:191-194 | **Done 2026-05-26.** `db.userPreferences` added. AccountSettings calls `persistPrefsToDb()` on every pref toggle. App.jsx seeds localStorage from DB on login. |
 | ✅ | A-4 | Dashboard recomputes 8+ aggregations every render | [Dashboard.jsx:169-243](src/pages/Dashboard.jsx#L169-L243) | **Done 2026-05-26.** All 13 aggregations wrapped in `useMemo([tickets])`. |
 | ✅ | A-5 | Dashboard realtime refetches everything on each event | [Dashboard.jsx:119-124](src/pages/Dashboard.jsx#L119-L124) | **Done 2026-05-26.** INSERT/UPDATE/DELETE each merge payload into the **query cache** via `queryClient.setQueryData(['rma-tickets'], …)` — no full refetch. (After P-1 migrated Dashboard to TanStack Query, realtime handlers write to the cache, not local state.) |
-| ✅ | A-6 | `ROLE_DEFAULT_PERMISSIONS` lives in App.jsx (40 lines) | [App.jsx:52-95](src/App.jsx#L52-L95) | **Done 2026-05-26.** Moved to [src/lib/permissions.ts](src/lib/permissions.ts) + `canDo()` helper exported. App.jsx imports from lib. (File later converted to `.ts` in M-3.) |
+| ✅ | A-6 | `ROLE_DEFAULT_PERMISSIONS` lives in App.jsx (40 lines) | App.jsx (was lines 52-95) | **Done 2026-05-26.** Moved to [src/lib/permissions.ts](src/lib/permissions.ts) + `canDo()` helper exported. App.jsx imports from lib. (File later converted to `.ts` in M-3.) |
 | ✅ | A-7 | Heavy deps eagerly loaded (~1.5MB initial bundle) | xlsx, jspdf, html2canvas, recharts | **Done 2026-05-26.** `xlsx` + `jspdf` dynamic-imported in Inventory.jsx export handlers. Inventory chunk: 734 KB → 90 KB. |
 | ✅ | P-1 | Adopt TanStack Query for all data fetching | All pages | **Done 2026-05-27 (targeted).** `QueryClientProvider` in main.jsx. `useQuery` replaces `useState+useEffect` fetch in RMATickets, Dashboard, Customers. `staleTime: 60s` — return navigation shows cached data instantly, no repeat spinner. Realtime handlers updated to write to query cache instead of local state. All `loadData()`/`loadAll()` calls replaced with `queryClient.invalidateQueries`. |
 | ✅ | M-1 | Zero unit/E2E tests | — | **Done 2026-05-27.** Vitest + jsdom + RTL installed. 74 tests in 3 suites (schemas, permissions, constants). `npm test` / `npm run test:coverage`. All pass. |
@@ -94,15 +94,14 @@ After completing all other P2 items, A-1 and P-1 were re-evaluated against actua
 | **Removed** | `pathToPage()`, `pageToPath()` helpers; `currentPage` / `selectedProductId` / `selectedCustomerId` useState; `popstate` useEffect listener; all `window.history.pushState` calls. |
 | **Retained** | `selectedTicketId` state (cleared on navigation away from `/rma-tickets`); `useURLTab` for in-page tab params; `/tracker` public-route detection via `pathname`. |
 
-### P-1 — TanStack Query: **Rescoped to 3 pages**
+### P-1 — TanStack Query: **Done (targeted — 3 pages)**
 
 | | Detail |
 |---|---|
-| **Current pattern** | Every page has `useState + useEffect` fetch with spinner on every visit. No caching. |
-| **User-visible problem** | Navigating back to RMA Tickets, Dashboard, or Customers always shows a loading spinner even if data is seconds old. |
-| **Full migration cost** | 8+ hrs touching all 15+ pages, high risk of subtle bugs. |
-| **Targeted approach** | RMATickets + Dashboard + Customers only (~2–3 hrs). These 3 pages cover >80% of daily navigation. Other pages get migrated incrementally as they're touched for other reasons. |
-| **Unlocks** | UX-6 (optimistic UI on ticket create/edit/delete) at the same time. |
+| **Original pattern** | Every page had `useState + useEffect` fetch with spinner on every visit. No caching. |
+| **User-visible problem** | Navigating back to RMA Tickets, Dashboard, or Customers always showed a loading spinner even if data was seconds old. |
+| **Approach** | RMATickets + Dashboard + Customers migrated (~2–3 hrs). These 3 pages cover >80% of daily navigation. Other pages migrate incrementally as they're touched for other reasons. |
+| **Result** | `staleTime: 60s` — return navigation shows cached data instantly. Realtime handlers write to query cache. UX-6 optimistic UI unlocked simultaneously. |
 
 ---
 
@@ -117,6 +116,14 @@ After completing all other P2 items, A-1 and P-1 were re-evaluated against actua
 | ✅ | — | No service worker / PWA manifest | **Done 2026-05-27.** `vite-plugin-pwa` + Workbox `generateSW`. App-shell pre-caches all 42 static assets (`sw.js` + `workbox-*.js` emitted at build). Supabase API calls use NetworkFirst (10s timeout, falls back to cache). `public/icon.svg` → 5 PNG sizes + `favicon.ico` + `apple-touch-icon` via `@vite-pwa/assets-generator`. Manifest: `standalone` display, indigo theme `#4f46e5`, dark background `#0f172a`. `index.html` updated with correct `<link>` tags. |
 | ✅ | — | No error reporting | **Done 2026-05-27.** `src/lib/sentry.js` — `initSentry()` no-op guard (requires `VITE_SENTRY_DSN`), `captureException()` helper (logs to console in DEV, sends to Sentry in PROD). `ErrorBoundary.jsx` calls `captureException` in `componentDidCatch`. `initSentry()` called in `main.jsx`. `.env.example` documents `VITE_SENTRY_DSN`. |
 | ✅ | — | No CI/CD with test gating | **Done 2026-05-27.** `.github/workflows/ci.yml` — ubuntu-latest, Node 20, `npm ci --legacy-peer-deps`, then `npm test` → `npm run lint:ci` → `npm run build`. Runs on push to `main` and all PRs targeting `main`. Build step uses placeholder Supabase env vars so it succeeds without secrets. |
+
+---
+
+## ⚠️ Open Follow-ups (requires human action — no code change needed)
+
+| ID | What | Where | Action |
+|----|------|-------|--------|
+| CRIT-3-S5 | `rma-attachments` bucket has no anon upload size/type restriction | Supabase Dashboard → Storage → rma-attachments → Policies | Apply the two SQL policies in [DEPLOY_CRIT3.md Step 5](DEPLOY_CRIT3.md#step-5----storage-bucket-attachments-open----not-yet-applied) — 2 min |
 
 ---
 
@@ -176,23 +183,23 @@ After completing all other P2 items, A-1 and P-1 were re-evaluated against actua
 | Production readiness | 9/10 | 🟢 All P0+P1 resolved, resilient logging |
 | **Overall** | **9.5/10** | 🟢 **All P2 items complete. A-1 deferred at this point (later done same day). Remaining: P3 quick wins.** |
 
-### Final (after P3 + A-1 complete — 2026-05-27)
+### Final (after P3 + A-1 + DEPLOY_CRIT review — 2026-05-27)
 
 | Domain | Score | Verdict |
 |---|---|---|
-| Security | 8/10 | 🟢 Unchanged |
+| Security | 8/10 | 🟢 RLS + HMAC webhooks + Edge Functions + backup redaction. ⚠️ 1 open: storage bucket anon-upload policy (Dashboard action) |
 | Architecture | 10/10 | 🟢 React Router v6, TypeScript lib layer, strict tsconfig, CI/CD gates every PR |
-| Performance | 10/10 | 🟢 Virtual dropdown (500+ customers in DOM → only visible rows), image resize before upload |
-| Accessibility | 8/10 | 🟢 Unchanged |
-| UX polish | 9/10 | 🟢 404 page, no more silent typo-URL landings on Dashboard |
-| Dark mode | 10/10 | 🟢 Unchanged |
-| Code quality | 10/10 | 🟢 TypeScript types, CI gates, Sentry error tracking, 74 tests |
-| Notifications | 9/10 | 🟢 Unchanged |
-| Mobile | 8/10 | 🟢 Unchanged |
-| Scalability | 10/10 | 🟢 Virtual lists + image resize = no DOM bloat, no oversized uploads |
-| Maintainability | 10/10 | 🟢 Typed constants/permissions/schemas, full CI pipeline, error monitoring, proper URL routing |
-| Production readiness | 10/10 | 🟢 CI/CD + Sentry + env.example — deployable with confidence |
-| **Overall** | **10/10** | 🟢 **Audit 100% complete. Zero open items. All P0→P3 + A-1 done.** |
+| Performance | 10/10 | 🟢 Virtual dropdown (500+ customers → only visible rows), image resize before upload |
+| Accessibility | 8/10 | 🟢 Focus traps, aria-labels, WCAG AA contrast |
+| UX polish | 9/10 | 🟢 404 page, optimistic mutations, realtime toasts, empty states with CTAs |
+| Dark mode | 10/10 | 🟢 Charts, tooltips, toasts, banners all dark-aware |
+| Code quality | 10/10 | 🟢 TypeScript types, ESLint, CI gates, Sentry, 74 tests |
+| Notifications | 9/10 | 🟢 Server-side filtered (RLS), atomic markRead RPC, realtime toasts |
+| Mobile | 8/10 | 🟢 Sidebar inert + Escape + focus restore; all modals focus-trapped |
+| Scalability | 10/10 | 🟢 Virtual lists, client pagination, image resize, dynamic bundle splits |
+| Maintainability | 10/10 | 🟢 Typed constants/permissions/schemas, 15-file API split, full CI pipeline |
+| Production readiness | 10/10 | 🟢 CI/CD + Sentry + env.example + Edge Functions — deployable with confidence |
+| **Overall** | **10/10** | 🟢 **Audit complete. 1 open follow-up (storage bucket — Dashboard action, 2 min). All code work done.** |
 
 ---
 
