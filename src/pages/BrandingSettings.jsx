@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { branding as brandingAPI, notifications as notificationsAPI } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { useAppearance } from '../contexts/AppearanceContext'
+import { captureException } from '../lib/sentry'
+import { Button, Input } from '../components/ui'
 
 export default function BrandingSettings({
   currentUserRole,
@@ -76,10 +78,10 @@ export default function BrandingSettings({
           setEmailSettings(emailSettingsData)
         }
       } catch (error) {
-        console.error('Error loading email settings:', error)
+        captureException(error)
       }
     } catch (error) {
-      console.error('Error loading data:', error)
+      captureException(error)
       toast.error('Failed to load settings')
     } finally {
       setLoading(false)
@@ -133,7 +135,7 @@ export default function BrandingSettings({
 
       applyBrandingToApp(updates)
     } catch (error) {
-      console.error('Error saving branding:', error)
+      captureException(error)
       toast.error('Failed to save branding settings')
     } finally {
       setSaving(false)
@@ -158,7 +160,7 @@ export default function BrandingSettings({
       await notificationsAPI.updatePreferences(currentUserEmail, notificationPreferences)
       toast.success('Notification preferences saved successfully!')
     } catch (error) {
-      console.error('Error saving notifications:', error)
+      captureException(error)
       toast.error('Failed to save notification preferences')
     } finally {
       setSaving(false)
@@ -172,7 +174,7 @@ export default function BrandingSettings({
       toast.success('Email settings saved successfully!')
       loadData()
     } catch (error) {
-      console.error('Error saving email settings:', error)
+      captureException(error)
       toast.error('Failed to save email settings')
     } finally {
       setSaving(false)
@@ -201,7 +203,7 @@ export default function BrandingSettings({
       setShowTemplateModal(false)
       loadData()
     } catch (error) {
-      console.error('Error saving template:', error)
+      captureException(error)
       toast.error('Failed to save email template')
     } finally {
       setSaving(false)
@@ -232,7 +234,7 @@ export default function BrandingSettings({
       await notificationsAPI.sendTestEmail(currentUserEmail, templateName, testVariables)
       toast.success('Test email sent successfully! Check your inbox.')
     } catch (error) {
-      console.error('Error sending test email:', error)
+      captureException(error)
       toast.error('Failed to send test email')
     }
   }
@@ -601,11 +603,10 @@ function BrandingTab({
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
                 Company Name
               </label>
-              <input
+              <Input
                 type="text"
                 value={branding.company_name}
                 onChange={(e) => setBranding({ ...branding, company_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                 placeholder="myRMA"
               />
               <p className="text-xs text-gray-500 mt-1">Shown in sidebar and login page</p>
@@ -781,30 +782,9 @@ function BrandingTab({
           </div>
 
           <div className="pt-2">
-            <button
-              onClick={onSave}
-              disabled={saving}
-              className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
-            >
-              {saving ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                  Save Branding
-                </>
-              )}
-            </button>
+            <Button loading={saving} onClick={onSave}>
+              Save Branding
+            </Button>
           </div>
         </div>
       </BCard>
@@ -996,12 +976,12 @@ function BrandingTab({
               </div>
             </div>
           </div>
-          <input
+          <Input
             type="text"
             value={draftTabTitle}
             onChange={(e) => setDraftTabTitle(e.target.value)}
             onBlur={() => update({ tabTitle: draftTabTitle })}
-            className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+            className="mt-2"
             placeholder="myRMA 2.0 - RMA Management"
           />
         </div>
@@ -1234,11 +1214,11 @@ function EmailSettingsTab({ settings, setSettings, saving, onSave }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Resend API Key *</label>
         <div className="relative">
-          <input
+          <Input
             type={showApiKey ? 'text' : 'password'}
             value={settings.api_key}
             onChange={(e) => setSettings({ ...settings, api_key: e.target.value })}
-            className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent font-mono"
+            className="pr-12 font-mono"
             placeholder="re_xxxxxxxxxxxxxxxxxxxx"
           />
           <button
@@ -1257,11 +1237,10 @@ function EmailSettingsTab({ settings, setSettings, saving, onSave }) {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">From Email *</label>
-          <input
+          <Input
             type="email"
             value={settings.from_email}
             onChange={(e) => setSettings({ ...settings, from_email: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
             placeholder="noreply@yourdomain.com"
           />
           <p className="text-xs text-gray-500 mt-1">Use a verified domain in Resend</p>
@@ -1269,11 +1248,10 @@ function EmailSettingsTab({ settings, setSettings, saving, onSave }) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">From Name</label>
-          <input
+          <Input
             type="text"
             value={settings.from_name}
             onChange={(e) => setSettings({ ...settings, from_name: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
             placeholder="myRMA System"
           />
         </div>
@@ -1294,30 +1272,9 @@ function EmailSettingsTab({ settings, setSettings, saving, onSave }) {
       </div>
 
       <div className="flex justify-end pt-6 border-t">
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {saving ? (
-            <>
-              <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
-              Saving...
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-              Save Settings
-            </>
-          )}
-        </button>
+        <Button size="lg" loading={saving} onClick={onSave}>
+          Save Settings
+        </Button>
       </div>
     </div>
   )
@@ -1397,30 +1354,9 @@ function NotificationsTab({ preferences, setPreferences, saving, onSave }) {
       </div>
 
       <div className="flex justify-end pt-6 border-t">
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {saving ? (
-            <>
-              <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
-              Saving...
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-              Save Preferences
-            </>
-          )}
-        </button>
+        <Button size="lg" loading={saving} onClick={onSave}>
+          Save Preferences
+        </Button>
       </div>
     </div>
   )
@@ -1498,21 +1434,15 @@ function TemplateModal({ template, onTemplateChange, saving, onSave, onClose }) 
         <div className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Template Name</label>
-            <input
-              type="text"
-              value={template.template_name}
-              disabled
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"
-            />
+            <Input type="text" value={template.template_name} disabled />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Email Subject</label>
-            <input
+            <Input
               type="text"
               value={template.template_subject}
               onChange={(e) => onTemplateChange({ ...template, template_subject: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
             />
           </div>
 
@@ -1546,19 +1476,12 @@ function TemplateModal({ template, onTemplateChange, saving, onSave, onClose }) 
           </div>
 
           <div className="flex gap-3 pt-6 border-t">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-            >
+            <Button variant="secondary" className="flex-1" onClick={onClose}>
               Cancel
-            </button>
-            <button
-              onClick={onSave}
-              disabled={saving}
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? 'Saving...' : 'Save Template'}
-            </button>
+            </Button>
+            <Button loading={saving} className="flex-1" onClick={onSave}>
+              Save Template
+            </Button>
           </div>
         </div>
       </div>

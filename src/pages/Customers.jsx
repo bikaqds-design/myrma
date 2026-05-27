@@ -9,6 +9,7 @@ import { Button, PageHeader } from '../components/ui'
 import EmptyState from '../components/EmptyState'
 import { customerSchema, getFirstError } from '../lib/schemas'
 import { ROLES } from '../lib/constants'
+import { captureException } from '../lib/sentry'
 
 const EMPTY_FORM = {
   customer_type: 'B2B',
@@ -740,7 +741,7 @@ export default function Customers({
           )
         } else {
           toast.error('No valid customers to import')
-          if (errors.length > 0) console.error('Import errors:', errors)
+          if (errors.length > 0) captureException(new Error('CSV import errors'), { errors })
         }
         return
       }
@@ -764,7 +765,7 @@ export default function Customers({
         .catch(() => {})
       if (errors.length > 0) {
         toast.error(`${errors.length} rows had errors — check console`)
-        console.error('Import errors:', errors)
+        captureException(new Error('CSV import errors'), { errors })
       }
       setShowBulkUpload(false)
       queryClient.invalidateQueries({ queryKey: ['customers'] })

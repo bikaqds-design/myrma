@@ -60,6 +60,24 @@ export default defineConfig({
 
   base: '/',
 
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-query': ['@tanstack/react-query', '@tanstack/react-virtual'],
+          'vendor-radix': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-tooltip',
+            '@radix-ui/react-select',
+          ],
+          'vendor-ui': ['framer-motion', 'react-hot-toast'],
+          'vendor-forms': ['react-hook-form', '@hookform/resolvers', 'zod'],
+        },
+      },
+    },
+  },
+
   test: {
     environment: 'jsdom',
     globals: true,

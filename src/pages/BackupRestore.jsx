@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { backup as backupAPI, db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { captureException } from '../lib/sentry'
 
 export default function BackupRestore({ currentUserRole, currentUserEmail }) {
   const [loading, setLoading] = useState(false)
@@ -28,7 +29,7 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
         .log(currentUserEmail, 'backup_exported', `Exported ${data.length} products backup`)
         .catch(() => {})
     } catch (error) {
-      console.error('Export products error:', error)
+      captureException(error)
       toast.error('Failed to export products')
     } finally {
       setLoading(false)
@@ -45,7 +46,7 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
         .log(currentUserEmail, 'backup_exported', `Exported ${data.length} customers backup`)
         .catch(() => {})
     } catch (error) {
-      console.error('Export customers error:', error)
+      captureException(error)
       toast.error('Failed to export customers')
     } finally {
       setLoading(false)
@@ -62,7 +63,7 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
         .log(currentUserEmail, 'backup_exported', `Exported ${data.length} tickets backup`)
         .catch(() => {})
     } catch (error) {
-      console.error('Export tickets error:', error)
+      captureException(error)
       toast.error('Failed to export tickets')
     } finally {
       setLoading(false)
@@ -79,7 +80,7 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
         .log(currentUserEmail, 'backup_exported', 'Exported complete system backup')
         .catch(() => {})
     } catch (error) {
-      console.error('Export all error:', error)
+      captureException(error)
       toast.error('Failed to export complete backup')
     } finally {
       setLoading(false)
@@ -183,7 +184,7 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
             toast.error('Failed to restore any data')
           }
         } catch (error) {
-          console.error('Restore error:', error)
+          captureException(error)
           toast.error('Failed to restore data: ' + error.message)
         } finally {
           setRestoring(false)
@@ -199,7 +200,7 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
 
       reader.readAsText(file)
     } catch (error) {
-      console.error('File read error:', error)
+      captureException(error)
       toast.error('Failed to read backup file')
       setRestoring(false)
       event.target.value = ''

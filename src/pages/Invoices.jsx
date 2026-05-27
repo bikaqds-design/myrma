@@ -6,6 +6,7 @@ import EmptyState from '../components/EmptyState'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { ROLES } from '../lib/constants'
+import { captureException } from '../lib/sentry'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -587,7 +588,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
       }
       setTickets(tickRes)
     } catch (err) {
-      console.error(err)
+      captureException(err)
       toast.error('Failed to load invoices')
     } finally {
       setLoading(false)
@@ -700,7 +701,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
       }
       setPanelOpen(false)
     } catch (err) {
-      console.error(err)
+      captureException(err)
       toast.error(err.message || 'Save failed')
     } finally {
       setSaving(false)

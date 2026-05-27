@@ -8,6 +8,7 @@ import { useURLTab } from '../hooks/useURLTab'
 import EmptyState from '../components/EmptyState'
 import Modal from '../components/Modal'
 import { ROLES } from '../lib/constants'
+import { captureException } from '../lib/sentry'
 
 export default function Products({
   currentUserRole,
@@ -202,7 +203,7 @@ export default function Products({
       setCategories(categoriesData)
       setSubcategories(subcategoriesData)
     } catch (error) {
-      console.error('Error loading data:', error)
+      captureException(error)
       toast.error('Failed to load products')
     } finally {
       setLoading(false)
@@ -343,7 +344,7 @@ export default function Products({
           setSelectedProducts([])
           loadData()
         } catch (error) {
-          console.error('Error deleting products:', error)
+          captureException(error)
           toast.error('Failed to delete products')
         }
       }
@@ -369,7 +370,7 @@ export default function Products({
       setSelectedProducts([])
       loadData()
     } catch (error) {
-      console.error('Error updating products:', error)
+      captureException(error)
       toast.error('Failed to update products')
     }
   }
@@ -582,7 +583,7 @@ export default function Products({
 
       if (productsToImport.length === 0) {
         toast.error('No valid products to import')
-        if (errors.length > 0) console.error('Errors:', errors)
+        if (errors.length > 0) captureException(new Error('CSV import errors'), { errors })
         return
       }
 
@@ -618,13 +619,13 @@ export default function Products({
 
       if (errors.length > 0) {
         toast.error(`${errors.length} rows had errors. Check console for details.`)
-        console.error('Import errors:', errors)
+        captureException(new Error('CSV import errors'), { errors })
       }
 
       setShowBulkUpload(false)
       loadData()
     } catch (error) {
-      console.error('Bulk upload error:', error)
+      captureException(error)
       toast.error(`Failed to import: ${error.message}`)
     }
   }
@@ -763,7 +764,7 @@ export default function Products({
       resetProductForm()
       loadData()
     } catch (error) {
-      console.error('Error saving product:', error)
+      captureException(error)
       toast.error(`Failed to save product: ${error.message}`)
     }
   }
@@ -808,7 +809,7 @@ export default function Products({
       resetBrandForm()
       loadData()
     } catch (error) {
-      console.error('Error saving brand:', error)
+      captureException(error)
       toast.error(`Failed to save brand: ${error.message}`)
     }
   }
@@ -855,7 +856,7 @@ export default function Products({
       resetCategoryForm()
       loadData()
     } catch (error) {
-      console.error('Error saving category:', error)
+      captureException(error)
       toast.error(`Failed to save category: ${error.message}`)
     }
   }
@@ -897,7 +898,7 @@ export default function Products({
             .catch(() => {})
           loadData()
         } catch (error) {
-          console.error('Error deleting product:', error)
+          captureException(error)
           toast.error('Failed to delete product')
         }
       }
@@ -919,7 +920,7 @@ export default function Products({
           setOpenBrandMenu(null)
           loadData()
         } catch (error) {
-          console.error('Error deleting brand:', error)
+          captureException(error)
           toast.error('Failed to delete brand')
         }
       }
@@ -940,7 +941,7 @@ export default function Products({
             .catch(() => {})
           loadData()
         } catch (error) {
-          console.error('Error deleting category:', error)
+          captureException(error)
           toast.error('Failed to delete category')
         }
       }

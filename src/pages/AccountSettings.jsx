@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { auth, db, storage, notifications } from '../api/supabaseClient'
 import { WIDGET_CATALOG } from './Dashboard'
 import toast from 'react-hot-toast'
-import { Spinner, PageHeader } from '../components/ui'
+import { Spinner, PageHeader, Button, Input } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
 import { ROLES } from '../lib/constants'
 
@@ -493,22 +493,18 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                 </button>
               </div>
               <div>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                >
-                  Upload photo
-                </button>
+                <Button onClick={() => fileInputRef.current?.click()}>Upload photo</Button>
                 {avatarPreview && (
-                  <button
+                  <Button
+                    variant="secondary"
+                    className="ml-3"
                     onClick={() => {
                       setAvatarPreview(null)
                       setAvatarFile(null)
                     }}
-                    className="ml-3 px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 )}
                 <p className="text-xs text-gray-500 mt-2">JPG, PNG or GIF · Max 2MB</p>
               </div>
@@ -530,11 +526,10 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Display Name</label>
-              <input
+              <Input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
                 placeholder="Your name"
               />
             </div>
@@ -562,13 +557,9 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
             </div>
 
             <div className="pt-1 border-t border-gray-100">
-              <button
-                onClick={handleProfileSave}
-                disabled={profileLoading}
-                className="px-6 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-              >
-                {profileLoading ? 'Saving...' : 'Save Changes'}
-              </button>
+              <Button size="lg" loading={profileLoading} onClick={handleProfileSave}>
+                Save Changes
+              </Button>
             </div>
           </div>
         </div>
@@ -590,11 +581,11 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">New Password</label>
               <div className="relative">
-                <input
+                <Input
                   type={showNew ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
+                  className="pr-10"
                   placeholder="••••••••"
                 />
                 <button
@@ -613,11 +604,11 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                 Confirm Password
               </label>
               <div className="relative">
-                <input
+                <Input
                   type={showConfirm ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
+                  className="pr-10"
                   placeholder="••••••••"
                 />
                 <button
@@ -635,13 +626,14 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
             </div>
 
             <div className="pt-1 border-t border-gray-100">
-              <button
+              <Button
+                size="lg"
+                loading={passwordLoading}
+                disabled={!newPassword || !confirmPassword}
                 onClick={handlePasswordSave}
-                disabled={passwordLoading || !newPassword || !confirmPassword}
-                className="px-6 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
               >
-                {passwordLoading ? 'Updating...' : 'Update Password'}
-              </button>
+                Update Password
+              </Button>
             </div>
           </div>
 
@@ -699,13 +691,9 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                   ))}
                 </div>
                 <div className="pt-5 border-t border-gray-100 mt-2">
-                  <button
-                    onClick={handleNotifSave}
-                    disabled={notifSaving}
-                    className="px-6 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-                  >
-                    {notifSaving ? 'Saving...' : 'Save Preferences'}
-                  </button>
+                  <Button size="lg" loading={notifSaving} onClick={handleNotifSave}>
+                    Save Preferences
+                  </Button>
                 </div>
               </>
             ) : null}
@@ -723,18 +711,12 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                 </p>
               </div>
               <div className="flex gap-2 flex-shrink-0">
-                <button
-                  onClick={() => setSysAll(false)}
-                  className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
-                >
+                <Button variant="secondary" size="sm" onClick={() => setSysAll(false)}>
                   Hide all
-                </button>
-                <button
-                  onClick={() => setSysAll(true)}
-                  className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                >
+                </Button>
+                <Button size="sm" onClick={() => setSysAll(true)}>
                   Show all
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -783,18 +765,12 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                 </p>
               </div>
               <div className="flex gap-2">
-                <button
-                  onClick={disableAllWidgets}
-                  className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
-                >
+                <Button variant="secondary" size="sm" onClick={disableAllWidgets}>
                   Hide all
-                </button>
-                <button
-                  onClick={enableAllWidgets}
-                  className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                >
+                </Button>
+                <Button size="sm" onClick={enableAllWidgets}>
                   Show all
-                </button>
+                </Button>
               </div>
             </div>
 

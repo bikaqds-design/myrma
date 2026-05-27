@@ -6,6 +6,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { StatCardSkeleton, CardSkeleton } from '../components/Skeleton'
 import { Spinner, PageHeader } from '../components/ui'
 import { ROLES, BATCH_STATUS } from '../lib/constants'
+import { captureException } from '../lib/sentry'
 // xlsx and jspdf are loaded on-demand (A-7: lazy heavy deps)
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -2090,7 +2091,7 @@ function CompanyStockTab({
       setShowTransfer(false)
       onReload()
     } catch (err) {
-      console.error('Transfer error:', err)
+      captureException(err)
       toast.error('Transfer failed')
     } finally {
       setBulkProcessing(false)

@@ -6,6 +6,7 @@ import { CardSkeleton } from '../components/Skeleton'
 import { Button } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
 import { ROLES } from '../lib/constants'
+import { captureException } from '../lib/sentry'
 
 export default function ProductDetails({
   productId,
@@ -92,7 +93,7 @@ export default function ProductDetails({
       })
       setImagePreview(productData.product_image_url)
     } catch (error) {
-      console.error('Error loading product:', error)
+      captureException(error)
       toast.error('Failed to load product details')
     } finally {
       setLoading(false)
@@ -160,7 +161,7 @@ export default function ProductDetails({
       setImageFile(null)
       loadProductDetails()
     } catch (error) {
-      console.error('Error saving product:', error)
+      captureException(error)
       toast.error(`Failed to save: ${error.message}`)
     }
   }
@@ -183,7 +184,7 @@ export default function ProductDetails({
             .catch(() => {})
           onBack()
         } catch (error) {
-          console.error('Error deleting product:', error)
+          captureException(error)
           toast.error('Failed to delete product')
         }
       }

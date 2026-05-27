@@ -6,6 +6,7 @@ import Modal from '../components/Modal'
 import { Spinner } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
 import { ROLES } from '../lib/constants'
+import { captureException } from '../lib/sentry'
 
 function validatePasswordStrength(pw) {
   if (!pw || pw.length < 8) return 'Password must be at least 8 characters'
@@ -76,7 +77,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       setUsers(usersData)
       setCustomRoles(rolesData)
     } catch (error) {
-      console.error('Error loading data:', error)
+      captureException(error)
       toast.error('Failed to load data')
     } finally {
       setLoading(false)
@@ -134,7 +135,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       setShowAddUserModal(false)
       loadData()
     } catch (error) {
-      console.error('Error adding user:', error)
+      captureException(error)
       toast.error(error.message || 'Failed to add user')
     }
   }
@@ -162,7 +163,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
         .catch(() => {})
       loadData()
     } catch (error) {
-      console.error('Error updating role:', error)
+      captureException(error)
       toast.error('Failed to update role')
     }
   }
@@ -186,7 +187,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       setShowCreateRoleModal(false)
       loadData()
     } catch (error) {
-      console.error('Error creating role:', error)
+      captureException(error)
       toast.error('Failed to create custom role')
     }
   }
@@ -204,7 +205,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       setSelectedUser(null)
       loadData()
     } catch (error) {
-      console.error('Error updating permissions:', error)
+      captureException(error)
       toast.error('Failed to update permissions')
     }
   }
@@ -223,7 +224,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
             .catch(() => {})
           loadData()
         } catch (error) {
-          console.error('Error deleting role:', error)
+          captureException(error)
           toast.error('Failed to delete custom role')
         }
       }
@@ -397,7 +398,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       setSelectedUser(null)
       loadData()
     } catch (error) {
-      console.error('Error performing user action:', error)
+      captureException(error)
       toast.error('Failed to perform action')
     }
   }
@@ -409,7 +410,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       setUserActivity(activity)
       setShowActivityModal(true)
     } catch (error) {
-      console.error('Error loading activity:', error)
+      captureException(error)
       toast.error('Failed to load user activity')
     }
   }
@@ -453,7 +454,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       setSelectedUser(null)
       setResetPassword('')
     } catch (error) {
-      console.error('Error resetting password:', error)
+      captureException(error)
       toast.error('Failed to reset password: ' + (error?.message || 'unknown error'))
     }
   }

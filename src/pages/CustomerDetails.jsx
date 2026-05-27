@@ -7,6 +7,7 @@ import AttachmentsField from '../components/AttachmentsField'
 import { Button, Spinner } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
 import { ROLES } from '../lib/constants'
+import { captureException } from '../lib/sentry'
 
 export default function CustomerDetails({
   customerId,
@@ -65,7 +66,7 @@ export default function CustomerDetails({
       setTickets(ticketsData)
       setNotes(notesData)
     } catch (error) {
-      console.error('Error loading customer:', error)
+      captureException(error)
       toast.error('Failed to load customer details')
     } finally {
       setLoading(false)
@@ -126,7 +127,7 @@ export default function CustomerDetails({
           'customer_updated',
           `Updated customer ${editForm.contact_person}${editForm.company_name ? ` (${editForm.company_name})` : ''}`
         )
-        .catch((err) => console.error('audit log failed:', err))
+        .catch((err) => captureException(err))
     } catch (error) {
       toast.error(`Failed to update: ${error.message}`)
     }
@@ -147,7 +148,7 @@ export default function CustomerDetails({
               'customer_deleted',
               `Deleted customer ${customer.contact_person}${customer.company_name ? ` (${customer.company_name})` : ''}`
             )
-            .catch((err) => console.error('audit log failed:', err))
+            .catch((err) => captureException(err))
           onBack()
         } catch {
           toast.error('Failed to delete customer')
@@ -176,7 +177,7 @@ export default function CustomerDetails({
           'customer_note_added',
           `Added note on customer ${customer?.contact_person}`
         )
-        .catch((err) => console.error('audit log failed:', err))
+        .catch((err) => captureException(err))
     } catch {
       toast.error('Failed to add note')
     } finally {
@@ -201,7 +202,7 @@ export default function CustomerDetails({
           'customer_note_updated',
           `Updated note ${noteId} on customer ${customer?.contact_person}`
         )
-        .catch((err) => console.error('audit log failed:', err))
+        .catch((err) => captureException(err))
     } catch {
       toast.error('Failed to update note')
     }
@@ -220,7 +221,7 @@ export default function CustomerDetails({
             'customer_note_deleted',
             `Deleted note ${noteId} on customer ${customer?.contact_person}`
           )
-          .catch((err) => console.error('audit log failed:', err))
+          .catch((err) => captureException(err))
       } catch {
         toast.error('Failed to delete note')
       }

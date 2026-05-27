@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { Button, Spinner, PageHeader } from '../components/ui'
 import EmptyState from '../components/EmptyState'
 import { useAppearance } from '../contexts/AppearanceContext'
+import { captureException } from '../lib/sentry'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -121,7 +122,7 @@ export default function TechCalendar({
       .list()
       .then((data) => setTickets(data))
       .catch((err) => {
-        console.error(err)
+        captureException(err)
         toast.error('Failed to load tickets')
       })
       .finally(() => setLoading(false))
