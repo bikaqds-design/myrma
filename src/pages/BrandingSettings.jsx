@@ -1002,11 +1002,7 @@ function BrandingTab({
             </div>
             <div className="flex-1 bg-white rounded px-2 py-1 flex items-center gap-1.5 border border-gray-200 min-w-0">
               {faviconUrl ? (
-                <img
-                  src={faviconUrl}
-                  alt=""
-                  style={{ width: 14, height: 14, objectFit: 'contain', flexShrink: 0 }}
-                />
+                <img src={faviconUrl} alt="" className="w-3.5 h-3.5 object-contain flex-shrink-0" />
               ) : (
                 <div className="w-3.5 h-3.5 rounded-sm bg-gray-200 flex-shrink-0" />
               )}
@@ -1224,6 +1220,7 @@ function EmailSettingsTab({ settings, setSettings, saving, onSave }) {
           <button
             type="button"
             onClick={() => setShowApiKey(!showApiKey)}
+            aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
           >
             {showApiKey ? '🙈' : '👁️'}

@@ -1982,10 +1982,7 @@ function HierarchyTab({
       </div>
 
       {/* 3-column explorer */}
-      <div
-        className="grid grid-cols-3 gap-0 border border-gray-200 rounded-xl overflow-hidden"
-        style={{ minHeight: 480 }}
-      >
+      <div className="grid grid-cols-3 gap-0 border border-gray-200 rounded-xl overflow-hidden min-h-[480px]">
         {/* ── Column 1: Brands ── */}
         <div className="flex flex-col border-r border-gray-200">
           <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">

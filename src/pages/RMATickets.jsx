@@ -2186,8 +2186,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                         /* P-2: virtualised list — only visible rows rendered in DOM */
                         <div
                           ref={customerDropdownRef}
-                          className="absolute z-30 w-full bg-white border border-gray-200 rounded-lg shadow-xl mt-1 overflow-y-auto"
-                          style={{ maxHeight: 256 }}
+                          className="absolute z-30 w-full bg-white border border-gray-200 rounded-lg shadow-xl mt-1 overflow-y-auto max-h-64"
                         >
                           <div
                             style={{
@@ -2617,6 +2616,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                           <button
                             type="button"
                             onClick={() => handleDeleteAttachment(att, i)}
+                            aria-label="Delete attachment"
                             className="text-red-400 hover:text-red-600 p-1 flex-shrink-0"
                           >
                             <svg
@@ -2670,6 +2670,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                           <button
                             type="button"
                             onClick={() => setPendingFiles((p) => p.filter((_, idx) => idx !== i))}
+                            aria-label="Remove file"
                             className="text-red-400 hover:text-red-600 p-1 flex-shrink-0"
                           >
                             <svg

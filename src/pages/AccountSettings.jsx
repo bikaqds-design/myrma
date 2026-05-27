@@ -469,6 +469,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                 )}
                 <button
                   onClick={() => fileInputRef.current?.click()}
+                  aria-label="Change profile photo"
                   className="absolute -bottom-1 -right-1 w-7 h-7 bg-white border-2 border-gray-200 rounded-full flex items-center justify-center hover:bg-indigo-50 hover:border-indigo-300 shadow-sm transition-colors"
                 >
                   <svg
@@ -592,6 +593,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                   type="button"
                   onClick={() => setShowNew((v) => !v)}
                   tabIndex={-1}
+                  aria-label={showNew ? 'Hide password' : 'Show password'}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
                 >
                   <EyeIcon visible={showNew} />
@@ -615,6 +617,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                   type="button"
                   onClick={() => setShowConfirm((v) => !v)}
                   tabIndex={-1}
+                  aria-label={showConfirm ? 'Hide password' : 'Show password'}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
                 >
                   <EyeIcon visible={showConfirm} />

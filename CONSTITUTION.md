@@ -377,19 +377,38 @@ text-3xl+   — 30px+ — Reserved for dashboard KPI numbers
 
 ### 4.4 Dark Mode
 
-**MUST: Every component MUST support dark mode** using Tailwind's `dark:` prefix.
+#### Current implementation (CSS override approach)
 
-The dark mode class is applied to `<html>` by `AppearanceContext`. Access via `useAppearance()`.
+Dark mode is currently implemented via CSS `!important` rules in `src/styles/appearance.css`. When the user enables dark mode, `AppearanceContext` adds a `.dark-mode` class to `<html>`. The `appearance.css` file then applies global overrides for backgrounds, text colors, and borders using that class.
+
+This means most existing page components do **not** have `dark:` Tailwind classes — the CSS overrides handle them globally. This approach works but has gaps (inline `style={{}}` values, dynamic color injections, and chart colors are not covered by the overrides).
+
+**Accessing dark mode state in a component:**
 
 ```jsx
-// ✅ CORRECT — explicit dark mode classes
-<div className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+import { useAppearance } from '../contexts/AppearanceContext'
 
-// ❌ WRONG — no dark mode support
-<div className="bg-white text-gray-900">
+const { darkMode } = useAppearance()
+// darkMode is a boolean; use it to conditionally apply values
+// that CSS overrides cannot reach (e.g., inline styles, chart colors)
 ```
 
-**MUST: Use semantic color pairs** consistently:
+#### Preferred approach for new code
+
+New components added to the codebase SHOULD use Tailwind `dark:` prefix classes rather than relying on the CSS override. The `dark` variant is enabled via Tailwind's `class` strategy (class `dark` on `<html>`) which `AppearanceContext` applies automatically when dark mode is active.
+
+```jsx
+// ✅ CORRECT — explicit dark mode classes (preferred for new components)
+<div className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+
+// ⚠️ ACCEPTABLE — CSS override covers this for existing components
+<div className="bg-white text-gray-900">
+
+// ❌ WRONG — inline style bypasses both mechanisms; use darkMode boolean instead
+<div style={{ backgroundColor: 'white' }}>
+```
+
+**MUST: Use semantic color pairs** for all new components:
 
 | Light | Dark | Use |
 |-------|------|-----|
@@ -400,6 +419,8 @@ The dark mode class is applied to `<html>` by `AppearanceContext`. Access via `u
 | `text-gray-600` | `dark:text-gray-400` | Secondary text |
 | `text-gray-500` | `dark:text-gray-500` | Placeholder, metadata |
 | `border-gray-200` | `dark:border-gray-700` | Dividers, borders |
+
+> **Migration note:** Full Tailwind `dark:` migration of existing pages is tracked as MED-NEW-5 in `AUDIT_LOG.md`. Until that migration is complete, do not remove the CSS overrides in `appearance.css`.
 
 ### 4.5 Color Usage
 

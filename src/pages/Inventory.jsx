@@ -3627,10 +3627,7 @@ function WarehouseDetailModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl flex flex-col"
-        style={{ maxHeight: '90vh' }}
-      >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <div>

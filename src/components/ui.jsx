@@ -57,6 +57,8 @@ const SPINNER_COLORS = {
 export function Spinner({ size = 'md', color = 'indigo', className = '' }) {
   return (
     <div
+      role="status"
+      aria-label="Loading"
       className={`animate-spin rounded-full flex-shrink-0 ${SPINNER_SIZES[size] ?? SPINNER_SIZES.md} ${SPINNER_COLORS[color] ?? SPINNER_COLORS.indigo} ${className}`}
     />
   )
