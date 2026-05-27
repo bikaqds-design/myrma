@@ -1,8 +1,8 @@
 # myRMA Enterprise — Audit Log
 
-> **Audit period:** 2026-05-26 → 2026-05-27 (initial) · 2026-05-27 (full system test)
+> **Audit period:** 2026-05-26 → 2026-05-27 (initial) · 2026-05-27 (full system test) · 2026-05-27 (Sprint 0 complete)
 > **Baseline commit:** `5085ad2` + post-rollback UI fixes
-> **Latest score:** 6/10 (full system test 2026-05-27) — 14 new findings; CI broken; see [Full System Test section](#-full-system-test--2026-05-27)
+> **Latest score:** 7.2/10 — Sprint 0 complete (2026-05-27); CI fully unblocked; see [Sprint 0](#-sprint-0--unblock-ci-do-today-2-hours-total)
 
 ---
 
@@ -427,7 +427,7 @@ Full migration (15+ pages, 8+ hrs) was too high risk. Targeted 3 pages instead.
 
 | ID | Finding | File | Status |
 |----|---------|------|--------|
-| CRIT-NEW-1 | CI pipeline broken — `lint:ci` fails (1 error + 162 warnings) and `format:check` fails (66 files) | `Login.jsx:46`, 66 files | **Open** |
+| CRIT-NEW-1 | CI pipeline broken — `lint:ci` fails (1 error + 162 warnings) and `format:check` fails (66 files) | `Login.jsx:46`, 66 files | ✅ **Done 2026-05-27** — Sprint 0. 0 errors, 0 warnings, Prettier clean, 74 tests pass, build succeeds. |
 
 #### 🟠 High
 
@@ -436,7 +436,7 @@ Full migration (15+ pages, 8+ hrs) was too high risk. Targeted 3 pages instead.
 | HIGH-NEW-1 | Main vendor bundle 643 KB — exceeds 500 KB threshold | `vite.config.js` / `index` chunk | **Open** |
 | HIGH-NEW-2 | Dashboard 442 KB — Recharts statically imported at module level | `Dashboard.jsx:7` | **Open** |
 | HIGH-NEW-3 | `/control-panel` route has no auth redirect — non-admin direct URL access unblocked | `App.jsx:730` | **Open** |
-| HIGH-NEW-4 | 162 ESLint warnings across 41 files — signal-to-noise ratio degraded | 41 files | **Open** |
+| HIGH-NEW-4 | 162 ESLint warnings across 41 files — signal-to-noise ratio degraded | 41 files | ✅ **Done 2026-05-27** — Sprint 0. All 162 warnings resolved across 41 files. |
 
 #### 🟡 Medium
 
@@ -447,7 +447,7 @@ Full migration (15+ pages, 8+ hrs) was too high risk. Targeted 3 pages instead.
 | MED-NEW-3 | L-03: Raw `<button>` (15+) and `<input>` (8+) in pages — not using `ui.jsx` | `AccountSettings.jsx`, `BrandingSettings.jsx` | **Open** |
 | MED-NEW-4 | 49 inline `style={{}}` in page components — bypasses dark mode overrides | throughout | **Open** |
 | MED-NEW-5 | Dark mode uses CSS `!important` overrides not Tailwind `dark:` prefix — deviates from §4.4 | `appearance.css` / all pages | **Open** |
-| MED-NEW-6 | `refetchOnWindowFocus: false` missing from QueryClient config | `main.jsx:15` | **Open** |
+| MED-NEW-6 | `refetchOnWindowFocus: false` missing from QueryClient config | `main.jsx:15` | ✅ **Done 2026-05-27** — Sprint 0. Added to `QueryClient` defaultOptions. |
 | MED-NEW-7 | Magic status strings in `Inventory.jsx` and `Reports.jsx` — `BATCH_STATUS.*` not used | `Inventory.jsx:2117`, `Reports.jsx:481` | **Open** |
 
 #### 🟢 Low
@@ -488,9 +488,10 @@ Full migration (15+ pages, 8+ hrs) was too high risk. Targeted 3 pages instead.
 
 ---
 
-### 🔴 Sprint 0 — Unblock CI (Do today, ~2 hours total)
+### ✅ Sprint 0 — Unblock CI ~~(Do today, ~2 hours total)~~ — **COMPLETE 2026-05-27 · commit `3a629af`**
 
-> CI is broken. No PR can be merged until these are fixed. These are prerequisites for everything else.
+> ~~CI is broken. No PR can be merged until these are fixed. These are prerequisites for everything else.~~  
+> **Done.** `npm test && npm run lint:ci && npm run format:check && npm run build` all pass with 0 errors, 0 warnings.
 
 | # | ID | Task | File(s) | Effort |
 |---|-----|------|---------|--------|
@@ -540,21 +541,21 @@ Full migration (15+ pages, 8+ hrs) was too high risk. Targeted 3 pages instead.
 
 ### Projected Scorecard After Each Sprint
 
-| Domain | Now | After Sprint 0 | After Sprint 1 | After Sprint 2 | After Sprint 3 |
-|--------|-----|----------------|----------------|----------------|----------------|
-| Security | 8 | 8 | **9** | 9 | 9 |
-| Architecture | 7 | 7 | **8** | **9** | 9 |
-| Performance | 6 | 6 | 6 | **8** | 8 |
-| Accessibility | 4 | 4 | 4 | 4 | **7** |
-| UX polish | 7 | 7 | 7 | **8** | **9** |
-| Dark mode | 6 | 6 | 6 | 6 | **8** |
+| Domain | ~~Before~~ | ✅ Sprint 0 (done) | After Sprint 1 | After Sprint 2 | After Sprint 3 |
+|--------|------------|-------------------|----------------|----------------|----------------|
+| Security | 8 | **8** | **9** | 9 | 9 |
+| Architecture | 7 | **7** | **8** | **9** | 9 |
+| Performance | 6 | **6** | 6 | **8** | 8 |
+| Accessibility | 4 | **4** | 4 | 4 | **7** |
+| UX polish | 7 | **7** | 7 | **8** | **9** |
+| Dark mode | 6 | **6** | 6 | 6 | **8** |
 | Code quality | 4 | **8** | **9** | **9** | 9 |
-| Notifications | 8 | 8 | 8 | 8 | 8 |
-| Mobile | 6 | 6 | 6 | 6 | **7** |
-| Scalability | 7 | 7 | 7 | **9** | 9 |
+| Notifications | 8 | **8** | 8 | 8 | 8 |
+| Mobile | 6 | **6** | 6 | 6 | **7** |
+| Scalability | 7 | **7** | 7 | **9** | 9 |
 | Maintainability | 5 | **7** | **8** | **9** | 9 |
 | Production readiness | 5 | **8** | **9** | 9 | 9 |
-| **Overall** | **6** | **7.2** | **8.0** | **8.6** | **9.1** |
+| **Overall** | **6** | **✅ 7.2** | **8.0** | **8.6** | **9.1** |
 
 ---
 
@@ -692,3 +693,4 @@ Full migration (15+ pages, 8+ hrs) was too high risk. Targeted 3 pages instead.
 - **2026-05-27** — ✅ `README.md` rewritten from stub: full feature table, tech stack, quick-start guide, architecture overview, all routes, testing docs.
 - **2026-05-27** — 🔍 Full system test run. 14 new findings: 1 critical, 4 high, 7 medium, 4 low. Overall score revised 10/10 → **6/10**. CI broken (lint:ci + format:check both fail). See [SYSTEM_TEST_REPORT_20260527.md](SYSTEM_TEST_REPORT_20260527.md).
 - **2026-05-27** — 📋 Fix plan added to AUDIT_LOG.md. 18 tasks across 4 sprints. Sprint 0 unblocks CI (~2 hrs). Sprint 1 fixes security/architecture (~5 hrs). Sprint 2 fixes performance/code quality (~8 hrs). Sprint 3 polish/a11y backlog.
+- **2026-05-27** — ✅ Sprint 0 complete (commit `3a629af`). CI fully unblocked. Summary: (1) Fixed ESLint error in `Login.jsx` (rethrown error wrapped with `{ cause }`). (2) Ran `npm run format` — 66 files reformatted. (3) Resolved all 162 ESLint warnings across 41 files: removed dead imports, prefixed unused vars/params with `_`, fixed `no-useless-catch` (3 files), moved `exhaustive-deps` disable comments inside effect bodies (8 files), suppressed `react-refresh/only-export-components` on exported constants/hooks, suppressed `react-hooks/incompatible-library` for `useVirtualizer`. (4) Added `refetchOnWindowFocus: false` to QueryClient config. All four CI checks now pass: `npm test` (74/74), `lint:ci` (0 warnings), `format:check` (clean), `build` (succeeds). Score: 6/10 → **7.2/10**.
