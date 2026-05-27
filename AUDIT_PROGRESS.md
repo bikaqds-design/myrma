@@ -2,7 +2,7 @@
 
 > Audit date: 2026-05-26 → 2026-05-27
 > Baseline commit: `5085ad2` + post-rollback UI fixes
-> Overall score: **10/10** — all P0/P1/P2/P3 items complete (or consciously deferred). PWA done 2026-05-27. Only deferral: A-1 React Router (cosmetic gap, low ROI).
+> Overall score: **10/10** — all P0/P1/P2/P3 items complete. PWA done 2026-05-27. A-1 React Router migration done 2026-05-27. Zero open items.
 
 ---
 
@@ -38,7 +38,7 @@
 
 | ✅ | ID | Finding | Location | Fix |
 |----|----|---------|----------|-----|
-| ⏸ | A-1 | No React Router — manual `pathToPage` mapping; typo URLs land on Dashboard | [App.jsx:97-119](src/App.jsx#L97-L119) | **Deferred — low priority.** Custom routing works correctly. `useURLTab` handles deep-linking. Main gap: typo URLs silently land on Dashboard instead of 404. Not worth 6h migration risk unless team grows significantly or 10+ new routes are added. |
+| ✅ | A-1 | No React Router — manual `pathToPage` mapping; typo URLs land on Dashboard | [App.jsx](src/App.jsx) | **Done 2026-05-27.** Full React Router v6 migration: `BrowserRouter` in `main.jsx`; `useNavigate` + `useLocation` in App.jsx. All 13 routes declared with `<Routes>`/`<Route>`. `ProductDetailsRoute` + `CustomerDetailsRoute` wrapper components use `useParams()`. `NotFoundPage` catch-all `*` route — typo URLs now show 404 instead of silently landing on Dashboard. Removed `pathToPage()`, `pageToPath()`, `popstate` listener, `currentPage` state. Build ✅ + 74 tests ✅. |
 | ✅ | A-3 | Notification prefs in `localStorage` only — resets on new device | App.jsx:191-194 | **Done 2026-05-26.** `db.userPreferences` added. AccountSettings calls `persistPrefsToDb()` on every pref toggle. App.jsx seeds localStorage from DB on login. |
 | ✅ | A-4 | Dashboard recomputes 8+ aggregations every render | [Dashboard.jsx:169-243](src/pages/Dashboard.jsx#L169-L243) | **Done 2026-05-26.** All 13 aggregations wrapped in `useMemo([tickets])`. |
 | ✅ | A-5 | Dashboard realtime refetches everything on each event | [Dashboard.jsx:119-124](src/pages/Dashboard.jsx#L119-L124) | **Done 2026-05-26.** INSERT/UPDATE/DELETE each merge payload into the **query cache** via `queryClient.setQueryData(['rma-tickets'], …)` — no full refetch. (After P-1 migrated Dashboard to TanStack Query, realtime handlers write to the cache, not local state.) |
@@ -83,14 +83,16 @@
 
 After completing all other P2 items, A-1 and P-1 were re-evaluated against actual cost vs. benefit for this app.
 
-### A-1 — React Router: **Deferred**
+### A-1 — React Router: **Done 2026-05-27**
 
 | | Detail |
 |---|---|
-| **Current routing** | `pathToPage()` / `pageToPath()` in App.jsx + `useURLTab` hook. Works correctly for all navigation, deep-links, and browser history. |
-| **Real gap** | Typo URLs land on Dashboard silently (no 404). |
-| **Migration cost** | ~6 hrs, HIGH breakage risk across all navigation. |
-| **Verdict** | The gap is cosmetic for an internal tool. No user is harmed. Defer until team grows or 10+ new routes are needed. |
+| **Approach** | Full React Router v6 migration. `BrowserRouter` wraps app in `main.jsx`. `useNavigate` + `useLocation` hooks in App.jsx replace manual `pushState`/`popstate`. |
+| **Routes** | 13 `<Route>` declarations: all main pages + `/dashboard` redirect + `*` catch-all `NotFoundPage`. |
+| **Parameterized routes** | `/products/:id` and `/customers/:id` served by thin `ProductDetailsRoute` / `CustomerDetailsRoute` wrappers that call `useParams()` and pass the id prop to existing detail components — zero changes to ProductDetails.jsx or CustomerDetails.jsx. |
+| **404 page** | `NotFoundPage` component: shows the bad path, "Go to Dashboard" button, styled to match app. Resolves the original finding completely. |
+| **Removed** | `pathToPage()`, `pageToPath()` helpers; `currentPage` / `selectedProductId` / `selectedCustomerId` useState; `popstate` useEffect listener; all `window.history.pushState` calls. |
+| **Retained** | `selectedTicketId` state (cleared on navigation away from `/rma-tickets`); `useURLTab` for in-page tab params; `/tracker` public-route detection via `pathname`. |
 
 ### P-1 — TanStack Query: **Rescoped to 3 pages**
 
@@ -174,23 +176,23 @@ After completing all other P2 items, A-1 and P-1 were re-evaluated against actua
 | Production readiness | 9/10 | 🟢 All P0+P1 resolved, resilient logging |
 | **Overall** | **9.5/10** | 🟢 **All P2 items complete. A-1 deferred (low ROI). Remaining: P3 quick wins.** |
 
-### Final (after P3 complete — 2026-05-27)
+### Final (after P3 + A-1 complete — 2026-05-27)
 
 | Domain | Score | Verdict |
 |---|---|---|
 | Security | 8/10 | 🟢 Unchanged |
-| Architecture | 10/10 | 🟢 TypeScript lib layer, strict tsconfig, CI/CD gates every PR |
+| Architecture | 10/10 | 🟢 React Router v6, TypeScript lib layer, strict tsconfig, CI/CD gates every PR |
 | Performance | 10/10 | 🟢 Virtual dropdown (500+ customers in DOM → only visible rows), image resize before upload |
 | Accessibility | 8/10 | 🟢 Unchanged |
-| UX polish | 9/10 | 🟢 Unchanged |
+| UX polish | 9/10 | 🟢 404 page, no more silent typo-URL landings on Dashboard |
 | Dark mode | 10/10 | 🟢 Unchanged |
 | Code quality | 10/10 | 🟢 TypeScript types, CI gates, Sentry error tracking, 74 tests |
 | Notifications | 9/10 | 🟢 Unchanged |
 | Mobile | 8/10 | 🟢 Unchanged |
 | Scalability | 10/10 | 🟢 Virtual lists + image resize = no DOM bloat, no oversized uploads |
-| Maintainability | 10/10 | 🟢 Typed constants/permissions/schemas, full CI pipeline, error monitoring |
+| Maintainability | 10/10 | 🟢 Typed constants/permissions/schemas, full CI pipeline, error monitoring, proper URL routing |
 | Production readiness | 10/10 | 🟢 CI/CD + Sentry + env.example — deployable with confidence |
-| **Overall** | **10/10** | 🟢 **Audit complete. All P3 items done. Only deferral: A-1 React Router (cosmetic gap, low ROI).** |
+| **Overall** | **10/10** | 🟢 **Audit 100% complete. Zero open items. All P0→P3 + A-1 done.** |
 
 ---
 
@@ -237,7 +239,7 @@ _Mark each item with ✅ and date as you complete it._
 - **2026-05-27** — ✅ M-1: Vitest 4 + jsdom + RTL installed. 74 tests in 3 suites (schemas, permissions, constants). `npm test` passes.
 - **2026-05-27** — ✅ P-1 targeted: `QueryClientProvider` added to main.jsx (staleTime 60s, retry 1). `useQuery` in Dashboard, RMATickets, Customers replaces `useState+useEffect` fetch pattern. Shared query keys: `['rma-tickets']`, `['customers']`, `['products']`, `['users']`. Realtime handlers write to query cache via `setQueryData` / `invalidateQueries`.
 - **2026-05-27** — ✅ UX-6: Optimistic delete on tickets and customers — row removed from cache before `await`, rolled back via `setQueryData` on error. Optimistic update on customer edit — row updated in cache before `await`. Build + 74 tests: ✅ clean.
-- **2026-05-27** — ⏸ A-1: Deferred. Custom routing works correctly; typo-URL gap is cosmetic for internal tool. Revisit if team grows or 10+ routes needed.
+- **2026-05-27** — ⏸ A-1: Initially deferred. Custom routing works correctly; typo-URL gap cosmetic for internal tool. (Reversed — implemented same day; see final changelog entry.)
 - **2026-05-27** — ✅ P-1 + UX-6: All 3 targeted pages migrated. Commit `5e45b80`.
 - **2026-05-27** — ✅ P-3: `src/lib/resizeImage.js` — canvas downscale to 1200px (avatars 400px), JPEG q=0.85. Wired into all 5 `storage.js` upload helpers.
 - **2026-05-27** — ✅ CI/CD: `.github/workflows/ci.yml` — Node 20, `npm ci`, test → lint:ci → build on every push/PR to `main`. Placeholder Supabase env vars used in build step.
@@ -246,3 +248,4 @@ _Mark each item with ✅ and date as you complete it._
 - **2026-05-27** — ✅ M-3: `tsconfig.json` + `src/lib/constants.ts` / `permissions.ts` / `schemas.ts`. Old `.js` files deleted. Build ✅ + 74 tests ✅. Typed `Role`, `TicketStatus`, `Priority`, form data types all exported.
 - **2026-05-27** — ✅ PWA: `vite-plugin-pwa` + Workbox generateSW. App shell pre-caches 42 assets (`sw.js` emitted). Supabase calls NetworkFirst. `public/icon.svg` → 5 PNG sizes + favicon.ico + apple-touch-icon via `@vite-pwa/assets-generator`. `index.html` meta + link tags updated. Build ✅ + 74 tests ✅.
 - **2026-05-27** — 🔍 Cross-check: 7 audit inaccuracies corrected (`49eea2f`). A-5 description fixed (query cache, not local state). A-6/F-1/M-5 `.js` refs corrected to `.ts`. M-4 line count corrected (19→21). P-2 description clarified (tables paginated + dropdown virtualised — both correct). Test file headers updated.
+- **2026-05-27** — ✅ A-1: React Router v6 full migration. `BrowserRouter` in `main.jsx`. App.jsx rewritten: `useNavigate`/`useLocation` replace manual `pushState`/`popstate`. 13 routes via `<Routes>` + `*` `NotFoundPage`. `/products/:id` + `/customers/:id` via thin wrapper components using `useParams()`. Removed `pathToPage`, `pageToPath`, `currentPage` state. Build ✅ + 74 tests ✅.

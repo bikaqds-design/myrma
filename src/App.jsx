@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom'
 import { Toaster, toast } from 'react-hot-toast'
 import { auth, db, branding as brandingAPI, supabase } from './api/supabaseClient'
 import { useAppearance } from './contexts/AppearanceContext'
@@ -26,6 +27,29 @@ function AnnouncementBanner() {
     </div>
   )
 }
+
+// ── 404 page ──────────────────────────────────────────────────────────────────
+function NotFoundPage() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  return (
+    <div className="flex flex-col items-center justify-center h-full py-24 text-center">
+      <div className="text-6xl mb-4">🔍</div>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-2">Page not found</h1>
+      <p className="text-gray-500 dark:text-slate-400 mb-1">
+        The URL <code className="bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-sm font-mono">{location.pathname}</code> doesn&apos;t match any page.
+      </p>
+      <p className="text-sm text-gray-400 dark:text-slate-500 mb-6">Check the URL or use the sidebar to navigate.</p>
+      <button
+        onClick={() => navigate('/')}
+        className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+      >
+        Go to Dashboard
+      </button>
+    </div>
+  )
+}
+
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
 import RMATracker from './pages/RMATracker'
@@ -50,44 +74,55 @@ const PageSpinner = () => (
   </div>
 )
 
-function pathToPage(path) {
-  if (!path || path === '/' || path === '/dashboard') return { page: 'dashboard' }
-  if (path === '/products') return { page: 'products' }
-  if (path.startsWith('/products/')) return { page: 'product-details', id: path.split('/')[2] }
-  if (path === '/customers') return { page: 'customers' }
-  if (path.startsWith('/customers/')) return { page: 'customer-details', id: path.split('/')[2] }
-  if (path === '/rma-tickets') return { page: 'rma-tickets' }
-  if (path === '/inventory') return { page: 'inventory' }
-  if (path === '/account') return { page: 'account' }
-  if (path === '/control-panel') return { page: 'control-panel' }
-  if (path === '/calendar') return { page: 'calendar' }
-  if (path === '/invoices') return { page: 'invoices' }
-  if (path === '/parts') return { page: 'parts' }
-  if (path === '/reports') return { page: 'reports' }
-  return { page: 'dashboard' }
+// ── Thin route wrappers — extract useParams() so page components stay unchanged ──
+function ProductDetailsRoute({ currentUserRole, currentUserEmail, currentUserPermissions, onNavigateToTicket }) {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  return (
+    <ProductDetails
+      productId={id}
+      currentUserRole={currentUserRole}
+      currentUserEmail={currentUserEmail}
+      currentUserPermissions={currentUserPermissions}
+      onBack={() => navigate('/products')}
+      onNavigateToTicket={onNavigateToTicket}
+    />
+  )
 }
 
-function pageToPath(page, id = null) {
-  if (page === 'product-details' && id) return `/products/${id}`
-  if (page === 'customer-details' && id) return `/customers/${id}`
-  if (page === 'dashboard') return '/'
-  return `/${page}`
+function CustomerDetailsRoute({ currentUserRole, currentUserEmail, currentUserPermissions, onNavigateToTicket }) {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  return (
+    <CustomerDetails
+      customerId={id}
+      currentUserRole={currentUserRole}
+      currentUserEmail={currentUserEmail}
+      currentUserPermissions={currentUserPermissions}
+      onBack={() => navigate('/customers')}
+      onNavigateToTicket={onNavigateToTicket}
+    />
+  )
 }
 
+// ── Main app ──────────────────────────────────────────────────────────────────
 export default function App() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const pathname = location.pathname
+
   const { sidebarCompact, updateAppearance, darkMode } = useAppearance()
-  // DM-3: dark-aware toast options
   const toastOptions = darkMode
     ? { style: { background: '#1e293b', color: '#f1f5f9', border: '1px solid #334155' } }
     : undefined
+
   const [currentUser, setCurrentUser] = useState(null)
   const [currentUserRole, setCurrentUserRole] = useState(null)
   const [currentUserPermissions, setCurrentUserPermissions] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [currentPage, setCurrentPage] = useState(() => pathToPage(window.location.pathname).page)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [selectedProductId, setSelectedProductId] = useState(() => pathToPage(window.location.pathname).id || null)
-  const [selectedCustomerId, setSelectedCustomerId] = useState(() => pathToPage(window.location.pathname).id || null)
+  // selectedTicketId: open a specific ticket when navigating to /rma-tickets
+  // (e.g. from the notification bell or command palette)
   const [selectedTicketId, setSelectedTicketId] = useState(null)
   const [resetPasswordMode, setResetPasswordMode] = useState(false)
   const [companyName, setCompanyName] = useState('')
@@ -184,11 +219,9 @@ export default function App() {
         if (!n) return
         const myRole = currentUserRole
         const myEmail = currentUser?.email
-        // Check targeting: null arrays = broadcast to all staff
         const roleMatch = !n.target_roles?.length || n.target_roles.includes(myRole)
         const emailMatch = n.target_emails?.length && n.target_emails.includes(myEmail)
         if (!roleMatch && !emailMatch) return
-        // Respect per-type preferences
         try {
           const prefs = JSON.parse(localStorage.getItem(`notif_system_prefs_${myEmail}`) || '{}')
           if (prefs[n.type] === false) return
@@ -215,13 +248,11 @@ export default function App() {
     const handler = () => loadNotifsRef.current?.()
     window.addEventListener('notif-system-prefs-changed', handler)
 
-    // Cross-tab sync via BroadcastChannel (supported in all modern browsers)
     let bc = null
     if (typeof BroadcastChannel !== 'undefined') {
       bc = new BroadcastChannel('notif_system_prefs')
       bc.onmessage = (e) => {
         if (e.data?.type === 'notif-system-prefs-changed') {
-          // Write the fresh prefs into localStorage so applyPrefs() picks them up
           if (e.data.prefs && currentUser?.email) {
             try {
               localStorage.setItem(`notif_system_prefs_${currentUser.email}`, JSON.stringify(e.data.prefs))
@@ -260,6 +291,11 @@ export default function App() {
     return () => document.removeEventListener('keydown', handler)
   }, [sidebarOpen])
 
+  // Clear selectedTicketId when navigating away from /rma-tickets
+  useEffect(() => {
+    if (pathname !== '/rma-tickets') setSelectedTicketId(null)
+  }, [pathname])
+
   const markAllNotifsRead = useCallback(async () => {
     if (!currentUser?.email || !currentUserRole) return
     await db.notifications.markAllRead(currentUser.email, currentUserRole)
@@ -294,90 +330,63 @@ export default function App() {
     setCurrentUser(null)
     setCurrentUserRole(null)
     setCurrentUserPermissions(null)
-    setCurrentPage('dashboard')
-    window.history.replaceState({}, '', '/')
+    navigate('/')
   }
 
-  const handleNavigate = (page) => {
-    window.history.pushState({ page }, '', pageToPath(page))
-    setCurrentPage(page)
-    setSelectedProductId(null)
-    setSelectedCustomerId(null)
+  // A-1: React Router navigation — replaces window.history.pushState + currentPage state
+  const handleNavigate = useCallback((path) => {
+    navigate(path)
     setSelectedTicketId(null)
     setSidebarOpen(false)
-  }
+  }, [navigate])
 
-  const handleNavigateToProduct = (productId) => {
-    window.history.pushState({ page: 'product-details', id: productId }, '', `/products/${productId}`)
-    setSelectedProductId(productId)
-    setCurrentPage('product-details')
+  const handleNavigateToTicket = useCallback((ticketId) => {
+    setSelectedTicketId(ticketId)
+    navigate('/rma-tickets')
     setSidebarOpen(false)
-  }
+  }, [navigate])
 
-  const handleBackFromProductDetails = () => {
-    window.history.pushState({ page: 'products' }, '', '/products')
-    setSelectedProductId(null)
-    setCurrentPage('products')
-  }
-
-  const handleNavigateToCustomer = (customerId) => {
-    window.history.pushState({ page: 'customer-details', id: customerId }, '', `/customers/${customerId}`)
-    setSelectedCustomerId(customerId)
-    setCurrentPage('customer-details')
+  const handleCmdSelectTicket = useCallback((ticket) => {
+    setSelectedTicketId(ticket.id)
+    navigate('/rma-tickets')
     setSidebarOpen(false)
-  }
+  }, [navigate])
 
-  const handleBackFromCustomerDetails = () => {
-    window.history.pushState({ page: 'customers' }, '', '/customers')
-    setSelectedCustomerId(null)
-    setCurrentPage('customers')
-  }
+  const handleCmdSelectCustomer = useCallback((customer) => {
+    navigate(`/customers/${customer.id}`)
+    setSidebarOpen(false)
+  }, [navigate])
+
+  const handleCmdSelectProduct = useCallback((product) => {
+    navigate(`/products/${product.id}`)
+    setSidebarOpen(false)
+  }, [navigate])
 
   const handleProfileUpdate = (updatedUser) => {
     setCurrentUser(updatedUser)
   }
 
-  useEffect(() => {
-    const onPopState = () => {
-      const { page, id } = pathToPage(window.location.pathname)
-      setCurrentPage(page)
-      setSelectedTicketId(null)
-      if (page === 'product-details') { setSelectedProductId(id || null); setSelectedCustomerId(null) }
-      else if (page === 'customer-details') { setSelectedCustomerId(id || null); setSelectedProductId(null) }
-      else { setSelectedProductId(null); setSelectedCustomerId(null) }
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [])
+  // ── Active state derived from URL ─────────────────────────────────────────
+  const isProductsActive  = pathname === '/products'  || pathname.startsWith('/products/')
+  const isCustomersActive = pathname === '/customers' || pathname.startsWith('/customers/')
 
-  const handleNavigateToTicket = (ticketId) => {
-    window.history.pushState({ page: 'rma-tickets' }, '', '/rma-tickets')
-    setSelectedTicketId(ticketId)
-    setCurrentPage('rma-tickets')
-    setSidebarOpen(false)
+  // ── Derive page title for mobile header ───────────────────────────────────
+  const mobileTitle = (() => {
+    if (pathname === '/' || pathname === '/dashboard') return 'dashboard'
+    if (pathname.startsWith('/products/')) return 'product details'
+    if (pathname.startsWith('/customers/')) return 'customer details'
+    return pathname.slice(1).replace(/-/g, ' ')
+  })()
+
+  // ── Special routes — no auth needed ──────────────────────────────────────
+  if (pathname === '/tracker') {
+    return (
+      <>
+        <RMATracker />
+        <Toaster position="top-right" toastOptions={toastOptions} />
+      </>
+    )
   }
-
-  const handleCmdSelectTicket = useCallback((ticket) => {
-    window.history.pushState({ page: 'rma-tickets' }, '', '/rma-tickets')
-    setSelectedTicketId(ticket.id)
-    setCurrentPage('rma-tickets')
-    setSidebarOpen(false)
-  }, [])
-
-  const handleCmdSelectCustomer = useCallback((customer) => {
-    setSelectedCustomerId(customer.id)
-    setCurrentPage('customer-details')
-    setSidebarOpen(false)
-  }, [])
-
-  const handleCmdSelectProduct = useCallback((product) => {
-    setSelectedProductId(product.id)
-    setCurrentPage('product-details')
-    setSidebarOpen(false)
-  }, [])
-
-  const isProductsActive = currentPage === 'products' || currentPage === 'product-details'
-  const isCustomersActive = currentPage === 'customers' || currentPage === 'customer-details'
 
   if (resetPasswordMode) {
     return (
@@ -386,16 +395,6 @@ export default function App() {
           setResetPasswordMode(false)
           setCurrentUser(null)
         }} />
-        <Toaster position="top-right" toastOptions={toastOptions} />
-      </>
-    )
-  }
-
-  const isTrackerPage = window.location.pathname === '/tracker'
-  if (isTrackerPage) {
-    return (
-      <>
-        <RMATracker />
         <Toaster position="top-right" toastOptions={toastOptions} />
       </>
     )
@@ -418,6 +417,7 @@ export default function App() {
     )
   }
 
+  // ── Authenticated app shell ───────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <AnnouncementBanner />
@@ -489,15 +489,15 @@ export default function App() {
 
         <nav className={`flex-1 ${sidebarCompact ? 'p-2' : 'p-4'} space-y-1 overflow-y-auto`}>
           {[
-            { page: 'dashboard', label: 'Dashboard', active: currentPage === 'dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-            { page: 'products',  label: 'Products',  active: isProductsActive, icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
-            { page: 'customers', label: 'Customers', active: isCustomersActive, icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
-            { page: 'rma-tickets', label: 'RMA Tickets', active: currentPage === 'rma-tickets', icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z' },
-            { page: 'inventory',   label: 'Inventory',   active: currentPage === 'inventory',   icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
-            { page: 'calendar',    label: 'Calendar',    active: currentPage === 'calendar',    icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-            { page: 'reports',     label: 'Reports',     active: currentPage === 'reports',     icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-          ].map(({ page, label, active, icon }) => (
-            <button key={page} onClick={() => handleNavigate(page)} title={sidebarCompact ? label : undefined}
+            { path: '/',            label: 'Dashboard',   active: pathname === '/' || pathname === '/dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+            { path: '/products',    label: 'Products',    active: isProductsActive, icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
+            { path: '/customers',   label: 'Customers',   active: isCustomersActive, icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
+            { path: '/rma-tickets', label: 'RMA Tickets', active: pathname === '/rma-tickets', icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z' },
+            { path: '/inventory',   label: 'Inventory',   active: pathname === '/inventory', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
+            { path: '/calendar',    label: 'Calendar',    active: pathname === '/calendar', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+            { path: '/reports',     label: 'Reports',     active: pathname === '/reports', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+          ].map(({ path, label, active, icon }) => (
+            <button key={path} onClick={() => handleNavigate(path)} title={sidebarCompact ? label : undefined}
               className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3'} rounded-lg text-sm font-medium transition-colors ${active ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}>
               <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
@@ -523,8 +523,8 @@ export default function App() {
           {(currentUserRole === 'admin' || currentUserRole === 'super_admin') && (
             <>
               <div className="pt-2 border-t border-gray-700/60 my-1" />
-              <button onClick={() => handleNavigate('control-panel')} title={sidebarCompact ? 'Control Panel' : undefined}
-                className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3'} rounded-lg text-sm font-medium transition-colors ${currentPage === 'control-panel' ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}>
+              <button onClick={() => handleNavigate('/control-panel')} title={sidebarCompact ? 'Control Panel' : undefined}
+                className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3'} rounded-lg text-sm font-medium transition-colors ${pathname === '/control-panel' ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}>
                 <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -536,6 +536,30 @@ export default function App() {
 
         </nav>
 
+        {/* User profile (bottom of sidebar) */}
+        <div className={`border-t border-gray-700 ${sidebarCompact ? 'p-2' : 'p-4'}`}>
+          <button
+            onClick={() => handleNavigate('/account')}
+            title={sidebarCompact ? 'Account Settings' : undefined}
+            className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-2' : 'gap-3 px-2 py-2'} rounded-lg hover:bg-gray-700 transition-colors text-left group`}
+          >
+            {currentUser?.user_metadata?.avatar_url ? (
+              <img src={currentUser.user_metadata.avatar_url} alt="avatar" className="w-8 h-8 rounded-full object-cover ring-2 ring-indigo-500/30 flex-shrink-0" />
+            ) : (
+              <div className={`${sidebarCompact ? 'w-8 h-8' : 'w-8 h-8'} rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white font-semibold text-sm uppercase flex-shrink-0`}>
+                {(currentUser?.user_metadata?.display_name || currentUser?.email || '?')[0]}
+              </div>
+            )}
+            {!sidebarCompact && (
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-gray-200 truncate">
+                  {currentUser?.user_metadata?.display_name || currentUser?.email}
+                </div>
+                <div className="text-xs text-gray-500 capitalize">{currentUserRole}</div>
+              </div>
+            )}
+          </button>
+        </div>
 
       </div>
 
@@ -548,9 +572,7 @@ export default function App() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <h2 className="text-lg font-semibold text-gray-900 capitalize">
-            {currentPage.replace(/-/g, ' ')}
-          </h2>
+          <h2 className="text-lg font-semibold text-gray-900 capitalize">{mobileTitle}</h2>
           <div className="flex items-center gap-1.5">
             <NotificationBell
               notifications={notifications}
@@ -561,9 +583,9 @@ export default function App() {
               mobile={true}
             />
             <button
-              onClick={() => handleNavigate('account')}
+              onClick={() => handleNavigate('/account')}
               title="Account Settings" aria-label="Account Settings"
-              className={`w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white font-semibold text-sm uppercase flex-shrink-0 ${currentPage === 'account' ? 'ring-2 ring-indigo-400' : ''}`}
+              className={`w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white font-semibold text-sm uppercase flex-shrink-0 ${pathname === '/account' ? 'ring-2 ring-indigo-400' : ''}`}
             >
               {(currentUser?.user_metadata?.display_name || currentUser?.email || '?')[0]}
             </button>
@@ -613,7 +635,7 @@ export default function App() {
                   <div className="text-xs text-gray-500 capitalize mt-0.5">{currentUserRole}</div>
                 </div>
                 <button
-                  onClick={() => { handleNavigate('account'); setUserMenuOpen(false) }}
+                  onClick={() => { handleNavigate('/account'); setUserMenuOpen(false) }}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
                 >
                   <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -636,105 +658,118 @@ export default function App() {
           </div>
         </div>
 
+        {/* ── Page content — React Router <Routes> ────────────────────────── */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8 main-scroll">
           <Suspense fallback={<PageSpinner />}>
-          {currentPage === 'account' && (
-            <AccountSettings
-              currentUser={currentUser}
-              currentUserRole={currentUserRole}
-              onProfileUpdate={handleProfileUpdate}
-            />
-          )}
-          {currentPage === 'dashboard' && (
-            <Dashboard currentUserEmail={currentUser?.email} onNavigate={handleNavigate} />
-          )}
-          {currentPage === 'products' && (
-            <Products
-              currentUserRole={currentUserRole}
-              currentUserEmail={currentUser?.email}
-              currentUserPermissions={currentUserPermissions}
-              onNavigateToProduct={handleNavigateToProduct}
-            />
-          )}
-          {currentPage === 'product-details' && selectedProductId && (
-            <ProductDetails
-              productId={selectedProductId}
-              currentUserRole={currentUserRole}
-              currentUserEmail={currentUser?.email}
-              currentUserPermissions={currentUserPermissions}
-              onBack={handleBackFromProductDetails}
-              onNavigateToTicket={handleNavigateToTicket}
-            />
-          )}
-          {currentPage === 'customers' && (
-            <Customers
-              currentUserRole={currentUserRole}
-              currentUserEmail={currentUser?.email}
-              currentUserPermissions={currentUserPermissions}
-              onNavigateToCustomer={handleNavigateToCustomer}
-            />
-          )}
-          {currentPage === 'customer-details' && selectedCustomerId && (
-            <CustomerDetails
-              customerId={selectedCustomerId}
-              currentUserRole={currentUserRole}
-              currentUserEmail={currentUser?.email}
-              currentUserPermissions={currentUserPermissions}
-              onBack={handleBackFromCustomerDetails}
-              onNavigateToTicket={handleNavigateToTicket}
-            />
-          )}
-          {currentPage === 'rma-tickets' && (
-            <RMATickets
-              userRole={currentUserRole}
-              userEmail={currentUser?.email}
-              userPermissions={currentUserPermissions}
-              initialTicketId={selectedTicketId}
-            />
-          )}
-          {currentPage === 'inventory' && (
-            <Inventory
-              userRole={currentUserRole}
-              userEmail={currentUser?.email}
-              userPermissions={currentUserPermissions}
-              onNavigateToTicket={handleNavigateToTicket}
-            />
-          )}
-          {currentPage === 'control-panel' && (
-            <ControlPanel
-              currentUserRole={currentUserRole}
-              currentUserEmail={currentUser?.email}
-            />
-          )}
-          {currentPage === 'calendar' && (
-            <TechCalendar
-              userRole={currentUserRole}
-              userEmail={currentUser?.email}
-              userPermissions={currentUserPermissions}
-              onNavigateToTicket={handleNavigateToTicket}
-            />
-          )}
-          {currentPage === 'invoices' && (
-            <Invoices
-              userRole={currentUserRole}
-              userEmail={currentUser?.email}
-              userPermissions={currentUserPermissions}
-            />
-          )}
-          {currentPage === 'parts' && (
-            <PartsInventory
-              userRole={currentUserRole}
-              userEmail={currentUser?.email}
-              userPermissions={currentUserPermissions}
-            />
-          )}
-          {currentPage === 'reports' && (
-            <Reports
-              userRole={currentUserRole}
-              userEmail={currentUser?.email}
-              userPermissions={currentUserPermissions}
-            />
-          )}
+            <Routes>
+              <Route path="/" element={
+                <Dashboard currentUserEmail={currentUser?.email} onNavigate={handleNavigate} />
+              } />
+              <Route path="/dashboard" element={<Navigate to="/" replace />} />
+
+              <Route path="/products" element={
+                <Products
+                  currentUserRole={currentUserRole}
+                  currentUserEmail={currentUser?.email}
+                  currentUserPermissions={currentUserPermissions}
+                  onNavigateToProduct={(id) => navigate(`/products/${id}`)}
+                />
+              } />
+              <Route path="/products/:id" element={
+                <ProductDetailsRoute
+                  currentUserRole={currentUserRole}
+                  currentUserEmail={currentUser?.email}
+                  currentUserPermissions={currentUserPermissions}
+                  onNavigateToTicket={handleNavigateToTicket}
+                />
+              } />
+
+              <Route path="/customers" element={
+                <Customers
+                  currentUserRole={currentUserRole}
+                  currentUserEmail={currentUser?.email}
+                  currentUserPermissions={currentUserPermissions}
+                  onNavigateToCustomer={(id) => navigate(`/customers/${id}`)}
+                />
+              } />
+              <Route path="/customers/:id" element={
+                <CustomerDetailsRoute
+                  currentUserRole={currentUserRole}
+                  currentUserEmail={currentUser?.email}
+                  currentUserPermissions={currentUserPermissions}
+                  onNavigateToTicket={handleNavigateToTicket}
+                />
+              } />
+
+              <Route path="/rma-tickets" element={
+                <RMATickets
+                  userRole={currentUserRole}
+                  userEmail={currentUser?.email}
+                  userPermissions={currentUserPermissions}
+                  initialTicketId={selectedTicketId}
+                />
+              } />
+
+              <Route path="/inventory" element={
+                <Inventory
+                  userRole={currentUserRole}
+                  userEmail={currentUser?.email}
+                  userPermissions={currentUserPermissions}
+                  onNavigateToTicket={handleNavigateToTicket}
+                />
+              } />
+
+              <Route path="/account" element={
+                <AccountSettings
+                  currentUser={currentUser}
+                  currentUserRole={currentUserRole}
+                  onProfileUpdate={handleProfileUpdate}
+                />
+              } />
+
+              <Route path="/control-panel" element={
+                <ControlPanel
+                  currentUserRole={currentUserRole}
+                  currentUserEmail={currentUser?.email}
+                />
+              } />
+
+              <Route path="/calendar" element={
+                <TechCalendar
+                  userRole={currentUserRole}
+                  userEmail={currentUser?.email}
+                  userPermissions={currentUserPermissions}
+                  onNavigateToTicket={handleNavigateToTicket}
+                />
+              } />
+
+              <Route path="/invoices" element={
+                <Invoices
+                  userRole={currentUserRole}
+                  userEmail={currentUser?.email}
+                  userPermissions={currentUserPermissions}
+                />
+              } />
+
+              <Route path="/parts" element={
+                <PartsInventory
+                  userRole={currentUserRole}
+                  userEmail={currentUser?.email}
+                  userPermissions={currentUserPermissions}
+                />
+              } />
+
+              <Route path="/reports" element={
+                <Reports
+                  userRole={currentUserRole}
+                  userEmail={currentUser?.email}
+                  userPermissions={currentUserPermissions}
+                />
+              } />
+
+              {/* A-1: catch-all 404 — previously typo URLs silently landed on Dashboard */}
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
           </Suspense>
         </div>
       </div>
