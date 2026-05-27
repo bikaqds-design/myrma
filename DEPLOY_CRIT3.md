@@ -75,33 +75,28 @@ After 15 requests within a minute, you should see `429 Too many requests`.
 
 ---
 
-## Step 5 — Storage bucket attachments (OPEN — not yet applied)
+## Step 5 — Storage bucket policies
 
-⚠️ **Status: not applied.** `RMATracker.jsx` still uploads directly to Supabase Storage from the browser as the anon role. The `rma-attachments` bucket currently has no size or type restriction on anon uploads.
+The migration is in [supabase/migrations/20260527_storage_bucket_policies.sql](supabase/migrations/20260527_storage_bucket_policies.sql).
 
-The current tracker allows public uploads to the `rma-attachments` bucket via `storage.uploadCommentAttachment`. This is a separate concern from CRIT-3 but worth tightening soon:
+Apply via CLI:
 
-**Recommended bucket policy** (apply in Supabase Dashboard → Storage → rma-attachments → Policies):
-
-```sql
--- Block public reads except for a path prefix the Edge Function can sign URLs for.
--- Public can upload (so the tracker can attach files) — but uploads must be small.
-CREATE POLICY "public_upload_small" ON storage.objects
-  FOR INSERT TO anon
-  WITH CHECK (
-    bucket_id = 'rma-attachments'
-    AND (metadata->>'size')::bigint < 25 * 1024 * 1024
-    AND lower(coalesce(metadata->>'mimetype','')) IN (
-      'image/jpeg','image/png','image/gif','image/webp','application/pdf'
-    )
-  );
-
-CREATE POLICY "public_read" ON storage.objects
-  FOR SELECT TO anon
-  USING (bucket_id = 'rma-attachments');
+```powershell
+supabase db push
 ```
 
-Once applied, check the tracker file-upload flow still works end-to-end before marking this done.
+Or paste the file contents into Supabase Dashboard → SQL Editor → Run.
+
+What it does:
+- **`public_upload_small`** — anon can only upload to `rma-attachments` if the file is under 25 MB and is JPEG / PNG / GIF / WebP / PDF
+- **`public_read`** — anon can read from `rma-attachments` (so attachment URLs in the tracker work)
+- **`authenticated_full`** — authenticated staff have full access (covers internal uploads)
+
+**Verify after applying:**
+1. Open `/tracker` in an incognito window
+2. Find a ticket and post a comment with a file attachment
+3. The file should upload and the attachment link should load
+4. Try uploading a `.exe` or a file over 25 MB — should be blocked with a storage error
 
 ---
 
