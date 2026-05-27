@@ -91,13 +91,26 @@ Deno.serve(async (req) => {
   }
 
   const target = users.find(u => u.email === targetEmail)
+
   if (!target) {
-    return new Response(JSON.stringify({ error: `No auth user found for ${targetEmail}` }), {
-      status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    // User doesn't exist in Supabase Auth yet — create them.
+    // This is the adminCreateUser path: brand-new staff accounts are created here.
+    const { error: createError } = await adminClient.auth.admin.createUser({
+      email: targetEmail,
+      password: newPassword,
+      email_confirm: true,  // skip the confirmation email; admin is setting this up
+    })
+    if (createError) {
+      return new Response(JSON.stringify({ error: createError.message }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    return new Response(JSON.stringify({ success: true, created: true }), {
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 
-  // Set the new password via admin API
+  // User exists — update their password (adminSetPassword path).
   const { error: updateError } = await adminClient.auth.admin.updateUserById(target.id, {
     password: newPassword
   })
@@ -107,7 +120,7 @@ Deno.serve(async (req) => {
     })
   }
 
-  return new Response(JSON.stringify({ success: true }), {
+  return new Response(JSON.stringify({ success: true, created: false }), {
     status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   })
 })

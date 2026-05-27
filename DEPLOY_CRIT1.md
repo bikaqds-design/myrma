@@ -102,7 +102,7 @@ If admin operations fail after removing the key:
 3. Investigate why the Edge Function isn't reachable (check Edge Function logs, network tab).
 4. Once fixed, redo Step 4.
 
-The client code in [supabaseClient.js](src/api/supabaseClient.js) no longer reads `VITE_SUPABASE_SERVICE_KEY`, so adding it back won't restore old behavior — you'd also need to revert the commit. That's an intentional safety design.
+The client code no longer reads `VITE_SUPABASE_SERVICE_KEY` anywhere. Auth operations (`adminSetPassword`, `adminCreateUser`) live in [src/api/auth.js](src/api/auth.js) and invoke the Edge Function — adding the env var back won't restore old behavior without reverting the commit. That's an intentional safety design.
 
 ---
 

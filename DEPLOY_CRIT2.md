@@ -126,7 +126,8 @@ If no row exists → add one with the appropriate role.
 If row exists but they still can't see data, run this as super_admin to confirm policies are applied correctly:
 ```sql
 -- Should return their role string
-SELECT auth.user_role();
+-- Note: helper functions are in the PUBLIC schema with rma_ prefix (not auth schema)
+SELECT public.rma_user_role();
 -- (Won't work in SQL Editor since it doesn't have their JWT — use this from the client side via the app instead)
 ```
 
@@ -166,10 +167,11 @@ END $$;
 
 - **Technicians can read all tickets, not just assigned.** The app filters by assigned client-side. To enforce server-side, change `staff_read` on `rma_tickets` to:
   ```sql
+  -- Note: helper functions are public.rma_* (NOT auth.* — those don't exist)
   USING (
-    auth.is_manager_or_above()
-    OR (auth.user_role() = 'technician' AND assigned_technician = auth.current_user_email())
-    OR (auth.user_role() = 'viewer')
+    public.rma_is_manager_or_above()
+    OR (public.rma_user_role() = 'technician' AND assigned_technician = public.rma_current_user_email())
+    OR (public.rma_user_role() = 'viewer')
   )
   ```
   Defer this until you're sure no Dashboard widgets break.

@@ -75,7 +75,9 @@ After 15 requests within a minute, you should see `429 Too many requests`.
 
 ---
 
-## Step 5 — Storage bucket attachments (FOLLOW-UP)
+## Step 5 — Storage bucket attachments (OPEN — not yet applied)
+
+⚠️ **Status: not applied.** `RMATracker.jsx` still uploads directly to Supabase Storage from the browser as the anon role. The `rma-attachments` bucket currently has no size or type restriction on anon uploads.
 
 The current tracker allows public uploads to the `rma-attachments` bucket via `storage.uploadCommentAttachment`. This is a separate concern from CRIT-3 but worth tightening soon:
 
@@ -99,7 +101,7 @@ CREATE POLICY "public_read" ON storage.objects
   USING (bucket_id = 'rma-attachments');
 ```
 
-This is **defer-able** — not a blocker for the audit, but recommended.
+Once applied, check the tracker file-upload flow still works end-to-end before marking this done.
 
 ---
 
