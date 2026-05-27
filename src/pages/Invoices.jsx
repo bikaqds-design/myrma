@@ -5,6 +5,7 @@ import { Button, Spinner, PageHeader } from '../components/ui'
 import EmptyState from '../components/EmptyState'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useAppearance } from '../contexts/AppearanceContext'
+import { ROLES } from '../lib/constants'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -545,12 +546,12 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
   const { formatDate } = useAppearance()
 
   const _canDo = (s, a) =>
-    ['super_admin', 'admin'].includes(currentUserRole) || currentUserPermissions?.[s]?.[a]
+    [ROLES.SUPER_ADMIN, ROLES.ADMIN].includes(currentUserRole) || currentUserPermissions?.[s]?.[a]
 
-  const isAdmin = ['super_admin', 'admin'].includes(currentUserRole)
-  const isManager = currentUserRole === 'manager' || isAdmin
-  const isTech = currentUserRole === 'technician'
-  const isViewer = currentUserRole === 'viewer'
+  const isAdmin = [ROLES.SUPER_ADMIN, ROLES.ADMIN].includes(currentUserRole)
+  const isManager = currentUserRole === ROLES.MANAGER || isAdmin
+  const isTech = currentUserRole === ROLES.TECHNICIAN
+  const isViewer = currentUserRole === ROLES.VIEWER
 
   const [invoices, setInvoices] = useState([])
   const [tickets, setTickets] = useState([])

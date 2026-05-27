@@ -3,6 +3,7 @@ import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { Spinner, PageHeader } from '../components/ui'
 import { useAppearance } from '../contexts/AppearanceContext'
+import { ROLES, INVOICE_STATUS } from '../lib/constants'
 
 // ─── CSV Utility ──────────────────────────────────────────────────────────────
 function downloadCSV(rows, columns, filename) {
@@ -765,10 +766,10 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
 
   const totalInvoiced = invoices.reduce((s, i) => s + (i.total_amount || i.amount || 0), 0)
   const totalPaid = invoices
-    .filter((i) => i.status === 'paid')
+    .filter((i) => i.status === INVOICE_STATUS.PAID)
     .reduce((s, i) => s + (i.total_amount || i.amount || 0), 0)
   const totalPending = invoices
-    .filter((i) => i.status === 'pending' || i.status === 'overdue')
+    .filter((i) => i.status === INVOICE_STATUS.PENDING || i.status === INVOICE_STATUS.OVERDUE)
     .reduce((s, i) => s + (i.total_amount || i.amount || 0), 0)
   const quotesVal = invoices
     .filter((i) => i.type === 'quote' || i.invoice_type === 'quote')
@@ -923,16 +924,16 @@ export default function Reports({
   const { formatDate: _formatDate2, formatDateTime: _formatDateTime } = useAppearance()
 
   const _canDo = (action) => {
-    if (currentUserRole === 'super_admin' || currentUserRole === 'admin') return true
+    if (currentUserRole === ROLES.SUPER_ADMIN || currentUserRole === ROLES.ADMIN) return true
     return currentUserPermissions?.reports?.[action] === true
   }
 
   const isAdminOrManager =
-    currentUserRole === 'super_admin' ||
-    currentUserRole === 'admin' ||
-    currentUserRole === 'manager'
-  const _isViewer = currentUserRole === 'viewer'
-  const _isTechnician = currentUserRole === 'technician'
+    currentUserRole === ROLES.SUPER_ADMIN ||
+    currentUserRole === ROLES.ADMIN ||
+    currentUserRole === ROLES.MANAGER
+  const _isViewer = currentUserRole === ROLES.VIEWER
+  const _isTechnician = currentUserRole === ROLES.TECHNICIAN
 
   // Date range state
   const today = toYMD(new Date())

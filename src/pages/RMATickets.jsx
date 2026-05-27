@@ -9,6 +9,7 @@ import { PageSkeleton } from '../components/Skeleton'
 import { Button, Spinner, PageHeader } from '../components/ui'
 import EmptyState from '../components/EmptyState'
 import Modal from '../components/Modal'
+import { ROLES } from '../lib/constants'
 
 const generateRmaNumber = (existingTickets = []) => {
   const now = new Date()
@@ -309,7 +310,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   }, [queryClient])
 
   const canDo = (action) => {
-    if (userRole === 'admin' || userRole === 'super_admin') return true
+    if (userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN) return true
     return userPermissions?.rma_tickets?.[action] === true
   }
 
@@ -2282,7 +2283,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   </div>
                   <div>
                     <label className={lbl}>Assigned To</label>
-                    {userRole === 'admin' || userRole === 'super_admin' ? (
+                    {userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN ? (
                       <select
                         value={formData.assigned_technician}
                         onChange={(e) =>
@@ -3121,8 +3122,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                                 ? new Date(entry.created_date).toLocaleDateString()
                                 : '—'}
                             </span>
-                            {(userRole === 'admin' ||
-                              userRole === 'super_admin' ||
+                            {(userRole === ROLES.ADMIN ||
+                              userRole === ROLES.SUPER_ADMIN ||
                               entry.user_email === userEmail) && (
                               <button
                                 onClick={async () => {
@@ -3379,7 +3380,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                                   Reply{replies.length > 0 ? ` (${replies.length})` : ''}
                                 </button>
                               </div>
-                              {(userRole === 'admin' || userRole === 'super_admin') && (
+                              {(userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN) && (
                                 <button
                                   onClick={() => handleDeleteComment(comment.id)}
                                   className="text-gray-300 hover:text-red-500 flex-shrink-0 self-start p-1 transition-colors"
@@ -3477,7 +3478,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                                           </div>
                                         )}
                                       </div>
-                                      {(userRole === 'admin' || userRole === 'super_admin') && (
+                                      {(userRole === ROLES.ADMIN ||
+                                        userRole === ROLES.SUPER_ADMIN) && (
                                         <button
                                           onClick={() => handleDeleteComment(reply.id)}
                                           className="text-gray-300 hover:text-red-500 flex-shrink-0 self-start p-1 transition-colors"

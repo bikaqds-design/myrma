@@ -8,6 +8,7 @@ import AttachmentsField from '../components/AttachmentsField'
 import { Button, PageHeader } from '../components/ui'
 import EmptyState from '../components/EmptyState'
 import { customerSchema, getFirstError } from '../lib/schemas'
+import { ROLES } from '../lib/constants'
 
 const EMPTY_FORM = {
   customer_type: 'B2B',
@@ -100,7 +101,7 @@ export default function Customers({
   const closeConfirm = () => setConfirmDialog((d) => ({ ...d, open: false }))
 
   const canDo = (action) => {
-    if (currentUserRole === 'super_admin' || currentUserRole === 'admin') return true
+    if (currentUserRole === ROLES.SUPER_ADMIN || currentUserRole === ROLES.ADMIN) return true
     return currentUserPermissions?.customers?.[action] === true
   }
 

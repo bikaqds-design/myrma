@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { StatCardSkeleton, CardSkeleton } from '../components/Skeleton'
 import { Spinner, PageHeader } from '../components/ui'
+import { ROLES, BATCH_STATUS } from '../lib/constants'
 // xlsx and jspdf are loaded on-demand (A-7: lazy heavy deps)
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -1189,7 +1190,7 @@ function ProductStatusTab({
 // ─── Main Inventory Component ──────────────────────────────────────────────────
 export default function Inventory({ userRole, userEmail, userPermissions, onNavigateToTicket }) {
   const canDo = (a) =>
-    userRole === 'admin' || userRole === 'super_admin'
+    userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN
       ? true
       : userPermissions?.inventory?.[a] === true
 
@@ -4161,9 +4162,9 @@ function ManufacturerTab({
     const bb = getBrandBatches(name)
     return {
       total: bb.length,
-      draft: bb.filter((b) => b.status === 'draft').length,
-      sent: bb.filter((b) => b.status === 'sent').length,
-      resolved: bb.filter((b) => b.status === 'resolved').length,
+      draft: bb.filter((b) => b.status === BATCH_STATUS.DRAFT).length,
+      sent: bb.filter((b) => b.status === BATCH_STATUS.SENT).length,
+      resolved: bb.filter((b) => b.status === BATCH_STATUS.RESOLVED).length,
       units: bb.reduce((s, b) => s + (getBatchUnits(b.id).length || b.unit_count || 0), 0),
     }
   }

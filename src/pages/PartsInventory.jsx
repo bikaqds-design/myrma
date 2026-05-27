@@ -5,6 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { Button, Spinner, PageHeader } from '../components/ui'
 import { useAppearance } from '../contexts/AppearanceContext'
 import EmptyState from '../components/EmptyState'
+import { ROLES } from '../lib/constants'
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
 function downloadCSV(rows, columns, filename) {
@@ -300,13 +301,13 @@ export default function PartsInventory({
   const { formatDate: _formatDate } = useAppearance()
 
   const canDo = (action) => {
-    if (currentUserRole === 'super_admin' || currentUserRole === 'admin') return true
+    if (currentUserRole === ROLES.SUPER_ADMIN || currentUserRole === ROLES.ADMIN) return true
     return currentUserPermissions?.parts?.[action] === true
   }
-  const canAdd = canDo('create') || currentUserRole === 'manager'
-  const canEdit = canDo('edit') || currentUserRole === 'manager'
-  const canDelete = currentUserRole === 'super_admin' || currentUserRole === 'admin'
-  const canAdjust = canAdd || currentUserRole === 'technician' || canDo('adjust_stock')
+  const canAdd = canDo('create') || currentUserRole === ROLES.MANAGER
+  const canEdit = canDo('edit') || currentUserRole === ROLES.MANAGER
+  const canDelete = currentUserRole === ROLES.SUPER_ADMIN || currentUserRole === ROLES.ADMIN
+  const canAdjust = canAdd || currentUserRole === ROLES.TECHNICIAN || canDo('adjust_stock')
   const canExport = canAdd || canDo('export')
 
   const [parts, setParts] = useState([])

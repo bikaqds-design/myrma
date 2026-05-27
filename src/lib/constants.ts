@@ -182,11 +182,13 @@ export const CUSTOMER_STATUS = {
   VIP: 'vip',
 } as const
 
-// ── Product statuses ─────────────────────────────────────────────────────────
-export const PRODUCT_STATUS = {
-  ACTIVE: 'active',
-  INACTIVE: 'inactive',
-  DISCONTINUED: 'discontinued',
+// ── Invoice statuses ─────────────────────────────────────────────────────────
+export const INVOICE_STATUS = {
+  DRAFT: 'draft',
+  SENT: 'sent',
+  PAID: 'paid',
+  PENDING: 'pending',
+  OVERDUE: 'overdue',
 } as const
 
 // ── LocalStorage keys ────────────────────────────────────────────────────────

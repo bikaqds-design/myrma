@@ -4,6 +4,7 @@ import { WIDGET_CATALOG } from './Dashboard'
 import toast from 'react-hot-toast'
 import { Spinner, PageHeader } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
+import { ROLES } from '../lib/constants'
 
 function EyeIcon({ visible }) {
   return visible ? (
@@ -157,7 +158,7 @@ const SYSTEM_NOTIF_CATEGORIES = [
 ]
 
 export default function AccountSettings({ currentUser, currentUserRole, onProfileUpdate }) {
-  const isAdmin = currentUserRole === 'admin' || currentUserRole === 'super_admin'
+  const isAdmin = currentUserRole === ROLES.ADMIN || currentUserRole === ROLES.SUPER_ADMIN
   const tabs = [
     'Profile',
     'Security',

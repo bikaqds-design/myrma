@@ -7,6 +7,7 @@ import { Button, PageHeader } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
 import EmptyState from '../components/EmptyState'
 import Modal from '../components/Modal'
+import { ROLES } from '../lib/constants'
 
 export default function Products({
   currentUserRole,
@@ -98,7 +99,7 @@ export default function Products({
   const [logoPreview, setLogoPreview] = useState(null)
 
   const canDo = (action) => {
-    if (currentUserRole === 'super_admin' || currentUserRole === 'admin') return true
+    if (currentUserRole === ROLES.SUPER_ADMIN || currentUserRole === ROLES.ADMIN) return true
     return currentUserPermissions?.products?.[action] === true
   }
 

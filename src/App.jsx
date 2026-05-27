@@ -4,6 +4,7 @@ import { Toaster, toast } from 'react-hot-toast'
 import { auth, db, branding as brandingAPI, supabase } from './api/supabaseClient'
 import { useAppearance } from './contexts/AppearanceContext'
 import { ROLE_DEFAULT_PERMISSIONS } from './lib/permissions'
+import { ROLES } from './lib/constants'
 import CommandPalette from './components/CommandPalette'
 import NotificationBell from './components/NotificationBell'
 import { Spinner } from './components/ui'
@@ -721,7 +722,7 @@ export default function App() {
             )}
           </a>
 
-          {(currentUserRole === 'admin' || currentUserRole === 'super_admin') && (
+          {(currentUserRole === ROLES.ADMIN || currentUserRole === ROLES.SUPER_ADMIN) && (
             <>
               <div className="pt-2 border-t border-gray-700/60 my-1" />
               <button
@@ -1028,10 +1029,14 @@ export default function App() {
               <Route
                 path="/control-panel"
                 element={
-                  <ControlPanel
-                    currentUserRole={currentUserRole}
-                    currentUserEmail={currentUser?.email}
-                  />
+                  currentUserRole === ROLES.ADMIN || currentUserRole === ROLES.SUPER_ADMIN ? (
+                    <ControlPanel
+                      currentUserRole={currentUserRole}
+                      currentUserEmail={currentUser?.email}
+                    />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
                 }
               />
 

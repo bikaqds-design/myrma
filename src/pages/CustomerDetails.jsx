@@ -6,6 +6,7 @@ import { CardSkeleton } from '../components/Skeleton'
 import AttachmentsField from '../components/AttachmentsField'
 import { Button, Spinner } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
+import { ROLES } from '../lib/constants'
 
 export default function CustomerDetails({
   customerId,
@@ -28,11 +29,11 @@ export default function CustomerDetails({
   const [editNoteText, setEditNoteText] = useState('')
   const [savingNote, setSavingNote] = useState(false)
 
-  const isSuperAdmin = currentUserRole === 'super_admin'
+  const isSuperAdmin = currentUserRole === ROLES.SUPER_ADMIN
   const canDo = (action) => {
     if (isSuperAdmin) return true
     if (currentUserPermissions?.customers?.[action] === true) return true
-    if (currentUserRole === 'admin') return true
+    if (currentUserRole === ROLES.ADMIN) return true
     return false
   }
 

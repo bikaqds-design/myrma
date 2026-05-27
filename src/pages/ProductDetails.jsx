@@ -5,6 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { CardSkeleton } from '../components/Skeleton'
 import { Button } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
+import { ROLES } from '../lib/constants'
 
 export default function ProductDetails({
   productId,
@@ -222,11 +223,11 @@ export default function ProductDetails({
   const filteredCategories = categories.filter((c) => c.brand_id === editForm.brand_id)
   const filteredSubcategories = subcategories.filter((s) => s.category_id === editForm.category_id)
 
-  const isSuperAdmin = currentUserRole === 'super_admin'
+  const isSuperAdmin = currentUserRole === ROLES.SUPER_ADMIN
   const canDo = (action) => {
     if (isSuperAdmin) return true
     if (currentUserPermissions?.products?.[action] === true) return true
-    if (currentUserRole === 'admin') return true
+    if (currentUserRole === ROLES.ADMIN) return true
     return false
   }
 

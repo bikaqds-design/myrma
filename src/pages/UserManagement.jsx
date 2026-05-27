@@ -5,6 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import Modal from '../components/Modal'
 import { Spinner } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
+import { ROLES } from '../lib/constants'
 
 function validatePasswordStrength(pw) {
   if (!pw || pw.length < 8) return 'Password must be at least 8 characters'
@@ -421,7 +422,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
 
   const handleResetPassword = async () => {
     try {
-      if (currentUserRole === 'super_admin') {
+      if (currentUserRole === ROLES.SUPER_ADMIN) {
         // Direct password set via Edge Function (super_admin only)
         if (resetPassword.length < 6) {
           toast.error('Password must be at least 6 characters')
@@ -654,7 +655,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       {showPasswordModal && selectedUser && (
         <PasswordResetModal
           user={selectedUser}
-          isSuperAdmin={currentUserRole === 'super_admin'}
+          isSuperAdmin={currentUserRole === ROLES.SUPER_ADMIN}
           password={resetPassword}
           onPasswordChange={setResetPassword}
           onSubmit={handleResetPassword}
@@ -689,7 +690,7 @@ function UsersTab({
   openMenuId,
   setOpenMenuId,
 }) {
-  const isSuperAdmin = currentUserRole === 'super_admin'
+  const isSuperAdmin = currentUserRole === ROLES.SUPER_ADMIN
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
@@ -1291,7 +1292,7 @@ function RoleTemplatesTab({ currentUserRole, currentUserEmail }) {
   const [editingRole, setEditingRole] = useState(null)
   const [editPerms, setEditPerms] = useState(null)
   const [saving, setSaving] = useState(false)
-  const isSuperAdmin = currentUserRole === 'super_admin'
+  const isSuperAdmin = currentUserRole === ROLES.SUPER_ADMIN
 
   useEffect(() => {
     loadTemplates()
