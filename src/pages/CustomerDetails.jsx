@@ -7,7 +7,14 @@ import AttachmentsField from '../components/AttachmentsField'
 import { Button, Spinner } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
 
-export default function CustomerDetails({ customerId, currentUserRole, currentUserEmail, currentUserPermissions, onBack, onNavigateToTicket }) {
+export default function CustomerDetails({
+  customerId,
+  currentUserRole,
+  currentUserEmail,
+  currentUserPermissions,
+  onBack,
+  onNavigateToTicket,
+}) {
   const [customer, setCustomer] = useState(null)
   const [tickets, setTickets] = useState([])
   const [notes, setNotes] = useState([])
@@ -29,11 +36,20 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
     return false
   }
 
-  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null })
-  const openConfirm = (title, message, onConfirm) => setConfirmDialog({ open: true, title, message, onConfirm })
-  const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false }))
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+  })
+  const openConfirm = (title, message, onConfirm) =>
+    setConfirmDialog({ open: true, title, message, onConfirm })
+  const closeConfirm = () => setConfirmDialog((d) => ({ ...d, open: false }))
 
-  useEffect(() => { loadAll() }, [customerId])
+  useEffect(() => {
+    loadAll()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerId])
 
   const loadAll = async () => {
     setLoading(true)
@@ -41,7 +57,7 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
       const [customerData, ticketsData, notesData] = await Promise.all([
         db.customers.get(customerId),
         db.customers.getRelatedTickets(customerId),
-        db.customerNotes.list(customerId)
+        db.customerNotes.list(customerId),
       ])
       setCustomer(customerData)
       setEditForm(customerData)
@@ -96,14 +112,20 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
         notes: editForm.notes || null,
         attachments: allAttachments,
         updated_by: currentUserEmail,
-        updated_date: new Date().toISOString()
+        updated_date: new Date().toISOString(),
       })
       setCustomer(updated)
       setEditForm(updated)
       setPendingFiles([])
       setIsEditing(false)
       toast.success('Customer updated successfully')
-      db.auditLog.log(currentUserEmail, 'customer_updated', `Updated customer ${editForm.contact_person}${editForm.company_name ? ` (${editForm.company_name})` : ''}`).catch(err => console.error('audit log failed:', err))
+      db.auditLog
+        .log(
+          currentUserEmail,
+          'customer_updated',
+          `Updated customer ${editForm.contact_person}${editForm.company_name ? ` (${editForm.company_name})` : ''}`
+        )
+        .catch((err) => console.error('audit log failed:', err))
     } catch (error) {
       toast.error(`Failed to update: ${error.message}`)
     }
@@ -118,9 +140,15 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
         try {
           await db.customers.delete(customerId)
           toast.success('Customer deleted')
-          db.auditLog.log(currentUserEmail, 'customer_deleted', `Deleted customer ${customer.contact_person}${customer.company_name ? ` (${customer.company_name})` : ''}`).catch(err => console.error('audit log failed:', err))
+          db.auditLog
+            .log(
+              currentUserEmail,
+              'customer_deleted',
+              `Deleted customer ${customer.contact_person}${customer.company_name ? ` (${customer.company_name})` : ''}`
+            )
+            .catch((err) => console.error('audit log failed:', err))
           onBack()
-        } catch (error) {
+        } catch {
           toast.error('Failed to delete customer')
         }
       }
@@ -136,13 +164,19 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
         note: newNote.trim(),
         created_by: currentUserEmail,
         created_date: new Date().toISOString(),
-        updated_date: new Date().toISOString()
+        updated_date: new Date().toISOString(),
       })
-      setNotes(prev => [created, ...prev])
+      setNotes((prev) => [created, ...prev])
       setNewNote('')
       toast.success('Note added')
-      db.auditLog.log(currentUserEmail, 'customer_note_added', `Added note on customer ${customer?.contact_person}`).catch(err => console.error('audit log failed:', err))
-    } catch (error) {
+      db.auditLog
+        .log(
+          currentUserEmail,
+          'customer_note_added',
+          `Added note on customer ${customer?.contact_person}`
+        )
+        .catch((err) => console.error('audit log failed:', err))
+    } catch {
       toast.error('Failed to add note')
     } finally {
       setSavingNote(false)
@@ -154,40 +188,46 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
     try {
       const updated = await db.customerNotes.update(noteId, {
         note: editNoteText.trim(),
-        updated_date: new Date().toISOString()
+        updated_date: new Date().toISOString(),
       })
-      setNotes(prev => prev.map(n => n.id === noteId ? updated : n))
+      setNotes((prev) => prev.map((n) => (n.id === noteId ? updated : n)))
       setEditingNote(null)
       setEditNoteText('')
       toast.success('Note updated')
-      db.auditLog.log(currentUserEmail, 'customer_note_updated', `Updated note ${noteId} on customer ${customer?.contact_person}`).catch(err => console.error('audit log failed:', err))
-    } catch (error) {
+      db.auditLog
+        .log(
+          currentUserEmail,
+          'customer_note_updated',
+          `Updated note ${noteId} on customer ${customer?.contact_person}`
+        )
+        .catch((err) => console.error('audit log failed:', err))
+    } catch {
       toast.error('Failed to update note')
     }
   }
 
   const handleDeleteNote = (noteId) => {
-    openConfirm(
-      'Delete Note',
-      'Delete this note? This cannot be undone.',
-      async () => {
-        closeConfirm()
-        try {
-          await db.customerNotes.delete(noteId)
-          setNotes(prev => prev.filter(n => n.id !== noteId))
-          toast.success('Note deleted')
-          db.auditLog.log(currentUserEmail, 'customer_note_deleted', `Deleted note ${noteId} on customer ${customer?.contact_person}`).catch(err => console.error('audit log failed:', err))
-        } catch (error) {
-          toast.error('Failed to delete note')
-        }
+    openConfirm('Delete Note', 'Delete this note? This cannot be undone.', async () => {
+      closeConfirm()
+      try {
+        await db.customerNotes.delete(noteId)
+        setNotes((prev) => prev.filter((n) => n.id !== noteId))
+        toast.success('Note deleted')
+        db.auditLog
+          .log(
+            currentUserEmail,
+            'customer_note_deleted',
+            `Deleted note ${noteId} on customer ${customer?.contact_person}`
+          )
+          .catch((err) => console.error('audit log failed:', err))
+      } catch {
+        toast.error('Failed to delete note')
       }
-    )
+    })
   }
 
   const getStatusBadge = (status) => {
-    const style = status === 'Active'
-      ? 'bg-green-100 text-green-800'
-      : 'bg-gray-100 text-gray-800'
+    const style = status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
     return (
       <span className={`px-3 py-1 text-sm rounded-full font-medium ${style}`}>
         {status || 'Unknown'}
@@ -196,9 +236,7 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
   }
 
   const getTypeBadge = (type) => {
-    const style = type === 'B2B'
-      ? 'bg-blue-100 text-blue-800'
-      : 'bg-emerald-100 text-emerald-800'
+    const style = type === 'B2B' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
     return (
       <span className={`px-2 py-1 text-xs rounded-full font-medium ${style}`}>
         {type === 'B2B' ? '🏢 B2B' : '👤 B2C'}
@@ -208,14 +246,16 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
 
   const getTicketStatusBadge = (status) => {
     const styles = {
-      'New': 'bg-blue-100 text-blue-800',
+      New: 'bg-blue-100 text-blue-800',
       'In Progress': 'bg-yellow-100 text-yellow-800',
       'On Hold': 'bg-orange-100 text-orange-800',
-      'Completed': 'bg-green-100 text-green-800',
-      'Cancelled': 'bg-gray-100 text-gray-800'
+      Completed: 'bg-green-100 text-green-800',
+      Cancelled: 'bg-gray-100 text-gray-800',
     }
     return (
-      <span className={`px-2 py-1 text-xs rounded-full font-medium ${styles[status] || 'bg-gray-100 text-gray-800'}`}>
+      <span
+        className={`px-2 py-1 text-xs rounded-full font-medium ${styles[status] || 'bg-gray-100 text-gray-800'}`}
+      >
         {status || 'Unknown'}
       </span>
     )
@@ -223,18 +263,26 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '—'
-    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
   }
 
   const formatDateTime = (dateStr) => {
     if (!dateStr) return '—'
     return new Date(dateStr).toLocaleString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit'
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     })
   }
 
-  const inputClass = 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent'
+  const inputClass =
+    'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent'
   const labelClass = 'block text-sm font-medium text-gray-700 mb-1'
 
   if (loading) {
@@ -251,24 +299,34 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
     return (
       <div className="text-center py-12">
         <p className="text-gray-500">Customer not found.</p>
-        <Button className="mt-4" onClick={onBack}>Go Back</Button>
+        <Button className="mt-4" onClick={onBack}>
+          Go Back
+        </Button>
       </div>
     )
   }
 
-  const displayName = customer.customer_type === 'B2B' && customer.company_name
-    ? customer.company_name
-    : customer.contact_person
+  const displayName =
+    customer.customer_type === 'B2B' && customer.company_name
+      ? customer.company_name
+      : customer.contact_person
 
   return (
     <div className="space-y-6">
-
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
             Back to Customers
           </button>
@@ -296,15 +354,31 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
 
         {canDo('edit') && !isEditing && (
           <div className="flex items-center gap-2">
-            <Button onClick={() => { setIsEditing(true); setEditForm(customer); setPendingFiles([]) }}>
+            <Button
+              onClick={() => {
+                setIsEditing(true)
+                setEditForm(customer)
+                setPendingFiles([])
+              }}
+            >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                />
               </svg>
               Edit
             </Button>
             <Button variant="danger" onClick={handleDelete}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
               </svg>
               Delete
             </Button>
@@ -313,10 +387,19 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
 
         {isEditing && (
           <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={() => { setIsEditing(false); setEditForm(customer); setPendingFiles([]) }}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsEditing(false)
+                setEditForm(customer)
+                setPendingFiles([])
+              }}
+            >
               Cancel
             </Button>
-            <Button variant="success" onClick={handleSaveEdit}>Save Changes</Button>
+            <Button variant="success" onClick={handleSaveEdit}>
+              Save Changes
+            </Button>
           </div>
         )}
       </div>
@@ -324,11 +407,36 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total RMAs', value: tickets.length, icon: '🎫', color: 'bg-blue-50 text-blue-700' },
-          { label: 'Open Tickets', value: tickets.filter(t => t.ticket_status === 'New' || t.ticket_status === 'In Progress' || t.ticket_status === 'On Hold').length, icon: '🔓', color: 'bg-yellow-50 text-yellow-700' },
-          { label: 'Notes', value: notes.length, icon: '📝', color: 'bg-purple-50 text-purple-700' },
-          { label: 'Customer Since', value: formatDate(customer.created_date), icon: '📅', color: 'bg-green-50 text-green-700' }
-        ].map(stat => (
+          {
+            label: 'Total RMAs',
+            value: tickets.length,
+            icon: '🎫',
+            color: 'bg-blue-50 text-blue-700',
+          },
+          {
+            label: 'Open Tickets',
+            value: tickets.filter(
+              (t) =>
+                t.ticket_status === 'New' ||
+                t.ticket_status === 'In Progress' ||
+                t.ticket_status === 'On Hold'
+            ).length,
+            icon: '🔓',
+            color: 'bg-yellow-50 text-yellow-700',
+          },
+          {
+            label: 'Notes',
+            value: notes.length,
+            icon: '📝',
+            color: 'bg-purple-50 text-purple-700',
+          },
+          {
+            label: 'Customer Since',
+            value: formatDate(customer.created_date),
+            icon: '📅',
+            color: 'bg-green-50 text-green-700',
+          },
+        ].map((stat) => (
           <div key={stat.label} className={`rounded-xl p-4 ${stat.color}`}>
             <div className="text-2xl mb-1">{stat.icon}</div>
             <div className="text-xl font-bold">{stat.value}</div>
@@ -345,8 +453,8 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
               { key: 'profile', label: 'Profile', icon: '👤' },
               { key: 'rma', label: `RMA History (${tickets.length})`, icon: '🎫' },
               { key: 'notes', label: `Notes (${notes.length})`, icon: '📝' },
-              { key: 'activity', label: 'Activity Log', icon: '📋' }
-            ].map(tab => (
+              { key: 'activity', label: 'Activity Log', icon: '📋' },
+            ].map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
@@ -364,7 +472,6 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
         </div>
 
         <div className="p-6">
-
           {/* ==================== PROFILE TAB ==================== */}
           {activeTab === 'profile' && (
             <div className="space-y-8">
@@ -372,13 +479,19 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                 <div className="space-y-6">
                   {/* Customer Type + Status */}
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Customer Type & Status</h3>
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
+                      Customer Type & Status
+                    </h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className={labelClass}>Customer Type <span className="text-red-500">*</span></label>
+                        <label className={labelClass}>
+                          Customer Type <span className="text-red-500">*</span>
+                        </label>
                         <select
                           value={editForm.customer_type || 'B2B'}
-                          onChange={(e) => setEditForm({ ...editForm, customer_type: e.target.value })}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, customer_type: e.target.value })
+                          }
                           className={inputClass}
                         >
                           <option value="B2B">B2B — Business</option>
@@ -386,10 +499,14 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                         </select>
                       </div>
                       <div>
-                        <label className={labelClass}>Status <span className="text-red-500">*</span></label>
+                        <label className={labelClass}>
+                          Status <span className="text-red-500">*</span>
+                        </label>
                         <select
                           value={editForm.customer_status || 'Active'}
-                          onChange={(e) => setEditForm({ ...editForm, customer_status: e.target.value })}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, customer_status: e.target.value })
+                          }
                           className={inputClass}
                         >
                           <option value="Active">Active</option>
@@ -402,14 +519,20 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                   {/* B2B fields */}
                   {editForm.customer_type === 'B2B' && (
                     <div>
-                      <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Company Information</h3>
+                      <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
+                        Company Information
+                      </h3>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className={labelClass}>Company Name <span className="text-red-500">*</span></label>
+                          <label className={labelClass}>
+                            Company Name <span className="text-red-500">*</span>
+                          </label>
                           <input
                             type="text"
                             value={editForm.company_name || ''}
-                            onChange={(e) => setEditForm({ ...editForm, company_name: e.target.value })}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, company_name: e.target.value })
+                            }
                             className={inputClass}
                           />
                         </div>
@@ -418,7 +541,9 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                           <input
                             type="text"
                             value={editForm.cr_number || ''}
-                            onChange={(e) => setEditForm({ ...editForm, cr_number: e.target.value })}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, cr_number: e.target.value })
+                            }
                             className={inputClass}
                           />
                         </div>
@@ -437,19 +562,27 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
 
                   {/* Contact */}
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Contact Information</h3>
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
+                      Contact Information
+                    </h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className={labelClass}>Contact Person <span className="text-red-500">*</span></label>
+                        <label className={labelClass}>
+                          Contact Person <span className="text-red-500">*</span>
+                        </label>
                         <input
                           type="text"
                           value={editForm.contact_person || ''}
-                          onChange={(e) => setEditForm({ ...editForm, contact_person: e.target.value })}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, contact_person: e.target.value })
+                          }
                           className={inputClass}
                         />
                       </div>
                       <div>
-                        <label className={labelClass}>Mobile <span className="text-red-500">*</span></label>
+                        <label className={labelClass}>
+                          Mobile <span className="text-red-500">*</span>
+                        </label>
                         <input
                           type="tel"
                           value={editForm.mobile || ''}
@@ -480,7 +613,9 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                         <input
                           type="text"
                           value={editForm.account_manager || ''}
-                          onChange={(e) => setEditForm({ ...editForm, account_manager: e.target.value })}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, account_manager: e.target.value })
+                          }
                           className={inputClass}
                         />
                       </div>
@@ -489,7 +624,9 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
 
                   {/* Address */}
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Address</h3>
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
+                      Address
+                    </h3>
                     <textarea
                       value={editForm.address || ''}
                       onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
@@ -501,7 +638,9 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
 
                   {/* Notes */}
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Internal Notes</h3>
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
+                      Internal Notes
+                    </h3>
                     <textarea
                       value={editForm.notes || ''}
                       onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
@@ -513,7 +652,9 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
 
                   {/* Attachments */}
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Attachments</h3>
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
+                      Attachments
+                    </h3>
                     <AttachmentsField
                       savedAttachments={editForm.attachments || []}
                       onSavedChange={(val) => setEditForm({ ...editForm, attachments: val })}
@@ -528,30 +669,63 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                   {/* Left Column */}
                   <div className="space-y-6">
                     <div>
-                      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Contact Information</h3>
+                      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                        Contact Information
+                      </h3>
                       <div className="space-y-3">
-                        <DetailRow icon="👤" label="Contact Person" value={customer.contact_person} />
+                        <DetailRow
+                          icon="👤"
+                          label="Contact Person"
+                          value={customer.contact_person}
+                        />
                         <DetailRow icon="📱" label="Mobile" value={customer.mobile} />
                         <DetailRow icon="📞" label="Landline" value={customer.landline} />
-                        <DetailRow icon="✉️" label="Email" value={
-                          customer.email
-                            ? <a href={`mailto:${customer.email}`} className="text-indigo-600 hover:underline">{customer.email}</a>
-                            : null
-                        } />
-                        <DetailRow icon="👔" label="Account Manager" value={customer.account_manager} />
+                        <DetailRow
+                          icon="✉️"
+                          label="Email"
+                          value={
+                            customer.email ? (
+                              <a
+                                href={`mailto:${customer.email}`}
+                                className="text-indigo-600 hover:underline"
+                              >
+                                {customer.email}
+                              </a>
+                            ) : null
+                          }
+                        />
+                        <DetailRow
+                          icon="👔"
+                          label="Account Manager"
+                          value={customer.account_manager}
+                        />
                       </div>
                     </div>
 
                     <div>
-                      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">System Info</h3>
+                      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                        System Info
+                      </h3>
                       <div className="space-y-3">
-                        <DetailRow icon="🔢" label="Customer Code" value={
-                          customer.customer_code
-                            ? <span className="font-mono text-sm">{customer.customer_code}</span>
-                            : null
-                        } />
-                        <DetailRow icon="📅" label="Customer Since" value={formatDate(customer.created_date)} />
-                        <DetailRow icon="🔄" label="Last Updated" value={formatDateTime(customer.updated_date)} />
+                        <DetailRow
+                          icon="🔢"
+                          label="Customer Code"
+                          value={
+                            customer.customer_code ? (
+                              <span className="font-mono text-sm">{customer.customer_code}</span>
+                            ) : null
+                          }
+                        />
+                        <DetailRow
+                          icon="📅"
+                          label="Customer Since"
+                          value={formatDate(customer.created_date)}
+                        />
+                        <DetailRow
+                          icon="🔄"
+                          label="Last Updated"
+                          value={formatDateTime(customer.updated_date)}
+                        />
                         <DetailRow icon="👤" label="Created By" value={customer.created_by} />
                       </div>
                     </div>
@@ -561,7 +735,9 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                   <div className="space-y-6">
                     {customer.customer_type === 'B2B' && (
                       <div>
-                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Company Information</h3>
+                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                          Company Information
+                        </h3>
                         <div className="space-y-3">
                           <DetailRow icon="🏢" label="Company Name" value={customer.company_name} />
                           <DetailRow icon="📄" label="CR Number" value={customer.cr_number} />
@@ -571,7 +747,9 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                     )}
 
                     <div>
-                      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Address</h3>
+                      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                        Address
+                      </h3>
                       {customer.address ? (
                         <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap">
                           {customer.address}
@@ -583,7 +761,9 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
 
                     {customer.notes && (
                       <div>
-                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Internal Notes</h3>
+                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                          Internal Notes
+                        </h3>
                         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap">
                           {customer.notes}
                         </div>
@@ -592,7 +772,9 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
 
                     {(customer.attachments || []).length > 0 && (
                       <div>
-                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Attachments</h3>
+                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                          Attachments
+                        </h3>
                         <div className="space-y-2">
                           {customer.attachments.map((att, i) => (
                             <a
@@ -602,13 +784,39 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                               rel="noopener noreferrer"
                               className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-indigo-50 hover:border-indigo-300 transition-colors group"
                             >
-                              <svg className="w-5 h-5 text-gray-500 group-hover:text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                              <svg
+                                className="w-5 h-5 text-gray-500 group-hover:text-indigo-500 flex-shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                                />
                               </svg>
-                              <span className="text-sm text-gray-700 group-hover:text-indigo-700 flex-1 truncate">{att.name}</span>
-                              {att.size && <span className="text-xs text-gray-500 flex-shrink-0">{(att.size / 1024).toFixed(0)} KB</span>}
-                              <svg className="w-4 h-4 text-gray-300 group-hover:text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              <span className="text-sm text-gray-700 group-hover:text-indigo-700 flex-1 truncate">
+                                {att.name}
+                              </span>
+                              {att.size && (
+                                <span className="text-xs text-gray-500 flex-shrink-0">
+                                  {(att.size / 1024).toFixed(0)} KB
+                                </span>
+                              )}
+                              <svg
+                                className="w-4 h-4 text-gray-300 group-hover:text-indigo-400 flex-shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                                />
                               </svg>
                             </a>
                           ))}
@@ -635,37 +843,61 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                   <table className="w-full">
                     <thead className="bg-gray-50 border-y border-gray-200">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">RMA Number</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Issue</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          RMA Number
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Priority
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Issue
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Created
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Action
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {tickets.map(ticket => (
+                      {tickets.map((ticket) => (
                         <tr key={ticket.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3">
                             <span className="font-mono text-sm font-medium text-indigo-600">
                               {ticket.rma_number || ticket.id?.slice(0, 8)}
                             </span>
                           </td>
-                          <td className="px-4 py-3">{getTicketStatusBadge(ticket.ticket_status)}</td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 text-xs rounded-full font-medium ${
-                              ticket.priority === 'High' ? 'bg-red-100 text-red-800' :
-                              ticket.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                              ticket.priority === 'Critical' ? 'bg-red-200 text-red-900' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
+                            {getTicketStatusBadge(ticket.ticket_status)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`px-2 py-1 text-xs rounded-full font-medium ${
+                                ticket.priority === 'High'
+                                  ? 'bg-red-100 text-red-800'
+                                  : ticket.priority === 'Medium'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : ticket.priority === 'Critical'
+                                      ? 'bg-red-200 text-red-900'
+                                      : 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
                               {ticket.priority || 'Low'}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate" title={ticket.general_description || ''}>
+                          <td
+                            className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate"
+                            title={ticket.general_description || ''}
+                          >
                             {ticket.general_description || '—'}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-500">{formatDate(ticket.created_date)}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">
+                            {formatDate(ticket.created_date)}
+                          </td>
                           <td className="px-4 py-3">
                             <button
                               onClick={() => onNavigateToTicket(ticket.id)}
@@ -701,10 +933,23 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                     disabled={!newNote.trim() || savingNote}
                     className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
                   >
-                    {savingNote
-                      ? <Spinner size="sm" color="white" />
-                      : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                    }
+                    {savingNote ? (
+                      <Spinner size="sm" color="white" />
+                    ) : (
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                        />
+                      </svg>
+                    )}
                     Add Note
                   </button>
                 </div>
@@ -717,7 +962,7 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {notes.map(note => (
+                  {notes.map((note) => (
                     <div key={note.id} className="bg-white border border-gray-200 rounded-lg p-4">
                       {editingNote === note.id ? (
                         <div className="space-y-3">
@@ -729,7 +974,10 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                           />
                           <div className="flex gap-2 justify-end">
                             <button
-                              onClick={() => { setEditingNote(null); setEditNoteText('') }}
+                              onClick={() => {
+                                setEditingNote(null)
+                                setEditNoteText('')
+                              }}
                               className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition-colors"
                             >
                               Cancel
@@ -754,7 +1002,10 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                             </div>
                             <div className="flex gap-2">
                               <button
-                                onClick={() => { setEditingNote(note.id); setEditNoteText(note.note) }}
+                                onClick={() => {
+                                  setEditingNote(note.id)
+                                  setEditNoteText(note.note)
+                                }}
                                 className="text-indigo-600 hover:text-indigo-900 text-xs font-medium"
                               >
                                 Edit
@@ -779,25 +1030,27 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
           {/* ==================== ACTIVITY LOG TAB ==================== */}
           {activeTab === 'activity' && (
             <div className="space-y-3">
-              <p className="text-sm text-gray-500 mb-4">Timeline of all activity for this customer</p>
+              <p className="text-sm text-gray-500 mb-4">
+                Timeline of all activity for this customer
+              </p>
               {[
-                ...tickets.map(t => ({
+                ...tickets.map((t) => ({
                   type: 'ticket',
                   date: t.created_date,
                   icon: '🎫',
                   color: 'bg-blue-100',
                   title: 'RMA Ticket Created',
                   detail: `${t.rma_number || t.id?.slice(0, 8)} — ${t.issue_description || t.title || 'No description'}`,
-                  action: () => onNavigateToTicket(t.id)
+                  action: () => onNavigateToTicket(t.id),
                 })),
-                ...notes.map(n => ({
+                ...notes.map((n) => ({
                   type: 'note',
                   date: n.created_date,
                   icon: '📝',
                   color: 'bg-yellow-100',
                   title: 'Note Added',
                   detail: n.note.length > 80 ? n.note.slice(0, 80) + '...' : n.note,
-                  by: n.created_by
+                  by: n.created_by,
                 })),
                 {
                   type: 'created',
@@ -805,14 +1058,16 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                   icon: '✅',
                   color: 'bg-green-100',
                   title: 'Customer Created',
-                  detail: `Added by ${customer.created_by || 'Unknown'}`
-                }
+                  detail: `Added by ${customer.created_by || 'Unknown'}`,
+                },
               ]
-                .filter(e => e.date)
+                .filter((e) => e.date)
                 .sort((a, b) => new Date(b.date) - new Date(a.date))
                 .map((event, idx) => (
                   <div key={idx} className="flex gap-4 items-start">
-                    <div className={`w-10 h-10 rounded-full ${event.color} flex items-center justify-center flex-shrink-0 text-lg`}>
+                    <div
+                      className={`w-10 h-10 rounded-full ${event.color} flex items-center justify-center flex-shrink-0 text-lg`}
+                    >
                       {event.icon}
                     </div>
                     <div className="flex-1 pb-4 border-b border-gray-100 last:border-0">
@@ -822,14 +1077,16 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
                       </div>
                       <p className="text-sm text-gray-600 mt-1">{event.detail}</p>
                       {event.action && (
-                        <button onClick={event.action} className="text-xs text-indigo-600 hover:underline mt-1">
+                        <button
+                          onClick={event.action}
+                          className="text-xs text-indigo-600 hover:underline mt-1"
+                        >
                           View ticket →
                         </button>
                       )}
                     </div>
                   </div>
-                ))
-              }
+                ))}
               {tickets.length === 0 && notes.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   <div className="text-3xl mb-2">📋</div>
@@ -838,7 +1095,6 @@ export default function CustomerDetails({ customerId, currentUserRole, currentUs
               )}
             </div>
           )}
-
         </div>
       </div>
 
@@ -859,7 +1115,9 @@ function DetailRow({ icon, label, value }) {
       <span className="text-lg flex-shrink-0">{icon}</span>
       <div>
         <p className="text-xs font-medium text-gray-500">{label}</p>
-        <div className="text-sm text-gray-900">{value || <span className="text-gray-500">—</span>}</div>
+        <div className="text-sm text-gray-900">
+          {value || <span className="text-gray-500">—</span>}
+        </div>
       </div>
     </div>
   )

@@ -47,11 +47,14 @@ export async function resizeImage(file, maxWidth = 1200, quality = 0.85) {
       const outType = file.type === 'image/png' ? 'image/png' : 'image/jpeg'
       canvas.toBlob(
         (blob) => {
-          if (!blob) { resolve(file); return }
+          if (!blob) {
+            resolve(file)
+            return
+          }
           resolve(new File([blob], file.name, { type: outType, lastModified: Date.now() }))
         },
         outType,
-        outType === 'image/jpeg' ? quality : undefined,
+        outType === 'image/jpeg' ? quality : undefined
       )
     }
 

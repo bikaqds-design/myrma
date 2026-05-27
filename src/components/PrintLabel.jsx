@@ -8,7 +8,7 @@ export default function PrintLabel({ ticket, onClose }) {
     if (qrRef.current && ticket) {
       QRCode.toCanvas(qrRef.current, ticket.rma_number, {
         width: 150,
-        margin: 1
+        margin: 1,
       })
     }
   }, [ticket])
@@ -26,7 +26,12 @@ export default function PrintLabel({ ticket, onClose }) {
           <h2 className="text-2xl font-bold text-gray-900">Print RMA Label</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-600">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -39,7 +44,9 @@ export default function PrintLabel({ ticket, onClose }) {
 
           <div className="grid grid-cols-2 gap-8 mb-6">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b-2 border-gray-300 pb-2">CUSTOMER INFO</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b-2 border-gray-300 pb-2">
+                CUSTOMER INFO
+              </h3>
               <div className="space-y-2">
                 <div>
                   <p className="text-sm text-gray-600">Customer Name:</p>
@@ -47,7 +54,9 @@ export default function PrintLabel({ ticket, onClose }) {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Created Date:</p>
-                  <p className="text-lg font-semibold text-gray-900">{new Date(ticket.created_date).toLocaleDateString()}</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {new Date(ticket.created_date).toLocaleDateString()}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Priority:</p>
@@ -57,7 +66,9 @@ export default function PrintLabel({ ticket, onClose }) {
             </div>
 
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b-2 border-gray-300 pb-2">TICKET INFO</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b-2 border-gray-300 pb-2">
+                TICKET INFO
+              </h3>
               <div className="space-y-2">
                 <div>
                   <p className="text-sm text-gray-600">Status:</p>
@@ -65,12 +76,16 @@ export default function PrintLabel({ ticket, onClose }) {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Technician:</p>
-                  <p className="text-lg font-semibold text-gray-900">{ticket.assigned_technician || 'Unassigned'}</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {ticket.assigned_technician || 'Unassigned'}
+                  </p>
                 </div>
                 {ticket.due_date && (
                   <div>
                     <p className="text-sm text-gray-600">Due Date:</p>
-                    <p className="text-lg font-semibold text-gray-900">{new Date(ticket.due_date).toLocaleDateString()}</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {new Date(ticket.due_date).toLocaleDateString()}
+                    </p>
                   </div>
                 )}
               </div>
@@ -78,7 +93,9 @@ export default function PrintLabel({ ticket, onClose }) {
           </div>
 
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b-2 border-gray-300 pb-2">PRODUCTS</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b-2 border-gray-300 pb-2">
+              PRODUCTS
+            </h3>
             <div className="space-y-2">
               {Array.isArray(ticket.products) && ticket.products.length > 0 ? (
                 ticket.products.map((product, idx) => (
@@ -105,12 +122,23 @@ export default function PrintLabel({ ticket, onClose }) {
         </div>
 
         <div className="flex gap-3 justify-end mt-6 no-print">
-          <button onClick={onClose} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+          >
             Cancel
           </button>
-          <button onClick={handlePrint} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2">
+          <button
+            onClick={handlePrint}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+          >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+              />
             </svg>
             Print Label
           </button>
@@ -122,7 +150,8 @@ export default function PrintLabel({ ticket, onClose }) {
           body * {
             visibility: hidden;
           }
-          .print-content, .print-content * {
+          .print-content,
+          .print-content * {
             visibility: visible;
           }
           .print-content {

@@ -26,8 +26,8 @@ describe('canDo — super_admin / admin bypass', () => {
 
 describe('canDo — permission object lookup', () => {
   const perms = {
-    rma_tickets: { view_all: true,  delete: false },
-    products:    { view: true,      create: false },
+    rma_tickets: { view_all: true, delete: false },
+    products: { view: true, create: false },
   }
 
   it('returns true when permission is explicitly true', () => {
@@ -77,8 +77,10 @@ describe('ROLE_DEFAULT_PERMISSIONS', () => {
   it('each role has all required sections', () => {
     for (const role of requiredRoles) {
       for (const section of requiredSections) {
-        expect(ROLE_DEFAULT_PERMISSIONS[role][section],
-          `${role} missing section ${section}`).toBeDefined()
+        expect(
+          ROLE_DEFAULT_PERMISSIONS[role][section],
+          `${role} missing section ${section}`
+        ).toBeDefined()
       }
     }
   })
@@ -107,9 +109,9 @@ describe('ROLE_DEFAULT_PERMISSIONS', () => {
 // ── canDo with ROLE_DEFAULT_PERMISSIONS ──────────────────────────────────────
 
 describe('canDo with default permissions', () => {
-  const managerPerms  = ROLE_DEFAULT_PERMISSIONS[ROLES.MANAGER]
-  const techPerms     = ROLE_DEFAULT_PERMISSIONS[ROLES.TECHNICIAN]
-  const viewerPerms   = ROLE_DEFAULT_PERMISSIONS[ROLES.VIEWER]
+  const managerPerms = ROLE_DEFAULT_PERMISSIONS[ROLES.MANAGER]
+  const techPerms = ROLE_DEFAULT_PERMISSIONS[ROLES.TECHNICIAN]
+  const viewerPerms = ROLE_DEFAULT_PERMISSIONS[ROLES.VIEWER]
 
   it('manager can create tickets', () => {
     expect(canDo(ROLES.MANAGER, managerPerms, 'rma_tickets', 'create')).toBe(true)

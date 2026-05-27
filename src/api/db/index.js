@@ -6,7 +6,15 @@ import { userRoles, userActivity, userPreferences } from './users.js'
 import { brands, categories, subcategories, products } from './catalog.js'
 import { customers, customerNotes } from './customers.js'
 import { rmaTickets, ticketActivity, ticketComments, rmaTracker, serialHistory } from './tickets.js'
-import { announcements, rmaConfig, customFields, webhooks, auditLog, slaConfig, automationRules } from './system.js'
+import {
+  announcements,
+  rmaConfig,
+  customFields,
+  webhooks,
+  auditLog,
+  slaConfig,
+  automationRules,
+} from './system.js'
 import { inventory, warehouses, parts, ticketParts, timeEntries, invoices } from './inventory.js'
 import { notifications } from './notifications.js'
 

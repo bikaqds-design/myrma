@@ -5,12 +5,12 @@ const BTN_BASE =
   'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed'
 
 const BTN_VARIANTS = {
-  primary:   'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500',
+  primary: 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500',
   secondary: 'border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-gray-300',
-  danger:    'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
-  success:   'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500',
-  ghost:     'text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:ring-gray-200',
-  warning:   'bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-400',
+  danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
+  success: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500',
+  ghost: 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:ring-gray-200',
+  warning: 'bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-400',
 }
 
 const BTN_SIZES = {
@@ -19,7 +19,14 @@ const BTN_SIZES = {
   lg: 'px-5 py-2.5 text-base',
 }
 
-export function Button({ variant = 'primary', size = 'md', loading = false, children, className = '', ...props }) {
+export function Button({
+  variant = 'primary',
+  size = 'md',
+  loading = false,
+  children,
+  className = '',
+  ...props
+}) {
   const spinColor = variant === 'secondary' || variant === 'ghost' ? 'gray' : 'white'
   return (
     <button
@@ -43,8 +50,8 @@ const SPINNER_SIZES = {
 
 const SPINNER_COLORS = {
   indigo: 'border-indigo-600 border-t-transparent',
-  white:  'border-white border-t-transparent',
-  gray:   'border-gray-400 border-t-transparent',
+  white: 'border-white border-t-transparent',
+  gray: 'border-gray-400 border-t-transparent',
 }
 
 export function Spinner({ size = 'md', color = 'indigo', className = '' }) {
@@ -67,19 +74,19 @@ export function PageLoading({ message }) {
 
 // ─── BADGE ────────────────────────────────────────────────────────────────────
 const BADGE_VARIANTS = {
-  success:  'bg-green-100 text-green-800',
-  danger:   'bg-red-100 text-red-800',
-  warning:  'bg-yellow-100 text-yellow-800',
-  info:     'bg-blue-100 text-blue-800',
-  neutral:  'bg-gray-100 text-gray-700',
-  indigo:   'bg-indigo-100 text-indigo-800',
-  purple:   'bg-purple-100 text-purple-800',
-  teal:     'bg-teal-100 text-teal-800',
-  orange:   'bg-orange-100 text-orange-800',
-  pink:     'bg-pink-100 text-pink-800',
-  emerald:  'bg-emerald-100 text-emerald-800',
-  sky:      'bg-sky-100 text-sky-700',
-  amber:    'bg-amber-100 text-amber-800',
+  success: 'bg-green-100 text-green-800',
+  danger: 'bg-red-100 text-red-800',
+  warning: 'bg-yellow-100 text-yellow-800',
+  info: 'bg-blue-100 text-blue-800',
+  neutral: 'bg-gray-100 text-gray-700',
+  indigo: 'bg-indigo-100 text-indigo-800',
+  purple: 'bg-purple-100 text-purple-800',
+  teal: 'bg-teal-100 text-teal-800',
+  orange: 'bg-orange-100 text-orange-800',
+  pink: 'bg-pink-100 text-pink-800',
+  emerald: 'bg-emerald-100 text-emerald-800',
+  sky: 'bg-sky-100 text-sky-700',
+  amber: 'bg-amber-100 text-amber-800',
 }
 
 export function Badge({ variant = 'neutral', dot = false, children, className = '' }) {
@@ -130,7 +137,10 @@ export function Textarea({ className = '', rows = 3, ...props }) {
 // ─── LABEL ────────────────────────────────────────────────────────────────────
 export function Label({ children, required, htmlFor, className = '' }) {
   return (
-    <label htmlFor={htmlFor} className={`block text-sm font-medium text-gray-700 mb-1 ${className}`}>
+    <label
+      htmlFor={htmlFor}
+      className={`block text-sm font-medium text-gray-700 mb-1 ${className}`}
+    >
       {children}
       {required && <span className="text-red-500 ml-0.5">*</span>}
     </label>
@@ -138,7 +148,14 @@ export function Label({ children, required, htmlFor, className = '' }) {
 }
 
 // ─── PAGE HEADER ──────────────────────────────────────────────────────────────
-export function PageHeader({ title, subtitle, children, onBack, backLabel = 'Back', className = '' }) {
+export function PageHeader({
+  title,
+  subtitle,
+  children,
+  onBack,
+  backLabel = 'Back',
+  className = '',
+}) {
   return (
     <div className={`flex items-center justify-between flex-wrap gap-4 ${className}`}>
       <div className="flex items-center gap-3">
@@ -148,7 +165,12 @@ export function PageHeader({ title, subtitle, children, onBack, backLabel = 'Bac
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
             {backLabel}
           </button>
@@ -195,7 +217,9 @@ export function ModalOverlay({ children, onClose }) {
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-y-auto py-8 px-4"
-      onClick={e => { if (e.target === e.currentTarget) onClose?.() }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose?.()
+      }}
     >
       {children}
     </div>

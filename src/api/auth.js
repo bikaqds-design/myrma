@@ -4,7 +4,7 @@ import { supabase } from './client.js'
 // The Edge Function validates the caller's JWT and confirms super_admin role server-side.
 async function invokeAdminUserOp(targetEmail, newPassword) {
   const { data, error } = await supabase.functions.invoke('admin-reset-password', {
-    body: { targetEmail, newPassword }
+    body: { targetEmail, newPassword },
   })
   if (error) throw new Error(error.message || 'Admin user operation failed')
   if (data?.error) throw new Error(data.error)
@@ -27,13 +27,16 @@ export const auth = {
     if (error) throw error
   },
   async getCurrentUser() {
-    const { data: { user }, error } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
     if (error) return null
     return user
   },
   async resetPassword(email) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/`
+      redirectTo: `${window.location.origin}/`,
     })
     if (error) throw error
   },
@@ -62,5 +65,5 @@ export const auth = {
   },
   onAuthStateChange(callback) {
     return supabase.auth.onAuthStateChange(callback)
-  }
+  },
 }

@@ -12,9 +12,16 @@ const DEFAULT = {
   faviconUrl: '',
   tabTitle: 'myRMA',
   dashboardWidgets: [
-    'stat_tickets', 'stat_inventory', 'sla_health', 'resolution_rate',
-    'recent_tickets', 'overdue_tickets', 'weekly_trend', 'status_distribution',
-    'priority_distribution', 'top_issues',
+    'stat_tickets',
+    'stat_inventory',
+    'sla_health',
+    'resolution_rate',
+    'recent_tickets',
+    'overdue_tickets',
+    'weekly_trend',
+    'status_distribution',
+    'priority_distribution',
+    'top_issues',
   ],
 }
 
@@ -36,8 +43,8 @@ const GOOGLE_FONTS = {
 const AppearanceContext = createContext({
   ...DEFAULT,
   updateAppearance: () => {},
-  formatDate: d => d || '',
-  formatDateTime: d => d || '',
+  formatDate: (d) => d || '',
+  formatDateTime: (d) => d || '',
 })
 
 export function AppearanceProvider({ children }) {
@@ -45,19 +52,24 @@ export function AppearanceProvider({ children }) {
     try {
       const stored = localStorage.getItem('mrma_appearance')
       return stored ? { ...DEFAULT, ...JSON.parse(stored) } : DEFAULT
-    } catch { return DEFAULT }
+    } catch {
+      return DEFAULT
+    }
   })
 
   useEffect(() => {
-    db.rmaConfig.getAll().then(result => {
-      if (result.missing) return
-      const row = result.data.find(r => r.config_key === 'appearance_settings')
-      if (row?.config_value) {
-        const merged = { ...DEFAULT, ...row.config_value }
-        setSettings(merged)
-        localStorage.setItem('mrma_appearance', JSON.stringify(merged))
-      }
-    }).catch(() => {})
+    db.rmaConfig
+      .getAll()
+      .then((result) => {
+        if (result.missing) return
+        const row = result.data.find((r) => r.config_key === 'appearance_settings')
+        if (row?.config_value) {
+          const merged = { ...DEFAULT, ...row.config_value }
+          setSettings(merged)
+          localStorage.setItem('mrma_appearance', JSON.stringify(merged))
+        }
+      })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -74,7 +86,7 @@ export function AppearanceProvider({ children }) {
     if (s.fontFamily && s.fontFamily !== 'system' && GOOGLE_FONTS[s.fontFamily]) {
       const id = `gfont-${s.fontFamily}`
       // Remove any previously injected Google Font links other than the current one
-      document.querySelectorAll('link[id^="gfont-"]').forEach(el => {
+      document.querySelectorAll('link[id^="gfont-"]').forEach((el) => {
         if (el.id !== id) el.remove()
       })
       if (!document.getElementById(id)) {
@@ -86,11 +98,15 @@ export function AppearanceProvider({ children }) {
       }
     } else {
       // Switched to system font — clean up any leftover gfont links
-      document.querySelectorAll('link[id^="gfont-"]').forEach(el => el.remove())
+      document.querySelectorAll('link[id^="gfont-"]').forEach((el) => el.remove())
     }
     if (s.faviconUrl) {
       let favicon = document.querySelector("link[rel*='icon']")
-      if (!favicon) { favicon = document.createElement('link'); favicon.rel = 'icon'; document.head.appendChild(favicon) }
+      if (!favicon) {
+        favicon = document.createElement('link')
+        favicon.rel = 'icon'
+        document.head.appendChild(favicon)
+      }
       favicon.href = s.faviconUrl
     }
   }
@@ -98,7 +114,9 @@ export function AppearanceProvider({ children }) {
   const updateAppearance = async (partial, userEmail) => {
     const merged = { ...settings, ...partial }
     setSettings(merged)
-    try { await db.rmaConfig.set('appearance_settings', merged, userEmail) } catch {}
+    try {
+      await db.rmaConfig.set('appearance_settings', merged, userEmail)
+    } catch {}
   }
 
   const formatDate = (dateStr) => {
@@ -109,10 +127,14 @@ export function AppearanceProvider({ children }) {
     const mm = String(d.getMonth() + 1).padStart(2, '0')
     const yyyy = d.getFullYear()
     switch (settings.dateFormat) {
-      case 'MM/DD/YYYY': return `${mm}/${dd}/${yyyy}`
-      case 'YYYY-MM-DD': return `${yyyy}-${mm}-${dd}`
-      case 'DD-MM-YYYY': return `${dd}-${mm}-${yyyy}`
-      default: return `${dd}/${mm}/${yyyy}`
+      case 'MM/DD/YYYY':
+        return `${mm}/${dd}/${yyyy}`
+      case 'YYYY-MM-DD':
+        return `${yyyy}-${mm}-${dd}`
+      case 'DD-MM-YYYY':
+        return `${dd}-${mm}-${yyyy}`
+      default:
+        return `${dd}/${mm}/${yyyy}`
     }
   }
 
@@ -132,10 +154,13 @@ export function AppearanceProvider({ children }) {
   }
 
   return (
-    <AppearanceContext.Provider value={{ ...settings, updateAppearance, formatDate, formatDateTime }}>
+    <AppearanceContext.Provider
+      value={{ ...settings, updateAppearance, formatDate, formatDateTime }}
+    >
       {children}
     </AppearanceContext.Provider>
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAppearance = () => useContext(AppearanceContext)

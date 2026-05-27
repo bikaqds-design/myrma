@@ -57,13 +57,13 @@ export default [
     rules: {
       // ── Hooks (spread recommended, then tune) ──────────────────────────────
       ...reactHooks.configs.recommended.rules,
-      // react-hooks v5 adds opinionated rules — warn only on first setup
       'react-hooks/exhaustive-deps': 'warn',
-      'react-hooks/immutability': 'warn',
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/static-components': 'warn',
-      'react-hooks/preserve-manual-memoization': 'warn',
-      'react-hooks/purity': 'warn',
+      // react-hooks v5 React-Compiler rules — off until we adopt the compiler
+      'react-hooks/immutability': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/static-components': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
+      'react-hooks/purity': 'off',
 
       // ── Fast refresh ───────────────────────────────────────────────────────
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
@@ -75,7 +75,7 @@ export default [
       'no-irregular-whitespace': 'error',
 
       // ── JS quality — warnings (improve over time) ─────────────────────────
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_|^React$' }],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'prefer-const': 'warn',
       'eqeqeq': ['warn', 'always', { null: 'ignore' }],

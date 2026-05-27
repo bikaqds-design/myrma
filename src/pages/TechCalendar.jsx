@@ -9,17 +9,17 @@ import { useAppearance } from '../contexts/AppearanceContext'
 
 const PRIORITY_CLS = {
   Critical: 'bg-red-100 text-red-700 border border-red-200',
-  High:     'bg-orange-100 text-orange-700',
-  Medium:   'bg-yellow-100 text-yellow-700',
-  Low:      'bg-green-100 text-green-700',
+  High: 'bg-orange-100 text-orange-700',
+  Medium: 'bg-yellow-100 text-yellow-700',
+  Low: 'bg-green-100 text-green-700',
 }
 
 const STATUS_CLS = {
-  'New':         'bg-pink-100 text-pink-700',
+  New: 'bg-pink-100 text-pink-700',
   'In Progress': 'bg-blue-100 text-blue-700',
-  'On Hold':     'bg-yellow-100 text-yellow-700',
-  'Completed':   'bg-green-100 text-green-700',
-  'Cancelled':   'bg-gray-100 text-gray-600',
+  'On Hold': 'bg-yellow-100 text-yellow-700',
+  Completed: 'bg-green-100 text-green-700',
+  Cancelled: 'bg-gray-100 text-gray-600',
 }
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -64,19 +64,25 @@ function TicketCard({ ticket, isOverdue, onNavigateToTicket }) {
     <div
       onClick={() => onNavigateToTicket?.(ticket.id)}
       className={`rounded-lg border bg-white p-2.5 cursor-pointer hover:shadow-md transition-shadow text-xs ${
-        isOverdue ? 'border-l-4 border-l-red-500 border-t-gray-200 border-r-gray-200 border-b-gray-200' : 'border-gray-200'
+        isOverdue
+          ? 'border-l-4 border-l-red-500 border-t-gray-200 border-r-gray-200 border-b-gray-200'
+          : 'border-gray-200'
       }`}
     >
       <p className="font-semibold text-gray-800 truncate mb-1">{ticket.rma_number}</p>
       <p className="text-gray-500 truncate mb-1.5">{ticket.customer_name || '—'}</p>
       <div className="flex flex-wrap gap-1">
         {ticket.priority && (
-          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${PRIORITY_CLS[ticket.priority] || 'bg-gray-100 text-gray-600'}`}>
+          <span
+            className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${PRIORITY_CLS[ticket.priority] || 'bg-gray-100 text-gray-600'}`}
+          >
             {ticket.priority}
           </span>
         )}
         {ticket.ticket_status && (
-          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_CLS[ticket.ticket_status] || 'bg-gray-100 text-gray-600'}`}>
+          <span
+            className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_CLS[ticket.ticket_status] || 'bg-gray-100 text-gray-600'}`}
+          >
             {ticket.ticket_status}
           </span>
         )}
@@ -96,14 +102,12 @@ export default function TechCalendar({
   currentUserPermissions,
   onNavigateToTicket,
 }) {
-  const { formatDate } = useAppearance()
+  const { formatDate: _formatDate } = useAppearance()
 
-  const canDo = (s, a) =>
-    ['super_admin', 'admin'].includes(currentUserRole) ||
-    currentUserPermissions?.[s]?.[a]
+  const _canDo = (s, a) =>
+    ['super_admin', 'admin'].includes(currentUserRole) || currentUserPermissions?.[s]?.[a]
 
-  const isAdminOrManager =
-    ['super_admin', 'admin', 'manager'].includes(currentUserRole)
+  const isAdminOrManager = ['super_admin', 'admin', 'manager'].includes(currentUserRole)
 
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
@@ -113,9 +117,10 @@ export default function TechCalendar({
   // ─── Load data ──────────────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true)
-    db.rmaTickets.list()
-      .then(data => setTickets(data))
-      .catch(err => {
+    db.rmaTickets
+      .list()
+      .then((data) => setTickets(data))
+      .catch((err) => {
         console.error(err)
         toast.error('Failed to load tickets')
       })
@@ -125,7 +130,9 @@ export default function TechCalendar({
   // ─── Derived data ────────────────────────────────────────────────────────────
   const technicians = useMemo(() => {
     const set = new Set()
-    tickets.forEach(t => { if (t.assigned_technician) set.add(t.assigned_technician) })
+    tickets.forEach((t) => {
+      if (t.assigned_technician) set.add(t.assigned_technician)
+    })
     return Array.from(set).sort()
   }, [tickets])
 
@@ -133,7 +140,7 @@ export default function TechCalendar({
 
   const filteredTickets = useMemo(() => {
     if (!effectiveTech) return tickets
-    return tickets.filter(t => t.assigned_technician === effectiveTech)
+    return tickets.filter((t) => t.assigned_technician === effectiveTech)
   }, [tickets, effectiveTech])
 
   const today = new Date()
@@ -143,8 +150,10 @@ export default function TechCalendar({
 
   const ticketsByDay = useMemo(() => {
     const map = {}
-    days.forEach(d => { map[isoDate(d)] = [] })
-    filteredTickets.forEach(t => {
+    days.forEach((d) => {
+      map[isoDate(d)] = []
+    })
+    filteredTickets.forEach((t) => {
       if (!t.due_date) return
       const key = t.due_date.split('T')[0]
       if (map[key]) map[key].push(t)
@@ -152,13 +161,13 @@ export default function TechCalendar({
     return map
   }, [filteredTickets, days])
 
-  const unscheduled = useMemo(() =>
-    filteredTickets.filter(t =>
-      !t.due_date &&
-      t.ticket_status !== 'Completed' &&
-      t.ticket_status !== 'Cancelled'
-    )
-  , [filteredTickets])
+  const unscheduled = useMemo(
+    () =>
+      filteredTickets.filter(
+        (t) => !t.due_date && t.ticket_status !== 'Completed' && t.ticket_status !== 'Cancelled'
+      ),
+    [filteredTickets]
+  )
 
   // ─── Navigation ──────────────────────────────────────────────────────────────
   const goToPrev = () => {
@@ -202,21 +211,40 @@ export default function TechCalendar({
             className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
             aria-label="Previous week"
           >
-            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <svg
+              className="w-4 h-4 text-gray-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
           </button>
-          <span className="text-sm font-semibold text-gray-800 min-w-[160px] text-center">{weekLabel}</span>
+          <span className="text-sm font-semibold text-gray-800 min-w-[160px] text-center">
+            {weekLabel}
+          </span>
           <button
             onClick={goToNext}
             className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
             aria-label="Next week"
           >
-            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className="w-4 h-4 text-gray-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
-          <Button variant="secondary" size="sm" onClick={goToToday}>Today</Button>
+          <Button variant="secondary" size="sm" onClick={goToToday}>
+            Today
+          </Button>
         </div>
 
         {/* Technician filter — admin/manager only */}
@@ -225,12 +253,14 @@ export default function TechCalendar({
             <label className="text-sm text-gray-500">Technician:</label>
             <select
               value={selectedTech}
-              onChange={e => setSelectedTech(e.target.value)}
+              onChange={(e) => setSelectedTech(e.target.value)}
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="">All Technicians</option>
-              {technicians.map(t => (
-                <option key={t} value={t}>{t}</option>
+              {technicians.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
               ))}
             </select>
           </div>
@@ -250,13 +280,19 @@ export default function TechCalendar({
                   isToday ? 'bg-indigo-50' : 'bg-gray-50'
                 }`}
               >
-                <p className={`text-xs font-semibold uppercase tracking-wide ${isToday ? 'text-indigo-600' : 'text-gray-500'}`}>
+                <p
+                  className={`text-xs font-semibold uppercase tracking-wide ${isToday ? 'text-indigo-600' : 'text-gray-500'}`}
+                >
                   {DAY_NAMES[i]}
                 </p>
-                <p className={`text-lg font-bold mt-0.5 ${isToday ? 'text-indigo-700' : 'text-gray-800'}`}>
+                <p
+                  className={`text-lg font-bold mt-0.5 ${isToday ? 'text-indigo-700' : 'text-gray-800'}`}
+                >
                   {d.getDate()}
                 </p>
-                <p className="text-[10px] text-gray-500">{d.toLocaleDateString('en-US', { month: 'short' })}</p>
+                <p className="text-[10px] text-gray-500">
+                  {d.toLocaleDateString('en-US', { month: 'short' })}
+                </p>
               </div>
             )
           })}
@@ -278,10 +314,14 @@ export default function TechCalendar({
                 {dayTickets.length === 0 && (
                   <p className="text-[10px] text-gray-300 text-center mt-4">—</p>
                 )}
-                {dayTickets.map(ticket => {
+                {dayTickets.map((ticket) => {
                   const dueDate = ticket.due_date ? new Date(ticket.due_date) : null
                   dueDate && dueDate.setHours(0, 0, 0, 0)
-                  const isOverdue = dueDate && dueDate < today && ticket.ticket_status !== 'Completed' && ticket.ticket_status !== 'Cancelled'
+                  const isOverdue =
+                    dueDate &&
+                    dueDate < today &&
+                    ticket.ticket_status !== 'Completed' &&
+                    ticket.ticket_status !== 'Cancelled'
                   return (
                     <TicketCard
                       key={ticket.id}
@@ -300,8 +340,18 @@ export default function TechCalendar({
       {/* Unscheduled Panel */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
         <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <svg
+            className="w-4 h-4 text-gray-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
           </svg>
           Unscheduled Tickets
           {unscheduled.length > 0 && (
@@ -318,7 +368,7 @@ export default function TechCalendar({
           />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
-            {unscheduled.map(ticket => (
+            {unscheduled.map((ticket) => (
               <TicketCard
                 key={ticket.id}
                 ticket={ticket}

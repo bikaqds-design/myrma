@@ -18,10 +18,10 @@ export function initSentry() {
 
   Sentry.init({
     dsn,
-    environment: import.meta.env.MODE,           // 'production' | 'development'
-    release:     import.meta.env.VITE_APP_VERSION ?? undefined,
-    enabled:     import.meta.env.PROD,            // never sends events in dev builds
-    tracesSampleRate: 0.1,                        // 10 % of transactions traced
+    environment: import.meta.env.MODE, // 'production' | 'development'
+    release: import.meta.env.VITE_APP_VERSION ?? undefined,
+    enabled: import.meta.env.PROD, // never sends events in dev builds
+    tracesSampleRate: 0.1, // 10 % of transactions traced
     integrations: [Sentry.browserTracingIntegration()],
   })
 

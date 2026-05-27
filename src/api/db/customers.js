@@ -3,7 +3,11 @@ import { supabase } from '../client.js'
 export const customers = {
   async list() {
     // Capped at 500 rows — use listPaged() for server-side pagination (H-4)
-    const { data, error } = await supabase.from('customers').select('*').order('created_date', { ascending: false }).limit(500)
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .order('created_date', { ascending: false })
+      .limit(500)
     if (error) throw error
     return data || []
   },
@@ -15,7 +19,13 @@ export const customers = {
       .order('created_date', { ascending: false })
       .range(from, from + pageSize - 1)
     if (error) throw error
-    return { data: data || [], count: count || 0, page, pageSize, totalPages: Math.ceil((count || 0) / pageSize) }
+    return {
+      data: data || [],
+      count: count || 0,
+      page,
+      pageSize,
+      totalPages: Math.ceil((count || 0) / pageSize),
+    }
   },
   async get(id) {
     const { data, error } = await supabase.from('customers').select('*').eq('id', id).single()
@@ -42,7 +52,10 @@ export const customers = {
     // delete_customer_cascade runs in a single transaction — no partial state possible.
     const { error } = await supabase.rpc('delete_customer_cascade', { p_customer_id: id })
     if (error) {
-      if (error.code === 'PGRST202') throw new Error('delete_customer_cascade RPC not found. Run supabase/migrations/20260524_customer_cascade_delete.sql first.')
+      if (error.code === 'PGRST202')
+        throw new Error(
+          'delete_customer_cascade RPC not found. Run supabase/migrations/20260524_customer_cascade_delete.sql first.'
+        )
       throw error
     }
   },
@@ -51,32 +64,48 @@ export const customers = {
     // delete_customers_cascade runs in a single transaction — no partial state possible.
     const { error } = await supabase.rpc('delete_customers_cascade', { p_customer_ids: ids })
     if (error) {
-      if (error.code === 'PGRST202') throw new Error('delete_customers_cascade RPC not found. Run supabase/migrations/20260524_customer_cascade_delete.sql first.')
+      if (error.code === 'PGRST202')
+        throw new Error(
+          'delete_customers_cascade RPC not found. Run supabase/migrations/20260524_customer_cascade_delete.sql first.'
+        )
       throw error
     }
   },
   async bulkUpdateStatus(ids, status) {
-    const { error } = await supabase.from('customers').update({ customer_status: status, updated_date: new Date().toISOString() }).in('id', ids)
+    const { error } = await supabase
+      .from('customers')
+      .update({ customer_status: status, updated_date: new Date().toISOString() })
+      .in('id', ids)
     if (error) throw error
   },
   async getRelatedTickets(customerId) {
-    const { data, error } = await supabase.from('rma_tickets').select('*').eq('customer_id', customerId).order('created_date', { ascending: false })
+    const { data, error } = await supabase
+      .from('rma_tickets')
+      .select('*')
+      .eq('customer_id', customerId)
+      .order('created_date', { ascending: false })
     if (error) throw error
     return data || []
   },
   async uploadPhoto(file, customerId) {
     const fileExt = file.name.split('.').pop()
     const fileName = `customers/customer-${customerId}-${Date.now()}.${fileExt}`
-    const { error: uploadError } = await supabase.storage.from('rma-attachments').upload(fileName, file, { upsert: true })
+    const { error: uploadError } = await supabase.storage
+      .from('rma-attachments')
+      .upload(fileName, file, { upsert: true })
     if (uploadError) throw uploadError
     const { data } = supabase.storage.from('rma-attachments').getPublicUrl(fileName)
     return data.publicUrl
-  }
+  },
 }
 
 export const customerNotes = {
   async list(customerId) {
-    const { data, error } = await supabase.from('customer_notes').select('*').eq('customer_id', customerId).order('created_date', { ascending: false })
+    const { data, error } = await supabase
+      .from('customer_notes')
+      .select('*')
+      .eq('customer_id', customerId)
+      .order('created_date', { ascending: false })
     if (error) throw error
     return data || []
   },
@@ -93,5 +122,5 @@ export const customerNotes = {
   async delete(id) {
     const { error } = await supabase.from('customer_notes').delete().eq('id', id)
     if (error) throw error
-  }
+  },
 }

@@ -64,7 +64,7 @@ describe('changePasswordSchema', () => {
   it('accepts matching passwords with min length', () => {
     const result = changePasswordSchema.safeParse({
       currentPassword: 'old-pass',
-      newPassword:     'newpass1',
+      newPassword: 'newpass1',
       confirmPassword: 'newpass1',
     })
     expect(result.success).toBe(true)
@@ -73,7 +73,7 @@ describe('changePasswordSchema', () => {
   it('rejects mismatched passwords', () => {
     const result = changePasswordSchema.safeParse({
       currentPassword: 'old-pass',
-      newPassword:     'newpass1',
+      newPassword: 'newpass1',
       confirmPassword: 'different',
     })
     expect(result.success).toBe(false)
@@ -84,7 +84,7 @@ describe('changePasswordSchema', () => {
   it('rejects short new password', () => {
     const result = changePasswordSchema.safeParse({
       currentPassword: 'old',
-      newPassword:     'short',
+      newPassword: 'short',
       confirmPassword: 'short',
     })
     expect(result.success).toBe(false)
@@ -95,16 +95,16 @@ describe('changePasswordSchema', () => {
 
 describe('customerSchema', () => {
   const validB2C = {
-    customer_type:  'B2C',
+    customer_type: 'B2C',
     customer_status: 'active',
     contact_person: 'Alice Smith',
-    mobile:         '+1234567890',
+    mobile: '+1234567890',
   }
 
   const validB2B = {
     ...validB2C,
     customer_type: 'B2B',
-    company_name:  'Acme Corp',
+    company_name: 'Acme Corp',
   }
 
   it('accepts a valid B2C customer', () => {
@@ -154,9 +154,9 @@ describe('customerSchema', () => {
 
 describe('ticketSchema', () => {
   const valid = {
-    customer_name:  'Bob Jones',
-    ticket_status:  'Open',
-    priority:       'High',
+    customer_name: 'Bob Jones',
+    ticket_status: 'Open',
+    priority: 'High',
   }
 
   it('accepts valid ticket fields', () => {
@@ -196,11 +196,11 @@ describe('ticketSchema', () => {
 
 describe('productSchema', () => {
   const valid = {
-    brand_id:     '00000000-0000-0000-0000-000000000001',
-    sku:          'PRD-001',
+    brand_id: '00000000-0000-0000-0000-000000000001',
+    sku: 'PRD-001',
     product_name: 'Widget',
     product_type: 'hardware',
-    status:       'active',
+    status: 'active',
   }
 
   it('accepts a valid product', () => {

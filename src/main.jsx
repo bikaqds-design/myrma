@@ -14,8 +14,9 @@ import ErrorBoundary from './components/ErrorBoundary.jsx'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60_000,   // 1 min — stale data shows instantly on re-visit; background refetch starts
+      staleTime: 60_000, // 1 min — stale data shows instantly on re-visit; background refetch starts
       retry: 1,
+      refetchOnWindowFocus: false, // avoid surprise refetches when user alt-tabs back
     },
   },
 })
@@ -31,5 +32,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         </QueryClientProvider>
       </BrowserRouter>
     </ErrorBoundary>
-  </React.StrictMode>,
+  </React.StrictMode>
 )

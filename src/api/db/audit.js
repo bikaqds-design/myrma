@@ -28,12 +28,22 @@ export async function auditFlushQueue() {
 export async function auditInsert(entry) {
   const doInsert = () => supabase.from('user_activity_log').insert([entry])
   const { error } = await doInsert()
-  if (!error) { auditFlushQueue().catch(() => {}); return }
+  if (!error) {
+    auditFlushQueue().catch(() => {})
+    return
+  }
   // First attempt failed — retry once after 600ms
-  await new Promise(r => setTimeout(r, 600))
+  await new Promise((r) => setTimeout(r, 600))
   const { error: retryErr } = await doInsert()
-  if (!retryErr) { auditFlushQueue().catch(() => {}); return }
+  if (!retryErr) {
+    auditFlushQueue().catch(() => {})
+    return
+  }
   // Both failed — queue for next session and surface to console
-  console.error('[auditLog] Failed to write audit event (queued):', entry.action_type, retryErr?.message)
+  console.error(
+    '[auditLog] Failed to write audit event (queued):',
+    entry.action_type,
+    retryErr?.message
+  )
   _auditEnqueue(entry)
 }
