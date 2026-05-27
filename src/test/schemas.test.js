@@ -1,5 +1,5 @@
 /**
- * schemas.test.js — Unit tests for src/lib/schemas.js
+ * schemas.test.js — Unit tests for src/lib/schemas.ts
  *
  * Covers: loginSchema, forgotPasswordSchema, customerSchema,
  *         ticketSchema, getFirstError, getFieldErrors

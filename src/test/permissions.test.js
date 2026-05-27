@@ -1,5 +1,5 @@
 /**
- * permissions.test.js — Unit tests for src/lib/permissions.js
+ * permissions.test.js — Unit tests for src/lib/permissions.ts
  *
  * Covers: canDo() helper, ROLE_DEFAULT_PERMISSIONS structure
  */

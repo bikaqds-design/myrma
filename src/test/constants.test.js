@@ -1,5 +1,5 @@
 /**
- * constants.test.js — Unit tests for src/lib/constants.js
+ * constants.test.js — Unit tests for src/lib/constants.ts
  *
  * Verifies that constants are correct values (not renamed by accident),
  * derived lists are consistent with their source objects, and helper
