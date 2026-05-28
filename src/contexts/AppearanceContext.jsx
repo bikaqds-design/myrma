@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { db } from '../api/supabaseClient'
+import { safeStorage } from '../lib/safeStorage'
 
 const DEFAULT = {
   darkMode: false,
@@ -48,14 +49,10 @@ const AppearanceContext = createContext({
 })
 
 export function AppearanceProvider({ children }) {
-  const [settings, setSettings] = useState(() => {
-    try {
-      const stored = localStorage.getItem('mrma_appearance')
-      return stored ? { ...DEFAULT, ...JSON.parse(stored) } : DEFAULT
-    } catch {
-      return DEFAULT
-    }
-  })
+  const [settings, setSettings] = useState(() => ({
+    ...DEFAULT,
+    ...safeStorage.get('mrma_appearance', {}),
+  }))
 
   useEffect(() => {
     db.rmaConfig
@@ -66,7 +63,7 @@ export function AppearanceProvider({ children }) {
         if (row?.config_value) {
           const merged = { ...DEFAULT, ...row.config_value }
           setSettings(merged)
-          localStorage.setItem('mrma_appearance', JSON.stringify(merged))
+          safeStorage.set('mrma_appearance', merged)
         }
       })
       .catch(() => {})
@@ -74,7 +71,7 @@ export function AppearanceProvider({ children }) {
 
   useEffect(() => {
     applySettings(settings)
-    localStorage.setItem('mrma_appearance', JSON.stringify(settings))
+    safeStorage.set('mrma_appearance', settings)
   }, [settings])
 
   const applySettings = (s) => {

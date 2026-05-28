@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, db, storage } from '../api/supabaseClient'
+import { safeStorage } from '../lib/safeStorage'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { PageSkeleton } from '../components/Skeleton'
@@ -77,19 +78,14 @@ export default function Customers({
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(
-    () => parseInt(localStorage.getItem('customersPerPage')) || 25
+    () => safeStorage.get('customersPerPage', 25)
   )
   const [jumpToPage, setJumpToPage] = useState('')
 
   // Sorting
-  const [sortConfig, setSortConfig] = useState(() => {
-    try {
-      const saved = localStorage.getItem('customersSortConfig')
-      return saved ? JSON.parse(saved) : { key: 'created_date', direction: 'desc' }
-    } catch {
-      return { key: 'created_date', direction: 'desc' }
-    }
-  })
+  const [sortConfig, setSortConfig] = useState(() =>
+    safeStorage.get('customersSortConfig', { key: 'created_date', direction: 'desc' })
+  )
 
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
@@ -118,10 +114,10 @@ export default function Customers({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, customers, sortConfig, filterStatus, filterType, filterCompany])
   useEffect(() => {
-    localStorage.setItem('customersPerPage', itemsPerPage.toString())
+    safeStorage.set('customersPerPage', itemsPerPage)
   }, [itemsPerPage])
   useEffect(() => {
-    localStorage.setItem('customersSortConfig', JSON.stringify(sortConfig))
+    safeStorage.set('customersSortConfig', sortConfig)
   }, [sortConfig])
   useEffect(() => {
     setCurrentPage(1)

@@ -6,7 +6,7 @@ import { auth, db, branding as brandingAPI, supabase } from './api/supabaseClien
 import { useAppearance } from './contexts/AppearanceContext'
 import { ROLE_DEFAULT_PERMISSIONS } from './lib/permissions'
 import { ROLES } from './lib/constants'
-import CommandPalette from './components/CommandPalette'
+import { safeStorage } from './lib/safeStorage'
 import NotificationBell from './components/NotificationBell'
 import { Spinner } from './components/ui'
 import { captureException } from './lib/sentry'
@@ -69,6 +69,7 @@ const Invoices = React.lazy(() => import('./pages/Invoices'))
 const PartsInventory = React.lazy(() => import('./pages/PartsInventory'))
 const Reports = React.lazy(() => import('./pages/Reports'))
 const NotFoundPage = React.lazy(() => import('./pages/NotFoundPage'))
+const CommandPalette = React.lazy(() => import('./components/CommandPalette'))
 
 const PageSpinner = () => (
   <div className="flex items-center justify-center h-64">
@@ -208,14 +209,8 @@ export default function App() {
     if (!currentUser?.email || !currentUserRole || notifMissing) return
 
     const applyPrefs = (data) => {
-      try {
-        const prefs = JSON.parse(
-          localStorage.getItem(`notif_system_prefs_${currentUser.email}`) || '{}'
-        )
-        return data.filter((n) => prefs[n.type] !== false)
-      } catch {
-        return data
-      }
+      const prefs = safeStorage.get(`notif_system_prefs_${currentUser.email}`, {})
+      return data.filter((n) => prefs[n.type] !== false)
     }
 
     const loadNotifs = async () => {
@@ -233,12 +228,7 @@ export default function App() {
       .get(currentUser.email)
       .then((result) => {
         if (!result.missing && result.prefs?.notifSystem) {
-          try {
-            localStorage.setItem(
-              `notif_system_prefs_${currentUser.email}`,
-              JSON.stringify(result.prefs.notifSystem)
-            )
-          } catch {}
+          safeStorage.set(`notif_system_prefs_${currentUser.email}`, result.prefs.notifSystem)
         }
       })
       .catch(() => {})
@@ -258,10 +248,8 @@ export default function App() {
           const n = payload.new
           if (!n) return
           const myEmail = currentUser?.email
-          try {
-            const prefs = JSON.parse(localStorage.getItem(`notif_system_prefs_${myEmail}`) || '{}')
-            if (prefs[n.type] === false) return
-          } catch {}
+          const prefs = safeStorage.get(`notif_system_prefs_${myEmail}`, {})
+          if (prefs[n.type] === false) return
           const icons = {
             info: 'ℹ️',
             warning: '⚠️',
@@ -297,12 +285,7 @@ export default function App() {
       bc.onmessage = (e) => {
         if (e.data?.type === 'notif-system-prefs-changed') {
           if (e.data.prefs && currentUser?.email) {
-            try {
-              localStorage.setItem(
-                `notif_system_prefs_${currentUser.email}`,
-                JSON.stringify(e.data.prefs)
-              )
-            } catch {}
+            safeStorage.set(`notif_system_prefs_${currentUser.email}`, e.data.prefs)
           }
           loadNotifsRef.current?.()
         }
@@ -440,10 +423,23 @@ export default function App() {
 
   // ── Derive page title for mobile header ───────────────────────────────────
   const mobileTitle = (() => {
-    if (pathname === '/' || pathname === '/dashboard') return 'dashboard'
-    if (pathname.startsWith('/products/')) return 'product details'
-    if (pathname.startsWith('/customers/')) return 'customer details'
-    return pathname.slice(1).replace(/-/g, ' ')
+    if (pathname.startsWith('/products/')) return 'Product Details'
+    if (pathname.startsWith('/customers/')) return 'Customer Details'
+    const MAP = {
+      '/': 'Dashboard',
+      '/dashboard': 'Dashboard',
+      '/products': 'Products',
+      '/customers': 'Customers',
+      '/rma-tickets': 'RMA Tickets',
+      '/inventory': 'Inventory',
+      '/account': 'Account Settings',
+      '/control-panel': 'Control Panel',
+      '/calendar': 'Calendar',
+      '/invoices': 'Invoices',
+      '/parts': 'Parts Inventory',
+      '/reports': 'Reports',
+    }
+    return MAP[pathname] ?? pathname.slice(1).replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
   })()
 
   // ── Special routes — no auth needed ──────────────────────────────────────

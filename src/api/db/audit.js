@@ -1,6 +1,7 @@
 import { supabase } from '../client.js'
 import { STORAGE_KEY } from '../../lib/constants.js'
 import { captureException } from '../../lib/sentry.js'
+import { safeStorage } from '../../lib/safeStorage.js'
 
 // ─── Audit log helpers (H-9) ─────────────────────────────────────────────────
 // Resilient fire-and-log: retry once, then queue to localStorage.
@@ -9,20 +10,18 @@ const AUDIT_QUEUE_KEY = STORAGE_KEY.AUDIT_QUEUE
 const AUDIT_QUEUE_MAX = 50
 
 export function _auditEnqueue(entry) {
-  try {
-    const q = JSON.parse(localStorage.getItem(AUDIT_QUEUE_KEY) || '[]')
-    q.push(entry)
-    if (q.length > AUDIT_QUEUE_MAX) q.splice(0, q.length - AUDIT_QUEUE_MAX)
-    localStorage.setItem(AUDIT_QUEUE_KEY, JSON.stringify(q))
-  } catch {}
+  const q = safeStorage.get(AUDIT_QUEUE_KEY, [])
+  q.push(entry)
+  if (q.length > AUDIT_QUEUE_MAX) q.splice(0, q.length - AUDIT_QUEUE_MAX)
+  safeStorage.set(AUDIT_QUEUE_KEY, q)
 }
 
 export async function auditFlushQueue() {
   try {
-    const q = JSON.parse(localStorage.getItem(AUDIT_QUEUE_KEY) || '[]')
+    const q = safeStorage.get(AUDIT_QUEUE_KEY, [])
     if (!q.length) return
     const { error } = await supabase.from('user_activity_log').insert(q)
-    if (!error) localStorage.removeItem(AUDIT_QUEUE_KEY)
+    if (!error) safeStorage.remove(AUDIT_QUEUE_KEY)
   } catch {}
 }
 

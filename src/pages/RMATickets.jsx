@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { supabase, db, storage, branding as brandingAPI } from '../api/supabaseClient'
+import { safeStorage } from '../lib/safeStorage'
 import toast from 'react-hot-toast'
 import QRCode from 'qrcode'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -131,13 +132,12 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(
-    () => parseInt(localStorage.getItem('rmaTicketsPerPage')) || 25
+    () => safeStorage.get('rmaTicketsPerPage', 25)
   )
   const [jumpToPage, setJumpToPage] = useState('')
-  const [sortConfig, setSortConfig] = useState(() => {
-    const saved = localStorage.getItem('rmaTicketsSortConfig')
-    return saved ? JSON.parse(saved) : { key: 'created_date', direction: 'desc' }
-  })
+  const [sortConfig, setSortConfig] = useState(() =>
+    safeStorage.get('rmaTicketsSortConfig', { key: 'created_date', direction: 'desc' })
+  )
 
   const [showFilters, setShowFilters] = useState(false)
   const [filterStatus, setFilterStatus] = useState('')
@@ -242,10 +242,10 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     filterCustomer,
   ])
   useEffect(() => {
-    localStorage.setItem('rmaTicketsPerPage', itemsPerPage.toString())
+    safeStorage.set('rmaTicketsPerPage', itemsPerPage)
   }, [itemsPerPage])
   useEffect(() => {
-    localStorage.setItem('rmaTicketsSortConfig', JSON.stringify(sortConfig))
+    safeStorage.set('rmaTicketsSortConfig', sortConfig)
   }, [sortConfig])
   useEffect(() => {
     setCurrentPage(1)

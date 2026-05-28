@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, supabase } from '../api/supabaseClient'
+import { safeStorage } from '../lib/safeStorage'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { Spinner, PageHeader } from '../components/ui'
 
@@ -190,14 +191,9 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
     : { backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 8 }
   const storageKey = `dashboard_widgets_${currentUserEmail}`
 
-  const [enabledWidgets, setEnabledWidgets] = useState(() => {
-    try {
-      const stored = localStorage.getItem(storageKey)
-      return stored ? JSON.parse(stored) : dashboardWidgets || WIDGET_CATALOG.map((w) => w.id)
-    } catch {
-      return dashboardWidgets || WIDGET_CATALOG.map((w) => w.id)
-    }
-  })
+  const [enabledWidgets, setEnabledWidgets] = useState(() =>
+    safeStorage.get(storageKey, dashboardWidgets || WIDGET_CATALOG.map((w) => w.id))
+  )
 
   // P-1: TanStack Query — cached fetch; stale data renders instantly on re-visit
   const queryClient = useQueryClient()
@@ -249,19 +245,15 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
 
   // Re-read widget prefs when returning to this page (storageKey may differ per user)
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(storageKey)
-      if (stored) setEnabledWidgets(JSON.parse(stored))
-    } catch {}
+    const stored = safeStorage.get(storageKey, null)
+    if (stored) setEnabledWidgets(stored)
   }, [storageKey])
 
   // Listen for storage events from AccountSettings (same-tab custom event)
   useEffect(() => {
     const handler = () => {
-      try {
-        const stored = localStorage.getItem(storageKey)
-        if (stored) setEnabledWidgets(JSON.parse(stored))
-      } catch {}
+      const stored = safeStorage.get(storageKey, null)
+      if (stored) setEnabledWidgets(stored)
     }
     window.addEventListener('dashboard-widgets-changed', handler)
     return () => window.removeEventListener('dashboard-widgets-changed', handler)

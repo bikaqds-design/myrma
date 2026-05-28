@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { auth, db, storage, notifications } from '../api/supabaseClient'
 import { captureException } from '../lib/sentry'
+import { safeStorage } from '../lib/safeStorage'
 import { WIDGET_CATALOG } from './Dashboard'
 import toast from 'react-hot-toast'
 import { Spinner, PageHeader, Button, Input } from '../components/ui'
@@ -171,19 +172,14 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
 
   // Appearance — widget prefs
   const widgetStorageKey = `dashboard_widgets_${currentUser?.email}`
-  const [widgetPrefs, setWidgetPrefs] = useState(() => {
-    try {
-      const stored = localStorage.getItem(`dashboard_widgets_${currentUser?.email}`)
-      return stored ? JSON.parse(stored) : WIDGET_CATALOG.map((w) => w.id)
-    } catch {
-      return WIDGET_CATALOG.map((w) => w.id)
-    }
-  })
+  const [widgetPrefs, setWidgetPrefs] = useState(() =>
+    safeStorage.get(`dashboard_widgets_${currentUser?.email}`, WIDGET_CATALOG.map((w) => w.id))
+  )
 
   const toggleWidget = (id) => {
     setWidgetPrefs((prev) => {
       const next = prev.includes(id) ? prev.filter((w) => w !== id) : [...prev, id]
-      localStorage.setItem(widgetStorageKey, JSON.stringify(next))
+      safeStorage.set(widgetStorageKey, next)
       window.dispatchEvent(new Event('dashboard-widgets-changed'))
       return next
     })
@@ -192,13 +188,13 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
   const enableAllWidgets = () => {
     const all = WIDGET_CATALOG.map((w) => w.id)
     setWidgetPrefs(all)
-    localStorage.setItem(widgetStorageKey, JSON.stringify(all))
+    safeStorage.set(widgetStorageKey, all)
     window.dispatchEvent(new Event('dashboard-widgets-changed'))
   }
 
   const disableAllWidgets = () => {
     setWidgetPrefs([])
-    localStorage.setItem(widgetStorageKey, JSON.stringify([]))
+    safeStorage.set(widgetStorageKey, [])
     window.dispatchEvent(new Event('dashboard-widgets-changed'))
   }
 
@@ -224,13 +220,9 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
 
   // System (in-app) notification preferences (localStorage-backed, auto-save)
   const sysPrefsKey = `notif_system_prefs_${currentUser?.email}`
-  const [sysNotifPrefs, setSysNotifPrefs] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(`notif_system_prefs_${currentUser?.email}`) || '{}')
-    } catch {
-      return {}
-    }
-  })
+  const [sysNotifPrefs, setSysNotifPrefs] = useState(() =>
+    safeStorage.get(`notif_system_prefs_${currentUser?.email}`, {})
+  )
 
   // BroadcastChannel for cross-tab pref sync (falls back to no-op if unsupported)
   const notifChannel = useRef(
@@ -261,7 +253,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
   const toggleSysNotif = (key) => {
     setSysNotifPrefs((prev) => {
       const next = { ...prev, [key]: prev[key] === false ? true : false }
-      localStorage.setItem(sysPrefsKey, JSON.stringify(next))
+      safeStorage.set(sysPrefsKey, next)
       broadcastPrefs(next)
       persistPrefsToDb(next)
       return next
@@ -275,7 +267,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
       })
     )
     setSysNotifPrefs(next)
-    localStorage.setItem(sysPrefsKey, JSON.stringify(next))
+    safeStorage.set(sysPrefsKey, next)
     broadcastPrefs(next)
     persistPrefsToDb(next)
   }

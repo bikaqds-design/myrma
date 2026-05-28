@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useURLTab } from '../hooks/useURLTab'
 import { supabase, db } from '../api/supabaseClient'
+import { safeStorage } from '../lib/safeStorage'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { StatCardSkeleton, CardSkeleton } from '../components/Skeleton'
@@ -1573,7 +1574,7 @@ function ByProductTab({
   const [filterProduct, setFilterProduct] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(
-    () => parseInt(localStorage.getItem('invByProductPerPage')) || 25
+    () => safeStorage.get('invByProductPerPage', 25)
   )
   const [selectedRows, setSelectedRows] = useState([])
 
@@ -1595,7 +1596,7 @@ function ByProductTab({
     setCurrentPage(1)
   }, [search, filterBrand, filterStatus, filterProduct, itemsPerPage])
   React.useEffect(() => {
-    localStorage.setItem('invByProductPerPage', itemsPerPage.toString())
+    safeStorage.set('invByProductPerPage', itemsPerPage)
   }, [itemsPerPage])
 
   // Keyboard shortcuts: / = focus search, Esc = close detail modal
@@ -1967,7 +1968,7 @@ function CompanyStockTab({
   const [filterProduct, setFilterProduct] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(
-    () => parseInt(localStorage.getItem('invStockPerPage')) || 25
+    () => safeStorage.get('invStockPerPage', 25)
   )
   const [selectedRows, setSelectedRows] = useState([])
   const [showTransfer, setShowTransfer] = useState(false)
@@ -1998,7 +1999,7 @@ function CompanyStockTab({
     setCurrentPage(1)
   }, [search, filterBrand, filterResolution, filterProduct, itemsPerPage])
   React.useEffect(() => {
-    localStorage.setItem('invStockPerPage', itemsPerPage.toString())
+    safeStorage.set('invStockPerPage', itemsPerPage)
   }, [itemsPerPage])
 
   const searchRef = useRef(null)

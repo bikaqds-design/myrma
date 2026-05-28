@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, db, storage } from '../api/supabaseClient'
+import { safeStorage } from '../lib/safeStorage'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { PageSkeleton } from '../components/Skeleton'
@@ -40,16 +41,15 @@ export default function Products({
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(() => {
-    return parseInt(localStorage.getItem('productsPerPage')) || 25
-  })
+  const [itemsPerPage, setItemsPerPage] = useState(
+    () => safeStorage.get('productsPerPage', 25)
+  )
   const [jumpToPage, setJumpToPage] = useState('')
 
   // Sorting State
-  const [sortConfig, setSortConfig] = useState(() => {
-    const saved = localStorage.getItem('productsSortConfig')
-    return saved ? JSON.parse(saved) : { key: 'created_date', direction: 'desc' }
-  })
+  const [sortConfig, setSortConfig] = useState(() =>
+    safeStorage.get('productsSortConfig', { key: 'created_date', direction: 'desc' })
+  )
 
   const brands = productsPageData?.brandsData ?? []
   const categories = productsPageData?.categoriesData ?? []
@@ -170,11 +170,11 @@ export default function Products({
   }, [showAddProduct, showAddBrand, showAddCategory])
 
   useEffect(() => {
-    localStorage.setItem('productsPerPage', itemsPerPage.toString())
+    safeStorage.set('productsPerPage', itemsPerPage)
   }, [itemsPerPage])
 
   useEffect(() => {
-    localStorage.setItem('productsSortConfig', JSON.stringify(sortConfig))
+    safeStorage.set('productsSortConfig', sortConfig)
   }, [sortConfig])
 
   useEffect(() => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { db, storage, branding as brandingAPI } from '../api/supabaseClient'
+import { safeStorage } from '../lib/safeStorage'
 
 // ── Client-side brute-force protection ──────────────────────────────────────
 // Tracks "not found" attempts in localStorage. After MAX_FAILS failures within
@@ -11,16 +12,10 @@ const WINDOW_MS = 5 * 60 * 1000 // 5-minute sliding window
 const LOCKOUT_MS = 15 * 60 * 1000 // 15-minute lockout
 
 function getRLState() {
-  try {
-    return JSON.parse(localStorage.getItem(RL_KEY) || '{}')
-  } catch {
-    return {}
-  }
+  return safeStorage.get(RL_KEY, {})
 }
 function saveRLState(s) {
-  try {
-    localStorage.setItem(RL_KEY, JSON.stringify(s))
-  } catch {}
+  safeStorage.set(RL_KEY, s)
 }
 /** Returns { locked: true, secsLeft } or { locked: false } */
 function checkRateLimit() {
@@ -45,9 +40,7 @@ function recordFailure() {
 }
 /** Clears the lockout (call on successful lookup). */
 function clearFailures() {
-  try {
-    localStorage.removeItem(RL_KEY)
-  } catch {}
+  safeStorage.remove(RL_KEY)
 }
 
 const PRODUCT_STATUS_COLORS = {
