@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, auth } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -18,9 +19,19 @@ function validatePasswordStrength(pw) {
 
 export default function UserManagement({ currentUserRole, currentUserEmail }) {
   const [activeTab, setActiveTab] = useURLTab('umtab', 'users')
-  const [users, setUsers] = useState([])
-  const [customRoles, setCustomRoles] = useState([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const { data: umData, isLoading: loading } = useQuery({
+    queryKey: ['user-management'],
+    queryFn: async () => {
+      const [usersData, rolesData] = await Promise.all([
+        db.userRoles.listAllRoles(),
+        db.userRoles.getCustomRoles(),
+      ])
+      return { usersData, rolesData }
+    },
+  })
+  const users = umData?.usersData ?? []
+  const customRoles = umData?.rolesData ?? []
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
     title: '',
@@ -64,25 +75,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
-      const [usersData, rolesData] = await Promise.all([
-        db.userRoles.listAllRoles(),
-        db.userRoles.getCustomRoles(),
-      ])
-      setUsers(usersData)
-      setCustomRoles(rolesData)
-    } catch (error) {
-      captureException(error)
-      toast.error('Failed to load data')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['user-management'] })
 
   const handleAddUser = async (e) => {
     e.preventDefault()
@@ -133,7 +126,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       setNewUserRole('technician')
       setNewUserPassword('')
       setShowAddUserModal(false)
-      loadData()
+      invalidate()
     } catch (error) {
       captureException(error)
       toast.error(error.message || 'Failed to add user')
@@ -161,7 +154,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       db.auditLog
         .log(currentUserEmail, 'user_role_changed', `Changed role of ${email} to ${newRole}`)
         .catch(() => {})
-      loadData()
+      invalidate()
     } catch (error) {
       captureException(error)
       toast.error('Failed to update role')
@@ -185,7 +178,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       setNewRoleDescription('')
       setNewRolePermissions(getDefaultPermissions())
       setShowCreateRoleModal(false)
-      loadData()
+      invalidate()
     } catch (error) {
       captureException(error)
       toast.error('Failed to create custom role')
@@ -203,7 +196,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       toast.success('Permissions updated successfully!')
       setShowPermissionsModal(false)
       setSelectedUser(null)
-      loadData()
+      invalidate()
     } catch (error) {
       captureException(error)
       toast.error('Failed to update permissions')
@@ -222,7 +215,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
           db.auditLog
             .log(currentUserEmail, 'custom_role_deleted', `Deleted custom role ${roleId}`)
             .catch(() => {})
-          loadData()
+          invalidate()
         } catch (error) {
           captureException(error)
           toast.error('Failed to delete custom role')
@@ -382,7 +375,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
                   .catch(() => {})
                 setShowUserControlModal(false)
                 setSelectedUser(null)
-                loadData()
+                invalidate()
               } catch {
                 toast.error('Failed to delete user')
               }
@@ -396,7 +389,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
 
       setShowUserControlModal(false)
       setSelectedUser(null)
-      loadData()
+      invalidate()
     } catch (error) {
       captureException(error)
       toast.error('Failed to perform action')

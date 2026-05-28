@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, db, storage } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -18,11 +19,22 @@ export default function Products({
 }) {
   const searchRef = useRef(null)
   const [activeTab, setActiveTab] = useURLTab('tab', 'products')
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const { data: productsPageData, isLoading: loading } = useQuery({
+    queryKey: ['products-page'],
+    queryFn: async () => {
+      const [productsData, brandsData, categoriesData, subcategoriesData] = await Promise.all([
+        db.products.list(),
+        db.brands.list(),
+        db.categories.list(),
+        db.subcategories.list(),
+      ])
+      return { productsData, brandsData, categoriesData, subcategoriesData }
+    },
+  })
 
-  const [products, setProducts] = useState([])
+  const products = productsPageData?.productsData ?? []
   const [filteredProducts, setFilteredProducts] = useState([])
-  const [_productsTotalCount, setProductsTotalCount] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedProducts, setSelectedProducts] = useState([])
 
@@ -39,9 +51,9 @@ export default function Products({
     return saved ? JSON.parse(saved) : { key: 'created_date', direction: 'desc' }
   })
 
-  const [brands, setBrands] = useState([])
-  const [categories, setCategories] = useState([])
-  const [subcategories, setSubcategories] = useState([])
+  const brands = productsPageData?.brandsData ?? []
+  const categories = productsPageData?.categoriesData ?? []
+  const subcategories = productsPageData?.subcategoriesData ?? []
   const [expandedBrands, setExpandedBrands] = useState({})
   const [expandedCategories, setExpandedCategories] = useState({})
   const [openBrandMenu, setOpenBrandMenu] = useState(null)
@@ -105,10 +117,6 @@ export default function Products({
   }
 
   useEffect(() => {
-    loadData()
-  }, [])
-
-  useEffect(() => {
     const handler = (e) => {
       if (!e.target.closest('.action-menu')) setOpenMenuId(null)
     }
@@ -125,12 +133,14 @@ export default function Products({
   useEffect(() => {
     const channel = supabase
       .channel('products_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () =>
+        queryClient.invalidateQueries({ queryKey: ['products-page'] })
+      )
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [queryClient])
 
   // Keyboard shortcuts: / = focus search, N = add product, Esc = close modal
   useEffect(() => {
@@ -183,32 +193,6 @@ export default function Products({
     document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
   }, [showAddDropdown, openBrandMenu])
-
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      const [productsData, brandsData, categoriesData, subcategoriesData] = await Promise.all([
-        db.products.list(),
-        db.brands.list(),
-        db.categories.list(),
-        db.subcategories.list(),
-      ])
-
-      db.products
-        .listPaged(0, 1)
-        .then((r) => setProductsTotalCount(r.count))
-        .catch(() => {})
-      setProducts(productsData)
-      setBrands(brandsData)
-      setCategories(categoriesData)
-      setSubcategories(subcategoriesData)
-    } catch (error) {
-      captureException(error)
-      toast.error('Failed to load products')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleSearchAndSort = () => {
     let filtered = [...products]
@@ -342,7 +326,7 @@ export default function Products({
             )
             .catch(() => {})
           setSelectedProducts([])
-          loadData()
+          queryClient.invalidateQueries({ queryKey: ['products-page'] })
         } catch (error) {
           captureException(error)
           toast.error('Failed to delete products')
@@ -368,7 +352,7 @@ export default function Products({
         )
         .catch(() => {})
       setSelectedProducts([])
-      loadData()
+      queryClient.invalidateQueries({ queryKey: ['products-page'] })
     } catch (error) {
       captureException(error)
       toast.error('Failed to update products')
@@ -623,7 +607,7 @@ export default function Products({
       }
 
       setShowBulkUpload(false)
-      loadData()
+      queryClient.invalidateQueries({ queryKey: ['products-page'] })
     } catch (error) {
       captureException(error)
       toast.error(`Failed to import: ${error.message}`)
@@ -762,7 +746,7 @@ export default function Products({
 
       setShowAddProduct(false)
       resetProductForm()
-      loadData()
+      queryClient.invalidateQueries({ queryKey: ['products-page'] })
     } catch (error) {
       captureException(error)
       toast.error(`Failed to save product: ${error.message}`)
@@ -807,7 +791,7 @@ export default function Products({
 
       setShowAddBrand(false)
       resetBrandForm()
-      loadData()
+      queryClient.invalidateQueries({ queryKey: ['products-page'] })
     } catch (error) {
       captureException(error)
       toast.error(`Failed to save brand: ${error.message}`)
@@ -854,7 +838,7 @@ export default function Products({
 
       setShowAddCategory(false)
       resetCategoryForm()
-      loadData()
+      queryClient.invalidateQueries({ queryKey: ['products-page'] })
     } catch (error) {
       captureException(error)
       toast.error(`Failed to save category: ${error.message}`)
@@ -896,7 +880,7 @@ export default function Products({
               `Deleted product ${product.product_name} (${product.sku})`
             )
             .catch(() => {})
-          loadData()
+          queryClient.invalidateQueries({ queryKey: ['products-page'] })
         } catch (error) {
           captureException(error)
           toast.error('Failed to delete product')
@@ -918,7 +902,7 @@ export default function Products({
             .log(currentUserEmail, 'brand_deleted', `Deleted brand ${brand.brand_name}`)
             .catch(() => {})
           setOpenBrandMenu(null)
-          loadData()
+          queryClient.invalidateQueries({ queryKey: ['products-page'] })
         } catch (error) {
           captureException(error)
           toast.error('Failed to delete brand')
@@ -939,7 +923,7 @@ export default function Products({
           db.auditLog
             .log(currentUserEmail, 'category_deleted', `Deleted category ${category.category_name}`)
             .catch(() => {})
-          loadData()
+          queryClient.invalidateQueries({ queryKey: ['products-page'] })
         } catch (error) {
           captureException(error)
           toast.error('Failed to delete category')

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../lib/sentry'
@@ -311,16 +312,20 @@ export default function PartsInventory({
   const canAdjust = canAdd || currentUserRole === ROLES.TECHNICIAN || canDo('adjust_stock')
   const canExport = canAdd || canDo('export')
 
-  const [parts, setParts] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [tableMissing, setTableMissing] = useState(false)
+  const queryClient = useQueryClient()
+  const { data: partsResult, isLoading: loading } = useQuery({
+    queryKey: ['parts'],
+    queryFn: () => db.parts.list(),
+  })
+  const tableMissing = partsResult?.missing ?? false
+  const parts = useMemo(() => partsResult?.data ?? [], [partsResult])
+
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState('part_name')
   const [sortDir, setSortDir] = useState('asc')
   const [showLowOnly, setShowLowOnly] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editingPart, setEditingPart] = useState(null)
-  const [saving, setSaving] = useState(false)
   const [adjusting, setAdjusting] = useState({})
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
@@ -332,29 +337,6 @@ export default function PartsInventory({
   const openConfirm = (title, message, onConfirm) =>
     setConfirmDialog({ open: true, title, message, onConfirm })
   const closeConfirm = () => setConfirmDialog((d) => ({ ...d, open: false }))
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await db.parts.list()
-      if (res.missing) {
-        setTableMissing(true)
-        setLoading(false)
-        return
-      }
-      setTableMissing(false)
-      setParts(res.data || [])
-    } catch (err) {
-      captureException(err, { page: 'PartsInventory', context: 'loadParts' })
-      toast.error('Failed to load parts')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
 
   const handleSort = (key) => {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -390,61 +372,73 @@ export default function PartsInventory({
     })
   }, [parts, search, showLowOnly, sortKey, sortDir])
 
-  const handleSave = async (data) => {
-    setSaving(true)
-    try {
-      if (editingPart) {
-        await db.parts.update(editingPart.id, data)
-        toast.success('Part updated')
-      } else {
-        await db.parts.create(data)
-        toast.success('Part added')
-      }
+  const saveMutation = useMutation({
+    mutationFn: (data) =>
+      editingPart ? db.parts.update(editingPart.id, data) : db.parts.create(data),
+    onSuccess: () => {
+      toast.success(editingPart ? 'Part updated' : 'Part added')
       setShowModal(false)
       setEditingPart(null)
-      await load()
-    } catch (err) {
+      queryClient.invalidateQueries({ queryKey: ['parts'] })
+    },
+    onError: (err) => {
       captureException(err, { page: 'PartsInventory', context: 'savePart' })
       toast.error(err.message || 'Failed to save part')
-    } finally {
-      setSaving(false)
-    }
-  }
+    },
+  })
+  const saving = saveMutation.isPending
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => db.parts.delete(id),
+    onSuccess: () => {
+      toast.success('Part deleted')
+      queryClient.invalidateQueries({ queryKey: ['parts'] })
+    },
+    onError: (err) => {
+      captureException(err, { page: 'PartsInventory', context: 'deletePart' })
+      toast.error('Failed to delete part')
+    },
+  })
+
+  const adjustMutation = useMutation({
+    mutationFn: ({ id, delta }) => db.parts.adjustQuantity(id, delta),
+    onSuccess: (updated, { id, delta, name }) => {
+      queryClient.setQueryData(['parts'], (prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          data: prev.data.map((p) => (p.id === id ? { ...p, quantity: updated.quantity } : p)),
+        }
+      })
+      if (delta > 0) toast.success(`+${delta} added to ${name}`)
+      else toast.success(`${delta} removed from ${name}`)
+    },
+    onError: (err) => {
+      captureException(err, { page: 'PartsInventory', context: 'adjustQuantity' })
+      toast.error('Failed to adjust quantity')
+    },
+    onSettled: (_d, _e, { id }) => {
+      setAdjusting((a) => ({ ...a, [id]: false }))
+    },
+  })
+
+  const handleSave = (data) => saveMutation.mutate(data)
 
   const handleDelete = (part) => {
     openConfirm(
       'Delete Part',
       `Are you sure you want to delete "${part.part_name}"? This cannot be undone.`,
-      async () => {
+      () => {
         closeConfirm()
-        try {
-          await db.parts.delete(part.id)
-          toast.success('Part deleted')
-          await load()
-        } catch (err) {
-          captureException(err, { page: 'PartsInventory', context: 'deletePart' })
-          toast.error('Failed to delete part')
-        }
+        deleteMutation.mutate(part.id)
       }
     )
   }
 
-  const handleAdjust = async (part, delta) => {
+  const handleAdjust = (part, delta) => {
     if (adjusting[part.id]) return
     setAdjusting((a) => ({ ...a, [part.id]: true }))
-    try {
-      const updated = await db.parts.adjustQuantity(part.id, delta)
-      setParts((prev) =>
-        prev.map((p) => (p.id === part.id ? { ...p, quantity: updated.quantity } : p))
-      )
-      if (delta > 0) toast.success(`+${delta} added to ${part.part_name}`)
-      else toast.success(`${delta} removed from ${part.part_name}`)
-    } catch (err) {
-      captureException(err, { page: 'PartsInventory', context: 'adjustQuantity' })
-      toast.error('Failed to adjust quantity')
-    } finally {
-      setAdjusting((a) => ({ ...a, [part.id]: false }))
-    }
+    adjustMutation.mutate({ id: part.id, delta, name: part.part_name })
   }
 
   const handleExport = () => {

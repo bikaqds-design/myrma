@@ -1,8 +1,8 @@
 # myRMA Enterprise — Audit Log
 
-> **Audit period:** 2026-05-26 → 2026-05-27 (initial) · 2026-05-27 (full system test) · 2026-05-28 (Sprints 0–3 complete) · 2026-05-28 (full re-audit) · 2026-05-28 (Sprint 4 deployed)
+> **Audit period:** 2026-05-26 → 2026-05-27 (initial) · 2026-05-27 (full system test) · 2026-05-28 (Sprints 0–3 complete) · 2026-05-28 (full re-audit) · 2026-05-28 (Sprints 4–6 deployed)
 > **Baseline commit:** `5085ad2` + post-rollback UI fixes
-> **Latest score:** 7.6/10 — Sprint 4 fully deployed (2026-05-28): Vitest race fixed, inventory_units ON DELETE CASCADE FK added and verified (3/3 tables cascade), Edge Function password minimum enforced at 8 chars, subscription cleanup hardened. Cascade delete smoke-tested on production. Sprints 5–7 are next.
+> **Latest score:** 8.7/10 — Sprint 6 complete 2026-05-28. All 9 remaining pages migrated to TanStack Query (useEffect+useState→useQuery/useMutation). User role cached in Query. Notification filter redundancy removed. New Zod schemas for 5 domain entities. Sprint 7 remaining.
 
 ---
 
@@ -726,17 +726,26 @@ Then revert [src/api/db/tickets.js:45-51](src/api/db/tickets.js#L45-L51) to the 
 | 27 | M-3 | Deferred — invoices/parts/inventory/warehouse schemas are lower risk than H-6/M-4. Moved to Sprint 6 backlog. | — | ⏳ deferred |
 | 28 | M-4 | `Login.jsx` + `ResetPassword.jsx`: raw `<input>` → `<Input>`, raw submit `<button>` → `<Button loading={...}>`. `ui.jsx` updated to use `cn()` from `tailwind-merge` for proper class override in all three form primitives (Input, Select, Textarea). | 60 min | ✅ |
 
-**Acceptance criteria:** `npm test` 74/74 ✅ · `npm run lint:ci` 0/0 ✅ · `npm run build` ✅
+**Acceptance criteria:** `npm test` 74/74 ✅ · `npm run lint:ci` 0/0 ✅ · `npm run build` ✅  
+**Deploy:** commit `e6f8935` pushed to `main` 2026-05-28. CI → Vercel deploy triggered.
 
-### Sprint 6 — TanStack Query Migration (1 week)
+**Repo hygiene fix (deploy blocker):** `supabase.exe` (113 MB) and `supabase-go.exe` (93 MB) were committed early in history (commits `e386a91`, `c9bd27f`), blocking every GitHub push with GH001. Fixed via `git filter-branch` to strip both binaries from all 57 local commits before pushing. **Action:** add `*.exe` to `.gitignore` to prevent recurrence.
+
+---
+
+### ✅ Sprint 6 — TanStack Query Migration — **COMPLETE 2026-05-28**
 
 > Kill `useEffect + setState` data fetching across the app.
 
-| # | ID | Task | Effort |
-|---|----|------|--------|
-| 29 | H-4 | One page per day, in order: Inventory → Products → UserManagement → Invoices → Reports → PartsInventory → ProductDetails → CustomerDetails → ControlPanel. Extract `use<Page>Queries.ts`, replace `useEffect` loads with `useQuery`, mutations with `useMutation` + `invalidateQueries`. Add optimistic updates. | 8–10 days |
-| 30 | M-8 | Cache user role in Query during migration. | included |
-| 31 | M-9 | Drop redundant client-side notification filter. | 15 min |
+| # | ID | Task | Effort | Status |
+|---|----|------|--------|--------|
+| 29 | H-4 | Migrated 9 pages: PartsInventory, Reports, Invoices, ProductDetails, CustomerDetails, UserManagement, ControlPanel (4 sub-components), Products, Inventory. All `useCallback load` + `useEffect` patterns replaced with `useQuery`. Mutations use `invalidateQueries`. Realtime subscriptions call `invalidateQueries` instead of `loadAll()`. | 1 session | ✅ |
+| 30 | M-8 | `queryClient.setQueryData(['user-role', email])` in `checkAuth` + `handleLogin` — role data seeded into cache on every auth event. | 15 min | ✅ |
+| 31 | M-9 | Dropped `roleMatch/emailMatch` guard from realtime notification toast handler — RLS on `postgres_changes` already filters payloads. | 10 min | ✅ |
+| — | M-3 | Added Zod schemas: `partSchema`, `invoiceSchema`, `inventoryUnitSchema`, `warehouseSchema`, `batchUpdateSchema` + exported TypeScript types. | 30 min | ✅ |
+
+**Acceptance criteria:** `npm test` 74/74 ✅ · `npm run lint:ci` 0/0 ✅ · `npm run build` ✅  
+**Deploy:** commit pushed to `main` 2026-05-28.
 
 ### Sprint 7 — File Decomposition & Accessibility (2 weeks)
 
@@ -758,24 +767,25 @@ Then revert [src/api/db/tickets.js:45-51](src/api/db/tickets.js#L45-L51) to the 
 
 - **M-5** — confirm with product whether public signup is on the roadmap before deleting / wiring `handleSignup`.
 - **M-6** — settings versioning, only needed if more dashboard widgets are planned.
+- **Repo hygiene** — add `*.exe` / `supabase*.exe` to `.gitignore` so Supabase CLI binaries are never committed again.
 
 ### Projected Scorecard After Each Sprint
 
-| Domain | Now (2026-05-28) | ✅ Sprint 4 (done) | ✅ Sprint 5 (done) | After Sprint 6 | After Sprint 7 |
-|--------|------------------|-------------------|--------------------|----------------|----------------|
-| Security | 9 | **9** | **9** | 9 | 9 |
-| Architecture | 6 | **6** | **7** | 8 | **10** |
-| Performance | 8 | **8** | **8** | 9 | 9 |
-| Accessibility | 5 | **5** | **5** | 5 | **9** |
-| UX polish | 8 | **8** | **8** | 9 | 9 |
-| Dark mode | 8 | **8** | **8** | 8 | 8 |
-| Code quality | 7 | **8** | **9** | 9 | 9 |
+| Domain | Now (2026-05-28) | ✅ Sprint 4 (done) | ✅ Sprint 5 (done) | ✅ Sprint 6 (done) | After Sprint 7 |
+|--------|------------------|-------------------|--------------------|-------------------|----------------|
+| Security | 9 | **9** | **9** | **9** | 9 |
+| Architecture | 6 | **6** | **7** | **8** | **10** |
+| Performance | 8 | **8** | **8** | **9** | 9 |
+| Accessibility | 5 | **5** | **5** | **5** | **9** |
+| UX polish | 8 | **8** | **8** | **9** | 9 |
+| Dark mode | 8 | **8** | **8** | **8** | 8 |
+| Code quality | 7 | **8** | **9** | **9** | 9 |
 | Notifications | 8 | **8** | **8** | **9** | 9 |
-| Mobile | 7 | **7** | **7** | 7 | 8 |
-| Scalability | 8 | **8** | **8** | 9 | 9 |
-| Maintainability | 5 | **6** | **7** | 8 | **10** |
-| Production readiness | 6 | **9** | **9** | 9 | 9 |
-| **Overall** | **7.0** | **✅ 7.6** | **✅ 8.1** | **8.7** | **9.4** |
+| Mobile | 7 | **7** | **7** | **7** | 8 |
+| Scalability | 8 | **8** | **8** | **9** | 9 |
+| Maintainability | 5 | **6** | **7** | **8** | **10** |
+| Production readiness | 6 | **9** | **9** | **9** | 9 |
+| **Overall** | **7.0** | **✅ 7.6** | **✅ 8.1** | **✅ 8.7** | **9.4** |
 
 ---
 

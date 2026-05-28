@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { db, storage } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -16,9 +17,6 @@ export default function ProductDetails({
   onBack,
   onNavigateToTicket,
 }) {
-  const [loading, setLoading] = useState(true)
-  const [product, setProduct] = useState(null)
-  const [relatedTickets, setRelatedTickets] = useState([])
   const [activeTab, setActiveTab] = useURLTab('tab', 'details')
   const [editMode, setEditMode] = useState(false)
 
@@ -32,9 +30,27 @@ export default function ProductDetails({
     setConfirmDialog({ open: true, title, message, onConfirm })
   const closeConfirm = () => setConfirmDialog((d) => ({ ...d, open: false }))
 
-  const [brands, setBrands] = useState([])
-  const [categories, setCategories] = useState([])
-  const [subcategories, setSubcategories] = useState([])
+  const { data: productPageData, isLoading: loading } = useQuery({
+    queryKey: ['product-details', productId],
+    queryFn: async () => {
+      const [productData, brandsData, categoriesData, subcategoriesData, ticketsData] =
+        await Promise.all([
+          db.products.get(productId),
+          db.brands.list(),
+          db.categories.list(),
+          db.subcategories.list(),
+          db.products.getRelatedTickets(productId).catch(() => []),
+        ])
+      return { productData, brandsData, categoriesData, subcategoriesData, ticketsData }
+    },
+    enabled: !!productId,
+  })
+
+  const product = productPageData?.productData ?? null
+  const brands = productPageData?.brandsData ?? []
+  const categories = productPageData?.categoriesData ?? []
+  const subcategories = productPageData?.subcategoriesData ?? []
+  const relatedTickets = productPageData?.ticketsData ?? []
 
   const [editForm, setEditForm] = useState({
     brand_id: '',
@@ -49,56 +65,27 @@ export default function ProductDetails({
     product_link: '',
     product_image_url: null,
   })
-
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
 
+  // Sync editForm and imagePreview when product data loads
   useEffect(() => {
-    if (productId) {
-      loadProductDetails()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productId])
-
-  const loadProductDetails = async () => {
-    setLoading(true)
-    try {
-      const [productData, brandsData, categoriesData, subcategoriesData, ticketsData] =
-        await Promise.all([
-          db.products.get(productId),
-          db.brands.list(),
-          db.categories.list(),
-          db.subcategories.list(),
-          db.products.getRelatedTickets(productId).catch(() => []),
-        ])
-
-      setProduct(productData)
-      setBrands(brandsData)
-      setCategories(categoriesData)
-      setSubcategories(subcategoriesData)
-      setRelatedTickets(ticketsData)
-
-      setEditForm({
-        brand_id: productData.brand_id || '',
-        category_id: productData.category_id || '',
-        subcategory_id: productData.subcategory_id || '',
-        sku: productData.sku || '',
-        product_name: productData.product_name || '',
-        product_type: productData.product_type || 'hardware',
-        status: productData.status || 'active',
-        warranty_months: productData.warranty_months || 12,
-        product_description: productData.product_description || '',
-        product_link: productData.product_link || '',
-        product_image_url: productData.product_image_url || null,
-      })
-      setImagePreview(productData.product_image_url)
-    } catch (error) {
-      captureException(error)
-      toast.error('Failed to load product details')
-    } finally {
-      setLoading(false)
-    }
-  }
+    if (!product) return
+    setEditForm({
+      brand_id: product.brand_id || '',
+      category_id: product.category_id || '',
+      subcategory_id: product.subcategory_id || '',
+      sku: product.sku || '',
+      product_name: product.product_name || '',
+      product_type: product.product_type || 'hardware',
+      status: product.status || 'active',
+      warranty_months: product.warranty_months || 12,
+      product_description: product.product_description || '',
+      product_link: product.product_link || '',
+      product_image_url: product.product_image_url || null,
+    })
+    setImagePreview(product.product_image_url)
+  }, [product])
 
   const handleImageChange = (e) => {
     const file = e.target.files[0]

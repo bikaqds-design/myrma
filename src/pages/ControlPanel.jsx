@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useURLTab } from '../hooks/useURLTab'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -628,42 +629,41 @@ function SendAlert({ currentUserEmail }) {
 // ─── HOME VIEW ─────────────────────────────────────────────────────────────
 
 function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
-  const [stats, setStats] = useState(null)
-
-  useEffect(() => {
-    Promise.all([
-      db.rmaTickets.list(),
-      db.customers.list(),
-      db.products.list(),
-      db.userRoles.listAllRoles(),
-    ])
-      .then(([tickets, customers, products, users]) => {
-        const byStatus = tickets.reduce((a, t) => {
-          a[t.ticket_status] = (a[t.ticket_status] || 0) + 1
-          return a
-        }, {})
-        const open =
-          (byStatus['New'] || 0) + (byStatus['In Progress'] || 0) + (byStatus['On Hold'] || 0)
-        const overdue = tickets.filter(
-          (t) =>
-            t.due_date &&
-            new Date(t.due_date) < new Date() &&
-            t.ticket_status !== 'Completed' &&
-            t.ticket_status !== 'Cancelled'
-        ).length
-        setStats({
-          total: tickets.length,
-          open,
-          overdue,
-          completed: byStatus['Completed'] || 0,
-          customers: customers.length,
-          products: products.length,
-          users: users.length,
-          byStatus,
-        })
-      })
-      .catch(() => {})
-  }, [])
+  const { data: stats } = useQuery({
+    queryKey: ['control-panel-stats'],
+    queryFn: async () => {
+      const [tickets, customers, products, users] = await Promise.all([
+        db.rmaTickets.list(),
+        db.customers.list(),
+        db.products.list(),
+        db.userRoles.listAllRoles(),
+      ])
+      const byStatus = tickets.reduce((a, t) => {
+        a[t.ticket_status] = (a[t.ticket_status] || 0) + 1
+        return a
+      }, {})
+      const open =
+        (byStatus['Open'] || 0) + (byStatus['In Progress'] || 0) + (byStatus['On Hold'] || 0)
+      const overdue = tickets.filter(
+        (t) =>
+          t.due_date &&
+          new Date(t.due_date) < new Date() &&
+          t.ticket_status !== 'Closed' &&
+          t.ticket_status !== 'Cancelled'
+      ).length
+      return {
+        total: tickets.length,
+        open,
+        overdue,
+        completed: byStatus['Closed'] || 0,
+        customers: customers.length,
+        products: products.length,
+        users: users.length,
+        byStatus,
+      }
+    },
+    staleTime: 2 * 60_000,
+  })
 
   const statCards = stats
     ? [
@@ -773,15 +773,21 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
 const PRIORITIES = ['Critical', 'High', 'Medium', 'Low']
 
 function SLAPolicies({ currentUserEmail }) {
-  const [config, setConfig] = useState(null)
+  const queryClient = useQueryClient()
+  const { data: config, isLoading: slaLoading } = useQuery({
+    queryKey: ['sla-config'],
+    queryFn: () => db.slaConfig.get(),
+  })
+  const [localConfig, setLocalConfig] = useState(null)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    db.slaConfig.get().then(setConfig)
-  }, [])
+  // Keep local editable copy in sync with fetched config
+  React.useEffect(() => {
+    if (config && !localConfig) setLocalConfig(config)
+  }, [config, localConfig])
 
   const updatePolicy = (priority, hours) => {
-    setConfig((prev) => ({
+    setLocalConfig((prev) => ({
       ...prev,
       policies: prev.policies.map((p) =>
         p.priority === priority ? { ...p, hours: Number(hours) } : p
@@ -792,7 +798,8 @@ function SLAPolicies({ currentUserEmail }) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await db.slaConfig.save(config, currentUserEmail)
+      await db.slaConfig.save(localConfig, currentUserEmail)
+      queryClient.invalidateQueries({ queryKey: ['sla-config'] })
       toast.success('SLA policies saved')
       db.auditLog
         .log(currentUserEmail, 'sla_updated', 'Updated SLA policy configuration')
@@ -805,7 +812,7 @@ function SLAPolicies({ currentUserEmail }) {
     }
   }
 
-  if (!config)
+  if (slaLoading || !localConfig)
     return (
       <div className="flex justify-center py-10">
         <Spinner />
@@ -825,19 +832,19 @@ function SLAPolicies({ currentUserEmail }) {
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <span className="text-sm text-gray-600 font-medium">Enabled</span>
             <button
-              onClick={() => setConfig((c) => ({ ...c, enabled: !c.enabled }))}
-              className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${config.enabled ? 'bg-indigo-600' : 'bg-gray-300'}`}
+              onClick={() => setLocalConfig((c) => ({ ...c, enabled: !c.enabled }))}
+              className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${localConfig.enabled ? 'bg-indigo-600' : 'bg-gray-300'}`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${config.enabled ? 'translate-x-4' : 'translate-x-0'}`}
+                className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${localConfig.enabled ? 'translate-x-4' : 'translate-x-0'}`}
               />
             </button>
           </label>
         </div>
 
-        <div className={`space-y-3 ${!config.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
+        <div className={`space-y-3 ${!localConfig.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
           {PRIORITIES.map((p) => {
-            const policy = config.policies?.find((pl) => pl.priority === p) || {
+            const policy = localConfig.policies?.find((pl) => pl.priority === p) || {
               priority: p,
               hours: 72,
             }
@@ -873,11 +880,11 @@ function SLAPolicies({ currentUserEmail }) {
           <div className="flex items-center gap-3 pt-2">
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <button
-                onClick={() => setConfig((c) => ({ ...c, pauseOnHold: !c.pauseOnHold }))}
-                className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${config.pauseOnHold ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                onClick={() => setLocalConfig((c) => ({ ...c, pauseOnHold: !c.pauseOnHold }))}
+                className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${localConfig.pauseOnHold ? 'bg-indigo-600' : 'bg-gray-300'}`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${config.pauseOnHold ? 'translate-x-4' : 'translate-x-0'}`}
+                  className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${localConfig.pauseOnHold ? 'translate-x-4' : 'translate-x-0'}`}
                 />
               </button>
               <span className="text-sm text-gray-600">
@@ -947,19 +954,25 @@ const EMPTY_RULE = () => ({
 })
 
 function AutomationRules({ currentUserEmail }) {
+  const queryClient = useQueryClient()
+  const { data: fetchedRules } = useQuery({
+    queryKey: ['automation-rules'],
+    queryFn: () => db.automationRules.list(),
+  })
   const [rules, setRules] = useState(null)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    db.automationRules.list().then((r) => setRules(r || []))
-  }, [])
+  React.useEffect(() => {
+    if (fetchedRules && !rules) setRules(fetchedRules || [])
+  }, [fetchedRules, rules])
 
   const saveAll = async (newRules) => {
     setSaving(true)
     try {
       await db.automationRules.save(newRules, currentUserEmail)
       setRules(newRules)
+      queryClient.invalidateQueries({ queryKey: ['automation-rules'] })
       toast.success('Automation rules saved')
     } catch (e) {
       captureException(e, { page: 'ControlPanel', context: 'saveAutomationRules' })
@@ -1385,20 +1398,26 @@ const EMPTY_HOOK = () => ({
 })
 
 function WebhooksConfig({ currentUserEmail }) {
+  const queryClient = useQueryClient()
+  const { data: fetchedHooks } = useQuery({
+    queryKey: ['webhooks'],
+    queryFn: () => db.webhooks.list(),
+  })
   const [hooks, setHooks] = useState(null)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(null)
 
-  useEffect(() => {
-    db.webhooks.list().then((h) => setHooks(h || []))
-  }, [])
+  React.useEffect(() => {
+    if (fetchedHooks && !hooks) setHooks(fetchedHooks || [])
+  }, [fetchedHooks, hooks])
 
   const saveAll = async (newHooks) => {
     setSaving(true)
     try {
       await db.webhooks.save(newHooks, currentUserEmail)
       setHooks(newHooks)
+      queryClient.invalidateQueries({ queryKey: ['webhooks'] })
       toast.success('Webhooks saved')
     } catch (e) {
       captureException(e, { page: 'ControlPanel', context: 'saveWebhooks' })

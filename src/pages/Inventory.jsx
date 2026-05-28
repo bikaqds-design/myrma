@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useURLTab } from '../hooks/useURLTab'
 import { supabase, db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -1195,21 +1196,10 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
       ? true
       : userPermissions?.inventory?.[a] === true
 
-  const [tab, setTab] = useURLTab('tab', 'overview')
-  const [units, setUnits] = useState([])
-  const [batches, setBatches] = useState([])
-  const [brands, setBrands] = useState([])
-  const [brandMap, setBrandMap] = useState({})
-  const [warehouses, setWarehouses] = useState([])
-  const [whMissing, setWhMissing] = useState(false)
-  const [stats, setStats] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [tableMissing, setTableMissing] = useState(false)
-  const [rmaTickets, setRmaTickets] = useState([])
-
-  const loadAll = useCallback(async () => {
-    setLoading(true)
-    try {
+  const queryClient = useQueryClient()
+  const { data: invData, isLoading: loading } = useQuery({
+    queryKey: ['inventory'],
+    queryFn: async () => {
       const [ur, br, sr, brandList, productList, whRes, tkRes] = await Promise.all([
         db.inventory.listUnits(),
         db.inventory.listBatches(),
@@ -1219,54 +1209,44 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
         db.warehouses.list().catch(() => ({ missing: true, data: [] })),
         supabase
           .from('rma_tickets')
-          .select(
-            'id,rma_number,ticket_status,customer_name,assigned_technician,created_date,products'
-          )
+          .select('id,rma_number,ticket_status,customer_name,assigned_technician,created_date,products')
           .then((r) => r.data || []),
       ])
-      if (ur.missing) {
-        setTableMissing(true)
-        setLoading(false)
-        return
-      }
-      setTableMissing(false)
-      setUnits(ur.data)
-      setBatches(br.missing ? [] : br.data)
-      setStats(sr)
-      setBrands(brandList || [])
       const map = {}
       for (const p of productList || [])
         if (p.product_name) map[p.product_name] = p.brand?.brand_name || ''
-      setBrandMap(map)
-      setWhMissing(whRes.missing)
-      setWarehouses(whRes.data || [])
-      setRmaTickets(tkRes)
-    } catch {
-      toast.error('Failed to load inventory')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+      return { ur, br, sr, brandList, brandMap: map, whRes, tkRes }
+    },
+  })
 
-  useEffect(() => {
-    loadAll()
-  }, [loadAll])
+  const tableMissing = invData?.ur?.missing ?? false
+  const units = invData?.ur?.data ?? []
+  const batches = invData?.br?.missing ? [] : (invData?.br?.data ?? [])
+  const stats = invData?.sr ?? null
+  const brands = invData?.brandList ?? []
+  const brandMap = invData?.brandMap ?? {}
+  const whMissing = invData?.whRes?.missing ?? false
+  const warehouses = invData?.whRes?.data ?? []
+  const rmaTickets = invData?.tkRes ?? []
+
+  const [tab, setTab] = useURLTab('tab', 'overview')
+
+  const invalidateInventory = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ['inventory'] }),
+    [queryClient]
+  )
 
   // Real-time: refresh when inventory_units or rma_tickets change
   useEffect(() => {
     const channel = supabase
       .channel('inventory_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_units' }, () =>
-        loadAll()
-      )
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rma_tickets' }, () =>
-        loadAll()
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_units' }, invalidateInventory)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rma_tickets' }, invalidateInventory)
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [loadAll])
+  }, [invalidateInventory])
 
   if (loading)
     return (
@@ -1308,7 +1288,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
         </div>
         <pre className="bg-amber-100 border border-amber-200 rounded-xl p-4 text-xs text-amber-900 overflow-x-auto whitespace-pre">{`CREATE TABLE IF NOT EXISTS inventory_units (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  rma_ticket_id UUID, rma_number TEXT, product_name TEXT, serial_number TEXT,\n  warranty_status TEXT, status TEXT DEFAULT 'active_rma', resolution_type TEXT,\n  resolved_date TIMESTAMPTZ, manufacturer_batch_id UUID, notes TEXT,\n  created_date TIMESTAMPTZ DEFAULT now()\n);\n\nCREATE TABLE IF NOT EXISTS manufacturer_batches (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  batch_number TEXT UNIQUE, manufacturer_name TEXT, status TEXT DEFAULT 'draft',\n  sent_date DATE, tracking_number TEXT, resolution_type TEXT, resolution_date DATE,\n  resolution_notes TEXT, unit_count INT DEFAULT 0,\n  created_date TIMESTAMPTZ DEFAULT now(), created_by TEXT\n);`}</pre>
         <button
-          onClick={loadAll}
+          onClick={invalidateInventory}
           className="px-5 py-2 bg-amber-600 text-white rounded-xl text-sm font-medium hover:bg-amber-700"
         >
           Retry
@@ -1390,7 +1370,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
           <ExportMenu units={units} batches={batches} warehouses={warehouses} brandMap={brandMap} />
         )}
         <button
-          onClick={loadAll}
+          onClick={invalidateInventory}
           className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1436,7 +1416,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
           canResolve={canDo('resolve_units')}
           canTransfer={canDo('transfer')}
           userEmail={userEmail}
-          onReload={loadAll}
+          onReload={invalidateInventory}
           onNavigateToTicket={onNavigateToTicket}
         />
       )}
@@ -1478,7 +1458,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
           units={units}
           canTransfer={canDo('transfer')}
           userEmail={userEmail}
-          onReload={loadAll}
+          onReload={invalidateInventory}
         />
       )}
       {tab === 'warehouses' && (
@@ -1491,7 +1471,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
           userEmail={userEmail}
           canManage={canDo('manage_warehouses')}
           canTransfer={canDo('transfer')}
-          onReload={loadAll}
+          onReload={invalidateInventory}
         />
       )}
     </div>

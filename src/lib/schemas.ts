@@ -130,6 +130,76 @@ export const resetPasswordSchema = z
     path: ['confirmPassword'],
   })
 
+// ── Parts inventory ───────────────────────────────────────────────────────────
+
+export const partSchema = z.object({
+  part_name: z.string().min(1, 'Part name is required').max(300),
+  part_number: z.string().max(100).optional().nullable(),
+  quantity: z.number().int().min(0, 'Quantity must be 0 or more'),
+  unit_cost: z.number().min(0).optional().nullable(),
+  supplier: z.string().max(200).optional().nullable(),
+  reorder_level: z.number().int().min(0).optional().nullable(),
+  location: z.string().max(200).optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
+})
+
+// ── Invoices ──────────────────────────────────────────────────────────────────
+
+const lineItemSchema = z.object({
+  description: z.string().min(1, 'Description is required').max(500),
+  quantity: z.number().int().min(1),
+  unit_price: z.number().min(0),
+})
+
+export const invoiceSchema = z.object({
+  type: z.enum(['invoice', 'quote']),
+  invoice_number: z.string().min(1, 'Invoice number is required').max(100),
+  customer_name: z.string().min(1, 'Customer name is required').max(200),
+  customer_email: z
+    .union([z.string().email('Enter a valid email'), z.literal(''), z.null()])
+    .optional(),
+  rma_number_ref: z.string().max(100).optional().nullable(),
+  ticket_id: z.string().optional().nullable(),
+  lineItems: z.array(lineItemSchema).min(1, 'At least one line item is required'),
+  labour_hours: z.number().min(0).optional().nullable(),
+  labour_rate: z.number().min(0).optional().nullable(),
+  tax_pct: z.number().min(0).max(100).optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
+  due_date: z.string().optional().nullable(),
+  status: z.enum(['draft', 'sent', 'paid', 'pending', 'overdue']),
+})
+
+// ── Inventory units (manual create/update) ────────────────────────────────────
+
+export const inventoryUnitSchema = z.object({
+  product_name: z.string().min(1, 'Product name is required').max(300),
+  serial_number: z.string().max(100).optional().nullable(),
+  warranty_status: z.string().max(100).optional().nullable(),
+  status: z.string().max(100).optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
+  warehouse_id: z.string().uuid().optional().nullable(),
+})
+
+// ── Warehouses ────────────────────────────────────────────────────────────────
+
+export const warehouseSchema = z.object({
+  name: z.string().min(1, 'Warehouse name is required').max(200),
+  code: z.string().max(50).optional().nullable(),
+  location: z.string().max(300).optional().nullable(),
+  description: z.string().max(1000).optional().nullable(),
+  is_active: z.boolean().optional(),
+})
+
+// ── Manufacturer batches ──────────────────────────────────────────────────────
+
+export const batchUpdateSchema = z.object({
+  sent_date: z.string().optional().nullable(),
+  tracking_number: z.string().max(100).optional().nullable(),
+  resolution_type: z.string().max(100).optional().nullable(),
+  resolution_date: z.string().optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
+})
+
 // ── Derived types ─────────────────────────────────────────────────────────────
 
 export type LoginFormData = z.infer<typeof loginSchema>
@@ -139,6 +209,10 @@ export type CustomerFormData = z.infer<typeof customerSchema>
 export type TicketFormData = z.infer<typeof ticketSchema>
 export type ProductFormData = z.infer<typeof productSchema>
 export type AddUserFormData = z.infer<typeof addUserSchema>
+export type PartFormData = z.infer<typeof partSchema>
+export type InvoiceFormData = z.infer<typeof invoiceSchema>
+export type InventoryUnitFormData = z.infer<typeof inventoryUnitSchema>
+export type WarehouseFormData = z.infer<typeof warehouseSchema>
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 

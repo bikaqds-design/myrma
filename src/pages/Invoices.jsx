@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { Button, Spinner, PageHeader } from '../components/ui'
@@ -554,10 +555,26 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
   const isTech = currentUserRole === ROLES.TECHNICIAN
   const isViewer = currentUserRole === ROLES.VIEWER
 
-  const [invoices, setInvoices] = useState([])
-  const [tickets, setTickets] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [tableMissing, setTableMissing] = useState(false)
+  const queryClient = useQueryClient()
+  const { data: invoicesData, isLoading: loading, isError: invoicesError } = useQuery({
+    queryKey: ['invoices'],
+    queryFn: () => db.invoices.list(),
+  })
+  const { data: ticketsData } = useQuery({
+    queryKey: ['rma-tickets'],
+    queryFn: () => db.rmaTickets.list(),
+    staleTime: 60_000,
+  })
+  const tableMissing = invoicesData?.missing ?? false
+  const invoices = useMemo(
+    () => (invoicesData?.missing ? [] : (invoicesData?.data ?? invoicesData ?? [])),
+    [invoicesData]
+  )
+  const tickets = useMemo(() => ticketsData ?? [], [ticketsData])
+
+  useEffect(() => {
+    if (invoicesError) toast.error('Failed to load invoices')
+  }, [invoicesError])
   const [activeTab, setActiveTab] = useState('All')
   const [panelOpen, setPanelOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -573,31 +590,6 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
   const openConfirm = (title, message, onConfirm) =>
     setConfirmDialog({ open: true, title, message, onConfirm })
   const closeConfirm = () => setConfirmDialog((d) => ({ ...d, open: false, onConfirm: null }))
-
-  // ─── Load data ──────────────────────────────────────────────────────────────
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [invRes, tickRes] = await Promise.all([db.invoices.list(), db.rmaTickets.list()])
-      if (invRes?.missing) {
-        setTableMissing(true)
-        setInvoices([])
-      } else {
-        setTableMissing(false)
-        setInvoices(invRes?.data ?? invRes ?? [])
-      }
-      setTickets(tickRes)
-    } catch (err) {
-      captureException(err)
-      toast.error('Failed to load invoices')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
 
   // ─── Filtered list ───────────────────────────────────────────────────────────
   const visibleInvoices = useMemo(() => {
@@ -681,22 +673,18 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
       if (editingId) {
         const res = await db.invoices.update(editingId, payload)
         if (res?.missing) {
-          setTableMissing(true)
           toast.error('Invoices table not found')
           return
         }
-        setInvoices((prev) =>
-          prev.map((inv) => (inv.id === editingId ? { ...inv, ...payload } : inv))
-        )
+        queryClient.invalidateQueries({ queryKey: ['invoices'] })
         toast.success('Invoice updated')
       } else {
         const res = await db.invoices.create(payload)
         if (res?.missing) {
-          setTableMissing(true)
           toast.error('Invoices table not found')
           return
         }
-        setInvoices((prev) => [res, ...prev])
+        queryClient.invalidateQueries({ queryKey: ['invoices'] })
         toast.success(`${form.type === 'quote' ? 'Quote' : 'Invoice'} created`)
       }
       setPanelOpen(false)
@@ -712,7 +700,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
   const updateStatus = async (inv, newStatus) => {
     try {
       await db.invoices.update(inv.id, { status: newStatus })
-      setInvoices((prev) => prev.map((i) => (i.id === inv.id ? { ...i, status: newStatus } : i)))
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
       toast.success(`Marked as ${newStatus}`)
     } catch (err) {
       toast.error(err.message || 'Failed to update status')
@@ -728,7 +716,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
         closeConfirm()
         try {
           await db.invoices.delete(inv.id)
-          setInvoices((prev) => prev.filter((i) => i.id !== inv.id))
+          queryClient.invalidateQueries({ queryKey: ['invoices'] })
           toast.success('Invoice deleted')
         } catch (err) {
           toast.error(err.message || 'Delete failed')

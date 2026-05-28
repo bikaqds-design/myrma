@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom'
 import { Toaster, toast } from 'react-hot-toast'
+import { useQueryClient } from '@tanstack/react-query'
 import { auth, db, branding as brandingAPI, supabase } from './api/supabaseClient'
 import { useAppearance } from './contexts/AppearanceContext'
 import { ROLE_DEFAULT_PERMISSIONS } from './lib/permissions'
@@ -121,6 +122,7 @@ export default function App() {
   const navigate = useNavigate()
   const location = useLocation()
   const pathname = location.pathname
+  const queryClient = useQueryClient()
 
   const { sidebarCompact, updateAppearance, darkMode } = useAppearance()
   const toastOptions = darkMode
@@ -178,6 +180,7 @@ export default function App() {
       }
     })
     return () => subscription?.unsubscribe()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const checkAuth = async () => {
@@ -186,6 +189,7 @@ export default function App() {
       if (user) {
         setCurrentUser(user)
         const roleData = await db.userRoles.getUserRole(user.email)
+        queryClient.setQueryData(['user-role', user.email], roleData)
         const role = roleData?.role || 'technician'
         setCurrentUserRole(role)
         setCurrentUserPermissions(roleData?.permissions || ROLE_DEFAULT_PERMISSIONS[role] || null)
@@ -249,14 +253,11 @@ export default function App() {
         { event: 'INSERT', schema: 'public', table: 'notifications' },
         (payload) => {
           loadNotifs()
-          // UX-5: show a toast for notifications targeted at this user
+          // UX-5: toast for incoming notifications — RLS on postgres_changes already ensures
+          // only rows this user can SELECT reach the client; no client-side targeting check needed.
           const n = payload.new
           if (!n) return
-          const myRole = currentUserRole
           const myEmail = currentUser?.email
-          const roleMatch = !n.target_roles?.length || n.target_roles.includes(myRole)
-          const emailMatch = n.target_emails?.length && n.target_emails.includes(myEmail)
-          if (!roleMatch && !emailMatch) return
           try {
             const prefs = JSON.parse(localStorage.getItem(`notif_system_prefs_${myEmail}`) || '{}')
             if (prefs[n.type] === false) return
@@ -361,6 +362,7 @@ export default function App() {
     const user = data?.user || data
     setCurrentUser(user)
     const roleData = await db.userRoles.getUserRole(user.email)
+    queryClient.setQueryData(['user-role', user.email], roleData)
     const role = roleData?.role || 'technician'
     setCurrentUserRole(role)
     setCurrentUserPermissions(roleData?.permissions || ROLE_DEFAULT_PERMISSIONS[role] || null)

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, storage } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -17,10 +18,23 @@ export default function CustomerDetails({
   onBack,
   onNavigateToTicket,
 }) {
-  const [customer, setCustomer] = useState(null)
-  const [tickets, setTickets] = useState([])
+  const queryClient = useQueryClient()
+  const { data: customerPageData, isLoading: loading } = useQuery({
+    queryKey: ['customer-details', customerId],
+    queryFn: async () => {
+      const [customerData, ticketsData, notesData] = await Promise.all([
+        db.customers.get(customerId),
+        db.customers.getRelatedTickets(customerId),
+        db.customerNotes.list(customerId),
+      ])
+      return { customerData, ticketsData, notesData }
+    },
+    enabled: !!customerId,
+  })
+
+  const customer = customerPageData?.customerData ?? null
+  const tickets = customerPageData?.ticketsData ?? []
   const [notes, setNotes] = useState([])
-  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useURLTab('tab', 'profile')
   const [isEditing, setIsEditing] = useState(false)
   const [editForm, setEditForm] = useState({})
@@ -48,30 +62,13 @@ export default function CustomerDetails({
     setConfirmDialog({ open: true, title, message, onConfirm })
   const closeConfirm = () => setConfirmDialog((d) => ({ ...d, open: false }))
 
+  // Sync notes and editForm when query data loads
   useEffect(() => {
-    loadAll()
+    if (!customerPageData) return
+    setNotes(customerPageData.notesData || [])
+    setEditForm(customerPageData.customerData || {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerId])
-
-  const loadAll = async () => {
-    setLoading(true)
-    try {
-      const [customerData, ticketsData, notesData] = await Promise.all([
-        db.customers.get(customerId),
-        db.customers.getRelatedTickets(customerId),
-        db.customerNotes.list(customerId),
-      ])
-      setCustomer(customerData)
-      setEditForm(customerData)
-      setTickets(ticketsData)
-      setNotes(notesData)
-    } catch (error) {
-      captureException(error)
-      toast.error('Failed to load customer details')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleSaveEdit = async () => {
     if (!editForm.contact_person?.trim() || !editForm.mobile?.trim()) {
@@ -116,10 +113,11 @@ export default function CustomerDetails({
         updated_by: currentUserEmail,
         updated_date: new Date().toISOString(),
       })
-      setCustomer(updated)
       setEditForm(updated)
       setPendingFiles([])
       setIsEditing(false)
+      queryClient.invalidateQueries({ queryKey: ['customer-details', customerId] })
+      queryClient.invalidateQueries({ queryKey: ['customers'] })
       toast.success('Customer updated successfully')
       db.auditLog
         .log(

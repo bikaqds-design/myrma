@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../lib/sentry'
@@ -958,51 +959,32 @@ export default function Reports({
   ]
   const [activeTab, setActiveTab] = useState('tickets')
 
-  // Data state
-  const [tickets, setTickets] = useState([])
-  const [customers, setCustomers] = useState([])
-  const [timeEntries, setTimeEntries] = useState([])
-  const [timeEntriesMissing, setTeam] = useState(false)
-  const [invoices, setInvoices] = useState([])
-  const [invoicesMissing, setInvMissing] = useState(false)
-  const [loading, setLoading] = useState(true)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
+  const { data: reportData, isLoading: loading, isError, error } = useQuery({
+    queryKey: ['reports', isAdminOrManager],
+    queryFn: async () => {
       const [tkRes, custRes, teRes, invRes] = await Promise.all([
         db.rmaTickets.list(),
         db.customers.list(),
-        isAdminOrManager ? db.timeEntries.listAll() : Promise.resolve({ missing: false, data: [] }),
-        isAdminOrManager ? db.invoices.list() : Promise.resolve({ missing: false, data: [] }),
+        isAdminOrManager ? db.timeEntries.listAll() : { missing: false, data: [] },
+        isAdminOrManager ? db.invoices.list() : { missing: false, data: [] },
       ])
-      setTickets(tkRes || [])
-      setCustomers(custRes || [])
-      if (teRes.missing) {
-        setTeam(true)
-        setTimeEntries([])
-      } else {
-        setTeam(false)
-        setTimeEntries(teRes.data || [])
-      }
-      if (invRes.missing) {
-        setInvMissing(true)
-        setInvoices([])
-      } else {
-        setInvMissing(false)
-        setInvoices(invRes.data || [])
-      }
-    } catch (err) {
-      captureException(err, { page: 'Reports', context: 'loadData' })
-      toast.error('Failed to load report data')
-    } finally {
-      setLoading(false)
-    }
-  }, [isAdminOrManager])
+      return { tkRes, custRes, teRes, invRes }
+    },
+  })
 
   useEffect(() => {
-    load()
-  }, [load])
+    if (isError) {
+      captureException(error, { page: 'Reports', context: 'loadData' })
+      toast.error('Failed to load report data')
+    }
+  }, [isError, error])
+
+  const tickets = useMemo(() => reportData?.tkRes || [], [reportData])
+  const customers = useMemo(() => reportData?.custRes || [], [reportData])
+  const timeEntriesMissing = reportData?.teRes?.missing ?? false
+  const timeEntries = useMemo(() => reportData?.teRes?.data ?? [], [reportData])
+  const invoicesMissing = reportData?.invRes?.missing ?? false
+  const invoices = useMemo(() => reportData?.invRes?.data ?? [], [reportData])
 
   // Apply date range filter
   const filteredTickets = useMemo(
