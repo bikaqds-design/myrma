@@ -1,0 +1,15 @@
+export const EMPTY_FORM = {
+  customer_type: 'B2B',
+  customer_status: 'Active',
+  company_name: '',
+  contact_person: '',
+  account_manager: '',
+  mobile: '',
+  landline: '',
+  email: '',
+  address: '',
+  cr_number: '',
+  tax_id: '',
+  notes: '',
+  attachments: [],
+}
