@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { captureException } from '../lib/sentry'
 import { Spinner, PageHeader } from '../components/ui'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { ROLES, INVOICE_STATUS } from '../lib/constants'
@@ -991,7 +992,8 @@ export default function Reports({
         setInvMissing(false)
         setInvoices(invRes.data || [])
       }
-    } catch {
+    } catch (err) {
+      captureException(err, { page: 'Reports', context: 'loadData' })
       toast.error('Failed to load report data')
     } finally {
       setLoading(false)

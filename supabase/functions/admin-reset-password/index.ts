@@ -69,8 +69,8 @@ Deno.serve(async (req) => {
     })
   }
 
-  if (!targetEmail || !newPassword || newPassword.length < 6) {
-    return new Response(JSON.stringify({ error: 'targetEmail and newPassword (min 6 chars) are required' }), {
+  if (!targetEmail || !newPassword || newPassword.length < 8) {
+    return new Response(JSON.stringify({ error: 'targetEmail and newPassword (min 8 chars) are required' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }

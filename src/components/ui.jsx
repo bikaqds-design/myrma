@@ -1,4 +1,5 @@
 import React from 'react'
+import { cn } from '../lib/utils'
 
 // ─── BUTTON ───────────────────────────────────────────────────────────────────
 const BTN_BASE =
@@ -30,7 +31,7 @@ export function Button({
   const spinColor = variant === 'secondary' || variant === 'ghost' ? 'gray' : 'white'
   return (
     <button
-      className={`${BTN_BASE} ${BTN_VARIANTS[variant] ?? BTN_VARIANTS.primary} ${BTN_SIZES[size] ?? BTN_SIZES.md} ${className}`}
+      className={cn(BTN_BASE, BTN_VARIANTS[variant] ?? BTN_VARIANTS.primary, BTN_SIZES[size] ?? BTN_SIZES.md, className)}
       disabled={loading || props.disabled}
       {...props}
     >
@@ -121,19 +122,19 @@ const INPUT_BASE =
   'disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed'
 
 export function Input({ className = '', ...props }) {
-  return <input className={`${INPUT_BASE} ${className}`} {...props} />
+  return <input className={cn(INPUT_BASE, className)} {...props} />
 }
 
 export function Select({ className = '', children, ...props }) {
   return (
-    <select className={`${INPUT_BASE} ${className}`} {...props}>
+    <select className={cn(INPUT_BASE, className)} {...props}>
       {children}
     </select>
   )
 }
 
 export function Textarea({ className = '', rows = 3, ...props }) {
-  return <textarea rows={rows} className={`${INPUT_BASE} resize-none ${className}`} {...props} />
+  return <textarea rows={rows} className={cn(INPUT_BASE, 'resize-none', className)} {...props} />
 }
 
 // ─── LABEL ────────────────────────────────────────────────────────────────────

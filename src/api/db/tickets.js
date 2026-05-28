@@ -43,9 +43,9 @@ export const rmaTickets = {
     return data?.[0]
   },
   async delete(id) {
-    await supabase.from('inventory_units').delete().eq('rma_ticket_id', id)
-    await supabase.from('ticket_comments').delete().eq('ticket_id', id)
-    await supabase.from('ticket_activity').delete().eq('ticket_id', id)
+    // Cascade is enforced by ON DELETE CASCADE FKs on inventory_units,
+    // ticket_comments, ticket_activity → rma_tickets (migration 20260528).
+    // Postgres deletes children atomically inside the parent delete's transaction.
     const { error } = await supabase.from('rma_tickets').delete().eq('id', id)
     if (error) throw error
   },

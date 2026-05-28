@@ -1,5 +1,6 @@
 import { supabase } from '../client.js'
 import { STORAGE_KEY } from '../../lib/constants.js'
+import { captureException } from '../../lib/sentry.js'
 
 // ─── Audit log helpers (H-9) ─────────────────────────────────────────────────
 // Resilient fire-and-log: retry once, then queue to localStorage.
@@ -39,11 +40,9 @@ export async function auditInsert(entry) {
     auditFlushQueue().catch(() => {})
     return
   }
-  // Both failed — queue for next session and surface to console
-  console.error(
-    '[auditLog] Failed to write audit event (queued):',
-    entry.action_type,
-    retryErr?.message
-  )
+  // Both failed — queue for next session
+  captureException(new Error(`auditLog write failed: ${retryErr?.message}`), {
+    action_type: entry.action_type,
+  })
   _auditEnqueue(entry)
 }

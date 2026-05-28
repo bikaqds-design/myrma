@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useURLTab } from '../hooks/useURLTab'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { captureException } from '../lib/sentry'
 import { Spinner } from '../components/ui'
 import UserManagement from './UserManagement'
 import BrandingSettings from './BrandingSettings'
@@ -490,6 +491,7 @@ function SendAlert({ currentUserEmail }) {
       setSpecificEmail('')
       setTimeout(() => setSent(false), 3000)
     } catch (err) {
+      captureException(err, { page: 'ControlPanel', context: 'sendAlert' })
       toast.error(`Failed to send: ${err.message}`)
     } finally {
       setSending(false)
@@ -796,6 +798,7 @@ function SLAPolicies({ currentUserEmail }) {
         .log(currentUserEmail, 'sla_updated', 'Updated SLA policy configuration')
         .catch(() => {})
     } catch (e) {
+      captureException(e, { page: 'ControlPanel', context: 'saveSLA' })
       toast.error('Failed to save: ' + e.message)
     } finally {
       setSaving(false)
@@ -959,6 +962,7 @@ function AutomationRules({ currentUserEmail }) {
       setRules(newRules)
       toast.success('Automation rules saved')
     } catch (e) {
+      captureException(e, { page: 'ControlPanel', context: 'saveAutomationRules' })
       toast.error(e.message)
     } finally {
       setSaving(false)
@@ -1397,6 +1401,7 @@ function WebhooksConfig({ currentUserEmail }) {
       setHooks(newHooks)
       toast.success('Webhooks saved')
     } catch (e) {
+      captureException(e, { page: 'ControlPanel', context: 'saveWebhooks' })
       toast.error(e.message)
     } finally {
       setSaving(false)
@@ -1439,7 +1444,8 @@ function WebhooksConfig({ currentUserEmail }) {
       res.ok
         ? toast.success(`Webhook responded: ${res.status}`)
         : toast.error(`Webhook returned ${res.status}`)
-    } catch {
+    } catch (err) {
+      captureException(err, { page: 'ControlPanel', context: 'testWebhook' })
       toast.error('Failed to reach webhook URL')
     } finally {
       setTesting(null)

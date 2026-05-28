@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { captureException } from '../lib/sentry'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { Button, Spinner, PageHeader } from '../components/ui'
 import { useAppearance } from '../contexts/AppearanceContext'
@@ -343,7 +344,8 @@ export default function PartsInventory({
       }
       setTableMissing(false)
       setParts(res.data || [])
-    } catch {
+    } catch (err) {
+      captureException(err, { page: 'PartsInventory', context: 'loadParts' })
       toast.error('Failed to load parts')
     } finally {
       setLoading(false)
@@ -402,6 +404,7 @@ export default function PartsInventory({
       setEditingPart(null)
       await load()
     } catch (err) {
+      captureException(err, { page: 'PartsInventory', context: 'savePart' })
       toast.error(err.message || 'Failed to save part')
     } finally {
       setSaving(false)
@@ -418,7 +421,8 @@ export default function PartsInventory({
           await db.parts.delete(part.id)
           toast.success('Part deleted')
           await load()
-        } catch {
+        } catch (err) {
+          captureException(err, { page: 'PartsInventory', context: 'deletePart' })
           toast.error('Failed to delete part')
         }
       }
@@ -435,7 +439,8 @@ export default function PartsInventory({
       )
       if (delta > 0) toast.success(`+${delta} added to ${part.part_name}`)
       else toast.success(`${delta} removed from ${part.part_name}`)
-    } catch {
+    } catch (err) {
+      captureException(err, { page: 'PartsInventory', context: 'adjustQuantity' })
       toast.error('Failed to adjust quantity')
     } finally {
       setAdjusting((a) => ({ ...a, [part.id]: false }))

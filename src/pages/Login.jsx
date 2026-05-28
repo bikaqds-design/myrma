@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { auth } from '../api/supabaseClient'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { loginSchema, forgotPasswordSchema } from '../lib/schemas'
+import { Input, Button } from '../components/ui'
 
 export default function Login({ onLogin }) {
   const { loginBg } = useAppearance()
@@ -85,12 +86,10 @@ export default function Login({ onLogin }) {
           <form onSubmit={handleSubmit(onLoginSubmit)} className="space-y-6" noValidate>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-              <input
+              <Input
                 type="email"
                 {...register('email')}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent ${
-                  errors.email ? 'border-red-400 bg-red-50' : 'border-gray-300'
-                }`}
+                className={`py-3 px-4 focus:ring-indigo-600 ${errors.email ? 'border-red-400 bg-red-50' : ''}`}
                 placeholder="admin@example.com"
                 autoComplete="email"
               />
@@ -111,12 +110,10 @@ export default function Login({ onLogin }) {
                 </button>
               </div>
               <div className="relative">
-                <input
+                <Input
                   type={showPassword ? 'text' : 'password'}
                   {...register('password')}
-                  className={`w-full px-4 py-3 pr-12 border rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent ${
-                    errors.password ? 'border-red-400 bg-red-50' : 'border-gray-300'
-                  }`}
+                  className={`py-3 px-4 pr-12 focus:ring-indigo-600 ${errors.password ? 'border-red-400 bg-red-50' : ''}`}
                   placeholder="••••••••"
                   autoComplete="current-password"
                 />
@@ -165,13 +162,9 @@ export default function Login({ onLogin }) {
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isSubmitting ? 'Signing in…' : 'Sign In'}
-            </button>
+            <Button type="submit" loading={isSubmitting} className="w-full py-3">
+              Sign In
+            </Button>
           </form>
         ) : (
           /* ── Forgot password ────────────────────────────────────────────── */
@@ -183,12 +176,10 @@ export default function Login({ onLogin }) {
                 </p>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                  <input
+                  <Input
                     type="email"
                     {...forgotRegister('email')}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent ${
-                      forgotErrors.email ? 'border-red-400 bg-red-50' : 'border-gray-300'
-                    }`}
+                    className={`py-3 px-4 focus:ring-indigo-600 ${forgotErrors.email ? 'border-red-400 bg-red-50' : ''}`}
                     placeholder="your@email.com"
                     autoFocus
                     autoComplete="email"
@@ -205,13 +196,9 @@ export default function Login({ onLogin }) {
                   </div>
                 )}
 
-                <button
-                  type="submit"
-                  disabled={forgotSubmitting}
-                  className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {forgotSubmitting ? 'Sending…' : 'Send Reset Link'}
-                </button>
+                <Button type="submit" loading={forgotSubmitting} className="w-full py-3">
+                  Send Reset Link
+                </Button>
 
                 <button
                   type="button"

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { auth, db, storage, notifications } from '../api/supabaseClient'
+import { captureException } from '../lib/sentry'
 import { WIDGET_CATALOG } from './Dashboard'
 import toast from 'react-hot-toast'
 import { Spinner, PageHeader, Button, Input } from '../components/ui'
@@ -293,7 +294,8 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
     setNotifLoading(true)
     try {
       setNotifPrefs(await notifications.getPreferences(currentUser.email))
-    } catch {
+    } catch (err) {
+      captureException(err, { page: 'AccountSettings', context: 'loadNotifPrefs' })
       toast.error('Failed to load preferences')
     } finally {
       setNotifLoading(false)
@@ -304,7 +306,8 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
     setActivityLoading(true)
     try {
       setActivity(await db.userActivity.list(currentUser.email))
-    } catch {
+    } catch (err) {
+      captureException(err, { page: 'AccountSettings', context: 'loadActivity' })
       toast.error('Failed to load activity')
     } finally {
       setActivityLoading(false)
@@ -339,6 +342,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
         )
         .catch(() => {})
     } catch (err) {
+      captureException(err, { page: 'AccountSettings', context: 'updateProfile' })
       toast.error(err.message || 'Failed to update profile')
     } finally {
       setProfileLoading(false)
@@ -368,6 +372,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
         )
         .catch(() => {})
     } catch (err) {
+      captureException(err, { page: 'AccountSettings', context: 'updatePassword' })
       toast.error(err.message || 'Failed to update password')
     } finally {
       setPasswordLoading(false)
@@ -385,7 +390,8 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
           `Signed out all devices for ${currentUser?.email}`
         )
         .catch(() => {})
-    } catch {
+    } catch (err) {
+      captureException(err, { page: 'AccountSettings', context: 'signOutAll' })
       toast.error('Failed to sign out all devices')
     }
   }
@@ -402,7 +408,8 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
           `Updated notification preferences for ${currentUser?.email}`
         )
         .catch(() => {})
-    } catch {
+    } catch (err) {
+      captureException(err, { page: 'AccountSettings', context: 'saveNotifPrefs' })
       toast.error('Failed to save preferences')
     } finally {
       setNotifSaving(false)

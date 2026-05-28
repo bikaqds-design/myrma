@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import { auth } from '../api/supabaseClient'
+import { captureException } from '../lib/sentry'
+import { Input, Button } from '../components/ui'
 
 export default function ResetPassword({ onDone }) {
   const [password, setPassword] = useState('')
@@ -60,6 +62,7 @@ export default function ResetPassword({ onDone }) {
       setSuccess(true)
       setTimeout(onDone, 2000)
     } catch (err) {
+      captureException(err, { page: 'ResetPassword', context: 'updatePassword' })
       setError(err.message || 'Failed to update password')
     } finally {
       setLoading(false)
@@ -119,11 +122,11 @@ export default function ResetPassword({ onDone }) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
               <div className="relative">
-                <input
+                <Input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+                  className="py-3 px-4 pr-12 focus:ring-indigo-600"
                   placeholder="••••••••"
                   required
                   autoFocus
@@ -145,11 +148,11 @@ export default function ResetPassword({ onDone }) {
                 Confirm Password
               </label>
               <div className="relative">
-                <input
+                <Input
                   type={showConfirm ? 'text' : 'password'}
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
-                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+                  className="py-3 px-4 pr-12 focus:ring-indigo-600"
                   placeholder="••••••••"
                   required
                 />
@@ -169,13 +172,9 @@ export default function ResetPassword({ onDone }) {
               <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">{error}</div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? 'Updating...' : 'Update Password'}
-            </button>
+            <Button type="submit" loading={loading} className="w-full py-3">
+              Update Password
+            </Button>
           </form>
         )}
       </div>

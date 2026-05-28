@@ -8,6 +8,7 @@ import { ROLES } from './lib/constants'
 import CommandPalette from './components/CommandPalette'
 import NotificationBell from './components/NotificationBell'
 import { Spinner } from './components/ui'
+import { captureException } from './lib/sentry'
 
 function AnnouncementBanner() {
   const [items, setItems] = useState([])
@@ -152,7 +153,7 @@ export default function App() {
       })
       .catch(() => {})
     // H-9: flush any audit events that failed to write in a previous session
-    db.auditLog.flushQueue().catch(() => {})
+    db.auditLog.flushQueue().catch((err) => captureException(err, { context: 'auditLog.flushQueue' }))
   }, [])
 
   useEffect(() => {
@@ -176,7 +177,7 @@ export default function App() {
         setLoading(false)
       }
     })
-    return () => subscription.unsubscribe()
+    return () => subscription?.unsubscribe()
   }, [])
 
   const checkAuth = async () => {
@@ -190,7 +191,7 @@ export default function App() {
         setCurrentUserPermissions(roleData?.permissions || ROLE_DEFAULT_PERMISSIONS[role] || null)
       }
     } catch (error) {
-      console.error('Auth check error:', error)
+      captureException(error, { page: 'App', context: 'checkAuth' })
     } finally {
       setLoading(false)
     }

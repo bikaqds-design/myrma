@@ -15,7 +15,7 @@
  *   }
  */
 import { z } from 'zod'
-import { ROLES } from './constants.js'
+import { ROLES, ROLE_LIST, TICKET_STATUS_LIST, PRIORITY_LIST, type Role, type TicketStatus, type Priority } from './constants.js'
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -68,18 +68,34 @@ export const customerSchema = z
 
 // ── RMA Tickets ───────────────────────────────────────────────────────────────
 
+const ticketProductSchema = z.object({
+  product_name: z.string().max(300).optional().nullable(),
+  serial_number: z.string().max(100).optional().nullable(),
+  product_status: z.string().max(100).optional().nullable(),
+  warranty_status: z.string().max(100).optional().nullable(),
+  issue_description: z.string().max(2000).optional().nullable(),
+})
+
 export const ticketSchema = z.object({
   customer_name: z.string().min(1, 'Customer name is required').max(200),
   customer_email: z
     .union([z.string().email('Enter a valid email'), z.literal(''), z.null()])
     .optional(),
   customer_phone: z.string().max(50).optional().nullable(),
-  ticket_status: z.enum(['Open', 'In Progress', 'Pending', 'On Hold', 'Closed', 'Cancelled']),
-  priority: z.enum(['Critical', 'High', 'Medium', 'Low']),
+  ticket_status: z.enum(TICKET_STATUS_LIST as [TicketStatus, ...TicketStatus[]]),
+  priority: z.enum(PRIORITY_LIST as [Priority, ...Priority[]]),
   assigned_technician: z.string().optional().nullable(),
-  description: z.string().max(5000).optional().nullable(),
+  general_description: z.string().max(5000).optional().nullable(),
   internal_notes: z.string().max(5000).optional().nullable(),
+  accessories_received: z.string().max(2000).optional().nullable(),
   due_date: z.string().optional().nullable(),
+  carrier: z.string().max(100).optional().nullable(),
+  tracking_number: z.string().max(100).optional().nullable(),
+  shipping_label_url: z
+    .union([z.string().url('Enter a valid URL'), z.literal(''), z.null()])
+    .optional(),
+  products: z.array(ticketProductSchema).optional(),
+  attachments: z.array(z.any()).optional(),
 })
 
 // ── Products ──────────────────────────────────────────────────────────────────
@@ -101,7 +117,7 @@ export const productSchema = z.object({
 
 export const addUserSchema = z.object({
   email: z.string().email('Enter a valid email address'),
-  role: z.enum([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.VIEWER]),
+  role: z.enum(ROLE_LIST as [Role, ...Role[]]),
 })
 
 export const resetPasswordSchema = z

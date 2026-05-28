@@ -82,6 +82,10 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.js'],
+    // Vitest 4.1.7 has a parallel-pool race that surfaces as
+    // "Cannot read properties of undefined (reading 'config')" on suite import.
+    // Disable file-level parallelism to serialise suites and avoid the race.
+    fileParallelism: false,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

@@ -10,6 +10,7 @@ import { Button, Spinner, PageHeader } from '../components/ui'
 import EmptyState from '../components/EmptyState'
 import Modal from '../components/Modal'
 import { ROLES } from '../lib/constants'
+import { captureException } from '../lib/sentry'
 
 const generateRmaNumber = (existingTickets = []) => {
   const now = new Date()
@@ -192,7 +193,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const [formData, setFormData] = useState({
     customer_name: '',
     priority: 'Medium',
-    ticket_status: 'New',
+    ticket_status: 'Open',
     assigned_technician: '',
     due_date: DEFAULT_DUE(),
     general_description: '',
@@ -487,7 +488,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         try {
           const uploaded = await storage.uploadFile(file, rmaNumber)
           newAttachments.push(uploaded)
-        } catch {
+        } catch (err) {
+          captureException(err, { page: 'RMATickets', context: 'uploadAttachment' })
           toast.error(`Failed to upload ${file.name}`)
         }
       }
@@ -642,7 +644,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               ticketData.products
             )
             .catch((err) => {
-              console.warn('Inventory unit creation failed:', err?.message || err)
+              captureException(err, { page: 'RMATickets', context: 'createInventoryUnit' })
             })
           const techEmails =
             ticketData.assigned_technician && ticketData.assigned_technician !== userEmail
@@ -689,6 +691,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
       queryClient.invalidateQueries({ queryKey: ['rma-tickets-count'] })
     } catch (error) {
+      captureException(error, { page: 'RMATickets', context: 'saveTicket' })
       toast.error(`Failed to save ticket: ${error.message}`)
     } finally {
       setUploading(false)
@@ -758,7 +761,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         toast.success('Ticket deleted!')
         queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
         queryClient.invalidateQueries({ queryKey: ['rma-tickets-count'] })
-      } catch {
+      } catch (err) {
+        captureException(err, { page: 'RMATickets', context: 'deleteTicket' })
         queryClient.setQueryData(['rma-tickets'], previousTickets) // rollback on error
         toast.error('Failed to delete ticket')
       }
@@ -797,7 +801,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           setSelectedTickets([])
           queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
           queryClient.invalidateQueries({ queryKey: ['rma-tickets-count'] })
-        } catch {
+        } catch (err) {
+          captureException(err, { page: 'RMATickets', context: 'bulkDeleteTickets' })
           toast.error('Failed to delete tickets')
         } finally {
           setBulkProcessing(false)
@@ -848,7 +853,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       setSelectedTickets([])
       setBulkTicketStatus('')
       queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
-    } catch {
+    } catch (err) {
+      captureException(err, { page: 'RMATickets', context: 'bulkUpdateStatus' })
       toast.error('Failed to update status')
     } finally {
       setBulkProcessing(false)
@@ -892,7 +898,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       setSelectedTickets([])
       setBulkProductStatus('')
       queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
-    } catch {
+    } catch (err) {
+      captureException(err, { page: 'RMATickets', context: 'bulkUpdateProductStatus' })
       toast.error('Failed to update product status')
     } finally {
       setBulkProcessing(false)
@@ -1015,6 +1022,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       setCommentFiles([])
       setReplyingTo(null)
     } catch (err) {
+      captureException(err, { page: 'RMATickets', context: 'postComment' })
       toast.error('Failed to post comment: ' + (err?.message || err?.code || 'unknown error'))
     } finally {
       setSubmittingComment(false)
@@ -1028,7 +1036,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       db.auditLog
         .log(userEmail, 'ticket_comment_deleted', `Deleted comment ${commentId}`)
         .catch(() => {})
-    } catch {
+    } catch (err) {
+      captureException(err, { page: 'RMATickets', context: 'deleteComment' })
       toast.error('Failed to delete comment')
     }
   }
@@ -1311,7 +1320,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     setFormData({
       customer_name: '',
       priority: 'Medium',
-      ticket_status: 'New',
+      ticket_status: 'Open',
       assigned_technician: userEmail || '',
       due_date: DEFAULT_DUE(),
       general_description: '',
@@ -1360,7 +1369,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       if (att.path) await storage.deleteFile(att.path)
       setFormData({ ...formData, attachments: formData.attachments.filter((_, idx) => idx !== i) })
       toast.success('Attachment removed')
-    } catch {
+    } catch (err) {
+      captureException(err, { page: 'RMATickets', context: 'removeAttachment' })
       toast.error('Failed to remove attachment')
     }
   }
@@ -1536,10 +1546,11 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
             >
               <option value="">All</option>
-              <option value="New">New</option>
+              <option value="Open">Open</option>
               <option value="In Progress">In Progress</option>
+              <option value="Pending">Pending</option>
               <option value="On Hold">On Hold</option>
-              <option value="Completed">Completed</option>
+              <option value="Closed">Closed</option>
               <option value="Cancelled">Cancelled</option>
             </select>
           </div>
@@ -2273,10 +2284,11 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                       onChange={(e) => setFormData({ ...formData, ticket_status: e.target.value })}
                       className={inp}
                     >
-                      <option value="New">New</option>
+                      <option value="Open">Open</option>
                       <option value="In Progress">In Progress</option>
+                      <option value="Pending">Pending</option>
                       <option value="On Hold">On Hold</option>
-                      <option value="Completed">Completed</option>
+                      <option value="Closed">Closed</option>
                       <option value="Cancelled">Cancelled</option>
                     </select>
                   </div>
@@ -3006,7 +3018,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                               setTimeEntries((prev) => [...prev, entry])
                               setTimerNotes('')
                               toast.success(`Logged ${Math.floor(mins / 60)}h ${mins % 60}m`)
-                            } catch {
+                            } catch (err) {
+                              captureException(err, { page: 'RMATickets', context: 'saveTimeEntry' })
                               toast.error('Failed to save time entry')
                             }
                             setTimerStart(null)
@@ -3090,7 +3103,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                                 setManualNotes('')
                                 setAddingManual(false)
                                 toast.success(`Logged ${Math.floor(mins / 60)}h ${mins % 60}m`)
-                              } catch {
+                              } catch (err) {
+                                captureException(err, { page: 'RMATickets', context: 'logTimeManual' })
                                 toast.error('Failed to log time')
                               }
                             }}
@@ -3132,7 +3146,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                                     await db.timeEntries.delete(entry.id)
                                     setTimeEntries((prev) => prev.filter((e) => e.id !== entry.id))
                                     toast.success('Entry deleted')
-                                  } catch {
+                                  } catch (err) {
+                                    captureException(err, { page: 'RMATickets', context: 'deleteTimeEntry' })
                                     toast.error('Failed to delete')
                                   }
                                 }}
