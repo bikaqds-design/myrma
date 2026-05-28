@@ -745,23 +745,51 @@ Then revert [src/api/db/tickets.js:45-51](src/api/db/tickets.js#L45-L51) to the 
 | — | M-3 | Added Zod schemas: `partSchema`, `invoiceSchema`, `inventoryUnitSchema`, `warehouseSchema`, `batchUpdateSchema` + exported TypeScript types. | 30 min | ✅ |
 
 **Acceptance criteria:** `npm test` 74/74 ✅ · `npm run lint:ci` 0/0 ✅ · `npm run build` ✅  
-**Deploy:** commit pushed to `main` 2026-05-28.
+**Deploy:** commit `419cd80` pushed to `main` 2026-05-28.
 
-### Sprint 7 — File Decomposition & Accessibility (2 weeks)
+### ✅ Sprint 7 — File Decomposition & Accessibility — **IN PROGRESS 2026-05-29**
 
 > No page file > 800 lines; WCAG AA on top 5 pages.
 
-| # | ID | Task | Effort |
+#### ✅ Quick wins — COMPLETE (commit `2e33c8e`)
+
+| # | ID | Task | Status |
 |---|----|------|--------|
-| 32 | H-1 | Split Inventory.jsx into a folder. | 1–2 days |
-| 33 | H-2 | Split RMATickets.jsx into a folder. | 1–2 days |
-| 34 | H-3 | Split Products.jsx, UserManagement.jsx, Customers.jsx. | 2 days |
-| 35 | H-5 | ARIA pass on 5 largest pages. Add `@axe-core/react` in dev. | 1–2 days |
-| 36 | M-10 | `safeStorage` helper + replace direct `localStorage` calls. | 60 min |
-| 37 | L-2 | Lazy-load `CommandPalette`. | 30 min |
-| 38 | L-3 | `aria-label` on `PageHeader` back button. | 5 min |
-| 39 | L-5 | Title-case mobile route titles. | 15 min |
-| 40 | L-6 | Convert `src/api/db/*.js` to TypeScript; export Row types. | 1 day |
+| 36 | M-10 | `src/lib/safeStorage.ts` — `get/set/remove` with silent try/catch. All 41 bare `localStorage.*` calls replaced across 11 files. | ✅ |
+| 37 | L-2 | `CommandPalette` lazy-loaded via `React.lazy` — removed from main chunk. | ✅ |
+| 38 | L-3 | `PageHeader` back button: `aria-label={backLabel}` + `aria-hidden` on SVG. | ✅ |
+| 39 | L-5 | Mobile titles title-cased via `ROUTE_TITLES` map with fallback. | ✅ |
+
+#### ✅ File decomposition — COMPLETE
+
+| # | ID | Task | Commit | Status |
+|---|----|------|--------|--------|
+| 32 | H-1 | `Inventory.jsx` (4,861 lines) → `Inventory/` (11 files: `_shared`, `ExportMenu`, `TransferModal`, `ProductStatusTab`, `OverviewTab`, `ByProductTab`, `CompanyStockTab`, `ProductDetailModal`, `WarehousesTab`, `ManufacturerTab`, `index`). | `7070e30` | ✅ |
+| 33 | H-2 | `RMATickets.jsx` (3,765 lines) → `RMATickets/` (5 files: `_utils`, `_shared`, `TicketForm`, `TicketDrawer`, `index`). Form owns form state; Drawer owns comment/time/parts state. | `f4c605e` | ✅ |
+| 34 | H-3 | `Products.jsx` (3,142 lines) → `Products/` (4 files). `UserManagement.jsx` (2,200 lines) → `UserManagement/` (5 files). `Customers.jsx` (1,859 lines) → `Customers/` (3 files). | `bc25181` | ✅ |
+
+#### Accessibility — remaining
+
+| # | ID | Task | File(s) | Effort |
+|---|----|------|---------|--------|
+| 35a | H-5 | Install `@axe-core/react` as dev dependency. Mount in `src/main.jsx` behind `import.meta.env.DEV` guard. | `package.json`, `src/main.jsx` | 15 min |
+| 35b | H-5 | ARIA pass on `Inventory/index.jsx`: `aria-label` on icon-only buttons, `aria-sort` on column headers, `aria-modal` + `aria-labelledby` on drawers. | `src/pages/Inventory/` | 2–4 hours |
+| 35c | H-5 | ARIA pass on `RMATickets/index.jsx` + `TicketDrawer.jsx`. | `src/pages/RMATickets/` | 2–4 hours |
+| 35d | H-5 | ARIA pass on `Products/`, `Customers/`, `Reports.jsx`. | 3 locations | 2–4 hours |
+
+#### Type safety — remaining
+
+| # | ID | Task | File(s) | Effort |
+|---|----|------|---------|--------|
+| 40 | L-6 | Convert `src/api/db/*.js` → `.ts`; export `Row` types per table. | `src/api/db/` (8 files) | 1 day |
+
+#### Type safety
+
+| # | ID | Task | File(s) | Effort |
+|---|----|------|---------|--------|
+| 40 | L-6 | Convert `src/api/db/*.js` → `.ts`. Export `Row` types per table (e.g. `RMATicketRow`, `CustomerRow`, `ProductRow`). Page components import and use these types. | `src/api/db/` (8 files) | 1 day |
+
+**Acceptance criteria:** All page files ≤ 800 lines · `@axe-core/react` 0 critical violations on top 5 pages · `npm test` 74/74 · `npm run lint:ci` 0/0 · `npm run build` clean.
 
 ### Out of scope (track separately)
 
@@ -928,4 +956,5 @@ Then revert [src/api/db/tickets.js:45-51](src/api/db/tickets.js#L45-L51) to the 
 - **2026-05-28** — ✅ Sprint 2 complete (commit `1d39b30`). Code quality & performance. Summary: (1) MED-NEW-1: `captureException` from `src/lib/sentry.js` replaces all 52 `console.error` calls across 10 page files (BackupRestore, BrandingSettings, CustomerDetails, Customers, Inventory, ProductDetails, Products, RMATickets, TechCalendar, UserManagement). (2) HIGH-NEW-1: `vite.config.js` `manualChunks` splits 643 KB vendor bundle into 5 named chunks (vendor-react 180 KB, vendor-query, vendor-radix, vendor-ui, vendor-forms) — no chunk exceeds 340 KB. (3) HIGH-NEW-2: Recharts extracted to `DashboardCharts.jsx`, lazy-loaded via `React.lazy` + `Suspense` — ~442 KB removed from main bundle. (4) LOW-NEW-3: `NotFoundPage` extracted to `src/pages/NotFoundPage.jsx`, lazy-loaded in `App.jsx`. (5) MED-NEW-3: Action buttons in `AccountSettings.jsx` and `BrandingSettings.jsx` replaced with `<Button>` from ui.jsx; raw `<input type="text">` replaced with `<Input>`. (6) LOW-NEW-4: Verified — `Invoices.jsx` uses iframe + `window.print()`, not jsPDF; no action needed. CI remains clean. Score: 8.0/10 → **8.6/10**.
 - **2026-05-28** — ✅ Sprint 3 complete (commit `ce61231`). Polish & technical debt. Summary: (1) MED-NEW-4: Audited all 50 inline `style={{}}` across pages. Converted 4 static values to Tailwind (`max-h-[90vh]`, `min-h-[480px]`, `max-h-64`, `w-3.5 h-3.5 object-contain flex-shrink-0`). Remaining 46 are intentional: 27 in PDFLayout.jsx (pixel PDF rendering), dynamic runtime colors (branding/login bg/primary color), SVG `<text>` element styles, TanStack Virtual scroll absolute positioning. (2) MED-NEW-5: `CONSTITUTION.md §4.4` rewritten to document the CSS `!important` override approach as the current accepted pattern, `dark:` prefix as preferred for new components, and migration guidance. (3) Accessibility: `role="status"` + `aria-label="Loading"` added to `Spinner` component (propagates to all 25+ usages). `aria-label` added to icon-only buttons across 5 files: camera overlay, 2 password toggles (AccountSettings), API key toggle (BrandingSettings), delete attachment + remove file (RMATickets), 2 password toggles (UserManagement), 2 password toggles (ResetPassword). CI remains clean. Score: 8.6/10 → **9.1/10**.
 - **2026-05-28** — 🔍 **Full system re-audit** (user-requested). Honest pass across code, pages, functions, features, frontend, backend, UI/UX, user roles, components. **32 new findings**: 2 critical, 6 high, 10 medium, 8 low. **CI gate silently broken** — `npm test` reports 0 tests / 3 failed suites due to Vitest 4.1.7 parallel-pool race (tests pass individually). Other notable findings: cascading ticket delete is not transactional (data-integrity risk); 5 mega-page files (1.8k–4.8k lines each) violate single-file responsibility; TanStack Query adopted in only 3 of 21 pages despite CLAUDE.md mandate; ARIA missing entirely on 4 of 5 largest pages; 9 pages have `.catch` blocks that toast but never call `captureException`; Zod schemas cover ~30% of writes; Login + ResetPassword still use raw `<input>` / `<button>`. Positives preserved: RLS, edge functions, code-splitting, permissions model, zero XSS surface. Score re-baselined: 9.1/10 → **7.0/10**. New 4-sprint fix plan added (Sprints 4–7, 22 tasks).
-- **2026-05-28** — ✅ Sprint 4 code complete. Summary: (1) C-1: `fileParallelism: false` in `vite.config.js` test block — `npm test` returns 74/74 again (was 0/3 failed). (2) C-2: **Refined from RPC to `ON DELETE CASCADE` FKs.** Schema inspection revealed `ticket_comments` and `ticket_activity` already cascade, but `inventory_units` had no FK at all to `rma_tickets` — JS-level cascade was masking missing schema (any non-JS delete path silently left orphans). New migration `20260528_ticket_cascade_fk.sql` adds the missing FK. `tickets.js` delete simplified to single `delete().eq('id', id)`; Postgres now handles cascade atomically inside the parent's transaction. (3) L-8: Edge Function password minimum bumped 6 → 8 (matches UI). (4) M-7: `subscription?.unsubscribe()` — cleanup never throws. CI clean (test/lint/format/build all green). **Migration + Edge Function deploy pending** — see Sprint 4 Deploy Guide.
+- **2026-05-28** — ✅ Sprint 4 + Sprint 5 complete (commit `e6f8935`). Summary: (1) C-1: `fileParallelism: false` in `vite.config.js` test block — `npm test` returns 74/74 again (was 0/3 failed). (2) C-2: **Refined from RPC to `ON DELETE CASCADE` FKs.** Schema inspection revealed `inventory_units` had no FK to `rma_tickets` at all — JS-level cascade was masking missing schema. New migration `20260528_ticket_cascade_fk.sql` adds FK; `tickets.js` delete simplified to single `delete().eq()`. Postgres cascade is now atomic. (3) L-8: Edge Function password minimum bumped 6 → 8 to match UI. (4) M-7: `subscription?.unsubscribe()` — cleanup never throws. (5) H-6: `captureException` wired into all `.catch()` blocks in 9 pages (RMATickets 13 catch blocks, Reports, ControlPanel, AccountSettings, PartsInventory, ResetPassword). (6) L-1, L-4: `App.jsx` `console.error` → `captureException`; `flushQueue().catch()` reports to Sentry. (7) M-1: `ticketSchema` expanded 9 → 18 fields (`general_description`, `accessories_received`, `carrier`, `tracking_number`, `shipping_label_url`, `products`, `attachments`). (8) M-2, L-7: `ticketSchema` status/priority and `addUserSchema` role now derived from `TICKET_STATUS_LIST`/`PRIORITY_LIST`/`ROLE_LIST` — no hardcoded enum strings. Fixed ticket form default `'New'` → `'Open'`. (9) M-4: `Login.jsx` + `ResetPassword.jsx` raw `<input>` / `<button>` replaced with `<Input>` / `<Button loading={...}>`. `ui.jsx` updated with `cn()` from `tailwind-merge` for proper class override in Input, Select, Textarea. Score: 7.6/10 → **8.1/10**.
+- **2026-05-28** — ✅ Sprint 6 complete (commit `419cd80`). TanStack Query migration across all remaining pages. Summary: (1) H-4: 9 pages migrated from `useCallback load` + `useEffect` + multi-`useState` to `useQuery` / `useMutation` / `invalidateQueries` — PartsInventory, Reports, Invoices, ProductDetails, CustomerDetails, UserManagement, ControlPanel (HomeView + SLAPolicies + AutomationRules + WebhooksConfig), Products, Inventory (4,861 lines — `invalidateInventory` wrapped in `useCallback` for stable realtime dep). All `loadData()` / `loadAll()` call sites replaced with `invalidateQueries`. (2) M-8: `queryClient.setQueryData(['user-role', email])` seeded in both `checkAuth` and `handleLogin`. (3) M-9: Dropped `roleMatch/emailMatch` client filter from notification realtime handler — RLS already targets payloads server-side. (4) M-3: Added Zod schemas `partSchema`, `invoiceSchema`, `inventoryUnitSchema`, `warehouseSchema`, `batchUpdateSchema` + TypeScript types. Fixed: `saving` declared twice in PartsInventory (removed old `useState`), `useMutation` imported unused in Invoices, unstable derived arrays in Reports/Invoices wrapped in `useMemo`, `invalidateInventory` in `useCallback` to satisfy exhaustive-deps. CI clean. Score: 8.1/10 → **8.7/10**.
