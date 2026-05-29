@@ -913,6 +913,36 @@ The permission system is the weak point. The defaults and `canDo` helper are sou
 
 ---
 
+## 🔧 Updated Fix Plan — Sprint 9 (carried-over + full-system audit)
+
+> **Context:** Sprint 8 (permissions hardening) is complete. The user's original request was a *full* system test across UX, UI, architecture, frontend, backend, core code, pages, system logic, components, and security. Sprint 8 only covered the permissions/User-Management slice. Sprint 9 closes the carried-over items and performs the broader audit that hasn't happened yet.
+
+### Carried over from Sprint 8 (not code — needs user/ops action)
+
+| ID | Item | Owner | Action |
+|----|------|-------|--------|
+| PERM-3 | Repair any fully-corrupted legacy permission rows (e.g. omara) | User | Edit Permissions → Reset to Role Defaults → Save, or change role away/back; affected user re-logs in |
+| CRASH-3 | Make crashes auto-report | User | Set `VITE_SENTRY_DSN` in Vercel + redeploy. Until then, use the new "Copy error details" button when a crash occurs and paste it here |
+
+### New: full-system audit scope (Sprint 9)
+
+| ID | Area | What to check | Priority |
+|----|------|---------------|----------|
+| S9-1 | **Backend / data** | `announcements` query returns **400 Bad Request** in prod (malformed `is_…null`/`ends_at.gte` filter). Banner silently fails (caught). Fix the query in `db.announcements.listActive`. | 🟠 High |
+| S9-2 | **Security** | Verify RLS actually enforces what the client `canDo` implies (client checks are UX only). Confirm manager/technician/viewer can't mutate via direct API what the UI hides. Spot-check Edge Function JWT validation. | 🔴 Critical |
+| S9-3 | **Security** | Zod schema coverage on all mutating forms (tickets, customers, products, invoices, parts). Audit user-generated content render paths for XSS (comments, notes, announcements). | 🟠 High |
+| S9-4 | **System logic** | Cross-role click-through (manager/technician/viewer) of create/edit/delete on every page; record pass/fail checklist. Confirms PERM-1/2 fix end-to-end. | 🟠 High |
+| S9-5 | **Frontend / architecture** | Audit remaining single-file pages (Dashboard, Reports, Invoices, PartsInventory, ControlPanel, AccountSettings) for the useMemo-scope-leak class of bug (same root cause as CRASH-1) and unwrapped `React.lazy`. | 🟠 High |
+| S9-6 | **Performance** | Bundle review: `xlsx` (429 KB) and `DashboardCharts` (426 KB) are the heavy chunks — confirm both are lazy/route-split and not in the initial load. | 🟡 Medium |
+| S9-7 | **UX / UI** | Mobile pass on User Management + the heavy table pages; empty/loading/error states consistency; dark-mode gaps. | 🟡 Medium |
+| S9-8 | **Code quality** | L-6 (carried from Sprint 7, optional): convert `src/api/db/*.js` → TypeScript with Row types. | 🟢 Low |
+
+### Recommended order
+
+1. **S9-1** (quick, visible bug) → **S9-2/S9-3** (security is the highest stakes) → **S9-4** (validates the permission fix) → **S9-5** (prevent the next random crash) → **S9-6/S9-7** (polish) → **S9-8** (optional).
+
+---
+
 ## 📊 Scorecard
 
 ### Baseline (2026-05-26 start)
