@@ -19,17 +19,26 @@ export const announcements = {
     }
   },
   async listActive() {
+    // S9-1: filter client-side instead of via chained server-side .or()/.eq().
+    // The announcements table is optional and not all deployments have the
+    // is_active / starts_at / ends_at columns — filtering on a missing column
+    // returns HTTP 400. A plain select tolerates whatever columns exist, and we
+    // apply the active-window logic in JS (missing column → treated as "always on").
     try {
-      const now = new Date().toISOString()
       const { data, error } = await supabase
         .from('announcements')
         .select('*')
-        .eq('is_active', true)
-        .or(`starts_at.is.null,starts_at.lte.${now}`)
-        .or(`ends_at.is.null,ends_at.gte.${now}`)
         .order('created_date', { ascending: false })
       if (error) return []
-      return data || []
+      const now = Date.now()
+      return (data || []).filter((a) => {
+        if (a.is_active === false) return false
+        const starts = a.starts_at ? new Date(a.starts_at).getTime() : null
+        const ends = a.ends_at ? new Date(a.ends_at).getTime() : null
+        if (starts !== null && !Number.isNaN(starts) && starts > now) return false
+        if (ends !== null && !Number.isNaN(ends) && ends < now) return false
+        return true
+      })
     } catch {
       return []
     }
