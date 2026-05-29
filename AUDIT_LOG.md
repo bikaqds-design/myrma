@@ -883,6 +883,8 @@ The permission system is the weak point. The defaults and `canDo` helper are sou
 
 ## 🔧 Fix Plan — Post 2026-05-29 Audit (Sprint 8: Permissions Hardening)
 
+> **Status 2026-05-29:** Phase 1 + the Phase-2 relabel/hide shipped in commit `(Sprint 8 Phase 1)`. PERM-1 (`resolvePermissions` merge), PERM-2 (clear perms on role change), UM-1 (Role Templates → read-only "Role Reference" driven by runtime defaults), UM-3 (Custom Roles hidden behind `ENABLE_CUSTOM_ROLES`) are **done**; 80/80 tests pass. PERM-3 legacy rows: empty/partial rows self-heal at read time; a fully-populated corrupted row needs a one-click repair (Edit Permissions → Reset to Role Defaults → Save, or change role away/back). UM-2/4/5/6/7 and CRASH-3 instrumentation remain open.
+
 **Phase 1 — Stop the bleeding (manager role) · highest priority**
 
 1. **PERM-1** — In `App.jsx`, replace both `roleData?.permissions || ROLE_DEFAULT_PERMISSIONS[role]` lines with a `resolvePermissions(role, stored)` helper (added to `permissions.ts`) that **merges stored over role defaults** and treats `{}`/partial as "use defaults for missing sections". This self-heals existing corrupted rows at read time.
