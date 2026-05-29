@@ -1,20 +1,20 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-
-if (import.meta.env.DEV) {
-  const axe = await import('@axe-core/react')
-  axe.default(React, ReactDOM, 1000)
-}
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { AppearanceProvider } from './contexts/AppearanceContext.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { initSentry } from './lib/sentry.js'
-
-initSentry() // no-op if VITE_SENTRY_DSN is not set
 import App from './App.jsx'
 import './index.css'
 import './styles/appearance.css'
-import { AppearanceProvider } from './contexts/AppearanceContext.jsx'
-import ErrorBoundary from './components/ErrorBoundary.jsx'
+
+initSentry() // no-op if VITE_SENTRY_DSN is not set
+
+// @axe-core/react: dev-only accessibility violation logger — never included in production builds
+if (import.meta.env.DEV) {
+  import('@axe-core/react').then((axe) => axe.default(React, ReactDOM, 1000))
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {

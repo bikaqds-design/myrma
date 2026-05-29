@@ -8,13 +8,31 @@
 
 ## Contents
 
+### Initial audit — 2026-05-26 → 2026-05-27
+
 - [P0 — Critical findings + deploy guides](#-p0--critical-production-blockers)
 - [P1 — High findings](#-p1--high-data-integrity--architecture)
-- [P2 — Medium findings](#-p2--medium-frontend-architecture)
+- [P2 — Medium findings (frontend architecture)](#-p2--medium-frontend-architecture)
+- [P2 — Medium findings (UX & accessibility)](#-p2--medium-ux--accessibility)
+- [P2 — Dark mode gaps](#-p2--dark-mode-gaps)
+- [P-1 / A-1 Reassessment](#-p-1--a-1-reassessment-2026-05-27)
 - [P3 — Quarter findings](#-p3--quarter)
-- [Full System Test — 2026-05-27](#-full-system-test--2026-05-27)
-- [Full System Audit — 2026-05-28](#-full-system-audit--2026-05-28)
-- [Scorecard](#-scorecard)
+
+### Full system test — 2026-05-27
+
+- [Test results + new findings](#-full-system-test--2026-05-27)
+- [Fix plan: Sprints 0–3](#-fix-plan--post-full-system-test-2026-05-27)
+- [Scorecard: Sprints 0–3](#projected-scorecard-after-each-sprint)
+
+### Full re-audit — 2026-05-28
+
+- [Re-audit results + new findings](#-full-system-audit--2026-05-28)
+- [Fix plan: Sprints 4–7](#-fix-plan--post-2026-05-28-audit)
+- [Scorecard: Sprints 4–7](#scorecard-after-each-sprint)
+
+### Historical snapshots
+
+- [Scorecard — all versions](#-scorecard)
 - [Changelog](#-changelog)
 
 ---
