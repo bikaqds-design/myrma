@@ -22,7 +22,7 @@
 
 - [Test results + new findings](#-full-system-test--2026-05-27)
 - [Fix plan: Sprints 0–3](#-fix-plan--post-full-system-test-2026-05-27)
-- [Scorecard: Sprints 0–3](#projected-scorecard-after-each-sprint)
+- [Scorecard: Sprints 0–3](#scorecard-sprints-03-2026-05-27-full-system-test-period)
 
 ### Full re-audit — 2026-05-28
 
@@ -500,7 +500,7 @@ Full migration (15+ pages, 8+ hrs) was too high risk. Targeted 3 pages instead.
 
 ## 🔧 Fix Plan — Post Full System Test (2026-05-27)
 
-> **Current overall score: 9.1/10** (Sprint 0 + Sprint 1 + Sprint 2 + Sprint 3 complete)  
+> **Score at time of writing: 9.1/10** (after Sprints 0–3; re-baselined to 7.0 after the 2026-05-28 full re-audit — see below)  
 > All findings from the 2026-05-27 full system test. Ordered by priority.  
 > Full detail: [SYSTEM_TEST_REPORT_20260527.md](SYSTEM_TEST_REPORT_20260527.md)
 
@@ -557,7 +557,9 @@ Full migration (15+ pages, 8+ hrs) was too high risk. Targeted 3 pages instead.
 
 ---
 
-### Projected Scorecard After Each Sprint
+### Scorecard: Sprints 0–3 (2026-05-27 full system test period)
+
+> Score baseline for this table: **6.0/10** (2026-05-27 full system test). Final: **9.1/10** after Sprint 3. The project was then re-audited on 2026-05-28 revealing new findings that re-baselined to 7.0/10 — see the Sprints 4–7 table below.
 
 | Domain | ~~Before~~ | ✅ Sprint 0 (done) | ✅ Sprint 1 (done) | ✅ Sprint 2 (done) | ✅ Sprint 3 (done) |
 |--------|------------|-------------------|-------------------|-------------------|-------------------|
