@@ -151,7 +151,7 @@ window.location.href = '/rma-tickets'
 window.history.pushState({}, '', '/rma-tickets')
 ```
 
-**Exception:** `window.history.pushState` is permitted ONLY for within-route URL state (e.g., `?ticket=<id>` in `RMATickets.jsx` to sync the open ticket modal without triggering a full route transition). This exception MUST be documented in a code comment.
+**Exception:** `window.history.pushState` is permitted ONLY for within-route URL state (e.g., `?ticket=<id>` in `RMATickets/index.jsx` to sync the open ticket modal without triggering a full route transition). This exception MUST be documented in a code comment.
 
 **MUST: Use thin route wrapper components for parameterized routes** to avoid modifying page components.
 
@@ -301,7 +301,7 @@ import { Button, Spinner, Badge, ModalOverlay, ModalCard } from '../components/u
 </Button>
 ```
 
-**MUST: CSV bulk upload uses the custom `parseCSVLine` helper** defined locally in `Products.jsx` and `Customers.jsx`. Do not use `line.split(',')` — product names can contain commas inside quoted fields.
+**MUST: CSV bulk upload uses the custom `parseCSVLine` helper** defined locally in `Products/index.jsx` and `Customers/index.jsx`. Do not use `line.split(',')` — product names can contain commas inside quoted fields.
 
 ### 3.5 Table Rules
 
@@ -876,7 +876,7 @@ if (currentUserRole === 'admin') {
 
 **MUST: Lists with potentially unbounded length use `@tanstack/react-virtual`.**
 
-The current virtualized component is the customer search dropdown in `RMATickets.jsx` (the only un-paginated list).
+The current virtualized component is the customer search dropdown in `RMATickets/index.jsx` (the only un-paginated list).
 
 ```jsx
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -1037,7 +1037,7 @@ xl:   1280px — desktop
 
 | Type | Convention | Example |
 |------|-----------|---------|
-| React page component | PascalCase `.jsx` | `RMATickets.jsx` |
+| React page component | PascalCase `.jsx` or `PascalCase/index.jsx` folder | `RMATickets/index.jsx`, `Dashboard.jsx` |
 | React sub-component | PascalCase `.jsx` | `TicketRow.jsx` |
 | Shared UI component | PascalCase `.jsx` in `components/` | `ui.jsx`, `ErrorBoundary.jsx` |
 | API domain module | camelCase `.js` in `api/db/` | `tickets.js`, `customers.js` |
@@ -1155,14 +1155,17 @@ d:\myrma-app\
 │   ├── lib\                    # TypeScript-first pure logic
 │   │   ├── constants.ts        # All magic strings (ROLES, TICKET_STATUS, etc.)
 │   │   ├── permissions.ts      # canDo(), ROLE_DEFAULT_PERMISSIONS
-│   │   └── schemas.ts          # Zod validation schemas
-│   ├── pages\                  # Top-level page components (lazy-loaded)
+│   │   ├── schemas.ts          # Zod validation schemas
+│   │   └── safeStorage.ts      # localStorage wrapper (get/set/remove with silent catch)
+│   ├── pages\                  # Top-level page components (all lazy-loaded via React.lazy)
 │   │   ├── Dashboard.jsx
-│   │   ├── Products.jsx
+│   │   ├── Inventory\          # Folder — index.jsx + 10 sub-files
+│   │   ├── RMATickets\         # Folder — index.jsx + TicketForm, TicketDrawer, _shared, _utils
+│   │   ├── Products\           # Folder — index.jsx + ProductsListTab, HierarchyTab, _modals
+│   │   ├── Customers\          # Folder — index.jsx + _modals, _constants
+│   │   ├── UserManagement\     # Folder — index.jsx + UsersTab, RolesTab, _shared, _utils
 │   │   ├── ProductDetails.jsx
-│   │   ├── Customers.jsx
 │   │   ├── CustomerDetails.jsx
-│   │   ├── RMATickets.jsx
 │   │   ├── RMATracker.jsx      # Public-facing, no auth required
 │   │   ├── ControlPanel.jsx    # Admin-only sub-pages
 │   │   └── ...
@@ -1271,7 +1274,8 @@ if (currentUserRole === 'admin') { ... }
 
 Key utilities that already exist and must not be duplicated:
 - `canDo()` — permission check (`src/lib/permissions.ts`)
-- `parseCSVLine()` — CSV parsing (local to `Products.jsx`/`Customers.jsx`)
+- `parseCSVLine()` — CSV parsing (local to `Products/index.jsx`/`Customers/index.jsx`)
+- `safeStorage` — localStorage access (`src/lib/safeStorage.ts`)
 - `useURLTab()` — URL-synced tab state (`src/hooks/useURLTab.js`)
 - `captureException()` — Sentry error capture (wired in `ErrorBoundary.jsx`)
 - `useAppearance()` — theme access (`src/contexts/AppearanceContext.jsx`)
@@ -1475,7 +1479,8 @@ Before generating any UI element, ask: _Does `ui.jsx` already export this?_
 **LAW: Before generating any utility function, search for it** using the Grep or Glob tools. The following functions are ALREADY IMPLEMENTED and must not be reimplemented:
 
 - Permission checking → `canDo()` in `src/lib/permissions.ts`
-- CSV parsing → `parseCSVLine()` in `Products.jsx` / `Customers.jsx`
+- CSV parsing → `parseCSVLine()` in `Products/index.jsx` / `Customers/index.jsx`
+- localStorage access → `safeStorage` in `src/lib/safeStorage.ts`
 - URL tab sync → `useURLTab()` in `src/hooks/useURLTab.js`
 - Sentry capture → `captureException()` (via ErrorBoundary)
 - Theme access → `useAppearance()` from `AppearanceContext.jsx`
