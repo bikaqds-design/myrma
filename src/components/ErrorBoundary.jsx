@@ -29,9 +29,7 @@ export default class ErrorBoundary extends React.Component {
   render() {
     if (!this.state.error) return this.props.children
 
-    // Temporarily surfaced in production too — we need the real message to
-    // diagnose the post-login crash. Revert to `import.meta.env.DEV` once fixed.
-    const isDev = true
+    const isDev = import.meta.env.DEV
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900 p-6">
