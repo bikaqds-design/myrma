@@ -835,6 +835,78 @@ Then revert [src/api/db/tickets.js:45-51](src/api/db/tickets.js#L45-L51) to the 
 
 ---
 
+## 🧪 Full System Audit — 2026-05-29 (post-Sprint 7, permissions deep-dive)
+
+> **Trigger:** User reported (a) random "Something went wrong / refresh page" crashes still occurring, (b) **manager role cannot create products, tickets, or customers** despite role defaults allowing it, (c) multiple errors and illogical behaviour on the User Management page.
+> **Method:** Static trace of the permission data-flow (DB → `App.jsx` → page-level `canDo`), User Management component review, automated suite + lint run.
+> **Automated gate status:** `npx vitest run` → **74/74 pass, 3 suites**. `eslint src --max-warnings 0` → **0 errors**. Production build → clean. (Note: `npm test` immediately after a build can hit a transient Windows worker crash — `Cannot read properties of undefined (reading 'config')` — it is resource contention, not a real failure; a clean re-run is green.)
+
+### Root-cause: why the manager role can't create anything
+
+The bug is a **chain of three defects**, not one:
+
+| ID | Severity | Finding | Location | Detail |
+|----|----------|---------|----------|--------|
+| PERM-1 | 🔴 Critical | **Empty/partial-object truthy trap in permission resolution.** `roleData?.permissions \|\| ROLE_DEFAULT_PERMISSIONS[role]` — a stored `{}` (or partial) permissions object is *truthy*, so it overrides the role defaults instead of falling back. A manager whose `user_roles.permissions` is `{}` or partial gets **no** permissions → `canDo('create')` returns false everywhere. | [src/App.jsx:196](src/App.jsx#L196) (`checkAuth`) and the matching line in `handleLogin` (~L351) | Same class of bug as the (now-fixed) permissions modal. The fix must **merge** stored perms over role defaults, treating empty as absent. |
+| PERM-2 | 🔴 Critical | **Changing a user's role does not reset stale custom permissions.** `updateRole` writes only the `role` column. Promoting technician→manager keeps the technician's restrictive `permissions` object, which (via PERM-1) then overrides the manager defaults. | [src/api/db/users.js:37](src/api/db/users.js#L37) `updateRole`; [src/pages/UserManagement/index.jsx:130](src/pages/UserManagement/index.jsx#L130) `handleUpdateRole` | Role change should clear `permissions` (→ null) so role defaults apply, or explicitly re-seed from the new role. |
+| PERM-3 | 🟠 High | **Legacy data corruption from the old broken modal.** Before commit `5de277d`, `PermissionsModal` seeded from the all-`false` `getDefaultPermissions()` and showed empty boxes; saving wrote restrictive/empty objects onto real users. Those rows persist in the DB. | `user_roles.permissions` rows | Needs a one-time data repair (reset affected non-admin users to role defaults) — or rely on the PERM-1 merge fix to self-heal at read time. |
+
+### User Management — architectural & logic defects
+
+| ID | Severity | Finding | Location | Detail |
+|----|----------|---------|----------|--------|
+| UM-1 | 🟠 High | **The "Role Templates" tab is functionally dead.** Edits save to `rma_config.role_templates`, but **nothing in the runtime permission path ever reads that key** — `canDo` uses the hardcoded `ROLE_DEFAULT_PERMISSIONS` in `permissions.ts`. An admin can edit + save a template and it changes nothing. | [src/pages/UserManagement/RolesTab.jsx:67](src/pages/UserManagement/RolesTab.jsx#L67) writes; no reader exists | Either wire role templates into runtime resolution, or relabel the tab as read-only reference. |
+| UM-2 | 🟠 High | **Three diverging sources of truth for permissions, already drifted.** `ROLE_DEFAULT_PERMISSIONS` (permissions.ts, runtime) vs `getRoleTemplates()` (_utils.js, template display + custom-role seed) vs `getDefaultPermissions()` (_utils.js, all-false). Example drift: manager `products.import` is **false** at runtime but **true** in the template display. | [src/lib/permissions.ts:18](src/lib/permissions.ts#L18); [src/pages/UserManagement/_utils.js:85](src/pages/UserManagement/_utils.js#L85) | Collapse to a single source; derive the others from it. |
+| UM-3 | 🟠 High | **Custom roles can be created but never assigned or enforced.** The "Change Role" dropdown is hardcoded to the 5 built-in roles; `getUserRole` reads only `user_roles` (not `custom_roles`); a custom role string matches no `ROLE_DEFAULT_PERMISSIONS` key and isn't admin → `canDo` returns false for everything. The whole Custom Roles tab is a dead-end. | [src/pages/UserManagement/UsersTab.jsx:73-83](src/pages/UserManagement/UsersTab.jsx#L73); [src/api/db/users.js:5](src/api/db/users.js#L5) | Either fully wire custom roles end-to-end, or hide the tab until it's supported. |
+| UM-4 | 🟡 Medium | **"Custom / Role Default" badge uses a truthy check.** `user.permissions ? 'Custom' : 'Role Default'` mislabels a `{}` as "Custom". | [src/pages/UserManagement/UsersTab.jsx:105](src/pages/UserManagement/UsersTab.jsx#L105) | Check `Object.keys(perms).length > 0`. |
+| UM-5 | 🟡 Medium | **Permission editing hardcoded to super_admin**, ignoring the existing `user_management.manage_permissions` permission. Admins (and any role granted it) can't edit. | [src/pages/UserManagement/UsersTab.jsx:87](src/pages/UserManagement/UsersTab.jsx#L87) | Gate on `canDo(...,'user_management','manage_permissions')`. |
+| UM-6 | 🟡 Medium | **Role change is an instant `onChange` with no confirmation** — a misclick silently changes someone's role. | [src/pages/UserManagement/UsersTab.jsx:73](src/pages/UserManagement/UsersTab.jsx#L73) | Add a confirm step. |
+| UM-7 | 🟢 Low | **AddUserModal role list is inconsistent** with the table dropdown (different ordering, icons, no super_admin). | [src/pages/UserManagement/UsersTab.jsx:288](src/pages/UserManagement/UsersTab.jsx#L288) | Drive both from one role list constant. |
+
+### Already fixed this cycle (deployed)
+
+| ID | Finding | Commit |
+|----|---------|--------|
+| ✅ UM-FIX-1 | Permissions modal showed empty boxes (`{}` truthy trap) + missing 5 sections (Invoices, Parts, Time Tracking, Calendar, Reports) + only-first-underscore label bug; modal mutated parent state; no "Reset to Role Defaults". Rewritten with local state, `mergeWithDefaults`, role-default seeding, all 12 sections, audit log entry. | `5de277d` |
+| ✅ CRASH-1 | Dashboard `ticketsWithDue` ReferenceError (useMemo scope leak) — flash-then-crash for users with the SLA widget. | `5910c4d` |
+| ✅ CRASH-2 | Login "Required" on filled fields (forwardRef) + post-login crash (lazy CommandPalette outside Suspense). | `ebf2485` |
+
+### Random crash (CRASH-3) — still open, needs instrumentation
+
+The "refresh page / go to dashboard" screen is the `ErrorBoundary`. Its error display was reverted to **dev-only** (`b8ac445`), so production crashes are currently **invisible** — we cannot root-cause the intermittent one without the message. `captureException` is wired into `componentDidCatch`, but only reports if a Sentry DSN is configured. **Action:** confirm Sentry DSN is set in Vercel, and add a production-safe error surface (show the error *message* — not full stack — plus a "copy details" button) so the next occurrence is diagnosable.
+
+### Verdict
+
+The permission system is the weak point. The defaults and `canDo` helper are sound, but **resolution (PERM-1), lifecycle (PERM-2), and the User Management UI (UM-1…7) are inconsistent**, with two half-built features (Role Templates, Custom Roles) that imply capabilities the runtime doesn't honor. Recommend Sprint 8 below before any new feature work.
+
+---
+
+## 🔧 Fix Plan — Post 2026-05-29 Audit (Sprint 8: Permissions Hardening)
+
+**Phase 1 — Stop the bleeding (manager role) · highest priority**
+
+1. **PERM-1** — In `App.jsx`, replace both `roleData?.permissions || ROLE_DEFAULT_PERMISSIONS[role]` lines with a `resolvePermissions(role, stored)` helper (added to `permissions.ts`) that **merges stored over role defaults** and treats `{}`/partial as "use defaults for missing sections". This self-heals existing corrupted rows at read time.
+2. **PERM-2** — On role change (`handleUpdateRole`), set `permissions = null` so the new role's defaults apply cleanly; surface a toast explaining custom overrides were reset.
+3. **PERM-3** — One-time repair: a small admin action (or SQL migration) that nulls `permissions` for any non-admin user whose stored object is empty/partial. (Optional once PERM-1 lands, but cleans the data.)
+
+**Phase 2 — Make User Management honest**
+
+4. **UM-2** — Single source of truth: derive `getRoleTemplates()` display from `ROLE_DEFAULT_PERMISSIONS`; delete the all-false `getDefaultPermissions()` divergence (keep one blank-builder if needed for custom roles).
+5. **UM-1** — Decide Role Templates: either (a) wire `rma_config.role_templates` into `resolvePermissions` as an override layer, or (b) relabel the tab "Reference — built-in role defaults" and make it read-only. Recommend (b) for now (less risk).
+6. **UM-3** — Hide the Custom Roles tab behind a feature flag until it's wired end-to-end (assignable in the dropdown + loaded by `getUserRole` + enforced by `canDo`). Avoids implying a capability that silently fails.
+7. **UM-4 / UM-5 / UM-6 / UM-7** — Badge truthy fix, gate on `manage_permissions`, confirm-on-role-change, shared role-list constant.
+
+**Phase 3 — Diagnose the random crash (CRASH-3)**
+
+8. Confirm Sentry DSN in Vercel; add a production-safe ErrorBoundary surface (message + "copy details", not full stack) so the intermittent crash is captured next time.
+9. Add a Vitest test for `resolvePermissions` covering: null, `{}`, partial object, full custom object, each built-in role — locking PERM-1/PERM-2 behaviour.
+
+**Phase 4 — Broader audit follow-through (lower priority)**
+
+10. Manual cross-role click-through (manager / technician / viewer) of create/edit/delete on every page, recorded as a checklist in this log.
+
+---
+
 ## 📊 Scorecard
 
 ### Baseline (2026-05-26 start)
