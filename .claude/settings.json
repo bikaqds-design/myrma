@@ -35,7 +35,23 @@
       "PowerShell(Set-Clipboard)",
       "PowerShell(cd D:\\\\myrma-app; npm run lint 2>&1 | Select-String \"error|warning\" | Group-Object { \\($_ -split \"  \"\\)[1].Trim\\(\\) } | Sort-Object Count -Descending | Select-Object -First 15 | Format-Table Count, Name -AutoSize)",
       "PowerShell(New-Item -ItemType Directory -Force -Path \"d:\\\\myrma-app\\\\src\\\\test\")",
-      "PowerShell(cd d:\\\\myrma-app; \\(Get-Content src\\\\pages\\\\RMATickets.jsx\\).Count)"
+      "PowerShell(cd d:\\\\myrma-app; \\(Get-Content src\\\\pages\\\\RMATickets.jsx\\).Count)",
+      "Bash(npx eslint *)",
+      "Bash(git stash *)",
+      "Bash(git checkout *)",
+      "Bash(npm test *)",
+      "Bash(grep -n \"^function \\\\|^export default\\\\|^// ──\\\\|^const.*= .*{$\\\\|^import \" \"d:\\\\myrma-app\\\\src\\\\pages\\\\Products.jsx\")",
+      "Bash(grep -n \"^function \\\\|^export default\\\\|^// ──\\\\|^const.*= .*{$\\\\|^import \" \"d:\\\\myrma-app\\\\src\\\\pages\\\\UserManagement.jsx\")",
+      "Bash(grep -n \"^function \\\\|^export default\\\\|^// ──\\\\|^const.*= .*{$\\\\|^import \" \"d:\\\\myrma-app\\\\src\\\\pages\\\\Customers.jsx\")",
+      "Bash(Remove-Item \"D:\\\\myrma-app\\\\src\\\\pages\\\\Products.jsx\" -Force)",
+      "Bash(Remove-Item \"D:\\\\myrma-app\\\\src\\\\pages\\\\UserManagement.jsx\" -Force)",
+      "Bash(Remove-Item \"D:\\\\myrma-app\\\\src\\\\pages\\\\Customers.jsx\" -Force)",
+      "Bash(node -e ' *)",
+      "Bash(npm install *)",
+      "Bash(npm list *)",
+      "Bash(wc -l \"d:\\\\myrma-app\\\\CONSTITUTION.md\" \"d:\\\\myrma-app\\\\README.md\")",
+      "Bash(wc -l d:/myrma-app/__TRACKED_VAR__.md)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }
