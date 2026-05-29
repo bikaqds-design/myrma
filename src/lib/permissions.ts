@@ -245,6 +245,41 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
 }
 
 /**
+ * resolvePermissions(role, stored) → effective permissions object
+ *
+ * Merges a user's stored custom permissions ON TOP of their role defaults so that:
+ *   - null / undefined / `{}` (empty)          → role defaults (the common case)
+ *   - a partial object (missing some sections)  → role defaults fill the gaps
+ *   - explicit per-action overrides (incl. false) → preserved over the default
+ *
+ * This fixes the "empty/partial object is truthy" trap where
+ * `stored || ROLE_DEFAULT_PERMISSIONS[role]` would let a `{}` row silently
+ * strip a user (e.g. a manager) of every permission. Call this once when
+ * loading the session; pass the result to canDo().
+ */
+export function resolvePermissions(
+  role: string,
+  stored: UserPermissions | null | undefined
+): UserPermissions | null {
+  const defaults = ROLE_DEFAULT_PERMISSIONS[role as Role] ?? null
+  const hasStored =
+    !!stored && typeof stored === 'object' && Object.keys(stored).length > 0
+
+  if (!hasStored) return defaults
+  if (!defaults) return stored as UserPermissions // role with no built-in defaults
+
+  const merged: UserPermissions = {}
+  for (const section of Object.keys(defaults)) {
+    merged[section] = { ...defaults[section], ...(stored![section] || {}) }
+  }
+  // Preserve any extra sections that only exist in the stored object
+  for (const section of Object.keys(stored!)) {
+    if (!merged[section]) merged[section] = { ...stored![section] }
+  }
+  return merged
+}
+
+/**
  * canDo(role, permissions, section, action) → boolean
  *
  * Usage: canDo(currentUserRole, currentUserPermissions, 'rma_tickets', 'delete')

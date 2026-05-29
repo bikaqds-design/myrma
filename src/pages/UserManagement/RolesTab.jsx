@@ -1,7 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import toast from 'react-hot-toast'
+import React, { useState } from 'react'
 import Modal from '../../components/Modal'
-import { db } from '../../api/supabaseClient'
 import { ROLES } from '../../lib/constants'
 import { ROLE_DEFAULT_PERMISSIONS } from '../../lib/permissions'
 import { RoleBadge } from './_shared'
@@ -18,215 +16,85 @@ function mergeWithDefaults(permissions) {
   )
 }
 
-export function RoleTemplatesTab({ currentUserRole, currentUserEmail }) {
-  const [savedTemplates, setSavedTemplates] = useState({})
-  const [editingRole, setEditingRole] = useState(null)
-  const [editPerms, setEditPerms] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const isSuperAdmin = currentUserRole === ROLES.SUPER_ADMIN
-
-  useEffect(() => {
-    loadTemplates()
-  }, [])
-
-  const loadTemplates = async () => {
-    try {
-      const result = await db.rmaConfig.getAll()
-      if (!result.missing) {
-        const row = result.data.find((r) => r.config_key === 'role_templates')
-        if (row?.config_value) {
-          const val =
-            typeof row.config_value === 'string' ? JSON.parse(row.config_value) : row.config_value
-          setSavedTemplates(val)
-        }
-      }
-    } catch {
-      /* fall back to hardcoded defaults */
-    }
-  }
-
-  const getEffectivePerms = (roleKey) => {
-    if (savedTemplates[roleKey]) return savedTemplates[roleKey]
-    return getRoleTemplates().find((r) => r.key === roleKey)?.permissions || {}
-  }
-
-  const handleEdit = (role) => {
-    setEditingRole(role)
-    setEditPerms(JSON.parse(JSON.stringify(getEffectivePerms(role.key))))
-  }
-
-  const handleResetToDefault = () => {
-    const defaults = getRoleTemplates().find((r) => r.key === editingRole.key)
-    setEditPerms(JSON.parse(JSON.stringify(defaults.permissions)))
-  }
-
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      const updated = { ...savedTemplates, [editingRole.key]: editPerms }
-      await db.rmaConfig.set('role_templates', updated, currentUserEmail)
-      setSavedTemplates(updated)
-      setEditingRole(null)
-      toast.success(`${editingRole.name} template saved`)
-    } catch {
-      toast.error('Failed to save template')
-    } finally {
-      setSaving(false)
-    }
-  }
-
+// Read-only reference of the built-in role defaults that the app actually enforces
+// at runtime (ROLE_DEFAULT_PERMISSIONS). admin / super_admin bypass all checks, so
+// they're shown as full access. Per-user overrides live on the Users tab → Edit Permissions.
+export function RoleTemplatesTab() {
   const roles = getRoleTemplates()
+
+  // Source of truth = runtime defaults. admin/super_admin aren't in ROLE_DEFAULT_PERMISSIONS
+  // (they bypass canDo entirely) → fall back to the template's full-access map for display.
+  const getDisplayPerms = (roleKey) =>
+    ROLE_DEFAULT_PERMISSIONS[roleKey] ||
+    getRoleTemplates().find((r) => r.key === roleKey)?.permissions ||
+    {}
 
   return (
     <div className="space-y-6">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+        <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div className="text-sm text-blue-800">
+          <p className="font-medium">These are the built-in role defaults the app enforces.</p>
+          <p className="mt-0.5 text-blue-700">
+            They're shown for reference and can't be edited here. To grant or restrict permissions
+            for an individual user, use <strong>Edit Permissions</strong> on the Users tab.
+            Admins and super admins always have full access.
+          </p>
+        </div>
+      </div>
+
       {roles.map((role) => {
-        const perms = getEffectivePerms(role.key)
-        const hasCustom = !!savedTemplates[role.key]
+        const perms = getDisplayPerms(role.key)
+        const bypasses = role.key === ROLES.ADMIN || role.key === ROLES.SUPER_ADMIN
         return (
           <div key={role.key} className="border border-gray-200 rounded-xl p-6">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-base font-semibold text-gray-900">
-                    {role.icon} {role.name}
-                  </h3>
-                  {hasCustom && (
-                    <span className="px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-full">
-                      Modified
-                    </span>
-                  )}
-                </div>
+                <h3 className="text-base font-semibold text-gray-900 mb-1">
+                  {role.icon} {role.name}
+                </h3>
                 <p className="text-sm text-gray-500">{role.description}</p>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <RoleBadge role={role.key} />
-                {isSuperAdmin && (
-                  <button
-                    onClick={() => handleEdit(role)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors"
-                  >
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                      />
-                    </svg>
-                    Edit
-                  </button>
-                )}
-              </div>
+              <RoleBadge role={role.key} />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {Object.entries(perms).map(([module, modulePerms]) => {
-                const enabled = Object.entries(modulePerms)
-                  .filter(([, v]) => v)
-                  .map(([k]) => k)
-                return (
-                  <div key={module} className="bg-gray-50 rounded-lg p-3">
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                      {module.replace(/_/g, ' ')}
-                    </h4>
-                    <div className="flex flex-wrap gap-1.5">
-                      {enabled.length === 0 ? (
-                        <span className="text-xs text-gray-500 italic">No access</span>
-                      ) : (
-                        enabled.map((p) => (
-                          <span
-                            key={p}
-                            className="px-1.5 py-0.5 bg-green-100 text-green-800 text-xs rounded font-medium"
-                          >
-                            {p.replace(/_/g, ' ')}
-                          </span>
-                        ))
-                      )}
+            {bypasses ? (
+              <p className="text-sm text-gray-600 italic">Full access — bypasses all permission checks.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {Object.entries(perms).map(([module, modulePerms]) => {
+                  const enabled = Object.entries(modulePerms)
+                    .filter(([, v]) => v)
+                    .map(([k]) => k)
+                  return (
+                    <div key={module} className="bg-gray-50 rounded-lg p-3">
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                        {module.replace(/_/g, ' ')}
+                      </h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {enabled.length === 0 ? (
+                          <span className="text-xs text-gray-500 italic">No access</span>
+                        ) : (
+                          enabled.map((p) => (
+                            <span
+                              key={p}
+                              className="px-1.5 py-0.5 bg-green-100 text-green-800 text-xs rounded font-medium"
+                            >
+                              {p.replace(/_/g, ' ')}
+                            </span>
+                          ))
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )
       })}
-
-      {editingRole && (
-        <Modal
-          open={true}
-          onClose={() => setEditingRole(null)}
-          title={`Edit ${editingRole.name} Template`}
-          className="max-w-4xl"
-          hideHeader
-        >
-          <div className="flex flex-col max-h-[80vh]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">
-                  {editingRole.icon} Edit {editingRole.name} Template
-                </h3>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  These defaults apply when a user has no custom permissions set
-                </p>
-              </div>
-              <button
-                onClick={() => setEditingRole(null)}
-                className="text-gray-500 hover:text-gray-600"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-6 py-5">
-              {editPerms && (
-                <PermissionMatrix
-                  permissions={editPerms}
-                  onToggle={(module, perm) => {
-                    setEditPerms((p) => ({
-                      ...p,
-                      [module]: { ...p[module], [perm]: !p[module][perm] },
-                    }))
-                  }}
-                />
-              )}
-            </div>
-            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
-              <button
-                onClick={handleResetToDefault}
-                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-white transition-colors"
-              >
-                Reset to Default
-              </button>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setEditingRole(null)}
-                  className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="px-5 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-                >
-                  {saving ? 'Saving…' : 'Save Template'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </Modal>
-      )}
     </div>
   )
 }

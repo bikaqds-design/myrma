@@ -4,7 +4,7 @@ import { Toaster, toast } from 'react-hot-toast'
 import { useQueryClient } from '@tanstack/react-query'
 import { auth, db, branding as brandingAPI, supabase } from './api/supabaseClient'
 import { useAppearance } from './contexts/AppearanceContext'
-import { ROLE_DEFAULT_PERMISSIONS } from './lib/permissions'
+import { resolvePermissions } from './lib/permissions'
 import { ROLES } from './lib/constants'
 import { safeStorage } from './lib/safeStorage'
 import NotificationBell from './components/NotificationBell'
@@ -193,7 +193,7 @@ export default function App() {
         queryClient.setQueryData(['user-role', user.email], roleData)
         const role = roleData?.role || 'technician'
         setCurrentUserRole(role)
-        setCurrentUserPermissions(roleData?.permissions || ROLE_DEFAULT_PERMISSIONS[role] || null)
+        setCurrentUserPermissions(resolvePermissions(role, roleData?.permissions))
       }
     } catch (error) {
       captureException(error, { page: 'App', context: 'checkAuth' })
@@ -348,7 +348,7 @@ export default function App() {
     queryClient.setQueryData(['user-role', user.email], roleData)
     const role = roleData?.role || 'technician'
     setCurrentUserRole(role)
-    setCurrentUserPermissions(roleData?.permissions || ROLE_DEFAULT_PERMISSIONS[role] || null)
+    setCurrentUserPermissions(resolvePermissions(role, roleData?.permissions))
     db.userActivity.create(user.email, 'login', `Signed in as ${role}`).catch(() => {})
   }
 

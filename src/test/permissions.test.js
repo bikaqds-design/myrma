@@ -4,7 +4,7 @@
  * Covers: canDo() helper, ROLE_DEFAULT_PERMISSIONS structure
  */
 import { describe, it, expect } from 'vitest'
-import { canDo, ROLE_DEFAULT_PERMISSIONS } from '../lib/permissions'
+import { canDo, resolvePermissions, ROLE_DEFAULT_PERMISSIONS } from '../lib/permissions'
 import { ROLES } from '../lib/constants'
 
 // ── canDo — admin bypass ──────────────────────────────────────────────────────
@@ -54,6 +54,51 @@ describe('canDo — permission object lookup', () => {
 
   it('returns false when permissions is undefined', () => {
     expect(canDo(ROLES.MANAGER, undefined, 'rma_tickets', 'view_all')).toBe(false)
+  })
+})
+
+// ── resolvePermissions — PERM-1 empty/partial-object trap ────────────────────
+
+describe('resolvePermissions — the manager-can\'t-create regression guard', () => {
+  it('falls back to role defaults when stored is null', () => {
+    const resolved = resolvePermissions(ROLES.MANAGER, null)
+    expect(canDo(ROLES.MANAGER, resolved, 'products', 'create')).toBe(true)
+    expect(canDo(ROLES.MANAGER, resolved, 'rma_tickets', 'create')).toBe(true)
+    expect(canDo(ROLES.MANAGER, resolved, 'customers', 'create')).toBe(true)
+  })
+
+  it('falls back to role defaults when stored is an empty object (the truthy trap)', () => {
+    const resolved = resolvePermissions(ROLES.MANAGER, {})
+    expect(canDo(ROLES.MANAGER, resolved, 'products', 'create')).toBe(true)
+    expect(canDo(ROLES.MANAGER, resolved, 'rma_tickets', 'create')).toBe(true)
+  })
+
+  it('fills missing sections from role defaults when stored is partial', () => {
+    // stored only overrides products; rma_tickets/customers must still come from defaults
+    const resolved = resolvePermissions(ROLES.MANAGER, { products: { create: false } })
+    expect(canDo(ROLES.MANAGER, resolved, 'products', 'create')).toBe(false) // explicit override preserved
+    expect(canDo(ROLES.MANAGER, resolved, 'products', 'view')).toBe(true) // gap filled from default
+    expect(canDo(ROLES.MANAGER, resolved, 'rma_tickets', 'create')).toBe(true) // missing section filled
+  })
+
+  it('preserves explicit per-action overrides (including false) over defaults', () => {
+    const resolved = resolvePermissions(ROLES.MANAGER, {
+      rma_tickets: { delete: true },
+    })
+    expect(canDo(ROLES.MANAGER, resolved, 'rma_tickets', 'delete')).toBe(true) // override grants
+    expect(canDo(ROLES.MANAGER, resolved, 'rma_tickets', 'create')).toBe(true) // default kept
+  })
+
+  it('returns defaults for technician/viewer too', () => {
+    expect(canDo(ROLES.TECHNICIAN, resolvePermissions(ROLES.TECHNICIAN, {}), 'rma_tickets', 'create')).toBe(false)
+    expect(canDo(ROLES.VIEWER, resolvePermissions(ROLES.VIEWER, {}), 'products', 'view')).toBe(true)
+  })
+
+  it('uses stored as-is for a role with no built-in defaults (custom role)', () => {
+    const stored = { products: { view: true } }
+    const resolved = resolvePermissions('support_agent', stored)
+    expect(canDo('support_agent', resolved, 'products', 'view')).toBe(true)
+    expect(canDo('support_agent', resolved, 'products', 'create')).toBe(false)
   })
 })
 

@@ -35,9 +35,12 @@ export const userRoles = {
     return data?.[0]
   },
   async updateRole(email, role) {
+    // Clear any custom permission overrides so the new role's defaults apply cleanly.
+    // Stale overrides from a previous role would otherwise win at resolve time and
+    // silently restrict the user (PERM-2).
     const { data, error } = await supabase
       .from('user_roles')
-      .update({ role })
+      .update({ role, permissions: null })
       .eq('user_email', email)
       .select()
     if (error) throw error

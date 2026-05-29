@@ -11,6 +11,10 @@ import { validatePasswordStrength, getDefaultPermissions } from './_utils'
 import { UsersTab, AddUserModal, PasswordResetModal, UserControlModal, ActivityModal } from './UsersTab'
 import { RoleTemplatesTab, CustomRolesTab, CreateRoleModal, PermissionsModal } from './RolesTab'
 
+// Custom Roles are not yet wired end-to-end (not assignable in the role dropdown,
+// not loaded by getUserRole, not enforced by canDo). Hidden until fully supported (UM-3).
+const ENABLE_CUSTOM_ROLES = false
+
 export default function UserManagement({ currentUserRole, currentUserEmail }) {
   const [activeTab, setActiveTab] = useURLTab('umtab', 'users')
   const queryClient = useQueryClient()
@@ -144,9 +148,9 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
           targetEmails: [email],
         })
         .catch(() => {})
-      toast.success('Role updated successfully!')
+      toast.success(`Role updated to ${newRole}. Custom permissions reset to role defaults.`)
       db.auditLog
-        .log(currentUserEmail, 'user_role_changed', `Changed role of ${email} to ${newRole}`)
+        .log(currentUserEmail, 'user_role_changed', `Changed role of ${email} to ${newRole} (custom permissions reset)`)
         .catch(() => {})
       invalidate()
     } catch (error) {
@@ -521,19 +525,21 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
                   : 'border-transparent text-gray-500 hover:text-gray-700')
               }
             >
-              Role Templates
+              Role Reference
             </button>
-            <button
-              onClick={() => setActiveTab('custom')}
-              className={
-                'py-4 border-b-2 font-medium transition-colors ' +
-                (activeTab === 'custom'
-                  ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700')
-              }
-            >
-              Custom Roles
-            </button>
+            {ENABLE_CUSTOM_ROLES && (
+              <button
+                onClick={() => setActiveTab('custom')}
+                className={
+                  'py-4 border-b-2 font-medium transition-colors ' +
+                  (activeTab === 'custom'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700')
+                }
+              >
+                Custom Roles
+              </button>
+            )}
           </nav>
         </div>
 
@@ -553,14 +559,9 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
             />
           )}
 
-          {activeTab === 'roles' && (
-            <RoleTemplatesTab
-              currentUserRole={currentUserRole}
-              currentUserEmail={currentUserEmail}
-            />
-          )}
+          {activeTab === 'roles' && <RoleTemplatesTab />}
 
-          {activeTab === 'custom' && (
+          {ENABLE_CUSTOM_ROLES && activeTab === 'custom' && (
             <CustomRolesTab
               customRoles={customRoles}
               onCreateRole={() => setShowCreateRoleModal(true)}
