@@ -286,7 +286,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
     [tickets]
   )
 
-  const { slaPercent, resolutionPercent } = useMemo(() => {
+  const { slaPercent, resolutionPercent, trackedCount, onScheduleCount } = useMemo(() => {
     const ticketsWithDue = tickets.filter((t) => t.due_date && t.ticket_status !== 'Cancelled')
     const overdueActive = ticketsWithDue.filter(
       (t) => !['Closed', 'Resolved'].includes(t.ticket_status) && new Date(t.due_date) < new Date()
@@ -298,6 +298,9 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
           : 100,
       resolutionPercent:
         tickets.length > 0 ? Math.round((closedTickets / tickets.length) * 100) : 0,
+      // Exposed for the SLA widget caption (rendered outside this memo's scope)
+      trackedCount: ticketsWithDue.length,
+      onScheduleCount: ticketsWithDue.length - overdueActive,
     }
   }, [tickets, closedTickets])
 
@@ -574,8 +577,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
               />
             </div>
             <p className="text-center text-xs text-gray-500 mt-1">
-              {ticketsWithDue.length - overdueActive} of {ticketsWithDue.length} tracked tickets on
-              schedule
+              {onScheduleCount} of {trackedCount} tracked tickets on schedule
             </p>
           </WidgetCard>
         )}
