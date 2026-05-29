@@ -205,6 +205,7 @@ Current migrations:
 - `20260526_check_constraints.sql`
 - `20260527_storage_bucket_policies.sql`
 - `20260528_ticket_cascade_fk.sql`
+- `20260529_repair_permissions.sql`
 
 ### RLS SQL helper functions
 

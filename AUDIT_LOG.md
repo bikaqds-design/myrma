@@ -921,8 +921,8 @@ The permission system is the weak point. The defaults and `canDo` helper are sou
 
 | ID | Item | Owner | Action |
 |----|------|-------|--------|
-| PERM-3 | Repair any fully-corrupted legacy permission rows (e.g. omara) | User | Edit Permissions → Reset to Role Defaults → Save, or change role away/back; affected user re-logs in |
-| CRASH-3 | Make crashes auto-report | User | Set `VITE_SENTRY_DSN` in Vercel + redeploy. Until then, use the new "Copy error details" button when a crash occurs and paste it here |
+| PERM-3 | Repair any fully-corrupted legacy permission rows (e.g. omara) | ✅ Done (migration) + User to apply | Migration `20260529_repair_permissions.sql` nulls all non-admin overrides (safe — none were legitimately set while the modal was broken) so they fall back to role defaults. **Apply it:** `supabase db push` (or run the SQL in the Supabase SQL editor). Affected users then re-log in. |
+| CRASH-3 | Make crashes auto-report | ✅ Code complete + User to set DSN | ErrorBoundary surfaces the error message in prod + "Copy error details"; Sentry auto-captures render **and** global errors once a DSN exists. **Remaining (ops-only):** set `VITE_SENTRY_DSN` in Vercel → redeploy. Already documented in `.env.example`. |
 
 ### New: full-system audit scope (Sprint 9)
 
