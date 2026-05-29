@@ -3,8 +3,20 @@ import toast from 'react-hot-toast'
 import Modal from '../../components/Modal'
 import { db } from '../../api/supabaseClient'
 import { ROLES } from '../../lib/constants'
+import { ROLE_DEFAULT_PERMISSIONS } from '../../lib/permissions'
 import { RoleBadge } from './_shared'
 import { getDefaultPermissions, getRoleTemplates } from './_utils'
+
+// Merges stored permissions on top of the full defaults so all keys are always present
+function mergeWithDefaults(permissions) {
+  const defaults = getDefaultPermissions()
+  return Object.fromEntries(
+    Object.entries(defaults).map(([section, actions]) => [
+      section,
+      { ...actions, ...(permissions?.[section] || {}) },
+    ])
+  )
+}
 
 export function RoleTemplatesTab({ currentUserRole, currentUserEmail }) {
   const [savedTemplates, setSavedTemplates] = useState({})
@@ -342,45 +354,96 @@ export function CreateRoleModal({
   )
 }
 
-export function PermissionsModal({ user, onUserChange, onSave, onClose }) {
+export function PermissionsModal({ user, onSave, onClose }) {
+  const [saving, setSaving] = useState(false)
+
+  // Seed: use stored custom permissions if present, otherwise role template defaults.
+  // mergeWithDefaults ensures all sections/keys exist even for partial stored objects.
+  const [perms, setPerms] = useState(() => {
+    const stored = user.permissions
+    const hasStored = stored && typeof stored === 'object' && Object.keys(stored).length > 0
+    const base = hasStored ? stored : (ROLE_DEFAULT_PERMISSIONS[user.role] || getDefaultPermissions())
+    return mergeWithDefaults(base)
+  })
+
+  const hasCustomPerms =
+    user.permissions && typeof user.permissions === 'object' && Object.keys(user.permissions).length > 0
+
   const togglePermission = (module, perm) => {
-    const updated = { ...user }
-    if (!updated.permissions) updated.permissions = getDefaultPermissions()
-    if (!updated.permissions[module]) updated.permissions[module] = {}
-    updated.permissions[module][perm] = !updated.permissions[module][perm]
-    onUserChange(updated)
+    setPerms((p) => ({
+      ...p,
+      [module]: { ...(p[module] || {}), [perm]: !p[module]?.[perm] },
+    }))
+  }
+
+  const resetToRoleDefaults = () => {
+    const roleDefaults = ROLE_DEFAULT_PERMISSIONS[user.role]
+    setPerms(mergeWithDefaults(roleDefaults || getDefaultPermissions()))
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSave(perms)
+    } catch {
+      // parent handles error toast
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
-    <Modal
-      open={true}
-      onClose={onClose}
-      title={`Edit Permissions: ${user.user_email}`}
-      className="max-w-4xl"
-      hideHeader
-    >
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-        Edit Permissions: {user.user_email}
-      </h2>
+    <Modal open={true} onClose={onClose} title={`Edit Permissions: ${user.user_email}`} className="max-w-4xl" hideHeader>
+      <div className="flex flex-col max-h-[85vh]">
+        <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Edit Permissions</h2>
+            <p className="text-sm text-gray-500 mt-0.5">{user.user_email}</p>
+            <div className="flex items-center gap-2 mt-2">
+              <RoleBadge role={user.role} />
+              {hasCustomPerms ? (
+                <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">
+                  Custom overrides active
+                </span>
+              ) : (
+                <span className="text-xs text-gray-400">Showing role defaults</span>
+              )}
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 mt-1">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
-      <PermissionMatrix
-        permissions={user.permissions || getDefaultPermissions()}
-        onToggle={togglePermission}
-      />
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <PermissionMatrix permissions={perms} onToggle={togglePermission} />
+        </div>
 
-      <div className="flex gap-3 pt-6 border-t mt-6">
-        <button
-          onClick={onClose}
-          className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={onSave}
-          className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-        >
-          Save Permissions
-        </button>
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
+          <button
+            onClick={resetToRoleDefaults}
+            className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-white transition-colors"
+          >
+            Reset to Role Defaults
+          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-5 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            >
+              {saving ? 'Saving...' : 'Save Permissions'}
+            </button>
+          </div>
+        </div>
       </div>
     </Modal>
   )
@@ -392,32 +455,52 @@ export function PermissionMatrix({ permissions, onToggle }) {
     { key: 'customers', label: 'Customers' },
     { key: 'rma_tickets', label: 'RMA Tickets' },
     { key: 'inventory', label: 'Inventory' },
+    { key: 'invoices', label: 'Invoices' },
+    { key: 'parts', label: 'Parts Inventory' },
+    { key: 'time_tracking', label: 'Time Tracking' },
+    { key: 'calendar', label: 'Calendar' },
+    { key: 'reports', label: 'Reports' },
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'user_management', label: 'User Management' },
     { key: 'settings', label: 'Settings' },
   ]
 
   return (
-    <div className="space-y-4">
-      {modules.map((module) => (
-        <div key={module.key} className="border border-gray-200 rounded-lg p-4">
-          <h4 className="font-medium text-gray-900 mb-3">{module.label}</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {permissions[module.key] &&
-              Object.entries(permissions[module.key]).map(([perm, enabled]) => (
-                <label key={perm} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={enabled}
-                    onChange={() => onToggle(module.key, perm)}
-                    className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-600"
-                  />
-                  <span className="text-sm text-gray-700">{perm.replace('_', ' ')}</span>
-                </label>
-              ))}
+    <div className="space-y-3">
+      {modules.map((module) => {
+        const modulePerms = permissions[module.key] || {}
+        const entries = Object.entries(modulePerms)
+        const enabledCount = entries.filter(([, v]) => v).length
+        return (
+          <div key={module.key} className="border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium text-gray-900">{module.label}</h4>
+              <span className="text-xs text-gray-400">
+                {enabledCount}/{entries.length} enabled
+              </span>
+            </div>
+            {entries.length === 0 ? (
+              <p className="text-sm text-gray-400 italic">No permissions defined</p>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {entries.map(([perm, enabled]) => (
+                  <label key={perm} className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={!!enabled}
+                      onChange={() => onToggle(module.key, perm)}
+                      className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                    />
+                    <span className="text-sm text-gray-700 capitalize">
+                      {perm.replace(/_/g, ' ')}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

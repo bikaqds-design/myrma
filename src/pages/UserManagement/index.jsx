@@ -184,16 +184,20 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
     setShowPermissionsModal(true)
   }
 
-  const handleSavePermissions = async () => {
+  const handleSavePermissions = async (permissions) => {
     try {
-      await db.userRoles.updateUserPermissions(selectedUser.user_email, selectedUser.permissions)
+      await db.userRoles.updateUserPermissions(selectedUser.user_email, permissions)
       toast.success('Permissions updated successfully!')
+      db.auditLog
+        .log(currentUserEmail, 'user_permissions_changed', `Updated permissions for ${selectedUser.user_email}`)
+        .catch(() => {})
       setShowPermissionsModal(false)
       setSelectedUser(null)
       invalidate()
     } catch (error) {
       captureException(error)
       toast.error('Failed to update permissions')
+      throw error
     }
   }
 
@@ -600,7 +604,6 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       {showPermissionsModal && selectedUser && (
         <PermissionsModal
           user={selectedUser}
-          onUserChange={setSelectedUser}
           onSave={handleSavePermissions}
           onClose={() => {
             setShowPermissionsModal(false)

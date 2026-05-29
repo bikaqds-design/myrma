@@ -79,6 +79,11 @@ export function getDefaultPermissions() {
       manage_categories: false,
       view_audit_logs: false,
     },
+    invoices: { view: false, create: false, edit: false, delete: false },
+    time_tracking: { log: false, view_all: false, delete: false },
+    parts: { view: false, create: false, edit: false, delete: false },
+    calendar: { view: false },
+    reports: { view: false, export: false },
   }
 }
 
