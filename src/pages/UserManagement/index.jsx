@@ -131,32 +131,39 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
     }
   }
 
-  const handleUpdateRole = async (email, newRole) => {
-    try {
-      await db.userRoles.updateRole(email, newRole)
-      db.userActivity
-        .create(currentUserEmail, 'user_role_changed', `Changed role of ${email} to ${newRole}`)
-        .catch(() => {})
-      db.notifications
-        .create({
-          type: 'user_role_changed',
-          title: 'Role Updated',
-          message: `${email}'s role was changed to ${newRole}`,
-          entityType: 'user',
-          createdBy: currentUserEmail,
-          targetRoles: ['super_admin'],
-          targetEmails: [email],
-        })
-        .catch(() => {})
-      toast.success(`Role updated to ${newRole}. Custom permissions reset to role defaults.`)
-      db.auditLog
-        .log(currentUserEmail, 'user_role_changed', `Changed role of ${email} to ${newRole} (custom permissions reset)`)
-        .catch(() => {})
-      invalidate()
-    } catch (error) {
-      captureException(error)
-      toast.error('Failed to update role')
-    }
+  const handleUpdateRole = (email, newRole) => {
+    openConfirm(
+      'Change User Role',
+      `Change ${email} to "${newRole}"? Any custom permission overrides will be reset to the new role's defaults.`,
+      async () => {
+        closeConfirm()
+        try {
+          await db.userRoles.updateRole(email, newRole)
+          db.userActivity
+            .create(currentUserEmail, 'user_role_changed', `Changed role of ${email} to ${newRole}`)
+            .catch(() => {})
+          db.notifications
+            .create({
+              type: 'user_role_changed',
+              title: 'Role Updated',
+              message: `${email}'s role was changed to ${newRole}`,
+              entityType: 'user',
+              createdBy: currentUserEmail,
+              targetRoles: ['super_admin'],
+              targetEmails: [email],
+            })
+            .catch(() => {})
+          toast.success(`Role updated to ${newRole}. Custom permissions reset to role defaults.`)
+          db.auditLog
+            .log(currentUserEmail, 'user_role_changed', `Changed role of ${email} to ${newRole} (custom permissions reset)`)
+            .catch(() => {})
+          invalidate()
+        } catch (error) {
+          captureException(error)
+          toast.error('Failed to update role')
+        }
+      }
+    )
   }
 
   const handleCreateCustomRole = async (e) => {

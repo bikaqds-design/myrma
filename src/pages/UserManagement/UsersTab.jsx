@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import toast from 'react-hot-toast'
 import Modal from '../../components/Modal'
 import { ROLES } from '../../lib/constants'
-import { StatusBadge, RoleBadge } from './_shared'
+import { StatusBadge, RoleBadge, ASSIGNABLE_ROLES } from './_shared'
 
 export function UsersTab({
   users,
@@ -17,6 +17,14 @@ export function UsersTab({
   setOpenMenuId,
 }) {
   const isSuperAdmin = currentUserRole === ROLES.SUPER_ADMIN
+  // Admin + super_admin can manage permissions (consistent with admin bypass; the
+  // whole page is already admin-only). Was hardcoded super_admin-only before (UM-5).
+  const canManagePermissions =
+    currentUserRole === ROLES.ADMIN || currentUserRole === ROLES.SUPER_ADMIN
+  // An empty {} is not a real override — only treat a non-empty object as "Custom" (UM-4)
+  const hasCustomPerms = (u) =>
+    !!u.permissions && typeof u.permissions === 'object' && Object.keys(u.permissions).length > 0
+  const roleOptions = ASSIGNABLE_ROLES.filter((r) => !r.superAdminOnly || isSuperAdmin)
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
@@ -75,16 +83,16 @@ export function UsersTab({
                     onChange={(e) => onUpdateRole(user.user_email, e.target.value)}
                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-sm"
                   >
-                    {isSuperAdmin && <option value="super_admin">Super Admin</option>}
-                    <option value="admin">Admin</option>
-                    <option value="manager">Manager</option>
-                    <option value="technician">Technician</option>
-                    <option value="viewer">Viewer</option>
+                    {roleOptions.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
                   </select>
                 )}
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                {isSuperAdmin ? (
+                {canManagePermissions ? (
                   <button
                     onClick={() => onEditPermissions(user)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 border-gray-200 text-gray-600"
@@ -102,11 +110,11 @@ export function UsersTab({
                         d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
                       />
                     </svg>
-                    {user.permissions ? 'Custom' : 'Role Default'}
+                    {hasCustomPerms(user) ? 'Custom' : 'Role Default'}
                   </button>
                 ) : (
                   <span className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-500">
-                    {user.permissions ? 'Custom' : 'Role Default'}
+                    {hasCustomPerms(user) ? 'Custom' : 'Role Default'}
                   </span>
                 )}
               </td>
@@ -285,10 +293,11 @@ export function AddUserModal({
             onChange={(e) => onRoleChange(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
           >
-            <option value="technician">🔧 Technician</option>
-            <option value="manager">👔 Manager</option>
-            <option value="admin">👑 Admin</option>
-            <option value="viewer">👁️ Viewer</option>
+            {ASSIGNABLE_ROLES.filter((r) => !r.superAdminOnly).map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
           </select>
         </div>
 

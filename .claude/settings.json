@@ -51,7 +51,11 @@
       "Bash(npm list *)",
       "Bash(wc -l \"d:\\\\myrma-app\\\\CONSTITUTION.md\" \"d:\\\\myrma-app\\\\README.md\")",
       "Bash(wc -l d:/myrma-app/__TRACKED_VAR__.md)",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(Select-Object -Last 15)",
+      "Bash(Select-Object -Last 8)",
+      "Bash(Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue)",
+      "Bash(npx vitest *)"
     ]
   }
 }

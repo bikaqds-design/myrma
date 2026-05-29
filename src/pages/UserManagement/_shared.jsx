@@ -1,3 +1,15 @@
+// Single list of assignable roles, used by both the Add-User modal and the
+// per-user "Change Role" dropdown so they never drift (UM-7). `superAdminOnly`
+// roles are only offered when the acting user is a super admin.
+// eslint-disable-next-line react-refresh/only-export-components
+export const ASSIGNABLE_ROLES = [
+  { value: 'super_admin', label: '👑 Super Admin', superAdminOnly: true },
+  { value: 'admin', label: '👑 Admin' },
+  { value: 'manager', label: '👔 Manager' },
+  { value: 'technician', label: '🔧 Technician' },
+  { value: 'viewer', label: '👁️ Viewer' },
+]
+
 export function StatusBadge({ status }) {
   const badges = {
     active: 'bg-green-100 text-green-800',
