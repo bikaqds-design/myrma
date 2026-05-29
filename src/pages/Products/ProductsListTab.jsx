@@ -43,10 +43,13 @@ export default function ProductsListTab({
   const SortableHeader = ({ label, sortKey }) => {
     const isActive = sortConfig.key === sortKey
     const direction = isActive ? sortConfig.direction : null
+    const ariaSort = isActive ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'
 
     return (
       <button
         onClick={() => handleSort(sortKey)}
+        aria-label={`Sort by ${label}`}
+        aria-sort={ariaSort}
         className="flex items-center gap-1 hover:text-gray-900 transition-colors"
       >
         <span>{label}</span>
@@ -481,9 +484,12 @@ export default function ProductsListTab({
                         e.stopPropagation()
                         setOpenMenuId(openMenuId === product.id ? null : product.id)
                       }}
+                      aria-label={`Actions for ${product.product_name}`}
+                      aria-expanded={openMenuId === product.id}
+                      aria-haspopup="menu"
                       className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
                     >
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4" aria-hidden="true" fill="currentColor" viewBox="0 0 24 24">
                         <circle cx="12" cy="5" r="1.5" />
                         <circle cx="12" cy="12" r="1.5" />
                         <circle cx="12" cy="19" r="1.5" />

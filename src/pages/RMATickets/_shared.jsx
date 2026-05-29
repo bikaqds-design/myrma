@@ -3,9 +3,16 @@
 
 export function SortableHeader({ label, sortKey, sortConfig, onSort }) {
   const isActive = sortConfig.key === sortKey
+  const ariaSort = isActive
+    ? sortConfig.direction === 'asc'
+      ? 'ascending'
+      : 'descending'
+    : 'none'
   return (
     <button
       onClick={() => onSort(sortKey)}
+      aria-label={`Sort by ${label}`}
+      aria-sort={ariaSort}
       className="flex items-center gap-1 hover:text-gray-900 transition-colors"
     >
       <span>{label}</span>

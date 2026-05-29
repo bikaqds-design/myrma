@@ -333,9 +333,12 @@ export function BrandBar({ brands, groups, selected, onSelect }) {
 // ─── Inventory Sort Button ────────────────────────────────────────────────────
 export function InvSortBtn({ label, sortKey, activeSortKey, activeSortDir, onSort }) {
   const isActive = activeSortKey === sortKey
+  const ariaSort = isActive ? (activeSortDir === 'asc' ? 'ascending' : 'descending') : 'none'
   return (
     <button
       onClick={() => onSort(sortKey)}
+      aria-label={`Sort by ${label}`}
+      aria-sort={ariaSort}
       className="flex items-center gap-1 hover:text-gray-900 transition-colors"
     >
       {label}
