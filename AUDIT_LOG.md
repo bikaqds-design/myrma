@@ -883,7 +883,11 @@ The permission system is the weak point. The defaults and `canDo` helper are sou
 
 ## 🔧 Fix Plan — Post 2026-05-29 Audit (Sprint 8: Permissions Hardening)
 
-> **Status 2026-05-29:** Phase 1 + the Phase-2 relabel/hide shipped in commit `(Sprint 8 Phase 1)`. PERM-1 (`resolvePermissions` merge), PERM-2 (clear perms on role change), UM-1 (Role Templates → read-only "Role Reference" driven by runtime defaults), UM-3 (Custom Roles hidden behind `ENABLE_CUSTOM_ROLES`) are **done**; 80/80 tests pass. PERM-3 legacy rows: empty/partial rows self-heal at read time; a fully-populated corrupted row needs a one-click repair (Edit Permissions → Reset to Role Defaults → Save, or change role away/back). UM-2/4/5/6/7 and CRASH-3 instrumentation remain open.
+> **Status 2026-05-29 — Sprint 8 COMPLETE.** Phase 1 (`5de277d`/Phase-1 commit) + Phase 2 (`013166b`):
+> - **PERM-1** ✅ `resolvePermissions` merge wired into App.jsx; **PERM-2** ✅ role change clears perms; **PERM-3** ⏳ empty/partial rows self-heal at read time, a fully-populated corrupted row needs a one-click repair (Edit Permissions → Reset to Role Defaults → Save, or change role away/back).
+> - **UM-1** ✅ Role Templates → read-only "Role Reference" from runtime defaults; **UM-2** ✅ single source of truth — `getDefaultPermissions`/`getRoleTemplates` derived from `ROLE_DEFAULT_PERMISSIONS` (−538 lines of drifted dupes); **UM-3** ✅ Custom Roles hidden behind flag; **UM-4** ✅ badge truthy fix; **UM-5** ✅ permission editing gated admin+; **UM-6** ✅ confirm on role change; **UM-7** ✅ shared `ASSIGNABLE_ROLES`.
+> - **CRASH-3** ✅ ErrorBoundary surfaces the error message in production + "Copy error details" button; Sentry still requires `VITE_SENTRY_DSN` in Vercel to send events.
+> - Gates: 80/80 tests, lint clean, build clean.
 
 **Phase 1 — Stop the bleeding (manager role) · highest priority**
 
