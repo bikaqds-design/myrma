@@ -121,21 +121,28 @@ const INPUT_BASE =
   'focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ' +
   'disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed'
 
-export function Input({ className = '', ...props }) {
-  return <input className={cn(INPUT_BASE, className)} {...props} />
-}
+// forwardRef so react-hook-form's register() ref attaches to the DOM node —
+// without it the ref is silently dropped and RHF never reads the value.
+export const Input = React.forwardRef(function Input({ className = '', ...props }, ref) {
+  return <input ref={ref} className={cn(INPUT_BASE, className)} {...props} />
+})
 
-export function Select({ className = '', children, ...props }) {
+export const Select = React.forwardRef(function Select({ className = '', children, ...props }, ref) {
   return (
-    <select className={cn(INPUT_BASE, className)} {...props}>
+    <select ref={ref} className={cn(INPUT_BASE, className)} {...props}>
       {children}
     </select>
   )
-}
+})
 
-export function Textarea({ className = '', rows = 3, ...props }) {
-  return <textarea rows={rows} className={cn(INPUT_BASE, 'resize-none', className)} {...props} />
-}
+export const Textarea = React.forwardRef(function Textarea(
+  { className = '', rows = 3, ...props },
+  ref
+) {
+  return (
+    <textarea ref={ref} rows={rows} className={cn(INPUT_BASE, 'resize-none', className)} {...props} />
+  )
+})
 
 // ─── LABEL ────────────────────────────────────────────────────────────────────
 export function Label({ children, required, htmlFor, className = '' }) {

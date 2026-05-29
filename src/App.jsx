@@ -488,13 +488,17 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 flex">
       <AnnouncementBanner />
       <Toaster position="top-right" />
-      <CommandPalette
-        open={cmdPaletteOpen}
-        onClose={() => setCmdPaletteOpen(false)}
-        onSelectTicket={handleCmdSelectTicket}
-        onSelectCustomer={handleCmdSelectCustomer}
-        onSelectProduct={handleCmdSelectProduct}
-      />
+      {/* CommandPalette is React.lazy — needs its own Suspense boundary.
+          null fallback: it's a hidden modal until Ctrl+K, no placeholder needed. */}
+      <Suspense fallback={null}>
+        <CommandPalette
+          open={cmdPaletteOpen}
+          onClose={() => setCmdPaletteOpen(false)}
+          onSelectTicket={handleCmdSelectTicket}
+          onSelectCustomer={handleCmdSelectCustomer}
+          onSelectProduct={handleCmdSelectProduct}
+        />
+      </Suspense>
 
       {sidebarOpen && (
         <div
