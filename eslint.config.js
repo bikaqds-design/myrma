@@ -84,7 +84,9 @@ export default [
       // Empty catch blocks are intentional in this codebase (graceful degradation)
       'no-empty': ['warn', { allowEmptyCatch: true }],
 
-      'no-undef': 'off',
+      // Re-enabled: 'off' let "X is not defined" bugs (load, ticketsWithDue)
+      // reach production. This is the guard that catches that whole crash class.
+      'no-undef': 'error',
     },
   },
 

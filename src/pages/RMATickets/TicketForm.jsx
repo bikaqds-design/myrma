@@ -45,7 +45,7 @@ export function TicketForm({
       return {
         customer_name: editingTicket.customer_name || '',
         priority: editingTicket.priority || 'Medium',
-        ticket_status: editingTicket.ticket_status || 'New',
+        ticket_status: editingTicket.ticket_status || 'Open',
         assigned_technician: editingTicket.assigned_technician || '',
         due_date: editingTicket.due_date || '',
         general_description: editingTicket.general_description || '',
