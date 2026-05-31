@@ -959,7 +959,7 @@ export default function Reports({
   ]
   const [activeTab, setActiveTab] = useState('tickets')
 
-  const { data: reportData, isLoading: loading, isError, error } = useQuery({
+  const { data: reportData, isLoading: loading, isError, error, refetch } = useQuery({
     queryKey: ['reports', isAdminOrManager],
     queryFn: async () => {
       const [tkRes, custRes, teRes, invRes] = await Promise.all([
@@ -1054,7 +1054,7 @@ export default function Reports({
         subtitle="Analyse ticket performance, customer trends, and financials"
       >
         <button
-          onClick={load}
+          onClick={() => refetch()}
           className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
