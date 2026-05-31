@@ -2,12 +2,15 @@ import { supabase } from '../client.js'
 
 export const customers = {
   async list() {
-    // Capped at 500 rows — use listPaged() for server-side pagination (H-4)
+    // 5 000-row cap — the Customers page filters/sorts client-side so all rows
+    // must be in memory. At ~600 bytes/row this is ~3 MB for 5 000 customers,
+    // well within browser limits. If the dataset ever exceeds 5 000, switch the
+    // page to server-side pagination using listPaged().
     const { data, error } = await supabase
       .from('customers')
       .select('*')
       .order('created_date', { ascending: false })
-      .limit(500)
+      .limit(5000)
     if (error) throw error
     return data || []
   },
