@@ -55,21 +55,39 @@ import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
 import RMATracker from './pages/RMATracker'
 
-const AccountSettings = React.lazy(() => import('./pages/AccountSettings'))
-const Dashboard = React.lazy(() => import('./pages/Dashboard'))
-const Products = React.lazy(() => import('./pages/Products'))
-const ProductDetails = React.lazy(() => import('./pages/ProductDetails'))
-const Customers = React.lazy(() => import('./pages/Customers'))
-const CustomerDetails = React.lazy(() => import('./pages/CustomerDetails'))
-const RMATickets = React.lazy(() => import('./pages/RMATickets'))
-const Inventory = React.lazy(() => import('./pages/Inventory'))
-const ControlPanel = React.lazy(() => import('./pages/ControlPanel'))
-const TechCalendar = React.lazy(() => import('./pages/TechCalendar'))
-const Invoices = React.lazy(() => import('./pages/Invoices'))
-const PartsInventory = React.lazy(() => import('./pages/PartsInventory'))
-const Reports = React.lazy(() => import('./pages/Reports'))
-const NotFoundPage = React.lazy(() => import('./pages/NotFoundPage'))
-const CommandPalette = React.lazy(() => import('./components/CommandPalette'))
+// When Vite redeploys, content-hashed chunk filenames change. A user who still
+// has the old index.html cached will try to fetch old chunk URLs that no longer
+// exist → "Failed to fetch dynamically imported module". Auto-reload on that
+// specific error so the browser picks up the new index.html and correct chunks.
+function lazyWithReload(importFn) {
+  return React.lazy(() =>
+    importFn().catch((err) => {
+      // Only reload for chunk-fetch failures, not genuine module errors
+      if (err?.message?.includes('Failed to fetch dynamically imported module') ||
+          err?.message?.includes('Importing a module script failed')) {
+        window.location.reload()
+        return new Promise(() => {}) // suspend forever — reload takes over
+      }
+      throw err
+    })
+  )
+}
+
+const AccountSettings = lazyWithReload(() => import('./pages/AccountSettings'))
+const Dashboard = lazyWithReload(() => import('./pages/Dashboard'))
+const Products = lazyWithReload(() => import('./pages/Products'))
+const ProductDetails = lazyWithReload(() => import('./pages/ProductDetails'))
+const Customers = lazyWithReload(() => import('./pages/Customers'))
+const CustomerDetails = lazyWithReload(() => import('./pages/CustomerDetails'))
+const RMATickets = lazyWithReload(() => import('./pages/RMATickets'))
+const Inventory = lazyWithReload(() => import('./pages/Inventory'))
+const ControlPanel = lazyWithReload(() => import('./pages/ControlPanel'))
+const TechCalendar = lazyWithReload(() => import('./pages/TechCalendar'))
+const Invoices = lazyWithReload(() => import('./pages/Invoices'))
+const PartsInventory = lazyWithReload(() => import('./pages/PartsInventory'))
+const Reports = lazyWithReload(() => import('./pages/Reports'))
+const NotFoundPage = lazyWithReload(() => import('./pages/NotFoundPage'))
+const CommandPalette = lazyWithReload(() => import('./components/CommandPalette'))
 
 const PageSpinner = () => (
   <div className="flex items-center justify-center h-64">
