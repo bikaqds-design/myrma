@@ -2,12 +2,13 @@ import { supabase } from '../client.js'
 
 export const rmaTickets = {
   async list() {
-    // Capped at 500 rows — use listPaged() for server-side pagination (H-4)
+    // 5 000-row cap — RMA Tickets filters/sorts client-side so all rows must be
+    // in memory. Raised from 500 to cover real-world datasets without truncation.
     const { data, error } = await supabase
       .from('rma_tickets')
       .select('*')
       .order('created_date', { ascending: false })
-      .limit(500)
+      .limit(5000)
     if (error) throw error
     return data || []
   },

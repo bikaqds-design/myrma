@@ -99,14 +99,15 @@ export const subcategories = {
 
 export const products = {
   async list() {
-    // Capped at 500 rows — use listPaged() for server-side pagination (H-4)
+    // 5 000-row cap — Products page filters/sorts client-side so all rows must
+    // be in memory. Raised from 500 to cover real-world datasets without truncation.
     const { data, error } = await supabase
       .from('products')
       .select(
         '*, brand:brands(id, brand_name, brand_logo_url), category:categories(id, category_name), subcategory:subcategories(id, subcategory_name)'
       )
       .order('created_date', { ascending: false })
-      .limit(500)
+      .limit(5000)
     if (error) throw error
     return data || []
   },
