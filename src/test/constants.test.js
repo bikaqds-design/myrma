@@ -55,8 +55,8 @@ describe('TICKET_STATUS', () => {
     expect(TICKET_STATUS.CANCELLED).toBe('Cancelled')
   })
 
-  it('TICKET_STATUS_LIST contains all six statuses', () => {
-    expect(TICKET_STATUS_LIST).toHaveLength(6)
+  it('TICKET_STATUS_LIST contains all seven statuses', () => {
+    expect(TICKET_STATUS_LIST).toHaveLength(7)
     for (const v of Object.values(TICKET_STATUS)) {
       expect(TICKET_STATUS_LIST).toContain(v)
     }

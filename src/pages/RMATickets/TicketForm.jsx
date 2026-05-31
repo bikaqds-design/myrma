@@ -574,6 +574,7 @@ export function TicketForm({
                   <option value="In Progress">In Progress</option>
                   <option value="Pending">Pending</option>
                   <option value="On Hold">On Hold</option>
+                  <option value="Completed">Completed</option>
                   <option value="Closed">Closed</option>
                   <option value="Cancelled">Cancelled</option>
                 </select>

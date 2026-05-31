@@ -39,6 +39,7 @@ export const TICKET_STATUS = {
   IN_PROGRESS: 'In Progress',
   PENDING: 'Pending',
   ON_HOLD: 'On Hold',
+  COMPLETED: 'Completed',
   CLOSED: 'Closed',
   CANCELLED: 'Cancelled',
 } as const
@@ -50,12 +51,14 @@ export const TICKET_STATUS_LIST: TicketStatus[] = [
   TICKET_STATUS.IN_PROGRESS,
   TICKET_STATUS.PENDING,
   TICKET_STATUS.ON_HOLD,
+  TICKET_STATUS.COMPLETED,
   TICKET_STATUS.CLOSED,
   TICKET_STATUS.CANCELLED,
 ]
 
-/** Statuses that are considered "resolved" — ticket is no longer active */
+/** Statuses that are considered "resolved" — ticket is no longer actively worked on */
 export const TICKET_STATUS_RESOLVED: TicketStatus[] = [
+  TICKET_STATUS.COMPLETED,
   TICKET_STATUS.CLOSED,
   TICKET_STATUS.CANCELLED,
 ]

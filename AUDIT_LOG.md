@@ -1008,7 +1008,142 @@ User reported multiple live errors (screenshots: "load is not defined" crash, ti
 
 ---
 
-## 📊 Scorecard
+## 🧪 Full System Audit — 2026-05-31 (post-hotfix-batch)
+
+> **Trigger:** User-requested full system audit after the 2026-05-31 hotfix batch closed the "X is not defined" crash class and raised list() caps to 5,000. Goal: identify what's still open without touching what's already working.
+> **Automated gate status:** `npm test` → **80/80 pass, 3 suites**. `npm run lint:ci` → **0 errors, 0 warnings**. `npm run build` → **clean**, 49 assets pre-cached.
+> **Method:** Static code analysis across all layers (API, pages, edge functions, dependencies, bundle, accessibility, constants). No runtime browser pass (requires live auth).
+
+### Findings
+
+| ID | Domain | Severity | Status | Finding |
+|----|--------|----------|--------|---------|
+| S10-SEC-1 | Dependencies | 🔴 Critical | ⚠️ Open | `xlsx` (SheetJS community edition) has prototype pollution + ReDoS CVEs. **No fix available** from the vendor. Write-only usage (no user-uploaded files parsed) significantly mitigates real-world impact. Accept with documentation. |
+| S10-SEC-2 | Dependencies | 🟡 Moderate | ⚠️ Open | `jspdf ≤4.2.0` depends on `dompurify ≤3.3.3` (7 CVEs). Fixable via `npm audit fix --force` which upgrades jspdf to 4.2.1 — a breaking change. PDF printing must be smoke-tested after. |
+| S10-SEC-3 | Auth / UX | 🟠 High | ⚠️ Open | **"Add User" button is visible to `admin` role but the Edge Function (`admin-reset-password`) rejects non-`super_admin` callers with a 403.** An admin clicking "Add User" sees "Failed to add user" with no explanation. UI must match the server's actual gate. (S9-2b carried over.) |
+| S10-ARCH-1 | Data layer | 🟡 Moderate | ⚠️ Open | `Inventory/index.jsx:35`, `ProductDetailModal.jsx:177`, `WarehousesTab.jsx:518` call `supabase.from('rma_tickets')` directly (read-only fetch, no security impact). All other pages use `db.*` helpers. Cosmetic inconsistency. |
+| S10-ARCH-2 | Data fetching | 🟡 Moderate | ⚠️ Open | `TechCalendar.jsx:119` still uses `useEffect + setState` to load tickets. Every other page was migrated to `useQuery` in Sprint 6; this one was missed. |
+| S10-ARCH-3 | Data fetching | 🟡 Moderate | ⚠️ Open | `cp/AuditLog.jsx` uses manual `load()` + `useEffect` + `eslint-disable` suppressors. Pre-TanStack pattern; missed during Sprint 6. |
+| S10-ARCH-4 | Constants | 🟡 Moderate | ⚠️ Open | `Dashboard.jsx:282,292,359`, `ControlPanel.jsx:646,651,658,944`, `CustomerDetails.jsx:420-421`, `ProductDetails.jsx:745,747` use raw status strings (`'Closed'`, `'In Progress'`, `'New'`, etc.) instead of `TICKET_STATUS.*` constants. The audit log already noted a `Resolved` vs `Closed` mismatch in the `StatusBadge`. |
+| S10-CQ-1 | Observability | 🟡 Moderate | ⚠️ Open | All 7 `src/pages/cp/*.jsx` sub-pages (Announcements, AuditLog, CustomFields, DataCleanup, Integrations, PDFLayout, RMAConfig) have zero `captureException` imports. Errors in Control Panel sub-pages are silently swallowed. |
+| S10-DB-1 | Production | 🔴 Critical | ⏳ **User action required** | `20260531_relax_ticket_status_constraint.sql` not confirmed applied. Without it, ticket creation/edit can fail with a constraint violation. |
+| S10-DB-2 | Production | 🔴 Critical | ⏳ **User action required** | `20260529_repair_permissions.sql` not confirmed applied. Without it, managers/technicians/viewers with corrupt legacy permission rows may have zero permissions even after the code fix. |
+| S10-GOOD-1 | Security | ✅ | Clean | All XSS surfaces escaped. `esc()` helper in both `RMATickets/index.jsx` and `Invoices.jsx` covers every user-controlled field in both `document.write()` builders. |
+| S10-GOOD-2 | Auth | ✅ | Clean | No direct `localStorage.*` calls outside `safeStorage`. No raw Supabase client import in any page for writes. Service role key fully removed from browser code. |
+| S10-GOOD-3 | CI | ✅ | Clean | All 4 CI gates green: 80 tests, 0 lint warnings, clean build, Prettier. |
+| S10-GOOD-4 | Bundle | ✅ | Clean | Heavy deps (xlsx, jspdf, html2canvas, Recharts) are all lazy/dynamic-imported. No initial-load bloat. `lazyWithReload()` wraps all 15 routes. |
+| S10-GOOD-5 | Accessibility | ✅ | Clean | `aria-sort`, `aria-expanded`, `aria-haspopup`, `aria-controls`, `aria-label` on all sort/filter/action elements. `Spinner` has `role="status"`. |
+
+---
+
+## 🔧 Fix Plan — Sprint 10 (Precision Fixes, 2026-05-31)
+
+> **Guiding principle: the previous sprints' mass-refactors caused cascading regressions. Sprint 10 is a surgical pass. Every task is one file, one commit, CI verified before moving to the next. No batch sweeps. No adjacency edits. Each task must be independently revertable with `git revert <sha>` without touching anything else.**
+
+### Safety protocol for every task
+
+1. Before the edit: `npm test && npm run lint:ci && npm run build` must be green.
+2. Make only the stated change — no opportunistic cleanup.
+3. After the edit: re-run all three gates. Any red → revert and diagnose before continuing.
+4. One commit per task. Do not combine tasks.
+5. If a task touches a file another developer (or another session) recently changed, read the full current file before editing.
+
+---
+
+### Phase A — Additions only (zero regression risk)
+
+These tasks add lines of code. They do not change existing logic, remove any code, or alter data flow. They cannot break a working feature.
+
+| # | ID | Task | File(s) | Change type | Rollback |
+|---|-----|------|---------|-------------|----------|
+| 1 | S10-SEC-3 | **Gate "Add User" button to `super_admin` only.** Wrap the button (`line ~502`) with `currentUserRole === ROLES.SUPER_ADMIN`. Show no button (or a tooltip "Only super admins can create users") for `admin`. No change to the Edge Function — the server gate stays as-is. | `src/pages/UserManagement/index.jsx` | Add 1 conditional | `git revert <sha>` |
+| 2 | S10-CQ-1 | **Add `captureException` to `cp/Announcements.jsx`.** Import from `../../lib/sentry`. Add `captureException(err, { page: 'Announcements' })` inside every existing `catch` block that currently only calls `toast.error`. | `src/pages/cp/Announcements.jsx` | Add import + calls | `git revert <sha>` |
+| 3 | S10-CQ-1 | Same: `cp/RMAConfig.jsx` | `src/pages/cp/RMAConfig.jsx` | Add import + calls | `git revert <sha>` |
+| 4 | S10-CQ-1 | Same: `cp/CustomFields.jsx` | `src/pages/cp/CustomFields.jsx` | Add import + calls | `git revert <sha>` |
+| 5 | S10-CQ-1 | Same: `cp/PDFLayout.jsx` | `src/pages/cp/PDFLayout.jsx` | Add import + calls | `git revert <sha>` |
+| 6 | S10-CQ-1 | Same: `cp/DataCleanup.jsx` | `src/pages/cp/DataCleanup.jsx` | Add import + calls | `git revert <sha>` |
+| 7 | S10-CQ-1 | Same: `cp/Integrations.jsx` | `src/pages/cp/Integrations.jsx` | Add import + calls | `git revert <sha>` |
+| 8 | S10-CQ-1 | Same: `cp/AuditLog.jsx` | `src/pages/cp/AuditLog.jsx` | Add import + calls | `git revert <sha>` |
+
+**Acceptance gate (after each task):** `npm test` 80/80 · `npm run lint:ci` 0 warnings · `npm run build` clean.
+
+---
+
+### Phase B — Constant substitution (logic-identical, string-value-identical)
+
+These tasks replace a raw string literal with the constant that has the same string value. The runtime behavior is byte-for-byte identical. The only risk is a typo in the constant name — prevented by lint (`no-undef`).
+
+**Rule:** Only add the import and swap the string. Do not touch any surrounding logic.
+
+| # | ID | Task | File(s) | Lines to touch | Rollback |
+|---|-----|------|---------|----------------|----------|
+| 9 | S10-ARCH-4a | Replace raw status strings in `Dashboard.jsx`. Add `TICKET_STATUS` to the existing `import { ... } from '../lib/constants'`. Replace: `['Closed', 'Resolved']` → `TICKET_STATUS_RESOLVED`, `['Closed', 'Resolved', 'Cancelled']` → same, `t.ticket_status !== 'Closed'` → `t.ticket_status !== TICKET_STATUS.CLOSED`. | `src/pages/Dashboard.jsx` | Lines 282, 292, 359 | `git revert <sha>` |
+| 10 | S10-ARCH-4b | Same in `CustomerDetails.jsx`. Lines 420-421: `t.ticket_status === 'New' \|\| t.ticket_status === 'In Progress'` → use `TICKET_STATUS.*`. | `src/pages/CustomerDetails.jsx` | Lines 420-421 | `git revert <sha>` |
+| 11 | S10-ARCH-4c | Same in `ProductDetails.jsx`. Lines 745, 747. | `src/pages/ProductDetails.jsx` | Lines 745, 747 | `git revert <sha>` |
+| 12 | S10-ARCH-4d | Same in `ControlPanel.jsx`. Lines 646, 651, 658. (Line 944 is a `STATUS_OPTIONS` array for an automation rule form — leave it as-is; it's user-configurable text, not a status comparison.) | `src/pages/ControlPanel.jsx` | Lines 646, 651, 658 | `git revert <sha>` |
+
+**Acceptance gate (after each task):** same as Phase A.
+
+---
+
+### Phase C — Data fetching migration (isolated pages, one at a time)
+
+These convert a `useEffect + setState` pattern to `useQuery`. Each page is fully isolated — the fix can't affect other pages. The risk is that a missing state variable or a wrong query key causes the page to show a loading spinner forever or throw on render. That is caught immediately by loading the page and is fully revertable.
+
+**Rule:** Read the entire file before starting. Match the `queryKey` exactly to any related `invalidateQueries` call that references this page's data from elsewhere. Do not remove any UI logic — only replace the data-fetching wiring.
+
+| # | ID | Task | File(s) | Pattern to replace | Risk note | Rollback |
+|---|-----|------|---------|-------------------|-----------|----------|
+| 13 | S10-ARCH-2 | **`TechCalendar.jsx` → `useQuery`.** Current: `useEffect → db.rmaTickets.list() → setTickets`. Replace with `const { data: tickets = [], isLoading: loading } = useQuery({ queryKey: ['tech-calendar-tickets'], queryFn: () => db.rmaTickets.list() })`. Remove `loading` state and `useEffect`. Keep all `useMemo` derived data — they consume `tickets` which still exists. | `src/pages/TechCalendar.jsx` | Lines 119-130 | `git revert <sha>` |
+| 14 | S10-ARCH-3 | **`cp/AuditLog.jsx` → `useQuery`.** Current: `load()` async function + two `useEffect`s (one calls `load()`, one calls `applyFilters()`). Replace `load` with `useQuery`; keep `applyFilters` as a `useMemo` over `query.data`. Verify the filter UI (search, filterUser, filterAction, filterFrom, filterTo) still works by checking that `applyFilters` receives the updated base data. | `src/pages/cp/AuditLog.jsx` | ~Lines 10-40 | `git revert <sha>` |
+
+**Acceptance gate (after each task):** same as Phase A, **plus manually navigate to the page and verify data loads**.
+
+---
+
+### Phase D — Dependency update (needs manual smoke test)
+
+This is the riskiest task. `jspdf 4.2.1` is a major-version library bump. The API surface for our usage (PDF export on the Invoices page) should be unchanged, but it must be verified by a human in a browser.
+
+| # | ID | Task | Command | What to test | Rollback |
+|---|-----|------|---------|--------------|----------|
+| 15 | S10-SEC-2 | **Upgrade jspdf to fix DOMPurify CVEs.** Run `npm audit fix --force`. Verify `package.json` shows `jspdf@4.2.1`. Run CI gates. | `npm audit fix --force` | Open Invoices page → print/export any invoice → PDF renders correctly with all fields | `npm install jspdf@4.2.0` |
+
+**Do not proceed to this task unless Phase C is committed and green.**
+
+---
+
+### Phase E — Accepted risks (no code action)
+
+| ID | Finding | Decision | Rationale |
+|----|---------|----------|-----------|
+| S10-SEC-1 | `xlsx` prototype pollution CVE | **Accept** | No fix available. Write-only usage (export, never parse user uploads). Prototype pollution via JSON array serialization path is not reachable from this usage. Re-evaluate if user-upload of xlsx files is ever added. |
+| S10-ARCH-1 | Raw `supabase.from('rma_tickets')` in 3 Inventory files | **Accept** | Read-only fetches. No security impact. Refactoring them to `db.rmaTickets.list()` would fetch 5,000 rows including all columns; the current raw queries fetch only the subset of columns needed for the Inventory view. The performance trade-off is intentional. Document in code comment. |
+
+---
+
+### Required DB actions (ops, not code)
+
+> These must be applied in the Supabase SQL Editor before testing. The code changes are already deployed; the DB is the blocker.
+
+| # | Migration | SQL file | Urgency | What breaks without it |
+|---|-----------|----------|---------|------------------------|
+| DB-1 | Relax ticket status constraint | `supabase/migrations/20260531_relax_ticket_status_constraint.sql` | 🔴 **Immediate** | Every ticket create/edit fails with a constraint violation |
+| DB-2 | Repair corrupt permission rows | `supabase/migrations/20260529_repair_permissions.sql` | 🔴 **Immediate** | Managers/technicians/viewers with legacy bad rows have zero permissions |
+
+---
+
+### Sprint 10 Scorecard (projected)
+
+| Domain | Current (post-hotfix) | After Phase A | After Phase B | After Phase C | After Phase D |
+|--------|----------------------|---------------|---------------|---------------|---------------|
+| Security | 8/10 | **8.5** (SEC-3 fixed) | 8.5 | 8.5 | **9** (jspdf CVEs fixed) |
+| Architecture | 9/10 | 9 | **9.5** (constants clean) | **10** (all pages on useQuery) | 10 |
+| Code quality | 9/10 | **9.5** (cp pages have Sentry) | 9.5 | 9.5 | 9.5 |
+| Production readiness | 8/10 | 8 | 8 | 8 | **9** |
+| **Overall** | **8.8/10** | **8.9** | **9.0** | **9.1** | **9.3** |
+
+---
 
 ### Baseline (2026-05-26 start)
 
@@ -1154,3 +1289,4 @@ User reported multiple live errors (screenshots: "load is not defined" crash, ti
 - **2026-05-29** — ✅ Sprint 7 H-2 (commit `f4c605e`). `RMATickets.jsx` (3,765 lines) decomposed into `RMATickets/` folder: 5 files — `_utils` (pure helpers/constants), `_shared` (SortableHeader), `TicketForm` (owns all form state + save handler), `TicketDrawer` (owns comment/time/parts state + loaders), `index` (queries, table, filter/sort/pagination/bulk, 1,549 lines). `window.history.pushState` for `?ticket=` URL sync retained.
 - **2026-05-29** — ✅ Sprint 7 H-3 (commit `bc25181`). `Products.jsx` (3,142) → `Products/` (4 files: `index`, `ProductsListTab`, `HierarchyTab`, `_modals`). `UserManagement.jsx` (2,200) → `UserManagement/` (5 files: `index`, `UsersTab`, `RolesTab`, `_shared`, `_utils`). `Customers.jsx` (1,859) → `Customers/` (3 files: `index`, `_modals`, `_constants`).
 - **2026-05-29** — ✅ Sprint 7 H-5 (commit `550bed6`). `@axe-core/react` v4.11.3 installed; mounted in `main.jsx` behind `import.meta.env.DEV`. 34 ARIA gaps closed: `aria-sort` + `aria-label` on all sort buttons in `SortableHeader` (RMATickets) and `InvSortBtn` (Inventory) — propagates to every table; `aria-expanded` + `aria-haspopup="menu"` + `aria-label` on all three-dot action menus (RMATickets, Products, Customers); `aria-expanded` + `aria-controls` on filter-panel toggles with matching `id`s; `aria-label` + SVG `aria-hidden` on modal close buttons. Score: **8.7 → 9.3/10**.
+- **2026-05-31** — 🔍 **Full system audit** (user-requested, post-hotfix-batch). Static analysis of all layers. Automated gates: 80/80 tests, 0 lint warnings, clean build. **15 findings (2 critical ops, 1 high, 5 moderate, 5 accepted/clean)**. Critical: two DB migrations unconfirmed in production (ticket constraint + permission repair). High: Add User button visible to `admin` but Edge Function is `super_admin`-only (S9-2b, carried over). Moderate: `cp/*.jsx` (7 files) have no captureException; TechCalendar + AuditLog not on useQuery; hardcoded status strings in 4 pages; jspdf DOMPurify CVEs (fixable). Accepted: xlsx CVE (no vendor fix, write-only), raw Supabase reads in 3 Inventory files (intentional column subset). All CI gates green. Score: **8.8/10**. Sprint 10 plan written — surgical, one-file-one-commit approach to avoid regression cascade.

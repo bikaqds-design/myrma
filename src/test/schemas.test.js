@@ -169,7 +169,7 @@ describe('ticketSchema', () => {
   })
 
   it('rejects invalid ticket_status', () => {
-    const result = ticketSchema.safeParse({ ...valid, ticket_status: 'Completed' })
+    const result = ticketSchema.safeParse({ ...valid, ticket_status: 'Resolved' })
     expect(result.success).toBe(false)
   })
 
