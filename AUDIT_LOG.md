@@ -963,7 +963,17 @@ Findings (none critical):
 | S9-2c | 🟡 Medium | Client permissions are **granular per-section/action**; RLS is **coarse role-tier**. A custom override that crosses tiers (e.g. grant a technician `products.create`) shows the button but the DB rejects it (fail-closed = safe, but confusing). | Note the limitation in the permission editor, or scope custom grants to the role's RLS tier. |
 | S9-2d | 🟢 Low | `rma_config` is admin-only write, but appearance settings are saved there for all users → non-admin writes silently fail and fall back to localStorage (no cross-device sync). | Move appearance prefs to `user_preferences`, or relax `rma_config` for the `appearance_settings` key. |
 
-Remaining Sprint 9: **S9-3** (Zod/XSS) → **S9-4** (cross-role click-through) → **S9-5** (crash-class sweep) → **S9-6/S9-7** (perf/UX) → **S9-8** (optional TS).
+**S9-3 — Zod coverage + XSS audit: ✅ Done.**
+
+- **XSS (fixed, commit `34f…`):** No `dangerouslySetInnerHTML` in the React tree (auto-escaped). Two `document.write()` print/PDF builders were the real surface. **Invoices `exportPDF` was vulnerable** — `invoice.notes`, `customer_name`/`email`, line-item `description`, `status`, `rma_number_ref` were interpolated raw; a stored `<img src=x onerror=…>` would execute in the print window. Added an `esc()` helper and escaped every user field. RMATickets print already escaped its body; fixed its `<title>` to use the existing `esc()`.
+- **Zod (finding, not a hole):** `loginSchema`, `forgotPasswordSchema`, `customerSchema` are wired into their forms. But `ticketSchema`, `productSchema`, `addUserSchema`, `changePasswordSchema` are **defined and unit-tested yet never applied** to the ticket / product / add-user / change-password forms. Not a security gap — the DB `check_constraints` migration + RLS enforce valid enums/shape server-side — but a client-side validation-UX inconsistency.
+
+| ID | Severity | Finding | Recommendation |
+|----|----------|---------|----------------|
+| S9-3a | ✅ Fixed | XSS via unescaped `document.write` in Invoices print | Escaped all user fields (commit pushed) |
+| S9-3b | 🟡 Medium | 4 Zod schemas exist + tested but not wired to their forms (ticket/product/add-user/change-password) | Wire `zodResolver`/`safeParse` into those forms for client-side UX (server already enforced) |
+
+Remaining Sprint 9: **S9-4** (cross-role click-through) → **S9-5** (crash-class sweep) → **S9-6/S9-7** (perf/UX) → **S9-8** (optional TS).
 
 ---
 
