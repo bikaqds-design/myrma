@@ -941,6 +941,30 @@ The permission system is the weak point. The defaults and `canDo` helper are sou
 
 1. **S9-1** (quick, visible bug) → **S9-2/S9-3** (security is the highest stakes) → **S9-4** (validates the permission fix) → **S9-5** (prevent the next random crash) → **S9-6/S9-7** (polish) → **S9-8** (optional).
 
+### Sprint 9 progress — results
+
+**S9-1 — announcements 400: ✅ Fixed** (commit `ab1933e`). `listActive()` filtered server-side via `.eq('is_active').or(starts_at…).or(ends_at…)`. The announcements table is optional with no `CREATE TABLE` migration, so those columns may be absent — PostgREST returns 400 when filtering a missing column. Switched to a plain `select` + client-side active-window filter that tolerates missing columns. Lint/build clean, 80/80 tests.
+
+**S9-2 — RLS / security verification: ✅ Done (audit). Verdict: RLS is sound.**
+
+Headline: the client `canDo` is correctly UX-only; **RLS enforces the real boundary server-side**, and there is **no table where the UI is the only thing preventing a dangerous write**. Spot-checks against [20260526_enable_rls.sql](supabase/migrations/20260526_enable_rls.sql):
+
+- **Viewer** is truly read-only (excluded from every insert/update; comments & inventory explicitly exclude `viewer`).
+- **Technician** can only update tickets where `assigned_technician = self`, plus comments/inventory/time — cannot touch products/customers/invoices/user_roles.
+- **Manager** cannot write any admin table (`user_roles`, `rma_config`, branding, email, webhooks) and cannot delete anything → **no privilege-escalation path** (can't self-promote).
+- **Edge Functions** validate the caller JWT (`auth.getUser()`), re-check role via the service key, validate input, and prevent self-lockout. Service key never reaches the browser. `public-track` is rate-limited (CRIT-3).
+
+Findings (none critical):
+
+| ID | Severity | Finding | Recommendation |
+|----|----------|---------|----------------|
+| S9-2a | 🟡 Medium | `user_preferences` table has no migration and no RLS policy. If present it may be unsecured (any authenticated user reads/writes all rows). Low sensitivity (notif prefs); localStorage fallback masks it. | Add a per-user RLS policy (proposed migration was declined — left as recommendation). |
+| S9-2b | 🟠 High | `admin-reset-password` Edge Function is **super_admin-only**, but the UI shows **Add User** + direct password-set to regular admins → they hit 403 ("Failed to add user"). | Either broaden the Edge Function to allow `admin` (redeploy), or hide those actions from non-super-admins. |
+| S9-2c | 🟡 Medium | Client permissions are **granular per-section/action**; RLS is **coarse role-tier**. A custom override that crosses tiers (e.g. grant a technician `products.create`) shows the button but the DB rejects it (fail-closed = safe, but confusing). | Note the limitation in the permission editor, or scope custom grants to the role's RLS tier. |
+| S9-2d | 🟢 Low | `rma_config` is admin-only write, but appearance settings are saved there for all users → non-admin writes silently fail and fall back to localStorage (no cross-device sync). | Move appearance prefs to `user_preferences`, or relax `rma_config` for the `appearance_settings` key. |
+
+Remaining Sprint 9: **S9-3** (Zod/XSS) → **S9-4** (cross-role click-through) → **S9-5** (crash-class sweep) → **S9-6/S9-7** (perf/UX) → **S9-8** (optional TS).
+
 ---
 
 ## 📊 Scorecard
