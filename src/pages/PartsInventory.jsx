@@ -313,7 +313,7 @@ export default function PartsInventory({
   const canExport = canAdd || canDo('export')
 
   const queryClient = useQueryClient()
-  const { data: partsResult, isLoading: loading } = useQuery({
+  const { data: partsResult, isLoading: loading, refetch } = useQuery({
     queryKey: ['parts'],
     queryFn: () => db.parts.list(),
   })
