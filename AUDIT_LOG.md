@@ -973,7 +973,27 @@ Findings (none critical):
 | S9-3a | ✅ Fixed | XSS via unescaped `document.write` in Invoices print | Escaped all user fields (commit pushed) |
 | S9-3b | 🟡 Medium | 4 Zod schemas exist + tested but not wired to their forms (ticket/product/add-user/change-password) | Wire `zodResolver`/`safeParse` into those forms for client-side UX (server already enforced) |
 
-Remaining Sprint 9: **S9-4** (cross-role click-through) → **S9-5** (crash-class sweep) → **S9-6/S9-7** (perf/UX) → **S9-8** (optional TS).
+**S9-5 — crash-class sweep (useMemo scope leaks + unwrapped React.lazy): ✅ Done. Clean.**
+
+Swept every page. Only `Dashboard.jsx` and `Reports.jsx` use `useMemo`: Dashboard's CRASH-1 leak is fixed (commit `5910c4d`); Reports' `reportData`/`filteredInventory` correctly return objects and JSX accesses via the returned handle — no leak. All `React.lazy` usages are Suspense-wrapped: App.jsx routes under `<Suspense fallback={PageSpinner}>` (L914), CommandPalette has its own (L493), DashboardCharts has its own (L724). **No remaining instances of the crash class.**
+
+**S9-6 — bundle / performance: ⚠️ One finding.**
+
+The heavy libs are code-split into separate chunks (per build output: `xlsx` 429 KB, `jspdf` 358 KB, `html2canvas` 202 KB, `DashboardCharts` 426 KB) — so they're **not in the initial load**. `DashboardCharts` is lazy (Suspense). **But `xlsx` is a _static_ `import * as XLSX from 'xlsx'`** in ~7 pages (Reports, Invoices, PartsInventory, Inventory/_shared, Customers, Products, RMATickets), so its 429 KB chunk downloads on **first visit to any of those routes**, not when the user actually clicks Export.
+
+| ID | Severity | Finding | Recommendation |
+|----|----------|---------|----------------|
+| S9-6a | 🟡 Medium | `xlsx` (429 KB) statically imported across 7 pages → loads on route visit, not on export | Convert to dynamic `const XLSX = await import('xlsx')` inside the export handlers so it only loads when a user exports. Same pattern for `jspdf`/`html2canvas` if statically imported. |
+
+### Remaining Sprint 9 (need runtime / lower priority)
+
+| ID | Item | Status |
+|----|------|--------|
+| S9-4 | Cross-role click-through (manager/technician/viewer) of create/edit/delete on every page | ⏳ **Needs a running browser + live auth** — can't be done in a headless static pass. Static gating verified consistent (every page's `canDo` matches role defaults; PERM-1/2 fixed; RLS confirmed in S9-2). Recommend a manual QA pass or the `/run` + browser-drive skill with seeded test users. |
+| S9-6a | Make `xlsx` load on-demand | 🔜 Open (see above) |
+| S9-7 | Mobile / empty-loading-error states / dark-mode pass | 🔜 Open (manual UX review) |
+| S9-8 | Convert `src/api/db/*.js` → TypeScript | 🔜 Open (optional) |
+| S9-3b | Wire the 4 unused Zod schemas into their forms | 🔜 Open (UX only; server enforced) |
 
 ---
 
