@@ -992,6 +992,22 @@ Initial draft of this entry claimed `xlsx` was statically imported across pages 
 
 ---
 
+## 🚑 Hotfix batch — 2026-05-31 (user-reported production errors)
+
+User reported multiple live errors (screenshots: "load is not defined" crash, ticket-save constraint failure, new products missing from the ticket form, 500-row customer cap). Root-caused and fixed:
+
+| ID | Severity | Bug | Root cause | Fix (commit) |
+|----|----------|-----|------------|--------------|
+| BUG-A | 🔴 Critical | `load is not defined` crash on Reports | `onClick={load}` left over from the pre-TanStack refactor; `load` never defined → ReferenceError on render (the "random" crash) | Use `refetch` from `useQuery` |
+| BUG-ROOT | 🔴 Critical | Whole "X is not defined" crash class reaches prod | **`no-undef` was `'off'` in eslint.config.js** — CI never caught `load`, `ticketsWithDue` (CRASH-1), etc. | Re-enabled `'no-undef': 'error'`; lint/build/80-tests green |
+| BUG-B | 🔴 Critical | "Failed to save ticket … violates rma_tickets_ticket_status_check" | (1) a stale DB constraint `rma_tickets_ticket_status_check` (not in our migrations) with an outdated value set; (2) `TicketForm` defaulted an edited ticket's status to `'New'` (invalid everywhere) | Migration `20260531_relax_ticket_status_constraint.sql` drops the stale constraint (keeps non-empty guard); TicketForm default → `'Open'`. **User must apply the migration.** |
+| BUG-C | 🟠 High | New products don't appear in the RMA ticket form | Product mutations invalidated `['products-page']` but the ticket form reads `['products']` — never refreshed | Invalidate both keys (handler + realtime) |
+| BUG-D | 🟡 Medium | "Showing 500 of 866 customers" | `customers.list()` / `products.list()` hard-cap `.limit(500)` (H-4). Intentional, with a search/filter banner — but a real ceiling. **Not the cause of BUG-C** (lists are newest-first, so new rows are within the 500). | Documented; proper fix = server-side pagination or an async search picker (deferred) |
+
+**Note on the `'On Hold'` vs `'Resolved'` drift:** `TICKET_STATUS` + the 20260526 `chk_ticket_status` constraint use `Open / In Progress / Pending / On Hold / Closed / Cancelled`. Some UI (Dashboard `StatusBadge`) still references `Resolved`. Cosmetic mismatch to reconcile in a follow-up.
+
+---
+
 ## 📊 Scorecard
 
 ### Baseline (2026-05-26 start)
