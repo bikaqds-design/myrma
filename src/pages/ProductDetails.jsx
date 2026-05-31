@@ -30,7 +30,7 @@ export default function ProductDetails({
     setConfirmDialog({ open: true, title, message, onConfirm })
   const closeConfirm = () => setConfirmDialog((d) => ({ ...d, open: false }))
 
-  const { data: productPageData, isLoading: loading } = useQuery({
+  const { data: productPageData, isLoading: loading, refetch } = useQuery({
     queryKey: ['product-details', productId],
     queryFn: async () => {
       const [productData, brandsData, categoriesData, subcategoriesData, ticketsData] =
@@ -146,7 +146,7 @@ export default function ProductDetails({
         .catch(() => {})
       setEditMode(false)
       setImageFile(null)
-      fetchProduct()
+      refetch()
     } catch (error) {
       captureException(error)
       toast.error(`Failed to save: ${error.message}`)

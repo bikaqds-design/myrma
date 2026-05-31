@@ -55,7 +55,13 @@
       "Bash(Select-Object -Last 15)",
       "Bash(Select-Object -Last 8)",
       "Bash(Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue)",
-      "Bash(npx vitest *)"
+      "Bash(npx vitest *)",
+      "Bash(node_modules/.bin/eslint src *)",
+      "Bash(echo \"EXIT_BUILD=$?\")",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(sed -n '505,545p' src/pages/PartsInventory.jsx)",
+      "Bash(sed -n '142,158p' src/pages/ProductDetails.jsx)",
+      "Bash(sed -n '1148,1180p' src/pages/Reports.jsx)"
     ]
   }
 }
