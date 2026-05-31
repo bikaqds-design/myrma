@@ -91,12 +91,17 @@ function exportPDF(invoice) {
     tax_pct: invoice.tax_pct || 0,
   })
 
+  // S9-3: escape user-controlled values before writing raw HTML to the print
+  // window (description/customer/notes are user input → XSS via document.write).
+  const esc = (v) =>
+    String(v ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c])
+
   const lineRows = (invoice.line_items || [])
     .map(
       (li) => `
     <tr style="border-bottom:1px solid #e5e7eb">
-      <td style="padding:8px 12px">${li.description || ''}</td>
-      <td style="padding:8px 12px;text-align:right">${li.qty}</td>
+      <td style="padding:8px 12px">${esc(li.description)}</td>
+      <td style="padding:8px 12px;text-align:right">${esc(li.qty)}</td>
       <td style="padding:8px 12px;text-align:right">$${fmt(li.unitPrice)}</td>
       <td style="padding:8px 12px;text-align:right">$${fmt((parseFloat(li.qty) || 0) * (parseFloat(li.unitPrice) || 0))}</td>
     </tr>`
@@ -107,7 +112,7 @@ function exportPDF(invoice) {
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>${invoice.invoice_number}</title>
+  <title>${esc(invoice.invoice_number)}</title>
   <style>
     body{font-family:sans-serif;color:#111;margin:0;padding:32px}
     h1{font-size:28px;font-weight:700;color:#4f46e5;margin:0}
@@ -127,19 +132,19 @@ function exportPDF(invoice) {
   </style>
 </head>
 <body>
-  <h1>${invoice.invoice_number}</h1>
+  <h1>${esc(invoice.invoice_number)}</h1>
   <div class="meta">
     <div class="meta-block">
       <p class="label">Bill To</p>
-      <p><strong>${invoice.customer_name || '—'}</strong></p>
-      ${invoice.customer_email ? `<p>${invoice.customer_email}</p>` : ''}
-      ${invoice.rma_number_ref ? `<p>RMA: ${invoice.rma_number_ref}</p>` : ''}
+      <p><strong>${esc(invoice.customer_name) || '—'}</strong></p>
+      ${invoice.customer_email ? `<p>${esc(invoice.customer_email)}</p>` : ''}
+      ${invoice.rma_number_ref ? `<p>RMA: ${esc(invoice.rma_number_ref)}</p>` : ''}
     </div>
     <div class="meta-block" style="text-align:right">
       <p class="label">Details</p>
       <p>Type: <strong>${invoice.type === 'quote' ? 'Quote' : 'Invoice'}</strong></p>
-      <p>Status: ${invoice.status || 'draft'}</p>
-      ${invoice.due_date ? `<p>Due: ${invoice.due_date}</p>` : ''}
+      <p>Status: ${esc(invoice.status) || 'draft'}</p>
+      ${invoice.due_date ? `<p>Due: ${esc(invoice.due_date)}</p>` : ''}
     </div>
   </div>
   <table>
@@ -173,7 +178,7 @@ function exportPDF(invoice) {
       <tr class="total-row"><td>Total</td><td style="text-align:right">$${fmt(totals.total)}</td></tr>
     </table>
   </div>
-  ${invoice.notes ? `<div class="notes"><strong>Notes:</strong> ${invoice.notes}</div>` : ''}
+  ${invoice.notes ? `<div class="notes"><strong>Notes:</strong> ${esc(invoice.notes)}</div>` : ''}
 </body>
 </html>`
 

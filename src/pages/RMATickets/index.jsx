@@ -667,7 +667,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     ].filter(Boolean)
 
     const w = window.open('', '_blank')
-    w.document.write(`<!DOCTYPE html><html><head><title>RMA Ticket - ${ticket.rma_number}</title>
+    w.document.write(`<!DOCTYPE html><html><head><title>RMA Ticket - ${esc(ticket.rma_number)}</title>
       <style>
         *{box-sizing:border-box;margin:0;padding:0}
         body{font-family:${font};font-size:${fontSize}px;color:#1F2937;padding:30px}
