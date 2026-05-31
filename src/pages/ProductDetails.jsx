@@ -146,7 +146,7 @@ export default function ProductDetails({
         .catch(() => {})
       setEditMode(false)
       setImageFile(null)
-      loadProductDetails()
+      fetchProduct()
     } catch (error) {
       captureException(error)
       toast.error(`Failed to save: ${error.message}`)

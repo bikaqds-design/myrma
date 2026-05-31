@@ -1000,6 +1000,9 @@ export default function Reports({
     [invoices, fromDate, toDate]
   )
 
+  // Display formatter passed to the tab sub-components (was referenced but never defined).
+  const formatDate = (d) => (d ? new Date(d).toLocaleDateString() : '—')
+
   // Preset date ranges
   const applyPreset = (days) => {
     const d = new Date()

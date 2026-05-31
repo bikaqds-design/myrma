@@ -31,6 +31,8 @@ export default [
         localStorage: 'readonly',
         sessionStorage: 'readonly',
         crypto: 'readonly',
+        BroadcastChannel: 'readonly',
+        Image: 'readonly',
         Promise: 'readonly',
         TextEncoder: 'readonly',
         Uint8Array: 'readonly',

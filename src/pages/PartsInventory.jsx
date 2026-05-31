@@ -509,7 +509,7 @@ export default function PartsInventory({
           {MIGRATION_SQL}
         </pre>
         <button
-          onClick={load}
+          onClick={() => refetch()}
           className="px-5 py-2 bg-amber-600 text-white rounded-xl text-sm font-medium hover:bg-amber-700 transition-colors"
         >
           Retry
@@ -538,7 +538,7 @@ export default function PartsInventory({
           </button>
         )}
         <button
-          onClick={load}
+          onClick={() => refetch()}
           className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
