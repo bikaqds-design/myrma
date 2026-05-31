@@ -134,9 +134,10 @@ export default function Products({
   useEffect(() => {
     const channel = supabase
       .channel('products_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () =>
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
         queryClient.invalidateQueries({ queryKey: ['products-page'] })
-      )
+        queryClient.invalidateQueries({ queryKey: ['products'] })
+      })
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
