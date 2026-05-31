@@ -854,11 +854,26 @@ if (currentUserRole === 'admin') {
 
 **MUST: SQL injection is impossible via the Supabase client** (uses parameterized queries). Do not construct raw SQL strings with user input in Edge Functions.
 
-### 8.5 CORS and Public Endpoints
+### 8.5 XSS Prevention
+
+**LAW: Never use `dangerouslySetInnerHTML` with user-controlled data.** React auto-escapes JSX expressions — use them; never bypass them.
+
+**LAW: Any code that writes raw HTML strings via `document.write()` or `innerHTML` MUST escape user-controlled values first.** The print/PDF builders in `Invoices.jsx` and `RMATickets/index.jsx` are the only places in the app that construct raw HTML. Both use a local `esc()` helper — always extend that pattern when adding new fields:
+
+```js
+const esc = (v) =>
+  String(v ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c])
+```
+
+User-controlled fields that MUST be escaped before HTML interpolation: ticket descriptions, customer names, notes, invoice line items, addresses, free-text fields of any kind.
+
+### 8.6 CORS and Public Endpoints
 
 **MUST: The `/tracker` route is the ONLY page rendered without authentication.** All other routes check for a valid session.
 
 **MUST: `public-track` Edge Function does not return sensitive customer data** — only the fields needed for the public tracker UI.
+
+**MUST: `resolvePermissions(role, stored)` from `src/lib/permissions.ts` is used whenever loading permission data into state.** Never use `stored || ROLE_DEFAULT_PERMISSIONS[role]` directly — a stored `{}` (empty object) is truthy and silently overrides the role defaults, stripping all permissions from the user.
 
 ---
 
@@ -1296,6 +1311,8 @@ TypeScript is adopted incrementally — currently in `src/lib/` only.
 
 **LAW: No ESLint errors on main.** CI blocks merges with ESLint errors.
 
+**LAW: `no-undef` is set to `'error'` in `eslint.config.js`.** Do not set it to `'warn'` or `'off'`. This rule is the only static guard against the "X is not defined" crash class (e.g. calling a renamed function, using a variable outside its scope). If a legitimate browser global is not recognised, add it to the `globals` list in `eslint.config.js` — do not disable the rule.
+
 **MUST: Run `npm run lint` before pushing** any commit to a feature branch.
 
 **MUST: Run `npm run format` to ensure Prettier formatting** matches the project standard.
@@ -1306,7 +1323,7 @@ TypeScript is adopted incrementally — currently in `src/lib/` only.
 
 ### 15.1 Current Test Suite
 
-74 tests across 3 suites in `src/lib/`:
+80 tests across 3 suites in `src/lib/`:
 
 | File | Tests | Coverage |
 |------|-------|---------|
