@@ -27,6 +27,7 @@ const DEFAULT = {
 }
 
 const FONT_STACKS = {
+  hanken: "'Hanken Grotesk', system-ui, -apple-system, sans-serif",
   inter: "'Inter', system-ui, -apple-system, sans-serif",
   roboto: "'Roboto', system-ui, sans-serif",
   opensans: "'Open Sans', system-ui, sans-serif",
@@ -35,6 +36,7 @@ const FONT_STACKS = {
 }
 
 const GOOGLE_FONTS = {
+  hanken: 'Hanken+Grotesk:wght@400;500;600;700;800',
   inter: 'Inter:wght@400;500;600;700',
   roboto: 'Roboto:wght@400;500;700',
   opensans: 'Open+Sans:wght@400;500;600;700',

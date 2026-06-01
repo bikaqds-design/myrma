@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import { captureException } from '../lib/sentry.js'
 
 export default class ErrorBoundary extends React.Component {
@@ -63,8 +63,8 @@ export default class ErrorBoundary extends React.Component {
     const message = this.state.error?.message || String(this.state.error)
 
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900 p-6">
-        <div className="max-w-lg w-full bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-red-200 dark:border-red-900 p-8">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0b0f17] p-6">
+        <div className="max-w-lg w-full bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-red-200 dark:border-red-900 p-8">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center flex-shrink-0">
               <svg
@@ -82,10 +82,10 @@ export default class ErrorBoundary extends React.Component {
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
+              <h1 className="text-lg font-semibold text-gray-900 dark:text-[#e8ebf0]">
                 Something went wrong
               </h1>
-              <p className="text-sm text-gray-500 dark:text-slate-400">
+              <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">
                 The page crashed unexpectedly.
               </p>
             </div>
@@ -104,7 +104,7 @@ export default class ErrorBoundary extends React.Component {
               <summary className="cursor-pointer text-gray-600 dark:text-slate-300 font-medium mb-2">
                 Full stack (dev only)
               </summary>
-              <pre className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-3 overflow-auto text-red-700 dark:text-red-300 whitespace-pre-wrap break-all">
+              <pre className="bg-gray-50 dark:bg-[#0b0f17] border border-gray-200 dark:border-[#212a38] rounded-lg p-3 overflow-auto text-red-700 dark:text-red-300 whitespace-pre-wrap break-all">
                 {String(this.state.error?.stack || this.state.error)}
                 {this.state.info?.componentStack || ''}
               </pre>
@@ -135,7 +135,7 @@ export default class ErrorBoundary extends React.Component {
             </button>
             <button
               onClick={this.handleHome}
-              className="flex-1 px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200 rounded-lg text-sm font-medium transition-colors"
+              className="flex-1 px-4 py-2 bg-gray-100 dark:bg-[#1a2230] hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-[#e8ebf0] rounded-lg text-sm font-medium transition-colors"
             >
               Go to dashboard
             </button>

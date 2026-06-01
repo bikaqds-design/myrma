@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Modal.jsx — accessible modal dialog built on @radix-ui/react-dialog.
  *
  * Provides:
@@ -51,9 +51,9 @@ export default function Modal({
           className={[
             'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2',
             'z-50 w-full max-w-lg',
-            'bg-white dark:bg-slate-800',
+            'bg-white dark:bg-[#121823]',
             'rounded-2xl shadow-xl',
-            'border border-gray-200 dark:border-slate-700',
+            'border border-gray-200 dark:border-[#212a38]',
             noPadding ? '' : 'p-6',
             scrollable ? 'overflow-y-auto max-h-[90vh]' : '',
             'focus:outline-none',
@@ -76,7 +76,7 @@ export default function Modal({
               <Dialog.Close asChild>
                 <button
                   aria-label="Close"
-                  className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700 transition-colors"
+                  className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-[#9aa4b2] dark:hover:text-slate-200 dark:hover:bg-slate-700 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -92,7 +92,7 @@ export default function Modal({
           )}
 
           {description && (
-            <p id="modal-description" className="text-sm text-gray-500 dark:text-slate-400 mb-4">
+            <p id="modal-description" className="text-sm text-gray-500 dark:text-[#9aa4b2] mb-4">
               {description}
             </p>
           )}

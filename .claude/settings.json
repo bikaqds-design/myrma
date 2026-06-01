@@ -61,7 +61,15 @@
       "Bash(echo \"EXIT=$?\")",
       "Bash(sed -n '505,545p' src/pages/PartsInventory.jsx)",
       "Bash(sed -n '142,158p' src/pages/ProductDetails.jsx)",
-      "Bash(sed -n '1148,1180p' src/pages/Reports.jsx)"
+      "Bash(sed -n '1148,1180p' src/pages/Reports.jsx)",
+      "Bash(grep -v \"//.*document\")",
+      "Bash(grep -v \"//.*console\")",
+      "Bash(grep \"catch.*{$\\\\|catch.*error.*{\")",
+      "Bash(npm audit *)",
+      "Bash(sort -k5 -rn)",
+      "Bash(awk '{print $5, $9}')",
+      "Bash(git merge *)",
+      "Bash(git fetch *)"
     ]
   }
 }
