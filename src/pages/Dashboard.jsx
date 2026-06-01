@@ -4,7 +4,7 @@ import { db, supabase } from '../api/supabaseClient'
 import { safeStorage } from '../lib/safeStorage'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { Spinner, PageHeader } from '../components/ui'
-import { TICKET_STATUS, TICKET_STATUS_RESOLVED } from '../lib/constants'
+import { TICKET_STATUS, TICKET_STATUS_LIST, TICKET_STATUS_RESOLVED } from '../lib/constants'
 
 const DashboardCharts = lazy(() => import('./DashboardCharts'))
 
@@ -266,12 +266,6 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
   // A-4: all aggregations memoised — only recompute when tickets changes
   const totalTickets = useMemo(() => tickets.length, [tickets])
 
-  const openTickets = useMemo(
-    () =>
-      tickets.filter((t) => !['Closed', 'Resolved', 'Cancelled'].includes(t.ticket_status)).length,
-    [tickets]
-  )
-
   const closedTickets = useMemo(
     () => tickets.filter((t) => TICKET_STATUS_RESOLVED.includes(t.ticket_status)).length,
     [tickets]
@@ -286,6 +280,13 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       }),
     [tickets]
   )
+
+  const statusCounts = useMemo(() => {
+    const counts = {}
+    TICKET_STATUS_LIST.forEach((s) => { counts[s] = 0 })
+    tickets.forEach((t) => { if (counts[t.ticket_status] !== undefined) counts[t.ticket_status]++ })
+    return counts
+  }, [tickets])
 
   const { slaPercent, resolutionPercent, trackedCount, onScheduleCount } = useMemo(() => {
     const ticketsWithDue = tickets.filter((t) => t.due_date && t.ticket_status !== TICKET_STATUS.CANCELLED)
@@ -434,73 +435,26 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* ── Ticket KPIs ── */}
         {on('stat_tickets') && (
-          <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              {
-                title: 'Total Tickets',
-                value: totalTickets,
-                color: 'indigo',
-                icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
-                navPath: '/rma-tickets',
-              },
-              {
-                title: 'Open',
-                value: openTickets,
-                color: 'blue',
-                icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
-                navPath: '/rma-tickets?status=Open',
-              },
-              {
-                title: 'Closed',
-                value: closedTickets,
-                color: 'green',
-                icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
-                navPath: '/rma-tickets?status=Closed',
-              },
-              {
-                title: 'Overdue',
-                value: overdueList.length,
-                color: 'red',
-                icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z',
-                navPath: '/rma-tickets?overdue=true',
-              },
-            ].map(({ title, value, color, icon, navPath }) => {
-              const bg = {
-                indigo: 'bg-indigo-100 text-indigo-600',
-                blue: 'bg-blue-100 text-blue-600',
-                green: 'bg-green-100 text-green-600',
-                red: 'bg-red-100 text-red-600',
-              }[color]
-              return (
-                <div
-                  key={title}
-                  onClick={nav(navPath)}
-                  className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-500">{title}</p>
-                      <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
-                    </div>
-                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${bg}`}>
-                      <svg
-                        className="w-6 h-6"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d={icon}
-                        />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+              { label: TICKET_STATUS.OPEN,        cls: 'bg-blue-50 border-blue-200 text-blue-700',    navPath: `/rma-tickets?status=${TICKET_STATUS.OPEN}` },
+              { label: TICKET_STATUS.IN_PROGRESS, cls: 'bg-indigo-50 border-indigo-200 text-indigo-700', navPath: `/rma-tickets?status=${TICKET_STATUS.IN_PROGRESS}` },
+              { label: TICKET_STATUS.PENDING,     cls: 'bg-orange-50 border-orange-200 text-orange-700', navPath: `/rma-tickets?status=${TICKET_STATUS.PENDING}` },
+              { label: TICKET_STATUS.ON_HOLD,     cls: 'bg-yellow-50 border-yellow-200 text-yellow-700', navPath: `/rma-tickets?status=${TICKET_STATUS.ON_HOLD}` },
+              { label: TICKET_STATUS.COMPLETED,   cls: 'bg-teal-50 border-teal-200 text-teal-700',    navPath: `/rma-tickets?status=${TICKET_STATUS.COMPLETED}` },
+              { label: TICKET_STATUS.CLOSED,      cls: 'bg-green-50 border-green-200 text-green-700', navPath: `/rma-tickets?status=${TICKET_STATUS.CLOSED}` },
+              { label: TICKET_STATUS.CANCELLED,   cls: 'bg-gray-50 border-gray-200 text-gray-600',   navPath: `/rma-tickets?status=${TICKET_STATUS.CANCELLED}` },
+              { label: 'Overdue',                  cls: 'bg-red-50 border-red-200 text-red-700',       navPath: '/rma-tickets?overdue=true', overdue: true },
+            ].map(({ label, cls, navPath, overdue }) => (
+              <div
+                key={label}
+                onClick={nav(navPath)}
+                className={`rounded-xl border p-4 cursor-pointer hover:shadow-md transition-all ${cls}`}
+              >
+                <p className="text-2xl font-bold">{overdue ? overdueList.length : statusCounts[label]}</p>
+                <p className="text-xs font-medium mt-1 opacity-80">{label}</p>
+              </div>
+            ))}
           </div>
         )}
 
@@ -509,7 +463,6 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
           <WidgetCard
             className="lg:col-span-2"
             title="Inventory Snapshot"
-            onClick={nav('inventory')}
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -521,36 +474,21 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
               </svg>
             }
           >
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               {[
-                {
-                  label: 'Active RMA',
-                  value: invStats.active_rma ?? 0,
-                  cls: 'bg-blue-50',
-                  tc: 'text-blue-700',
-                },
-                {
-                  label: 'Company Stock',
-                  value: invStats.company_stock ?? 0,
-                  cls: 'bg-amber-50',
-                  tc: 'text-amber-700',
-                },
-                {
-                  label: 'Sent to Manufacturer',
-                  value: invStats.sent_to_manufacturer ?? 0,
-                  cls: 'bg-purple-50',
-                  tc: 'text-purple-700',
-                },
-                {
-                  label: 'Total Units',
-                  value: invStats.total ?? 0,
-                  cls: 'bg-gray-50',
-                  tc: 'text-gray-700',
-                },
+                { label: 'Active RMA',           value: invStats.active_rma ?? 0,            cls: 'bg-blue-50 border-blue-200 text-blue-700',     tab: 'by-product' },
+                { label: 'Received',             value: invStats.received ?? 0,              cls: 'bg-sky-50 border-sky-200 text-sky-700',         tab: 'received' },
+                { label: 'Sent to Manufacturer', value: invStats.sent_to_manufacturer ?? 0,  cls: 'bg-purple-50 border-purple-200 text-purple-700', tab: 'overview' },
+                { label: 'Company Stock',        value: invStats.company_stock ?? 0,         cls: 'bg-amber-50 border-amber-200 text-amber-700',   tab: 'rma-stock' },
+                { label: 'Total Units',          value: invStats.total ?? 0,                 cls: 'bg-gray-50 border-gray-200 text-gray-700',      tab: 'overview' },
               ].map((c) => (
-                <div key={c.label} className={`rounded-lg p-4 ${c.cls}`}>
-                  <div className={`text-2xl font-bold ${c.tc}`}>{c.value}</div>
-                  <div className={`text-xs font-medium mt-0.5 opacity-70 ${c.tc}`}>{c.label}</div>
+                <div
+                  key={c.label}
+                  onClick={() => onNavigate?.(`/inventory?tab=${c.tab}`)}
+                  className={`rounded-xl border p-4 cursor-pointer hover:shadow-md transition-all ${c.cls}`}
+                >
+                  <div className="text-2xl font-bold">{c.value}</div>
+                  <div className="text-xs font-medium mt-1 opacity-80">{c.label}</div>
                 </div>
               ))}
             </div>

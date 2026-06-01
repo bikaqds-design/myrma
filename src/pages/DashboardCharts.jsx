@@ -71,7 +71,7 @@ export default function DashboardCharts({
       {on('weekly_trend') && (
         <WidgetCard
           title="Weekly Trend"
-          onClick={nav('rma-tickets')}
+          onClick={nav('/rma-tickets')}
           icon={
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -105,7 +105,7 @@ export default function DashboardCharts({
       {on('monthly_trend') && (
         <WidgetCard
           title="Monthly Trend (30 days)"
-          onClick={nav('rma-tickets')}
+          onClick={nav('/rma-tickets')}
           icon={
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -135,7 +135,7 @@ export default function DashboardCharts({
       {on('status_distribution') && (
         <WidgetCard
           title="Status Distribution"
-          onClick={nav('rma-tickets')}
+          onClick={nav('/rma-tickets')}
           icon={
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -181,7 +181,7 @@ export default function DashboardCharts({
       {on('priority_distribution') && (
         <WidgetCard
           title="Priority Distribution"
-          onClick={nav('rma-tickets')}
+          onClick={nav('/rma-tickets')}
           icon={
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -222,7 +222,7 @@ export default function DashboardCharts({
         <WidgetCard
           className="lg:col-span-2"
           title="Technician Performance"
-          onClick={nav('rma-tickets')}
+          onClick={nav('/rma-tickets')}
           icon={
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
