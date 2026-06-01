@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { db, branding as brandingAPI } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { captureException } from '../../lib/sentry'
 
 const DEFAULT_SECTION_ORDER = [
   'ticketInfo',
@@ -114,7 +115,8 @@ export default function PDFLayout({ currentUserEmail }) {
       } else if (brandingData?.primary_color) {
         setConfig((c) => ({ ...c, primaryColor: brandingData.primary_color }))
       }
-    } catch {
+    } catch (err) {
+      captureException(err)
     } finally {
       setLoading(false)
     }
@@ -126,6 +128,7 @@ export default function PDFLayout({ currentUserEmail }) {
       await db.rmaConfig.set('pdf_layout', config, currentUserEmail)
       toast.success('PDF layout saved')
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     } finally {
       setSaving(false)
