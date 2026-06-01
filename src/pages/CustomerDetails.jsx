@@ -7,7 +7,7 @@ import { CardSkeleton } from '../components/Skeleton'
 import AttachmentsField from '../components/AttachmentsField'
 import { Button, Spinner } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
-import { ROLES } from '../lib/constants'
+import { ROLES, TICKET_STATUS } from '../lib/constants'
 import { captureException } from '../lib/sentry'
 
 export default function CustomerDetails({
@@ -417,9 +417,9 @@ export default function CustomerDetails({
             label: 'Open Tickets',
             value: tickets.filter(
               (t) =>
-                t.ticket_status === 'New' ||
-                t.ticket_status === 'In Progress' ||
-                t.ticket_status === 'On Hold'
+                t.ticket_status === TICKET_STATUS.OPEN ||
+                t.ticket_status === TICKET_STATUS.IN_PROGRESS ||
+                t.ticket_status === TICKET_STATUS.ON_HOLD
             ).length,
             icon: '🔓',
             color: 'bg-yellow-50 text-yellow-700',
