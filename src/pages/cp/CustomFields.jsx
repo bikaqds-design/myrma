@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { MigrationNotice } from './Announcements'
+import { captureException } from '../../lib/sentry'
 
 const FIELD_TYPES = ['text', 'number', 'date', 'select', 'textarea', 'checkbox']
 const APPLIES_TO = ['ticket', 'customer']
@@ -114,6 +115,7 @@ export default function CustomFields({ currentUserEmail }) {
       setShowModal(false)
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     } finally {
       setSaving(false)
@@ -132,6 +134,7 @@ export default function CustomFields({ currentUserEmail }) {
       toast.success('Deleted')
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     }
   }
@@ -141,6 +144,7 @@ export default function CustomFields({ currentUserEmail }) {
       await db.customFields.update(f.id, { is_active: !f.is_active })
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     }
   }
