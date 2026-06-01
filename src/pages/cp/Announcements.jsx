@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { captureException } from '../../lib/sentry'
 
 const EMPTY_FORM = {
   title: '',
@@ -115,6 +116,7 @@ export default function Announcements({ currentUserEmail }) {
       setShowModal(false)
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     } finally {
       setSaving(false)
@@ -131,6 +133,7 @@ export default function Announcements({ currentUserEmail }) {
         .catch(() => {})
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     }
   }
@@ -147,6 +150,7 @@ export default function Announcements({ currentUserEmail }) {
         .catch(() => {})
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     }
   }
