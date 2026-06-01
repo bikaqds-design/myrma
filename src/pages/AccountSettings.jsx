@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import { Spinner, PageHeader, Button, Input } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
 import { ROLES } from '../lib/constants'
+import { useAppearance } from '../contexts/AppearanceContext'
 
 function EyeIcon({ visible }) {
   return visible ? (
@@ -169,6 +170,10 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
     ...(isAdmin ? ['Activity'] : []),
   ]
   const [activeTab, setActiveTab] = useURLTab('tab', 'Profile')
+
+  // Appearance — display settings
+  const { darkMode, fontFamily, tableDensity, dateFormat, updateAppearance } = useAppearance()
+  const updateDisplay = (partial) => updateAppearance(partial, currentUser?.email)
 
   // Appearance — widget prefs
   const widgetStorageKey = `dashboard_widgets_${currentUser?.email}`
@@ -756,10 +761,91 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
       {/* ── APPEARANCE TAB ── */}
       {activeTab === 'Appearance' && (
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          {/* ── Display Settings ── */}
+          <div className="bg-white dark:bg-[#121823] rounded-2xl border border-gray-200 dark:border-[#212a38] p-6">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0] uppercase tracking-wide mb-4">
+              Display
+            </h2>
+
+            {/* Dark Mode */}
+            <div className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-[#212a38]">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-[#e8ebf0]">Dark Mode</p>
+                <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">Switch the entire app to a dark theme</p>
+              </div>
+              <Toggle checked={darkMode} onChange={(v) => updateDisplay({ darkMode: v })} />
+            </div>
+
+            {/* Font Family */}
+            <div className="py-3 border-b border-gray-100 dark:border-[#212a38]">
+              <p className="text-sm font-medium text-gray-900 dark:text-[#e8ebf0] mb-1">Font</p>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-3">Applied globally across all pages</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: 'hanken', label: 'Hanken Grotesk' },
+                  { value: 'inter', label: 'Inter' },
+                  { value: 'roboto', label: 'Roboto' },
+                  { value: 'opensans', label: 'Open Sans' },
+                  { value: 'poppins', label: 'Poppins' },
+                  { value: 'system', label: 'System' },
+                ].map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    onClick={() => updateDisplay({ fontFamily: f.value })}
+                    className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${fontFamily === f.value ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] hover:border-gray-300'}`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Table Density */}
+            <div className="py-3 border-b border-gray-100 dark:border-[#212a38]">
+              <p className="text-sm font-medium text-gray-900 dark:text-[#e8ebf0] mb-1">Table Density</p>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-3">Controls row height in all data tables</p>
+              <div className="flex gap-2">
+                {[
+                  { id: 'spacious', label: 'Spacious' },
+                  { id: 'comfortable', label: 'Comfortable' },
+                  { id: 'compact', label: 'Compact' },
+                ].map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => updateDisplay({ tableDensity: d.id })}
+                    className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${tableDensity === d.id ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] hover:border-gray-300'}`}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Date Format */}
+            <div className="pt-3">
+              <p className="text-sm font-medium text-gray-900 dark:text-[#e8ebf0] mb-1">Date Format</p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD', 'DD-MM-YYYY'].map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => updateDisplay({ dateFormat: f })}
+                    className={`px-3 py-1.5 rounded-lg border text-sm font-mono transition-all ${dateFormat === f ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] hover:border-gray-300'}`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Dashboard Widgets ── */}
+          <div className="bg-white dark:bg-[#121823] rounded-2xl border border-gray-200 dark:border-[#212a38] p-6">
             <div className="flex items-center justify-between mb-1">
               <div>
-                <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0] uppercase tracking-wide">
                   Dashboard Widgets
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">
