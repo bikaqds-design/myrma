@@ -4,6 +4,7 @@ import { useURLTab } from '../hooks/useURLTab'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../lib/sentry'
+import { TICKET_STATUS } from '../lib/constants'
 import { Spinner } from '../components/ui'
 import UserManagement from './UserManagement'
 import BrandingSettings from './BrandingSettings'
@@ -643,19 +644,21 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
         return a
       }, {})
       const open =
-        (byStatus['Open'] || 0) + (byStatus['In Progress'] || 0) + (byStatus['On Hold'] || 0)
+        (byStatus[TICKET_STATUS.OPEN] || 0) +
+        (byStatus[TICKET_STATUS.IN_PROGRESS] || 0) +
+        (byStatus[TICKET_STATUS.ON_HOLD] || 0)
       const overdue = tickets.filter(
         (t) =>
           t.due_date &&
           new Date(t.due_date) < new Date() &&
-          t.ticket_status !== 'Closed' &&
-          t.ticket_status !== 'Cancelled'
+          t.ticket_status !== TICKET_STATUS.CLOSED &&
+          t.ticket_status !== TICKET_STATUS.CANCELLED
       ).length
       return {
         total: tickets.length,
         open,
         overdue,
-        completed: byStatus['Closed'] || 0,
+        completed: byStatus[TICKET_STATUS.CLOSED] || 0,
         customers: customers.length,
         products: products.length,
         users: users.length,
