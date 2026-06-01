@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { captureException } from '../../lib/sentry'
 
 export default function AuditLog() {
   const [logs, setLogs] = useState([])
@@ -25,7 +26,8 @@ export default function AuditLog() {
     try {
       const data = await db.auditLog.listAll(500)
       setLogs(data)
-    } catch {
+    } catch (err) {
+      captureException(err)
       toast.error('Failed to load audit log')
     } finally {
       setLoading(false)
