@@ -115,7 +115,7 @@ export default function TechCalendar({
   const [selectedTech, setSelectedTech] = useState('')
 
   // ─── Load data ──────────────────────────────────────────────────────────────
-  const { data: tickets = [], isLoading: loading, isError, error } = useQuery({
+  const { data: tickets = [], isLoading: loading, isError, error, refetch } = useQuery({
     queryKey: ['tech-calendar-tickets'],
     queryFn: () => db.rmaTickets.list(),
   })
@@ -189,6 +189,15 @@ export default function TechCalendar({
     return (
       <div className="flex items-center justify-center min-h-[320px]">
         <Spinner size="lg" />
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[320px] gap-3">
+        <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">Failed to load calendar data.</p>
+        <Button variant="secondary" size="sm" onClick={() => refetch()}>Retry</Button>
       </div>
     )
   }

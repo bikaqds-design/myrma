@@ -247,30 +247,39 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
   const on = (id) => enabledWidgets.includes(id)
   const nav = (page) => () => onNavigate?.(page)
 
-  const totalTickets = useMemo(() => tickets.length, [tickets])
+  const rangedTickets = useMemo(() => {
+    if (range === 'All') return tickets
+    const cutoff = new Date()
+    if (range === 'Today') cutoff.setHours(0, 0, 0, 0)
+    else cutoff.setDate(cutoff.getDate() - parseInt(range))
+    const iso = cutoff.toISOString()
+    return tickets.filter((t) => t.created_date && t.created_date >= iso)
+  }, [tickets, range])
+
+  const totalTickets = useMemo(() => rangedTickets.length, [rangedTickets])
 
   const closedTickets = useMemo(
-    () => tickets.filter((t) => TICKET_STATUS_RESOLVED.includes(t.ticket_status)).length,
-    [tickets]
+    () => rangedTickets.filter((t) => TICKET_STATUS_RESOLVED.includes(t.ticket_status)).length,
+    [rangedTickets]
   )
 
   const overdueList = useMemo(
-    () => tickets.filter((t) => {
+    () => rangedTickets.filter((t) => {
       if (!t.due_date || TICKET_STATUS_RESOLVED.includes(t.ticket_status)) return false
       return new Date(t.due_date) < new Date()
     }),
-    [tickets]
+    [rangedTickets]
   )
 
   const statusCounts = useMemo(() => {
     const counts = {}
     TICKET_STATUS_LIST.forEach((s) => { counts[s] = 0 })
-    tickets.forEach((t) => { if (counts[t.ticket_status] !== undefined) counts[t.ticket_status]++ })
+    rangedTickets.forEach((t) => { if (counts[t.ticket_status] !== undefined) counts[t.ticket_status]++ })
     return counts
-  }, [tickets])
+  }, [rangedTickets])
 
   const invProductCounts = useMemo(() => {
-    const flat = tickets
+    const flat = rangedTickets
       .filter((t) => t.ticket_status !== TICKET_STATUS.CANCELLED)
       .flatMap((t) => (t.products || []).map((p) => ({ ...p, ts: t.ticket_status })))
       .filter((p) => {
@@ -287,10 +296,10 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       cantRepair:  active("Can't Repair"),
       rmaStock:    flat.filter((p) => p.product_status === 'Replacement' || p.product_status === 'Credit Note').length,
     }
-  }, [tickets, invStats])
+  }, [rangedTickets, invStats])
 
   const { slaPercent, resolutionPercent, trackedCount, onScheduleCount } = useMemo(() => {
-    const ticketsWithDue = tickets.filter((t) => t.due_date && t.ticket_status !== TICKET_STATUS.CANCELLED)
+    const ticketsWithDue = rangedTickets.filter((t) => t.due_date && t.ticket_status !== TICKET_STATUS.CANCELLED)
     const overdueActive = ticketsWithDue.filter(
       (t) => !TICKET_STATUS_RESOLVED.includes(t.ticket_status) && new Date(t.due_date) < new Date()
     ).length
@@ -298,11 +307,11 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       slaPercent: ticketsWithDue.length > 0
         ? Math.round(((ticketsWithDue.length - overdueActive) / ticketsWithDue.length) * 100)
         : 100,
-      resolutionPercent: tickets.length > 0 ? Math.round((closedTickets / tickets.length) * 100) : 0,
+      resolutionPercent: rangedTickets.length > 0 ? Math.round((closedTickets / rangedTickets.length) * 100) : 0,
       trackedCount: ticketsWithDue.length,
       onScheduleCount: ticketsWithDue.length - overdueActive,
     }
-  }, [tickets, closedTickets])
+  }, [rangedTickets, closedTickets])
 
   const weeklyTrend = useMemo(() => {
     const days = []
@@ -310,10 +319,10 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       const d = new Date()
       d.setDate(d.getDate() - i)
       const ds = d.toISOString().split('T')[0]
-      days.push({ date: d.toLocaleDateString('en-US', { weekday: 'short' }), tickets: tickets.filter((t) => t.created_date?.startsWith(ds)).length })
+      days.push({ date: d.toLocaleDateString('en-US', { weekday: 'short' }), tickets: rangedTickets.filter((t) => t.created_date?.startsWith(ds)).length })
     }
     return days
-  }, [tickets])
+  }, [rangedTickets])
 
   const monthlyTrend = useMemo(() => {
     const days = []
@@ -324,28 +333,28 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       days.push({
         date: i % 6 === 0 ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
         fullDate: ds,
-        tickets: tickets.filter((t) => t.created_date?.startsWith(ds)).length,
+        tickets: rangedTickets.filter((t) => t.created_date?.startsWith(ds)).length,
       })
     }
     return days
-  }, [tickets])
+  }, [rangedTickets])
 
   const statusDist = useMemo(() => {
     const counts = {}
-    tickets.forEach((t) => { counts[t.ticket_status] = (counts[t.ticket_status] || 0) + 1 })
+    rangedTickets.forEach((t) => { counts[t.ticket_status] = (counts[t.ticket_status] || 0) + 1 })
     return Object.entries(counts).map(([name, value]) => ({ name, value, color: STATUS_COLOR[name] || '#94a3b8' }))
-  }, [tickets])
+  }, [rangedTickets])
 
   const priorityDist = useMemo(() => {
     const order = ['Critical', 'High', 'Medium', 'Low']
     const counts = {}
-    tickets.forEach((t) => { if (t.priority) counts[t.priority] = (counts[t.priority] || 0) + 1 })
+    rangedTickets.forEach((t) => { if (t.priority) counts[t.priority] = (counts[t.priority] || 0) + 1 })
     return order.filter((p) => counts[p]).map((name) => ({ name, value: counts[name], color: PRIORITY_COLOR[name] || '#94a3b8' }))
-  }, [tickets])
+  }, [rangedTickets])
 
   const technicianPerformance = useMemo(() => {
     const stats = {}
-    tickets.forEach((t) => {
+    rangedTickets.forEach((t) => {
       const tech = t.assigned_technician || 'Unassigned'
       if (!stats[tech]) stats[tech] = { total: 0, closed: 0 }
       stats[tech].total++
@@ -355,7 +364,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       .map(([name, s]) => ({ name, total: s.total, closed: s.closed, closeRate: s.total > 0 ? Math.round((s.closed / s.total) * 100) : 0 }))
       .sort((a, b) => b.closeRate - a.closeRate)
       .slice(0, 5)
-  }, [tickets])
+  }, [rangedTickets])
 
   const topIssues = useMemo(() => {
     const counts = {}
@@ -550,8 +559,6 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
           <DashboardCharts
             on={on} nav={nav}
             weeklyTrend={weeklyTrend} monthlyTrend={monthlyTrend}
-            statusDist={statusDist} priorityDist={priorityDist}
-            technicianPerformance={technicianPerformance}
             chartGridColor={chartGridColor} chartTickStyle={chartTickStyle} chartTooltipStyle={chartTooltipStyle}
             tk={tk}
           />
