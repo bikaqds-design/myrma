@@ -435,26 +435,28 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* ── Ticket KPIs ── */}
         {on('stat_tickets') && (
-          <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { label: TICKET_STATUS.OPEN,        cls: 'bg-blue-50 border-blue-200 text-blue-700',    navPath: `/rma-tickets?status=${TICKET_STATUS.OPEN}` },
-              { label: TICKET_STATUS.IN_PROGRESS, cls: 'bg-indigo-50 border-indigo-200 text-indigo-700', navPath: `/rma-tickets?status=${TICKET_STATUS.IN_PROGRESS}` },
-              { label: TICKET_STATUS.PENDING,     cls: 'bg-orange-50 border-orange-200 text-orange-700', navPath: `/rma-tickets?status=${TICKET_STATUS.PENDING}` },
-              { label: TICKET_STATUS.ON_HOLD,     cls: 'bg-yellow-50 border-yellow-200 text-yellow-700', navPath: `/rma-tickets?status=${TICKET_STATUS.ON_HOLD}` },
-              { label: TICKET_STATUS.COMPLETED,   cls: 'bg-teal-50 border-teal-200 text-teal-700',    navPath: `/rma-tickets?status=${TICKET_STATUS.COMPLETED}` },
-              { label: TICKET_STATUS.CLOSED,      cls: 'bg-green-50 border-green-200 text-green-700', navPath: `/rma-tickets?status=${TICKET_STATUS.CLOSED}` },
-              { label: TICKET_STATUS.CANCELLED,   cls: 'bg-gray-50 border-gray-200 text-gray-600',   navPath: `/rma-tickets?status=${TICKET_STATUS.CANCELLED}` },
-              { label: 'Overdue',                  cls: 'bg-red-50 border-red-200 text-red-700',       navPath: '/rma-tickets?overdue=true', overdue: true },
-            ].map(({ label, cls, navPath, overdue }) => (
-              <div
-                key={label}
-                onClick={nav(navPath)}
-                className={`rounded-xl border p-4 cursor-pointer hover:shadow-md transition-all ${cls}`}
-              >
-                <p className="text-2xl font-bold">{overdue ? overdueList.length : statusCounts[label]}</p>
-                <p className="text-xs font-medium mt-1 opacity-80">{label}</p>
-              </div>
-            ))}
+          <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+            <div className="flex divide-x divide-gray-100 dark:divide-slate-700 overflow-x-auto">
+              {[
+                { label: 'Open',        value: statusCounts[TICKET_STATUS.OPEN],        color: 'text-blue-600',   navPath: `/rma-tickets?status=${TICKET_STATUS.OPEN}` },
+                { label: 'In Progress', value: statusCounts[TICKET_STATUS.IN_PROGRESS], color: 'text-indigo-600', navPath: `/rma-tickets?status=${TICKET_STATUS.IN_PROGRESS}` },
+                { label: 'Pending',     value: statusCounts[TICKET_STATUS.PENDING],     color: 'text-orange-500', navPath: `/rma-tickets?status=${TICKET_STATUS.PENDING}` },
+                { label: 'On Hold',     value: statusCounts[TICKET_STATUS.ON_HOLD],     color: 'text-yellow-600', navPath: `/rma-tickets?status=${TICKET_STATUS.ON_HOLD}` },
+                { label: 'Completed',   value: statusCounts[TICKET_STATUS.COMPLETED],   color: 'text-teal-600',   navPath: `/rma-tickets?status=${TICKET_STATUS.COMPLETED}` },
+                { label: 'Closed',      value: statusCounts[TICKET_STATUS.CLOSED],      color: 'text-green-600',  navPath: `/rma-tickets?status=${TICKET_STATUS.CLOSED}` },
+                { label: 'Cancelled',   value: statusCounts[TICKET_STATUS.CANCELLED],   color: 'text-gray-400',   navPath: `/rma-tickets?status=${TICKET_STATUS.CANCELLED}` },
+                { label: 'Overdue',     value: overdueList.length,                      color: 'text-red-500',    navPath: '/rma-tickets?overdue=true' },
+              ].map(({ label, value, color, navPath }) => (
+                <button
+                  key={label}
+                  onClick={nav(navPath)}
+                  className="flex-1 min-w-[80px] py-5 px-2 text-center hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors group"
+                >
+                  <div className={`text-2xl font-bold tabular-nums ${color}`}>{value ?? 0}</div>
+                  <div className="text-[11px] text-gray-400 dark:text-slate-400 mt-1 leading-tight group-hover:text-gray-600 dark:group-hover:text-slate-300 whitespace-nowrap">{label}</div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -474,22 +476,22 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
               </svg>
             }
           >
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="flex divide-x divide-gray-100 dark:divide-slate-700 overflow-x-auto">
               {[
-                { label: 'Active RMA',           value: invStats.active_rma ?? 0,            cls: 'bg-blue-50 border-blue-200 text-blue-700',     tab: 'by-product' },
-                { label: 'Received',             value: invStats.received ?? 0,              cls: 'bg-sky-50 border-sky-200 text-sky-700',         tab: 'received' },
-                { label: 'Sent to Manufacturer', value: invStats.sent_to_manufacturer ?? 0,  cls: 'bg-purple-50 border-purple-200 text-purple-700', tab: 'overview' },
-                { label: 'Company Stock',        value: invStats.company_stock ?? 0,         cls: 'bg-amber-50 border-amber-200 text-amber-700',   tab: 'rma-stock' },
-                { label: 'Total Units',          value: invStats.total ?? 0,                 cls: 'bg-gray-50 border-gray-200 text-gray-700',      tab: 'overview' },
+                { label: 'Active RMA',           value: invStats.active_rma ?? 0,           color: 'text-blue-600',   tab: 'by-product' },
+                { label: 'Received',             value: invStats.received ?? 0,             color: 'text-sky-600',    tab: 'received' },
+                { label: 'Sent to Mfg',          value: invStats.sent_to_manufacturer ?? 0, color: 'text-purple-600', tab: 'overview' },
+                { label: 'Company Stock',        value: invStats.company_stock ?? 0,        color: 'text-amber-600',  tab: 'rma-stock' },
+                { label: 'Total Units',          value: invStats.total ?? 0,                color: 'text-gray-600',   tab: 'overview' },
               ].map((c) => (
-                <div
+                <button
                   key={c.label}
                   onClick={() => onNavigate?.(`/inventory?tab=${c.tab}`)}
-                  className={`rounded-xl border p-4 cursor-pointer hover:shadow-md transition-all ${c.cls}`}
+                  className="flex-1 min-w-[80px] py-5 px-2 text-center hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors group"
                 >
-                  <div className="text-2xl font-bold">{c.value}</div>
-                  <div className="text-xs font-medium mt-1 opacity-80">{c.label}</div>
-                </div>
+                  <div className={`text-2xl font-bold tabular-nums ${c.color}`}>{c.value}</div>
+                  <div className="text-[11px] text-gray-400 dark:text-slate-400 mt-1 leading-tight group-hover:text-gray-600 whitespace-nowrap">{c.label}</div>
+                </button>
               ))}
             </div>
           </WidgetCard>
