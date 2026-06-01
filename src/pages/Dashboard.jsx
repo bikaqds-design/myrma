@@ -4,6 +4,7 @@ import { db, supabase } from '../api/supabaseClient'
 import { safeStorage } from '../lib/safeStorage'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { Spinner, PageHeader } from '../components/ui'
+import { TICKET_STATUS, TICKET_STATUS_RESOLVED } from '../lib/constants'
 
 const DashboardCharts = lazy(() => import('./DashboardCharts'))
 
@@ -272,14 +273,14 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
   )
 
   const closedTickets = useMemo(
-    () => tickets.filter((t) => ['Closed', 'Resolved'].includes(t.ticket_status)).length,
+    () => tickets.filter((t) => TICKET_STATUS_RESOLVED.includes(t.ticket_status)).length,
     [tickets]
   )
 
   const overdueList = useMemo(
     () =>
       tickets.filter((t) => {
-        if (!t.due_date || ['Closed', 'Resolved', 'Cancelled'].includes(t.ticket_status))
+        if (!t.due_date || TICKET_STATUS_RESOLVED.includes(t.ticket_status))
           return false
         return new Date(t.due_date) < new Date()
       }),
@@ -287,9 +288,9 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
   )
 
   const { slaPercent, resolutionPercent, trackedCount, onScheduleCount } = useMemo(() => {
-    const ticketsWithDue = tickets.filter((t) => t.due_date && t.ticket_status !== 'Cancelled')
+    const ticketsWithDue = tickets.filter((t) => t.due_date && t.ticket_status !== TICKET_STATUS.CANCELLED)
     const overdueActive = ticketsWithDue.filter(
-      (t) => !['Closed', 'Resolved'].includes(t.ticket_status) && new Date(t.due_date) < new Date()
+      (t) => !TICKET_STATUS_RESOLVED.includes(t.ticket_status) && new Date(t.due_date) < new Date()
     ).length
     return {
       slaPercent:
@@ -356,7 +357,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       const tech = t.assigned_technician || 'Unassigned'
       if (!stats[tech]) stats[tech] = { total: 0, closed: 0 }
       stats[tech].total++
-      if (['Closed', 'Resolved'].includes(t.ticket_status)) stats[tech].closed++
+      if (TICKET_STATUS_RESOLVED.includes(t.ticket_status)) stats[tech].closed++
     })
     return Object.entries(stats)
       .map(([name, s]) => ({
