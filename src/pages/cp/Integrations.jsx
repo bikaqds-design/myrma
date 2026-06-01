@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { MigrationNotice } from './Announcements'
+import { captureException } from '../../lib/sentry'
 
 const WEBHOOK_EVENTS = [
   'ticket.created',
@@ -92,6 +93,7 @@ export default function Integrations({ currentUserEmail }) {
       setShowModal(false)
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     } finally {
       setSaving(false)
@@ -105,6 +107,7 @@ export default function Integrations({ currentUserEmail }) {
       toast.success('Deleted')
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     }
   }
@@ -114,6 +117,7 @@ export default function Integrations({ currentUserEmail }) {
       await db.webhooks.update(w.id, { is_active: !w.is_active })
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     }
   }
