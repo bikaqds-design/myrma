@@ -6,7 +6,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { CardSkeleton } from '../components/Skeleton'
 import { Button } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
-import { ROLES } from '../lib/constants'
+import { ROLES, TICKET_STATUS } from '../lib/constants'
 import { captureException } from '../lib/sentry'
 
 export default function ProductDetails({
@@ -742,13 +742,13 @@ export default function ProductDetails({
                             <span
                               className={
                                 'px-2 py-1 text-xs rounded-full ' +
-                                (ticket.ticket_status === 'New'
+                                (ticket.ticket_status === TICKET_STATUS.OPEN
                                   ? 'bg-blue-100 text-blue-800'
-                                  : ticket.ticket_status === 'In Progress'
+                                  : ticket.ticket_status === TICKET_STATUS.IN_PROGRESS
                                     ? 'bg-yellow-100 text-yellow-800'
-                                    : ticket.ticket_status === 'On Hold'
+                                    : ticket.ticket_status === TICKET_STATUS.ON_HOLD
                                       ? 'bg-orange-100 text-orange-800'
-                                      : ticket.ticket_status === 'Completed'
+                                      : ticket.ticket_status === TICKET_STATUS.COMPLETED
                                         ? 'bg-green-100 text-green-800'
                                         : 'bg-gray-100 text-gray-800')
                               }
