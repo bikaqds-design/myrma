@@ -441,26 +441,30 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
                 value: totalTickets,
                 color: 'indigo',
                 icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+                navPath: '/rma-tickets',
               },
               {
                 title: 'Open',
                 value: openTickets,
                 color: 'blue',
                 icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+                navPath: '/rma-tickets?status=Open',
               },
               {
                 title: 'Closed',
                 value: closedTickets,
                 color: 'green',
                 icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+                navPath: '/rma-tickets?status=Closed',
               },
               {
                 title: 'Overdue',
                 value: overdueList.length,
                 color: 'red',
                 icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z',
+                navPath: '/rma-tickets?overdue=true',
               },
-            ].map(({ title, value, color, icon }) => {
+            ].map(({ title, value, color, icon, navPath }) => {
               const bg = {
                 indigo: 'bg-indigo-100 text-indigo-600',
                 blue: 'bg-blue-100 text-blue-600',
@@ -470,7 +474,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
               return (
                 <div
                   key={title}
-                  onClick={nav('rma-tickets')}
+                  onClick={nav(navPath)}
                   className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all"
                 >
                   <div className="flex items-center justify-between">
@@ -557,7 +561,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
         {on('sla_health') && (
           <WidgetCard
             title="SLA Health"
-            onClick={nav('rma-tickets')}
+            onClick={nav('/rma-tickets?overdue=true')}
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -587,7 +591,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
         {on('resolution_rate') && (
           <WidgetCard
             title="Resolution Rate"
-            onClick={nav('rma-tickets')}
+            onClick={nav('/rma-tickets?status=Closed')}
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -623,7 +627,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
         {on('recent_tickets') && (
           <WidgetCard
             title="Recent Tickets"
-            onClick={nav('rma-tickets')}
+            onClick={nav('/rma-tickets')}
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -664,7 +668,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
         {on('overdue_tickets') && (
           <WidgetCard
             title="Overdue Tickets"
-            onClick={nav('rma-tickets')}
+            onClick={nav('/rma-tickets?overdue=true')}
             icon={
               <svg
                 className="w-5 h-5 text-red-500"
@@ -742,7 +746,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
           <WidgetCard
             className="lg:col-span-2"
             title="Top Issues"
-            onClick={nav('rma-tickets')}
+            onClick={nav('/rma-tickets')}
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
