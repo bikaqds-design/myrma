@@ -533,7 +533,12 @@ export default function App() {
         >
           {sidebarCompact ? (
             <>
-              <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <button
+                onClick={() => handleNavigate('/')}
+                title="Go to Dashboard"
+                aria-label="Go to Dashboard"
+                className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0 hover:bg-indigo-500 transition-colors"
+              >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
@@ -542,7 +547,7 @@ export default function App() {
                     d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                   />
                 </svg>
-              </div>
+              </button>
               <button
                 onClick={() => updateAppearance({ sidebarCompact: false }, currentUser?.email)}
                 title="Expand sidebar"
@@ -561,7 +566,12 @@ export default function App() {
             </>
           ) : (
             <>
-              <div className="flex items-center gap-3">
+              <button
+                onClick={() => handleNavigate('/')}
+                title="Go to Dashboard"
+                aria-label="Go to Dashboard"
+                className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+              >
                 <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -572,11 +582,11 @@ export default function App() {
                     />
                   </svg>
                 </div>
-                <div>
+                <div className="text-left">
                   <h1 className="text-xl font-bold">myRMA</h1>
                   <p className="text-xs text-gray-500">{companyName || 'RMA Management'}</p>
                 </div>
-              </div>
+              </button>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => updateAppearance({ sidebarCompact: true }, currentUser?.email)}
@@ -826,10 +836,10 @@ export default function App() {
           <NotificationBell
             notifications={notifications}
             currentUserEmail={currentUser?.email}
-            sidebarCompact={true}
             onNavigateToTicket={handleNavigateToTicket}
             onMarkAllRead={markAllNotifsRead}
             mobile={true}
+            iconOnly={true}
           />
           {/* User dropdown */}
           <div className="relative" ref={userMenuRef}>

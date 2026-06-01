@@ -51,6 +51,7 @@ export default function NotificationBell({
   onNavigateToTicket,
   onMarkAllRead,
   mobile = false,
+  iconOnly = false,
 }) {
   const [open, setOpen] = useState(false)
   const [panelStyle, setPanelStyle] = useState({})
@@ -280,7 +281,7 @@ export default function NotificationBell({
         onClick={handleToggle}
         title="Notifications"
         aria-label="Notifications"
-        className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3'} rounded-lg transition-colors relative ${mobile ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-300 hover:bg-gray-700'}`}
+        className={iconOnly ? 'relative p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors flex items-center justify-center' : `w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3'} rounded-lg transition-colors relative ${mobile ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-300 hover:bg-gray-700'}`}
       >
         <div className="relative flex-shrink-0">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
