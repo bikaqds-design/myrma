@@ -1,40 +1,28 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../../lib/sentry'
 
 export default function AuditLog() {
-  const [logs, setLogs] = useState([])
-  const [filtered, setFiltered] = useState([])
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterUser, setFilterUser] = useState('')
   const [filterAction, setFilterAction] = useState('')
   const [filterFrom, setFilterFrom] = useState('')
   const [filterTo, setFilterTo] = useState('')
 
+  const { data: logs = [], isLoading: loading, isError, error } = useQuery({
+    queryKey: ['audit-log'],
+    queryFn: () => db.auditLog.listAll(500),
+  })
   useEffect(() => {
-    load()
-  }, [])
-  useEffect(() => {
-    applyFilters()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [logs, search, filterUser, filterAction, filterFrom, filterTo])
-
-  const load = async () => {
-    setLoading(true)
-    try {
-      const data = await db.auditLog.listAll(500)
-      setLogs(data)
-    } catch (err) {
-      captureException(err)
+    if (isError) {
+      captureException(error)
       toast.error('Failed to load audit log')
-    } finally {
-      setLoading(false)
     }
-  }
+  }, [isError, error])
 
-  const applyFilters = () => {
+  const filtered = useMemo(() => {
     let f = [...logs]
     if (search) {
       const q = search.toLowerCase()
@@ -49,8 +37,8 @@ export default function AuditLog() {
     if (filterAction) f = f.filter((l) => l.action_type === filterAction)
     if (filterFrom) f = f.filter((l) => new Date(l.created_date) >= new Date(filterFrom))
     if (filterTo) f = f.filter((l) => new Date(l.created_date) <= new Date(filterTo + 'T23:59:59'))
-    setFiltered(f)
-  }
+    return f
+  }, [logs, search, filterUser, filterAction, filterFrom, filterTo])
 
   const handleExport = () => {
     const csv = [
