@@ -759,36 +759,6 @@ export default function App() {
           )}
         </nav>
 
-        {/* User profile (bottom of sidebar) */}
-        <div className={`border-t border-gray-700 ${sidebarCompact ? 'p-2' : 'p-4'}`}>
-          <button
-            onClick={() => handleNavigate('/account')}
-            title={sidebarCompact ? 'Account Settings' : undefined}
-            className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-2' : 'gap-3 px-2 py-2'} rounded-lg hover:bg-gray-700 transition-colors text-left group`}
-          >
-            {currentUser?.user_metadata?.avatar_url ? (
-              <img
-                src={currentUser.user_metadata.avatar_url}
-                alt="avatar"
-                className="w-8 h-8 rounded-full object-cover ring-2 ring-indigo-500/30 flex-shrink-0"
-              />
-            ) : (
-              <div
-                className={`${sidebarCompact ? 'w-8 h-8' : 'w-8 h-8'} rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white font-semibold text-sm uppercase flex-shrink-0`}
-              >
-                {(currentUser?.user_metadata?.display_name || currentUser?.email || '?')[0]}
-              </div>
-            )}
-            {!sidebarCompact && (
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-gray-200 truncate">
-                  {currentUser?.user_metadata?.display_name || currentUser?.email}
-                </div>
-                <div className="text-xs text-gray-500 capitalize">{currentUserRole}</div>
-              </div>
-            )}
-          </button>
-        </div>
       </div>
 
       {/* UX-4: inert disables all keyboard/pointer interaction behind the open sidebar on mobile */}
