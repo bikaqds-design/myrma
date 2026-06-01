@@ -1133,15 +1133,15 @@ This is the riskiest task. `jspdf 4.2.1` is a major-version library bump. The AP
 
 ---
 
-### Sprint 10 Scorecard (projected)
+### Sprint 10 Scorecard
 
-| Domain | Current (post-hotfix) | After Phase A | After Phase B | After Phase C | After Phase D |
-|--------|----------------------|---------------|---------------|---------------|---------------|
-| Security | 8/10 | **8.5** (SEC-3 fixed) | 8.5 | 8.5 | **9** (jspdf CVEs fixed) |
-| Architecture | 9/10 | 9 | **9.5** (constants clean) | **10** (all pages on useQuery) | 10 |
-| Code quality | 9/10 | **9.5** (cp pages have Sentry) | 9.5 | 9.5 | 9.5 |
-| Production readiness | 8/10 | 8 | 8 | 8 | **9** |
-| **Overall** | **8.8/10** | **8.9** | **9.0** | **9.1** | **9.3** |
+| Domain | Pre-Sprint 10 | After Phase A | After Phase B | After Phase C | After Phase D |
+| ------ | ------------ | ------------- | ------------- | ------------- | ------------- |
+| Security | 8/10 | **8.5** (SEC-3 fixed) | 8.5 | 8.5 | **9** ✅ (jspdf CVEs fixed) |
+| Architecture | 9/10 | 9 | **9.5** (constants clean) | **10** ✅ (all pages on useQuery) | 10 |
+| Code quality | 9/10 | **9.5** ✅ (cp pages have Sentry) | 9.5 | 9.5 | 9.5 |
+| Production readiness | 8/10 | 8 | 8 | 8 | **9** ✅ |
+| **Overall** | **8.8/10** | **8.9** | **9.0** | **9.1** | **9.3** ✅ |
 
 ---
 
@@ -1290,3 +1290,8 @@ This is the riskiest task. `jspdf 4.2.1` is a major-version library bump. The AP
 - **2026-05-29** — ✅ Sprint 7 H-3 (commit `bc25181`). `Products.jsx` (3,142) → `Products/` (4 files: `index`, `ProductsListTab`, `HierarchyTab`, `_modals`). `UserManagement.jsx` (2,200) → `UserManagement/` (5 files: `index`, `UsersTab`, `RolesTab`, `_shared`, `_utils`). `Customers.jsx` (1,859) → `Customers/` (3 files: `index`, `_modals`, `_constants`).
 - **2026-05-29** — ✅ Sprint 7 H-5 (commit `550bed6`). `@axe-core/react` v4.11.3 installed; mounted in `main.jsx` behind `import.meta.env.DEV`. 34 ARIA gaps closed: `aria-sort` + `aria-label` on all sort buttons in `SortableHeader` (RMATickets) and `InvSortBtn` (Inventory) — propagates to every table; `aria-expanded` + `aria-haspopup="menu"` + `aria-label` on all three-dot action menus (RMATickets, Products, Customers); `aria-expanded` + `aria-controls` on filter-panel toggles with matching `id`s; `aria-label` + SVG `aria-hidden` on modal close buttons. Score: **8.7 → 9.3/10**.
 - **2026-05-31** — 🔍 **Full system audit** (user-requested, post-hotfix-batch). Static analysis of all layers. Automated gates: 80/80 tests, 0 lint warnings, clean build. **15 findings (2 critical ops, 1 high, 5 moderate, 5 accepted/clean)**. Critical: two DB migrations unconfirmed in production (ticket constraint + permission repair). High: Add User button visible to `admin` but Edge Function is `super_admin`-only (S9-2b, carried over). Moderate: `cp/*.jsx` (7 files) have no captureException; TechCalendar + AuditLog not on useQuery; hardcoded status strings in 4 pages; jspdf DOMPurify CVEs (fixable). Accepted: xlsx CVE (no vendor fix, write-only), raw Supabase reads in 3 Inventory files (intentional column subset). All CI gates green. Score: **8.8/10**. Sprint 10 plan written — surgical, one-file-one-commit approach to avoid regression cascade.
+- **2026-06-01** — ✅ **DB migrations applied** (user-applied in Supabase SQL Editor). DB-1: `20260531_relax_ticket_status_constraint.sql` — dropped hard-coded `ticket_status` CHECK constraint, replaced with non-empty guard. DB-2: `20260529_repair_permissions.sql` — cleared corrupt `permissions` column for all manager/technician/viewer rows; verification query returned 0 rows.
+- **2026-06-01** — ✅ **Sprint 10 Phase A complete** (commits `30dad6f`–`35a7935`, branch `test`). 8 tasks: (1) S10-SEC-3: `Add User` button gated to `ROLES.SUPER_ADMIN` only in `UserManagement/index.jsx` — admin no longer sees a button that silently 403s. (2–8) S10-CQ-1: `captureException` added to all catch blocks in 7 `cp/*.jsx` files (Announcements, RMAConfig, CustomFields, PDFLayout, DataCleanup, Integrations, AuditLog) — Control Panel errors now report to Sentry. CI: 80/80 · 0 warnings · clean build.
+- **2026-06-01** — ✅ **Sprint 10 Phase B complete** (commits `4148533`–`9dadadb`, branch `test`). 4 tasks: S10-ARCH-4a–d: Raw status strings replaced with `TICKET_STATUS.*` / `TICKET_STATUS_RESOLVED` constants in `Dashboard.jsx`, `CustomerDetails.jsx`, `ProductDetails.jsx`, `ControlPanel.jsx`. Also removed stale `'Resolved'` string from Dashboard (status never existed in DB). CI: 80/80 · 0 warnings · clean build.
+- **2026-06-01** — ✅ **Sprint 10 Phase C complete** (commits `cb34fd3`–`416e538`, branch `test`). 2 tasks: S10-ARCH-2: `TechCalendar.jsx` migrated from `useEffect+setState` to `useQuery(['tech-calendar-tickets'])`. S10-ARCH-3: `cp/AuditLog.jsx` migrated — `load()+2×useEffect+setFiltered` replaced with `useQuery(['audit-log'])` + `useMemo` for filters; removed the `eslint-disable` suppressor that was masking the bad deps pattern. All pages now on TanStack Query. CI: 80/80 · 0 warnings · clean build.
+- **2026-06-01** — ✅ **Sprint 10 Phase D complete** (commit `a072c03`, branch `test`). S10-SEC-2: `jspdf` upgraded `4.2.0 → 4.2.1` via `npm audit fix --force`. Fixes 3 CVEs in `dompurify ≤3.3.3` (1 moderate, 1 high, 1 critical). CI: 80/80 · 0 warnings · clean build. **Pending:** user browser smoke test of PDF export on Invoices page before merge to `main`.
