@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { captureException } from '../../lib/sentry'
 
 export default function DataCleanup() {
   const [tickets, setTickets] = useState([])
@@ -21,7 +22,8 @@ export default function DataCleanup() {
       const [t, c] = await Promise.all([db.rmaTickets.list(), db.customers.list()])
       setTickets(t)
       setCustomers(c)
-    } catch {
+    } catch (err) {
+      captureException(err)
       toast.error('Failed to load data')
     } finally {
       setLoading(false)
@@ -71,6 +73,7 @@ export default function DataCleanup() {
       toast.success(`Deleted ${list.length} ${label} tickets`)
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     } finally {
       setWorking(false)
