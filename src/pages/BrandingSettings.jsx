@@ -504,7 +504,7 @@ function BrandingTab({
   currentUserEmail,
 }) {
   const {
-    darkMode,
+
     fontFamily,
     tableDensity,
     sidebarCompact,
@@ -804,9 +804,6 @@ function BrandingTab({
           </svg>
         }
       >
-        <BRow label="Dark Mode" desc="Switch the entire app to a dark theme">
-          <BToggle checked={darkMode} onChange={(v) => update({ darkMode: v })} />
-        </BRow>
         <BRow label="Compact Sidebar" desc="Icons-only sidebar — hover to see labels">
           <BToggle checked={sidebarCompact} onChange={(v) => update({ sidebarCompact: v })} />
         </BRow>
