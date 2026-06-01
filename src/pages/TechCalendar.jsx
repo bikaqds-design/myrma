@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { Button, Spinner, PageHeader } from '../components/ui'
@@ -110,23 +111,20 @@ export default function TechCalendar({
 
   const isAdminOrManager = ['super_admin', 'admin', 'manager'].includes(currentUserRole)
 
-  const [tickets, setTickets] = useState([])
-  const [loading, setLoading] = useState(true)
   const [mondayDate, setMondayDate] = useState(() => getMonday(new Date()))
   const [selectedTech, setSelectedTech] = useState('')
 
   // ─── Load data ──────────────────────────────────────────────────────────────
+  const { data: tickets = [], isLoading: loading, isError, error } = useQuery({
+    queryKey: ['tech-calendar-tickets'],
+    queryFn: () => db.rmaTickets.list(),
+  })
   useEffect(() => {
-    setLoading(true)
-    db.rmaTickets
-      .list()
-      .then((data) => setTickets(data))
-      .catch((err) => {
-        captureException(err)
-        toast.error('Failed to load tickets')
-      })
-      .finally(() => setLoading(false))
-  }, [])
+    if (isError) {
+      captureException(error)
+      toast.error('Failed to load tickets')
+    }
+  }, [isError, error])
 
   // ─── Derived data ────────────────────────────────────────────────────────────
   const technicians = useMemo(() => {
