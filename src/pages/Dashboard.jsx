@@ -3,200 +3,208 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, supabase } from '../api/supabaseClient'
 import { safeStorage } from '../lib/safeStorage'
 import { useAppearance } from '../contexts/AppearanceContext'
-import { Spinner, PageHeader } from '../components/ui'
+import { Spinner } from '../components/ui'
 import { TICKET_STATUS, TICKET_STATUS_LIST, TICKET_STATUS_RESOLVED } from '../lib/constants'
 
 const DashboardCharts = lazy(() => import('./DashboardCharts'))
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const WIDGET_CATALOG = [
-  {
-    id: 'stat_tickets',
-    label: 'Ticket KPIs',
-    desc: '4 stat cards: Total, Open, Closed, Overdue',
-    size: 'full',
-  },
-  {
-    id: 'stat_inventory',
-    label: 'Inventory Snapshot',
-    desc: '4 inventory status counts',
-    size: 'full',
-  },
-  {
-    id: 'sla_health',
-    label: 'SLA Health',
-    desc: 'On-time ticket completion rate gauge',
-    size: 'half',
-  },
-  {
-    id: 'resolution_rate',
-    label: 'Resolution Rate',
-    desc: 'Percentage of closed tickets gauge',
-    size: 'half',
-  },
-  {
-    id: 'recent_tickets',
-    label: 'Recent Tickets',
-    desc: 'Last 10 RMA tickets with status',
-    size: 'half',
-  },
-  {
-    id: 'overdue_tickets',
-    label: 'Overdue Tickets',
-    desc: 'All tickets past their due date',
-    size: 'half',
-  },
-  {
-    id: 'weekly_trend',
-    label: 'Weekly Trend',
-    desc: '7-day ticket creation line chart',
-    size: 'half',
-  },
-  {
-    id: 'monthly_trend',
-    label: 'Monthly Trend (30d)',
-    desc: '30-day ticket creation bar chart',
-    size: 'half',
-  },
-  {
-    id: 'status_distribution',
-    label: 'Status Distribution',
-    desc: 'Pie chart of ticket statuses',
-    size: 'half',
-  },
-  {
-    id: 'priority_distribution',
-    label: 'Priority Distribution',
-    desc: 'Pie chart of ticket priorities',
-    size: 'half',
-  },
-  {
-    id: 'technician_performance',
-    label: 'Technician Performance',
-    desc: 'Bar chart of top 5 technicians by close rate',
-    size: 'full',
-  },
-  {
-    id: 'top_issues',
-    label: 'Top Issues',
-    desc: 'Ranked list of most common product issues',
-    size: 'full',
-  },
+  { id: 'stat_tickets',           label: 'Ticket KPIs',               desc: 'Hero tiles + status strip',                     size: 'full' },
+  { id: 'stat_inventory',         label: 'Inventory Snapshot',         desc: '5 inventory status categories',                 size: 'full' },
+  { id: 'sla_health',             label: 'SLA Health',                 desc: 'On-time ticket completion rate gauge',           size: 'half' },
+  { id: 'resolution_rate',        label: 'Resolution Rate',            desc: 'Percentage of closed tickets gauge',             size: 'half' },
+  { id: 'recent_tickets',         label: 'Recent Tickets',             desc: 'Last 10 RMA tickets with status',               size: 'half' },
+  { id: 'overdue_tickets',        label: 'Overdue Tickets',            desc: 'All tickets past their due date',               size: 'half' },
+  { id: 'weekly_trend',           label: 'Weekly Trend',               desc: '7-day ticket creation line chart',              size: 'half' },
+  { id: 'monthly_trend',          label: 'Monthly Trend (30d)',         desc: '30-day ticket creation bar chart',              size: 'half' },
+  { id: 'status_distribution',    label: 'Status Distribution',        desc: 'Donut chart of ticket statuses',                size: 'half' },
+  { id: 'priority_distribution',  label: 'Priority Distribution',      desc: 'Donut chart of ticket priorities',              size: 'half' },
+  { id: 'technician_performance', label: 'Technician Performance',     desc: 'Top 5 technicians by close rate',               size: 'full' },
+  { id: 'top_issues',             label: 'Top Issues',                 desc: 'Ranked list of most common product issues',     size: 'full' },
 ]
 
-function WidgetCard({ title, icon, onClick, children, className = '' }) {
-  return (
-    <div
-      onClick={onClick}
-      className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6 ${onClick ? 'cursor-pointer hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-500 transition-all' : ''} ${className}`}
-    >
-      {title && (
-        <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100 mb-4 flex items-center gap-2">
-          {icon && <span className="text-indigo-600 dark:text-indigo-400">{icon}</span>}
-          {title}
-          {onClick && (
-            <svg
-              className="w-3.5 h-3.5 text-gray-500 dark:text-slate-500 ml-auto flex-shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          )}
-        </h2>
-      )}
-      {children}
-    </div>
-  )
+// ── Design tokens ─────────────────────────────────────────────────────────────
+const STATUS_COLOR = {
+  Open:          '#3b82f6',
+  'In Progress': '#6366f1',
+  Pending:       '#f59e0b',
+  'On Hold':     '#eab308',
+  Completed:     '#14b8a6',
+  Closed:        '#10b981',
+  Cancelled:     '#94a3b8',
+  Overdue:       '#ef4444',
 }
-
-function CircularGauge({ percent, color, label, sublabel }) {
-  const r = 45
-  const circ = 2 * Math.PI * r
-  const dash = (Math.max(0, Math.min(percent, 100)) / 100) * circ
-  return (
-    <div className="flex flex-col items-center py-2">
-      <svg width="140" height="140" viewBox="0 0 120 120">
-        <circle
-          cx="60"
-          cy="60"
-          r={r}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="10"
-          className="text-gray-200"
-        />
-        <circle
-          cx="60"
-          cy="60"
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth="10"
-          strokeDasharray={`${dash} ${circ}`}
-          strokeLinecap="round"
-          transform="rotate(-90 60 60)"
-          style={{ transition: 'stroke-dasharray 0.6s ease' }}
-        />
-        <text
-          x="60"
-          y="56"
-          textAnchor="middle"
-          style={{ fontSize: 22, fontWeight: 700 }}
-          fill="currentColor"
-        >
-          {percent}%
-        </text>
-        <text
-          x="60"
-          y="74"
-          textAnchor="middle"
-          style={{ fontSize: 10 }}
-          fill="currentColor"
-          opacity="0.5"
-        >
-          {sublabel}
-        </text>
-      </svg>
-      <p className="text-sm font-medium text-gray-700 mt-1 text-center">{label}</p>
-    </div>
-  )
+const PRIORITY_COLOR = {
+  Critical: '#ef4444',
+  High:     '#f59e0b',
+  Medium:   '#6366f1',
+  Low:      '#94a3b8',
 }
-
-function StatusBadge({ status }) {
-  const colors = {
-    Open: 'bg-blue-100 text-blue-700',
-    'In Progress': 'bg-amber-100 text-amber-700',
-    Pending: 'bg-purple-100 text-purple-700',
-    Resolved: 'bg-green-100 text-green-700',
-    Closed: 'bg-gray-100 text-gray-700',
-    Cancelled: 'bg-red-100 text-red-700',
+function tokens(dark) {
+  return {
+    accent:      dark ? '#a5b4fc' : '#4338ca',
+    surface:     dark ? '#121823' : '#ffffff',
+    surfaceInset:dark ? '#0e131c' : '#f7f8fb',
+    border:      dark ? '#212a38' : '#e6e9ef',
+    borderSoft:  dark ? '#1a2230' : '#eef0f4',
+    text:        dark ? '#e8ebf0' : '#211f1b',
+    textMuted:   dark ? '#9aa4b2' : '#6c6760',
+    textFaint:   dark ? '#646f7e' : '#a39e95',
+    track:       dark ? '#212a38' : '#eaedf2',
+    grid:        dark ? '#1a2230' : '#eef1f5',
+    good:        dark ? '#34d399' : '#10b981',
+    bad:         dark ? '#f87171' : '#ef4444',
+    warn:        dark ? '#fbbf24' : '#f59e0b',
   }
+}
+
+// ── Primitives ────────────────────────────────────────────────────────────────
+function SvgGauge({ percent, color, tk, size = 132 }) {
+  const thickness = 12
+  const r = (size - thickness) / 2
+  const cx = size / 2
+  const C = 2 * Math.PI * r
+  const len = (Math.max(0, Math.min(percent, 100)) / 100) * C
   return (
-    <span
-      className={`px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${colors[status] || 'bg-gray-100 text-gray-700'}`}
-    >
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={cx} cy={cx} r={r} fill="none" stroke={tk.track} strokeWidth={thickness} />
+      <circle cx={cx} cy={cx} r={r} fill="none" stroke={color} strokeWidth={thickness}
+        strokeLinecap="round" strokeDasharray={`${len} ${C - len}`}
+        transform={`rotate(-90 ${cx} ${cx})`}
+        style={{ transition: 'stroke-dasharray 0.7s cubic-bezier(.2,.7,.3,1)' }} />
+      <text x={cx} y={cx - 2} textAnchor="middle" dominantBaseline="middle"
+        style={{ fontSize: 32, fontWeight: 700, letterSpacing: -0.5 }} fill={tk.text}>
+        {percent}%
+      </text>
+      <text x={cx} y={cx + 22} textAnchor="middle"
+        style={{ fontSize: 11, fontWeight: 500, letterSpacing: 0.3 }} fill={tk.textFaint}>
+        on-time
+      </text>
+    </svg>
+  )
+}
+
+function SvgDonut({ segments, tk, size = 108 }) {
+  const thickness = 11
+  const r = (size - thickness) / 2
+  const cx = size / 2
+  const C = 2 * Math.PI * r
+  const total = segments.reduce((s, d) => s + d.value, 0) || 1
+  const gap = 3
+  let acc = 0
+  return (
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={cx} cy={cx} r={r} fill="none" stroke={tk.track} strokeWidth={thickness} />
+        {segments.map((s, i) => {
+          const frac = s.value / total
+          const len = Math.max(frac * C - gap, 0)
+          const el = (
+            <circle key={i} cx={cx} cy={cx} r={r} fill="none" stroke={s.color}
+              strokeWidth={thickness} strokeLinecap="round"
+              strokeDasharray={`${len} ${C - len}`}
+              strokeDashoffset={-acc * C}
+              transform={`rotate(-90 ${cx} ${cx})`} />
+          )
+          acc += frac
+          return el
+        })}
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontSize: 21, fontWeight: 760, color: tk.text, fontVariantNumeric: 'tabular-nums' }}>
+          {total}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function Sparkline({ data, color, width = 76, height = 30 }) {
+  if (!data || data.length < 2) return null
+  const max = Math.max(...data, 1)
+  const min = Math.min(...data)
+  const rng = max - min || 1
+  const pts = data.map((v, i) => [
+    (i / (data.length - 1)) * width,
+    height - ((v - min) / rng) * (height - 4) - 2,
+  ])
+  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ')
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ flexShrink: 0 }}>
+      <path d={d} fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function StatusPill({ status }) {
+  const color = STATUS_COLOR[status] || '#94a3b8'
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '3px 10px', borderRadius: 999,
+      fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap',
+      color, background: color + '1e', flexShrink: 0,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: 3, background: color, display: 'inline-block' }} />
       {status}
     </span>
   )
 }
 
+function CardHead({ title, action, tk }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      <h3 style={{ margin: 0, fontSize: 13.5, fontWeight: 650, color: tk.text, letterSpacing: -0.1 }}>{title}</h3>
+      {action && <span style={{ fontSize: 11.5, fontWeight: 600, color: tk.textFaint }}>{action}</span>}
+    </div>
+  )
+}
+
+function SectionLabel({ children, tk }) {
+  return (
+    <div className="col-span-12" style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '6px 0 -4px' }}>
+      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '1.2px', color: tk.textFaint, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+        {children}
+      </span>
+      <span style={{ flex: 1, height: 1, background: tk.border }} />
+    </div>
+  )
+}
+
+function DonutWithLegend({ segments, tk }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1 }}>
+      <SvgDonut segments={segments} tk={tk} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7, flex: 1, minWidth: 0 }}>
+        {segments.slice(0, 5).map((s) => (
+          <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flexShrink: 0 }} />
+            <span style={{ color: tk.textMuted, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</span>
+            <span style={{ color: tk.text, fontWeight: 650, fontVariantNumeric: 'tabular-nums' }}>{s.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 export default function Dashboard({ currentUserEmail, onNavigate }) {
   const { dashboardWidgets, darkMode } = useAppearance()
-  // DM-1/DM-2: chart theming derived from dark mode
-  const chartTickStyle = { fontSize: 11, fill: darkMode ? '#94a3b8' : '#6b7280' }
-  const chartGridColor = darkMode ? '#334155' : '#f3f4f6'
+  const tk = tokens(darkMode)
+  const chartTickStyle  = { fontSize: 10, fill: tk.textFaint }
+  const chartGridColor  = tk.grid
   const chartTooltipStyle = darkMode
-    ? { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9' }
-    : { backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 8 }
+    ? { backgroundColor: '#121823', border: `1px solid ${tk.border}`, borderRadius: 8, color: tk.text }
+    : { backgroundColor: '#fff',    border: `1px solid ${tk.border}`, borderRadius: 8 }
   const storageKey = `dashboard_widgets_${currentUserEmail}`
 
   const [enabledWidgets, setEnabledWidgets] = useState(() =>
     safeStorage.get(storageKey, dashboardWidgets || WIDGET_CATALOG.map((w) => w.id))
   )
+  const [range, setRange] = useState('30d')
 
-  // P-1: TanStack Query — cached fetch; stale data renders instantly on re-visit
   const queryClient = useQueryClient()
   const { data: tickets = [], isLoading: loading } = useQuery({
     queryKey: ['rma-tickets'],
@@ -209,48 +217,24 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
     staleTime: 2 * 60_000,
   })
 
-  // A-5: merge realtime payload into query cache instead of local state
   useEffect(() => {
     const channel = supabase
       .channel('dashboard-rt')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'rma_tickets' },
-        ({ new: row }) => {
-          queryClient.setQueryData(['rma-tickets'], (old) => (old ? [row, ...old] : [row]))
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'rma_tickets' },
-        ({ new: row }) => {
-          queryClient.setQueryData(
-            ['rma-tickets'],
-            (old) => old?.map((t) => (t.id === row.id ? row : t)) ?? [row]
-          )
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'rma_tickets' },
-        ({ old: row }) => {
-          queryClient.setQueryData(
-            ['rma-tickets'],
-            (old) => old?.filter((t) => t.id !== row.id) ?? []
-          )
-        }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rma_tickets' },
+        ({ new: row }) => { queryClient.setQueryData(['rma-tickets'], (old) => (old ? [row, ...old] : [row])) })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rma_tickets' },
+        ({ new: row }) => { queryClient.setQueryData(['rma-tickets'], (old) => old?.map((t) => (t.id === row.id ? row : t)) ?? [row]) })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'rma_tickets' },
+        ({ old: row }) => { queryClient.setQueryData(['rma-tickets'], (old) => old?.filter((t) => t.id !== row.id) ?? []) })
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [queryClient])
 
-  // Re-read widget prefs when returning to this page (storageKey may differ per user)
   useEffect(() => {
     const stored = safeStorage.get(storageKey, null)
     if (stored) setEnabledWidgets(stored)
   }, [storageKey])
 
-  // Listen for storage events from AccountSettings (same-tab custom event)
   useEffect(() => {
     const handler = () => {
       const stored = safeStorage.get(storageKey, null)
@@ -263,7 +247,6 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
   const on = (id) => enabledWidgets.includes(id)
   const nav = (page) => () => onNavigate?.(page)
 
-  // A-4: all aggregations memoised — only recompute when tickets changes
   const totalTickets = useMemo(() => tickets.length, [tickets])
 
   const closedTickets = useMemo(
@@ -272,12 +255,10 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
   )
 
   const overdueList = useMemo(
-    () =>
-      tickets.filter((t) => {
-        if (!t.due_date || TICKET_STATUS_RESOLVED.includes(t.ticket_status))
-          return false
-        return new Date(t.due_date) < new Date()
-      }),
+    () => tickets.filter((t) => {
+      if (!t.due_date || TICKET_STATUS_RESOLVED.includes(t.ticket_status)) return false
+      return new Date(t.due_date) < new Date()
+    }),
     [tickets]
   )
 
@@ -299,12 +280,12 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       })
     const active = (ps) => flat.filter((p) => p.ts !== TICKET_STATUS.COMPLETED && p.product_status === ps).length
     return {
-      allUnits:   invStats?.total ?? 0,
-      received:   flat.filter((p) => p.ts !== TICKET_STATUS.COMPLETED && (p.product_status === 'Received' || !p.product_status)).length,
+      allUnits:    invStats?.total ?? 0,
+      received:    flat.filter((p) => p.ts !== TICKET_STATUS.COMPLETED && (p.product_status === 'Received' || !p.product_status)).length,
       underRepair: active('Under Repair'),
-      repaired:   active('Repaired'),
-      cantRepair: active("Can't Repair"),
-      rmaStock:   flat.filter((p) => p.product_status === 'Replacement' || p.product_status === 'Credit Note').length,
+      repaired:    active('Repaired'),
+      cantRepair:  active("Can't Repair"),
+      rmaStock:    flat.filter((p) => p.product_status === 'Replacement' || p.product_status === 'Credit Note').length,
     }
   }, [tickets, invStats])
 
@@ -314,13 +295,10 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       (t) => !TICKET_STATUS_RESOLVED.includes(t.ticket_status) && new Date(t.due_date) < new Date()
     ).length
     return {
-      slaPercent:
-        ticketsWithDue.length > 0
-          ? Math.round(((ticketsWithDue.length - overdueActive) / ticketsWithDue.length) * 100)
-          : 100,
-      resolutionPercent:
-        tickets.length > 0 ? Math.round((closedTickets / tickets.length) * 100) : 0,
-      // Exposed for the SLA widget caption (rendered outside this memo's scope)
+      slaPercent: ticketsWithDue.length > 0
+        ? Math.round(((ticketsWithDue.length - overdueActive) / ticketsWithDue.length) * 100)
+        : 100,
+      resolutionPercent: tickets.length > 0 ? Math.round((closedTickets / tickets.length) * 100) : 0,
       trackedCount: ticketsWithDue.length,
       onScheduleCount: ticketsWithDue.length - overdueActive,
     }
@@ -332,10 +310,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       const d = new Date()
       d.setDate(d.getDate() - i)
       const ds = d.toISOString().split('T')[0]
-      days.push({
-        date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        tickets: tickets.filter((t) => t.created_date?.startsWith(ds)).length,
-      })
+      days.push({ date: d.toLocaleDateString('en-US', { weekday: 'short' }), tickets: tickets.filter((t) => t.created_date?.startsWith(ds)).length })
     }
     return days
   }, [tickets])
@@ -357,19 +332,15 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
 
   const statusDist = useMemo(() => {
     const counts = {}
-    tickets.forEach((t) => {
-      counts[t.ticket_status] = (counts[t.ticket_status] || 0) + 1
-    })
-    return Object.entries(counts).map(([name, value]) => ({ name, value }))
+    tickets.forEach((t) => { counts[t.ticket_status] = (counts[t.ticket_status] || 0) + 1 })
+    return Object.entries(counts).map(([name, value]) => ({ name, value, color: STATUS_COLOR[name] || '#94a3b8' }))
   }, [tickets])
 
   const priorityDist = useMemo(() => {
     const order = ['Critical', 'High', 'Medium', 'Low']
     const counts = {}
-    tickets.forEach((t) => {
-      if (t.priority) counts[t.priority] = (counts[t.priority] || 0) + 1
-    })
-    return order.filter((p) => counts[p]).map((name) => ({ name, value: counts[name] }))
+    tickets.forEach((t) => { if (t.priority) counts[t.priority] = (counts[t.priority] || 0) + 1 })
+    return order.filter((p) => counts[p]).map((name) => ({ name, value: counts[name], color: PRIORITY_COLOR[name] || '#94a3b8' }))
   }, [tickets])
 
   const technicianPerformance = useMemo(() => {
@@ -381,12 +352,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       if (TICKET_STATUS_RESOLVED.includes(t.ticket_status)) stats[tech].closed++
     })
     return Object.entries(stats)
-      .map(([name, s]) => ({
-        name,
-        total: s.total,
-        closed: s.closed,
-        closeRate: s.total > 0 ? Math.round((s.closed / s.total) * 100) : 0,
-      }))
+      .map(([name, s]) => ({ name, total: s.total, closed: s.closed, closeRate: s.total > 0 ? Math.round((s.closed / s.total) * 100) : 0 }))
       .sort((a, b) => b.closeRate - a.closeRate)
       .slice(0, 5)
   }, [tickets])
@@ -400,21 +366,18 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
         if (issue) counts[issue] = (counts[issue] || 0) + 1
       })
     })
-    return Object.entries(counts)
-      .map(([issue, count]) => ({ issue, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5)
+    return Object.entries(counts).map(([issue, count]) => ({ issue, count })).sort((a, b) => b.count - a.count).slice(0, 5)
   }, [tickets])
 
   const recentTickets = useMemo(
-    () =>
-      [...tickets]
-        .sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))
-        .slice(0, 10),
+    () => [...tickets].sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0)).slice(0, 8),
     [tickets]
   )
 
   const daysBetween = (a) => Math.ceil((new Date() - new Date(a)) / 86400000)
+  const openActive = (statusCounts[TICKET_STATUS.OPEN] || 0) + (statusCounts[TICKET_STATUS.IN_PROGRESS] || 0) +
+    (statusCounts[TICKET_STATUS.PENDING] || 0) + (statusCounts[TICKET_STATUS.ON_HOLD] || 0)
+  const sparkWeekly = weeklyTrend.map((d) => d.tickets)
 
   if (loading) {
     return (
@@ -425,285 +388,306 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
   }
 
   const hasWidgets = WIDGET_CATALOG.some((w) => on(w.id))
+  const RANGES = ['Today', '7d', '30d', 'All']
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Dashboard" subtitle="RMA system overview and analytics" />
+    <div style={{ color: tk.text }}>
+      {/* ── Page header ── */}
+      <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
+        <div>
+          <h1 style={{ margin: 0, fontSize: 25, fontWeight: 750, letterSpacing: -0.5, color: tk.text }}>RMA Operations</h1>
+          <p style={{ margin: '4px 0 0', fontSize: 13.5, color: tk.textMuted }}>System overview &amp; analytics · updated just now</p>
+        </div>
+        <div className="flex gap-2">
+          {RANGES.map((seg) => (
+            <button key={seg} onClick={() => setRange(seg)}
+              style={{
+                padding: '7px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 650,
+                background: range === seg ? tk.accent : tk.surface,
+                color:      range === seg ? '#fff'     : tk.textMuted,
+                border:     `1px solid ${range === seg ? tk.accent : tk.border}`,
+                cursor: 'pointer', transition: 'all .15s',
+              }}>
+              {seg}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {!hasWidgets && (
-        <div className="bg-white rounded-xl border-2 border-dashed border-gray-200 p-14 text-center">
-          <svg
-            className="w-12 h-12 text-gray-300 mx-auto mb-3"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
-            />
-          </svg>
-          <p className="text-gray-600 font-medium">No widgets enabled</p>
-          <p className="text-gray-500 text-sm mt-1">
-            Go to Account Settings → Appearance to enable widgets
-          </p>
+        <div style={{ background: tk.surface, border: `2px dashed ${tk.border}`, borderRadius: 14, padding: '56px 0', textAlign: 'center' }}>
+          <p style={{ color: tk.textMuted, fontWeight: 600, margin: 0 }}>No widgets enabled</p>
+          <p style={{ color: tk.textFaint, fontSize: 13, marginTop: 4 }}>Go to Account Settings → Appearance to enable widgets</p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* ── Ticket KPIs ── */}
+      <div className="grid grid-cols-12 gap-4">
+
+        {/* ── Hero KPI tiles ── */}
         {on('stat_tickets') && (
-          <WidgetCard
-            className="lg:col-span-3"
-            title="Ticket Status"
-            icon={
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-              </svg>
-            }
-          >
-            <div className="flex divide-x divide-gray-100 dark:divide-slate-700 overflow-x-auto">
-              {[
-                { label: 'Open',        value: statusCounts[TICKET_STATUS.OPEN],        color: 'text-blue-600',   navPath: `/rma-tickets?status=${TICKET_STATUS.OPEN}` },
-                { label: 'In Progress', value: statusCounts[TICKET_STATUS.IN_PROGRESS], color: 'text-indigo-600', navPath: `/rma-tickets?status=${TICKET_STATUS.IN_PROGRESS}` },
-                { label: 'Pending',     value: statusCounts[TICKET_STATUS.PENDING],     color: 'text-orange-500', navPath: `/rma-tickets?status=${TICKET_STATUS.PENDING}` },
-                { label: 'On Hold',     value: statusCounts[TICKET_STATUS.ON_HOLD],     color: 'text-yellow-600', navPath: `/rma-tickets?status=${TICKET_STATUS.ON_HOLD}` },
-                { label: 'Completed',   value: statusCounts[TICKET_STATUS.COMPLETED],   color: 'text-teal-600',   navPath: `/rma-tickets?status=${TICKET_STATUS.COMPLETED}` },
-                { label: 'Closed',      value: statusCounts[TICKET_STATUS.CLOSED],      color: 'text-green-600',  navPath: `/rma-tickets?status=${TICKET_STATUS.CLOSED}` },
-                { label: 'Cancelled',   value: statusCounts[TICKET_STATUS.CANCELLED],   color: 'text-gray-400',   navPath: `/rma-tickets?status=${TICKET_STATUS.CANCELLED}` },
-                { label: 'Overdue',     value: overdueList.length,                      color: 'text-red-500',    navPath: '/rma-tickets?overdue=true' },
-              ].map(({ label, value, color, navPath }) => (
-                <button
-                  key={label}
-                  onClick={nav(navPath)}
-                  className="flex-1 min-w-[80px] py-5 px-2 text-center hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors group"
-                >
-                  <div className={`text-2xl font-bold tabular-nums ${color}`}>{value ?? 0}</div>
-                  <div className="text-[11px] text-gray-400 dark:text-slate-400 mt-1 leading-tight group-hover:text-gray-600 dark:group-hover:text-slate-300 whitespace-nowrap">{label}</div>
-                </button>
-              ))}
-            </div>
-          </WidgetCard>
-        )}
-
-        {/* ── Row 2: SLA · Resolution · Overdue ── */}
-        {/* ── SLA Health ── */}
-        {on('sla_health') && (
-          <WidgetCard
-            title="SLA Health"
-            onClick={nav('/rma-tickets?overdue=true')}
-            icon={
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                />
-              </svg>
-            }
-          >
-            <div className="flex justify-center">
-              <CircularGauge
-                percent={slaPercent}
-                color={slaPercent >= 80 ? '#10b981' : slaPercent >= 60 ? '#f59e0b' : '#ef4444'}
-                label="On-time Delivery Rate"
-                sublabel="of tickets"
-              />
-            </div>
-            <p className="text-center text-xs text-gray-500 mt-1">
-              {onScheduleCount} of {trackedCount} tracked tickets on schedule
-            </p>
-          </WidgetCard>
-        )}
-
-        {/* ── Resolution Rate ── */}
-        {on('resolution_rate') && (
-          <WidgetCard
-            title="Resolution Rate"
-            onClick={nav('/rma-tickets?status=Closed')}
-            icon={
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
-                />
-              </svg>
-            }
-          >
-            <div className="flex justify-center">
-              <CircularGauge
-                percent={resolutionPercent}
-                color={
-                  resolutionPercent >= 70
-                    ? '#10b981'
-                    : resolutionPercent >= 40
-                      ? '#f59e0b'
-                      : '#6366f1'
-                }
-                label="Ticket Resolution Rate"
-                sublabel="resolved"
-              />
-            </div>
-            <p className="text-center text-xs text-gray-500 mt-1">
-              {closedTickets} of {totalTickets} tickets resolved or closed
-            </p>
-          </WidgetCard>
-        )}
-
-        {/* ── Overdue Tickets (paired with SLA + Resolution in row 2) ── */}
-        {on('overdue_tickets') && (
-          <WidgetCard
-            title="Overdue Tickets"
-            onClick={nav('/rma-tickets?overdue=true')}
-            icon={
-              <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            }
-          >
-            {overdueList.length === 0 ? (
-              <div className="text-center py-8">
-                <svg className="w-10 h-10 text-green-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-sm text-green-600 font-medium">No overdue tickets!</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100 -mx-2">
-                {overdueList.slice(0, 8).map((t) => (
-                  <div key={t.id} className="flex items-center justify-between py-2 px-2 hover:bg-red-50 rounded-lg">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">{t.rma_number || '—'}</p>
-                      <p className="text-xs text-gray-500 truncate">{t.customer_name || '—'}</p>
-                    </div>
-                    <span className="ml-2 flex-shrink-0 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium">
-                      {daysBetween(t.due_date)}d
+          <>
+            {[
+              { label: 'Total Tickets', value: totalTickets, color: tk.text, spark: sparkWeekly, delta: '+8%', deltaUp: true },
+              { label: 'Active / Open',  value: openActive,   color: tk.accent, spark: [12,14,11,17,15,16,openActive], caption: 'across 4 live states' },
+              { label: 'Overdue',        value: overdueList.length, color: tk.bad, spark: [3,4,5,4,6,6,overdueList.length], caption: 'needs attention today' },
+              { label: 'SLA On-time',    value: `${slaPercent}%`, color: tk.good, spark: [92,93,94,95,95,96,slaPercent], delta: '+2%', deltaUp: true },
+            ].map(({ label, value, color, spark, delta, deltaUp, caption }) => (
+              <div key={label} className="col-span-12 sm:col-span-6 lg:col-span-3"
+                style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', gap: 0 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: tk.textMuted, letterSpacing: 0.1 }}>{label}</span>
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 8 }}>
+                  <span style={{ fontSize: 40, fontWeight: 780, color, letterSpacing: -1.4, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+                  <Sparkline data={spark} color={color} />
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  {delta ? (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: deltaUp ? tk.good : tk.bad, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                      <svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"
+                        style={{ transform: deltaUp ? 'none' : 'rotate(180deg)' }}>
+                        <path d="M4.5 7.5V1.5M4.5 1.5L1.5 4.5M4.5 1.5L7.5 4.5" />
+                      </svg>
+                      {delta}
                     </span>
-                  </div>
-                ))}
+                  ) : (
+                    <span style={{ fontSize: 12, color: tk.textMuted }}>{caption}</span>
+                  )}
+                </div>
               </div>
-            )}
-          </WidgetCard>
+            ))}
+          </>
         )}
 
-        {/* ── Row 3: Recent Tickets (2/3) + Top Issues (1/3) ── */}
-        {on('recent_tickets') && (
-          <WidgetCard
-            className="lg:col-span-2"
-            title="Recent Tickets"
-            onClick={nav('/rma-tickets')}
-            icon={
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            }
-          >
-            {recentTickets.length === 0 ? (
-              <p className="text-center text-gray-500 py-8 text-sm">No tickets yet</p>
-            ) : (
-              <div className="divide-y divide-gray-100 -mx-2">
-                {recentTickets.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between py-2.5 px-2 hover:bg-gray-50 rounded-lg">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">{t.rma_number || '—'}</p>
-                      <p className="text-xs text-gray-500 truncate">{t.customer_name || '—'}</p>
-                    </div>
-                    <div className="ml-3 flex-shrink-0">
-                      <StatusBadge status={t.ticket_status} />
-                    </div>
+        {/* ── Ticket status strip ── */}
+        {on('stat_tickets') && (
+          <div className="col-span-12"
+            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, display: 'flex', overflow: 'hidden' }}>
+            {[
+              { label: 'Open',        value: statusCounts[TICKET_STATUS.OPEN],        navPath: `/rma-tickets?status=${TICKET_STATUS.OPEN}` },
+              { label: 'In Progress', value: statusCounts[TICKET_STATUS.IN_PROGRESS], navPath: `/rma-tickets?status=${TICKET_STATUS.IN_PROGRESS}` },
+              { label: 'Pending',     value: statusCounts[TICKET_STATUS.PENDING],     navPath: `/rma-tickets?status=${TICKET_STATUS.PENDING}` },
+              { label: 'On Hold',     value: statusCounts[TICKET_STATUS.ON_HOLD],     navPath: `/rma-tickets?status=${TICKET_STATUS.ON_HOLD}` },
+              { label: 'Completed',   value: statusCounts[TICKET_STATUS.COMPLETED],   navPath: `/rma-tickets?status=${TICKET_STATUS.COMPLETED}` },
+              { label: 'Closed',      value: statusCounts[TICKET_STATUS.CLOSED],      navPath: `/rma-tickets?status=${TICKET_STATUS.CLOSED}` },
+              { label: 'Cancelled',   value: statusCounts[TICKET_STATUS.CANCELLED],   navPath: `/rma-tickets?status=${TICKET_STATUS.CANCELLED}` },
+              { label: 'Overdue',     value: overdueList.length,                      navPath: '/rma-tickets?overdue=true' },
+            ].map(({ label, value, navPath }, i) => {
+              const color = STATUS_COLOR[label] || '#94a3b8'
+              return (
+                <button key={label} onClick={nav(navPath)}
+                  style={{
+                    flex: 1, minWidth: 72, padding: '16px 8px',
+                    borderLeft: i ? `1px solid ${tk.borderSoft}` : 'none',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    background: 'transparent', cursor: 'pointer', transition: 'background .15s',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = tk.surfaceInset}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 11.5, color: tk.textMuted, fontWeight: 550 }}>{label}</span>
                   </div>
-                ))}
+                  <div style={{ fontSize: 26, fontWeight: 760, color: tk.text, letterSpacing: -0.7, fontVariantNumeric: 'tabular-nums' }}>
+                    {value ?? 0}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {/* ── Section: Performance ── */}
+        {(on('sla_health') || on('resolution_rate') || on('status_distribution') || on('priority_distribution')) && (
+          <SectionLabel tk={tk}>Performance</SectionLabel>
+        )}
+
+        {on('sla_health') && (
+          <div className="col-span-12 sm:col-span-6 lg:col-span-3" onClick={nav('/rma-tickets?overdue=true')}
+            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+            <CardHead title="SLA Health" tk={tk} />
+            <SvgGauge percent={slaPercent} color={slaPercent >= 80 ? tk.good : slaPercent >= 60 ? tk.warn : tk.bad} tk={tk} />
+            <p style={{ margin: '10px 0 0', fontSize: 11.5, color: tk.textMuted, textAlign: 'center' }}>
+              {onScheduleCount}/{trackedCount} on schedule
+            </p>
+          </div>
+        )}
+
+        {on('resolution_rate') && (
+          <div className="col-span-12 sm:col-span-6 lg:col-span-3" onClick={nav(`/rma-tickets?status=${TICKET_STATUS.CLOSED}`)}
+            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+            <CardHead title="Resolution Rate" tk={tk} />
+            <SvgGauge percent={resolutionPercent} color={resolutionPercent >= 70 ? tk.good : resolutionPercent >= 40 ? tk.warn : tk.accent} tk={tk} />
+            <p style={{ margin: '10px 0 0', fontSize: 11.5, color: tk.textMuted, textAlign: 'center' }}>
+              {closedTickets}/{totalTickets} resolved or closed
+            </p>
+          </div>
+        )}
+
+        {on('status_distribution') && (
+          <div className="col-span-12 sm:col-span-6 lg:col-span-3" onClick={nav('/rma-tickets')}
+            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
+            <CardHead title="Status Mix" tk={tk} />
+            {statusDist.length === 0
+              ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', paddingTop: 20 }}>No data</p>
+              : <DonutWithLegend segments={statusDist} tk={tk} />}
+          </div>
+        )}
+
+        {on('priority_distribution') && (
+          <div className="col-span-12 sm:col-span-6 lg:col-span-3" onClick={nav('/rma-tickets')}
+            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
+            <CardHead title="Priority Mix" tk={tk} />
+            {priorityDist.length === 0
+              ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', paddingTop: 20 }}>No data</p>
+              : <DonutWithLegend segments={priorityDist} tk={tk} />}
+          </div>
+        )}
+
+        {/* ── Section: Trends ── */}
+        {(on('weekly_trend') || on('monthly_trend')) && (
+          <SectionLabel tk={tk}>Trends</SectionLabel>
+        )}
+        <Suspense fallback={null}>
+          <DashboardCharts
+            on={on} nav={nav}
+            weeklyTrend={weeklyTrend} monthlyTrend={monthlyTrend}
+            statusDist={statusDist} priorityDist={priorityDist}
+            technicianPerformance={technicianPerformance}
+            chartGridColor={chartGridColor} chartTickStyle={chartTickStyle} chartTooltipStyle={chartTooltipStyle}
+            tk={tk}
+          />
+        </Suspense>
+
+        {/* ── Section: Activity ── */}
+        {(on('recent_tickets') || on('overdue_tickets') || on('top_issues')) && (
+          <SectionLabel tk={tk}>Activity</SectionLabel>
+        )}
+
+        {on('recent_tickets') && (
+          <div className="col-span-12 lg:col-span-5" onClick={nav('/rma-tickets')}
+            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
+            <CardHead title="Recent Tickets" action="View all" tk={tk} />
+            {recentTickets.length === 0
+              ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No tickets yet</p>
+              : recentTickets.map((t, i) => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderTop: i ? `1px solid ${tk.borderSoft}` : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 650, color: tk.text, width: 84, flexShrink: 0 }}>{t.rma_number || '—'}</span>
+                    <span style={{ fontSize: 12.5, color: tk.textMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.customer_name || '—'}</span>
+                  </div>
+                  <StatusPill status={t.ticket_status} />
+                </div>
+              ))}
+          </div>
+        )}
+
+        {on('overdue_tickets') && (
+          <div className="col-span-12 sm:col-span-6 lg:col-span-3" onClick={nav('/rma-tickets?overdue=true')}
+            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
+            <CardHead title="Overdue" action={String(overdueList.length)} tk={tk} />
+            {overdueList.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <svg className="mx-auto mb-2" width="32" height="32" fill="none" stroke={tk.good} strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p style={{ color: tk.good, fontSize: 13, fontWeight: 600, margin: 0 }}>All clear!</p>
               </div>
-            )}
-          </WidgetCard>
+            ) : overdueList.slice(0, 8).map((t, i) => (
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderTop: i ? `1px solid ${tk.borderSoft}` : 'none' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: tk.text }}>{t.rma_number || '—'}</div>
+                  <div style={{ fontSize: 11.5, color: tk.textMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.customer_name || '—'}</div>
+                </div>
+                <span style={{ flexShrink: 0, marginLeft: 8, padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, color: tk.bad, background: tk.bad + '1a' }}>
+                  {daysBetween(t.due_date)}d
+                </span>
+              </div>
+            ))}
+          </div>
         )}
 
         {on('top_issues') && (
-          <WidgetCard
-            title="Top Issues"
-            onClick={nav('/rma-tickets')}
-            icon={
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-              </svg>
-            }
-          >
-            {topIssues.length === 0 ? (
-              <p className="text-center text-gray-500 py-8 text-sm">No issues recorded yet</p>
-            ) : (
-              <div className="space-y-3">
-                {topIssues.map((item, idx) => {
-                  const max = topIssues[0]?.count || 1
-                  return (
-                    <div key={idx} className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-gray-400 w-4 flex-shrink-0">{idx + 1}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <p className="text-xs text-gray-700 truncate">{item.issue}</p>
-                          <span className="ml-2 text-xs font-semibold text-gray-500 flex-shrink-0">{item.count}</span>
-                        </div>
-                        <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-indigo-400 rounded-full" style={{ width: `${(item.count / max) * 100}%` }} />
-                        </div>
+          <div className="col-span-12 sm:col-span-6 lg:col-span-4"
+            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column' }}>
+            <CardHead title="Top Issues" tk={tk} />
+            {topIssues.length === 0
+              ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No issues recorded yet</p>
+              : topIssues.map((item, idx) => {
+                const maxCount = topIssues[0]?.count || 1
+                return (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: idx ? 14 : 0 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: tk.textFaint, width: 14, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{idx + 1}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, gap: 8 }}>
+                        <span style={{ fontSize: 13, color: tk.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.issue}</span>
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: tk.textMuted, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{item.count}</span>
+                      </div>
+                      <div style={{ height: 6, background: tk.track, borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${(item.count / maxCount) * 100}%`, background: tk.accent, borderRadius: 3 }} />
                       </div>
                     </div>
-                  )
-                })}
-              </div>
-            )}
-          </WidgetCard>
+                  </div>
+                )
+              })}
+          </div>
         )}
 
-        {/* ── Inventory Snapshot (row 4 — full width) ── */}
-        {on('stat_inventory') && invStats && (
-          <WidgetCard
-            className="lg:col-span-3"
-            title="Inventory Snapshot"
-            icon={
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-            }
-          >
-            <div className="flex divide-x divide-gray-100 dark:divide-slate-700 overflow-x-auto">
+        {/* ── Section: Team & Inventory ── */}
+        {(on('technician_performance') || on('stat_inventory')) && (
+          <SectionLabel tk={tk}>Team &amp; Inventory</SectionLabel>
+        )}
+
+        {on('technician_performance') && (
+          <div className="col-span-12 lg:col-span-7"
+            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column' }}>
+            <CardHead title="Technician Performance" action="Top 5 by close rate" tk={tk} />
+            {technicianPerformance.length === 0
+              ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', padding: '24px 0' }}>No assigned tickets</p>
+              : (
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', gap: 12, flex: 1, paddingTop: 6 }}>
+                  {technicianPerformance.map((tech) => (
+                    <div key={tech.name} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: tk.text, fontVariantNumeric: 'tabular-nums' }}>{tech.closeRate}%</span>
+                      <div style={{ width: '100%', maxWidth: 46, height: 120, background: tk.surfaceInset, borderRadius: 7, display: 'flex', alignItems: 'flex-end', overflow: 'hidden' }}>
+                        <div style={{ width: '100%', height: `${tech.closeRate}%`, background: `linear-gradient(180deg, ${tk.accent}, ${tk.accent}8c)`, borderRadius: 6 }} />
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: tk.text, lineHeight: 1.3 }}>{tech.name}</div>
+                        <div style={{ fontSize: 11, color: tk.textFaint }}>{tech.closed}/{tech.total} closed</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+          </div>
+        )}
+
+        {on('stat_inventory') && (
+          <div className="col-span-12 sm:col-span-6 lg:col-span-5"
+            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column' }}>
+            <CardHead title="Inventory Snapshot" action={`${invProductCounts.allUnits} units`} tk={tk} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, flex: 1 }}>
               {[
-                { label: 'All Units',    value: invProductCounts.allUnits,    color: 'text-gray-700',   tab: 'by-product'   },
-                { label: 'Received',     value: invProductCounts.received,    color: 'text-sky-600',    tab: 'received'     },
-                { label: 'Under Repair', value: invProductCounts.underRepair, color: 'text-orange-600', tab: 'under-repair' },
-                { label: 'Repaired',     value: invProductCounts.repaired,    color: 'text-teal-600',   tab: 'repaired'     },
-                { label: "Can't Repair", value: invProductCounts.cantRepair,  color: 'text-red-500',    tab: 'cant-repair'  },
-                { label: 'RMA Stock',    value: invProductCounts.rmaStock,    color: 'text-indigo-600', tab: 'rma-stock'    },
+                { label: 'Received',     value: invProductCounts.received,    color: '#0ea5e9', tab: 'received'     },
+                { label: 'Under Repair', value: invProductCounts.underRepair, color: '#f97316', tab: 'under-repair' },
+                { label: 'Repaired',     value: invProductCounts.repaired,    color: '#14b8a6', tab: 'repaired'     },
+                { label: "Can't Repair", value: invProductCounts.cantRepair,  color: '#ef4444', tab: 'cant-repair'  },
+                { label: 'RMA Stock',    value: invProductCounts.rmaStock,    color: '#6366f1', tab: 'rma-stock'    },
               ].map((c) => (
                 <button key={c.label} onClick={() => onNavigate?.(`/inventory?tab=${c.tab}`)}
-                  className="flex-1 min-w-[72px] py-5 px-2 text-center hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors group">
-                  <div className={`text-2xl font-bold tabular-nums ${c.color}`}>{c.value}</div>
-                  <div className="text-[11px] text-gray-400 dark:text-slate-400 mt-1 leading-tight group-hover:text-gray-600 whitespace-nowrap">{c.label}</div>
+                  style={{ background: tk.surfaceInset, borderRadius: 10, padding: '14px 12px', textAlign: 'left', border: 'none', cursor: 'pointer', transition: 'filter .15s' }}
+                  onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(0.95)'}
+                  onMouseLeave={(e) => e.currentTarget.style.filter = 'none'}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 2, background: c.color }} />
+                    <span style={{ fontSize: 11, color: tk.textMuted, fontWeight: 550 }}>{c.label}</span>
+                  </div>
+                  <div style={{ fontSize: 24, fontWeight: 760, color: tk.text, letterSpacing: -0.6, fontVariantNumeric: 'tabular-nums' }}>{c.value}</div>
                 </button>
               ))}
             </div>
-          </WidgetCard>
+          </div>
         )}
 
-        {/* ── Chart widgets (lazy-loaded — Recharts excluded from main bundle) ── */}
-        <Suspense fallback={null}>
-          <DashboardCharts
-            on={on}
-            nav={nav}
-            weeklyTrend={weeklyTrend}
-            monthlyTrend={monthlyTrend}
-            statusDist={statusDist}
-            priorityDist={priorityDist}
-            technicianPerformance={technicianPerformance}
-            chartGridColor={chartGridColor}
-            chartTickStyle={chartTickStyle}
-            chartTooltipStyle={chartTooltipStyle}
-          />
-        </Suspense>
       </div>
     </div>
   )
