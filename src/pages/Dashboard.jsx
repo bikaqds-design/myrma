@@ -452,11 +452,11 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* ── Ticket KPIs ── */}
         {on('stat_tickets') && (
           <WidgetCard
-            className="lg:col-span-2"
+            className="lg:col-span-3"
             title="Ticket Status"
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -488,44 +488,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
           </WidgetCard>
         )}
 
-        {/* ── Inventory Snapshot ── */}
-        {on('stat_inventory') && invStats && (
-          <WidgetCard
-            className="lg:col-span-2"
-            title="Inventory Snapshot"
-            icon={
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                />
-              </svg>
-            }
-          >
-            <div className="flex divide-x divide-gray-100 dark:divide-slate-700 overflow-x-auto">
-              {[
-                { label: 'All Units',    value: invProductCounts.allUnits,    color: 'text-gray-700',   tab: 'by-product'  },
-                { label: 'Received',     value: invProductCounts.received,    color: 'text-sky-600',    tab: 'received'    },
-                { label: 'Under Repair', value: invProductCounts.underRepair, color: 'text-orange-600', tab: 'under-repair'},
-                { label: 'Repaired',     value: invProductCounts.repaired,    color: 'text-teal-600',   tab: 'repaired'    },
-                { label: "Can't Repair", value: invProductCounts.cantRepair,  color: 'text-red-500',    tab: 'cant-repair' },
-                { label: 'RMA Stock',    value: invProductCounts.rmaStock,    color: 'text-indigo-600', tab: 'rma-stock'   },
-              ].map((c) => (
-                <button
-                  key={c.label}
-                  onClick={() => onNavigate?.(`/inventory?tab=${c.tab}`)}
-                  className="flex-1 min-w-[72px] py-5 px-2 text-center hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors group"
-                >
-                  <div className={`text-2xl font-bold tabular-nums ${c.color}`}>{c.value}</div>
-                  <div className="text-[11px] text-gray-400 dark:text-slate-400 mt-1 leading-tight group-hover:text-gray-600 whitespace-nowrap">{c.label}</div>
-                </button>
-              ))}
-            </div>
-          </WidgetCard>
-        )}
-
+        {/* ── Row 2: SLA · Resolution · Overdue ── */}
         {/* ── SLA Health ── */}
         {on('sla_health') && (
           <WidgetCard
@@ -592,19 +555,51 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
           </WidgetCard>
         )}
 
-        {/* ── Recent Tickets ── */}
+        {/* ── Overdue Tickets (paired with SLA + Resolution in row 2) ── */}
+        {on('overdue_tickets') && (
+          <WidgetCard
+            title="Overdue Tickets"
+            onClick={nav('/rma-tickets?overdue=true')}
+            icon={
+              <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+          >
+            {overdueList.length === 0 ? (
+              <div className="text-center py-8">
+                <svg className="w-10 h-10 text-green-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm text-green-600 font-medium">No overdue tickets!</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100 -mx-2">
+                {overdueList.slice(0, 8).map((t) => (
+                  <div key={t.id} className="flex items-center justify-between py-2 px-2 hover:bg-red-50 rounded-lg">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 truncate">{t.rma_number || '—'}</p>
+                      <p className="text-xs text-gray-500 truncate">{t.customer_name || '—'}</p>
+                    </div>
+                    <span className="ml-2 flex-shrink-0 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                      {daysBetween(t.due_date)}d
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </WidgetCard>
+        )}
+
+        {/* ── Row 3: Recent Tickets (2/3) + Top Issues (1/3) ── */}
         {on('recent_tickets') && (
           <WidgetCard
+            className="lg:col-span-2"
             title="Recent Tickets"
             onClick={nav('/rma-tickets')}
             icon={
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             }
           >
@@ -613,14 +608,9 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
             ) : (
               <div className="divide-y divide-gray-100 -mx-2">
                 {recentTickets.map((t) => (
-                  <div
-                    key={t.id}
-                    className="flex items-center justify-between py-2.5 px-2 hover:bg-gray-50 rounded-lg"
-                  >
+                  <div key={t.id} className="flex items-center justify-between py-2.5 px-2 hover:bg-gray-50 rounded-lg">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {t.ticket_number || `#${String(t.id).slice(0, 8)}`}
-                      </p>
+                      <p className="text-sm font-medium text-gray-900 truncate">{t.rma_number || '—'}</p>
                       <p className="text-xs text-gray-500 truncate">{t.customer_name || '—'}</p>
                     </div>
                     <div className="ml-3 flex-shrink-0">
@@ -633,64 +623,69 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
           </WidgetCard>
         )}
 
-        {/* ── Overdue Tickets ── */}
-        {on('overdue_tickets') && (
+        {on('top_issues') && (
           <WidgetCard
-            title="Overdue Tickets"
-            onClick={nav('/rma-tickets?overdue=true')}
+            title="Top Issues"
+            onClick={nav('/rma-tickets')}
             icon={
-              <svg
-                className="w-5 h-5 text-red-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             }
           >
-            {overdueList.length === 0 ? (
-              <div className="text-center py-8">
-                <svg
-                  className="w-10 h-10 text-green-400 mx-auto mb-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <p className="text-sm text-green-600 font-medium">No overdue tickets!</p>
-              </div>
+            {topIssues.length === 0 ? (
+              <p className="text-center text-gray-500 py-8 text-sm">No issues recorded yet</p>
             ) : (
-              <div className="divide-y divide-gray-100 -mx-2">
-                {overdueList.slice(0, 10).map((t) => (
-                  <div
-                    key={t.id}
-                    className="flex items-center justify-between py-2.5 px-2 hover:bg-red-50 rounded-lg"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {t.ticket_number || `#${String(t.id).slice(0, 8)}`}
-                      </p>
-                      <p className="text-xs text-gray-500 truncate">{t.customer_name || '—'}</p>
+              <div className="space-y-3">
+                {topIssues.map((item, idx) => {
+                  const max = topIssues[0]?.count || 1
+                  return (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-gray-400 w-4 flex-shrink-0">{idx + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <p className="text-xs text-gray-700 truncate">{item.issue}</p>
+                          <span className="ml-2 text-xs font-semibold text-gray-500 flex-shrink-0">{item.count}</span>
+                        </div>
+                        <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-indigo-400 rounded-full" style={{ width: `${(item.count / max) * 100}%` }} />
+                        </div>
+                      </div>
                     </div>
-                    <span className="ml-3 flex-shrink-0 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium">
-                      {daysBetween(t.due_date)}d overdue
-                    </span>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
+          </WidgetCard>
+        )}
+
+        {/* ── Inventory Snapshot (row 4 — full width) ── */}
+        {on('stat_inventory') && invStats && (
+          <WidgetCard
+            className="lg:col-span-3"
+            title="Inventory Snapshot"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+            }
+          >
+            <div className="flex divide-x divide-gray-100 dark:divide-slate-700 overflow-x-auto">
+              {[
+                { label: 'All Units',    value: invProductCounts.allUnits,    color: 'text-gray-700',   tab: 'by-product'   },
+                { label: 'Received',     value: invProductCounts.received,    color: 'text-sky-600',    tab: 'received'     },
+                { label: 'Under Repair', value: invProductCounts.underRepair, color: 'text-orange-600', tab: 'under-repair' },
+                { label: 'Repaired',     value: invProductCounts.repaired,    color: 'text-teal-600',   tab: 'repaired'     },
+                { label: "Can't Repair", value: invProductCounts.cantRepair,  color: 'text-red-500',    tab: 'cant-repair'  },
+                { label: 'RMA Stock',    value: invProductCounts.rmaStock,    color: 'text-indigo-600', tab: 'rma-stock'    },
+              ].map((c) => (
+                <button key={c.label} onClick={() => onNavigate?.(`/inventory?tab=${c.tab}`)}
+                  className="flex-1 min-w-[72px] py-5 px-2 text-center hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors group">
+                  <div className={`text-2xl font-bold tabular-nums ${c.color}`}>{c.value}</div>
+                  <div className="text-[11px] text-gray-400 dark:text-slate-400 mt-1 leading-tight group-hover:text-gray-600 whitespace-nowrap">{c.label}</div>
+                </button>
+              ))}
+            </div>
           </WidgetCard>
         )}
 
@@ -709,56 +704,6 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
             chartTooltipStyle={chartTooltipStyle}
           />
         </Suspense>
-
-        {/* ── Top Issues ── */}
-        {on('top_issues') && (
-          <WidgetCard
-            className="lg:col-span-2"
-            title="Top Issues"
-            onClick={nav('/rma-tickets')}
-            icon={
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                />
-              </svg>
-            }
-          >
-            {topIssues.length === 0 ? (
-              <p className="text-center text-gray-500 py-8 text-sm">No issues recorded yet</p>
-            ) : (
-              <div className="space-y-4">
-                {topIssues.map((item, idx) => {
-                  const max = topIssues[0]?.count || 1
-                  return (
-                    <div key={idx} className="flex items-center gap-3">
-                      <div className="w-7 h-7 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0">
-                        {idx + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-sm text-gray-800 truncate">{item.issue}</p>
-                          <span className="ml-3 text-sm font-semibold text-gray-600 flex-shrink-0">
-                            {item.count}
-                          </span>
-                        </div>
-                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-indigo-500 rounded-full transition-all duration-500"
-                            style={{ width: `${(item.count / max) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </WidgetCard>
-        )}
       </div>
     </div>
   )

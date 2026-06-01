@@ -70,6 +70,7 @@ export default function DashboardCharts({
     <>
       {on('weekly_trend') && (
         <WidgetCard
+          className="lg:col-span-2"
           title="Weekly Trend"
           onClick={nav('/rma-tickets')}
           icon={
@@ -104,6 +105,7 @@ export default function DashboardCharts({
 
       {on('monthly_trend') && (
         <WidgetCard
+          className="lg:col-span-2"
           title="Monthly Trend (30 days)"
           onClick={nav('/rma-tickets')}
           icon={
@@ -220,7 +222,7 @@ export default function DashboardCharts({
 
       {on('technician_performance') && (
         <WidgetCard
-          className="lg:col-span-2"
+          className="lg:col-span-3"
           title="Technician Performance"
           onClick={nav('/rma-tickets')}
           icon={
