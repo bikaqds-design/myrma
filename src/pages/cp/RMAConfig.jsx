@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { MigrationNotice } from './Announcements'
+import { captureException } from '../../lib/sentry'
 
 const DEFAULT_SLA = {
   Low: { response: 72, resolution: 168 },
@@ -48,7 +49,8 @@ export default function RMAConfig({ currentUserEmail }) {
       if (byKey.sla_rules) setSla(byKey.sla_rules)
       if (byKey.auto_assignment_rules) setRules(byKey.auto_assignment_rules)
       if (byKey.default_settings) setSettings(byKey.default_settings)
-    } catch {
+    } catch (err) {
+      captureException(err)
       toast.error('Failed to load config')
     } finally {
       setLoading(false)
@@ -72,6 +74,7 @@ export default function RMAConfig({ currentUserEmail }) {
         )
         .catch(() => {})
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     } finally {
       setSaving(false)
