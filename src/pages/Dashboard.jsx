@@ -288,6 +288,26 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
     return counts
   }, [tickets])
 
+  const invProductCounts = useMemo(() => {
+    const flat = tickets
+      .filter((t) => t.ticket_status !== TICKET_STATUS.CANCELLED)
+      .flatMap((t) => (t.products || []).map((p) => ({ ...p, ts: t.ticket_status })))
+      .filter((p) => {
+        if (p.ts === TICKET_STATUS.COMPLETED)
+          return p.product_status === 'Replacement' || p.product_status === 'Credit Note'
+        return true
+      })
+    const active = (ps) => flat.filter((p) => p.ts !== TICKET_STATUS.COMPLETED && p.product_status === ps).length
+    return {
+      allUnits:   invStats?.total ?? 0,
+      received:   flat.filter((p) => p.ts !== TICKET_STATUS.COMPLETED && (p.product_status === 'Received' || !p.product_status)).length,
+      underRepair: active('Under Repair'),
+      repaired:   active('Repaired'),
+      cantRepair: active("Can't Repair"),
+      rmaStock:   flat.filter((p) => p.product_status === 'Replacement' || p.product_status === 'Credit Note').length,
+    }
+  }, [tickets, invStats])
+
   const { slaPercent, resolutionPercent, trackedCount, onScheduleCount } = useMemo(() => {
     const ticketsWithDue = tickets.filter((t) => t.due_date && t.ticket_status !== TICKET_STATUS.CANCELLED)
     const overdueActive = ticketsWithDue.filter(
@@ -478,16 +498,17 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
           >
             <div className="flex divide-x divide-gray-100 dark:divide-slate-700 overflow-x-auto">
               {[
-                { label: 'Active RMA',           value: invStats.active_rma ?? 0,           color: 'text-blue-600',   tab: 'by-product' },
-                { label: 'Received',             value: invStats.received ?? 0,             color: 'text-sky-600',    tab: 'received' },
-                { label: 'Sent to Mfg',          value: invStats.sent_to_manufacturer ?? 0, color: 'text-purple-600', tab: 'overview' },
-                { label: 'Company Stock',        value: invStats.company_stock ?? 0,        color: 'text-amber-600',  tab: 'rma-stock' },
-                { label: 'Total Units',          value: invStats.total ?? 0,                color: 'text-gray-600',   tab: 'overview' },
+                { label: 'All Units',    value: invProductCounts.allUnits,    color: 'text-gray-700',   tab: 'by-product'  },
+                { label: 'Received',     value: invProductCounts.received,    color: 'text-sky-600',    tab: 'received'    },
+                { label: 'Under Repair', value: invProductCounts.underRepair, color: 'text-orange-600', tab: 'under-repair'},
+                { label: 'Repaired',     value: invProductCounts.repaired,    color: 'text-teal-600',   tab: 'repaired'    },
+                { label: "Can't Repair", value: invProductCounts.cantRepair,  color: 'text-red-500',    tab: 'cant-repair' },
+                { label: 'RMA Stock',    value: invProductCounts.rmaStock,    color: 'text-indigo-600', tab: 'rma-stock'   },
               ].map((c) => (
                 <button
                   key={c.label}
                   onClick={() => onNavigate?.(`/inventory?tab=${c.tab}`)}
-                  className="flex-1 min-w-[80px] py-5 px-2 text-center hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors group"
+                  className="flex-1 min-w-[72px] py-5 px-2 text-center hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors group"
                 >
                   <div className={`text-2xl font-bold tabular-nums ${c.color}`}>{c.value}</div>
                   <div className="text-[11px] text-gray-400 dark:text-slate-400 mt-1 leading-tight group-hover:text-gray-600 whitespace-nowrap">{c.label}</div>
