@@ -17,6 +17,12 @@ import {
 } from './system.js'
 import { inventory, warehouses, parts, ticketParts, timeEntries, invoices } from './inventory.js'
 import { notifications } from './notifications.js'
+import {
+  whatsappTemplates,
+  notificationLogs,
+  notificationSettings,
+  notificationQueue,
+} from './whatsappNotifications.js'
 
 export const db = {
   // Users & roles
@@ -60,4 +66,10 @@ export const db = {
 
   // In-app notifications
   notifications,
+
+  // WhatsApp / messaging
+  whatsappTemplates,
+  notificationLogs,
+  notificationSettings,
+  notificationQueue,
 }

@@ -7,6 +7,10 @@ import { useAppearance } from './contexts/AppearanceContext'
 import { resolvePermissions } from './lib/permissions'
 import { ROLES } from './lib/constants'
 import { safeStorage } from './lib/safeStorage'
+import { registerTicketEventHandlers } from './lib/events/ticketEventHandlers'
+
+// Register notification event handlers once at module load
+registerTicketEventHandlers()
 import NotificationBell from './components/NotificationBell'
 import { Spinner } from './components/ui'
 import { captureException } from './lib/sentry'

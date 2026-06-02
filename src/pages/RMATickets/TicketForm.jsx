@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { db, storage } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { notificationEventBus } from '../../lib/events/NotificationEventBus.js'
 import Modal from '../../components/Modal'
 import { Button } from '../../components/ui'
 import { ROLES } from '../../lib/constants'
@@ -346,6 +347,24 @@ export function TicketForm({
             })
             .catch(() => {})
         }
+
+        // ── WhatsApp notification events ─────────────────────────────────
+        {
+          const updatedPayload = { ...editingTicket, ...ticketData, id: editingTicket.id }
+          const ts = new Date().toISOString()
+          const statusChanged = ticketData.ticket_status !== editingTicket.ticket_status
+          const assigneeChanged = ticketData.assigned_technician !== editingTicket.assigned_technician
+          const isClosed = ['Closed', 'Completed', 'Cancelled'].includes(ticketData.ticket_status)
+
+          if (assigneeChanged) {
+            notificationEventBus.emitAsync({ type: 'ticket.assigned', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })
+          }
+          if (statusChanged && isClosed) {
+            notificationEventBus.emitAsync({ type: 'ticket.closed', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })
+          } else if (statusChanged) {
+            notificationEventBus.emitAsync({ type: 'ticket.updated', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })
+          }
+        }
       } else {
         const newTicket = await db.rmaTickets.create({
           ...ticketData,
@@ -390,6 +409,14 @@ export function TicketForm({
               status: ticketData.ticket_status,
             })
             .catch(() => {})
+          // WhatsApp notification
+          notificationEventBus.emitAsync({
+            type: 'ticket.created',
+            timestamp: new Date().toISOString(),
+            ticketId: newTicket.id,
+            ticket: { ...ticketData, id: newTicket.id, rma_number: rmaNumber },
+            triggeredBy: userEmail,
+          })
         }
         db.userActivity
           .create(

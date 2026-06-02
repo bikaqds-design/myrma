@@ -16,6 +16,10 @@ import DataCleanup from './cp/DataCleanup'
 import Integrations from './cp/Integrations'
 import CustomFields from './cp/CustomFields'
 import PDFLayout from './cp/PDFLayout'
+import WASettings from './cp/WASettings'
+import WATemplates from './cp/WATemplates'
+import WALogs from './cp/WALogs'
+import WATestCenter from './cp/WATestCenter'
 
 // ─── Feature registry ──────────────────────────────────────────────────────
 
@@ -235,6 +239,57 @@ const GROUPS = [
     ],
   },
   {
+    id: 'messaging',
+    label: 'WhatsApp & Messaging',
+    color: 'teal',
+    features: [
+      {
+        id: 'wa-settings',
+        label: 'Notification Settings',
+        desc: 'Enable providers, per-event toggles, retry and rate-limit config',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+        ),
+      },
+      {
+        id: 'wa-templates',
+        label: 'Message Templates',
+        desc: 'Create, edit and preview WhatsApp message templates with variables',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3v-3z" />
+          </svg>
+        ),
+      },
+      {
+        id: 'wa-logs',
+        label: 'Notification Logs',
+        desc: 'View sent/failed messages, delivery status, retry failed notifications',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+        ),
+      },
+      {
+        id: 'wa-test',
+        label: 'Test Center',
+        desc: 'Send test messages, simulate events, run the queue worker manually',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
     id: 'data',
     label: 'Data & System',
     color: 'amber',
@@ -324,6 +379,13 @@ const COLOR_MAP = {
     icon: 'bg-rose-100 text-rose-600',
     label: 'text-rose-900',
     hover: 'hover:border-rose-300 hover:bg-rose-50/80',
+  },
+  teal: {
+    bg: 'bg-teal-50',
+    border: 'border-teal-100',
+    icon: 'bg-teal-100 text-teal-600',
+    label: 'text-teal-900',
+    hover: 'hover:border-teal-300 hover:bg-teal-50/80',
   },
 }
 
@@ -431,6 +493,10 @@ export default function ControlPanel({ currentUserRole, currentUserEmail }) {
       {section === 'sla' && <SLAPolicies currentUserEmail={currentUserEmail} />}
       {section === 'automation' && <AutomationRules currentUserEmail={currentUserEmail} />}
       {section === 'webhooks' && <WebhooksConfig currentUserEmail={currentUserEmail} />}
+      {section === 'wa-settings' && <WASettings currentUserEmail={currentUserEmail} />}
+      {section === 'wa-templates' && <WATemplates currentUserEmail={currentUserEmail} />}
+      {section === 'wa-logs' && <WALogs currentUserEmail={currentUserEmail} />}
+      {section === 'wa-test' && <WATestCenter currentUserEmail={currentUserEmail} />}
     </div>
   )
 }
