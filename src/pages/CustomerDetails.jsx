@@ -49,6 +49,24 @@ export default function CustomerDetails({
   const [editingNote, setEditingNote] = useState(null)
   const [editNoteText, setEditNoteText] = useState('')
   const [savingNote, setSavingNote] = useState(false)
+  const [drawerTicket, setDrawerTicket] = useState(null)   // ticket shown in the RMA detail drawer
+  const [drawerComments, setDrawerComments] = useState([])
+  const [drawerCommentsLoading, setDrawerCommentsLoading] = useState(false)
+
+  const openTicketDrawer = async (ticket) => {
+    setDrawerTicket(ticket)
+    setDrawerComments([])
+    setDrawerCommentsLoading(true)
+    try {
+      const result = await db.ticketComments.list(ticket.id)
+      const comments = result?.data ?? result ?? []
+      setDrawerComments(Array.isArray(comments) ? comments : [])
+    } catch {
+      setDrawerComments([])
+    } finally {
+      setDrawerCommentsLoading(false)
+    }
+  }
 
   const isSuperAdmin = currentUserRole === ROLES.SUPER_ADMIN
   const canDo = (action) => {
@@ -849,69 +867,40 @@ export default function CustomerDetails({
                   <table className="w-full">
                     <thead className="bg-gray-50 border-y border-gray-200">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          RMA Number
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Status
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Priority
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Issue
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Created
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Action
-                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">RMA Number</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Issue</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {tickets.map((ticket) => (
-                        <tr key={ticket.id} className="hover:bg-gray-50">
+                        <tr
+                          key={ticket.id}
+                          className="hover:bg-indigo-50 cursor-pointer transition-colors"
+                          onClick={() => openTicketDrawer(ticket)}
+                        >
                           <td className="px-4 py-3">
-                            <span className="font-mono text-sm font-medium text-indigo-600">
+                            <span className="font-mono text-sm font-semibold text-indigo-600 hover:underline">
                               {ticket.rma_number || ticket.id?.slice(0, 8)}
                             </span>
                           </td>
+                          <td className="px-4 py-3">{getTicketStatusBadge(ticket.ticket_status)}</td>
                           <td className="px-4 py-3">
-                            {getTicketStatusBadge(ticket.ticket_status)}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={`px-2 py-1 text-xs rounded-full font-medium ${
-                                ticket.priority === 'High'
-                                  ? 'bg-red-100 text-red-800'
-                                  : ticket.priority === 'Medium'
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : ticket.priority === 'Critical'
-                                      ? 'bg-red-200 text-red-900'
-                                      : 'bg-gray-100 text-gray-800'
-                              }`}
-                            >
+                            <span className={`px-2 py-1 text-xs rounded-full font-medium ${
+                              ticket.priority === 'Critical' ? 'bg-red-200 text-red-900'
+                              : ticket.priority === 'High' ? 'bg-red-100 text-red-800'
+                              : ticket.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-gray-100 text-gray-800'
+                            }`}>
                               {ticket.priority || 'Low'}
                             </span>
                           </td>
-                          <td
-                            className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate"
-                            title={ticket.general_description || ''}
-                          >
+                          <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate" title={ticket.general_description || ''}>
                             {ticket.general_description || '—'}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-500">
-                            {formatDate(ticket.created_date)}
-                          </td>
-                          <td className="px-4 py-3">
-                            <button
-                              onClick={() => onNavigateToTicket(ticket.id)}
-                              className="text-indigo-600 hover:text-indigo-900 text-sm font-medium hover:underline"
-                            >
-                              View →
-                            </button>
-                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{formatDate(ticket.created_date)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1111,6 +1100,19 @@ export default function CustomerDetails({
         onConfirm={confirmDialog.onConfirm}
         onCancel={closeConfirm}
       />
+
+      {/* ── RMA Ticket Detail Drawer ── */}
+      {drawerTicket && (
+        <TicketDetailDrawer
+          ticket={drawerTicket}
+          comments={drawerComments}
+          commentsLoading={drawerCommentsLoading}
+          formatDate={formatDate}
+          formatDateTime={formatDateTime}
+          getTicketStatusBadge={getTicketStatusBadge}
+          onClose={() => setDrawerTicket(null)}
+        />
+      )}
     </div>
   )
 }
@@ -1123,6 +1125,146 @@ function DetailRow({ icon, label, value }) {
         <p className="text-xs font-medium text-gray-500">{label}</p>
         <div className="text-sm text-gray-900">
           {value || <span className="text-gray-500">—</span>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Ticket Detail Drawer (read-only, opens from RMA History tab) ─────────────
+function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, formatDateTime, getTicketStatusBadge, onClose }) {
+  const products = ticket.products || []
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      {/* Backdrop */}
+      <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Panel */}
+      <div className="w-full max-w-lg bg-white dark:bg-[#121823] shadow-2xl flex flex-col h-full overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-[#212a38] flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="font-mono text-base font-bold text-indigo-600 dark:text-[#a5b4fc] truncate">
+              {ticket.rma_number}
+            </span>
+            {getTicketStatusBadge(ticket.ticket_status)}
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1a2230] transition-colors flex-shrink-0 ml-3"
+          >
+            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+          {/* Key details grid */}
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">Priority</p>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                ticket.priority === 'Critical' ? 'bg-red-200 text-red-900'
+                : ticket.priority === 'High' ? 'bg-red-100 text-red-800'
+                : ticket.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800'
+                : 'bg-gray-100 text-gray-700'
+              }`}>{ticket.priority || 'Low'}</span>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">Assigned To</p>
+              <p className="font-medium text-gray-800 dark:text-[#e8ebf0] truncate">{ticket.assigned_technician || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">Created</p>
+              <p className="font-medium text-gray-800 dark:text-[#e8ebf0]">{formatDate(ticket.created_date)}</p>
+            </div>
+            {ticket.due_date && (
+              <div>
+                <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">Due Date</p>
+                <p className="font-medium text-gray-800 dark:text-[#e8ebf0]">{formatDate(ticket.due_date)}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Description */}
+          {ticket.general_description && (
+            <div>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-2">Issue Description</p>
+              <p className="text-sm text-gray-700 dark:text-[#e8ebf0] bg-gray-50 dark:bg-[#0f1520] rounded-lg p-3 leading-relaxed whitespace-pre-wrap">
+                {ticket.general_description}
+              </p>
+            </div>
+          )}
+
+          {/* Products */}
+          {products.length > 0 && (
+            <div>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-3">
+                Items ({products.length})
+              </p>
+              <div className="space-y-2">
+                {products.map((p, i) => (
+                  <div key={i} className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-[#0f1520] rounded-lg border border-gray-100 dark:border-[#212a38]">
+                    <div className="w-8 h-8 bg-indigo-100 dark:bg-[#1a2230] rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-indigo-600 dark:text-[#a5b4fc]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 dark:text-[#e8ebf0]">{p.product_name || `Item ${i + 1}`}</p>
+                      {p.serial_number && <p className="text-xs text-gray-500 dark:text-[#9aa4b2] font-mono mt-0.5">S/N: {p.serial_number}</p>}
+                      {p.issue_description && <p className="text-xs text-gray-600 dark:text-[#9aa4b2] mt-1">{p.issue_description}</p>}
+                      {p.product_status && (
+                        <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full font-medium bg-blue-100 text-blue-700">
+                          {p.product_status}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Comments */}
+          <div>
+            <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-3">
+              Comments {!commentsLoading && `(${comments.length})`}
+            </p>
+            {commentsLoading ? (
+              <div className="flex justify-center py-6">
+                <div className="animate-spin w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full" />
+              </div>
+            ) : comments.length === 0 ? (
+              <p className="text-sm text-gray-400 dark:text-[#4a5568] text-center py-4">No comments yet</p>
+            ) : (
+              <div className="space-y-3">
+                {comments.map((c) => {
+                  const isTeam = !c.is_customer_comment
+                  const name = c.author_name || c.user_email || (isTeam ? 'Team' : 'Customer')
+                  return (
+                    <div key={c.id} className={`flex gap-3 p-3 rounded-xl border text-sm ${isTeam ? 'bg-indigo-50 dark:bg-[#1a2230] border-indigo-100 dark:border-[#212a38]' : 'bg-gray-50 dark:bg-[#0f1520] border-gray-100 dark:border-[#212a38]'}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 ${isTeam ? 'bg-indigo-500' : 'bg-gray-400'}`}>
+                        {name[0]?.toUpperCase() || '?'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="font-semibold text-gray-900 dark:text-[#e8ebf0] text-xs">{name}</span>
+                          {isTeam && <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-700 rounded-full">Staff</span>}
+                          <span className="text-xs text-gray-400 dark:text-[#4a5568] ml-auto">{formatDateTime(c.created_date)}</span>
+                        </div>
+                        <p className="text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap leading-relaxed">{c.comment_text}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
