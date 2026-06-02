@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -29,10 +29,24 @@ const DEFAULT_SETTINGS = {
   rate_limit: { messages_per_minute: 60, messages_per_day: 1000 },
 }
 
+function mergeWithDefaults(overrides) {
+  const out = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) // deep clone
+  for (const [k, v] of Object.entries(overrides ?? {})) {
+    if (v === null || v === undefined) continue
+    if (typeof v === 'object' && !Array.isArray(v) && out[k] && typeof out[k] === 'object') {
+      out[k] = { ...out[k], ...v }
+    } else {
+      out[k] = v
+    }
+  }
+  return out
+}
+
 export default function WASettings({ currentUserEmail }) {
   const qc = useQueryClient()
   const [saving, setSaving] = useState(false)
-  const [local, setLocal] = useState(null)
+  const [form, setForm] = useState(DEFAULT_SETTINGS)
+  const [initialized, setInitialized] = useState(false)
 
   const { data: raw, isLoading } = useQuery({
     queryKey: ['notification-settings'],
@@ -40,39 +54,25 @@ export default function WASettings({ currentUserEmail }) {
       const result = await db.notificationSettings.getAll()
       return result?.data ?? {}
     },
-    onSuccess: (data) => {
-      if (!local) setLocal(merge(DEFAULT_SETTINGS, data))
-    },
   })
 
-  // Merge DB values over defaults on first load
-  if (!local && raw) {
-    const merged = merge(DEFAULT_SETTINGS, raw)
-    setLocal(merged)
-  }
-
-  const settings = local ?? DEFAULT_SETTINGS
-
-  function merge(defaults, overrides) {
-    const out = { ...defaults }
-    for (const [k, v] of Object.entries(overrides)) {
-      if (v === null || v === undefined) continue
-      if (typeof v === 'object' && !Array.isArray(v) && typeof out[k] === 'object') {
-        out[k] = { ...out[k], ...v }
-      } else {
-        out[k] = v
-      }
+  // Initialise form from DB data exactly once
+  useEffect(() => {
+    if (raw && !initialized) {
+      setForm(mergeWithDefaults(raw))
+      setInitialized(true)
     }
-    return out
-  }
+  }, [raw, initialized])
+
+  const settings = form
 
   function set(path, value) {
-    setLocal((prev) => {
-      const next = { ...prev }
+    setForm((prev) => {
+      const next = JSON.parse(JSON.stringify(prev)) // deep clone to avoid mutation
       const parts = path.split('.')
       let cur = next
       for (let i = 0; i < parts.length - 1; i++) {
-        cur[parts[i]] = { ...cur[parts[i]] }
+        if (!cur[parts[i]] || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {}
         cur = cur[parts[i]]
       }
       cur[parts[parts.length - 1]] = value
@@ -92,6 +92,7 @@ export default function WASettings({ currentUserEmail }) {
         retry_config:        settings.retry_config,
         rate_limit:          settings.rate_limit,
       }, currentUserEmail)
+      setInitialized(false) // allow useEffect to re-sync from fresh query data
       qc.invalidateQueries({ queryKey: ['notification-settings'] })
       toast.success('Notification settings saved')
     } catch (err) {
@@ -101,7 +102,7 @@ export default function WASettings({ currentUserEmail }) {
     }
   }
 
-  if (isLoading && !local) return <div className="flex justify-center py-12"><Spinner /></div>
+  if (isLoading && !initialized) return <div className="flex justify-center py-12"><Spinner /></div>
 
   return (
     <div className="max-w-3xl space-y-6">
