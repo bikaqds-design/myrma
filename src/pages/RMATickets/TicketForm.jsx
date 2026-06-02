@@ -59,6 +59,7 @@ export function TicketForm({
     }
     return {
       customer_name: '',
+      customer_id: '',
       priority: 'Medium',
       ticket_status: 'Open',
       assigned_technician: userEmail || '',
@@ -222,6 +223,7 @@ export function TicketForm({
 
       const ticketData = {
         customer_name: formData.customer_name,
+        customer_id: formData.customer_id || null,
         priority: formData.priority,
         ticket_status: formData.ticket_status,
         assigned_technician: formData.assigned_technician,
@@ -513,7 +515,7 @@ export function TicketForm({
                                 onMouseDown={(e) => {
                                   e.preventDefault()
                                   setCustomerSearch(displayName)
-                                  setFormData({ ...formData, customer_name: displayName })
+                                  setFormData({ ...formData, customer_name: displayName, customer_id: c.id })
                                   setShowCustomerDropdown(false)
                                 }}
                                 className="w-full h-full px-4 text-left hover:bg-indigo-50 border-b border-gray-100 flex flex-col justify-center"

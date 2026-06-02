@@ -81,14 +81,49 @@ export const customers = {
       .in('id', ids)
     if (error) throw error
   },
-  async getRelatedTickets(customerId) {
-    const { data, error } = await supabase
-      .from('rma_tickets')
-      .select('*')
-      .eq('customer_id', customerId)
-      .order('created_date', { ascending: false })
-    if (error) throw error
-    return data || []
+  async getRelatedTickets(customerId, customerNames = []) {
+    // Tickets may be linked by UUID FK (customer_id) OR by name string (customer_name).
+    // Historically tickets only stored customer_name, so we query both to find all matches.
+    try {
+      const cols =
+        'id, rma_number, customer_name, customer_id, ticket_status, priority, general_description, created_date, due_date, products, assigned_technician'
+
+      const queries = [
+        supabase
+          .from('rma_tickets')
+          .select(cols)
+          .eq('customer_id', customerId)
+          .order('created_date', { ascending: false }),
+      ]
+
+      const uniqueNames = [...new Set(customerNames.filter(Boolean))]
+      if (uniqueNames.length > 0) {
+        queries.push(
+          supabase
+            .from('rma_tickets')
+            .select(cols)
+            .in('customer_name', uniqueNames)
+            .order('created_date', { ascending: false })
+        )
+      }
+
+      const results = await Promise.all(queries)
+      const seen = new Set()
+      const merged = []
+      for (const { data, error } of results) {
+        if (error) throw error
+        for (const ticket of data || []) {
+          if (!seen.has(ticket.id)) {
+            seen.add(ticket.id)
+            merged.push(ticket)
+          }
+        }
+      }
+      return merged.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
+    } catch (err) {
+      if (err?.code === '42P01') return []
+      throw err
+    }
   },
   async uploadPhoto(file, customerId) {
     const fileExt = file.name.split('.').pop()

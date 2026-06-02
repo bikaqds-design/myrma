@@ -22,11 +22,17 @@ export default function CustomerDetails({
   const { data: customerPageData, isLoading: loading } = useQuery({
     queryKey: ['customer-details', customerId],
     queryFn: async () => {
-      const [customerData, ticketsData, notesData] = await Promise.all([
+      // Fetch customer + notes in parallel first, then tickets using both
+      // customer_id FK and customer_name string so legacy tickets are found too.
+      const [customerData, notesData] = await Promise.all([
         db.customers.get(customerId),
-        db.customers.getRelatedTickets(customerId),
         db.customerNotes.list(customerId),
       ])
+      const displayNames = [
+        customerData?.company_name,
+        customerData?.contact_person,
+      ].filter(Boolean)
+      const ticketsData = await db.customers.getRelatedTickets(customerId, displayNames)
       return { customerData, ticketsData, notesData }
     },
     enabled: !!customerId,
