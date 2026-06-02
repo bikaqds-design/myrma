@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { db, storage } from '../api/supabaseClient'
+import { db, storage, branding as brandingAPI } from '../api/supabaseClient'
+import QRCode from 'qrcode'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { CardSkeleton } from '../components/Skeleton'
@@ -1132,90 +1133,245 @@ function DetailRow({ icon, label, value }) {
 }
 
 // ── Ticket Detail Drawer (read-only, opens from RMA History tab) ─────────────
-function exportTicketPDF(ticket, comments, formatDate, formatDateTime) {
-  const esc = (v) =>
-    String(v ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c])
+async function exportTicketPDF(ticket) {
+  const esc = (s) =>
+    String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
 
-  const products = ticket.products || []
-  const productRows = products
+  let qrCodeUrl = ''
+  try {
+    qrCodeUrl = await QRCode.toDataURL(ticket.rma_number)
+  } catch {}
+
+  const PDF_DEFAULT = {
+    paperSize: 'A4',
+    orientation: 'portrait',
+    font: 'Arial, sans-serif',
+    fontSize: 11,
+    primaryColor: '#4F46E5',
+    headerStyle: 'colored',
+    showLogo: false,
+    logoPosition: 'right',
+    showCompanyName: true,
+    showRmaNumber: true,
+    showDate: true,
+    sections: {
+      ticketInfo: true,
+      generalDescription: true,
+      products: true,
+      accessories: true,
+      attachments: true,
+      signatureLine: false,
+    },
+    sectionOrder: [
+      'ticketInfo',
+      'generalDescription',
+      'products',
+      'accessories',
+      'attachments',
+      'signatureLine',
+    ],
+    footerText: '',
+    showGeneratedDate: true,
+    showWatermark: false,
+  }
+  let pdfCfg = PDF_DEFAULT
+  let brandingData = {}
+  try {
+    const [cfgResult, brd] = await Promise.all([db.rmaConfig.getAll(), brandingAPI.getBranding()])
+    if (!cfgResult.missing) {
+      const row = cfgResult.data.find((r) => r.config_key === 'pdf_layout')
+      if (row?.config_value) {
+        const val = typeof row.config_value === 'string' ? JSON.parse(row.config_value) : row.config_value
+        pdfCfg = {
+          ...PDF_DEFAULT,
+          ...val,
+          sections: { ...PDF_DEFAULT.sections, ...(val.sections || {}) },
+          sectionOrder: val.sectionOrder?.length ? val.sectionOrder : PDF_DEFAULT.sectionOrder,
+        }
+      }
+    }
+    if (brd) brandingData = brd
+  } catch {}
+
+  const color = pdfCfg.primaryColor || '#4F46E5'
+  const font = pdfCfg.font || 'Arial, sans-serif'
+  const fontSize = pdfCfg.fontSize || 11
+  const sec = pdfCfg.sections || PDF_DEFAULT.sections
+  const companyName = brandingData.company_name || 'myRMA'
+  const logoUrl = pdfCfg.showLogo ? brandingData.logo_url || null : null
+
+  const fmtPdf = (d) =>
+    d
+      ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+      : 'N/A'
+  const fmtTS = (d) => {
+    if (!d) return 'N/A'
+    const dt = new Date(d)
+    return (
+      dt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) +
+      ' at ' +
+      dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    )
+  }
+
+  const productsHtml = (ticket.products || [])
     .map(
       (p, i) => `
-    <tr style="border-bottom:1px solid #e5e7eb">
-      <td style="padding:8px 12px">${esc(p.product_name || `Item ${i + 1}`)}</td>
-      <td style="padding:8px 12px">${esc(p.serial_number || '—')}</td>
-      <td style="padding:8px 12px">${esc(p.issue_description || '—')}</td>
-      <td style="padding:8px 12px">${esc(p.product_status || '—')}</td>
-    </tr>`
-    )
-    .join('')
-
-  const commentRows = comments
-    .map(
-      (c) => {
-        const isTeam = !c.is_customer_comment
-        const name = c.author_name || c.user_email || (isTeam ? 'Team' : 'Customer')
-        return `
-    <div style="margin-bottom:12px;padding:10px 12px;border-radius:8px;background:${isTeam ? '#eef2ff' : '#f9fafb'};border:1px solid ${isTeam ? '#c7d2fe' : '#e5e7eb'}">
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-        <span style="font-weight:600;font-size:12px;color:#374151">${esc(name)}${isTeam ? ' <span style="font-size:10px;background:#e0e7ff;color:#4338ca;padding:1px 6px;border-radius:999px;margin-left:4px">Staff</span>' : ''}</span>
-        <span style="font-size:11px;color:#9ca3af">${esc(formatDateTime(c.created_date))}</span>
-      </div>
-      <p style="margin:0;font-size:13px;color:#374151;white-space:pre-wrap">${esc(c.comment_text)}</p>
+    <div style="border:1px solid #E5E7EB;border-radius:6px;padding:12px;margin-bottom:12px">
+      <h4 style="margin:0 0 8px;font-size:${fontSize + 1}px;color:#1F2937">Product ${i + 1}: ${esc(p.product_name) || '—'}</h4>
+      <table style="width:100%;font-size:${fontSize}px;border-collapse:collapse">
+        <tr><td style="color:#6B7280;padding:3px 8px;width:40%">Serial Number</td><td style="font-family:monospace"><strong>${esc(p.serial_number) || '—'}</strong></td></tr>
+        <tr><td style="color:#6B7280;padding:3px 8px">Product Status</td><td><strong>${esc(p.product_status) || '—'}</strong></td></tr>
+        <tr><td style="color:#6B7280;padding:3px 8px">Warranty Status</td><td><strong>${esc(p.warranty_status) || '—'}</strong></td></tr>
+        <tr><td colspan="2" style="padding:6px 8px 0"><strong>Issue:</strong> ${esc(p.issue_description) || '—'}</td></tr>
+      </table>
     </div>`
-      }
     )
     .join('')
 
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <title>RMA ${esc(ticket.rma_number)}</title>
-  <style>
-    body{font-family:sans-serif;color:#111;margin:0;padding:32px}
-    h1{font-size:24px;font-weight:700;color:#4f46e5;margin:0}
-    .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;background:#dbeafe;color:#1e40af;margin-left:12px;vertical-align:middle}
-    .meta{display:flex;flex-wrap:wrap;gap:24px;margin:20px 0 28px;padding:16px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb}
-    .meta-item .label{font-size:10px;font-weight:600;text-transform:uppercase;color:#9ca3af;letter-spacing:.05em;margin-bottom:3px}
-    .meta-item .val{font-size:13px;font-weight:600;color:#111827}
-    h2{font-size:13px;font-weight:600;text-transform:uppercase;color:#9ca3af;letter-spacing:.05em;margin:24px 0 8px}
-    .desc{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;font-size:13px;white-space:pre-wrap;color:#374151}
-    table{width:100%;border-collapse:collapse;font-size:13px}
-    thead{background:#f9fafb}
-    th{padding:8px 12px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;border-bottom:2px solid #e5e7eb}
-    @media print{body{padding:16px}}
-  </style>
-</head>
-<body>
-  <h1>RMA Ticket <span class="badge">${esc(ticket.rma_number)}</span></h1>
-  <div class="meta">
-    <div class="meta-item"><div class="label">Status</div><div class="val">${esc(ticket.ticket_status || '—')}</div></div>
-    <div class="meta-item"><div class="label">Priority</div><div class="val">${esc(ticket.priority || 'Low')}</div></div>
-    <div class="meta-item"><div class="label">Assigned To</div><div class="val">${esc(ticket.assigned_technician || '—')}</div></div>
-    <div class="meta-item"><div class="label">Created</div><div class="val">${esc(formatDate(ticket.created_date))}</div></div>
-    ${ticket.due_date ? `<div class="meta-item"><div class="label">Due Date</div><div class="val">${esc(formatDate(ticket.due_date))}</div></div>` : ''}
-    <div class="meta-item"><div class="label">Customer</div><div class="val">${esc(ticket.customer_name || '—')}</div></div>
-  </div>
-  ${ticket.general_description ? `<h2>Issue Description</h2><div class="desc">${esc(ticket.general_description)}</div>` : ''}
-  ${products.length > 0 ? `
-  <h2>Items (${products.length})</h2>
-  <table>
-    <thead><tr><th>Product</th><th>Serial Number</th><th>Issue</th><th>Status</th></tr></thead>
-    <tbody>${productRows}</tbody>
-  </table>` : ''}
-  ${comments.length > 0 ? `<h2>Comments (${comments.length})</h2>${commentRows}` : ''}
-</body>
-</html>`
+  const attachHtml = (ticket.attachments || []).length
+    ? (ticket.attachments || [])
+        .map(
+          (a) =>
+            `<li style="margin-bottom:4px">${esc(a.name)} <span style="color:#9CA3AF">(${(a.size / 1024).toFixed(1)} KB)</span></li>`
+        )
+        .join('')
+    : '<li style="color:#9CA3AF">No attachments</li>'
 
-  const win = window.open('', '_blank')
-  if (!win) {
-    return false
+  const priorityColors = {
+    Critical: '#FEE2E2;color:#991B1B',
+    High: '#FFEDD5;color:#9A3412',
+    Medium: '#DBEAFE;color:#1E40AF',
+    Low: '#F3F4F6;color:#374151',
   }
-  win.document.write(html)
-  win.document.close()
-  win.focus()
-  setTimeout(() => win.print(), 400)
-  return true
+  const pc = priorityColors[ticket.priority] || priorityColors.Medium
+
+  const headerBorderStyle =
+    pdfCfg.headerStyle === 'colored'
+      ? `border-bottom:3px solid ${color};background:linear-gradient(135deg,${color}15 0%,transparent 100%)`
+      : pdfCfg.headerStyle === 'minimal'
+        ? 'border-bottom:1px solid #E5E7EB'
+        : 'border-bottom:none'
+
+  const logoHtml = logoUrl
+    ? `<img src="${logoUrl}" style="max-height:60px;max-width:140px;object-fit:contain" />`
+    : ''
+
+  const headerLeft =
+    pdfCfg.logoPosition === 'left'
+      ? `<div style="display:flex;align-items:center;gap:12px">${logoHtml}<div>${pdfCfg.showCompanyName ? `<div style="font-size:${fontSize + 4}px;font-weight:bold;color:${color}">${esc(companyName)}</div>` : ''}${pdfCfg.showRmaNumber ? `<div style="font-size:${fontSize + 2}px;color:#6B7280;margin-top:2px">${esc(ticket.rma_number)}</div>` : ''}${pdfCfg.showDate ? `<div style="font-size:${fontSize - 1}px;color:#9CA3AF;margin-top:2px">${esc(fmtTS(ticket.created_date))}</div>` : ''}<div style="margin-top:6px"><span class="badge" style="background:#DBEAFE;color:#1E40AF">${esc(ticket.ticket_status)}</span><span class="badge" style="background:${pc}">${esc(ticket.priority)}</span></div></div></div>`
+      : `<div>${pdfCfg.showCompanyName ? `<div style="font-size:${fontSize + 4}px;font-weight:bold;color:${color}">${esc(companyName)}</div>` : ''}${pdfCfg.showRmaNumber ? `<div style="font-size:${fontSize + 2}px;color:#6B7280;margin-top:2px">${esc(ticket.rma_number)}</div>` : ''}${pdfCfg.showDate ? `<div style="font-size:${fontSize - 1}px;color:#9CA3AF;margin-top:2px">${esc(fmtTS(ticket.created_date))}</div>` : ''}<div style="margin-top:6px"><span class="badge" style="background:#DBEAFE;color:#1E40AF">${esc(ticket.ticket_status)}</span><span class="badge" style="background:${pc}">${esc(ticket.priority)}</span></div></div>`
+
+  const headerRight =
+    pdfCfg.logoPosition === 'right'
+      ? `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">${logoHtml}${qrCodeUrl ? `<div style="text-align:center"><img src="${qrCodeUrl}" width="80" height="80"/><div style="font-size:10px;color:#6B7280;margin-top:2px">Scan to view</div></div>` : ''}</div>`
+      : qrCodeUrl
+        ? `<div style="text-align:center"><img src="${qrCodeUrl}" width="80" height="80"/><div style="font-size:10px;color:#6B7280;margin-top:2px">Scan to view</div></div>`
+        : ''
+
+  const watermarkHtml = pdfCfg.showWatermark
+    ? `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);font-size:80px;font-weight:bold;color:${color};opacity:0.05;pointer-events:none;z-index:-1">DRAFT</div>`
+    : ''
+
+  const footerContent = [
+    pdfCfg.showGeneratedDate ? `Generated: ${new Date().toLocaleString()}` : '',
+    pdfCfg.footerText || companyName,
+  ].filter(Boolean)
+
+  const w = window.open('', '_blank')
+  if (!w) {
+    toast.error('Pop-up blocked — allow pop-ups and try again')
+    return
+  }
+  w.document.write(`<!DOCTYPE html><html><head><title>RMA Ticket - ${esc(ticket.rma_number)}</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:${font};font-size:${fontSize}px;color:#1F2937;padding:30px}
+      .header{display:flex;justify-content:space-between;align-items:flex-start;${headerBorderStyle};padding-bottom:20px;margin-bottom:24px}
+      .badge{display:inline-block;padding:3px 10px;border-radius:9999px;font-size:${fontSize - 1}px;font-weight:bold;margin-right:6px;margin-top:6px}
+      .section{margin-bottom:20px}
+      .section-title{font-size:${fontSize - 1}px;text-transform:uppercase;letter-spacing:0.05em;color:${color};border-bottom:2px solid ${color}33;padding-bottom:6px;margin-bottom:12px;font-weight:600}
+      .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+      .info-label{font-size:${fontSize - 2}px;color:#6B7280;margin-bottom:2px}
+      .info-value{font-size:${fontSize}px;font-weight:bold}
+      .desc-box{background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:12px;white-space:pre-wrap}
+      .footer{margin-top:30px;border-top:1px solid #E5E7EB;padding-top:12px;display:flex;justify-content:space-between;color:#9CA3AF;font-size:${fontSize - 2}px}
+      .sig-box{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px}
+      .sig-line{border-top:1px solid #374151;padding-top:6px;font-size:${fontSize - 1}px;color:#6B7280;text-align:center}
+      @media print{body{padding:15px}}
+    </style></head>
+    <body>
+    ${watermarkHtml}
+    <div class="header">
+      ${headerLeft}
+      ${headerRight}
+    </div>
+
+    ${pdfCfg.sectionOrder
+      .map((key) => {
+        if (!sec[key]) return ''
+        if (key === 'ticketInfo')
+          return `
+      <div class="section">
+        <div class="section-title">Ticket Information</div>
+        <div class="grid">
+          <div><div class="info-label">Customer</div><div class="info-value">${esc(ticket.customer_name) || '—'}</div></div>
+          <div><div class="info-label">Assigned To</div><div class="info-value">${esc(ticket.assigned_technician) || 'Unassigned'}</div></div>
+          <div><div class="info-label">Due Date</div><div class="info-value">${esc(fmtPdf(ticket.due_date))}</div></div>
+          <div><div class="info-label">Created</div><div class="info-value">${esc(fmtTS(ticket.created_date))}</div></div>
+          <div><div class="info-label">Created By</div><div class="info-value">${esc(ticket.created_by) || '—'}</div></div>
+        </div>
+      </div>`
+        if (key === 'generalDescription')
+          return ticket.general_description
+            ? `
+      <div class="section">
+        <div class="section-title">General RMA Description</div>
+        <div class="desc-box">${esc(ticket.general_description)}</div>
+      </div>`
+            : ''
+        if (key === 'products')
+          return `
+      <div class="section">
+        <div class="section-title">Products (${(ticket.products || []).length})</div>
+        ${productsHtml || '<p style="color:#9CA3AF">No products listed</p>'}
+      </div>`
+        if (key === 'accessories')
+          return ticket.accessories_received
+            ? `
+      <div class="section">
+        <div class="section-title">Accessories Received</div>
+        <div class="desc-box">${esc(ticket.accessories_received)}</div>
+      </div>`
+            : ''
+        if (key === 'attachments')
+          return `
+      <div class="section">
+        <div class="section-title">Attachments</div>
+        <ul style="padding-left:20px">${attachHtml}</ul>
+      </div>`
+        if (key === 'signatureLine')
+          return `
+      <div class="sig-box">
+        <div><div class="sig-line">Customer Signature</div></div>
+        <div><div class="sig-line">Technician Signature</div></div>
+      </div>`
+        return ''
+      })
+      .join('')}
+
+    <div class="footer">
+      <span>${esc(footerContent[0]) || ''}</span>
+      <span>${esc(footerContent[1]) || ''}</span>
+    </div>
+    <script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>
+    </body></html>`)
+  w.document.close()
 }
 
 function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, formatDateTime, getTicketStatusBadge, onClose }) {
@@ -1238,10 +1394,7 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 ml-3">
             <button
-              onClick={() => {
-                const ok = exportTicketPDF(ticket, comments, formatDate, formatDateTime)
-                if (!ok) toast.error('Pop-up blocked — allow pop-ups and try again')
-              }}
+              onClick={() => exportTicketPDF(ticket)}
               title="Export PDF"
               aria-label="Export PDF"
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-[#9aa4b2] bg-gray-100 dark:bg-[#1a2230] hover:bg-gray-200 dark:hover:bg-[#212a38] rounded-lg transition-colors"
