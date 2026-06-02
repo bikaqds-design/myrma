@@ -508,7 +508,7 @@ function SendAlert({ currentUserEmail }) {
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
             Alert Type
           </p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {ALERT_TYPES.map((t) => (
               <button
                 key={t.value}
@@ -560,7 +560,7 @@ function SendAlert({ currentUserEmail }) {
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
             Send To
           </p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {ALERT_TARGETS.map((t) => (
               <button
                 key={t.value}
@@ -694,7 +694,7 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
     <div className="space-y-8">
       {/* Quick stats */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {statCards.map((c) => (
             <div key={c.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
               <div className={`text-2xl font-bold ${colorStat[c.color].split(' ')[1]}`}>

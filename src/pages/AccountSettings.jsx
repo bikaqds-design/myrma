@@ -433,7 +433,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
 
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-8">
-        <nav className="-mb-px flex gap-6">
+        <nav className="-mb-px flex gap-4 sm:gap-6 overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab}

@@ -318,7 +318,7 @@ export default function ProductDetails({
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="border-b border-gray-200">
-          <nav className="flex gap-8 px-6">
+          <nav className="flex gap-4 sm:gap-8 px-6">
             <button
               onClick={() => setActiveTab('details')}
               className={
@@ -442,7 +442,7 @@ export default function ProductDetails({
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Brand <span className="text-red-500">*</span>
@@ -494,7 +494,7 @@ export default function ProductDetails({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Subcategory
@@ -535,7 +535,7 @@ export default function ProductDetails({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Status
@@ -599,7 +599,7 @@ export default function ProductDetails({
                   </>
                 ) : (
                   <>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <DetailField label="Brand" value={product.brand?.brand_name || '-'} />
                       <DetailField
                         label="Category"
@@ -672,7 +672,7 @@ export default function ProductDetails({
                       </div>
                     )}
 
-                    <div className="pt-4 border-t border-gray-200 grid grid-cols-2 gap-4">
+                    <div className="pt-4 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <DetailField label="Created" value={formatDate(product.created_date)} />
                       <DetailField label="Created By" value={product.created_by || '-'} />
                       <DetailField label="Last Updated" value={formatDate(product.updated_date)} />

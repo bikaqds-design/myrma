@@ -604,7 +604,7 @@ export default function PartsInventory({
 
       {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <div className="relative flex-1 min-w-0 max-w-sm">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}

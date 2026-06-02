@@ -448,7 +448,7 @@ export default function CustomerDetails({
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="border-b border-gray-200">
-          <nav className="flex gap-6 px-6">
+          <nav className="flex gap-4 sm:gap-6 px-6">
             {[
               { key: 'profile', label: 'Profile', icon: '👤' },
               { key: 'rma', label: `RMA History (${tickets.length})`, icon: '🎫' },
@@ -482,7 +482,7 @@ export default function CustomerDetails({
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
                       Customer Type & Status
                     </h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className={labelClass}>
                           Customer Type <span className="text-red-500">*</span>
@@ -522,7 +522,7 @@ export default function CustomerDetails({
                       <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
                         Company Information
                       </h3>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className={labelClass}>
                             Company Name <span className="text-red-500">*</span>
@@ -565,7 +565,7 @@ export default function CustomerDetails({
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
                       Contact Information
                     </h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className={labelClass}>
                           Contact Person <span className="text-red-500">*</span>

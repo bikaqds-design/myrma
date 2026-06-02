@@ -30,22 +30,22 @@ export function UsersTab({
       <table className="w-full">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
               User
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
               Status
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
               Role
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
               Change Role
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
               Permissions
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
               Actions
             </th>
           </tr>
@@ -53,7 +53,7 @@ export function UsersTab({
         <tbody className="divide-y divide-gray-200">
           {users.map((user) => (
             <tr key={user.id} className="hover:bg-gray-50">
-              <td className="px-6 py-4 whitespace-nowrap">
+              <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center">
                   <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-semibold">
                     {user.user_email.charAt(0).toUpperCase()}
@@ -68,13 +68,13 @@ export function UsersTab({
                   </div>
                 </div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap">
+              <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                 <StatusBadge status={user.status || 'active'} />
               </td>
-              <td className="px-6 py-4 whitespace-nowrap">
+              <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                 <RoleBadge role={user.role} />
               </td>
-              <td className="px-6 py-4 whitespace-nowrap">
+              <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                 {user.user_email === currentUserEmail ? (
                   <span className="text-sm text-gray-500 italic">current user</span>
                 ) : (
@@ -91,7 +91,7 @@ export function UsersTab({
                   </select>
                 )}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap">
+              <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                 {canManagePermissions ? (
                   <button
                     onClick={() => onEditPermissions(user)}
@@ -118,7 +118,7 @@ export function UsersTab({
                   </span>
                 )}
               </td>
-              <td className="px-6 py-4 relative action-menu">
+              <td className="px-3 sm:px-6 py-4 relative action-menu">
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
@@ -133,7 +133,7 @@ export function UsersTab({
                   </svg>
                 </button>
                 {openMenuId === user.id && (
-                  <div className="absolute right-0 top-9 z-30 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
+                  <div className="absolute right-0 top-9 z-30 w-40 sm:w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
                     <button
                       onClick={() => {
                         onUserControl(user)

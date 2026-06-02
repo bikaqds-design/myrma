@@ -313,7 +313,7 @@ function InvoicePanel({
           </div>
 
           {/* Customer */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
               <input
@@ -420,7 +420,7 @@ function InvoicePanel({
           </div>
 
           {/* Labour */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Labour Hours</label>
               <input
@@ -448,7 +448,7 @@ function InvoicePanel({
           </div>
 
           {/* Discount + Tax */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Discount %</label>
               <input
@@ -790,7 +790,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
       </PageHeader>
 
       {/* Status filter tabs */}
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit overflow-x-auto">
         {STATUS_TABS.map((tab) => (
           <button
             key={tab}

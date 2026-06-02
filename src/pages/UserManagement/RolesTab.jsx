@@ -350,7 +350,7 @@ export function PermissionMatrix({ permissions, onToggle }) {
             {entries.length === 0 ? (
               <p className="text-sm text-gray-400 italic">No permissions defined</p>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                 {entries.map(([perm, enabled]) => (
                   <label key={perm} className="flex items-center gap-2 cursor-pointer select-none">
                     <input

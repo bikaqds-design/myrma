@@ -232,7 +232,7 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
   return (
     <div className="space-y-5">
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <KpiCard
           label="Total Tickets"
           value={total}
@@ -482,7 +482,7 @@ function CustomersTab({ customers, tickets, formatDate }) {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <KpiCard
           label="Active Customers"
           value={totalActive}
@@ -634,7 +634,7 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <KpiCard
           label="Active Technicians"
           value={activeTechs}
@@ -804,7 +804,7 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <KpiCard
           label="Total Invoiced"
           value={fmt$(totalInvoiced)}

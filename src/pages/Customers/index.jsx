@@ -873,7 +873,7 @@ export default function Customers({
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
         <div className="p-5 space-y-4">
           {/* Toolbar */}
-          <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 flex-1">
               <div className="relative flex-1 max-w-md">
                 <input
@@ -1067,7 +1067,7 @@ export default function Customers({
 
           {/* Filters */}
           {showFilters && (
-            <div id="customer-filters-panel" className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg flex-wrap">
+            <div id="customer-filters-panel" className="flex flex-wrap gap-3 items-center p-4 bg-gray-50 rounded-lg">
               <div className="flex items-center gap-2">
                 <label className="text-sm font-medium text-gray-700">Status:</label>
                 <select
@@ -1131,7 +1131,7 @@ export default function Customers({
           )}
 
           {/* Count + per-page */}
-          <div className="flex items-center justify-between text-sm text-gray-600">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-gray-600">
             <span>
               Showing {filteredCustomers.length === 0 ? 0 : startIndex + 1}–{endIndex} of{' '}
               {filteredCustomers.length} customers
@@ -1377,7 +1377,7 @@ export default function Customers({
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-200">
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}

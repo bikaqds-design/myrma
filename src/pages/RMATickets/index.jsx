@@ -928,7 +928,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
       {/* Filter panel */}
       {showFilters && (
-        <div id="ticket-filters-panel" className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg flex-wrap">
+        <div id="ticket-filters-panel" className="flex flex-wrap gap-3 items-center p-4 bg-gray-50 rounded-lg">
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-gray-700">Status:</label>
             <select
@@ -1004,7 +1004,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   }}
                   onFocus={() => setShowFilterCustomerDropdown(true)}
                   placeholder={filterCustomer || 'All customers...'}
-                  className={`w-52 px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 ${filterCustomer ? 'border-indigo-400 bg-indigo-50 pr-7' : 'border-gray-300'}`}
+                  className={`w-full sm:w-52 px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 ${filterCustomer ? 'border-indigo-400 bg-indigo-50 pr-7' : 'border-gray-300'}`}
                 />
                 {filterCustomer && (
                   <button
@@ -1482,7 +1482,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
       {/* Pagination footer */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-200">
           <div className="flex items-center gap-2">
             <button
               onClick={() => handlePageChange(currentPage - 1)}

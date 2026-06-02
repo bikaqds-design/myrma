@@ -203,7 +203,7 @@ export default function TechCalendar({
   }
 
   return (
-    <div className="p-6 max-w-full">
+    <div className="p-3 sm:p-6 max-w-full">
       {/* Header */}
       <PageHeader
         title="Tech Calendar"
@@ -276,7 +276,8 @@ export default function TechCalendar({
       </div>
 
       {/* Calendar Grid */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
+      <div className="overflow-x-auto -mx-3 sm:mx-0">
+      <div className="min-w-[640px] bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
         {/* Day header row */}
         <div className="grid grid-cols-7 border-b border-gray-200">
           {days.map((d, i) => {
@@ -343,6 +344,7 @@ export default function TechCalendar({
             )
           })}
         </div>
+      </div>
       </div>
 
       {/* Unscheduled Panel */}
