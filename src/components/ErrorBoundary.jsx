@@ -101,7 +101,7 @@ export default class ErrorBoundary extends React.Component {
 
           {isDev && (
             <details className="mt-2 mb-2 text-xs">
-              <summary className="cursor-pointer text-gray-600 dark:text-slate-300 font-medium mb-2">
+              <summary className="cursor-pointer text-gray-600 dark:text-[#9aa4b2] font-medium mb-2">
                 Full stack (dev only)
               </summary>
               <pre className="bg-gray-50 dark:bg-[#0b0f17] border border-gray-200 dark:border-[#212a38] rounded-lg p-3 overflow-auto text-red-700 dark:text-red-300 whitespace-pre-wrap break-all">
