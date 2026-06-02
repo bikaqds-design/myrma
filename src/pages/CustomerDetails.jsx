@@ -1132,6 +1132,92 @@ function DetailRow({ icon, label, value }) {
 }
 
 // ── Ticket Detail Drawer (read-only, opens from RMA History tab) ─────────────
+function exportTicketPDF(ticket, comments, formatDate, formatDateTime) {
+  const esc = (v) =>
+    String(v ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c])
+
+  const products = ticket.products || []
+  const productRows = products
+    .map(
+      (p, i) => `
+    <tr style="border-bottom:1px solid #e5e7eb">
+      <td style="padding:8px 12px">${esc(p.product_name || `Item ${i + 1}`)}</td>
+      <td style="padding:8px 12px">${esc(p.serial_number || '—')}</td>
+      <td style="padding:8px 12px">${esc(p.issue_description || '—')}</td>
+      <td style="padding:8px 12px">${esc(p.product_status || '—')}</td>
+    </tr>`
+    )
+    .join('')
+
+  const commentRows = comments
+    .map(
+      (c) => {
+        const isTeam = !c.is_customer_comment
+        const name = c.author_name || c.user_email || (isTeam ? 'Team' : 'Customer')
+        return `
+    <div style="margin-bottom:12px;padding:10px 12px;border-radius:8px;background:${isTeam ? '#eef2ff' : '#f9fafb'};border:1px solid ${isTeam ? '#c7d2fe' : '#e5e7eb'}">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-weight:600;font-size:12px;color:#374151">${esc(name)}${isTeam ? ' <span style="font-size:10px;background:#e0e7ff;color:#4338ca;padding:1px 6px;border-radius:999px;margin-left:4px">Staff</span>' : ''}</span>
+        <span style="font-size:11px;color:#9ca3af">${esc(formatDateTime(c.created_date))}</span>
+      </div>
+      <p style="margin:0;font-size:13px;color:#374151;white-space:pre-wrap">${esc(c.comment_text)}</p>
+    </div>`
+      }
+    )
+    .join('')
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>RMA ${esc(ticket.rma_number)}</title>
+  <style>
+    body{font-family:sans-serif;color:#111;margin:0;padding:32px}
+    h1{font-size:24px;font-weight:700;color:#4f46e5;margin:0}
+    .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;background:#dbeafe;color:#1e40af;margin-left:12px;vertical-align:middle}
+    .meta{display:flex;flex-wrap:wrap;gap:24px;margin:20px 0 28px;padding:16px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb}
+    .meta-item .label{font-size:10px;font-weight:600;text-transform:uppercase;color:#9ca3af;letter-spacing:.05em;margin-bottom:3px}
+    .meta-item .val{font-size:13px;font-weight:600;color:#111827}
+    h2{font-size:13px;font-weight:600;text-transform:uppercase;color:#9ca3af;letter-spacing:.05em;margin:24px 0 8px}
+    .desc{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;font-size:13px;white-space:pre-wrap;color:#374151}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    thead{background:#f9fafb}
+    th{padding:8px 12px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;color:#6b7280;border-bottom:2px solid #e5e7eb}
+    @media print{body{padding:16px}}
+  </style>
+</head>
+<body>
+  <h1>RMA Ticket <span class="badge">${esc(ticket.rma_number)}</span></h1>
+  <div class="meta">
+    <div class="meta-item"><div class="label">Status</div><div class="val">${esc(ticket.ticket_status || '—')}</div></div>
+    <div class="meta-item"><div class="label">Priority</div><div class="val">${esc(ticket.priority || 'Low')}</div></div>
+    <div class="meta-item"><div class="label">Assigned To</div><div class="val">${esc(ticket.assigned_technician || '—')}</div></div>
+    <div class="meta-item"><div class="label">Created</div><div class="val">${esc(formatDate(ticket.created_date))}</div></div>
+    ${ticket.due_date ? `<div class="meta-item"><div class="label">Due Date</div><div class="val">${esc(formatDate(ticket.due_date))}</div></div>` : ''}
+    <div class="meta-item"><div class="label">Customer</div><div class="val">${esc(ticket.customer_name || '—')}</div></div>
+  </div>
+  ${ticket.general_description ? `<h2>Issue Description</h2><div class="desc">${esc(ticket.general_description)}</div>` : ''}
+  ${products.length > 0 ? `
+  <h2>Items (${products.length})</h2>
+  <table>
+    <thead><tr><th>Product</th><th>Serial Number</th><th>Issue</th><th>Status</th></tr></thead>
+    <tbody>${productRows}</tbody>
+  </table>` : ''}
+  ${comments.length > 0 ? `<h2>Comments (${comments.length})</h2>${commentRows}` : ''}
+</body>
+</html>`
+
+  const win = window.open('', '_blank')
+  if (!win) {
+    return false
+  }
+  win.document.write(html)
+  win.document.close()
+  win.focus()
+  setTimeout(() => win.print(), 400)
+  return true
+}
+
 function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, formatDateTime, getTicketStatusBadge, onClose }) {
   const products = ticket.products || []
 
@@ -1150,15 +1236,31 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
             </span>
             {getTicketStatusBadge(ticket.ticket_status)}
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1a2230] transition-colors flex-shrink-0 ml-3"
-          >
-            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+            <button
+              onClick={() => {
+                const ok = exportTicketPDF(ticket, comments, formatDate, formatDateTime)
+                if (!ok) toast.error('Pop-up blocked — allow pop-ups and try again')
+              }}
+              title="Export PDF"
+              aria-label="Export PDF"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-[#9aa4b2] bg-gray-100 dark:bg-[#1a2230] hover:bg-gray-200 dark:hover:bg-[#212a38] rounded-lg transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              PDF
+            </button>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1a2230] transition-colors"
+            >
+              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Scrollable body */}
