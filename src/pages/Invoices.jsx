@@ -338,84 +338,57 @@ function InvoicePanel({
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-gray-700">Line Items</label>
-              <button
-                onClick={addLine}
-                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-              >
+              <button onClick={addLine} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
                 + Add Row
               </button>
             </div>
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <table className="w-full text-xs">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-2 py-2 text-left text-gray-500 font-medium">Description</th>
-                    <th className="px-2 py-2 text-right text-gray-500 font-medium w-14">Qty</th>
-                    <th className="px-2 py-2 text-right text-gray-500 font-medium w-20">Unit $</th>
-                    <th className="px-2 py-2 text-right text-gray-500 font-medium w-20">Total</th>
-                    <th className="w-8" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {form.lineItems.map((li, idx) => (
-                    <tr key={idx} className="border-t border-gray-100">
-                      <td className="px-2 py-1.5">
-                        <input
-                          type="text"
-                          value={li.description}
-                          onChange={(e) => updateLine(idx, 'description', e.target.value)}
-                          placeholder="Item description"
-                          className="w-full bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-400 rounded px-1 py-0.5"
-                        />
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <input
-                          type="number"
-                          min="0"
-                          value={li.qty}
-                          onChange={(e) => updateLine(idx, 'qty', e.target.value)}
-                          className="w-full bg-transparent text-right focus:outline-none focus:ring-1 focus:ring-indigo-400 rounded px-1 py-0.5"
-                        />
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={li.unitPrice}
-                          onChange={(e) => updateLine(idx, 'unitPrice', e.target.value)}
-                          className="w-full bg-transparent text-right focus:outline-none focus:ring-1 focus:ring-indigo-400 rounded px-1 py-0.5"
-                        />
-                      </td>
-                      <td className="px-2 py-1.5 text-right text-gray-600">
+            <div className="space-y-2">
+              {form.lineItems.map((li, idx) => (
+                <div key={idx} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                  {/* Description full width */}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={li.description}
+                      onChange={(e) => updateLine(idx, 'description', e.target.value)}
+                      placeholder="Item description"
+                      className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                    />
+                    {form.lineItems.length > 1 && (
+                      <button onClick={() => removeLine(idx)} className="text-gray-300 hover:text-red-500 flex-shrink-0">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  {/* Qty | Unit $ | Line total */}
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <label className="block text-gray-400 mb-1">Qty</label>
+                      <input
+                        type="number" min="0" value={li.qty}
+                        onChange={(e) => updateLine(idx, 'qty', e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-400 mb-1">Unit $</label>
+                      <input
+                        type="number" min="0" step="0.01" value={li.unitPrice}
+                        onChange={(e) => updateLine(idx, 'unitPrice', e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-400 mb-1">Total</label>
+                      <div className="px-2 py-1.5 bg-gray-50 rounded text-sm text-right font-medium text-gray-700">
                         ${fmt((parseFloat(li.qty) || 0) * (parseFloat(li.unitPrice) || 0))}
-                      </td>
-                      <td className="px-1 py-1.5">
-                        {form.lineItems.length > 1 && (
-                          <button
-                            onClick={() => removeLine(idx)}
-                            className="text-gray-300 hover:text-red-500 transition-colors"
-                          >
-                            <svg
-                              className="w-3.5 h-3.5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M6 18L18 6M6 6l12 12"
-                              />
-                            </svg>
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -740,7 +713,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
   }
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       {/* Migration banner */}
       {tableMissing && (
         <div className="mb-6 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm">
@@ -790,7 +763,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
       </PageHeader>
 
       {/* Status filter tabs */}
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit overflow-x-auto">
+      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-full sm:w-fit overflow-x-auto">
         {STATUS_TABS.map((tab) => (
           <button
             key={tab}
@@ -815,7 +788,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
         ))}
       </div>
 
-      {/* Table */}
+      {/* Empty state */}
       {visibleInvoices.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
           <EmptyState
@@ -830,74 +803,77 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
           />
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Invoice #
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Type
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Customer
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Ticket
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Total
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Due Date
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Created
-                  </th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {visibleInvoices.map((inv) => (
-                  <InvoiceRow
-                    key={inv.id}
-                    inv={inv}
-                    isAdmin={isAdmin}
-                    isManager={isManager}
-                    isTech={isTech}
-                    formatDate={formatDate}
-                    onEdit={() => openEdit(inv)}
-                    onExportPDF={() => exportPDF(inv)}
-                    onMarkSent={() =>
-                      openConfirm('Mark as Sent', `Mark ${inv.invoice_number} as Sent?`, () => {
-                        closeConfirm()
-                        updateStatus(inv, 'sent')
-                      })
-                    }
-                    onMarkPaid={() =>
-                      openConfirm('Mark as Paid', `Mark ${inv.invoice_number} as Paid?`, () => {
-                        closeConfirm()
-                        updateStatus(inv, 'paid')
-                      })
-                    }
-                    onVoid={() =>
-                      openConfirm('Void Invoice', `Void ${inv.invoice_number}?`, () => {
-                        closeConfirm()
-                        updateStatus(inv, 'void')
-                      })
-                    }
-                    onDelete={isAdmin ? () => handleDelete(inv) : undefined}
-                  />
-                ))}
-              </tbody>
-            </table>
+        <>
+          {/* ── Mobile card list (hidden on sm+) ── */}
+          <div className="sm:hidden space-y-3">
+            {visibleInvoices.map((inv) => (
+              <InvoiceCard
+                key={inv.id}
+                inv={inv}
+                isAdmin={isAdmin}
+                isManager={isManager}
+                formatDate={formatDate}
+                onEdit={() => openEdit(inv)}
+                onExportPDF={() => exportPDF(inv)}
+                onMarkSent={() =>
+                  openConfirm('Mark as Sent', `Mark ${inv.invoice_number} as Sent?`, () => { closeConfirm(); updateStatus(inv, 'sent') })
+                }
+                onMarkPaid={() =>
+                  openConfirm('Mark as Paid', `Mark ${inv.invoice_number} as Paid?`, () => { closeConfirm(); updateStatus(inv, 'paid') })
+                }
+                onVoid={() =>
+                  openConfirm('Void Invoice', `Void ${inv.invoice_number}?`, () => { closeConfirm(); updateStatus(inv, 'void') })
+                }
+                onDelete={isAdmin ? () => handleDelete(inv) : undefined}
+              />
+            ))}
           </div>
-        </div>
+
+          {/* ── Desktop table (hidden on mobile) ── */}
+          <div className="hidden sm:block bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Invoice #</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Customer</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ticket</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Due Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Created</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {visibleInvoices.map((inv) => (
+                    <InvoiceRow
+                      key={inv.id}
+                      inv={inv}
+                      isAdmin={isAdmin}
+                      isManager={isManager}
+                      isTech={isTech}
+                      formatDate={formatDate}
+                      onEdit={() => openEdit(inv)}
+                      onExportPDF={() => exportPDF(inv)}
+                      onMarkSent={() =>
+                        openConfirm('Mark as Sent', `Mark ${inv.invoice_number} as Sent?`, () => { closeConfirm(); updateStatus(inv, 'sent') })
+                      }
+                      onMarkPaid={() =>
+                        openConfirm('Mark as Paid', `Mark ${inv.invoice_number} as Paid?`, () => { closeConfirm(); updateStatus(inv, 'paid') })
+                      }
+                      onVoid={() =>
+                        openConfirm('Void Invoice', `Void ${inv.invoice_number}?`, () => { closeConfirm(); updateStatus(inv, 'void') })
+                      }
+                      onDelete={isAdmin ? () => handleDelete(inv) : undefined}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Slide-over panel */}
@@ -924,6 +900,94 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
         onConfirm={confirmDialog.onConfirm}
         onCancel={closeConfirm}
       />
+    </div>
+  )
+}
+
+// ─── Invoice Card (mobile) ────────────────────────────────────────────────────
+
+function InvoiceCard({ inv, isAdmin, isManager, formatDate, onEdit, onExportPDF, onMarkSent, onMarkPaid, onVoid, onDelete }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const canChangeStatus = isManager
+  const canEdit = isManager
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+      {/* Top row: invoice number + total */}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="min-w-0">
+          <span className="font-mono text-sm font-semibold text-indigo-700">{inv.invoice_number}</span>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_CLS[inv.type] || 'bg-gray-100 text-gray-600'}`}>
+              {inv.type === 'quote' ? 'Quote' : 'Invoice'}
+            </span>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_CLS[inv.status] || 'bg-gray-100 text-gray-600'}`}>
+              {inv.status ? inv.status.charAt(0).toUpperCase() + inv.status.slice(1) : 'Draft'}
+            </span>
+          </div>
+        </div>
+        <span className="text-lg font-bold text-gray-900 tabular-nums flex-shrink-0">${fmt(inv.total)}</span>
+      </div>
+
+      {/* Customer */}
+      <p className="text-sm font-medium text-gray-800 truncate">{inv.customer_name || '—'}</p>
+      {inv.customer_email && <p className="text-xs text-gray-500 truncate">{inv.customer_email}</p>}
+
+      {/* Meta row */}
+      <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 flex-wrap">
+        {inv.rma_number_ref && <span className="font-mono">{inv.rma_number_ref}</span>}
+        {inv.due_date && <span>Due {formatDate(inv.due_date)}</span>}
+        {inv.created_at && <span>Created {formatDate(inv.created_at)}</span>}
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+        <button
+          onClick={onExportPDF}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          PDF
+        </button>
+
+        {(canEdit || canChangeStatus || isAdmin) && (
+          <div className="relative flex-1">
+            <button
+              onClick={() => setMenuOpen((o) => !o)}
+              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Actions
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 bottom-full mb-1 w-44 bg-white border border-gray-200 rounded-xl shadow-xl z-40 py-1 text-sm">
+                  {canEdit && (
+                    <button onClick={() => { setMenuOpen(false); onEdit() }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700">Edit</button>
+                  )}
+                  {canChangeStatus && inv.status === 'draft' && (
+                    <button onClick={() => { setMenuOpen(false); onMarkSent() }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700">Mark Sent</button>
+                  )}
+                  {canChangeStatus && inv.status === 'sent' && (
+                    <button onClick={() => { setMenuOpen(false); onMarkPaid() }} className="w-full text-left px-4 py-2 hover:bg-gray-50 text-gray-700">Mark Paid</button>
+                  )}
+                  {canChangeStatus && inv.status !== 'void' && inv.status !== 'paid' && (
+                    <button onClick={() => { setMenuOpen(false); onVoid() }} className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600">Void</button>
+                  )}
+                  {isAdmin && onDelete && (
+                    <button onClick={() => { setMenuOpen(false); onDelete() }} className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 border-t border-gray-100">Delete</button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
