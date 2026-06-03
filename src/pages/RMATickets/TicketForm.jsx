@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { db, storage } from '../../api/supabaseClient'
+import { db, storage, notifications } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { notificationEventBus } from '../../lib/events/NotificationEventBus.js'
 import Modal from '../../components/Modal'
@@ -46,6 +46,8 @@ export function TicketForm({
       const prods = editingTicket.products?.length ? editingTicket.products : [{ ...EMPTY_PRODUCT }]
       return {
         customer_name: editingTicket.customer_name || '',
+        customer_id: editingTicket.customer_id || '',
+        customer_email: editingTicket.customer_email || '',
         priority: editingTicket.priority || 'Medium',
         ticket_status: editingTicket.ticket_status || 'Open',
         assigned_technician: editingTicket.assigned_technician || '',
@@ -62,6 +64,7 @@ export function TicketForm({
     return {
       customer_name: '',
       customer_id: '',
+      customer_email: '',
       priority: 'Medium',
       ticket_status: 'Open',
       assigned_technician: userEmail || '',
@@ -229,9 +232,18 @@ export function TicketForm({
         } catch {}
       }
 
+      // Resolve customer email: formData first, then fall back to customers prop lookup
+      // (covers existing tickets that have customer_id but customer_email was never stored)
+      const resolvedCustomerEmail =
+        formData.customer_email ||
+        customers.find((c) => c.id === formData.customer_id)?.email ||
+        editingTicket?.customer_email ||
+        null
+
       const ticketData = {
         customer_name: formData.customer_name,
         customer_id: formData.customer_id || null,
+        customer_email: resolvedCustomerEmail,
         priority: formData.priority,
         ticket_status: formData.ticket_status,
         assigned_technician: formData.assigned_technician,
@@ -355,7 +367,7 @@ export function TicketForm({
             .catch(() => {})
         }
 
-        // ── WhatsApp notification events ─────────────────────────────────
+        // ── WhatsApp + email notification events ─────────────────────────
         {
           const updatedPayload = { ...editingTicket, ...ticketData, id: editingTicket.id }
           const ts = new Date().toISOString()
@@ -370,6 +382,16 @@ export function TicketForm({
             notificationEventBus.emitAsync({ type: 'ticket.closed', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })
           } else if (statusChanged) {
             notificationEventBus.emitAsync({ type: 'ticket.updated', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })
+          }
+          // Email customer on any status change
+          if (statusChanged && resolvedCustomerEmail) {
+            notifications.sendEmail(resolvedCustomerEmail, 'ticket_status_changed', {
+              customer_name: ticketData.customer_name,
+              rma_number: editingTicket.rma_number,
+              old_status: editingTicket.ticket_status,
+              new_status: ticketData.ticket_status,
+              priority: ticketData.priority,
+            }).catch(() => {})
           }
         }
       } else {
@@ -432,6 +454,16 @@ export function TicketForm({
             },
             triggeredBy: userEmail,
           })
+          // Email notification to customer
+          if (resolvedCustomerEmail) {
+            notifications.sendEmail(resolvedCustomerEmail, 'ticket_created', {
+              customer_name: ticketData.customer_name,
+              rma_number: newTicket.rma_number || rmaNumber,
+              priority: ticketData.priority,
+              status: ticketData.ticket_status,
+              issue_description: ticketData.general_description || '',
+            }).catch(() => {})
+          }
         }
         db.userActivity
           .create(
@@ -557,7 +589,7 @@ export function TicketForm({
                                 onMouseDown={(e) => {
                                   e.preventDefault()
                                   setCustomerSearch(displayName)
-                                  setFormData({ ...formData, customer_name: displayName, customer_id: c.id })
+                                  setFormData({ ...formData, customer_name: displayName, customer_id: c.id, customer_email: c.email || '' })
                                   setShowCustomerDropdown(false)
                                 }}
                                 className="w-full h-full px-4 text-left hover:bg-indigo-50 border-b border-gray-100 flex flex-col justify-center"
