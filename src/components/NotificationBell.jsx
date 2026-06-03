@@ -69,6 +69,12 @@ export default function NotificationBell({
   const isRead = (n) => readSets.get(n.id)?.has(normalizedEmail) || false
   const unread = notifications.filter((n) => !isRead(n)).length
 
+  // The text label + trailing count badge only belong in the full sidebar mode.
+  // In icon-only (top bar) and compact-sidebar modes we show just the bell with
+  // a single corner badge — otherwise the corner badge AND the trailing badge
+  // both render, producing a duplicate "1 … 1".
+  const showLabel = !sidebarCompact && !iconOnly
+
   // Close on outside click
   useEffect(() => {
     if (!open) return
@@ -292,7 +298,7 @@ export default function NotificationBell({
               d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
             />
           </svg>
-          {unread > 0 && (
+          {unread > 0 && !showLabel && (
             <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60" />
               <span className="relative min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
@@ -301,8 +307,8 @@ export default function NotificationBell({
             </span>
           )}
         </div>
-        {!sidebarCompact && <span className="flex-1 text-left">Notifications</span>}
-        {!sidebarCompact && unread > 0 && (
+        {showLabel && <span className="flex-1 text-left">Notifications</span>}
+        {showLabel && unread > 0 && (
           <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full leading-none">
             {unread > 99 ? '99+' : unread}
           </span>
