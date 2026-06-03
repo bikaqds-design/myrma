@@ -143,7 +143,7 @@ npm run dev
 npm run dev                    # Vite dev server (hot reload, port 5173)
 npm run build                  # Production build → dist/
 npm run preview                # Preview production build locally
-npm test                       # Vitest unit tests (74 tests, ~1s)
+npm test                       # Vitest unit tests (80 tests, ~1s)
 npm run test:watch             # Vitest in watch mode
 npm run test:coverage          # Coverage report (HTML + text)
 npm run lint                   # ESLint check
@@ -305,7 +305,7 @@ Roles are stored in the `user_roles` table. Default permission sets are defined 
 npm test
 ```
 
-74 unit tests across 3 suites in `src/lib/`:
+80 unit tests across 3 suites in `src/lib/`:
 
 | Suite | Coverage |
 |-------|---------|
@@ -322,7 +322,7 @@ Tests run in under 1 second via Vitest with jsdom environment.
 GitHub Actions runs automatically on every push and PR to `main`:
 
 ```
-1. npm test              → all 74 tests must pass
+1. npm test              → all 80 tests must pass
 2. npm run lint:ci       → zero ESLint warnings allowed
 3. npm run build         → production build must succeed
 ```

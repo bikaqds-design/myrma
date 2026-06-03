@@ -377,11 +377,7 @@ text-3xl+   — 30px+ — Reserved for dashboard KPI numbers
 
 ### 4.4 Dark Mode
 
-#### Current implementation (CSS override approach)
-
-Dark mode is currently implemented via CSS `!important` rules in `src/styles/appearance.css`. When the user enables dark mode, `AppearanceContext` adds a `.dark-mode` class to `<html>`. The `appearance.css` file then applies global overrides for backgrounds, text colors, and borders using that class.
-
-This means most existing page components do **not** have `dark:` Tailwind classes — the CSS overrides handle them globally. This approach works but has gaps (inline `style={{}}` values, dynamic color injections, and chart colors are not covered by the overrides).
+Dark mode is implemented via Tailwind's `class` strategy. `AppearanceContext` toggles the `dark` class on `<html>` (`html.classList.toggle('dark', !!s.darkMode)`) when the user's preference is active. All `dark:` prefix classes in the codebase activate automatically.
 
 **Accessing dark mode state in a component:**
 
@@ -389,38 +385,45 @@ This means most existing page components do **not** have `dark:` Tailwind classe
 import { useAppearance } from '../contexts/AppearanceContext'
 
 const { darkMode } = useAppearance()
-// darkMode is a boolean; use it to conditionally apply values
-// that CSS overrides cannot reach (e.g., inline styles, chart colors)
+// Use the darkMode boolean for values Tailwind dark: cannot reach:
+// inline styles, SVG fill/stroke, Recharts axis/tick colors
 ```
 
-#### Preferred approach for new code
+**MUST: Use the Direction B design token color pairs** for all new UI:
 
-New components added to the codebase SHOULD use Tailwind `dark:` prefix classes rather than relying on the CSS override. The `dark` variant is enabled via Tailwind's `class` strategy (class `dark` on `<html>`) which `AppearanceContext` applies automatically when dark mode is active.
+| Token | Light | Dark | Use |
+|-------|-------|------|-----|
+| Page background | `bg-[#f4f6f9]` | `dark:bg-[#0b0f17]` | Body / page fill |
+| Surface (card) | `bg-white` | `dark:bg-[#121823]` | Cards, panels, sidebar |
+| Surface inset | `bg-[#f8f9fb]` | `dark:bg-[#0f1520]` | Inset sections, inputs |
+| Border | `border-[#e6e9ef]` | `dark:border-[#212a38]` | Card and divider borders |
+| Border soft | `border-[#f0f2f6]` | `dark:border-[#1a2230]` | Subtle separators |
+| Accent | `text-[#4338ca]` | `dark:text-[#a5b4fc]` | Active nav, highlights |
+| Text primary | `text-[#211f1b]` | `dark:text-[#e8ebf0]` | Headings, body text |
+| Text muted | `text-[#6c6760]` | `dark:text-[#9aa4b2]` | Subtitles, secondary |
+| Text faint | `text-[#a09d99]` | `dark:text-[#4a5568]` | Metadata, labels |
 
 ```jsx
-// ✅ CORRECT — explicit dark mode classes (preferred for new components)
-<div className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+// ✅ CORRECT — Direction B design tokens
+<div className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38]">
 
-// ⚠️ ACCEPTABLE — CSS override covers this for existing components
-<div className="bg-white text-gray-900">
+// ✅ CORRECT — inline style for dynamic/SVG values
+<div style={{ color: darkMode ? '#a5b4fc' : '#4338ca' }}>
 
-// ❌ WRONG — inline style bypasses both mechanisms; use darkMode boolean instead
+// ❌ WRONG — stale slate-* classes; do not use for new code
+<div className="dark:bg-slate-800 dark:border-slate-700">
+
+// ❌ WRONG — inline style without darkMode boolean (bypasses dark mode)
 <div style={{ backgroundColor: 'white' }}>
 ```
 
-**MUST: Use semantic color pairs** for all new components:
+**Card style:** Flat hairline cards — no shadows. Use:
+```
+bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-[18px]
+```
+Never add `shadow-sm`, `shadow-md`, or `shadow-lg` to card surfaces.
 
-| Light | Dark | Use |
-|-------|------|-----|
-| `bg-white` | `dark:bg-gray-800` | Card backgrounds |
-| `bg-gray-50` | `dark:bg-gray-900` | Page backgrounds |
-| `bg-gray-100` | `dark:bg-gray-700` | Input backgrounds |
-| `text-gray-900` | `dark:text-white` | Primary text |
-| `text-gray-600` | `dark:text-gray-400` | Secondary text |
-| `text-gray-500` | `dark:text-gray-500` | Placeholder, metadata |
-| `border-gray-200` | `dark:border-gray-700` | Dividers, borders |
-
-> **Migration note:** Full Tailwind `dark:` migration of existing pages is tracked as MED-NEW-5 in `AUDIT_LOG.md`. Until that migration is complete, do not remove the CSS overrides in `appearance.css`.
+> **Legacy note:** ~46 page files still carry stale `dark:bg-slate-*` / `dark:border-slate-*` classes from before the Direction B migration. These are being swept file-by-file. Do not introduce new slate-* dark classes. `appearance.css` may still exist for override compatibility with not-yet-migrated components — do not remove it until the sweep is complete.
 
 ### 4.5 Color Usage
 
@@ -436,7 +439,11 @@ gray     — Inactive, disabled, archived
 purple   — Special status (escalated, VIP)
 ```
 
-**MUST: Never use hard-coded hex colors** in className strings. All colors through Tailwind palette names.
+**MUST: Use semantic color values** for all new UI. Two permitted forms:
+- Tailwind palette names (`bg-indigo-600`, `text-gray-500`) for component states: buttons, badges, status alerts.
+- Direction B design token hex values (`bg-[#f4f6f9]`, `dark:bg-[#121823]`) for the page/card/text/border layer — see the token table in §4.4. These are the **only** permitted hex values in `className` strings; do not invent new hex values.
+
+**MUST: Never hard-code arbitrary hex values** in `className` strings beyond the design token set in §4.4.
 
 ### 4.6 Forbidden Anti-Patterns
 
@@ -1536,7 +1543,7 @@ auth.current_user_email()
 
 **MUST: Generated code follows all naming conventions** in Section 12.
 
-**MUST: Generated components include dark mode classes** (`dark:bg-gray-800`, etc.) — never generate a component with light-mode-only Tailwind classes.
+**MUST: Generated components include dark mode classes** using Direction B design tokens (`dark:bg-[#121823]`, `dark:border-[#212a38]`, `dark:text-[#e8ebf0]`, etc.) — never generate a component with light-mode-only Tailwind classes. See §4.4 for the full token table. Do not use stale `dark:bg-slate-*` or `dark:bg-gray-*` on new components.
 
 **MUST: Generated API calls use the barrel import** (`from '../api/supabaseClient.js'`).
 

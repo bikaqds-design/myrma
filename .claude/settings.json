@@ -69,7 +69,24 @@
       "Bash(sort -k5 -rn)",
       "Bash(awk '{print $5, $9}')",
       "Bash(git merge *)",
-      "Bash(git fetch *)"
+      "Bash(git fetch *)",
+      "Bash(npx tsc *)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "PowerShell(Set-Location d:\\\\myrma-app; $tsc = Resolve-Path \".\\\\node_modules\\\\.bin\\\\tsc.cmd\"; & $tsc --noEmit 2>&1 | Select-Object -First 50)",
+      "Bash(git diff *)",
+      "Bash(git -C \"D:\\\\myrma-app\" diff --name-only)",
+      "Bash(git -C \"D:\\\\myrma-app\" diff HEAD --stat)",
+      "Bash(git -C \"D:\\\\myrma-app\" status)",
+      "Bash(git -C \"D:\\\\myrma-app\" log --oneline -10)",
+      "Bash(git -C \"D:\\\\myrma-app\" show --stat d090e8e)",
+      "Bash(git -C \"D:\\\\myrma-app\" diff d090e8e^..d090e8e -- src/App.jsx src/pages/BrandingSettings.jsx)",
+      "Bash(git -C \"D:\\\\myrma-app\" diff 38e037b^..38e037b -- src/pages/AccountSettings.jsx)",
+      "Bash(git -C \"D:\\\\myrma-app\" show d090e8e:src/pages/BrandingSettings.jsx)",
+      "Bash(xargs wc -l)",
+      "Bash(del audit.js system.js users.js notifications.js tickets.js customers.js catalog.js inventory.js whatsappNotifications.js index.js)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\bika_\\.claude\\projects\\d--myrma-app"
     ]
   }
 }
