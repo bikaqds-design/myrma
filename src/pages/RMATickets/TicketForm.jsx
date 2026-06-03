@@ -377,6 +377,15 @@ export function TicketForm({
 
           if (assigneeChanged) {
             notificationEventBus.emitAsync({ type: 'ticket.assigned', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })
+            if (ticketData.assigned_technician) {
+              notifications.sendEmail(ticketData.assigned_technician, 'ticket_assigned', {
+                recipient_name: ticketData.assigned_technician,
+                rma_number: editingTicket.rma_number,
+                customer_name: ticketData.customer_name,
+                priority: ticketData.priority,
+                due_date: ticketData.due_date || 'N/A',
+              }).catch((err) => console.error('[email] ticket_assigned:', err.message))
+            }
           }
           if (statusChanged && isClosed) {
             notificationEventBus.emitAsync({ type: 'ticket.closed', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })

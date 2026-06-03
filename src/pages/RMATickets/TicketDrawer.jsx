@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { db, storage } from '../../api/supabaseClient'
+import { db, storage, notifications } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import Modal from '../../components/Modal'
 import { Button, Spinner } from '../../components/ui'
@@ -154,6 +154,15 @@ export function TicketDrawer({
             targetEmails,
           })
           .catch(() => {})
+        // Email customer for public comments only
+        if (!isInternalComment && ticket.customer_email) {
+          notifications.sendEmail(ticket.customer_email, 'comment_added', {
+            recipient_name: ticket.customer_name,
+            rma_number: ticket.rma_number,
+            comment_author: userEmail,
+            comment_text: newComment.trim(),
+          }).catch((err) => console.error('[email] comment_added:', err.message))
+        }
       }
       setNewComment('')
       db.auditLog
