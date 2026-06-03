@@ -1,5 +1,34 @@
 import { supabase } from '../client.js'
 
+// ── Row types ─────────────────────────────────────────────────────────────────
+
+export interface NotificationRow {
+  id: string
+  type: string
+  title: string
+  message: string
+  entity_type: string | null
+  entity_id: string | null
+  entity_ref: string | null
+  created_by: string | null
+  created_date: string
+  target_roles: string[]
+  target_emails: string[]
+  read_by: string[]
+}
+
+interface CreateNotificationParams {
+  type: string
+  title: string
+  message: string
+  entityType?: string | null
+  entityId?: string | null
+  entityRef?: string | null
+  createdBy?: string | null
+  targetRoles?: string[]
+  targetEmails?: string[]
+}
+
 // In-app notifications (db.notifications) — distinct from the email notifications module (src/api/email.js).
 export const notifications = {
   async create({
@@ -12,7 +41,7 @@ export const notifications = {
     createdBy,
     targetRoles = [],
     targetEmails = [],
-  }) {
+  }: CreateNotificationParams): Promise<NotificationRow | null> {
     try {
       const { data, error } = await supabase
         .from('notifications')
@@ -36,16 +65,18 @@ export const notifications = {
         if (error.code === '42P01') return null
         return null
       }
-      return data?.[0]
+      return data?.[0] ?? null
     } catch {
       return null
     }
   },
 
-  async listForUser(_email, _role) {
+  async listForUser(
+    _email: string,
+    _role: string
+  ): Promise<{ missing: boolean; data: NotificationRow[] }> {
     try {
       // RLS policy user_read_targeted already filters by target_roles/target_emails server-side.
-      // No client-side filter needed — what comes back is exactly what this user should see (H-5 fix).
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
@@ -61,16 +92,14 @@ export const notifications = {
     }
   },
 
-  async markRead(id, email) {
+  async markRead(id: string, email: string): Promise<void> {
     try {
-      // Reuse mark_notifications_read RPC — single atomic UPDATE, no read-then-write (H-5 fix)
       await supabase.rpc('mark_notifications_read', { p_email: email, p_ids: [id] })
     } catch {}
   },
 
-  async markAllRead(email, role) {
+  async markAllRead(email: string, role: string): Promise<void> {
     try {
-      // Fetch unread IDs only — single SELECT, filter client-side for role/email targeting
       const { data } = await supabase
         .from('notifications')
         .select('id, read_by, target_roles, target_emails')
@@ -82,7 +111,7 @@ export const notifications = {
             (n.target_roles?.includes(role) || n.target_emails?.includes(email)) &&
             !n.read_by?.includes(email)
         )
-        .map((n) => n.id)
+        .map((n) => n.id as string)
       if (!ids.length) return
       // Single batched UPDATE via RPC — replaces N individual updates (H-2 fix)
       await supabase.rpc('mark_notifications_read', { p_email: email, p_ids: ids })

@@ -1,7 +1,63 @@
 import { supabase } from '../client.js'
 
+// ── Row types ─────────────────────────────────────────────────────────────────
+
+export interface BrandRow {
+  id: string
+  brand_name: string
+  brand_logo_url: string | null
+  created_date: string
+}
+
+export interface CategoryRow {
+  id: string
+  brand_id: string
+  category_name: string
+  created_date: string
+  brand?: Pick<BrandRow, 'id' | 'brand_name'>
+}
+
+export interface SubcategoryRow {
+  id: string
+  category_id: string
+  subcategory_name: string
+  created_date: string
+  category?: Pick<CategoryRow, 'id' | 'category_name' | 'brand_id'>
+}
+
+export interface ProductRow {
+  id: string
+  sku: string
+  product_name: string
+  brand_id: string | null
+  category_id: string | null
+  subcategory_id: string | null
+  product_type: string
+  status: string
+  warranty_months: number | null
+  product_description: string | null
+  product_link: string | null
+  product_image_url: string | null
+  updated_by: string | null
+  updated_date: string | null
+  created_date: string
+  brand?: Pick<BrandRow, 'id' | 'brand_name' | 'brand_logo_url'>
+  category?: Pick<CategoryRow, 'id' | 'category_name'>
+  subcategory?: Pick<SubcategoryRow, 'id' | 'subcategory_name'>
+}
+
+export interface PagedResult<T> {
+  data: T[]
+  count: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+// ── Brands ────────────────────────────────────────────────────────────────────
+
 export const brands = {
-  async list() {
+  async list(): Promise<BrandRow[]> {
     const { data, error } = await supabase
       .from('brands')
       .select('*')
@@ -9,24 +65,26 @@ export const brands = {
     if (error) throw error
     return data || []
   },
-  async create(brand) {
+  async create(brand: Partial<BrandRow>): Promise<BrandRow | undefined> {
     const { data, error } = await supabase.from('brands').insert([brand]).select()
     if (error) throw error
     return data?.[0]
   },
-  async update(id, brand) {
+  async update(id: string, brand: Partial<BrandRow>): Promise<BrandRow | undefined> {
     const { data, error } = await supabase.from('brands').update(brand).eq('id', id).select()
     if (error) throw error
     return data?.[0]
   },
-  async delete(id) {
+  async delete(id: string): Promise<void> {
     const { error } = await supabase.from('brands').delete().eq('id', id)
     if (error) throw error
   },
 }
 
+// ── Categories ────────────────────────────────────────────────────────────────
+
 export const categories = {
-  async list() {
+  async list(): Promise<CategoryRow[]> {
     const { data, error } = await supabase
       .from('categories')
       .select('*, brand:brands(id, brand_name)')
@@ -34,7 +92,7 @@ export const categories = {
     if (error) throw error
     return data || []
   },
-  async listByBrand(brandId) {
+  async listByBrand(brandId: string): Promise<CategoryRow[]> {
     const { data, error } = await supabase
       .from('categories')
       .select('*')
@@ -43,24 +101,26 @@ export const categories = {
     if (error) throw error
     return data || []
   },
-  async create(category) {
+  async create(category: Partial<CategoryRow>): Promise<CategoryRow | undefined> {
     const { data, error } = await supabase.from('categories').insert([category]).select()
     if (error) throw error
     return data?.[0]
   },
-  async update(id, category) {
+  async update(id: string, category: Partial<CategoryRow>): Promise<CategoryRow | undefined> {
     const { data, error } = await supabase.from('categories').update(category).eq('id', id).select()
     if (error) throw error
     return data?.[0]
   },
-  async delete(id) {
+  async delete(id: string): Promise<void> {
     const { error } = await supabase.from('categories').delete().eq('id', id)
     if (error) throw error
   },
 }
 
+// ── Subcategories ─────────────────────────────────────────────────────────────
+
 export const subcategories = {
-  async list() {
+  async list(): Promise<SubcategoryRow[]> {
     const { data, error } = await supabase
       .from('subcategories')
       .select('*, category:categories(id, category_name, brand_id)')
@@ -68,7 +128,7 @@ export const subcategories = {
     if (error) throw error
     return data || []
   },
-  async listByCategory(categoryId) {
+  async listByCategory(categoryId: string): Promise<SubcategoryRow[]> {
     const { data, error } = await supabase
       .from('subcategories')
       .select('*')
@@ -77,12 +137,12 @@ export const subcategories = {
     if (error) throw error
     return data || []
   },
-  async create(subcategory) {
+  async create(subcategory: Partial<SubcategoryRow>): Promise<SubcategoryRow | undefined> {
     const { data, error } = await supabase.from('subcategories').insert([subcategory]).select()
     if (error) throw error
     return data?.[0]
   },
-  async update(id, subcategory) {
+  async update(id: string, subcategory: Partial<SubcategoryRow>): Promise<SubcategoryRow | undefined> {
     const { data, error } = await supabase
       .from('subcategories')
       .update(subcategory)
@@ -91,16 +151,17 @@ export const subcategories = {
     if (error) throw error
     return data?.[0]
   },
-  async delete(id) {
+  async delete(id: string): Promise<void> {
     const { error } = await supabase.from('subcategories').delete().eq('id', id)
     if (error) throw error
   },
 }
 
+// ── Products ──────────────────────────────────────────────────────────────────
+
 export const products = {
-  async list() {
-    // 5 000-row cap — Products page filters/sorts client-side so all rows must
-    // be in memory. Raised from 500 to cover real-world datasets without truncation.
+  async list(): Promise<ProductRow[]> {
+    // 5 000-row cap — Products page filters/sorts client-side.
     const { data, error } = await supabase
       .from('products')
       .select(
@@ -111,7 +172,7 @@ export const products = {
     if (error) throw error
     return data || []
   },
-  async listPaged(page = 0, pageSize = 50) {
+  async listPaged(page = 0, pageSize = 50): Promise<PagedResult<ProductRow>> {
     const from = page * pageSize
     const { data, count, error } = await supabase
       .from('products')
@@ -130,7 +191,7 @@ export const products = {
       totalPages: Math.ceil((count || 0) / pageSize),
     }
   },
-  async get(id) {
+  async get(id: string): Promise<ProductRow> {
     const { data, error } = await supabase
       .from('products')
       .select(
@@ -141,37 +202,37 @@ export const products = {
     if (error) throw error
     return data
   },
-  async create(product) {
+  async create(product: Partial<ProductRow>): Promise<ProductRow | undefined> {
     const { data, error } = await supabase.from('products').insert([product]).select()
     if (error) throw error
     return data?.[0]
   },
-  async bulkCreate(products) {
-    const { data, error } = await supabase.from('products').insert(products).select()
+  async bulkCreate(productsData: Partial<ProductRow>[]): Promise<ProductRow[]> {
+    const { data, error } = await supabase.from('products').insert(productsData).select()
     if (error) throw error
     return data || []
   },
-  async update(id, product) {
+  async update(id: string, product: Partial<ProductRow>): Promise<ProductRow | undefined> {
     const { data, error } = await supabase.from('products').update(product).eq('id', id).select()
     if (error) throw error
     return data?.[0]
   },
-  async delete(id) {
+  async delete(id: string): Promise<void> {
     const { error } = await supabase.from('products').delete().eq('id', id)
     if (error) throw error
   },
-  async bulkDelete(ids) {
+  async bulkDelete(ids: string[]): Promise<void> {
     const { error } = await supabase.from('products').delete().in('id', ids)
     if (error) throw error
   },
-  async bulkUpdateStatus(ids, status) {
+  async bulkUpdateStatus(ids: string[], status: string): Promise<void> {
     const { error } = await supabase
       .from('products')
       .update({ status, updated_date: new Date().toISOString() })
       .in('id', ids)
     if (error) throw error
   },
-  async search(query) {
+  async search(query: string): Promise<ProductRow[]> {
     const safe = query.replace(/[%_\\]/g, '\\$&').replace(/[(),"]/g, '')
     const { data, error } = await supabase
       .from('products')
@@ -183,7 +244,7 @@ export const products = {
     if (error) throw error
     return data || []
   },
-  async getRelatedTickets(productId) {
+  async getRelatedTickets(productId: string): Promise<unknown[]> {
     const { data, error } = await supabase
       .from('rma_tickets')
       .select('*')

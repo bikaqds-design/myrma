@@ -73,3 +73,20 @@ export const db = {
   notificationSettings,
   notificationQueue,
 }
+
+// Re-export all Row types for page components to import
+export type { AuditLogRow } from './audit.js'
+export type { AnnouncementRow, RmaConfigRow, CustomFieldRow, WebhookRow, SlaConfig, AutomationRule } from './system.js'
+export type { UserRoleRow, UserActivityRow, UserPreferencesRow } from './users.js'
+export type { NotificationRow } from './notifications.js'
+export type { RMATicketRow, TicketActivityRow, TicketCommentRow, TicketProductItem } from './tickets.js'
+export type { CustomerRow, CustomerNoteRow } from './customers.js'
+export type { BrandRow, CategoryRow, SubcategoryRow, ProductRow } from './catalog.js'
+export type {
+  InventoryUnitRow, ManufacturerBatchRow, WarehouseRow,
+  PartRow, TicketPartRow, TimeEntryRow, InvoiceRow, InventoryStatsRow,
+} from './inventory.js'
+export type {
+  WhatsAppTemplateRow, TemplateVariable, NotificationLogRow,
+  NotificationSettingRow, NotificationQueueRow,
+} from './whatsappNotifications.js'
