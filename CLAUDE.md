@@ -96,18 +96,21 @@ All Supabase access goes through `src/api/supabaseClient.js`, which exports:
 
 **Never query `supabase` directly from page components; use these helpers.**
 
-Domain modules in `src/api/db/`:
+Domain modules in `src/api/db/` (all TypeScript — export Row types):
 
-| Module | Covers |
-|--------|--------|
-| `tickets.js` | RMA ticket CRUD + `rmaTracker` public lookup (via Edge Function) |
-| `customers.js` | Customer CRUD |
-| `catalog.js` | Product/catalog CRUD |
-| `inventory.js` | Inventory CRUD |
-| `users.js` | User role management |
-| `notifications.js` | Notification table ops |
-| `system.js` | System config (`rma_config` table) |
-| `audit.js` | Audit log reads |
+| Module | Covers | Key Row Types |
+|--------|--------|---------------|
+| `tickets.ts` | RMA ticket CRUD + `rmaTracker` public lookup (via Edge Function) | `RMATicketRow`, `TicketCommentRow`, `TicketActivityRow` |
+| `customers.ts` | Customer CRUD | `CustomerRow`, `CustomerNoteRow` |
+| `catalog.ts` | Product/catalog CRUD | `ProductRow`, `BrandRow`, `CategoryRow`, `SubcategoryRow` |
+| `inventory.ts` | Inventory, warehouses, parts, time entries, invoices | `InventoryUnitRow`, `PartRow`, `InvoiceRow`, `WarehouseRow` |
+| `users.ts` | User role management | `UserRoleRow`, `UserActivityRow`, `UserPreferencesRow` |
+| `notifications.ts` | Notification table ops | `NotificationRow` |
+| `system.ts` | System config, announcements, webhooks, SLA, automation rules | `RmaConfigRow`, `WebhookRow`, `SlaConfig`, `AutomationRule` |
+| `audit.ts` | Audit log reads + resilient write queue (H-9) | `AuditLogRow` |
+| `whatsappNotifications.ts` | WhatsApp templates, notification logs, settings, queue | `WhatsAppTemplateRow`, `NotificationLogRow`, `NotificationQueueRow` |
+
+Import Row types from `src/api/db/index.ts` — all are re-exported there for convenience.
 
 Many optional tables (e.g. `announcements`, `custom_field_definitions`, `inventory_units`, `warehouses`) may not exist in every deployment. All `db.*` helpers that target these tables guard with `error.code === '42P01'` (table not found) and return `{ missing: true, data: [] }` instead of throwing.
 
@@ -173,9 +176,27 @@ Card style: `bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#21
 
 In `Dashboard.jsx`, these tokens are computed at render time via `tokens(darkMode)` and passed as a `tk` prop to sub-components. For SVG/inline-style values, use the `darkMode` boolean from `useAppearance()` and pick from the table above.
 
+### WhatsApp / Messaging system
+
+Provider-agnostic notification layer that fires on ticket lifecycle events. Ticket saves emit events via `notificationEventBus.emitAsync()` → handlers in `src/lib/events/ticketEventHandlers.ts` check settings → INSERT into `notification_queue` → invoke `notification-worker` for fast delivery with queue persistence for retry.
+
+**Library (`src/lib/`):**
+- `messaging/types.ts` — `IMessagingProvider`, `NotificationEvent`, `EventType`, `DeliveryStatus`
+- `messaging/TemplateEngine.ts` — `{{key}}` substitution + `{{#key}}…{{/key}}` conditionals; `toWhatsAppParams()` builds positional Meta API params
+- `messaging/MessagingService.ts` — `messagingService` singleton; `registerProvider()`, `send()`, `sendBatch()`
+- `messaging/providers/WhatsAppProvider.ts` — calls `send-whatsapp` Edge Function; never calls Meta API directly
+- `events/NotificationEventBus.ts` — `notificationEventBus` singleton; `on()`, `emit()`, `emitAsync()`
+- `events/ticketEventHandlers.ts` — `registerTicketEventHandlers()` called once from `App.jsx`
+
+**DB tables** (`20260602_whatsapp_notifications.sql`): `whatsapp_templates`, `notification_logs`, `notification_settings`, `notification_queue`.
+
+**Required Supabase secrets:** `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`.
+
+**Control Panel UI:** `src/pages/cp/WASettings.jsx` (provider + per-event toggles), `WATemplates.jsx` (CRUD + phone preview), `WALogs.jsx` (paginated delivery log), `WATestCenter.jsx` (send test, simulate event, run worker).
+
 ### Control Panel
 
-`src/pages/ControlPanel.jsx` hosts all admin-only sub-pages (User Management, Branding, RMA Config, Custom Fields, PDF Layout, Announcements, Audit Log, Data Cleanup, Backup/Restore, Integrations). It uses `useURLTab` to keep the active feature in the URL as `?feature=...`.
+`src/pages/ControlPanel.jsx` hosts all admin-only sub-pages (User Management, Branding, RMA Config, Custom Fields, PDF Layout, Announcements, Audit Log, Data Cleanup, Backup/Restore, Integrations, **WhatsApp & Messaging**). It uses `useURLTab` to keep the active feature in the URL as `?feature=...`.
 
 ### CSV bulk upload
 
@@ -191,6 +212,9 @@ Live in `supabase/functions/`:
 - `admin-reset-password` — handles password reset (existing user) AND account creation (new user, create-if-missing logic)
 - `public-track` — rate-limited public RMA lookup by RMA number (used by `/tracker`)
 - `send-email` — email dispatch via the notifications system
+- `send-whatsapp` — WhatsApp message dispatch via Meta Cloud API; reads `WHATSAPP_ACCESS_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` from Supabase secrets; writes audit log to `notification_logs`
+- `notification-worker` — queue processor; fetches up to 10 pending `notification_queue` jobs, invokes `send-whatsapp`, exponential-backoff retry (5 min → 10 min → 20 min), 200 ms rate limit
+- `whatsapp-webhook` — Meta delivery-status callbacks (GET: verification handshake via `WHATSAPP_WEBHOOK_VERIFY_TOKEN`; POST: updates `notification_logs` delivery status on sent/delivered/read/failed)
 
 All Edge Functions validate the caller's JWT before performing privileged operations. Never expose the service role key to the browser.
 
@@ -237,6 +261,8 @@ Current migrations:
 - `20260528_ticket_cascade_fk.sql`
 - `20260529_repair_permissions.sql`
 - `20260531_relax_ticket_status_constraint.sql`
+- `20260602_whatsapp_notifications.sql`
+- `20260603_user_preferences_rls.sql`
 
 ### RLS SQL helper functions
 

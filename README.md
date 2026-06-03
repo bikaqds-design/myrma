@@ -26,6 +26,7 @@ myRMA provides end-to-end lifecycle management for product returns, warranty cla
 | **Real-Time Notifications** | Live updates via Supabase Realtime, per-user preference controls |
 | **Dark Mode** | Full dark/light theme toggle, persisted per user |
 | **PWA / Offline** | Installable app with offline shell via Workbox service worker |
+| **WhatsApp Notifications** | Automated WhatsApp messages on ticket lifecycle events via Meta Cloud API |
 | **PDF Generation** | Ticket and invoice PDF export |
 | **Bulk CSV Import** | Mass upload for products and customers |
 | **Audit Log** | Full system audit trail visible in the Control Panel |
@@ -107,6 +108,10 @@ supabase/migrations/20260526_enable_rls.sql
 supabase/migrations/20260526_check_constraints.sql
 supabase/migrations/20260527_storage_bucket_policies.sql
 supabase/migrations/20260528_ticket_cascade_fk.sql
+supabase/migrations/20260529_repair_permissions.sql
+supabase/migrations/20260531_relax_ticket_status_constraint.sql
+supabase/migrations/20260602_whatsapp_notifications.sql
+supabase/migrations/20260603_user_preferences_rls.sql
 ```
 
 ### 4. Set up storage
@@ -119,11 +124,16 @@ Create a storage bucket named **`rma-attachments`** in your Supabase project. Th
 supabase functions deploy admin-reset-password
 supabase functions deploy public-track
 supabase functions deploy send-email
+supabase functions deploy send-whatsapp
+supabase functions deploy notification-worker
+supabase functions deploy whatsapp-webhook
 ```
 
-Set the required secrets:
-```bash
-supabase secrets set SERVICE_ROLE_KEY=your-service-role-key
+Set the required secrets in Supabase Dashboard → Edge Functions → Secrets:
+```
+WHATSAPP_ACCESS_TOKEN         # permanent system-user token from Meta
+WHATSAPP_PHONE_NUMBER_ID      # phone number ID from WhatsApp Business API
+WHATSAPP_WEBHOOK_VERIFY_TOKEN # arbitrary string matching Meta webhook config
 ```
 
 ### 6. Start development
@@ -167,11 +177,11 @@ myrma-app/
 │   │   ├── branding.js                       # Company branding settings
 │   │   ├── email.js                          # Notification dispatch + send-email Edge Function
 │   │   ├── backup.js                         # Full data export/import
-│   │   └── db/
-│   │       ├── index.js                      # Aggregates all domain modules → `db` export
-│   │       ├── tickets.js                    # RMA ticket CRUD + public tracker lookup
-│   │       ├── customers.js                  # Customer CRUD
-│   │       ├── catalog.js                    # Product catalog CRUD
+│   │   └── db/                               # All TypeScript — export Row types
+│   │       ├── index.ts                      # Aggregates all domain modules → `db` export + re-exports all Row types
+│   │       ├── tickets.ts                    # RMA ticket CRUD + public tracker lookup
+│   │       ├── customers.ts                  # Customer CRUD
+│   │       ├── catalog.ts                    # Product catalog CRUD
 │   │       ├── inventory.js                  # Inventory CRUD
 │   │       ├── users.js                      # User role management
 │   │       ├── notifications.js              # Notification table ops

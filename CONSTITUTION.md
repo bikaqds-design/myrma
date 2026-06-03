@@ -672,14 +672,16 @@ The following keys are used by the app — do not reuse them:
 src/api/supabaseClient.js     ← barrel re-export (21 lines, nothing else)
 src/api/client.js             ← creates the supabase client instance
 src/api/auth.js               ← authentication helpers
-src/api/db/index.js           ← aggregates all domain modules
-src/api/db/tickets.js         ← RMA ticket CRUD
-src/api/db/customers.js       ← customer CRUD
-src/api/db/products.js        ← product CRUD
-src/api/db/inventory.js       ← inventory CRUD
-src/api/db/users.js           ← user role management
-src/api/db/notifications.js   ← notification table ops
-... (15 domain files total)
+src/api/db/index.ts           ← aggregates all domain modules + re-exports all Row types
+src/api/db/tickets.ts         ← RMA ticket CRUD (exports RMATicketRow, TicketCommentRow …)
+src/api/db/customers.ts       ← customer CRUD (exports CustomerRow …)
+src/api/db/catalog.ts         ← product/catalog CRUD (exports ProductRow, BrandRow …)
+src/api/db/inventory.ts       ← inventory, parts, invoices (exports PartRow, InvoiceRow …)
+src/api/db/users.ts           ← user role management (exports UserRoleRow …)
+src/api/db/notifications.ts   ← notification table ops (exports NotificationRow)
+src/api/db/system.ts          ← system config, announcements, webhooks, SLA, automation
+src/api/db/audit.ts           ← audit log with resilient write queue (H-9)
+src/api/db/whatsappNotifications.ts ← WhatsApp templates, logs, settings, queue
 src/api/storage.js            ← file upload/download
 src/api/branding.js           ← company branding settings
 src/api/email.js              ← notification dispatch + Edge Function call
@@ -1218,7 +1220,7 @@ d:\myrma-app\
 |-------------|--------------|
 | New page component | `src/pages/NewPage.jsx` |
 | New shared UI component | `src/components/NewComponent.jsx` (or extend `ui.jsx` if primitive) |
-| New Supabase domain module | `src/api/db/newdomain.js` + export from `src/api/db/index.js` |
+| New Supabase domain module | `src/api/db/newdomain.ts` + export from `src/api/db/index.ts`; export Row types |
 | New React hook | `src/hooks/useNewHook.js` |
 | New TypeScript utility | `src/lib/newutil.ts` with corresponding test |
 | New Edge Function | `supabase/functions/new-function/index.ts` |
@@ -1304,15 +1306,17 @@ Key utilities that already exist and must not be duplicated:
 
 ### 14.5 TypeScript Adoption Rules
 
-TypeScript is adopted incrementally — currently in `src/lib/` only.
+TypeScript is adopted in `src/lib/` and `src/api/db/`.
 
-**MUST: All new files in `src/lib/` are `.ts`.**
+**MUST: All new files in `src/lib/` and `src/api/db/` are `.ts`.**
+
+**MUST: Every `src/api/db/` module exports Row type interfaces** for its DB tables (e.g. `RMATicketRow`, `CustomerRow`). Import them from `src/api/db/index.ts` — all Row types are re-exported there.
 
 **MUST: TypeScript files use strict typing** — no `any` without a `// eslint-disable-next-line @typescript-eslint/no-explicit-any` and an explanation comment.
 
 **MUST: `.js` imports in TypeScript files are valid** — the Vite bundler resolves `import foo from './foo.js'` to `./foo.ts`. Do not change this pattern.
 
-**SHOULD: New `src/api/` modules use JSDoc type annotations** as a stepping stone toward TypeScript.
+**MUST: New Supabase domain module files are `.ts`** and export their Row types from `index.ts`.
 
 ### 14.6 ESLint & Prettier
 
