@@ -384,18 +384,25 @@ export function TicketForm({
             notificationEventBus.emitAsync({ type: 'ticket.updated', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })
           }
           // Email customer on any status change
-          if (statusChanged && resolvedCustomerEmail) {
-            notifications.sendEmail(resolvedCustomerEmail, 'status_changed', {
-              recipient_name: ticketData.customer_name,
-              customer_name: ticketData.customer_name,
-              rma_number: editingTicket.rma_number,
-              old_status: editingTicket.ticket_status,
-              new_status: ticketData.ticket_status,
-              priority: ticketData.priority,
-              status: ticketData.ticket_status,
-              updated_by: userEmail,
-              update_time: new Date().toLocaleString(),
-            }).catch((err) => console.error('[email] status change:', err.message))
+          if (statusChanged) {
+            if (!resolvedCustomerEmail) {
+              console.warn('[email] status change skipped — no customer email on ticket', editingTicket.id)
+            } else {
+              notifications.sendEmail(resolvedCustomerEmail, 'status_changed', {
+                recipient_name: ticketData.customer_name,
+                customer_name: ticketData.customer_name,
+                rma_number: editingTicket.rma_number,
+                old_status: editingTicket.ticket_status,
+                new_status: ticketData.ticket_status,
+                priority: ticketData.priority,
+                status: ticketData.ticket_status,
+                updated_by: userEmail,
+                update_time: new Date().toLocaleString(),
+              }).catch((err) => {
+                console.error('[email] status change failed:', err.message)
+                toast.error(`Email notification failed: ${err.message}`, { duration: 6000 })
+              })
+            }
           }
         }
       } else {
