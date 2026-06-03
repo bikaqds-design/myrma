@@ -102,11 +102,17 @@ export function registerTicketEventHandlers(): void {
           ...(event.metadata ?? {}),
         }
 
-        let variables = TemplateEngine.resolveVariables(
-          template.variables as Array<{ key: string; label: string; source: string }>,
-          payload
-        )
+        const templateVars = template.variables as Array<{ key: string; label: string; source: string }>
+        let variables = TemplateEngine.resolveVariables(templateVars, payload)
         variables = TemplateEngine.formatDates(variables)
+
+        // Build an EXPLICITLY ORDERED param array from the template's variable
+        // definition order. This is critical: the queue `payload` is a JSONB
+        // column, and Postgres JSONB does NOT preserve object key order (it
+        // reorders keys by length then alphabetically). Sending the `variables`
+        // object alone would scramble WhatsApp's positional {{1}},{{2}} params.
+        // JSONB *does* preserve array element order, so we send this array.
+        const params = templateVars.map((def) => variables[def.key] ?? '')
 
         // ── 6. Queue the notification ─────────────────────────────────────
         const { error: queueError } = await supabase
@@ -120,6 +126,7 @@ export function registerTicketEventHandlers(): void {
               templateId: template.id,
               templateName: template.template_name,
               variables,
+              params,
               attachmentUrl: (event.metadata?.pdfUrl as string) ?? null,
               ticketId: event.ticketId ?? null,
               language: template.language ?? 'en',

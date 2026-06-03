@@ -43,6 +43,7 @@ interface QueueJob {
     templateId?: string
     templateName?: string
     variables?: Record<string, string>
+    params?: string[]
     attachmentUrl?: string | null
     ticketId?: string | null
     language?: string
@@ -120,7 +121,15 @@ serve(async (req: Request) => {
     if (lockErr) continue  // another worker grabbed it
 
     try {
-      const { to, templateName: payloadTemplateName, variables = {}, attachmentUrl, ticketId, language = 'en', recipientName } = job.payload
+      const { to, templateName: payloadTemplateName, variables = {}, params, attachmentUrl, ticketId, language = 'en', recipientName } = job.payload
+
+      // Use the explicitly-ordered `params` array when present — it is
+      // JSONB-safe (arrays keep order). Fall back to Object.values(variables)
+      // only for legacy jobs queued before the params field existed.
+      const bodyParams: string[] =
+        Array.isArray(params) && params.length
+          ? params.map((v) => String(v ?? ''))
+          : Object.values(variables).map((v) => String(v ?? ''))
 
       // Resolve template name if only templateId provided
       let resolvedTemplateName = payloadTemplateName
@@ -138,10 +147,10 @@ serve(async (req: Request) => {
       const phone = to.replace(/[^0-9]/g, '')
       const components: unknown[] = []
 
-      if (Object.keys(variables).length > 0) {
+      if (bodyParams.length > 0) {
         components.push({
           type: 'body',
-          parameters: Object.values(variables).map((v) => ({ type: 'text', text: String(v ?? '') })),
+          parameters: bodyParams.map((v) => ({ type: 'text', text: String(v ?? '') })),
         })
       }
       if (attachmentUrl) {
