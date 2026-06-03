@@ -504,7 +504,7 @@ function BrandingTab({
   currentUserEmail,
 }) {
   const {
-
+    darkMode,
     fontFamily,
     tableDensity,
     sidebarCompact,
@@ -804,6 +804,9 @@ function BrandingTab({
           </svg>
         }
       >
+        <BRow label="Dark Mode" desc="Switch the entire app to a dark theme">
+          <BToggle checked={darkMode} onChange={(v) => update({ darkMode: v })} />
+        </BRow>
         <BRow label="Compact Sidebar" desc="Icons-only sidebar — hover to see labels">
           <BToggle checked={sidebarCompact} onChange={(v) => update({ sidebarCompact: v })} />
         </BRow>
@@ -849,7 +852,7 @@ function BrandingTab({
         </div>
 
         <BRow label="Sidebar Position" desc="Coming soon — left or right sidebar" border={false}>
-          <span className="text-xs px-2 py-1 bg-gray-100 text-gray-500 rounded-full font-medium">
+          <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2] rounded-full font-medium">
             Soon
           </span>
         </BRow>
@@ -1378,7 +1381,7 @@ function TemplatesTab({ templates, onEdit, onSendTest }) {
                     template.variables.map((variable) => (
                       <span
                         key={variable}
-                        className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded"
+                        className="px-2 py-1 bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#9aa4b2] text-xs rounded"
                       >
                         {`{{${variable}}}`}
                       </span>
@@ -1388,13 +1391,13 @@ function TemplatesTab({ templates, onEdit, onSendTest }) {
               <div className="flex gap-2 ml-4">
                 <button
                   onClick={() => onEdit(template)}
-                  className="px-3 py-1 text-sm bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200"
+                  className="px-3 py-1 text-sm bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 rounded hover:bg-indigo-200 dark:hover:bg-indigo-900/30"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => onSendTest(template.template_name)}
-                  className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200"
+                  className="px-3 py-1 text-sm bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded hover:bg-green-200 dark:hover:bg-green-900/30"
                 >
                   Test
                 </button>

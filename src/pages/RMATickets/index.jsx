@@ -8,7 +8,7 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import { PageSkeleton } from '../../components/Skeleton'
 import { Button, PageHeader } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
-import { ROLES, TICKET_STATUS_RESOLVED } from '../../lib/constants'
+import { ROLES } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
 import { SortableHeader } from './_shared'
 import { getStatusColor, getPriorityColor, fmt } from './_utils'
@@ -60,16 +60,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     safeStorage.get('rmaTicketsSortConfig', { key: 'created_date', direction: 'desc' })
   )
 
-  const [filterStatus, setFilterStatus] = useState(
-    () => new URLSearchParams(window.location.search).get('status') || ''
-  )
-  const [filterOverdue, setFilterOverdue] = useState(
-    () => new URLSearchParams(window.location.search).get('overdue') === 'true'
-  )
-  const [showFilters, setShowFilters] = useState(() => {
-    const p = new URLSearchParams(window.location.search)
-    return !!(p.get('status') || p.get('overdue'))
-  })
+  const [showFilters, setShowFilters] = useState(false)
+  const [filterStatus, setFilterStatus] = useState('')
   const [filterPriority, setFilterPriority] = useState('')
   const [filterAssigned, setFilterAssigned] = useState('')
   const [filterCustomer, setFilterCustomer] = useState('')
@@ -108,7 +100,6 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     tickets,
     sortConfig,
     filterStatus,
-    filterOverdue,
     filterPriority,
     filterAssigned,
     filterCustomer,
@@ -222,12 +213,6 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       )
     }
     if (filterStatus) filtered = filtered.filter((t) => t.ticket_status === filterStatus)
-    if (filterOverdue) {
-      const now = new Date()
-      filtered = filtered.filter(
-        (t) => t.due_date && new Date(t.due_date) < now && !TICKET_STATUS_RESOLVED.includes(t.ticket_status)
-      )
-    }
     if (filterPriority) filtered = filtered.filter((t) => t.priority === filterPriority)
     if (filterAssigned) filtered = filtered.filter((t) => t.assigned_technician === filterAssigned)
     if (filterCustomer) filtered = filtered.filter((t) => t.customer_name === filterCustomer)
@@ -828,7 +813,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       )
     if (days <= 2)
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
           {days}d left
         </span>
       )
@@ -878,7 +863,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             onClick={() => setShowFilters(!showFilters)}
             aria-expanded={showFilters}
             aria-controls="ticket-filters-panel"
-            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || filterStatus || filterOverdue || filterPriority || filterAssigned || filterCustomer ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || filterStatus || filterPriority || filterAssigned || filterCustomer ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -889,9 +874,12 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               />
             </svg>
             Filters
-            {(filterStatus || filterOverdue || filterPriority || filterAssigned || filterCustomer) && (
+            {(filterStatus || filterPriority || filterAssigned || filterCustomer) && (
               <span className="w-4 h-4 bg-indigo-600 text-white text-xs rounded-full flex items-center justify-center">
-                {[filterStatus, filterOverdue, filterPriority, filterAssigned, filterCustomer].filter(Boolean).length}
+                {
+                  [filterStatus, filterPriority, filterAssigned, filterCustomer].filter(Boolean)
+                    .length
+                }
               </span>
             )}
           </button>
@@ -928,7 +916,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
       {/* Filter panel */}
       {showFilters && (
-        <div id="ticket-filters-panel" className="flex flex-wrap gap-3 items-center p-4 bg-gray-50 rounded-lg">
+        <div id="ticket-filters-panel" className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg flex-wrap">
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-gray-700">Status:</label>
             <select
@@ -941,21 +929,9 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               <option value="In Progress">In Progress</option>
               <option value="Pending">Pending</option>
               <option value="On Hold">On Hold</option>
-              <option value="Completed">Completed</option>
               <option value="Closed">Closed</option>
               <option value="Cancelled">Cancelled</option>
             </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={filterOverdue}
-                onChange={(e) => setFilterOverdue(e.target.checked)}
-                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-              />
-              Overdue only
-            </label>
           </div>
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-gray-700">Priority:</label>
@@ -1004,7 +980,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   }}
                   onFocus={() => setShowFilterCustomerDropdown(true)}
                   placeholder={filterCustomer || 'All customers...'}
-                  className={`w-full sm:w-52 px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 ${filterCustomer ? 'border-indigo-400 bg-indigo-50 pr-7' : 'border-gray-300'}`}
+                  className={`w-52 px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 ${filterCustomer ? 'border-indigo-400 bg-indigo-50 pr-7' : 'border-gray-300'}`}
                 />
                 {filterCustomer && (
                   <button
@@ -1482,7 +1458,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
       {/* Pagination footer */}
       {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-200">
+        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
           <div className="flex items-center gap-2">
             <button
               onClick={() => handlePageChange(currentPage - 1)}

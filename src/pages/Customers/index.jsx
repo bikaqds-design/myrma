@@ -758,10 +758,10 @@ export default function Customers({
 
   const getStatusBadge = (status) => {
     const map = {
-      Active:    'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400',
-      Inactive:  'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
+      Active: 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400',
+      Inactive: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
       Suspended: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
-      VIP:       'bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-400',
+      VIP: 'bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-400',
     }
     return (
       <span
@@ -818,7 +818,7 @@ export default function Customers({
         onClick={() => handleSort(col)}
         aria-label={`Sort by ${label}`}
         aria-sort={ariaSort}
-        className="flex items-center text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase hover:text-gray-800"
+        className="flex items-center text-xs font-semibold text-gray-500 uppercase hover:text-gray-800"
       >
         {label}
         <SortIcon col={col} />
@@ -847,14 +847,14 @@ export default function Customers({
     }
     return pages.map((p, i) =>
       p === '...' ? (
-        <span key={`e${i}`} className="px-2 text-gray-500 dark:text-[#9aa4b2]">
+        <span key={`e${i}`} className="px-2 text-gray-500">
           …
         </span>
       ) : (
         <button
           key={p}
           onClick={() => handlePageChange(p)}
-          className={`w-8 h-8 rounded text-sm ${currentPage === p ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-100 dark:bg-[#1a2230]'}`}
+          className={`w-8 h-8 rounded text-sm ${currentPage === p ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
         >
           {p}
         </button>
@@ -870,10 +870,10 @@ export default function Customers({
       <PageHeader title="Customers" subtitle="Manage B2B and B2C customer records" />
 
       {/* Table Card */}
-      <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] shadow-sm">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
         <div className="p-5 space-y-4">
           {/* Toolbar */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3 flex-1">
               <div className="relative flex-1 max-w-md">
                 <input
@@ -882,10 +882,10 @@ export default function Customers({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search name, company, mobile, code... (Press / to focus)"
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                 />
                 <svg
-                  className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2"
+                  className="w-5 h-5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -902,7 +902,7 @@ export default function Customers({
                 onClick={() => setShowFilters(!showFilters)}
                 aria-expanded={showFilters}
                 aria-controls="customer-filters-panel"
-                className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || filterStatus || filterType || filterCompany ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 dark:border-[#212a38] text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520]'}`}
+                className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || filterStatus || filterType || filterCompany ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -946,7 +946,7 @@ export default function Customers({
                       }
                     }}
                     defaultValue=""
-                    className="px-4 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
                   >
                     <option value="">Change Status…</option>
                     <option value="Active">Active</option>
@@ -958,7 +958,7 @@ export default function Customers({
               {canDo('export') && (
                 <button
                   onClick={handleExportCSV}
-                  className="px-4 py-2 border border-gray-300 dark:border-[#212a38] text-gray-700 dark:text-[#e8ebf0] rounded-lg hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-2 text-sm"
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -1004,17 +1004,17 @@ export default function Customers({
                     </svg>
                   </button>
                   {showAddDropdown && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#121823] rounded-lg shadow-lg border border-gray-200 dark:border-[#212a38] z-20">
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
                       <button
                         onClick={() => {
                           resetForm()
                           setShowAddCustomer(true)
                           setShowAddDropdown(false)
                         }}
-                        className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-3 border-b border-gray-100 dark:border-[#212a38] rounded-t-lg"
+                        className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 border-b border-gray-100 rounded-t-lg"
                       >
                         <svg
-                          className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2]"
+                          className="w-5 h-5 text-gray-500"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -1027,8 +1027,8 @@ export default function Customers({
                           />
                         </svg>
                         <div>
-                          <div className="font-medium text-gray-900 dark:text-[#e8ebf0]">Add Single Customer</div>
-                          <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">Create one customer</div>
+                          <div className="font-medium text-gray-900">Add Single Customer</div>
+                          <div className="text-xs text-gray-500">Create one customer</div>
                         </div>
                       </button>
                       {canDo('import') && (
@@ -1037,10 +1037,10 @@ export default function Customers({
                             setShowBulkUpload(true)
                             setShowAddDropdown(false)
                           }}
-                          className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-3 rounded-b-lg"
+                          className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 rounded-b-lg"
                         >
                           <svg
-                            className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2]"
+                            className="w-5 h-5 text-gray-500"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -1053,8 +1053,8 @@ export default function Customers({
                             />
                           </svg>
                           <div>
-                            <div className="font-medium text-gray-900 dark:text-[#e8ebf0]">Bulk Add / Upload</div>
-                            <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">Upload CSV file</div>
+                            <div className="font-medium text-gray-900">Bulk Add / Upload</div>
+                            <div className="text-xs text-gray-500">Upload CSV file</div>
                           </div>
                         </button>
                       )}
@@ -1067,13 +1067,13 @@ export default function Customers({
 
           {/* Filters */}
           {showFilters && (
-            <div id="customer-filters-panel" className="flex flex-wrap gap-3 items-center p-4 bg-gray-50 dark:bg-[#0f1520] rounded-lg">
+            <div id="customer-filters-panel" className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg flex-wrap">
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">Status:</label>
+                <label className="text-sm font-medium text-gray-700">Status:</label>
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm"
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
                 >
                   <option value="">All</option>
                   <option value="Active">Active</option>
@@ -1082,11 +1082,11 @@ export default function Customers({
                 </select>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">Type:</label>
+                <label className="text-sm font-medium text-gray-700">Type:</label>
                 <select
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm"
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
                 >
                   <option value="">All</option>
                   <option value="B2B">B2B</option>
@@ -1094,13 +1094,13 @@ export default function Customers({
                 </select>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">Company / Contact:</label>
+                <label className="text-sm font-medium text-gray-700">Company / Contact:</label>
                 <input
                   type="text"
                   value={filterCompany}
                   onChange={(e) => setFilterCompany(e.target.value)}
                   placeholder="Type to filter…"
-                  className="px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm w-44 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-44 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
               {(filterStatus || filterType || filterCompany) && (
@@ -1131,17 +1131,17 @@ export default function Customers({
           )}
 
           {/* Count + per-page */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-gray-600 dark:text-[#9aa4b2]">
+          <div className="flex items-center justify-between text-sm text-gray-600">
             <span>
               Showing {filteredCustomers.length === 0 ? 0 : startIndex + 1}–{endIndex} of{' '}
               {filteredCustomers.length} customers
             </span>
             <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600 dark:text-[#9aa4b2]">Items per page:</label>
+              <label className="text-sm text-gray-600">Items per page:</label>
               <select
                 value={itemsPerPage}
                 onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
-                className="px-3 py-1 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
+                className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
               >
                 <option value={10}>10</option>
                 <option value={25}>25</option>
@@ -1154,7 +1154,7 @@ export default function Customers({
           {/* Table */}
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-[#0f1520] border-y border-gray-200 dark:border-[#212a38]">
+              <thead className="bg-gray-50 border-y border-gray-200">
                 <tr>
                   <th className="px-4 py-3 text-left w-10">
                     <input
@@ -1167,7 +1167,7 @@ export default function Customers({
                       className="w-4 h-4 text-indigo-600 rounded"
                     />
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase w-10">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase w-10">
                     #
                   </th>
                   <th className="px-4 py-3 text-left">
@@ -1188,7 +1188,7 @@ export default function Customers({
                   <th className="px-4 py-3 text-left">
                     <Th label="Status" col="customer_status" />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
                     Actions
                   </th>
                 </tr>
@@ -1215,7 +1215,7 @@ export default function Customers({
                   </tr>
                 ) : (
                   paginatedCustomers.map((c, idx) => (
-                    <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] transition-colors">
+                    <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
                         <input
                           type="checkbox"
@@ -1224,11 +1224,11 @@ export default function Customers({
                           className="w-4 h-4 text-indigo-600 rounded"
                         />
                       </td>
-                      <td className="px-3 py-3 text-xs text-gray-500 dark:text-[#9aa4b2] tabular-nums">
+                      <td className="px-3 py-3 text-xs text-gray-500 tabular-nums">
                         {(currentPage - 1) * itemsPerPage + idx + 1}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-xs font-mono text-gray-500 dark:text-[#9aa4b2]">
+                        <span className="text-xs font-mono text-gray-500">
                           {c.customer_code || '—'}
                         </span>
                       </td>
@@ -1242,12 +1242,12 @@ export default function Customers({
                           <div>
                             <button
                               onClick={() => onNavigateToCustomer(c.id)}
-                              className="font-medium text-gray-900 dark:text-[#e8ebf0] hover:text-indigo-600 text-sm text-left"
+                              className="font-medium text-gray-900 hover:text-indigo-600 text-sm text-left"
                             >
                               {c.contact_person || '—'}
                             </button>
                             {c.company_name && (
-                              <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">{c.company_name}</div>
+                              <div className="text-xs text-gray-500">{c.company_name}</div>
                             )}
                           </div>
                         </div>
@@ -1259,14 +1259,14 @@ export default function Customers({
                           {c.customer_type}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-[#9aa4b2]">{c.mobile || '—'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{c.mobile || '—'}</td>
                       <td className="px-4 py-3 text-sm">
                         {c.email ? (
                           <a href={`mailto:${c.email}`} className="text-indigo-600 hover:underline">
                             {c.email}
                           </a>
                         ) : (
-                          <span className="text-gray-500 dark:text-[#9aa4b2]">—</span>
+                          <span className="text-gray-500">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3">{getStatusBadge(c.customer_status)}</td>
@@ -1279,7 +1279,7 @@ export default function Customers({
                           aria-label={`Actions for ${c.contact_person || c.company_name || 'customer'}`}
                           aria-expanded={openMenuId === c.id}
                           aria-haspopup="menu"
-                          className="p-1.5 rounded-lg text-gray-500 dark:text-[#9aa4b2] hover:text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-100 dark:bg-[#1a2230] transition-colors"
+                          className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
                         >
                           <svg className="w-4 h-4" aria-hidden="true" fill="currentColor" viewBox="0 0 24 24">
                             <circle cx="12" cy="5" r="1.5" />
@@ -1288,16 +1288,16 @@ export default function Customers({
                           </svg>
                         </button>
                         {openMenuId === c.id && (
-                          <div className="absolute right-0 top-9 z-30 w-44 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-gray-200 dark:border-[#212a38] py-1 overflow-hidden">
+                          <div className="absolute right-0 top-9 z-30 w-44 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
                             <button
                               onClick={() => {
                                 onNavigateToCustomer(c.id)
                                 setOpenMenuId(null)
                               }}
-                              className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-2.5"
+                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
                             >
                               <svg
-                                className="w-4 h-4 text-gray-500 dark:text-[#9aa4b2]"
+                                className="w-4 h-4 text-gray-500"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -1323,10 +1323,10 @@ export default function Customers({
                                   handleEditCustomer(c)
                                   setOpenMenuId(null)
                                 }}
-                                className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-2.5"
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
                               >
                                 <svg
-                                  className="w-4 h-4 text-gray-500 dark:text-[#9aa4b2]"
+                                  className="w-4 h-4 text-gray-500"
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -1377,12 +1377,12 @@ export default function Customers({
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-200 dark:border-[#212a38]">
+            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="px-3 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   Previous
                 </button>
@@ -1390,13 +1390,13 @@ export default function Customers({
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="px-3 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   Next
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600 dark:text-[#9aa4b2]">Jump to page:</span>
+                <span className="text-sm text-gray-600">Jump to page:</span>
                 <input
                   type="number"
                   min="1"
@@ -1405,7 +1405,7 @@ export default function Customers({
                   onChange={(e) => setJumpToPage(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleJumpToPage()}
                   placeholder={currentPage.toString()}
-                  className="w-20 px-3 py-1 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
+                  className="w-20 px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
                 />
                 <button
                   onClick={handleJumpToPage}

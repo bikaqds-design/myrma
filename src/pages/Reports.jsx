@@ -69,7 +69,7 @@ function KpiCard({ label, value, icon, color = 'indigo', sub }) {
   }
   const c = colors[color] || colors.indigo
   return (
-    <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] p-5 flex items-start gap-4">
+    <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-start gap-4">
       <div
         className={`w-10 h-10 rounded-xl ${c.bg} flex items-center justify-center flex-shrink-0`}
       >
@@ -79,8 +79,8 @@ function KpiCard({ label, value, icon, color = 'indigo', sub }) {
       </div>
       <div className="min-w-0">
         <p className={`text-2xl font-bold ${c.val} leading-none`}>{value}</p>
-        <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-1">{label}</p>
-        {sub && <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">{sub}</p>}
+        <p className="text-sm text-gray-500 mt-1">{label}</p>
+        {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
       </div>
     </div>
   )
@@ -118,14 +118,14 @@ function MigrationBanner({ table, children }) {
 function StatusBadge({ status }) {
   const map = {
     New: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
-    'In Progress': 'bg-yellow-100 text-yellow-700',
+    'In Progress': 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
     'On Hold': 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
     Completed: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
     Cancelled: 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]',
   }
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[status] || 'bg-gray-100 text-gray-600'}`}
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[status] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'}`}
     >
       {status || '—'}
     </span>
@@ -136,12 +136,12 @@ function PriorityBadge({ priority }) {
   const map = {
     Critical: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
     High: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
-    Medium: 'bg-yellow-100 text-yellow-700',
+    Medium: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
     Low: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
   }
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[priority] || 'bg-gray-100 text-gray-600'}`}
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${map[priority] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'}`}
     >
       {priority || '—'}
     </span>
@@ -227,12 +227,12 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
   }
 
   const sel =
-    'px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white dark:bg-[#0f1520] text-gray-800 dark:text-[#e8ebf0]'
+    'px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white'
 
   return (
     <div className="space-y-5">
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label="Total Tickets"
           value={total}
@@ -298,12 +298,12 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
             </option>
           ))}
         </select>
-        <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">
+        <span className="text-sm text-gray-500">
           {filtered.length} ticket{filtered.length !== 1 ? 's' : ''}
         </span>
         <button
           onClick={handleExport}
-          className="ml-auto flex items-center gap-1.5 px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
+          className="ml-auto flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -319,14 +319,14 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="text-center py-12 bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
-          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">No tickets match the selected filters</p>
+        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+          <p className="text-sm text-gray-500">No tickets match the selected filters</p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   {[
                     'RMA #',
@@ -341,18 +341,18 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
                   ].map((h) => (
                     <th
                       key={h}
-                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
+                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap"
                     >
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
+              <tbody className="divide-y divide-gray-100">
                 {filtered.map((t) => {
                   const hrs = resolutionHours(t)
                   return (
-                    <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors">
+                    <tr key={t.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
                         <button
                           onClick={() => onNavigateToTicket?.(t.id)}
@@ -361,7 +361,7 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
                           {t.rma_number || t.id?.slice(0, 8)}
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] max-w-[160px] truncate">
+                      <td className="px-4 py-3 text-gray-700 max-w-[160px] truncate">
                         {t.customer_name || '—'}
                       </td>
                       <td className="px-4 py-3">
@@ -370,10 +370,10 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
                       <td className="px-4 py-3">
                         <PriorityBadge priority={t.priority} />
                       </td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs max-w-[120px] truncate">
+                      <td className="px-4 py-3 text-gray-500 text-xs max-w-[120px] truncate">
                         {t.assigned_technician || '—'}
                       </td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs whitespace-nowrap">
+                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
                         {formatDate(t.created_date)}
                       </td>
                       <td className="px-4 py-3 text-xs whitespace-nowrap">
@@ -391,7 +391,7 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
                           <span className="text-gray-300">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs whitespace-nowrap">
+                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
                         {t.ticket_status === 'Completed' ? (
                           formatDate(t.updated_date)
                         ) : (
@@ -400,7 +400,7 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
                       </td>
                       <td className="px-4 py-3 text-xs">
                         {hrs !== null ? (
-                          <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium">
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 font-medium">
                             {hrs}h
                           </span>
                         ) : (
@@ -482,7 +482,7 @@ function CustomersTab({ customers, tickets, formatDate }) {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <KpiCard
           label="Active Customers"
           value={totalActive}
@@ -506,7 +506,7 @@ function CustomersTab({ customers, tickets, formatDate }) {
       <div className="flex justify-end">
         <button
           onClick={handleExport}
-          className="flex items-center gap-1.5 px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -521,14 +521,14 @@ function CustomersTab({ customers, tickets, formatDate }) {
       </div>
 
       {enriched.length === 0 ? (
-        <div className="text-center py-12 bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
-          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">No customer data in range</p>
+        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+          <p className="text-sm text-gray-500">No customer data in range</p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   {[
                     'Customer Name',
@@ -539,35 +539,35 @@ function CustomersTab({ customers, tickets, formatDate }) {
                   ].map((h) => (
                     <th
                       key={h}
-                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider"
+                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
                     >
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
+              <tbody className="divide-y divide-gray-100">
                 {enriched.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors">
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-[#e8ebf0]">
+                  <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-gray-900">
                       {c.contact_person || '—'}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2]">{c.company_name || '—'}</td>
+                    <td className="px-4 py-3 text-gray-500">{c.company_name || '—'}</td>
                     <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
+                      <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400">
                         {c.totalTickets}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       {c.openTickets > 0 ? (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
                           {c.openTickets}
                         </span>
                       ) : (
                         <span className="text-gray-300 text-xs">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs">
+                    <td className="px-4 py-3 text-gray-500 text-xs">
                       {c.lastActivity ? formatDate(c.lastActivity) : '—'}
                     </td>
                   </tr>
@@ -634,7 +634,7 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <KpiCard
           label="Active Technicians"
           value={activeTechs}
@@ -665,7 +665,7 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
       <div className="flex justify-end">
         <button
           onClick={handleExport}
-          className="flex items-center gap-1.5 px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -680,14 +680,14 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
       </div>
 
       {stats.length === 0 ? (
-        <div className="text-center py-12 bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
-          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">No assigned tickets in range</p>
+        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+          <p className="text-sm text-gray-500">No assigned tickets in range</p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   {[
                     'Technician',
@@ -698,23 +698,23 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
                   ].map((h) => (
                     <th
                       key={h}
-                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
+                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap"
                     >
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
+              <tbody className="divide-y divide-gray-100">
                 {stats.map((t) => {
                   const avgRes = t.resolveTimes.length
                     ? (t.resolveTimes.reduce((s, v) => s + v, 0) / t.resolveTimes.length).toFixed(1)
                     : null
                   return (
-                    <tr key={t.email} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors">
-                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-[#e8ebf0] text-xs">{t.email}</td>
+                    <tr key={t.email} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 font-medium text-gray-900 text-xs">{t.email}</td>
                       <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400">
                           {t.assigned}
                         </span>
                       </td>
@@ -732,7 +732,7 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
                           <span className="text-gray-300 text-xs">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs">
+                      <td className="px-4 py-3 text-gray-500 text-xs">
                         {timeEntriesMissing ? 'N/A' : `${t.hoursLogged.toFixed(1)}h`}
                       </td>
                     </tr>
@@ -759,11 +759,11 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
     )
 
   const INV_STATUS_CLS = {
-    paid:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+    paid: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
     pending: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
     overdue: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
-    draft:   'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
-    voided:  'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]',
+    draft: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
+    voided: 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]',
   }
 
   const totalInvoiced = invoices.reduce((s, i) => s + (i.total_amount || i.amount || 0), 0)
@@ -804,7 +804,7 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label="Total Invoiced"
           value={fmt$(totalInvoiced)}
@@ -834,7 +834,7 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
       <div className="flex justify-end">
         <button
           onClick={handleExport}
-          className="flex items-center gap-1.5 px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -849,48 +849,48 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
       </div>
 
       {invoices.length === 0 ? (
-        <div className="text-center py-12 bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
-          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">No invoices in the selected date range</p>
+        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+          <p className="text-sm text-gray-500">No invoices in the selected date range</p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   {['Invoice #', 'Customer', 'Type', 'Status', 'Total', 'Due Date'].map((h) => (
                     <th
                       key={h}
-                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
+                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap"
                     >
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
+              <tbody className="divide-y divide-gray-100">
                 {invoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors">
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-gray-900 dark:text-[#e8ebf0]">
+                  <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs font-medium text-gray-900">
                       {inv.invoice_number || '—'}
                     </td>
-                    <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] max-w-[150px] truncate">
+                    <td className="px-4 py-3 text-gray-700 max-w-[150px] truncate">
                       {inv.customer_name || '—'}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] capitalize text-xs">
+                    <td className="px-4 py-3 text-gray-500 capitalize text-xs">
                       {inv.type || inv.invoice_type || '—'}
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${INV_STATUS_CLS[inv.status] || 'bg-gray-100 text-gray-600'}`}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${INV_STATUS_CLS[inv.status] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'}`}
                       >
                         {inv.status || '—'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-semibold text-gray-900 dark:text-[#e8ebf0] tabular-nums">
+                    <td className="px-4 py-3 font-semibold text-gray-900 tabular-nums">
                       {fmt$(inv.total_amount || inv.amount || 0)}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs whitespace-nowrap">
+                    <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
                       {inv.due_date ? (
                         <span
                           className={
@@ -1016,9 +1016,9 @@ export default function Reports({
   }
 
   const inputCls =
-    'px-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white dark:bg-[#0f1520] text-gray-800 dark:text-[#e8ebf0]'
+    'px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent'
   const presetCls = (active) =>
-    `px-3 py-1.5 text-xs rounded-lg border transition-colors ${active ? 'bg-indigo-600 text-white border-indigo-600' : 'border-[#e6e9ef] dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230]'}`
+    `px-3 py-1.5 text-xs rounded-lg border transition-colors ${active ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`
 
   const isPreset7 =
     fromDate ===
@@ -1058,7 +1058,7 @@ export default function Reports({
       >
         <button
           onClick={() => refetch()}
-          className="flex items-center gap-1.5 px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -1073,9 +1073,9 @@ export default function Reports({
       </PageHeader>
 
       {/* Date Range Bar */}
-      <div className="flex items-center gap-3 flex-wrap bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] px-4 py-3">
+      <div className="flex items-center gap-3 flex-wrap bg-white rounded-xl border border-gray-200 px-4 py-3">
         <svg
-          className="w-4 h-4 text-gray-500 dark:text-[#9aa4b2] flex-shrink-0"
+          className="w-4 h-4 text-gray-500 flex-shrink-0"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -1094,7 +1094,7 @@ export default function Reports({
           max={toDate}
           className={inputCls}
         />
-        <span className="text-gray-500 dark:text-[#9aa4b2] text-sm">to</span>
+        <span className="text-gray-500 text-sm">to</span>
         <input
           type="date"
           value={toDate}
@@ -1129,13 +1129,13 @@ export default function Reports({
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-[#e6e9ef] dark:border-[#212a38]">
+      <div className="border-b border-gray-200">
         <div className="flex gap-1 overflow-x-auto">
           {allTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === tab.id ? 'border-indigo-600 text-indigo-600 dark:text-[#a5b4fc]' : 'border-transparent text-gray-500 dark:text-[#9aa4b2] hover:text-gray-700 dark:hover:text-[#e8ebf0]'}`}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === tab.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
             >
               {tab.label}
             </button>

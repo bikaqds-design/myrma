@@ -327,7 +327,7 @@ export default function ProductsListTab({
       </div>
 
       {/* Pagination Top Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-gray-600">
+      <div className="flex items-center justify-between text-sm text-gray-600">
         <div>
           Showing {startIndex + 1}-{endIndex} of {totalProducts} products
         </div>
@@ -371,10 +371,10 @@ export default function ProductsListTab({
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader label="Product Name" sortKey="product_name" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader label="Brand" sortKey="brand" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader label="Category" sortKey="category" />
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -455,10 +455,10 @@ export default function ProductsListTab({
                       {product.product_name}
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
+                  <td className="px-4 py-3 text-sm text-gray-600">
                     {product.brand?.brand_name || '-'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
+                  <td className="px-4 py-3 text-sm text-gray-600">
                     {product.category?.category_name || '-'}
                   </td>
                   <td className="px-4 py-3">
@@ -585,7 +585,7 @@ export default function ProductsListTab({
 
       {/* Pagination Bottom */}
       {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-200">
+        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
           <div className="flex items-center gap-2">
             <button
               onClick={() => handlePageChange(currentPage - 1)}

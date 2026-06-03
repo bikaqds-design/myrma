@@ -195,9 +195,9 @@ export function TicketDrawer({
       scrollable={false}
     >
       <div className="w-full">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200 dark:border-[#212a38]">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-[#e8ebf0]">Ticket Details</h2>
+            <h2 className="text-xl font-bold text-gray-900">Ticket Details</h2>
             <p className="text-sm font-mono text-indigo-600 mt-0.5">{ticket.rma_number}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -218,7 +218,7 @@ export function TicketDrawer({
             <button
               onClick={onClose}
               aria-label="Close ticket details"
-              className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 dark:text-[#9aa4b2] hover:bg-gray-100 dark:bg-[#1a2230]"
+              className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100"
             >
               <svg className="w-5 h-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -235,7 +235,7 @@ export function TicketDrawer({
         <div className="px-6 py-5 space-y-6 max-h-[72vh] overflow-y-auto">
           {/* Info grid */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
               Ticket Information
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -270,8 +270,8 @@ export function TicketDrawer({
                 { label: 'Created By', value: ticket.created_by || '—' },
               ].map(({ label, value }) => (
                 <div key={label}>
-                  <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-1">{label}</p>
-                  <div className="text-sm font-medium text-gray-900 dark:text-[#e8ebf0]">{value}</div>
+                  <p className="text-xs text-gray-500 mb-1">{label}</p>
+                  <div className="text-sm font-medium text-gray-900">{value}</div>
                 </div>
               ))}
             </div>
@@ -280,10 +280,10 @@ export function TicketDrawer({
           {/* General description */}
           {ticket.general_description && (
             <div>
-              <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
                 General RMA Description
               </h3>
-              <div className="bg-gray-50 dark:bg-[#0f1520] rounded-xl p-4 text-sm text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap">
+              <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap">
                 {ticket.general_description}
               </div>
             </div>
@@ -291,17 +291,17 @@ export function TicketDrawer({
 
           {/* Products */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
               Products ({(ticket.products || []).length})
             </h3>
             {(ticket.products || []).map((p, i) => (
-              <div key={i} className="border border-gray-200 dark:border-[#212a38] rounded-xl p-4 mb-3">
+              <div key={i} className="border border-gray-200 rounded-xl p-4 mb-3">
                 <h4 className="font-semibold text-gray-800 text-sm mb-3">
                   Product {i + 1} — {p.product_name}
                 </h4>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">Serial Number</p>
+                    <p className="text-xs text-gray-500">Serial Number</p>
                     <div className="flex items-center gap-2">
                       <p className="font-mono font-medium">{p.serial_number || '—'}</p>
                       {p.serial_number && (
@@ -319,15 +319,15 @@ export function TicketDrawer({
                     </div>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">Product Status</p>
+                    <p className="text-xs text-gray-500">Product Status</p>
                     <p className="font-medium">{p.product_status}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">Warranty</p>
+                    <p className="text-xs text-gray-500">Warranty</p>
                     <p className="font-medium">{p.warranty_status}</p>
                   </div>
                   <div className="col-span-2">
-                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">Issue Description</p>
+                    <p className="text-xs text-gray-500">Issue Description</p>
                     <p className="font-medium">{p.issue_description}</p>
                   </div>
                 </div>
@@ -356,16 +356,16 @@ export function TicketDrawer({
                 {serialHistory.map((t) => (
                   <div
                     key={t.id}
-                    className={`flex items-center justify-between p-2 bg-white dark:bg-[#121823] rounded-lg border text-xs ${t.id === ticket.id ? 'border-indigo-300' : 'border-gray-200 dark:border-[#212a38]'}`}
+                    className={`flex items-center justify-between p-2 bg-white rounded-lg border text-xs ${t.id === ticket.id ? 'border-indigo-300' : 'border-gray-200'}`}
                   >
                     <span className="font-mono font-medium text-indigo-700">{t.rma_number}</span>
-                    <span className="text-gray-600 dark:text-[#9aa4b2]">{t.customer_name}</span>
+                    <span className="text-gray-600">{t.customer_name}</span>
                     <span
                       className={`px-2 py-0.5 rounded-full font-medium ${getStatusColor(t.ticket_status)}`}
                     >
                       {t.ticket_status}
                     </span>
-                    <span className="text-gray-500 dark:text-[#9aa4b2]">
+                    <span className="text-gray-500">
                       {t.created_date ? new Date(t.created_date).toLocaleDateString() : '—'}
                     </span>
                     {t.id !== ticket.id && (
@@ -387,9 +387,9 @@ export function TicketDrawer({
 
           {/* ── Time Tracking ── */}
           {!timeEntriesMissing && (
-            <div className="border-t border-gray-200 dark:border-[#212a38] pt-5">
+            <div className="border-t border-gray-200 pt-5">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Time Tracking
                 </h3>
                 <span className="text-xs text-indigo-600 font-medium">
@@ -452,7 +452,7 @@ export function TicketDrawer({
                       value={timerNotes}
                       onChange={(e) => setTimerNotes(e.target.value)}
                       placeholder="Timer notes (optional)"
-                      className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 dark:border-[#212a38] rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 outline-none"
+                      className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 outline-none"
                     />
                   )}
                   {!timerRunning && (
@@ -466,7 +466,7 @@ export function TicketDrawer({
                 </div>
                 {/* Manual entry form */}
                 {addingManual && !timerRunning && (
-                  <div className="bg-gray-50 dark:bg-[#0f1520] border border-gray-200 dark:border-[#212a38] rounded-xl p-3">
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       <input
                         type="number"
@@ -475,9 +475,9 @@ export function TicketDrawer({
                         value={manualHours}
                         onChange={(e) => setManualHours(e.target.value)}
                         placeholder="0"
-                        className="w-16 px-2 py-1.5 border border-gray-200 dark:border-[#212a38] rounded-lg text-xs text-center focus:ring-1 focus:ring-indigo-400 outline-none"
+                        className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-center focus:ring-1 focus:ring-indigo-400 outline-none"
                       />
-                      <span className="text-xs text-gray-500 dark:text-[#9aa4b2] font-medium">h</span>
+                      <span className="text-xs text-gray-500 font-medium">h</span>
                       <input
                         type="number"
                         min="0"
@@ -485,14 +485,14 @@ export function TicketDrawer({
                         value={manualMins}
                         onChange={(e) => setManualMins(e.target.value)}
                         placeholder="0"
-                        className="w-16 px-2 py-1.5 border border-gray-200 dark:border-[#212a38] rounded-lg text-xs text-center focus:ring-1 focus:ring-indigo-400 outline-none"
+                        className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-center focus:ring-1 focus:ring-indigo-400 outline-none"
                       />
-                      <span className="text-xs text-gray-500 dark:text-[#9aa4b2] font-medium">m</span>
+                      <span className="text-xs text-gray-500 font-medium">m</span>
                       <input
                         value={manualNotes}
                         onChange={(e) => setManualNotes(e.target.value)}
                         placeholder="Notes (optional)"
-                        className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 dark:border-[#212a38] rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 outline-none"
+                        className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 outline-none"
                       />
                       <button
                         onClick={async () => {
@@ -539,18 +539,18 @@ export function TicketDrawer({
                     {[...timeEntries].reverse().map((entry) => (
                       <div
                         key={entry.id}
-                        className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-[#0f1520] rounded-lg text-xs group"
+                        className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs group"
                       >
-                        <span className="text-gray-500 dark:text-[#9aa4b2] shrink-0">{entry.user_email}</span>
+                        <span className="text-gray-500 shrink-0">{entry.user_email}</span>
                         <span className="font-semibold text-gray-800 shrink-0">
                           {Math.floor((entry.duration_min || 0) / 60)}h{' '}
                           {(entry.duration_min || 0) % 60}m
                         </span>
                         {entry.notes && (
-                          <span className="text-gray-500 dark:text-[#9aa4b2] flex-1 truncate">{entry.notes}</span>
+                          <span className="text-gray-500 flex-1 truncate">{entry.notes}</span>
                         )}
                         {!entry.notes && <span className="flex-1" />}
-                        <span className="text-gray-500 dark:text-[#9aa4b2] shrink-0">
+                        <span className="text-gray-500 shrink-0">
                           {entry.created_date
                             ? new Date(entry.created_date).toLocaleDateString()
                             : '—'}
@@ -581,7 +581,7 @@ export function TicketDrawer({
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-500 dark:text-[#9aa4b2] italic">No time entries yet.</p>
+                  <p className="text-xs text-gray-500 italic">No time entries yet.</p>
                 )}
               </div>
             </div>
@@ -589,9 +589,9 @@ export function TicketDrawer({
 
           {/* ── Parts Used ── */}
           {!ticketPartsMissing && (
-            <div className="border-t border-gray-200 dark:border-[#212a38] pt-5">
+            <div className="border-t border-gray-200 pt-5">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Parts Used ({ticketParts.length})
                 </h3>
                 {ticketParts.length > 0 && (
@@ -608,26 +608,26 @@ export function TicketDrawer({
                   {ticketParts.map((tp) => (
                     <div
                       key={tp.id}
-                      className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-[#0f1520] rounded-lg text-xs"
+                      className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg text-xs"
                     >
                       <span className="font-medium text-gray-800 flex-1">
                         {tp.parts?.part_name || '—'}
                       </span>
                       {tp.parts?.part_number && (
-                        <span className="text-gray-500 dark:text-[#9aa4b2] font-mono">{tp.parts.part_number}</span>
+                        <span className="text-gray-500 font-mono">{tp.parts.part_number}</span>
                       )}
-                      <span className="text-gray-500 dark:text-[#9aa4b2]">×{tp.quantity}</span>
-                      <span className="font-semibold text-gray-700 dark:text-[#e8ebf0]">
+                      <span className="text-gray-500">×{tp.quantity}</span>
+                      <span className="font-semibold text-gray-700">
                         ${(tp.quantity * tp.unit_cost).toFixed(2)}
                       </span>
                       {tp.notes && (
-                        <span className="text-gray-500 dark:text-[#9aa4b2] truncate max-w-[8rem]">{tp.notes}</span>
+                        <span className="text-gray-500 truncate max-w-[8rem]">{tp.notes}</span>
                       )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-gray-500 dark:text-[#9aa4b2] italic">No parts recorded on this ticket.</p>
+                <p className="text-xs text-gray-500 italic">No parts recorded on this ticket.</p>
               )}
             </div>
           )}
@@ -635,10 +635,10 @@ export function TicketDrawer({
           {/* Accessories */}
           {ticket.accessories_received && (
             <div>
-              <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
                 Accessories Received
               </h3>
-              <div className="bg-gray-50 dark:bg-[#0f1520] rounded-xl p-4 text-sm text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap">
+              <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap">
                 {ticket.accessories_received}
               </div>
             </div>
@@ -647,7 +647,7 @@ export function TicketDrawer({
           {/* Attachments */}
           {ticket.attachments?.length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
                 Attachments ({ticket.attachments.length})
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -657,7 +657,7 @@ export function TicketDrawer({
                     href={att.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex flex-col items-center p-3 border border-gray-200 dark:border-[#212a38] rounded-xl hover:bg-indigo-50 dark:hover:bg-[#1a2230] hover:border-indigo-300 transition-colors group"
+                    className="flex flex-col items-center p-3 border border-gray-200 rounded-xl hover:bg-indigo-50 hover:border-indigo-300 transition-colors group"
                   >
                     {isImage(att.type) ? (
                       <img
@@ -666,9 +666,9 @@ export function TicketDrawer({
                         className="w-full h-24 object-cover rounded-lg mb-2"
                       />
                     ) : (
-                      <div className="w-full h-24 bg-gray-100 dark:bg-[#1a2230] rounded-lg flex items-center justify-center mb-2">
+                      <div className="w-full h-24 bg-gray-100 rounded-lg flex items-center justify-center mb-2">
                         <svg
-                          className="w-10 h-10 text-gray-500 dark:text-[#9aa4b2]"
+                          className="w-10 h-10 text-gray-500"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -682,10 +682,10 @@ export function TicketDrawer({
                         </svg>
                       </div>
                     )}
-                    <p className="text-xs font-medium text-gray-700 dark:text-[#e8ebf0] group-hover:text-indigo-600 truncate w-full text-center">
+                    <p className="text-xs font-medium text-gray-700 group-hover:text-indigo-600 truncate w-full text-center">
                       {att.name}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{fmtBytes(att.size)}</p>
+                    <p className="text-xs text-gray-500">{fmtBytes(att.size)}</p>
                   </a>
                 ))}
               </div>
@@ -693,12 +693,12 @@ export function TicketDrawer({
           )}
 
           {/* ── Comments & Communication ── */}
-          <div className="border-t border-gray-200 dark:border-[#212a38] pt-5">
+          <div className="border-t border-gray-200 pt-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Comments & Communication
               </h3>
-              <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">
+              <span className="text-xs text-gray-500">
                 {ticketComments.length} comment{ticketComments.length !== 1 ? 's' : ''}
               </span>
             </div>
@@ -708,7 +708,7 @@ export function TicketDrawer({
                 <Spinner size="md" />
               </div>
             ) : ticketComments.filter((c) => !c.parent_comment_id).length === 0 ? (
-              <div className="text-center py-6 text-gray-500 dark:text-[#9aa4b2] text-sm">
+              <div className="text-center py-6 text-gray-500 text-sm">
                 No comments yet. Start the conversation below.
               </div>
             ) : (
@@ -734,7 +734,7 @@ export function TicketDrawer({
                     return (
                       <div key={comment.id}>
                         <div
-                          className={`flex gap-3 p-4 rounded-xl border ${comment.is_internal ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 dark:bg-[#0f1520] border-gray-200 dark:border-[#212a38]'}`}
+                          className={`flex gap-3 p-4 rounded-xl border ${comment.is_internal ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}
                         >
                           <div
                             className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 ${comment.is_internal ? 'bg-amber-500' : comment.is_customer_comment ? 'bg-green-500' : 'bg-indigo-500'}`}
@@ -743,24 +743,24 @@ export function TicketDrawer({
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <span className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">
+                              <span className="text-sm font-semibold text-gray-900">
                                 {displayName}
                               </span>
                               {comment.is_internal && (
-                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
                                   Internal
                                 </span>
                               )}
                               {comment.is_customer_comment && (
-                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800">
                                   Customer
                                 </span>
                               )}
-                              <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">
+                              <span className="text-xs text-gray-500">
                                 {dateStr} · {timeStr}
                               </span>
                             </div>
-                            <p className="text-sm text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap">
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap">
                               {comment.comment_text}
                             </p>
                             {comment.attachments?.length > 0 && (
@@ -771,7 +771,7 @@ export function TicketDrawer({
                                     href={att.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-[#121823] border border-gray-200 dark:border-[#212a38] rounded-lg text-xs text-indigo-600 hover:text-indigo-800 hover:border-indigo-300 transition-colors"
+                                    className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs text-indigo-600 hover:text-indigo-800 hover:border-indigo-300 transition-colors"
                                   >
                                     <svg
                                       className="w-3 h-3"
@@ -797,7 +797,7 @@ export function TicketDrawer({
                                 setNewComment('')
                                 setCommentFiles([])
                               }}
-                              className="mt-2 text-xs text-gray-500 dark:text-[#9aa4b2] hover:text-indigo-600 transition-colors flex items-center gap-1"
+                              className="mt-2 text-xs text-gray-500 hover:text-indigo-600 transition-colors flex items-center gap-1"
                             >
                               <svg
                                 className="w-3 h-3"
@@ -847,7 +847,7 @@ export function TicketDrawer({
                               return (
                                 <div
                                   key={reply.id}
-                                  className={`flex gap-3 p-3 rounded-xl border ${reply.is_internal ? 'bg-amber-50 border-amber-200' : 'bg-white dark:bg-[#121823] border-gray-200 dark:border-[#212a38]'}`}
+                                  className={`flex gap-3 p-3 rounded-xl border ${reply.is_internal ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}
                                 >
                                   <div
                                     className={`w-7 h-7 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 ${reply.is_internal ? 'bg-amber-400' : reply.is_customer_comment ? 'bg-green-400' : 'bg-indigo-400'}`}
@@ -856,20 +856,20 @@ export function TicketDrawer({
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                                      <span className="text-xs font-semibold text-gray-900 dark:text-[#e8ebf0]">
+                                      <span className="text-xs font-semibold text-gray-900">
                                         {rName}
                                       </span>
                                       {reply.is_internal && (
-                                        <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                                        <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
                                           Internal
                                         </span>
                                       )}
                                       {reply.is_customer_comment && (
-                                        <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">
+                                        <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800">
                                           Customer
                                         </span>
                                       )}
-                                      <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">
+                                      <span className="text-xs text-gray-500">
                                         {rTs.toLocaleDateString('en-US', {
                                           month: 'short',
                                           day: 'numeric',
@@ -881,7 +881,7 @@ export function TicketDrawer({
                                         })}
                                       </span>
                                     </div>
-                                    <p className="text-sm text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap">
+                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
                                       {reply.comment_text}
                                     </p>
                                     {reply.attachments?.length > 0 && (
@@ -892,7 +892,7 @@ export function TicketDrawer({
                                             href={att.url}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-[#121823] border border-gray-200 dark:border-[#212a38] rounded-lg text-xs text-indigo-600 hover:text-indigo-800 hover:border-indigo-300 transition-colors"
+                                            className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs text-indigo-600 hover:text-indigo-800 hover:border-indigo-300 transition-colors"
                                           >
                                             <svg
                                               className="w-3 h-3"
@@ -941,7 +941,7 @@ export function TicketDrawer({
                         )}
 
                         {replyingTo === comment.id && (
-                          <div className="ml-8 mt-2 bg-white dark:bg-[#121823] border border-indigo-200 rounded-xl p-3 space-y-2">
+                          <div className="ml-8 mt-2 bg-white border border-indigo-200 rounded-xl p-3 space-y-2">
                             <div className="flex items-center gap-1.5 mb-1">
                               <svg
                                 className="w-3 h-3 text-indigo-500"
@@ -969,7 +969,7 @@ export function TicketDrawer({
                               }}
                               rows={2}
                               placeholder="Write a reply... (Ctrl+Enter to submit)"
-                              className="w-full text-sm text-gray-700 dark:text-[#e8ebf0] resize-none outline-none placeholder-gray-400"
+                              className="w-full text-sm text-gray-700 resize-none outline-none placeholder-gray-400"
                               autoFocus
                             />
                             {commentFiles.length > 0 && (
@@ -977,7 +977,7 @@ export function TicketDrawer({
                                 {commentFiles.map((f, i) => (
                                   <span
                                     key={i}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-[#1a2230] rounded text-xs text-gray-600 dark:text-[#9aa4b2]"
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600"
                                   >
                                     {f.name}
                                     <button
@@ -986,7 +986,7 @@ export function TicketDrawer({
                                           prev.filter((_, j) => j !== i)
                                         )
                                       }
-                                      className="text-gray-500 dark:text-[#9aa4b2] hover:text-red-500"
+                                      className="text-gray-500 hover:text-red-500"
                                     >
                                       ×
                                     </button>
@@ -998,7 +998,7 @@ export function TicketDrawer({
                               <div className="flex items-center gap-3">
                                 <button
                                   onClick={() => commentFileInputRef.current?.click()}
-                                  className="text-gray-500 dark:text-[#9aa4b2] hover:text-indigo-600 transition-colors"
+                                  className="text-gray-500 hover:text-indigo-600 transition-colors"
                                   title="Attach file"
                                   aria-label="Attach file"
                                 >
@@ -1022,10 +1022,10 @@ export function TicketDrawer({
                                     className={`relative w-8 h-4 rounded-full transition-colors ${isInternalComment ? 'bg-amber-500' : 'bg-gray-200'}`}
                                   >
                                     <div
-                                      className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white dark:bg-[#121823] rounded-full shadow transition-transform ${isInternalComment ? 'translate-x-4' : ''}`}
+                                      className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${isInternalComment ? 'translate-x-4' : ''}`}
                                     />
                                   </div>
-                                  <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">Internal</span>
+                                  <span className="text-xs text-gray-500">Internal</span>
                                 </label>
                               </div>
                               <div className="flex items-center gap-2">
@@ -1035,7 +1035,7 @@ export function TicketDrawer({
                                     setNewComment('')
                                     setCommentFiles([])
                                   }}
-                                  className="text-xs text-gray-500 dark:text-[#9aa4b2] hover:text-gray-600 dark:text-[#9aa4b2]"
+                                  className="text-xs text-gray-500 hover:text-gray-600"
                                 >
                                   Cancel
                                 </button>
@@ -1061,7 +1061,7 @@ export function TicketDrawer({
             )}
 
             {!replyingTo && (
-              <div className="bg-white dark:bg-[#121823] border border-gray-200 dark:border-[#212a38] rounded-xl p-3 space-y-3">
+              <div className="bg-white border border-gray-200 rounded-xl p-3 space-y-3">
                 <textarea
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
@@ -1070,21 +1070,21 @@ export function TicketDrawer({
                   }}
                   rows={3}
                   placeholder="Write a comment... (Ctrl+Enter to submit)"
-                  className="w-full text-sm text-gray-700 dark:text-[#e8ebf0] resize-none outline-none placeholder-gray-400"
+                  className="w-full text-sm text-gray-700 resize-none outline-none placeholder-gray-400"
                 />
                 {commentFiles.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {commentFiles.map((f, i) => (
                       <span
                         key={i}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-[#1a2230] rounded text-xs text-gray-600 dark:text-[#9aa4b2]"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600"
                       >
                         {f.name}
                         <button
                           onClick={() =>
                             setCommentFiles((prev) => prev.filter((_, j) => j !== i))
                           }
-                          className="text-gray-500 dark:text-[#9aa4b2] hover:text-red-500"
+                          className="text-gray-500 hover:text-red-500"
                         >
                           ×
                         </button>
@@ -1096,7 +1096,7 @@ export function TicketDrawer({
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => commentFileInputRef.current?.click()}
-                      className="text-gray-500 dark:text-[#9aa4b2] hover:text-indigo-600 transition-colors"
+                      className="text-gray-500 hover:text-indigo-600 transition-colors"
                       title="Attach file"
                       aria-label="Attach file"
                     >
@@ -1120,10 +1120,10 @@ export function TicketDrawer({
                         className={`relative w-9 h-5 rounded-full transition-colors ${isInternalComment ? 'bg-amber-500' : 'bg-gray-200'}`}
                       >
                         <div
-                          className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white dark:bg-[#121823] rounded-full shadow transition-transform ${isInternalComment ? 'translate-x-4' : ''}`}
+                          className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${isInternalComment ? 'translate-x-4' : ''}`}
                         />
                       </div>
-                      <span className="text-xs text-gray-600 dark:text-[#9aa4b2]">Internal only</span>
+                      <span className="text-xs text-gray-600">Internal only</span>
                     </label>
                   </div>
                   <button
@@ -1168,7 +1168,7 @@ export function TicketDrawer({
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-[#212a38]">
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200">
           {(canDo('edit_all') || canDo('edit_assigned')) && (
             <Button
               onClick={() => {

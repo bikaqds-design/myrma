@@ -44,17 +44,17 @@ function clearFailures() {
 }
 
 const PRODUCT_STATUS_COLORS = {
-  Received:      'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
-  'Under Repair':'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
-  Repaired:      'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
-  "Can't Repair":'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
-  Replacement:   'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400',
+  Received: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
+  'Under Repair': 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
+  Repaired: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+  "Can't Repair": 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
+  Replacement: 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400',
   'Credit Note': 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
 }
 
-// All 7 ticket statuses shown in the progress bar in order.
-const PROGRESS_STEPS = ['Open', 'In Progress', 'Pending', 'On Hold', 'Completed', 'Closed', 'Cancelled']
-
+// Linear progress steps — mirrors the ticket form status options exactly.
+// 'Cancelled' is handled separately as a terminal state, not a progress step.
+const PROGRESS_STEPS = ['Open', 'In Progress', 'Pending', 'On Hold', 'Completed', 'Closed']
 const STATUS_COLORS = {
   Open: 'bg-blue-500',
   'In Progress': 'bg-indigo-500',
@@ -63,17 +63,40 @@ const STATUS_COLORS = {
   Completed: 'bg-teal-500',
   Closed: 'bg-green-500',
   Cancelled: 'bg-red-500',
+  // legacy alias
   New: 'bg-blue-500',
 }
-
 const STATUS_STEP_COLORS = {
-  Open:         { active: 'border-blue-500 bg-blue-500',    done: 'border-green-500 bg-green-500', text: 'text-blue-600' },
-  'In Progress':{ active: 'border-indigo-500 bg-indigo-500',done: 'border-green-500 bg-green-500', text: 'text-indigo-600' },
-  Pending:      { active: 'border-orange-500 bg-orange-500',done: 'border-green-500 bg-green-500', text: 'text-orange-600' },
-  'On Hold':    { active: 'border-yellow-500 bg-yellow-500',done: 'border-green-500 bg-green-500', text: 'text-yellow-600' },
-  Completed:    { active: 'border-teal-500 bg-teal-500',    done: 'border-green-500 bg-green-500', text: 'text-teal-600' },
-  Closed:       { active: 'border-green-600 bg-green-600',  done: 'border-green-500 bg-green-500', text: 'text-green-700' },
-  Cancelled:    { active: 'border-red-500 bg-red-500',      done: 'border-red-500 bg-red-500',     text: 'text-red-600' },
+  Open: {
+    active: 'border-blue-500 bg-blue-500',
+    done: 'border-green-500 bg-green-500',
+    text: 'text-blue-600',
+  },
+  'In Progress': {
+    active: 'border-indigo-500 bg-indigo-500',
+    done: 'border-green-500 bg-green-500',
+    text: 'text-indigo-600',
+  },
+  Pending: {
+    active: 'border-orange-500 bg-orange-500',
+    done: 'border-green-500 bg-green-500',
+    text: 'text-orange-600',
+  },
+  'On Hold': {
+    active: 'border-yellow-500 bg-yellow-500',
+    done: 'border-green-500 bg-green-500',
+    text: 'text-yellow-600',
+  },
+  Completed: {
+    active: 'border-teal-500 bg-teal-500',
+    done: 'border-green-500 bg-green-500',
+    text: 'text-teal-600',
+  },
+  Closed: {
+    active: 'border-green-500 bg-green-500',
+    done: 'border-green-500 bg-green-500',
+    text: 'text-green-600',
+  },
 }
 
 const SCHEMA_SQL = `-- Run these in your Supabase SQL editor:
@@ -252,7 +275,9 @@ export default function RMATracker() {
   // Normalize legacy 'New' → 'Open' so old tickets still show progress correctly.
   const currentStatus = ticket?.ticket_status === 'New' ? 'Open' : ticket?.ticket_status
   const isCancelled = currentStatus === 'Cancelled'
-  const stepIdx = PROGRESS_STEPS.findIndex((s) => s.toLowerCase() === currentStatus?.toLowerCase())
+  const stepIdx = PROGRESS_STEPS.findIndex(
+    (s) => s.toLowerCase() === currentStatus?.toLowerCase()
+  )
   const products = ticket?.products || []
   const topComments = comments.filter((c) => !c.parent_comment_id)
   const getReplies = (id) => comments.filter((c) => c.parent_comment_id === id)
@@ -436,62 +461,88 @@ export default function RMATracker() {
                     Refresh
                   </button>
                 </div>
-                {/* 7-step progress bar — scrollable on mobile so labels aren't crushed */}
-                <div className="overflow-x-auto -mx-1 px-1 pb-1">
-                  <div className="flex items-start gap-0 min-w-[480px]">
+                {isCancelled ? (
+                  <div className="flex items-center gap-3 py-3 px-4 bg-red-50 border border-red-200 rounded-xl">
+                    <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+                      <svg
+                        className="w-4 h-4 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2.5}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-red-700">
+                        This ticket has been cancelled
+                      </div>
+                      <div className="text-xs text-red-500 mt-0.5">
+                        No further action will be taken on this request.
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-0">
                     {PROGRESS_STEPS.map((step, i) => {
-                      const isLast = i === PROGRESS_STEPS.length - 1
+                      const done = i < stepIdx
                       const active = i === stepIdx
-                      // When Cancelled is active, treat all previous steps as "not done" —
-                      // we don't know which statuses the ticket actually passed through.
-                      const done = isCancelled ? false : i < stepIdx
+                      const isLast = i === PROGRESS_STEPS.length - 1
                       const colors = STATUS_STEP_COLORS[step] || {
                         active: 'border-indigo-600 bg-indigo-600',
                         done: 'border-green-500 bg-green-500',
                         text: 'text-indigo-600',
                       }
-                      const isCancelledStep = step === 'Cancelled'
                       return (
                         <React.Fragment key={step}>
-                          <div className="flex flex-col items-center gap-1.5 flex-shrink-0 flex-1">
+                          <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
                             <div
                               className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all ${
-                                active ? colors.active : done ? colors.done : 'border-gray-200 bg-white'
+                                active
+                                  ? colors.active
+                                  : done
+                                    ? colors.done
+                                    : 'border-gray-200 bg-white'
                               }`}
                             >
                               {done ? (
-                                <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                </svg>
-                              ) : active && isCancelledStep ? (
-                                <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                                <svg
+                                  className="w-3.5 h-3.5 text-white"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={3}
+                                    d="M5 13l4 4L19 7"
+                                  />
                                 </svg>
                               ) : active ? (
                                 <div className="w-2 h-2 bg-white rounded-full" />
                               ) : null}
                             </div>
-                            <span className={`text-[9px] sm:text-[10px] font-medium leading-tight text-center w-full px-0.5 ${
-                              active ? colors.text : done ? 'text-green-600' : 'text-gray-400'
-                            }`}>
+                            <span
+                              className={`text-[10px] font-medium leading-tight text-center max-w-[52px] ${active ? colors.text : done ? 'text-green-600' : 'text-gray-500'}`}
+                            >
                               {step}
                             </span>
                           </div>
                           {!isLast && (
-                            <div className={`h-0.5 flex-1 mx-0.5 mt-3.5 flex-shrink-0 w-4 ${
-                              done ? 'bg-green-400' : 'bg-gray-200'
-                            }`} />
+                            <div
+                              className={`h-0.5 flex-1 mx-1 mb-4 ${i < stepIdx ? 'bg-green-400' : 'bg-gray-200'}`}
+                            />
                           )}
                         </React.Fragment>
                       )
                     })}
                   </div>
-                </div>
-                {/* Cancelled note below the bar */}
-                {isCancelled && (
-                  <p className="text-xs text-red-500 mt-2 text-center">
-                    This request has been cancelled — no further action will be taken.
-                  </p>
                 )}
               </div>
             </div>
@@ -550,14 +601,14 @@ export default function RMATracker() {
                         <div className="flex gap-2 mt-2 flex-wrap">
                           {p.product_status && (
                             <span
-                              className={`px-2 py-0.5 text-xs rounded-full font-medium ${PRODUCT_STATUS_COLORS[p.product_status] || 'bg-gray-100 text-gray-600'}`}
+                              className={`px-2 py-0.5 text-xs rounded-full font-medium ${PRODUCT_STATUS_COLORS[p.product_status] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'}`}
                             >
                               {p.product_status}
                             </span>
                           )}
                           {p.warranty_status && (
                             <span
-                              className={`px-2 py-0.5 text-xs rounded-full font-medium ${p.warranty_status === 'In Warranty' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
+                              className={`px-2 py-0.5 text-xs rounded-full font-medium ${p.warranty_status === 'In Warranty' ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400'}`}
                             >
                               {p.warranty_status}
                             </span>
@@ -817,7 +868,7 @@ function CommentBubble({
         <div className="flex items-center gap-2 flex-wrap mb-1">
           <span className="text-sm font-semibold text-gray-900">{displayName}</span>
           {isTeam && (
-            <span className="px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-full">
+            <span className="px-2 py-0.5 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 rounded-full">
               Support Team
             </span>
           )}

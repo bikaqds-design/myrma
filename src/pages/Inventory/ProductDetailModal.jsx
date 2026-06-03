@@ -26,17 +26,17 @@ export function TicketPreviewModal({ rmaNumber, onClose, onOpenFull }) {
   }, [rmaNumber])
 
   const priorityColor = {
-    Critical: 'bg-red-100 text-red-700',
-    High: 'bg-orange-100 text-orange-700',
-    Medium: 'bg-blue-100 text-blue-700',
-    Low: 'bg-gray-100 text-gray-500',
+    Critical: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
+    High: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
+    Medium: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
+    Low: 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]',
   }
   const statusColor = {
-    New: 'bg-blue-100 text-blue-700',
-    'In Progress': 'bg-yellow-100 text-yellow-700',
-    'On Hold': 'bg-orange-100 text-orange-700',
-    Completed: 'bg-green-100 text-green-700',
-    Cancelled: 'bg-gray-100 text-gray-500',
+    New: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
+    'In Progress': 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
+    'On Hold': 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
+    Completed: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+    Cancelled: 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]',
   }
   const fmt = (d) => (d ? new Date(d).toLocaleDateString() : '—')
 
@@ -84,14 +84,14 @@ export function TicketPreviewModal({ rmaNumber, onClose, onOpenFull }) {
               <div className="flex items-center gap-2 flex-wrap">
                 {ticket.ticket_status && (
                   <span
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColor[ticket.ticket_status] || 'bg-gray-100 text-gray-500'}`}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColor[ticket.ticket_status] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'}`}
                   >
                     {ticket.ticket_status}
                   </span>
                 )}
                 {ticket.priority && (
                   <span
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold ${priorityColor[ticket.priority] || 'bg-gray-100 text-gray-500'}`}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold ${priorityColor[ticket.priority] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'}`}
                   >
                     {ticket.priority}
                   </span>
@@ -233,11 +233,11 @@ export function ProductDetailModal({
   }
 
   const tsCls = {
-    New: 'bg-blue-100 text-blue-700',
-    'In Progress': 'bg-yellow-100 text-yellow-700',
-    'On Hold': 'bg-orange-100 text-orange-700',
-    Completed: 'bg-green-100 text-green-700',
-    Cancelled: 'bg-gray-100 text-gray-500',
+    New: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
+    'In Progress': 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
+    'On Hold': 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
+    Completed: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+    Cancelled: 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]',
   }
   const wName = (id) => warehouses.find((w) => w.id === id)?.name
 
@@ -295,14 +295,14 @@ export function ProductDetailModal({
         {/* Stock summary */}
         {isStock && (
           <div className="flex gap-3 px-6 py-3 bg-gray-50 border-b border-gray-100 flex-wrap">
-            <span className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+            <span className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400">
               {group.replacement} Replacement
             </span>
-            <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+            <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400">
               {group.credit_note} Credit Note
             </span>
             {group.units.length - group.replacement - group.credit_note > 0 && (
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]">
                 {group.units.length - group.replacement - group.credit_note} Other
               </span>
             )}
@@ -440,7 +440,7 @@ export function ProductDetailModal({
                       <td className="px-4 py-3">
                         {tk ? (
                           <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${tsCls[tk.ticket_status] || 'bg-gray-100 text-gray-500'}`}
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${tsCls[tk.ticket_status] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'}`}
                           >
                             {tk.ticket_status}
                           </span>
@@ -456,7 +456,7 @@ export function ProductDetailModal({
                       </td>
                       <td className="px-4 py-3">
                         {u.warehouse_id ? (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400">
                             {wName(u.warehouse_id) || 'Custom'}
                           </span>
                         ) : (
@@ -520,7 +520,7 @@ export function ProductDetailModal({
                           {tk?.customer_name || '—'}
                         </td>
                         <td className="px-4 py-3">
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400">
                             Batched
                           </span>
                         </td>

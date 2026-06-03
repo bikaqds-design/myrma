@@ -5,43 +5,6 @@ import { ROLE_DEFAULT_PERMISSIONS } from '../../lib/permissions'
 import { RoleBadge } from './_shared'
 import { getDefaultPermissions, getRoleTemplates } from './_utils'
 
-// Permissions that the DB (RLS) cannot enforce for a given role — granting them shows
-// the UI button but the server will reject the write. Used to surface a warning.
-const RLS_CEILING = {
-  [ROLES.VIEWER]: {
-    products: ['create', 'edit_all', 'delete', 'import'],
-    customers: ['create', 'edit', 'delete', 'import'],
-    rma_tickets: ['create', 'edit_all', 'edit_assigned', 'delete', 'bulk_actions'],
-    inventory: ['create', 'edit', 'delete', 'transfer'],
-    invoices: ['create', 'edit', 'delete'],
-    parts: ['create', 'edit', 'delete', 'adjust'],
-    reports: ['export'],
-    calendar: ['create', 'edit', 'delete'],
-    time_tracking: ['create', 'edit', 'delete'],
-    user_management: ['view', 'create', 'edit', 'delete', 'manage_permissions'],
-  },
-  [ROLES.TECHNICIAN]: {
-    products: ['create', 'edit_all', 'delete', 'import'],
-    customers: ['create', 'edit', 'delete', 'import'],
-    invoices: ['create', 'edit', 'delete'],
-    user_management: ['view', 'create', 'edit', 'delete', 'manage_permissions'],
-  },
-}
-
-function getCrossTierPermissions(role, perms) {
-  const ceiling = RLS_CEILING[role]
-  if (!ceiling) return []
-  const violations = []
-  for (const [section, actions] of Object.entries(ceiling)) {
-    for (const action of actions) {
-      if (perms?.[section]?.[action] === true) {
-        violations.push(`${section}.${action}`)
-      }
-    }
-  }
-  return violations
-}
-
 // Merges stored permissions on top of the full defaults so all keys are always present
 function mergeWithDefaults(permissions) {
   const defaults = getDefaultPermissions()
@@ -117,7 +80,7 @@ export function RoleTemplatesTab() {
                           enabled.map((p) => (
                             <span
                               key={p}
-                              className="px-1.5 py-0.5 bg-green-100 text-green-800 text-xs rounded font-medium"
+                              className="px-1.5 py-0.5 bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 text-xs rounded font-medium"
                             >
                               {p.replace(/_/g, ' ')}
                             </span>
@@ -271,8 +234,6 @@ export function PermissionsModal({ user, onSave, onClose }) {
     return mergeWithDefaults(base)
   })
 
-  const crossTierViolations = getCrossTierPermissions(user.role, perms)
-
   const hasCustomPerms =
     user.permissions && typeof user.permissions === 'object' && Object.keys(user.permissions).length > 0
 
@@ -309,7 +270,7 @@ export function PermissionsModal({ user, onSave, onClose }) {
             <div className="flex items-center gap-2 mt-2">
               <RoleBadge role={user.role} />
               {hasCustomPerms ? (
-                <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">
+                <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded-full">
                   Custom overrides active
                 </span>
               ) : (
@@ -323,20 +284,6 @@ export function PermissionsModal({ user, onSave, onClose }) {
             </svg>
           </button>
         </div>
-
-        {crossTierViolations.length > 0 && (
-          <div className="mx-6 mt-3 mb-1 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
-            <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-            </svg>
-            <span>
-              <strong>Cross-tier permissions detected</strong> — the following permissions exceed what the
-              database (RLS) enforces for the <strong>{user.role}</strong> role. The UI button will appear,
-              but the server will reject the write:{' '}
-              <span className="font-mono">{crossTierViolations.join(', ')}</span>
-            </span>
-          </div>
-        )}
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           <PermissionMatrix permissions={perms} onToggle={togglePermission} />
@@ -403,7 +350,7 @@ export function PermissionMatrix({ permissions, onToggle }) {
             {entries.length === 0 ? (
               <p className="text-sm text-gray-400 italic">No permissions defined</p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                 {entries.map(([perm, enabled]) => (
                   <label key={perm} className="flex items-center gap-2 cursor-pointer select-none">
                     <input

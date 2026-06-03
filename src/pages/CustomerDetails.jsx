@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { db, storage, branding as brandingAPI } from '../api/supabaseClient'
-import QRCode from 'qrcode'
+import { db, storage } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { CardSkeleton } from '../components/Skeleton'
 import AttachmentsField from '../components/AttachmentsField'
 import { Button, Spinner } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
-import { ROLES, TICKET_STATUS } from '../lib/constants'
+import { ROLES } from '../lib/constants'
 import { captureException } from '../lib/sentry'
 
 export default function CustomerDetails({
@@ -23,17 +22,11 @@ export default function CustomerDetails({
   const { data: customerPageData, isLoading: loading } = useQuery({
     queryKey: ['customer-details', customerId],
     queryFn: async () => {
-      // Fetch customer + notes in parallel first, then tickets using both
-      // customer_id FK and customer_name string so legacy tickets are found too.
-      const [customerData, notesData] = await Promise.all([
+      const [customerData, ticketsData, notesData] = await Promise.all([
         db.customers.get(customerId),
+        db.customers.getRelatedTickets(customerId),
         db.customerNotes.list(customerId),
       ])
-      const displayNames = [
-        customerData?.company_name,
-        customerData?.contact_person,
-      ].filter(Boolean)
-      const ticketsData = await db.customers.getRelatedTickets(customerId, displayNames)
       return { customerData, ticketsData, notesData }
     },
     enabled: !!customerId,
@@ -50,24 +43,6 @@ export default function CustomerDetails({
   const [editingNote, setEditingNote] = useState(null)
   const [editNoteText, setEditNoteText] = useState('')
   const [savingNote, setSavingNote] = useState(false)
-  const [drawerTicket, setDrawerTicket] = useState(null)   // ticket shown in the RMA detail drawer
-  const [drawerComments, setDrawerComments] = useState([])
-  const [drawerCommentsLoading, setDrawerCommentsLoading] = useState(false)
-
-  const openTicketDrawer = async (ticket) => {
-    setDrawerTicket(ticket)
-    setDrawerComments([])
-    setDrawerCommentsLoading(true)
-    try {
-      const result = await db.ticketComments.list(ticket.id)
-      const comments = result?.data ?? result ?? []
-      setDrawerComments(Array.isArray(comments) ? comments : [])
-    } catch {
-      setDrawerComments([])
-    } finally {
-      setDrawerCommentsLoading(false)
-    }
-  }
 
   const isSuperAdmin = currentUserRole === ROLES.SUPER_ADMIN
   const canDo = (action) => {
@@ -442,9 +417,9 @@ export default function CustomerDetails({
             label: 'Open Tickets',
             value: tickets.filter(
               (t) =>
-                t.ticket_status === TICKET_STATUS.OPEN ||
-                t.ticket_status === TICKET_STATUS.IN_PROGRESS ||
-                t.ticket_status === TICKET_STATUS.ON_HOLD
+                t.ticket_status === 'New' ||
+                t.ticket_status === 'In Progress' ||
+                t.ticket_status === 'On Hold'
             ).length,
             icon: '🔓',
             color: 'bg-yellow-50 text-yellow-700',
@@ -473,7 +448,7 @@ export default function CustomerDetails({
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="border-b border-gray-200">
-          <nav className="flex gap-4 sm:gap-6 px-6">
+          <nav className="flex gap-6 px-6">
             {[
               { key: 'profile', label: 'Profile', icon: '👤' },
               { key: 'rma', label: `RMA History (${tickets.length})`, icon: '🎫' },
@@ -507,7 +482,7 @@ export default function CustomerDetails({
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
                       Customer Type & Status
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className={labelClass}>
                           Customer Type <span className="text-red-500">*</span>
@@ -547,7 +522,7 @@ export default function CustomerDetails({
                       <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
                         Company Information
                       </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className={labelClass}>
                             Company Name <span className="text-red-500">*</span>
@@ -590,7 +565,7 @@ export default function CustomerDetails({
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
                       Contact Information
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className={labelClass}>
                           Contact Person <span className="text-red-500">*</span>
@@ -868,40 +843,69 @@ export default function CustomerDetails({
                   <table className="w-full">
                     <thead className="bg-gray-50 border-y border-gray-200">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">RMA Number</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Issue</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          RMA Number
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Priority
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Issue
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Created
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Action
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {tickets.map((ticket) => (
-                        <tr
-                          key={ticket.id}
-                          className="hover:bg-indigo-50 cursor-pointer transition-colors"
-                          onClick={() => openTicketDrawer(ticket)}
-                        >
+                        <tr key={ticket.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3">
-                            <span className="font-mono text-sm font-semibold text-indigo-600 hover:underline">
+                            <span className="font-mono text-sm font-medium text-indigo-600">
                               {ticket.rma_number || ticket.id?.slice(0, 8)}
                             </span>
                           </td>
-                          <td className="px-4 py-3">{getTicketStatusBadge(ticket.ticket_status)}</td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 text-xs rounded-full font-medium ${
-                              ticket.priority === 'Critical' ? 'bg-red-200 text-red-900'
-                              : ticket.priority === 'High' ? 'bg-red-100 text-red-800'
-                              : ticket.priority === 'Medium' ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
-                              : 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]'
-                            }`}>
+                            {getTicketStatusBadge(ticket.ticket_status)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`px-2 py-1 text-xs rounded-full font-medium ${
+                                ticket.priority === 'High'
+                                  ? 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
+                                  : ticket.priority === 'Medium'
+                                    ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
+                                    : ticket.priority === 'Critical'
+                                      ? 'bg-red-200 text-red-900'
+                                      : 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]'
+                              }`}
+                            >
                               {ticket.priority || 'Low'}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate" title={ticket.general_description || ''}>
+                          <td
+                            className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate"
+                            title={ticket.general_description || ''}
+                          >
                             {ticket.general_description || '—'}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-500">{formatDate(ticket.created_date)}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">
+                            {formatDate(ticket.created_date)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => onNavigateToTicket(ticket.id)}
+                              className="text-indigo-600 hover:text-indigo-900 text-sm font-medium hover:underline"
+                            >
+                              View →
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1101,19 +1105,6 @@ export default function CustomerDetails({
         onConfirm={confirmDialog.onConfirm}
         onCancel={closeConfirm}
       />
-
-      {/* ── RMA Ticket Detail Drawer ── */}
-      {drawerTicket && (
-        <TicketDetailDrawer
-          ticket={drawerTicket}
-          comments={drawerComments}
-          commentsLoading={drawerCommentsLoading}
-          formatDate={formatDate}
-          formatDateTime={formatDateTime}
-          getTicketStatusBadge={getTicketStatusBadge}
-          onClose={() => setDrawerTicket(null)}
-        />
-      )}
     </div>
   )
 }
@@ -1126,400 +1117,6 @@ function DetailRow({ icon, label, value }) {
         <p className="text-xs font-medium text-gray-500">{label}</p>
         <div className="text-sm text-gray-900">
           {value || <span className="text-gray-500">—</span>}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Ticket Detail Drawer (read-only, opens from RMA History tab) ─────────────
-async function exportTicketPDF(ticket) {
-  const esc = (s) =>
-    String(s ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;')
-
-  let qrCodeUrl = ''
-  try {
-    qrCodeUrl = await QRCode.toDataURL(ticket.rma_number)
-  } catch {}
-
-  const PDF_DEFAULT = {
-    paperSize: 'A4',
-    orientation: 'portrait',
-    font: 'Arial, sans-serif',
-    fontSize: 11,
-    primaryColor: '#4F46E5',
-    headerStyle: 'colored',
-    showLogo: false,
-    logoPosition: 'right',
-    showCompanyName: true,
-    showRmaNumber: true,
-    showDate: true,
-    sections: {
-      ticketInfo: true,
-      generalDescription: true,
-      products: true,
-      accessories: true,
-      attachments: true,
-      signatureLine: false,
-    },
-    sectionOrder: [
-      'ticketInfo',
-      'generalDescription',
-      'products',
-      'accessories',
-      'attachments',
-      'signatureLine',
-    ],
-    footerText: '',
-    showGeneratedDate: true,
-    showWatermark: false,
-  }
-  let pdfCfg = PDF_DEFAULT
-  let brandingData = {}
-  try {
-    const [cfgResult, brd] = await Promise.all([db.rmaConfig.getAll(), brandingAPI.getBranding()])
-    if (!cfgResult.missing) {
-      const row = cfgResult.data.find((r) => r.config_key === 'pdf_layout')
-      if (row?.config_value) {
-        const val = typeof row.config_value === 'string' ? JSON.parse(row.config_value) : row.config_value
-        pdfCfg = {
-          ...PDF_DEFAULT,
-          ...val,
-          sections: { ...PDF_DEFAULT.sections, ...(val.sections || {}) },
-          sectionOrder: val.sectionOrder?.length ? val.sectionOrder : PDF_DEFAULT.sectionOrder,
-        }
-      }
-    }
-    if (brd) brandingData = brd
-  } catch {}
-
-  const color = pdfCfg.primaryColor || '#4F46E5'
-  const font = pdfCfg.font || 'Arial, sans-serif'
-  const fontSize = pdfCfg.fontSize || 11
-  const sec = pdfCfg.sections || PDF_DEFAULT.sections
-  const companyName = brandingData.company_name || 'myRMA'
-  const logoUrl = pdfCfg.showLogo ? brandingData.logo_url || null : null
-
-  const fmtPdf = (d) =>
-    d
-      ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-      : 'N/A'
-  const fmtTS = (d) => {
-    if (!d) return 'N/A'
-    const dt = new Date(d)
-    return (
-      dt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) +
-      ' at ' +
-      dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-    )
-  }
-
-  const productsHtml = (ticket.products || [])
-    .map(
-      (p, i) => `
-    <div style="border:1px solid #E5E7EB;border-radius:6px;padding:12px;margin-bottom:12px">
-      <h4 style="margin:0 0 8px;font-size:${fontSize + 1}px;color:#1F2937">Product ${i + 1}: ${esc(p.product_name) || '—'}</h4>
-      <table style="width:100%;font-size:${fontSize}px;border-collapse:collapse">
-        <tr><td style="color:#6B7280;padding:3px 8px;width:40%">Serial Number</td><td style="font-family:monospace"><strong>${esc(p.serial_number) || '—'}</strong></td></tr>
-        <tr><td style="color:#6B7280;padding:3px 8px">Product Status</td><td><strong>${esc(p.product_status) || '—'}</strong></td></tr>
-        <tr><td style="color:#6B7280;padding:3px 8px">Warranty Status</td><td><strong>${esc(p.warranty_status) || '—'}</strong></td></tr>
-        <tr><td colspan="2" style="padding:6px 8px 0"><strong>Issue:</strong> ${esc(p.issue_description) || '—'}</td></tr>
-      </table>
-    </div>`
-    )
-    .join('')
-
-  const attachHtml = (ticket.attachments || []).length
-    ? (ticket.attachments || [])
-        .map(
-          (a) =>
-            `<li style="margin-bottom:4px">${esc(a.name)} <span style="color:#9CA3AF">(${(a.size / 1024).toFixed(1)} KB)</span></li>`
-        )
-        .join('')
-    : '<li style="color:#9CA3AF">No attachments</li>'
-
-  const priorityColors = {
-    Critical: '#FEE2E2;color:#991B1B',
-    High: '#FFEDD5;color:#9A3412',
-    Medium: '#DBEAFE;color:#1E40AF',
-    Low: '#F3F4F6;color:#374151',
-  }
-  const pc = priorityColors[ticket.priority] || priorityColors.Medium
-
-  const headerBorderStyle =
-    pdfCfg.headerStyle === 'colored'
-      ? `border-bottom:3px solid ${color};background:linear-gradient(135deg,${color}15 0%,transparent 100%)`
-      : pdfCfg.headerStyle === 'minimal'
-        ? 'border-bottom:1px solid #E5E7EB'
-        : 'border-bottom:none'
-
-  const logoHtml = logoUrl
-    ? `<img src="${logoUrl}" style="max-height:60px;max-width:140px;object-fit:contain" />`
-    : ''
-
-  const headerLeft =
-    pdfCfg.logoPosition === 'left'
-      ? `<div style="display:flex;align-items:center;gap:12px">${logoHtml}<div>${pdfCfg.showCompanyName ? `<div style="font-size:${fontSize + 4}px;font-weight:bold;color:${color}">${esc(companyName)}</div>` : ''}${pdfCfg.showRmaNumber ? `<div style="font-size:${fontSize + 2}px;color:#6B7280;margin-top:2px">${esc(ticket.rma_number)}</div>` : ''}${pdfCfg.showDate ? `<div style="font-size:${fontSize - 1}px;color:#9CA3AF;margin-top:2px">${esc(fmtTS(ticket.created_date))}</div>` : ''}<div style="margin-top:6px"><span class="badge" style="background:#DBEAFE;color:#1E40AF">${esc(ticket.ticket_status)}</span><span class="badge" style="background:${pc}">${esc(ticket.priority)}</span></div></div></div>`
-      : `<div>${pdfCfg.showCompanyName ? `<div style="font-size:${fontSize + 4}px;font-weight:bold;color:${color}">${esc(companyName)}</div>` : ''}${pdfCfg.showRmaNumber ? `<div style="font-size:${fontSize + 2}px;color:#6B7280;margin-top:2px">${esc(ticket.rma_number)}</div>` : ''}${pdfCfg.showDate ? `<div style="font-size:${fontSize - 1}px;color:#9CA3AF;margin-top:2px">${esc(fmtTS(ticket.created_date))}</div>` : ''}<div style="margin-top:6px"><span class="badge" style="background:#DBEAFE;color:#1E40AF">${esc(ticket.ticket_status)}</span><span class="badge" style="background:${pc}">${esc(ticket.priority)}</span></div></div>`
-
-  const headerRight =
-    pdfCfg.logoPosition === 'right'
-      ? `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">${logoHtml}${qrCodeUrl ? `<div style="text-align:center"><img src="${qrCodeUrl}" width="80" height="80"/><div style="font-size:10px;color:#6B7280;margin-top:2px">Scan to view</div></div>` : ''}</div>`
-      : qrCodeUrl
-        ? `<div style="text-align:center"><img src="${qrCodeUrl}" width="80" height="80"/><div style="font-size:10px;color:#6B7280;margin-top:2px">Scan to view</div></div>`
-        : ''
-
-  const watermarkHtml = pdfCfg.showWatermark
-    ? `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);font-size:80px;font-weight:bold;color:${color};opacity:0.05;pointer-events:none;z-index:-1">DRAFT</div>`
-    : ''
-
-  const footerContent = [
-    pdfCfg.showGeneratedDate ? `Generated: ${new Date().toLocaleString()}` : '',
-    pdfCfg.footerText || companyName,
-  ].filter(Boolean)
-
-  const w = window.open('', '_blank')
-  if (!w) {
-    toast.error('Pop-up blocked — allow pop-ups and try again')
-    return
-  }
-  w.document.write(`<!DOCTYPE html><html><head><title>RMA Ticket - ${esc(ticket.rma_number)}</title>
-    <style>
-      *{box-sizing:border-box;margin:0;padding:0}
-      body{font-family:${font};font-size:${fontSize}px;color:#1F2937;padding:30px}
-      .header{display:flex;justify-content:space-between;align-items:flex-start;${headerBorderStyle};padding-bottom:20px;margin-bottom:24px}
-      .badge{display:inline-block;padding:3px 10px;border-radius:9999px;font-size:${fontSize - 1}px;font-weight:bold;margin-right:6px;margin-top:6px}
-      .section{margin-bottom:20px}
-      .section-title{font-size:${fontSize - 1}px;text-transform:uppercase;letter-spacing:0.05em;color:${color};border-bottom:2px solid ${color}33;padding-bottom:6px;margin-bottom:12px;font-weight:600}
-      .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-      .info-label{font-size:${fontSize - 2}px;color:#6B7280;margin-bottom:2px}
-      .info-value{font-size:${fontSize}px;font-weight:bold}
-      .desc-box{background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:12px;white-space:pre-wrap}
-      .footer{margin-top:30px;border-top:1px solid #E5E7EB;padding-top:12px;display:flex;justify-content:space-between;color:#9CA3AF;font-size:${fontSize - 2}px}
-      .sig-box{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px}
-      .sig-line{border-top:1px solid #374151;padding-top:6px;font-size:${fontSize - 1}px;color:#6B7280;text-align:center}
-      @media print{body{padding:15px}}
-    </style></head>
-    <body>
-    ${watermarkHtml}
-    <div class="header">
-      ${headerLeft}
-      ${headerRight}
-    </div>
-
-    ${pdfCfg.sectionOrder
-      .map((key) => {
-        if (!sec[key]) return ''
-        if (key === 'ticketInfo')
-          return `
-      <div class="section">
-        <div class="section-title">Ticket Information</div>
-        <div class="grid">
-          <div><div class="info-label">Customer</div><div class="info-value">${esc(ticket.customer_name) || '—'}</div></div>
-          <div><div class="info-label">Assigned To</div><div class="info-value">${esc(ticket.assigned_technician) || 'Unassigned'}</div></div>
-          <div><div class="info-label">Due Date</div><div class="info-value">${esc(fmtPdf(ticket.due_date))}</div></div>
-          <div><div class="info-label">Created</div><div class="info-value">${esc(fmtTS(ticket.created_date))}</div></div>
-          <div><div class="info-label">Created By</div><div class="info-value">${esc(ticket.created_by) || '—'}</div></div>
-        </div>
-      </div>`
-        if (key === 'generalDescription')
-          return ticket.general_description
-            ? `
-      <div class="section">
-        <div class="section-title">General RMA Description</div>
-        <div class="desc-box">${esc(ticket.general_description)}</div>
-      </div>`
-            : ''
-        if (key === 'products')
-          return `
-      <div class="section">
-        <div class="section-title">Products (${(ticket.products || []).length})</div>
-        ${productsHtml || '<p style="color:#9CA3AF">No products listed</p>'}
-      </div>`
-        if (key === 'accessories')
-          return ticket.accessories_received
-            ? `
-      <div class="section">
-        <div class="section-title">Accessories Received</div>
-        <div class="desc-box">${esc(ticket.accessories_received)}</div>
-      </div>`
-            : ''
-        if (key === 'attachments')
-          return `
-      <div class="section">
-        <div class="section-title">Attachments</div>
-        <ul style="padding-left:20px">${attachHtml}</ul>
-      </div>`
-        if (key === 'signatureLine')
-          return `
-      <div class="sig-box">
-        <div><div class="sig-line">Customer Signature</div></div>
-        <div><div class="sig-line">Technician Signature</div></div>
-      </div>`
-        return ''
-      })
-      .join('')}
-
-    <div class="footer">
-      <span>${esc(footerContent[0]) || ''}</span>
-      <span>${esc(footerContent[1]) || ''}</span>
-    </div>
-    <script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>
-    </body></html>`)
-  w.document.close()
-}
-
-function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, formatDateTime, getTicketStatusBadge, onClose }) {
-  const products = ticket.products || []
-
-  return (
-    <div className="fixed inset-0 z-50 flex">
-      {/* Backdrop */}
-      <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-
-      {/* Panel */}
-      <div className="w-full max-w-lg bg-white dark:bg-[#121823] shadow-2xl flex flex-col h-full overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-[#212a38] flex-shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="font-mono text-base font-bold text-indigo-600 dark:text-[#a5b4fc] truncate">
-              {ticket.rma_number}
-            </span>
-            {getTicketStatusBadge(ticket.ticket_status)}
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-            <button
-              onClick={() => exportTicketPDF(ticket)}
-              title="Export PDF"
-              aria-label="Export PDF"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-[#9aa4b2] bg-gray-100 dark:bg-[#1a2230] hover:bg-gray-200 dark:hover:bg-[#212a38] rounded-lg transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              PDF
-            </button>
-            <button
-              onClick={onClose}
-              aria-label="Close"
-              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1a2230] transition-colors"
-            >
-              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-          {/* Key details grid */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">Priority</p>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                ticket.priority === 'Critical' ? 'bg-red-200 text-red-900'
-                : ticket.priority === 'High' ? 'bg-red-100 text-red-800'
-                : ticket.priority === 'Medium' ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
-                : 'bg-gray-100 text-gray-700'
-              }`}>{ticket.priority || 'Low'}</span>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">Assigned To</p>
-              <p className="font-medium text-gray-800 dark:text-[#e8ebf0] truncate">{ticket.assigned_technician || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">Created</p>
-              <p className="font-medium text-gray-800 dark:text-[#e8ebf0]">{formatDate(ticket.created_date)}</p>
-            </div>
-            {ticket.due_date && (
-              <div>
-                <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">Due Date</p>
-                <p className="font-medium text-gray-800 dark:text-[#e8ebf0]">{formatDate(ticket.due_date)}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Description */}
-          {ticket.general_description && (
-            <div>
-              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-2">Issue Description</p>
-              <p className="text-sm text-gray-700 dark:text-[#e8ebf0] bg-gray-50 dark:bg-[#0f1520] rounded-lg p-3 leading-relaxed whitespace-pre-wrap">
-                {ticket.general_description}
-              </p>
-            </div>
-          )}
-
-          {/* Products */}
-          {products.length > 0 && (
-            <div>
-              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-3">
-                Items ({products.length})
-              </p>
-              <div className="space-y-2">
-                {products.map((p, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-[#0f1520] rounded-lg border border-gray-100 dark:border-[#212a38]">
-                    <div className="w-8 h-8 bg-indigo-100 dark:bg-[#1a2230] rounded-lg flex items-center justify-center flex-shrink-0">
-                      <svg className="w-4 h-4 text-indigo-600 dark:text-[#a5b4fc]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
-                      </svg>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 dark:text-[#e8ebf0]">{p.product_name || `Item ${i + 1}`}</p>
-                      {p.serial_number && <p className="text-xs text-gray-500 dark:text-[#9aa4b2] font-mono mt-0.5">S/N: {p.serial_number}</p>}
-                      {p.issue_description && <p className="text-xs text-gray-600 dark:text-[#9aa4b2] mt-1">{p.issue_description}</p>}
-                      {p.product_status && (
-                        <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full font-medium bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400">
-                          {p.product_status}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Comments */}
-          <div>
-            <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-3">
-              Comments {!commentsLoading && `(${comments.length})`}
-            </p>
-            {commentsLoading ? (
-              <div className="flex justify-center py-6">
-                <div className="animate-spin w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full" />
-              </div>
-            ) : comments.length === 0 ? (
-              <p className="text-sm text-gray-400 dark:text-[#4a5568] text-center py-4">No comments yet</p>
-            ) : (
-              <div className="space-y-3">
-                {comments.map((c) => {
-                  const isTeam = !c.is_customer_comment
-                  const name = c.author_name || c.user_email || (isTeam ? 'Team' : 'Customer')
-                  return (
-                    <div key={c.id} className={`flex gap-3 p-3 rounded-xl border text-sm ${isTeam ? 'bg-indigo-50 dark:bg-[#1a2230] border-indigo-100 dark:border-[#212a38]' : 'bg-gray-50 dark:bg-[#0f1520] border-gray-100 dark:border-[#212a38]'}`}>
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 ${isTeam ? 'bg-indigo-500' : 'bg-gray-400'}`}>
-                        {name[0]?.toUpperCase() || '?'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="font-semibold text-gray-900 dark:text-[#e8ebf0] text-xs">{name}</span>
-                          {isTeam && <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-700 rounded-full">Staff</span>}
-                          <span className="text-xs text-gray-400 dark:text-[#4a5568] ml-auto">{formatDateTime(c.created_date)}</span>
-                        </div>
-                        <p className="text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap leading-relaxed">{c.comment_text}</p>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>
