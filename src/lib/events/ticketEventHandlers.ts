@@ -112,7 +112,13 @@ export function registerTicketEventHandlers(): void {
         // reorders keys by length then alphabetically). Sending the `variables`
         // object alone would scramble WhatsApp's positional {{1}},{{2}} params.
         // JSONB *does* preserve array element order, so we send this array.
-        const params = templateVars.map((def) => variables[def.key] ?? '')
+        // Meta rejects empty positional params with #131008 "Required parameter
+        // is missing". Substitute a placeholder for any blank value so a single
+        // missing field never blocks the whole notification.
+        const params = templateVars.map((def) => {
+          const v = variables[def.key]
+          return v != null && String(v).trim() !== '' ? String(v) : '—'
+        })
 
         // ── 6. Queue the notification ─────────────────────────────────────
         const { error: queueError } = await supabase

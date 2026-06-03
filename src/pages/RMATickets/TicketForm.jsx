@@ -416,12 +416,20 @@ export function TicketForm({
               status: ticketData.ticket_status,
             })
             .catch(() => {})
-          // WhatsApp notification
+          // WhatsApp notification — spread the saved DB row so all fields
+          // (incl. created_date) are present; ticketData alone lacks created_date
+          // which left {{created_date}} empty → Meta #131008 "required parameter missing".
           notificationEventBus.emitAsync({
             type: 'ticket.created',
             timestamp: new Date().toISOString(),
             ticketId: newTicket.id,
-            ticket: { ...ticketData, id: newTicket.id, rma_number: rmaNumber },
+            ticket: {
+              ...ticketData,
+              ...newTicket,
+              id: newTicket.id,
+              rma_number: newTicket.rma_number || rmaNumber,
+              created_date: newTicket.created_date || new Date().toISOString(),
+            },
             triggeredBy: userEmail,
           })
         }
