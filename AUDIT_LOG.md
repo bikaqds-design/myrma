@@ -1307,4 +1307,56 @@ This is the riskiest task. `jspdf 4.2.1` is a major-version library bump. The AP
 - **2026-06-03** — ✅ **Static cross-role QA pass** (no commit — analysis only). Verified `canDo` wiring consistent across all 12 page files: admin bypass pattern identical everywhere; manager/technician/viewer permission defaults match `ROLE_DEFAULT_PERMISSIONS`; `/control-panel` route guard confirmed (`Navigate to="/"` for non-admin); technician `edit_assigned` check correctly gates on `assigned_technician !== userEmail`; RLS server-side enforcement confirmed from `20260526_enable_rls.sql`. Verdict: all 3 roles correctly gated, no discrepancies found.
 - **2026-06-03** — ✅ **Doc sync** (commit `cb6cf4b`, branch `test`). `CLAUDE.md` updated: domain modules table updated to TypeScript with Row types, 2 new migrations added, WhatsApp system section added, 3 new Edge Functions added, Control Panel updated. `AUDIT_LOG.md` updated with 2026-06-03 entries. `CONSTITUTION.md` and `README.md` updated.
 
-> **Current score: 9.7/10**. Open items: jsPDF browser smoke test (code done, test pending), test → main merge awaiting approval, Meta WhatsApp template approval awaiting.
+---
+
+## 🧪 Session 2 — 2026-06-03 (dark mode polish + WhatsApp end-to-end bring-up)
+
+> Long working session. Two themes: (1) finish dark mode across every page; (2) get WhatsApp notifications actually delivering to a real phone. Also includes a self-inflicted regression and its recovery — documented honestly as a lesson.
+
+### Dark mode — completed
+
+| Commit | Work |
+|--------|------|
+| `c63c643` | Full dark sweep across 12 zero-coverage pages (Inventory sub-tabs, TicketDrawer, Invoices, PartsInventory, ControlPanel, Customers, Products). Fixed the **white-row bug** in Inventory OverviewTab (`hover:bg-indigo-50` = near-white on dark). |
+| `9816e06` | Badge/pill colors: `bg-*-100 text-*-700/800` → added `dark:bg-*-900/20 dark:text-*-400` so status/priority/type badges aren't washed out on dark. |
+| `2d69b92` | Blocking inline script in `index.html` reads `mrma_appearance` and sets `html.dark` before React renders — kills the white flash on load for dark-mode users. |
+| `378a267` | TechCalendar + Reports (had 0–1 dark classes) fully tokenised. |
+| `ead2a03` | Notification bell: removed duplicate count badge (corner badge + trailing badge both rendered). |
+
+### ⚠️ Regression + recovery (lesson)
+
+| Commit | What |
+|--------|------|
+| `2b8d3e6` | **BAD** — a badge-color sweep was run via a background agent in a git **worktree based on a stale, pre-WhatsApp commit** (`961e787`). Copying its 33 files back **reverted WhatsApp wiring in ControlPanel, mobile responsiveness, and other recent work** — keeping only badge edits. Also broke the Dashboard layout (Overdue widget text overlap). |
+| `995b003` | Restored `Dashboard.jsx` from the good commit. |
+| `2e3b2af` | Restored **all 33 files** from `9816e06` (last fully-good commit) → WhatsApp + mobile + dark all back. Verified: ControlPanel WhatsApp imports present, messaging lib intact, App.jsx handler wiring intact, build + 160 tests clean. |
+
+**Lesson (now a rule):** never bulk-copy files out of a stale worktree; never delegate edits to files carrying critical wiring (WhatsApp/ControlPanel). Patch high-value files directly. See `feedback-git-branch-workflow` memory.
+
+### WhatsApp — debugged to working delivery
+
+The integration was code-complete but had never actually delivered to a phone. Walked through every gate:
+
+| Issue | Root cause | Fix |
+|-------|-----------|-----|
+| Send failed, Meta **190** | Temporary 24h Meta token kept expiring | Created a permanent **System User token** (never expires); updated `WHATSAPP_ACCESS_TOKEN` secret |
+| Send failed, Meta **100** "Object does not exist" | `WHATSAPP_PHONE_NUMBER_ID` had a **letter `O` instead of zero** (`11758049O5609358`) | Corrected to `1175804905609358` |
+| Generic "non-2xx" hid the real error | `supabase.functions.invoke` puts the Meta error in `error.context`, not `error.message` | `4d19804` — Test Center now reads `error.context.json()` and shows the real Meta error + code |
+| Queued sends arrived **scrambled** (variables in wrong order) | **Postgres JSONB does not preserve object key order** — it reorders by (length, then a–z). `notification_queue.payload` is JSONB; the worker's `Object.values(variables)` got reordered keys | `8ecfc81` — handler now also stores an explicitly-ordered `params: string[]` array (JSONB keeps array order); worker uses `payload.params`. See `reference-jsonb-key-order-gotcha` memory |
+| Real tickets failed Meta **131008** "required parameter missing" | `ticket.created` emit used `{...ticketData}` which lacks `created_date` → `{{created_date}}` empty (Meta rejects empty positional params) | `40abcd7` — spread the saved DB row (`newTicket`) into the event payload; safety net in handler replaces any blank param with `—` |
+| Message accepted but **not delivered**, webhook reports **131049** "not delivered to maintain healthy ecosystem engagement" | Templates are **Marketing** category — Meta throttles marketing template messages | ⏳ **User action:** recreate templates as **Utility** category (transactional). Marketing→Utility can't be changed by editing — must delete+recreate. `rma_ticket_created` recreated as `rma_ticket_created_v2`; DB `template_name` updated via SQL. Awaiting Meta approval. |
+
+**Meta error-code cheat sheet** (all land in `notification_logs.error_message` / `response_data`): 190 = token expired · 100 = bad phone number ID · 131008 = empty/missing positional param · 132000 = param count ≠ template `{{n}}` count · 131049 = Marketing-category delivery throttle (use Utility).
+
+### WhatsApp — still open
+
+- ⏳ `rma_ticket_created_v2` awaiting Meta **Utility** approval. Once Active → real tickets deliver.
+- ⏳ The other 3 templates (`rma_ticket_updated`, `rma_ticket_assigned`, `rma_ticket_closed`) are still **Marketing** and must be recreated as **Utility** too. Also: param counts to reconcile — our DB has updated=5, assigned=3, closed=3 vars; each must equal the Meta template's `{{n}}` count (the seed `updated` body uses `{{#notes}}` conditionals which Meta doesn't support, so its Meta `{{n}}` count likely differs from 5).
+- Test recipient limited to `+201000121585` until Meta **Production setup** (verify own business number).
+- pg_cron not yet set up to auto-run `notification-worker` (currently relies on the handler's best-effort immediate invoke).
+
+### Other
+
+- `94a428c` — `src/api/db/*.js` → TypeScript with Row types (S9-8/L-6) earlier same day.
+
+> **Current state:** `test` is **56 commits ahead of `main`** — **not merged** (user testing features first). WhatsApp pipeline proven working end-to-end (Meta accepts + returns `wamid`); only blocker to delivery is the Utility template approval. jsPDF browser smoke test still pending. test → main merge awaiting user approval.

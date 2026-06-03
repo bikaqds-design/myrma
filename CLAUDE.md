@@ -190,9 +190,17 @@ Provider-agnostic notification layer that fires on ticket lifecycle events. Tick
 
 **DB tables** (`20260602_whatsapp_notifications.sql`): `whatsapp_templates`, `notification_logs`, `notification_settings`, `notification_queue`.
 
-**Required Supabase secrets:** `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`.
+**Required Supabase secrets:** `WHATSAPP_ACCESS_TOKEN` (use a permanent **System User** token — the temporary API-Setup token expires every 24h → Meta error 190), `WHATSAPP_PHONE_NUMBER_ID` (all digits — a letter `O` for zero `0` causes Meta error 100), `WHATSAPP_WEBHOOK_VERIFY_TOKEN`.
 
 **Control Panel UI:** `src/pages/cp/WASettings.jsx` (provider + per-event toggles), `WATemplates.jsx` (CRUD + phone preview), `WALogs.jsx` (paginated delivery log), `WATestCenter.jsx` (send test, simulate event, run worker).
+
+**Template param ordering (CRITICAL — JSONB pitfall):** WhatsApp templates use positional `{{1}}…{{n}}` params. The handler stores an explicitly-ordered `params: string[]` array in `notification_queue.payload` and the worker sends *that* — **never** rely on `Object.values(variables)` for the param order. **Postgres JSONB does not preserve object key order** (it reorders keys by length, then alphabetically), so an object round-tripped through the JSONB `payload` column comes back scrambled. Arrays preserve order in JSONB; objects do not. The number of params must exactly equal the Meta template's `{{n}}` count, and no param may be empty (Meta rejects empty positional params with error 131008 — the handler substitutes `—` for blanks).
+
+**`whatsapp_templates.template_name`** is the Meta-registered template name actually sent to the API (e.g. `rma_ticket_created_v2`). The DB `body_content` is only for the in-app preview; only the `{{n}}` count must match Meta. To point the system at a renamed Meta template, `UPDATE whatsapp_templates SET template_name = '<new>' WHERE event_type = '<event>'` — no code change.
+
+**Meta template category:** transactional notifications (ticket created/updated/closed) must be **Utility** category. **Marketing** templates are throttled by Meta (error 131049 "not delivered to maintain healthy ecosystem engagement"). Category can't be changed by editing — delete + recreate as Utility, and keep the body purely transactional (no "thank you for choosing us" promo lines, which trigger Marketing classification).
+
+**Meta error cheat sheet** (all logged to `notification_logs.error_message` / `response_data`): 190 token expired · 100 bad phone number ID · 131008 empty/missing param · 132000 param count ≠ template `{{n}}` · 131049 Marketing-throttle (use Utility).
 
 ### Control Panel
 

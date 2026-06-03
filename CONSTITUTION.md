@@ -791,6 +791,21 @@ return new Response(JSON.stringify({ error: 'Human-readable message' }), {
 
 **LAW: Never alter production schema by running ad-hoc SQL in the Supabase dashboard.** All changes through migration files committed to git.
 
+### 7.5a JSONB Key-Order Rule
+
+**LAW: Never rely on JavaScript object key order for data that round-trips through a `jsonb` column.** PostgreSQL `jsonb` does **not** preserve object key insertion order — it normalizes keys by (length, then bytewise). Code that does `Object.values(obj)` or `Object.keys(obj)` to produce *ordered* output after the object has been read back from a `jsonb` column will be silently scrambled.
+
+```js
+// ❌ WRONG — order is lost when `variables` came from a jsonb column
+parameters: Object.values(variables).map((v) => ({ text: v }))
+
+// ✅ CORRECT — store an explicitly ordered array (jsonb preserves array order)
+// producer:  payload.params = defs.map((d) => variables[d.key])
+// consumer:  parameters: payload.params.map((v) => ({ text: v }))
+```
+
+This bit the WhatsApp queue (positional `{{1}}..{{n}}` params scrambled). For any ordered data crossing `jsonb`, use an **array**, never object key order. See `reference-jsonb-key-order-gotcha` in project memory.
+
 ### 7.6 Storage Bucket Rules
 
 The `rma-attachments` bucket has these enforced policies:

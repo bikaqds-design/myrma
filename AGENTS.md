@@ -217,9 +217,15 @@ Provider-agnostic notification layer that fires on ticket lifecycle events.
 **DB tables** (migration `20260602_whatsapp_notifications.sql`): `whatsapp_templates`, `notification_logs`, `notification_settings`, `notification_queue`.
 
 **Secrets required in Supabase Edge Functions → Secrets:**
-- `WHATSAPP_ACCESS_TOKEN` — permanent system-user token from Meta
-- `WHATSAPP_PHONE_NUMBER_ID` — phone number ID from WhatsApp Business API Setup
+- `WHATSAPP_ACCESS_TOKEN` — permanent **System User** token (the temporary API-Setup token expires every 24h → Meta error 190)
+- `WHATSAPP_PHONE_NUMBER_ID` — phone number ID, all digits (a letter `O` for zero `0` → Meta error 100)
 - `WHATSAPP_WEBHOOK_VERIFY_TOKEN` — arbitrary string matching Meta webhook config
+
+**Template param ordering (JSONB pitfall):** the handler stores an explicitly-ordered `params: string[]` in `notification_queue.payload`; the worker sends that. **Never** use `Object.values(variables)` for param order — Postgres JSONB reorders object keys (length, then a–z), scrambling positional `{{1}}..{{n}}` params. Arrays preserve order in JSONB; objects do not. No positional param may be empty (Meta 131008 — handler substitutes `—`).
+
+**`whatsapp_templates.template_name`** is the Meta-registered name sent to the API. Point the system at a renamed template via `UPDATE whatsapp_templates SET template_name='<new>' WHERE event_type='<event>'` — no code change.
+
+**Meta template category:** transactional notifications must be **Utility**, not **Marketing** (Marketing is delivery-throttled → error 131049). Category can't be edited — delete + recreate as Utility; keep bodies purely transactional. Meta error cheat sheet (in `notification_logs.error_message`): 190 token expired · 100 bad phone ID · 131008 empty param · 132000 param count ≠ `{{n}}` · 131049 Marketing throttle.
 
 ### PWA
 

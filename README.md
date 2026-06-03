@@ -136,6 +136,12 @@ WHATSAPP_PHONE_NUMBER_ID      # phone number ID from WhatsApp Business API
 WHATSAPP_WEBHOOK_VERIFY_TOKEN # arbitrary string matching Meta webhook config
 ```
 
+**WhatsApp setup gotchas (learned the hard way — see `CLAUDE.md` for full detail):**
+- Use a **permanent System User token**, not the temporary 24h token from Meta's API Setup page (it expires daily → Meta error 190).
+- `WHATSAPP_PHONE_NUMBER_ID` must be **all digits** (a letter `O` vs zero `0` → Meta error 100).
+- Templates must be **Utility** category, not Marketing — Marketing templates are delivery-throttled by Meta (error 131049). Keep bodies purely transactional.
+- Each template's variable count must equal its Meta `{{n}}` count; no positional param may be empty (error 131008 / 132000).
+
 ### 6. Start development
 
 ```bash
