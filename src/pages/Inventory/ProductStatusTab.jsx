@@ -221,7 +221,7 @@ export function ProductStatusTab({
             className="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           />
           <svg
-            className="w-4 h-4 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2"
+            className="w-4 h-4 text-gray-500 dark:text-[#9aa4b2] absolute left-2.5 top-1/2 -translate-y-1/2"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -236,7 +236,7 @@ export function ProductStatusTab({
         </div>
         <button
           onClick={() => setShowFilters((f) => !f)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm transition-colors ${showFilters || activeFilterCount > 0 ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+          className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm transition-colors ${showFilters || activeFilterCount > 0 ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520]'}`}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -253,7 +253,7 @@ export function ProductStatusTab({
             </span>
           )}
         </button>
-        <span className="text-xs text-gray-500 ml-auto whitespace-nowrap">
+        <span className="text-xs text-gray-500 dark:text-[#9aa4b2] ml-auto whitespace-nowrap">
           {filtered.length} product{filtered.length !== 1 ? 's' : ''} · {products.length} unit
           {products.length !== 1 ? 's' : ''}
         </span>
@@ -261,27 +261,27 @@ export function ProductStatusTab({
 
       {/* Filter panel */}
       {showFilters && (
-        <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
+        <div className="p-3 bg-gray-50 dark:bg-[#0f1520] border border-gray-200 dark:border-[#212a38] rounded-lg space-y-2">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             <div className="space-y-1">
-              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+              <label className="text-[10px] font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">
                 Product
               </label>
               <input
                 value={filterProduct}
                 onChange={(e) => setFilterProduct(e.target.value)}
                 placeholder="Filter by product…"
-                className="w-full px-2.5 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 bg-white"
+                className="w-full px-2.5 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-[#121823]"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+              <label className="text-[10px] font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">
                 Brand
               </label>
               <select
                 value={filterBrand}
                 onChange={(e) => setFilterBrand(e.target.value)}
-                className="w-full px-2.5 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 bg-white"
+                className="w-full px-2.5 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-[#121823]"
               >
                 <option value="">All brands</option>
                 {uniqueBrands.map((b) => (
@@ -292,13 +292,13 @@ export function ProductStatusTab({
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+              <label className="text-[10px] font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">
                 Product Status
               </label>
               <select
                 value={filterProductStatus}
                 onChange={(e) => setFilterProductStatus(e.target.value)}
-                className="w-full px-2.5 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 bg-white"
+                className="w-full px-2.5 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-[#121823]"
               >
                 <option value="">All statuses</option>
                 {uniqueStatuses.map((s) => (
@@ -309,13 +309,13 @@ export function ProductStatusTab({
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+              <label className="text-[10px] font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">
                 RMA Status
               </label>
               <select
                 value={filterRmaStatus}
                 onChange={(e) => setFilterRmaStatus(e.target.value)}
-                className="w-full px-2.5 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 bg-white"
+                className="w-full px-2.5 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-[#121823]"
               >
                 <option value="">All</option>
                 <option value="New">New</option>
@@ -374,7 +374,7 @@ export function ProductStatusTab({
                 setShowTransfer(true)
               }}
               disabled={transferring}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-indigo-300 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-50 disabled:opacity-50"
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-white dark:bg-[#121823] border border-indigo-300 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-50 dark:hover:bg-[#1a2230] disabled:opacity-50"
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -405,7 +405,7 @@ export function ProductStatusTab({
               downloadCSV(rows, 'inventory-selected.csv')
               setSelectedGroups([])
             }}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-indigo-300 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-50"
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-white dark:bg-[#121823] border border-indigo-300 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-50 dark:hover:bg-[#1a2230]"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -421,8 +421,8 @@ export function ProductStatusTab({
       )}
 
       {filtered.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-          <p className="text-gray-500 text-sm">
+        <div className="text-center py-12 bg-white dark:bg-[#121823] rounded-lg border border-gray-200 dark:border-[#212a38]">
+          <p className="text-gray-500 dark:text-[#9aa4b2] text-sm">
             {search || activeFilterCount
               ? 'No products match your filters'
               : 'No products in this category'}
@@ -430,12 +430,12 @@ export function ProductStatusTab({
         </div>
       ) : (
         <>
-          <div className="rounded-lg border border-gray-200 overflow-hidden">
+          <div className="rounded-lg border border-gray-200 dark:border-[#212a38] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-xs border-collapse">
-                <thead className="bg-gray-100 sticky top-0 z-10">
+                <thead className="bg-gray-100 dark:bg-[#1a2230] sticky top-0 z-10">
                   <tr>
-                    <th className="w-9 px-3 py-2 border-b border-r border-gray-200 text-center">
+                    <th className="w-9 px-3 py-2 border-b border-r border-gray-200 dark:border-[#212a38] text-center">
                       <input
                         type="checkbox"
                         checked={allPageChk}
@@ -449,10 +449,10 @@ export function ProductStatusTab({
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                       />
                     </th>
-                    <th className="w-8 px-2 py-2 text-center text-gray-500 font-semibold border-b border-r border-gray-200">
+                    <th className="w-8 px-2 py-2 text-center text-gray-500 dark:text-[#9aa4b2] font-semibold border-b border-r border-gray-200 dark:border-[#212a38]">
                       #
                     </th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600 border-b border-r border-gray-200">
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38]">
                       <InvSortBtn
                         label="Product"
                         sortKey="product_name"
@@ -461,7 +461,7 @@ export function ProductStatusTab({
                         onSort={handleSort}
                       />
                     </th>
-                    <th className="px-3 py-2 text-center font-semibold text-gray-600 border-b border-r border-gray-200 w-16">
+                    <th className="px-3 py-2 text-center font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38] w-16">
                       <InvSortBtn
                         label="Qty"
                         sortKey="qty"
@@ -470,18 +470,18 @@ export function ProductStatusTab({
                         onSort={handleSort}
                       />
                     </th>
-                    <th className="px-3 py-2 text-center font-semibold text-gray-600 border-b border-r border-gray-200 whitespace-nowrap">
+                    <th className="px-3 py-2 text-center font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38] whitespace-nowrap">
                       In Warranty
                     </th>
-                    <th className="px-3 py-2 text-center font-semibold text-gray-600 border-b border-r border-gray-200 whitespace-nowrap">
+                    <th className="px-3 py-2 text-center font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38] whitespace-nowrap">
                       Out of Warranty
                     </th>
                     {showTypeCol && (
-                      <th className="px-3 py-2 text-left font-semibold text-gray-600 border-b border-r border-gray-200 min-w-[160px]">
+                      <th className="px-3 py-2 text-left font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38] min-w-[160px]">
                         Types
                       </th>
                     )}
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600 border-b border-gray-200 w-28 whitespace-nowrap">
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-gray-200 dark:border-[#212a38] w-28 whitespace-nowrap">
                       Date
                     </th>
                   </tr>
@@ -499,16 +499,16 @@ export function ProductStatusTab({
                     const rowBg = isSelected
                       ? 'bg-indigo-50'
                       : idx % 2 === 0
-                        ? 'bg-white'
-                        : 'bg-gray-50/60'
+                        ? 'bg-white dark:bg-[#121823]'
+                        : 'bg-gray-50 dark:bg-[#0f1520]/60'
                     return (
                       <React.Fragment key={g.product_name}>
                         <tr
-                          className={`${rowBg} border-b border-gray-100 transition-colors cursor-pointer hover:bg-indigo-50/40`}
+                          className={`${rowBg} border-b border-gray-100 dark:border-[#212a38] transition-colors cursor-pointer hover:bg-indigo-50 dark:hover:bg-[#1a2230]/40`}
                           onClick={() => toggleExpand(g.product_name)}
                         >
                           <td
-                            className="px-3 py-1.5 text-center border-r border-gray-100"
+                            className="px-3 py-1.5 text-center border-r border-gray-100 dark:border-[#212a38]"
                             onClick={(e) => {
                               e.stopPropagation()
                               toggleSelect(g.product_name)
@@ -521,13 +521,13 @@ export function ProductStatusTab({
                               className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                             />
                           </td>
-                          <td className="px-2 py-1.5 text-center text-gray-500 tabular-nums border-r border-gray-100">
+                          <td className="px-2 py-1.5 text-center text-gray-500 dark:text-[#9aa4b2] tabular-nums border-r border-gray-100 dark:border-[#212a38]">
                             {startIndex + idx + 1}
                           </td>
-                          <td className="px-3 py-1.5 font-medium text-gray-900 border-r border-gray-100">
+                          <td className="px-3 py-1.5 font-medium text-gray-900 dark:text-[#e8ebf0] border-r border-gray-100 dark:border-[#212a38]">
                             <div className="flex items-center gap-1.5">
                               <svg
-                                className={`w-3 h-3 text-gray-500 flex-shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                                className={`w-3 h-3 text-gray-500 dark:text-[#9aa4b2] flex-shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`}
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -542,23 +542,23 @@ export function ProductStatusTab({
                               {g.product_name}
                             </div>
                           </td>
-                          <td className="px-3 py-1.5 text-center border-r border-gray-100">
-                            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400">
+                          <td className="px-3 py-1.5 text-center border-r border-gray-100 dark:border-[#212a38]">
+                            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-indigo-100 text-indigo-700">
                               {g.qty}
                             </span>
                           </td>
-                          <td className="px-3 py-1.5 text-center border-r border-gray-100">
+                          <td className="px-3 py-1.5 text-center border-r border-gray-100 dark:border-[#212a38]">
                             {g.in_warranty > 0 ? (
-                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400">
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
                                 {g.in_warranty}
                               </span>
                             ) : (
                               <span className="text-gray-300">—</span>
                             )}
                           </td>
-                          <td className="px-3 py-1.5 text-center border-r border-gray-100">
+                          <td className="px-3 py-1.5 text-center border-r border-gray-100 dark:border-[#212a38]">
                             {g.out_warranty > 0 ? (
-                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400">
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
                                 {g.out_warranty}
                               </span>
                             ) : (
@@ -566,7 +566,7 @@ export function ProductStatusTab({
                             )}
                           </td>
                           {showTypeCol && (
-                            <td className="px-3 py-1.5 border-r border-gray-100">
+                            <td className="px-3 py-1.5 border-r border-gray-100 dark:border-[#212a38]">
                               <div className="flex flex-wrap gap-1">
                                 {Object.entries(typeBreakdown).map(([type, count]) => (
                                   <span
@@ -579,7 +579,7 @@ export function ProductStatusTab({
                               </div>
                             </td>
                           )}
-                          <td className="px-3 py-1.5 text-gray-500 whitespace-nowrap">
+                          <td className="px-3 py-1.5 text-gray-500 dark:text-[#9aa4b2] whitespace-nowrap">
                             {fmtDate(g.latest_date)}
                           </td>
                         </tr>
@@ -589,11 +589,11 @@ export function ProductStatusTab({
                               key={`${p.rma_number}-${p.serial_number || i}`}
                               className="bg-blue-50/20 border-b border-blue-100/40"
                             >
-                              <td className="border-r border-gray-100" />
-                              <td className="border-r border-gray-100" />
+                              <td className="border-r border-gray-100 dark:border-[#212a38]" />
+                              <td className="border-r border-gray-100 dark:border-[#212a38]" />
                               <td colSpan={colSpanData} className="px-4 py-1.5">
                                 <div className="flex items-center gap-4 flex-wrap pl-3 border-l-2 border-indigo-200">
-                                  <span className="font-mono text-gray-500">
+                                  <span className="font-mono text-gray-500 dark:text-[#9aa4b2]">
                                     {p.serial_number || 'No S/N'}
                                   </span>
                                   <WarrantyBadge status={p.warranty_status} />
@@ -610,16 +610,16 @@ export function ProductStatusTab({
                                   ) : (
                                     <span className="text-gray-300">—</span>
                                   )}
-                                  <span className="text-gray-700">{p.customer_name || '—'}</span>
+                                  <span className="text-gray-700 dark:text-[#e8ebf0]">{p.customer_name || '—'}</span>
                                   <span
                                     className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${TICKET_STATUS_CLS[p.ticket_status] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'}`}
                                   >
                                     {p.ticket_status || '—'}
                                   </span>
                                   {p.assigned_technician && (
-                                    <span className="text-gray-500">{p.assigned_technician}</span>
+                                    <span className="text-gray-500 dark:text-[#9aa4b2]">{p.assigned_technician}</span>
                                   )}
-                                  <span className="text-gray-500">
+                                  <span className="text-gray-500 dark:text-[#9aa4b2]">
                                     {fmtDate(p.status_date || p.created_date)}
                                   </span>
                                 </div>

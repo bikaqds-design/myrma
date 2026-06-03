@@ -4,23 +4,20 @@ import toast from 'react-hot-toast'
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 export const STATUS_META = {
-  active_rma: { label: 'Active RMA', cls: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800' },
-  company_stock: { label: 'Company Stock', cls: 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800' },
-  sent_to_manufacturer: {
-    label: 'Sent to Mfr',
-    cls: 'bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800',
-  },
-  closed: { label: 'Closed', cls: 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2] border-gray-200 dark:border-[#212a38]' },
+  active_rma:           { label: 'Active RMA',    cls: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/30' },
+  company_stock:        { label: 'Company Stock', cls: 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/30' },
+  sent_to_manufacturer: { label: 'Sent to Mfr',  cls: 'bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-900/30' },
+  closed:               { label: 'Closed',        cls: 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2] border-gray-200 dark:border-[#212a38]' },
 }
 export const RESOLUTION_META = {
   return_to_customer: { label: 'Return to Customer', cls: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' },
-  credit_note: { label: 'Credit Note', cls: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400' },
-  replacement: { label: 'Replacement', cls: 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400' },
-  can_t_repair: { label: "Can't Repair", cls: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400' },
+  credit_note:        { label: 'Credit Note',         cls: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400' },
+  replacement:        { label: 'Replacement',          cls: 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400' },
+  can_t_repair:       { label: "Can't Repair",         cls: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400' },
 }
 export const BATCH_STATUS_META = {
-  draft: { label: 'Draft', cls: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]' },
-  sent: { label: 'Sent', cls: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' },
+  draft:    { label: 'Draft',    cls: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]' },
+  sent:     { label: 'Sent',     cls: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' },
   resolved: { label: 'Resolved', cls: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' },
 }
 export const _SYSTEM_WAREHOUSES = [
@@ -76,18 +73,18 @@ ALTER TABLE inventory_units
 // Product statuses that map to inventory tabs
 
 export const PRODUCT_STATUS_CLS = {
-  Received: 'bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#9aa4b2]',
-  'Under Repair': 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
-  Repaired: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
-  "Can't Repair": 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
-  Replacement: 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400',
+  Received:      'bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#9aa4b2]',
+  'Under Repair':'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
+  Repaired:      'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+  "Can't Repair":'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
+  Replacement:   'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400',
   'Credit Note': 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
 }
 export const TICKET_STATUS_CLS = {
-  New: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
-  'In Progress': 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
-  'On Hold': 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
-  Completed: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+  New:          'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
+  'In Progress':'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
+  'On Hold':    'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
+  Completed:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
 }
 
 // ─── Utilities ─────────────────────────────────────────────────────────────────
@@ -229,7 +226,7 @@ export function Pagination({ total, page, itemsPerPage, setItemsPerPage, onPage 
 export function StatusBadge({ status }) {
   const m = STATUS_META[status] || {
     label: status,
-    cls: 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2] border-gray-200 dark:border-[#212a38]',
+    cls: 'bg-gray-100 text-gray-500 border-gray-200',
   }
   return (
     <span
@@ -241,7 +238,7 @@ export function StatusBadge({ status }) {
 }
 export function ResolutionBadge({ type }) {
   if (!type) return <span className="text-gray-500 text-xs">—</span>
-  const m = RESOLUTION_META[type] || { label: type, cls: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]' }
+  const m = RESOLUTION_META[type] || { label: type, cls: 'bg-gray-100 text-gray-600' }
   return (
     <span
       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${m.cls}`}
@@ -301,7 +298,7 @@ export function BrandBar({ brands, groups, selected, onSelect }) {
     `flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-sm font-medium whitespace-nowrap transition-all ${isActive ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-200 text-gray-600 hover:border-indigo-300 hover:text-indigo-600'}`
   const cnt = (isActive, n) => (
     <span
-      className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'}`}
+      className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}
     >
       {n}
     </span>

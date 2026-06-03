@@ -3,33 +3,33 @@ import { createPortal } from 'react-dom'
 
 const TYPE_META = {
   // Tickets
-  ticket_created: { icon: '🎫', color: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' },
-  ticket_updated: { icon: '✏️', color: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400' },
-  ticket_deleted: { icon: '🗑️', color: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400' },
-  ticket_assigned: { icon: '👤', color: 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400' },
-  ticket_status_changed: { icon: '🔄', color: 'bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400' },
-  ticket_overdue: { icon: '⏰', color: 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400' },
-  due_date_warning: { icon: '⚠️', color: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400' },
-  comment_added: { icon: '💬', color: 'bg-sky-100 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400' },
+  ticket_created: { icon: '🎫', color: 'bg-blue-100 text-blue-700' },
+  ticket_updated: { icon: '✏️', color: 'bg-yellow-100 text-yellow-700' },
+  ticket_deleted: { icon: '🗑️', color: 'bg-red-100 text-red-700' },
+  ticket_assigned: { icon: '👤', color: 'bg-indigo-100 text-indigo-700' },
+  ticket_status_changed: { icon: '🔄', color: 'bg-purple-100 text-purple-700' },
+  ticket_overdue: { icon: '⏰', color: 'bg-red-100 text-red-800' },
+  due_date_warning: { icon: '⚠️', color: 'bg-yellow-100 text-yellow-800' },
+  comment_added: { icon: '💬', color: 'bg-sky-100 text-sky-700' },
   // Customers
-  customer_created: { icon: '🏢', color: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' },
-  customer_updated: { icon: '✏️', color: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400' },
-  customer_deleted: { icon: '🗑️', color: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400' },
+  customer_created: { icon: '🏢', color: 'bg-green-100 text-green-700' },
+  customer_updated: { icon: '✏️', color: 'bg-yellow-100 text-yellow-700' },
+  customer_deleted: { icon: '🗑️', color: 'bg-red-100 text-red-700' },
   // Products
-  product_created: { icon: '📦', color: 'bg-teal-100 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400' },
-  product_updated: { icon: '✏️', color: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400' },
-  product_deleted: { icon: '🗑️', color: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400' },
-  inventory_low: { icon: '📉', color: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400' },
+  product_created: { icon: '📦', color: 'bg-teal-100 text-teal-700' },
+  product_updated: { icon: '✏️', color: 'bg-yellow-100 text-yellow-700' },
+  product_deleted: { icon: '🗑️', color: 'bg-red-100 text-red-700' },
+  inventory_low: { icon: '📉', color: 'bg-orange-100 text-orange-700' },
   // Users
-  user_created: { icon: '👤', color: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' },
-  user_role_changed: { icon: '🔑', color: 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400' },
-  user_suspended: { icon: '🔒', color: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400' },
-  user_locked: { icon: '🔒', color: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400' },
-  user_activated: { icon: '✅', color: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' },
-  user_deleted: { icon: '🗑️', color: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400' },
+  user_created: { icon: '👤', color: 'bg-blue-100 text-blue-700' },
+  user_role_changed: { icon: '🔑', color: 'bg-indigo-100 text-indigo-700' },
+  user_suspended: { icon: '🔒', color: 'bg-orange-100 text-orange-700' },
+  user_locked: { icon: '🔒', color: 'bg-red-100 text-red-700' },
+  user_activated: { icon: '✅', color: 'bg-green-100 text-green-700' },
+  user_deleted: { icon: '🗑️', color: 'bg-red-100 text-red-700' },
   // System
-  system_announcement: { icon: '📢', color: 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400' },
-  custom_alert: { icon: '🔔', color: 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' },
+  system_announcement: { icon: '📢', color: 'bg-indigo-100 text-indigo-700' },
+  custom_alert: { icon: '🔔', color: 'bg-amber-100 text-amber-700' },
 }
 
 function timeAgo(dateStr) {
@@ -51,6 +51,7 @@ export default function NotificationBell({
   onNavigateToTicket,
   onMarkAllRead,
   mobile = false,
+  iconOnly = false,
 }) {
   const [open, setOpen] = useState(false)
   const [panelStyle, setPanelStyle] = useState({})
@@ -220,7 +221,7 @@ export default function NotificationBell({
             ) : (
               notifications.map((n) => {
                 const isUnread = !isRead(n)
-                const meta = TYPE_META[n.type] || { icon: '🔔', color: 'bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#9aa4b2]' }
+                const meta = TYPE_META[n.type] || { icon: '🔔', color: 'bg-gray-100 text-gray-700' }
                 const clickable = n.entity_type === 'ticket' && n.entity_id
                 return (
                   <div
@@ -280,7 +281,7 @@ export default function NotificationBell({
         onClick={handleToggle}
         title="Notifications"
         aria-label="Notifications"
-        className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3'} rounded-lg transition-colors relative ${mobile ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-300 hover:bg-gray-700'}`}
+        className={iconOnly ? 'relative p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors flex items-center justify-center' : `w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3'} rounded-lg transition-colors relative ${mobile ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-300 hover:bg-gray-700'}`}
       >
         <div className="relative flex-shrink-0">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

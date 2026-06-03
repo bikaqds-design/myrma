@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { MigrationNotice } from './Announcements'
+import { captureException } from '../../lib/sentry'
 
 const DEFAULT_SLA = {
   Low: { response: 72, resolution: 168 },
@@ -12,10 +13,10 @@ const DEFAULT_SLA = {
 const DEFAULT_RULES = []
 const DEFAULT_SETTINGS = { default_priority: 'Medium', default_status: 'New', auto_due_days: 7 }
 const PRIORITY_COLORS = {
-  Low: 'bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#9aa4b2]',
-  Medium: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
-  High: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
-  Critical: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
+  Low: 'bg-gray-100 text-gray-700',
+  Medium: 'bg-blue-100 text-blue-700',
+  High: 'bg-orange-100 text-orange-700',
+  Critical: 'bg-red-100 text-red-700',
 }
 
 export default function RMAConfig({ currentUserEmail }) {
@@ -48,7 +49,8 @@ export default function RMAConfig({ currentUserEmail }) {
       if (byKey.sla_rules) setSla(byKey.sla_rules)
       if (byKey.auto_assignment_rules) setRules(byKey.auto_assignment_rules)
       if (byKey.default_settings) setSettings(byKey.default_settings)
-    } catch {
+    } catch (err) {
+      captureException(err)
       toast.error('Failed to load config')
     } finally {
       setLoading(false)
@@ -72,6 +74,7 @@ export default function RMAConfig({ currentUserEmail }) {
         )
         .catch(() => {})
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     } finally {
       setSaving(false)

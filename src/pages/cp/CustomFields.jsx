@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { MigrationNotice } from './Announcements'
+import { captureException } from '../../lib/sentry'
 
 const FIELD_TYPES = ['text', 'number', 'date', 'select', 'textarea', 'checkbox']
 const APPLIES_TO = ['ticket', 'customer']
@@ -114,6 +115,7 @@ export default function CustomFields({ currentUserEmail }) {
       setShowModal(false)
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     } finally {
       setSaving(false)
@@ -132,6 +134,7 @@ export default function CustomFields({ currentUserEmail }) {
       toast.success('Deleted')
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     }
   }
@@ -141,6 +144,7 @@ export default function CustomFields({ currentUserEmail }) {
       await db.customFields.update(f.id, { is_active: !f.is_active })
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     }
   }
@@ -196,7 +200,7 @@ export default function CustomFields({ currentUserEmail }) {
           <button
             key={v}
             onClick={() => setFilterAppliesTo(v)}
-            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${filterAppliesTo === v ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-200 dark:hover:bg-[#212a38]'}`}
+            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${filterAppliesTo === v ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
           >
             {v === '' ? 'All' : v === 'ticket' ? '🎫 Tickets' : '👤 Customers'}
           </button>
@@ -242,7 +246,7 @@ export default function CustomFields({ currentUserEmail }) {
                 </td>
                 <td className="px-4 py-3">
                   <span
-                    className={`px-2 py-0.5 rounded text-xs font-medium ${f.applies_to === 'ticket' ? 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400' : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'}`}
+                    className={`px-2 py-0.5 rounded text-xs font-medium ${f.applies_to === 'ticket' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}
                   >
                     {f.applies_to}
                   </span>

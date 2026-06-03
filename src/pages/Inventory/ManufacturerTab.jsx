@@ -44,7 +44,7 @@ export function ManufacturerTab({
     <div className="space-y-6">
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-700">Brand Warehouses</h3>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-[#e8ebf0]">Brand Warehouses</h3>
           {selectedBrand && (
             <button
               onClick={() => setSelectedBrand(null)}
@@ -62,14 +62,14 @@ export function ManufacturerTab({
               <button
                 key={brand.id}
                 onClick={() => setSelectedBrand(isA ? null : brand.brand_name)}
-                className={`rounded-2xl border p-4 text-left transition-all ${isA ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-300' : 'border-gray-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/40'}`}
+                className={`rounded-2xl border p-4 text-left transition-all ${isA ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-300' : 'border-gray-200 dark:border-[#212a38] bg-white dark:bg-[#121823] hover:border-indigo-200 hover:bg-indigo-50 dark:hover:bg-[#1a2230]/40'}`}
               >
                 <BrandAvatar name={brand.brand_name} size="md" />
                 <div className="mt-3">
-                  <div className="font-semibold text-sm text-gray-900 truncate">
+                  <div className="font-semibold text-sm text-gray-900 dark:text-[#e8ebf0] truncate">
                     {brand.brand_name}
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5">
+                  <div className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">
                     {s.total} batch{s.total !== 1 ? 'es' : ''} · {s.units} unit
                     {s.units !== 1 ? 's' : ''}
                   </div>
@@ -82,12 +82,12 @@ export function ManufacturerTab({
                       </span>
                     )}
                     {s.sent > 0 && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700">
                         {s.sent} sent
                       </span>
                     )}
                     {s.resolved > 0 && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">
                         {s.resolved} done
                       </span>
                     )}
@@ -101,14 +101,14 @@ export function ManufacturerTab({
           {otherBatches.length > 0 && (
             <button
               onClick={() => setSelectedBrand(selectedBrand === '__other' ? null : '__other')}
-              className={`rounded-2xl border p-4 text-left transition-all ${selectedBrand === '__other' ? 'border-gray-400 bg-gray-50 ring-2 ring-gray-300' : 'border-dashed border-gray-300 bg-white hover:border-gray-400'}`}
+              className={`rounded-2xl border p-4 text-left transition-all ${selectedBrand === '__other' ? 'border-gray-400 bg-gray-50 dark:bg-[#0f1520] ring-2 ring-gray-300' : 'border-dashed border-gray-300 bg-white dark:bg-[#121823] hover:border-gray-400'}`}
             >
-              <div className="w-9 h-9 bg-gray-200 rounded-xl flex items-center justify-center text-gray-500 text-base font-bold">
+              <div className="w-9 h-9 bg-gray-200 rounded-xl flex items-center justify-center text-gray-500 dark:text-[#9aa4b2] text-base font-bold">
                 ?
               </div>
               <div className="mt-3">
-                <div className="font-semibold text-sm text-gray-900">Other</div>
-                <div className="text-xs text-gray-500 mt-0.5">
+                <div className="font-semibold text-sm text-gray-900 dark:text-[#e8ebf0]">Other</div>
+                <div className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">
                   {otherBatches.length} batch{otherBatches.length !== 1 ? 'es' : ''}
                 </div>
               </div>
@@ -118,7 +118,7 @@ export function ManufacturerTab({
       </div>
 
       {displayBatches.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-200 space-y-3">
+        <div className="text-center py-16 bg-white dark:bg-[#121823] rounded-2xl border border-gray-200 dark:border-[#212a38] space-y-3">
           <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto">
             <svg
               className="w-7 h-7 text-purple-600"
@@ -134,21 +134,21 @@ export function ManufacturerTab({
               />
             </svg>
           </div>
-          <p className="text-gray-600 font-medium">
+          <p className="text-gray-600 dark:text-[#9aa4b2] font-medium">
             {selectedBrand ? `No batches for ${selectedBrand} yet` : 'No manufacturer batches yet'}
           </p>
-          <p className="text-gray-500 text-sm">
+          <p className="text-gray-500 dark:text-[#9aa4b2] text-sm">
             Go to Company Stock, open a product, and select units to create a batch.
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="bg-white dark:bg-[#121823] rounded-2xl border border-gray-200 dark:border-[#212a38] overflow-hidden">
           {selectedBrand && selectedBrand !== '__other' && (
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 bg-indigo-50/60">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 dark:border-[#212a38] bg-indigo-50/60">
               <BrandAvatar name={selectedBrand} size="md" />
               <div>
-                <div className="font-semibold text-gray-900">{selectedBrand} — Return Batches</div>
-                <div className="text-xs text-gray-500">
+                <div className="font-semibold text-gray-900 dark:text-[#e8ebf0]">{selectedBrand} — Return Batches</div>
+                <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">
                   {displayBatches.length} batch{displayBatches.length !== 1 ? 'es' : ''}
                 </div>
               </div>
@@ -156,7 +156,7 @@ export function ManufacturerTab({
           )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-gray-50 dark:bg-[#0f1520] border-b border-gray-200 dark:border-[#212a38]">
                 <tr>
                   {[
                     'Batch #',
@@ -170,7 +170,7 @@ export function ManufacturerTab({
                   ].map((h) => (
                     <th
                       key={h}
-                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider"
                     >
                       {h}
                     </th>
@@ -186,14 +186,14 @@ export function ManufacturerTab({
                   }
                   const resLabel =
                     b.resolution_type === 'replacement_received'
-                      ? { label: 'Replacement Rcvd', cls: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' }
+                      ? { label: 'Replacement Rcvd', cls: 'bg-green-100 text-green-700' }
                       : b.resolution_type === 'credit_note_received'
-                        ? { label: 'Credit Note Rcvd', cls: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' }
+                        ? { label: 'Credit Note Rcvd', cls: 'bg-blue-100 text-blue-700' }
                         : null
                   return (
                     <tr
                       key={b.id}
-                      className="hover:bg-gray-50 cursor-pointer"
+                      className="hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] cursor-pointer"
                       onClick={() => setSelectedBatch(b)}
                     >
                       <td className="px-4 py-3 font-mono text-xs font-bold text-indigo-600">
@@ -202,12 +202,12 @@ export function ManufacturerTab({
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <BrandAvatar name={b.manufacturer_name} size="xs" />
-                          <span className="text-gray-900 font-medium text-sm">
+                          <span className="text-gray-900 dark:text-[#e8ebf0] font-medium text-sm">
                             {b.manufacturer_name}
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-gray-600">
+                      <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">
                         {getBatchUnits(b.id).length || b.unit_count || 0}
                       </td>
                       <td className="px-4 py-3">
@@ -215,10 +215,10 @@ export function ManufacturerTab({
                           {sm.label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                      <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] whitespace-nowrap">
                         {fmt(b.sent_date)}
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                      <td className="px-4 py-3 font-mono text-xs text-gray-500 dark:text-[#9aa4b2]">
                         {b.tracking_number || '—'}
                       </td>
                       <td className="px-4 py-3">
@@ -229,10 +229,10 @@ export function ManufacturerTab({
                             {resLabel.label}
                           </span>
                         ) : (
-                          <span className="text-gray-500 text-xs">—</span>
+                          <span className="text-gray-500 dark:text-[#9aa4b2] text-xs">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+                      <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs whitespace-nowrap">
                         {fmt(b.created_date)}
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -296,10 +296,10 @@ function ResolveModal({ count, onConfirm, onClose }) {
   }
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="p-6 border-b border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-900">Set Resolution</h3>
-          <p className="text-sm text-gray-500 mt-1">
+      <div className="bg-white dark:bg-[#121823] rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="p-6 border-b border-gray-100 dark:border-[#212a38]">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-[#e8ebf0]">Set Resolution</h3>
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-1">
             {count} unit{count !== 1 ? 's' : ''} selected
           </p>
         </div>
@@ -307,7 +307,7 @@ function ResolveModal({ count, onConfirm, onClose }) {
           {options.map((o) => (
             <label
               key={o.value}
-              className={`flex items-start gap-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${resolution === o.value ? o.active : 'border-gray-200 hover:border-gray-300 bg-white'}`}
+              className={`flex items-start gap-3 p-4 border-2 rounded-xl cursor-pointer transition-all ${resolution === o.value ? o.active : 'border-gray-200 dark:border-[#212a38] hover:border-gray-300 bg-white dark:bg-[#121823]'}`}
             >
               <input
                 type="radio"
@@ -318,8 +318,8 @@ function ResolveModal({ count, onConfirm, onClose }) {
                 className="mt-0.5 text-indigo-600"
               />
               <div>
-                <div className="font-medium text-sm text-gray-900">{o.label}</div>
-                <div className="text-xs text-gray-500 mt-0.5">{o.desc}</div>
+                <div className="font-medium text-sm text-gray-900 dark:text-[#e8ebf0]">{o.label}</div>
+                <div className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">{o.desc}</div>
               </div>
             </label>
           ))}
@@ -331,10 +331,10 @@ function ResolveModal({ count, onConfirm, onClose }) {
             className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
           />
         </div>
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-gray-100 dark:border-[#212a38] flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50"
+            className="px-4 py-2 border border-gray-300 text-gray-700 dark:text-[#e8ebf0] rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520]"
           >
             Cancel
           </button>
@@ -365,15 +365,15 @@ export function CreateBatchModal({ count, brands, onConfirm, onClose }) {
   }
   return (
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-        <div className="p-6 border-b border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-900">Create Manufacturer Batch</h3>
-          <p className="text-sm text-gray-500 mt-1">
+      <div className="bg-white dark:bg-[#121823] rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="p-6 border-b border-gray-100 dark:border-[#212a38]">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-[#e8ebf0]">Create Manufacturer Batch</h3>
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-1">
             {count} unit{count !== 1 ? 's' : ''} will be added
           </p>
         </div>
         <div className="p-6 space-y-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Manufacturer Name</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-2">Manufacturer Name</label>
           {brands.length > 0 ? (
             <div className="grid grid-cols-2 gap-2">
               {brands.map((b) => (
@@ -381,7 +381,7 @@ export function CreateBatchModal({ count, brands, onConfirm, onClose }) {
                   key={b.id || b.brand_name}
                   type="button"
                   onClick={() => setBrandName(b.brand_name || b)}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all text-left ${brandName === (b.brand_name || b) ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-gray-200 hover:border-indigo-200 text-gray-700'}`}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all text-left ${brandName === (b.brand_name || b) ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-gray-200 dark:border-[#212a38] hover:border-indigo-200 text-gray-700 dark:text-[#e8ebf0]'}`}
                 >
                   <BrandAvatar name={b.brand_name || b} size="xs" />
                   {b.brand_name || b}
@@ -390,7 +390,7 @@ export function CreateBatchModal({ count, brands, onConfirm, onClose }) {
               <button
                 type="button"
                 onClick={() => setBrandName('__custom')}
-                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${brandName === '__custom' ? 'border-gray-400 bg-gray-50' : 'border-dashed border-gray-300 hover:border-gray-400 text-gray-500'}`}
+                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${brandName === '__custom' ? 'border-gray-400 bg-gray-50 dark:bg-[#0f1520]' : 'border-dashed border-gray-300 hover:border-gray-400 text-gray-500 dark:text-[#9aa4b2]'}`}
               >
                 <div className="w-5 h-5 bg-gray-200 rounded flex items-center justify-center text-xs font-bold">
                   +
@@ -410,10 +410,10 @@ export function CreateBatchModal({ count, brands, onConfirm, onClose }) {
             />
           )}
         </div>
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-gray-100 dark:border-[#212a38] flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50"
+            className="px-4 py-2 border border-gray-300 text-gray-700 dark:text-[#e8ebf0] rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520]"
           >
             Cancel
           </button>
@@ -475,21 +475,21 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-4">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+      <div className="bg-white dark:bg-[#121823] rounded-2xl shadow-2xl w-full max-w-2xl my-4">
+        <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-[#212a38]">
           <div className="flex items-center gap-3">
             <BrandAvatar name={batch.manufacturer_name} size="lg" />
             <div>
-              <h3 className="text-lg font-bold text-gray-900 font-mono">{batch.batch_number}</h3>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-[#e8ebf0] font-mono">{batch.batch_number}</h3>
               <div className="flex items-center gap-3 mt-0.5">
-                <span className="text-sm text-gray-600 font-medium">{batch.manufacturer_name}</span>
+                <span className="text-sm text-gray-600 dark:text-[#9aa4b2] font-medium">{batch.manufacturer_name}</span>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sm.cls}`}>
                   {sm.label}
                 </span>
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-600">
+          <button onClick={onClose} className="text-gray-500 dark:text-[#9aa4b2] hover:text-gray-600 dark:text-[#9aa4b2]">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -501,36 +501,36 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
           </button>
         </div>
         {(batch.sent_date || batch.tracking_number) && (
-          <div className="px-6 py-3 bg-gray-50 border-b border-gray-100 flex gap-6 text-sm">
+          <div className="px-6 py-3 bg-gray-50 dark:bg-[#0f1520] border-b border-gray-100 dark:border-[#212a38] flex gap-6 text-sm">
             {batch.sent_date && (
               <div>
-                <span className="text-gray-500 text-xs">Sent:</span>{' '}
-                <span className="font-medium text-gray-700">{fmt(batch.sent_date)}</span>
+                <span className="text-gray-500 dark:text-[#9aa4b2] text-xs">Sent:</span>{' '}
+                <span className="font-medium text-gray-700 dark:text-[#e8ebf0]">{fmt(batch.sent_date)}</span>
               </div>
             )}
             {batch.tracking_number && (
               <div>
-                <span className="text-gray-500 text-xs">Tracking:</span>{' '}
-                <span className="font-mono font-medium text-gray-700">{batch.tracking_number}</span>
+                <span className="text-gray-500 dark:text-[#9aa4b2] text-xs">Tracking:</span>{' '}
+                <span className="font-mono font-medium text-gray-700 dark:text-[#e8ebf0]">{batch.tracking_number}</span>
               </div>
             )}
           </div>
         )}
-        <div className="p-6 border-b border-gray-100">
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+        <div className="p-6 border-b border-gray-100 dark:border-[#212a38]">
+          <h4 className="text-sm font-semibold text-gray-700 dark:text-[#e8ebf0] mb-3">
             Units in Batch ({batchUnits.length})
           </h4>
           {batchUnits.length === 0 ? (
-            <p className="text-sm text-gray-500">No units.</p>
+            <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">No units.</p>
           ) : (
-            <div className="rounded-xl border border-gray-100 overflow-hidden">
+            <div className="rounded-xl border border-gray-100 dark:border-[#212a38] overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50 dark:bg-[#0f1520]">
                   <tr>
                     {['Product', 'Serial #', 'Warranty', 'RMA Source', 'Resolution'].map((h) => (
                       <th
                         key={h}
-                        className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500"
+                        className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2]"
                       >
                         {h}
                       </th>
@@ -539,11 +539,11 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {batchUnits.map((u) => (
-                    <tr key={u.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-2.5 text-gray-900 font-medium">
+                    <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520]">
+                      <td className="px-3 py-2.5 text-gray-900 dark:text-[#e8ebf0] font-medium">
                         {u.product_name || '—'}
                       </td>
-                      <td className="px-3 py-2.5 font-mono text-xs text-gray-500">
+                      <td className="px-3 py-2.5 font-mono text-xs text-gray-500 dark:text-[#9aa4b2]">
                         {u.serial_number || '—'}
                       </td>
                       <td className="px-3 py-2.5">
@@ -563,7 +563,7 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
           )}
         </div>
         {canEdit && batch.status === 'draft' && (
-          <div className="p-6 border-b border-gray-100">
+          <div className="p-6 border-b border-gray-100 dark:border-[#212a38]">
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
               <h4 className="text-sm font-semibold text-blue-900">Mark as Sent to Manufacturer</h4>
               <div className="grid grid-cols-2 gap-3">
@@ -573,7 +573,7 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
                     type="date"
                     value={sentDate}
                     onChange={(e) => setSentDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white dark:bg-[#121823] focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
@@ -584,7 +584,7 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
                     value={tracking}
                     onChange={(e) => setTracking(e.target.value)}
                     placeholder="AWB / courier tracking..."
-                    className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white dark:bg-[#121823] focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -611,7 +611,7 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
           </div>
         )}
         {canEdit && batch.status === 'sent' && (
-          <div className="p-6 border-b border-gray-100">
+          <div className="p-6 border-b border-gray-100 dark:border-[#212a38]">
             <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
               <h4 className="text-sm font-semibold text-green-900">Mark Batch as Resolved</h4>
               <div className="grid grid-cols-2 gap-3">
@@ -622,7 +622,7 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
                   <select
                     value={resType}
                     onChange={(e) => setResType(e.target.value)}
-                    className="w-full px-3 py-2 border border-green-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-2 border border-green-200 rounded-lg text-sm bg-white dark:bg-[#121823] focus:ring-2 focus:ring-green-500"
                   >
                     <option value="">Select...</option>
                     <option value="replacement_received">Replacement Units Received</option>
@@ -637,7 +637,7 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
                     type="date"
                     value={resDate}
                     onChange={(e) => setResDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-green-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-2 border border-green-200 rounded-lg text-sm bg-white dark:bg-[#121823] focus:ring-2 focus:ring-green-500"
                   />
                 </div>
               </div>
@@ -646,7 +646,7 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
                 onChange={(e) => setResNotes(e.target.value)}
                 placeholder="Notes..."
                 rows={2}
-                className="w-full px-3 py-2 border border-green-200 rounded-lg text-sm bg-white resize-none focus:ring-2 focus:ring-green-500"
+                className="w-full px-3 py-2 border border-green-200 rounded-lg text-sm bg-white dark:bg-[#121823] resize-none focus:ring-2 focus:ring-green-500"
               />
               <button
                 onClick={handleMarkResolved}
@@ -671,7 +671,7 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
           </div>
         )}
         {batch.status === 'resolved' && (
-          <div className="p-6 border-b border-gray-100">
+          <div className="p-6 border-b border-gray-100 dark:border-[#212a38]">
             <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-1.5">
               <div className="flex items-center gap-2 mb-2">
                 <svg
@@ -713,7 +713,7 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
         <div className="px-6 py-4 flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50"
+            className="px-4 py-2 border border-gray-300 text-gray-700 dark:text-[#e8ebf0] rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520]"
           >
             Close
           </button>
