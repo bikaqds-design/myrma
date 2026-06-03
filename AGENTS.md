@@ -1,0 +1,296 @@
+# AGENTS.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+> **Full engineering rules are in [`CONSTITUTION.md`](CONSTITUTION.md).**  
+> **Audit history and scorecard are in [`AUDIT_LOG.md`](AUDIT_LOG.md).**
+
+## Commands
+
+```bash
+npm run dev            # start dev server (Vite, port 5173)
+npm run build          # production build
+npm run preview        # preview production build
+npm test               # Vitest unit tests (80 tests, 3 suites) — run before every push
+npm run test:watch     # Vitest in watch mode
+npm run test:coverage  # test with coverage report
+npm run lint           # ESLint (0 errors target)
+npm run lint:ci        # ESLint strict for CI (blocks on warnings too)
+npm run lint:fix       # ESLint auto-fix
+npm run format         # Prettier write
+npm run format:check   # Prettier check (used in CI)
+```
+
+## Environment
+
+Copy `.env` and populate:
+```
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
+```
+
+Both variables must be prefixed with `VITE_` to be visible in Vite. The service role key is only used in Edge Functions (never in browser code).
+
+## Architecture
+
+### React Router v6
+
+The app uses **React Router v6** (`react-router-dom`). `BrowserRouter` wraps the app in `src/main.jsx`. Navigation is handled via `useNavigate` and `useLocation` hooks in `src/App.jsx`.
+
+All top-level pages are lazy-loaded via the `lazyWithReload()` wrapper in `App.jsx` (not bare `React.lazy`). `lazyWithReload` catches "Failed to fetch dynamically imported module" errors that occur when a new Vite deploy changes chunk filenames while a user still has the old app loaded — it auto-reloads the page so they get the new chunks transparently. `App.jsx` declares routes with `<Routes>` / `<Route>`. Parameterized routes (`/products/:id`, `/customers/:id`) are served by thin wrapper components (`ProductDetailsRoute`, `CustomerDetailsRoute`) that call `useParams()` and pass the id prop to the underlying page component. A catch-all `*` route renders `NotFoundPage`. Active sidebar state is derived from `location.pathname`.
+
+**All routes:**
+
+| Path | Component | Auth |
+|------|-----------|------|
+| `/` | `Dashboard` | required |
+| `/dashboard` | `<Navigate to="/" replace />` | — |
+| `/products` | `Products` | required |
+| `/products/:id` | `ProductDetailsRoute` → `ProductDetails` | required |
+| `/customers` | `Customers` | required |
+| `/customers/:id` | `CustomerDetailsRoute` → `CustomerDetails` | required |
+| `/rma-tickets` | `RMATickets` | required |
+| `/inventory` | `Inventory` | required |
+| `/account` | `AccountSettings` | required |
+| `/control-panel` | `ControlPanel` | admin+ |
+| `/calendar` | `TechCalendar` | required |
+| `/invoices` | `Invoices` | required |
+| `/parts` | `PartsInventory` | required |
+| `/reports` | `Reports` | required |
+| `/tracker` | `RMATracker` | **none (public)** |
+| `*` | `NotFoundPage` | — |
+
+Props passed to every authenticated page component: `currentUserRole`, `currentUserEmail`, `currentUserPermissions`.
+
+`/tracker` is the only unauthenticated route — detected via `pathname === '/tracker'` before the auth check renders.
+
+**Exception:** `window.history.pushState` is used ONLY inside `RMATickets/index.jsx` to sync `?ticket=<id>` (open ticket modal URL) without triggering a full route transition. This is intentional in-page state, not top-level navigation.
+
+### Provider order in `src/main.jsx`
+
+```jsx
+<React.StrictMode>
+  <ErrorBoundary>          // catches render crashes → Sentry
+    <BrowserRouter>
+      <QueryClientProvider>  // TanStack Query (staleTime 60s, retry 1)
+        <AppearanceProvider> // dark mode, font, date format
+          <App />
+        </AppearanceProvider>
+      </QueryClientProvider>
+    </BrowserRouter>
+  </ErrorBoundary>
+</React.StrictMode>
+```
+
+**`TooltipProvider` from Radix must be present** (it's inside `App.jsx`). Removing it causes a blank page.
+
+### Data layer
+
+All Supabase access goes through `src/api/supabaseClient.js`, which exports:
+- `auth` — sign-in, sign-out, password reset, profile updates
+- `db` — namespaced CRUD helpers for every table (`db.products`, `db.customers`, `db.rmaTickets`, `db.inventory`, etc.)
+- `storage` — file uploads (attachments, avatars, brand logos) to the `rma-attachments` bucket
+- `branding` — company branding settings
+- `notifications` — email templates, preferences, and the `send-email` Edge Function call
+- `backup` — full data export/import
+
+**Never query `supabase` directly from page components; use these helpers.**
+
+Domain modules in `src/api/db/`:
+
+| Module | Covers |
+|--------|--------|
+| `tickets.js` | RMA ticket CRUD + `rmaTracker` public lookup (via Edge Function) |
+| `customers.js` | Customer CRUD |
+| `catalog.js` | Product/catalog CRUD |
+| `inventory.js` | Inventory CRUD |
+| `users.js` | User role management |
+| `notifications.js` | Notification table ops |
+| `system.js` | System config (`rma_config` table) |
+| `audit.js` | Audit log reads |
+| `whatsappNotifications.js` | WhatsApp templates, notification logs, settings, queue |
+
+Many optional tables (e.g. `announcements`, `custom_field_definitions`, `inventory_units`, `warehouses`) may not exist in every deployment. All `db.*` helpers that target these tables guard with `error.code === '42P01'` (table not found) and return `{ missing: true, data: [] }` instead of throwing.
+
+**List caps:** `db.customers.list()`, `db.rmaTickets.list()`, and `db.products.list()` cap at **5 000 rows** (raised from 500). These pages filter/sort client-side so all rows must be in memory. If any dataset exceeds 5 000, switch that page to server-side pagination using the existing `listPaged()` method. Do not lower the cap; it is intentional headroom.
+
+### TanStack Query
+
+`QueryClientProvider` wraps the app in `main.jsx` with `staleTime: 60_000`, `retry: 1`, `refetchOnWindowFocus: false`. Use `useQuery` for all data fetching; avoid `useEffect` + `setState` for async data. After mutations, invalidate with `queryClient.invalidateQueries`. Optimistic updates (`queryClient.setQueryData`) are used for ticket/customer delete and customer edit — always include rollback on error.
+
+### TypeScript lib layer
+
+`src/lib/` is TypeScript:
+- `constants.ts` — every magic string (`ROLES`, `TICKET_STATUS`, `PRIORITY`, `INVENTORY_STATUS`, `INVOICE_STATUS`, `NOTIF_TYPE`, `AUTOMATION_ACTION`, `CONFIG_KEY`, `STORAGE_KEY`). Always import from here; never hard-code status strings.
+- `permissions.ts` — `canDo(role, permissions, section, action)` helper + `ROLE_DEFAULT_PERMISSIONS` + `resolvePermissions(role, stored)`. `super_admin` and `admin` bypass all checks automatically.
+- `schemas.ts` — Zod validation schemas.
+- `safeStorage.ts` — `safeStorage.get(key, fallback)` / `safeStorage.set(key, value)` / `safeStorage.remove(key)`. All `localStorage` access must go through this helper — it silently catches quota errors and Safari private-mode restrictions. Never call `localStorage.*` directly.
+
+`.js` extensions in imports resolve to `.ts` files via Vite/TypeScript bundler resolution.
+
+### Permissions
+
+Roles: `super_admin`, `admin`, `manager`, `technician`, `viewer`.
+
+`super_admin` and `admin` bypass all permission checks. Other roles carry a `permissions` JSON object loaded from the `user_roles` table and passed down from `App.jsx` as `currentUserPermissions`. Default permission sets for `manager`, `technician`, and `viewer` are defined in `ROLE_DEFAULT_PERMISSIONS` in **`src/lib/permissions.ts`** (not App.jsx). The `canDo(role, permissions, section, action)` helper is exported from the same file.
+
+**Critical:** always resolve permissions with `resolvePermissions(role, stored)` (also in `permissions.ts`) before storing them in state — never use `stored || ROLE_DEFAULT_PERMISSIONS[role]`. An empty `{}` object is truthy and would override role defaults, stripping all permissions. `resolvePermissions` merges stored overrides on top of role defaults and treats `{}` / `null` / partial objects correctly.
+
+Use the `canDo` pattern when gating UI actions — import `canDo` from `src/lib/permissions` and call `canDo(currentUserRole, currentUserPermissions, 'section', 'action')`.
+
+### URL tab state
+
+`src/hooks/useURLTab.js` — a lightweight hook that syncs a tab or sub-section selection with a URL query parameter. Used throughout page components so deep-links and browser back/forward work within a page:
+
+```js
+const [activeTab, setActiveTab] = useURLTab('tab', 'products')
+```
+
+### Appearance / theming
+
+`src/contexts/AppearanceContext.jsx` provides global theming (dark mode, font, date/time format, sidebar compact mode, dashboard widget order). Settings are persisted to `rma_config` (key `appearance_settings`) and also cached via `safeStorage` under the key `mrma_appearance`. Access via `useAppearance()`.
+
+**Font:** Primary font is **Hanken Grotesk** (Google Fonts, weights 400–800). Loaded via `index.html` preconnect + stylesheet, and dynamically by `AppearanceContext` when selected. `tailwind.config.js` sets `fontFamily.sans: ['Hanken Grotesk', 'system-ui', 'sans-serif']`. `FONT_STACKS` and `GOOGLE_FONTS` in `AppearanceContext.jsx` include `hanken` as a selectable option.
+
+**Dark mode:** `AppearanceContext` toggles the `dark` class on `<html>` (`darkMode: 'class'` Tailwind strategy). Use `dark:` Tailwind prefix classes with Direction B design tokens — see the Design tokens section below.
+
+### Design tokens (Direction B "Command")
+
+All new UI uses these hex token pairs. Never use `dark:bg-slate-*` or `dark:bg-gray-*` for new components.
+
+| Token | Light | Dark |
+|-------|-------|------|
+| Page background | `#f4f6f9` | `#0b0f17` |
+| Surface (card) | `#ffffff` | `#121823` |
+| Surface inset | `#f8f9fb` | `#0f1520` |
+| Border | `#e6e9ef` | `#212a38` |
+| Border soft | `#f0f2f6` | `#1a2230` |
+| Accent | `#4338ca` | `#a5b4fc` |
+| Text primary | `#211f1b` | `#e8ebf0` |
+| Text muted | `#6c6760` | `#9aa4b2` |
+| Text faint | `#a09d99` | `#4a5568` |
+
+Card style: `bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-[18px]` — no shadow.
+
+In `Dashboard.jsx`, these tokens are computed at render time via `tokens(darkMode)` and passed as a `tk` prop to sub-components. For SVG/inline-style values, use the `darkMode` boolean from `useAppearance()` and pick from the table above.
+
+### Control Panel
+
+`src/pages/ControlPanel.jsx` hosts all admin-only sub-pages (User Management, Branding, RMA Config, Custom Fields, PDF Layout, Announcements, Audit Log, Data Cleanup, Backup/Restore, Integrations, **WhatsApp & Messaging**). It uses `useURLTab` to keep the active feature in the URL as `?feature=...`.
+
+The **WhatsApp & Messaging** group (`?feature=wa-settings|wa-templates|wa-logs|wa-test`) contains four sub-pages: `WASettings` (provider toggles, per-event toggles, retry/rate config), `WATemplates` (full CRUD with phone preview), `WALogs` (paginated delivery log with retry + CSV export), `WATestCenter` (send test message, simulate event, run worker, queue stats).
+
+### CSV bulk upload
+
+The Products and Customers pages support bulk CSV import. A custom `parseCSVLine` helper (local to those pages) handles quoted fields — do not use plain `split(',')` because product names can contain commas inside quotes.
+
+### Notifications
+
+Real-time notifications use a single Supabase Realtime channel (`app_notifications`) subscribed in `App.jsx`. Notification visibility is filtered **server-side** via RLS policy `user_read_targeted` — the query only returns rows the current user is allowed to see. Per-type preferences are stored via `safeStorage` under the key `notif_system_prefs_<email>` and also persisted to `db.userPreferences` (synced on login). Changes propagate via a `notif-system-prefs-changed` window event.
+
+### Edge Functions
+
+Live in `supabase/functions/`:
+- `admin-reset-password` — handles password reset (existing user) AND account creation (new user, create-if-missing logic)
+- `public-track` — rate-limited public RMA lookup by RMA number (used by `/tracker`)
+- `send-email` — email dispatch via the notifications system
+- `send-whatsapp` — WhatsApp message dispatch via Meta Cloud API (template + free-form); reads `WHATSAPP_ACCESS_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` from Supabase secrets; writes audit log to `notification_logs`
+- `notification-worker` — queue processor; fetches up to 10 pending jobs from `notification_queue`, invokes `send-whatsapp`, exponential-backoff retry (5 min → 10 min → 20 min), 200 ms rate limit between messages
+- `whatsapp-webhook` — Meta delivery-status callbacks (GET: verification handshake using `WHATSAPP_WEBHOOK_VERIFY_TOKEN`; POST: updates `notification_logs` delivery status on sent/delivered/read/failed)
+
+All Edge Functions validate the caller's JWT before performing privileged operations. Never expose the service role key to the browser.
+
+### WhatsApp / Messaging system
+
+Provider-agnostic notification layer that fires on ticket lifecycle events.
+
+**Library layer** (`src/lib/`):
+- `messaging/types.ts` — `IMessagingProvider`, `NotificationEvent`, `EventType`, `DeliveryStatus`, `QueueJob`
+- `messaging/TemplateEngine.ts` — `render(template, variables)` with `{{key}}` substitution + `{{#key}}…{{/key}}` conditionals; `resolveVariables(defs, payload)` dot-path resolution; `toWhatsAppParams(variables)` builds positional Meta API params
+- `messaging/MessagingService.ts` — `messagingService` singleton; `registerProvider()`, `send()`, `sendBatch()` with bounded concurrency
+- `messaging/providers/WhatsAppProvider.ts` — browser-side adapter; calls `send-whatsapp` Edge Function via `supabase.functions.invoke()`; never calls Meta API directly
+- `events/NotificationEventBus.ts` — `notificationEventBus` singleton; `on(eventType, handler)` returns unsubscribe; `emit(event)` async; `emitAsync(event)` fire-and-forget
+- `events/ticketEventHandlers.ts` — `registerTicketEventHandlers()` called once at app load from `App.jsx`; handles `ticket.created`, `ticket.updated`, `ticket.assigned`, `ticket.closed`, `ticket.cancelled`
+
+**Event flow:** `TicketForm.jsx` saves ticket → emits event via `notificationEventBus.emitAsync()` → handler checks `whatsapp_enabled` + per-event flag → loads template → resolves phone + variables → INSERTs into `notification_queue` → invokes `notification-worker` Edge Function immediately for fast delivery.
+
+**DB tables** (migration `20260602_whatsapp_notifications.sql`): `whatsapp_templates`, `notification_logs`, `notification_settings`, `notification_queue`.
+
+**Secrets required in Supabase Edge Functions → Secrets:**
+- `WHATSAPP_ACCESS_TOKEN` — permanent system-user token from Meta
+- `WHATSAPP_PHONE_NUMBER_ID` — phone number ID from WhatsApp Business API Setup
+- `WHATSAPP_WEBHOOK_VERIFY_TOKEN` — arbitrary string matching Meta webhook config
+
+### PWA
+
+`vite-plugin-pwa` (Workbox `generateSW` strategy) pre-caches ~42 static assets. Supabase API calls use `NetworkFirst` with a 10-second timeout and fall back to cache. The manifest is defined in `vite.config.js`. Dev mode SW is disabled by default (set `devOptions.enabled: true` to test locally).
+
+### Page folder structure
+
+Five large pages are organized as folders. `React.lazy(() => import('./pages/X'))` auto-resolves to `index.jsx` — no changes needed in `App.jsx` when adding files inside a page folder.
+
+| Folder | Files |
+|--------|-------|
+| `src/pages/Inventory/` | `index.jsx` (shell), `_shared.jsx`, `ExportMenu.jsx`, `TransferModal.jsx`, `ProductStatusTab.jsx`, `OverviewTab.jsx`, `ByProductTab.jsx`, `CompanyStockTab.jsx`, `ProductDetailModal.jsx`, `WarehousesTab.jsx`, `ManufacturerTab.jsx` |
+| `src/pages/RMATickets/` | `index.jsx` (shell + table), `TicketForm.jsx` (owns form state), `TicketDrawer.jsx` (owns comment/time/parts state), `_shared.jsx` (SortableHeader), `_utils.js` (pure helpers) |
+| `src/pages/Products/` | `index.jsx`, `ProductsListTab.jsx`, `HierarchyTab.jsx`, `_modals.jsx` |
+| `src/pages/UserManagement/` | `index.jsx`, `UsersTab.jsx`, `RolesTab.jsx`, `_shared.jsx`, `_utils.js` — "Role Templates" tab is now a read-only **"Role Reference"** (displays runtime `ROLE_DEFAULT_PERMISSIONS`). "Custom Roles" tab is hidden behind `ENABLE_CUSTOM_ROLES = false` flag (not yet wired end-to-end). |
+| `src/pages/Customers/` | `index.jsx`, `_modals.jsx`, `_constants.js` |
+
+The remaining pages (`Dashboard`, `Reports`, `Invoices`, `PartsInventory`, `ControlPanel`, `AccountSettings`, etc.) are still single files.
+
+### Accessibility
+
+`@axe-core/react` is installed as a devDependency and mounted in `src/main.jsx` behind an `import.meta.env.DEV` guard. In development, it logs WCAG violations to the browser console automatically — no setup needed. It is never included in production builds.
+
+All sort buttons use `aria-sort="ascending|descending|none"` (via `SortableHeader` in `RMATickets/_shared.jsx` and `InvSortBtn` in `Inventory/_shared.jsx`). All icon-only action-menu buttons have `aria-label`, `aria-expanded`, and `aria-haspopup="menu"`. Filter-panel toggles have `aria-expanded` + `aria-controls` pointing to the panel's `id`.
+
+### Sentry
+
+`initSentry()` is called in `main.jsx` with a no-op guard (skips if DSN is not set). `captureException()` helper is wired into `ErrorBoundary.componentDidCatch`. Import `captureException` from the Sentry integration file — do not call `Sentry.captureException()` directly in page components. Set `VITE_SENTRY_DSN` in Vercel environment variables to enable automatic error capture in production.
+
+The `ErrorBoundary` shows the error **message** in production (safe, user-diagnosable) plus a "Copy error details" button that captures the full stack + URL + timestamp. The full stack trace is dev-only.
+
+### Database migrations
+
+All schema changes are SQL migration files in `supabase/migrations/` named `YYYYMMDD_description.sql`. All migrations are idempotent (`IF NOT EXISTS`, `IF EXISTS`, `DROP POLICY IF EXISTS`). Never alter production schema via the Supabase dashboard without a corresponding migration file.
+
+Current migrations:
+- `20260524_customer_cascade_delete.sql`
+- `20260524_features.sql`
+- `20260526_enable_rls.sql`
+- `20260526_check_constraints.sql`
+- `20260527_storage_bucket_policies.sql`
+- `20260528_ticket_cascade_fk.sql`
+- `20260529_repair_permissions.sql`
+- `20260531_relax_ticket_status_constraint.sql`
+- `20260602_whatsapp_notifications.sql`
+- `20260603_user_preferences_rls.sql`
+
+### RLS SQL helper functions
+
+In any SQL policy, use the `public.rma_*` functions:
+
+```sql
+public.rma_user_role()          -- current user's role string
+public.rma_is_admin()           -- true for admin / super_admin
+public.rma_is_manager_or_above() -- true for manager, admin, super_admin
+public.rma_is_staff()           -- true for any authenticated staff
+public.rma_current_user_email() -- current user's email
+```
+
+**`auth.user_role()` and similar do not exist — never use them.**
+
+### Shared component library
+
+All UI primitives come from `src/components/ui.jsx`. Never re-implement buttons, inputs, modals, badges, or spinners in page components. Key exports: `Button` (variants: primary, secondary, danger, success, ghost, warning), `Spinner` (has built-in `role="status"` and `aria-label="Loading"`), `Badge`, `Card` (flat hairline, no shadow), `Input`, `Select`, `Textarea`, `Label`, `PageHeader`, `SectionTitle`, `Divider`, `IconButton`, `ModalOverlay`, `ModalCard`, `StatusPill` (dot + label pill, colored by status string — uses its own internal color map, no props beyond `status` and optional `className`).
+
+### CI/CD
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR to `main`:  
+**test → lint:ci → build** — all three must pass. Node 20, `npm ci --legacy-peer-deps`.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->

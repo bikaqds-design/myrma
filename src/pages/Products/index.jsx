@@ -9,6 +9,7 @@ import { PageHeader } from '../../components/ui'
 import { useURLTab } from '../../hooks/useURLTab'
 import { ROLES } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
+import { productSchema, getFirstError } from '../../lib/schemas'
 import ProductsListTab from './ProductsListTab'
 import HierarchyTab from './HierarchyTab'
 import { AddProductModal, AddBrandModal, AddCategoryModal, BulkUploadModal } from './_modals'
@@ -653,8 +654,12 @@ export default function Products({
   }
 
   const handleSaveProduct = async () => {
-    if (!productForm.sku || !productForm.product_name || !productForm.brand_id) {
-      toast.error('Please fill in all required fields')
+    const validation = productSchema.safeParse({
+      ...productForm,
+      warranty_months: productForm.warranty_months ? Number(productForm.warranty_months) : undefined,
+    })
+    if (!validation.success) {
+      toast.error(getFirstError(validation))
       return
     }
 

@@ -8,6 +8,7 @@ import Modal from '../../components/Modal'
 import { Button } from '../../components/ui'
 import { ROLES } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
+import { ticketSchema, getFirstError } from '../../lib/schemas'
 import {
   generateRmaNumber,
   DEFAULT_DUE,
@@ -192,6 +193,12 @@ export function TicketForm({
     }
     if (!editingTicket && !canDo('create')) {
       toast.error('You do not have permission to create tickets')
+      return
+    }
+
+    const validation = ticketSchema.safeParse(formData)
+    if (!validation.success) {
+      toast.error(getFirstError(validation))
       return
     }
 

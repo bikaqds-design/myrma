@@ -7,6 +7,7 @@ import { Spinner } from '../../components/ui'
 import { useURLTab } from '../../hooks/useURLTab'
 import { ROLES } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
+import { addUserSchema, getFirstError } from '../../lib/schemas'
 import { validatePasswordStrength, getDefaultPermissions } from './_utils'
 import { UsersTab, AddUserModal, PasswordResetModal, UserControlModal, ActivityModal } from './UsersTab'
 import { RoleTemplatesTab, CustomRolesTab, CreateRoleModal, PermissionsModal } from './RolesTab'
@@ -78,8 +79,14 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
   const handleAddUser = async (e) => {
     e.preventDefault()
 
-    if (!newUserEmail || !newUserPassword || !newUserRole) {
-      toast.error('Please fill all fields')
+    if (!newUserPassword) {
+      toast.error('Password is required')
+      return
+    }
+
+    const emailRoleValidation = addUserSchema.safeParse({ email: newUserEmail, role: newUserRole })
+    if (!emailRoleValidation.success) {
+      toast.error(getFirstError(emailRoleValidation))
       return
     }
 

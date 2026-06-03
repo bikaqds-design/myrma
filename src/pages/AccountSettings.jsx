@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { auth, db, storage, notifications } from '../api/supabaseClient'
 import { captureException } from '../lib/sentry'
+import { resetPasswordSchema, getFirstError } from '../lib/schemas'
 import { safeStorage } from '../lib/safeStorage'
 import { WIDGET_CATALOG } from './Dashboard'
 import toast from 'react-hot-toast'
@@ -347,12 +348,9 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
   }
 
   const handlePasswordSave = async () => {
-    if (newPassword.length < 6) {
-      toast.error('Password must be at least 6 characters')
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      toast.error('Passwords do not match')
+    const validation = resetPasswordSchema.safeParse({ newPassword, confirmPassword })
+    if (!validation.success) {
+      toast.error(getFirstError(validation))
       return
     }
     setPasswordLoading(true)
@@ -579,7 +577,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                 Change Password
               </h2>
               <p className="text-sm text-gray-500 mt-1">
-                Choose a strong password — at least 6 characters
+                Choose a strong password — at least 8 characters
               </p>
             </div>
 
