@@ -409,8 +409,8 @@ export default function ControlPanel({ currentUserRole, currentUserEmail }) {
               d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
             />
           </svg>
-          <h2 className="text-xl font-semibold text-gray-700">Access Restricted</h2>
-          <p className="text-gray-500 mt-1">This area is for administrators only.</p>
+          <h2 className="text-xl font-semibold text-gray-700 dark:text-[#e8ebf0]">Access Restricted</h2>
+          <p className="text-gray-500 dark:text-[#9aa4b2] mt-1">This area is for administrators only.</p>
         </div>
       </div>
     )
@@ -445,12 +445,12 @@ export default function ControlPanel({ currentUserRole, currentUserEmail }) {
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-          <span className="text-sm font-semibold text-gray-900">{activeFeature?.label}</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{activeFeature?.label}</span>
         </div>
       ) : (
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Control Panel</h1>
-          <p className="text-sm text-gray-500 mt-0.5">System administration and configuration</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-[#e8ebf0]">Control Panel</h1>
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-0.5">System administration and configuration</p>
         </div>
       )}
 
@@ -568,10 +568,10 @@ function SendAlert({ currentUserEmail }) {
 
   return (
     <div className="max-w-2xl space-y-5">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+      <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-6 space-y-6">
         {/* Type */}
         <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+          <p className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
             Alert Type
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -579,12 +579,12 @@ function SendAlert({ currentUserEmail }) {
               <button
                 key={t.value}
                 onClick={() => setType(t.value)}
-                className={`flex items-center gap-3 p-3.5 rounded-xl border-2 text-left transition-colors ${type === t.value ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
+                className={`flex items-center gap-3 p-3.5 rounded-xl border-2 text-left transition-colors ${type === t.value ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 dark:border-[#212a38] hover:border-gray-300 dark:border-[#212a38] bg-white dark:bg-[#121823]'}`}
               >
                 <span className="text-2xl">{t.icon}</span>
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{t.label}</p>
-                  <p className="text-xs text-gray-500">{t.desc}</p>
+                  <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t.desc}</p>
                 </div>
               </button>
             ))}
@@ -593,21 +593,21 @@ function SendAlert({ currentUserEmail }) {
 
         {/* Title */}
         <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
             Title <span className="text-red-500">*</span>
           </label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={100}
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+            className="w-full px-3 py-2.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
             placeholder="e.g. System maintenance tonight at 11pm"
           />
         </div>
 
         {/* Message */}
         <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
             Message <span className="text-red-500">*</span>
           </label>
           <textarea
@@ -615,15 +615,15 @@ function SendAlert({ currentUserEmail }) {
             onChange={(e) => setMessage(e.target.value)}
             rows={4}
             maxLength={500}
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent resize-none"
+            className="w-full px-3 py-2.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent resize-none"
             placeholder="Describe the alert in detail..."
           />
-          <p className="text-xs text-gray-500 text-right mt-1">{message.length}/500</p>
+          <p className="text-xs text-gray-500 dark:text-[#9aa4b2] text-right mt-1">{message.length}/500</p>
         </div>
 
         {/* Target */}
         <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+          <p className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
             Send To
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -631,7 +631,7 @@ function SendAlert({ currentUserEmail }) {
               <button
                 key={t.value}
                 onClick={() => setTarget(t.value)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-colors ${target === t.value ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:border-gray-300 bg-white'}`}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-colors ${target === t.value ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] hover:border-gray-300 dark:border-[#212a38] bg-white dark:bg-[#121823]'}`}
               >
                 <span>{t.icon}</span>
                 {t.label}
@@ -643,14 +643,14 @@ function SendAlert({ currentUserEmail }) {
               value={specificEmail}
               onChange={(e) => setSpecificEmail(e.target.value)}
               type="email"
-              className="w-full mt-3 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+              className="w-full mt-3 px-3 py-2.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
               placeholder="recipient@example.com"
             />
           )}
         </div>
 
         {/* Send */}
-        <div className="pt-2 border-t border-gray-100">
+        <div className="pt-2 border-t border-gray-100 dark:border-[#212a38]">
           <button
             onClick={handleSend}
             disabled={sending || !title.trim() || !message.trim()}
@@ -762,12 +762,12 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {statCards.map((c) => (
-            <div key={c.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+            <div key={c.label} className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-4 shadow-sm">
               <div className={`text-2xl font-bold ${colorStat[c.color].split(' ')[1]}`}>
                 {c.value}
               </div>
-              <div className="text-sm font-medium text-gray-700 mt-0.5">{c.label}</div>
-              <div className="text-xs text-gray-500">{c.sub}</div>
+              <div className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mt-0.5">{c.label}</div>
+              <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">{c.sub}</div>
             </div>
           ))}
         </div>
@@ -781,7 +781,7 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
             { label: 'In Progress', color: 'bg-blue-100 text-blue-800' },
             { label: 'On Hold', color: 'bg-yellow-100 text-yellow-800' },
             { label: 'Completed', color: 'bg-green-100 text-green-800' },
-            { label: 'Cancelled', color: 'bg-gray-100 text-gray-700' },
+            { label: 'Cancelled', color: 'bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#e8ebf0]' },
           ].map(({ label, color }) => (
             <div
               key={label}
@@ -799,23 +799,23 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
         const c = COLOR_MAP[group.color]
         return (
           <div key={group.id}>
-            <h2 className="text-base font-semibold text-gray-900 mb-3">{group.label}</h2>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-[#e8ebf0] mb-3">{group.label}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {group.features.map((f) => (
                 <button
                   key={f.id}
                   onClick={() => onNavigate(f.id)}
-                  className={`group bg-white border border-gray-200 rounded-xl p-4 text-left transition-all hover:shadow-md ${c.hover}`}
+                  className={`group bg-white dark:bg-[#121823] border border-gray-200 dark:border-[#212a38] rounded-xl p-4 text-left transition-all hover:shadow-md ${c.hover}`}
                 >
                   <div
                     className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${c.icon}`}
                   >
                     {f.icon}
                   </div>
-                  <div className="font-semibold text-gray-900 text-sm group-hover:text-indigo-700">
+                  <div className="font-semibold text-gray-900 dark:text-[#e8ebf0] text-sm group-hover:text-indigo-700">
                     {f.label}
                   </div>
-                  <div className="text-xs text-gray-500 mt-1 leading-relaxed">{f.desc}</div>
+                  <div className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-1 leading-relaxed">{f.desc}</div>
                   <div className="mt-3 flex items-center gap-1 text-xs font-medium text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
                     Open
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -890,22 +890,22 @@ function SLAPolicies({ currentUserEmail }) {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+      <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-6 space-y-5">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">SLA Policies</h3>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">SLA Policies</h3>
+            <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">
               Auto-set ticket due dates based on priority when a new ticket is created.
             </p>
           </div>
           <label className="flex items-center gap-2 cursor-pointer select-none">
-            <span className="text-sm text-gray-600 font-medium">Enabled</span>
+            <span className="text-sm text-gray-600 dark:text-[#9aa4b2] font-medium">Enabled</span>
             <button
               onClick={() => setLocalConfig((c) => ({ ...c, enabled: !c.enabled }))}
               className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${localConfig.enabled ? 'bg-indigo-600' : 'bg-gray-300'}`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${localConfig.enabled ? 'translate-x-4' : 'translate-x-0'}`}
+                className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white dark:bg-[#121823] shadow transition-transform ${localConfig.enabled ? 'translate-x-4' : 'translate-x-0'}`}
               />
             </button>
           </label>
@@ -924,7 +924,7 @@ function SLAPolicies({ currentUserEmail }) {
               Low: 'text-green-600',
             }
             return (
-              <div key={p} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+              <div key={p} className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-[#0f1520] rounded-lg">
                 <span className={`w-20 text-sm font-semibold ${colors[p]}`}>{p}</span>
                 <div className="flex items-center gap-2 flex-1">
                   <input
@@ -933,10 +933,10 @@ function SLAPolicies({ currentUserEmail }) {
                     max={8760}
                     value={policy.hours}
                     onChange={(e) => updatePolicy(p, e.target.value)}
-                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
+                    className="w-24 px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
                   />
-                  <span className="text-sm text-gray-500">hours</span>
-                  <span className="text-xs text-gray-500 ml-2">
+                  <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">hours</span>
+                  <span className="text-xs text-gray-500 dark:text-[#9aa4b2] ml-2">
                     (
                     {policy.hours >= 24 ? `${(policy.hours / 24).toFixed(1)}d` : `${policy.hours}h`}
                     )
@@ -953,17 +953,17 @@ function SLAPolicies({ currentUserEmail }) {
                 className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${localConfig.pauseOnHold ? 'bg-indigo-600' : 'bg-gray-300'}`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${localConfig.pauseOnHold ? 'translate-x-4' : 'translate-x-0'}`}
+                  className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white dark:bg-[#121823] shadow transition-transform ${localConfig.pauseOnHold ? 'translate-x-4' : 'translate-x-0'}`}
                 />
               </button>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-gray-600 dark:text-[#9aa4b2]">
                 Pause SLA clock when ticket is "On Hold"
               </span>
             </label>
           </div>
         </div>
 
-        <div className="pt-3 border-t border-gray-100">
+        <div className="pt-3 border-t border-gray-100 dark:border-[#212a38]">
           <button
             onClick={handleSave}
             disabled={saving}
@@ -1091,29 +1091,29 @@ function AutomationRules({ currentUserEmail }) {
             </svg>
             Back
           </button>
-          <span className="text-sm font-semibold text-gray-900">{editing.name || 'New Rule'}</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{editing.name || 'New Rule'}</span>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-5">
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-5 space-y-5">
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
               Rule Name
             </label>
             <input
               value={editing.name}
               onChange={(e) => setEditing((r) => ({ ...r, name: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
               placeholder="e.g. Auto-escalate critical tickets"
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
               Trigger Event
             </label>
             <select
               value={editing.trigger}
               onChange={(e) => setEditing((r) => ({ ...r, trigger: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 bg-white"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 bg-white dark:bg-[#121823]"
             >
               {TRIGGER_OPTIONS.map((t) => (
                 <option key={t.value} value={t.value}>
@@ -1126,8 +1126,8 @@ function AutomationRules({ currentUserEmail }) {
           {/* Conditions */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Conditions <span className="font-normal text-gray-500">(all must match)</span>
+              <label className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
+                Conditions <span className="font-normal text-gray-500 dark:text-[#9aa4b2]">(all must match)</span>
               </label>
               <button
                 onClick={() =>
@@ -1145,7 +1145,7 @@ function AutomationRules({ currentUserEmail }) {
               </button>
             </div>
             {editing.conditions.length === 0 && (
-              <p className="text-xs text-gray-500 italic">
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] italic">
                 No conditions — rule runs on all tickets
               </p>
             )}
@@ -1160,7 +1160,7 @@ function AutomationRules({ currentUserEmail }) {
                       return { ...r, conditions: conds }
                     })
                   }
-                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                  className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded text-sm bg-white dark:bg-[#121823]"
                 >
                   {FIELD_OPTIONS.map((f) => (
                     <option key={f.value} value={f.value}>
@@ -1177,7 +1177,7 @@ function AutomationRules({ currentUserEmail }) {
                       return { ...r, conditions: conds }
                     })
                   }
-                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                  className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded text-sm bg-white dark:bg-[#121823]"
                 >
                   {OP_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -1194,7 +1194,7 @@ function AutomationRules({ currentUserEmail }) {
                       return { ...r, conditions: conds }
                     })
                   }
-                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded text-sm"
                   placeholder="value"
                 />
                 <button
@@ -1222,8 +1222,8 @@ function AutomationRules({ currentUserEmail }) {
           {/* Actions */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Actions <span className="font-normal text-gray-500">(executed in order)</span>
+              <label className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
+                Actions <span className="font-normal text-gray-500 dark:text-[#9aa4b2]">(executed in order)</span>
               </label>
               <button
                 onClick={() =>
@@ -1251,7 +1251,7 @@ function AutomationRules({ currentUserEmail }) {
                       return { ...r, actions: acts }
                     })
                   }
-                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                  className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded text-sm bg-white dark:bg-[#121823]"
                 >
                   {ACTION_TYPES.map((at) => (
                     <option key={at.value} value={at.value}>
@@ -1269,7 +1269,7 @@ function AutomationRules({ currentUserEmail }) {
                         return { ...r, actions: acts }
                       })
                     }
-                    className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                    className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded text-sm bg-white dark:bg-[#121823]"
                   >
                     {STATUS_OPTIONS.map((s) => (
                       <option key={s}>{s}</option>
@@ -1286,7 +1286,7 @@ function AutomationRules({ currentUserEmail }) {
                         return { ...r, actions: acts }
                       })
                     }
-                    className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                    className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded text-sm bg-white dark:bg-[#121823]"
                   >
                     {PRIORITY_OPTIONS.map((p) => (
                       <option key={p}>{p}</option>
@@ -1303,7 +1303,7 @@ function AutomationRules({ currentUserEmail }) {
                         return { ...r, actions: acts }
                       })
                     }
-                    className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                    className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded text-sm"
                     placeholder={
                       a.type === 'assign_technician' ? 'email@example.com' : 'Notification message'
                     }
@@ -1328,7 +1328,7 @@ function AutomationRules({ currentUserEmail }) {
             ))}
           </div>
 
-          <div className="flex gap-3 pt-2 border-t border-gray-100">
+          <div className="flex gap-3 pt-2 border-t border-gray-100 dark:border-[#212a38]">
             <button
               onClick={saveEdit}
               disabled={saving}
@@ -1338,7 +1338,7 @@ function AutomationRules({ currentUserEmail }) {
             </button>
             <button
               onClick={() => setEditing(null)}
-              className="px-5 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200"
+              className="px-5 py-2 bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#e8ebf0] text-sm font-medium rounded-lg hover:bg-gray-200"
             >
               Cancel
             </button>
@@ -1351,7 +1351,7 @@ function AutomationRules({ currentUserEmail }) {
   return (
     <div className="max-w-2xl space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">
           {rules.length} rule{rules.length !== 1 ? 's' : ''} configured
         </p>
         <button
@@ -1366,7 +1366,7 @@ function AutomationRules({ currentUserEmail }) {
       </div>
 
       {rules.length === 0 ? (
-        <div className="bg-white rounded-xl border border-dashed border-gray-300 p-10 text-center">
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-dashed border-gray-300 dark:border-[#212a38] p-10 text-center">
           <svg
             className="w-10 h-10 text-gray-300 mx-auto mb-3"
             fill="none"
@@ -1380,28 +1380,28 @@ function AutomationRules({ currentUserEmail }) {
               d="M13 10V3L4 14h7v7l9-11h-7z"
             />
           </svg>
-          <p className="text-sm text-gray-500">No automation rules yet</p>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">No automation rules yet</p>
+          <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-1">
             Rules automatically act on tickets when events occur
           </p>
         </div>
       ) : (
         <div className="space-y-3">
           {rules.map((rule) => (
-            <div key={rule.id} className="bg-white rounded-xl border border-gray-200 p-4">
+            <div key={rule.id} className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm text-gray-900">{rule.name}</span>
+                    <span className="font-semibold text-sm text-gray-900 dark:text-[#e8ebf0]">{rule.name}</span>
                     <span
-                      className={`px-2 py-0.5 text-xs rounded-full font-medium ${rule.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+                      className={`px-2 py-0.5 text-xs rounded-full font-medium ${rule.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'}`}
                     >
                       {rule.enabled ? 'Active' : 'Disabled'}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-1">
                     Trigger:{' '}
-                    <span className="font-medium text-gray-700">
+                    <span className="font-medium text-gray-700 dark:text-[#e8ebf0]">
                       {TRIGGER_OPTIONS.find((t) => t.value === rule.trigger)?.label}
                     </span>
                     {rule.conditions.length > 0 && (
@@ -1423,7 +1423,7 @@ function AutomationRules({ currentUserEmail }) {
                   </button>
                   <button
                     onClick={() => setEditing({ ...rule })}
-                    className="text-xs px-3 py-1 rounded-lg font-medium bg-gray-50 text-gray-700 hover:bg-gray-100"
+                    className="text-xs px-3 py-1 rounded-lg font-medium bg-gray-50 dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-100 dark:bg-[#1a2230]"
                   >
                     Edit
                   </button>
@@ -1565,11 +1565,11 @@ function WebhooksConfig({ currentUserEmail }) {
             </svg>
             Back
           </button>
-          <span className="text-sm font-semibold text-gray-900">
+          <span className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">
             {editing.name || 'New Webhook'}
           </span>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-5 space-y-4">
           {[
             { label: 'Name', key: 'name', placeholder: 'e.g. Notify Slack', type: 'text' },
             {
@@ -1586,21 +1586,21 @@ function WebhooksConfig({ currentUserEmail }) {
             },
           ].map((f) => (
             <div key={f.key}>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
                 {f.label}
               </label>
               <input
                 type={f.type}
                 value={editing[f.key]}
                 onChange={(e) => setEditing((h) => ({ ...h, [f.key]: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
                 placeholder={f.placeholder}
               />
             </div>
           ))}
 
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+            <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-2">
               Events to Send <span className="font-normal">(leave empty = all events)</span>
             </label>
             <div className="flex flex-wrap gap-2">
@@ -1615,7 +1615,7 @@ function WebhooksConfig({ currentUserEmail }) {
                         : [...h.events, ev],
                     }))
                   }
-                  className={`px-2.5 py-1 text-xs rounded-full font-medium border transition-colors ${editing.events.includes(ev) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'}`}
+                  className={`px-2.5 py-1 text-xs rounded-full font-medium border transition-colors ${editing.events.includes(ev) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-[#121823] text-gray-600 dark:text-[#9aa4b2] border-gray-300 dark:border-[#212a38] hover:border-indigo-400'}`}
                 >
                   {ev}
                 </button>
@@ -1623,7 +1623,7 @@ function WebhooksConfig({ currentUserEmail }) {
             </div>
           </div>
 
-          <div className="flex gap-3 pt-2 border-t border-gray-100">
+          <div className="flex gap-3 pt-2 border-t border-gray-100 dark:border-[#212a38]">
             <button
               onClick={saveEdit}
               disabled={saving}
@@ -1633,7 +1633,7 @@ function WebhooksConfig({ currentUserEmail }) {
             </button>
             <button
               onClick={() => setEditing(null)}
-              className="px-5 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200"
+              className="px-5 py-2 bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#e8ebf0] text-sm font-medium rounded-lg hover:bg-gray-200"
             >
               Cancel
             </button>
@@ -1645,7 +1645,7 @@ function WebhooksConfig({ currentUserEmail }) {
   return (
     <div className="max-w-2xl space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">
           {hooks.length} webhook{hooks.length !== 1 ? 's' : ''} configured
         </p>
         <button
@@ -1666,33 +1666,33 @@ function WebhooksConfig({ currentUserEmail }) {
       </div>
 
       {hooks.length === 0 ? (
-        <div className="bg-white rounded-xl border border-dashed border-gray-300 p-10 text-center">
-          <p className="text-sm text-gray-500">No webhooks configured</p>
-          <p className="text-xs text-gray-500 mt-1">
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-dashed border-gray-300 dark:border-[#212a38] p-10 text-center">
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">No webhooks configured</p>
+          <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-1">
             Push ticket events to Slack, QuickBooks, Zapier, and more
           </p>
         </div>
       ) : (
         <div className="space-y-3">
           {hooks.map((h) => (
-            <div key={h.id} className="bg-white rounded-xl border border-gray-200 p-4">
+            <div key={h.id} className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm text-gray-900">{h.name}</span>
+                    <span className="font-semibold text-sm text-gray-900 dark:text-[#e8ebf0]">{h.name}</span>
                     <span
-                      className={`px-2 py-0.5 text-xs rounded-full font-medium ${h.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+                      className={`px-2 py-0.5 text-xs rounded-full font-medium ${h.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'}`}
                     >
                       {h.enabled ? 'Active' : 'Disabled'}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 font-mono mt-0.5 truncate">{h.url}</div>
+                  <div className="text-xs text-gray-500 dark:text-[#9aa4b2] font-mono mt-0.5 truncate">{h.url}</div>
                   {h.events.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {h.events.map((e) => (
                         <span
                           key={e}
-                          className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded"
+                          className="px-1.5 py-0.5 bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2] text-xs rounded"
                         >
                           {e}
                         </span>
@@ -1710,7 +1710,7 @@ function WebhooksConfig({ currentUserEmail }) {
                   </button>
                   <button
                     onClick={() => setEditing({ ...h })}
-                    className="text-xs px-3 py-1 rounded-lg font-medium bg-gray-50 text-gray-700 hover:bg-gray-100"
+                    className="text-xs px-3 py-1 rounded-lg font-medium bg-gray-50 dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-100 dark:bg-[#1a2230]"
                   >
                     Edit
                   </button>

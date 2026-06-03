@@ -16,39 +16,39 @@ export function OverviewTab({ stats: _stats, units, brands: _brands, brandMap, o
   return (
     <div className="space-y-4">
       {Object.keys(perBrand).length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-lg border border-gray-200">
-          <p className="text-gray-500 text-sm">No inventory data yet</p>
+        <div className="text-center py-20 bg-white dark:bg-[#121823] rounded-lg border border-gray-200 dark:border-[#212a38]">
+          <p className="text-gray-500 dark:text-[#9aa4b2] text-sm">No inventory data yet</p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-700">Stock by Brand</h3>
-            <span className="text-xs text-gray-500">{units.length} total units</span>
+        <div className="bg-white dark:bg-[#121823] rounded-lg border border-gray-200 dark:border-[#212a38]">
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-[#212a38] flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#e8ebf0]">Stock by Brand</h3>
+            <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">{units.length} total units</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-100">
+              <thead className="bg-gray-50 dark:bg-[#0f1520] border-b border-gray-100 dark:border-[#212a38]">
                 <tr>
                   {['Brand', 'Active RMA', 'Company Stock', 'Sent to Mfr', 'Total'].map((h) => (
                     <th
                       key={h}
-                      className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                      className="px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider"
                     >
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-[#212a38]">
                 {Object.entries(perBrand)
                   .sort((a, b) => b[1].total - a[1].total)
                   .map(([brand, cnt]) => (
                     <tr
                       key={brand}
-                      className="hover:bg-indigo-50 cursor-pointer transition-colors"
+                      className="hover:bg-gray-50 dark:hover:bg-[#1a2230] cursor-pointer transition-colors"
                       onClick={() => onNavigate('by-product')}
                     >
-                      <td className="px-5 py-3 font-medium text-gray-900">{brand}</td>
+                      <td className="px-5 py-3 font-medium text-gray-900 dark:text-[#e8ebf0]">{brand}</td>
                       <td className="px-5 py-3">
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                           {cnt.active}
@@ -64,7 +64,7 @@ export function OverviewTab({ stats: _stats, units, brands: _brands, brandMap, o
                           {cnt.sent}
                         </span>
                       </td>
-                      <td className="px-5 py-3 font-bold text-gray-800">{cnt.total}</td>
+                      <td className="px-5 py-3 font-bold text-gray-800 dark:text-[#e8ebf0]">{cnt.total}</td>
                     </tr>
                   ))}
               </tbody>

@@ -102,7 +102,7 @@ export function ByProductTab({
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
             />
             <svg
-              className="w-5 h-5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2"
+              className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -117,7 +117,7 @@ export function ByProductTab({
           </div>
           <button
             onClick={() => setShowFilters((f) => !f)}
-            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || activeFilterCount > 0 ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || activeFilterCount > 0 ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520]'}`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -135,7 +135,7 @@ export function ByProductTab({
             )}
           </button>
         </div>
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">
           {filtered.length} product{filtered.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -157,7 +157,7 @@ export function ByProductTab({
           <div className="h-5 w-px bg-indigo-200" />
           <button
             onClick={handleExportSelected}
-            className="flex items-center gap-2 px-3 py-1.5 bg-white border border-indigo-300 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-50 transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-[#121823] border border-indigo-300 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-50 dark:hover:bg-[#1a2230] transition-colors"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -174,9 +174,9 @@ export function ByProductTab({
 
       {/* Filter panel */}
       {showFilters && (
-        <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg flex-wrap">
+        <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-[#0f1520] rounded-lg flex-wrap">
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Product:</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">Product:</label>
             <input
               type="text"
               value={filterProduct}
@@ -186,7 +186,7 @@ export function ByProductTab({
             />
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Brand:</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">Brand:</label>
             <select
               value={filterBrand}
               onChange={(e) => setFilterBrand(e.target.value)}
@@ -201,7 +201,7 @@ export function ByProductTab({
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Status:</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">Status:</label>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
@@ -230,10 +230,10 @@ export function ByProductTab({
       )}
 
       {filtered.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-lg border border-gray-200 flex flex-col items-center gap-3">
-          <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
+        <div className="text-center py-20 bg-white dark:bg-[#121823] rounded-lg border border-gray-200 dark:border-[#212a38] flex flex-col items-center gap-3">
+          <div className="w-12 h-12 bg-gray-100 dark:bg-[#1a2230] rounded-xl flex items-center justify-center">
             <svg
-              className="w-6 h-6 text-gray-500"
+              className="w-6 h-6 text-gray-500 dark:text-[#9aa4b2]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -247,8 +247,8 @@ export function ByProductTab({
             </svg>
           </div>
           <div>
-            <p className="font-semibold text-gray-600 text-sm">No products found</p>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="font-semibold text-gray-600 dark:text-[#9aa4b2] text-sm">No products found</p>
+            <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">
               {search || filterBrand || filterStatus || filterProduct
                 ? 'Try adjusting your filters'
                 : 'Products appear here once inventory units are added via RMA tickets'}
@@ -257,12 +257,12 @@ export function ByProductTab({
         </div>
       ) : (
         <>
-          <div className="rounded-lg border border-gray-200 overflow-hidden">
+          <div className="rounded-lg border border-gray-200 dark:border-[#212a38] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-xs border-collapse">
-                <thead className="bg-gray-100 sticky top-0 z-10">
+                <thead className="bg-gray-100 dark:bg-[#1a2230] sticky top-0 z-10">
                   <tr>
-                    <th className="w-9 px-3 py-2 border-b border-r border-gray-200 text-center">
+                    <th className="w-9 px-3 py-2 border-b border-r border-gray-200 dark:border-[#212a38] text-center">
                       <input
                         type="checkbox"
                         checked={
@@ -278,26 +278,26 @@ export function ByProductTab({
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                       />
                     </th>
-                    <th className="w-8 px-2 py-2 text-center text-gray-500 font-semibold border-b border-r border-gray-200">
+                    <th className="w-8 px-2 py-2 text-center text-gray-500 dark:text-[#9aa4b2] font-semibold border-b border-r border-gray-200 dark:border-[#212a38]">
                       #
                     </th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600 border-b border-r border-gray-200">
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38]">
                       Brand
                     </th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600 border-b border-r border-gray-200">
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38]">
                       Product
                     </th>
-                    <th className="px-3 py-2 text-center font-semibold text-gray-600 border-b border-r border-gray-200 whitespace-nowrap">
+                    <th className="px-3 py-2 text-center font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38] whitespace-nowrap">
                       Active RMA
                     </th>
-                    <th className="px-3 py-2 text-center font-semibold text-gray-600 border-b border-r border-gray-200 whitespace-nowrap">
+                    <th className="px-3 py-2 text-center font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38] whitespace-nowrap">
                       Company Stock
                     </th>
 
-                    <th className="px-3 py-2 text-center font-semibold text-gray-600 border-b border-r border-gray-200">
+                    <th className="px-3 py-2 text-center font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38]">
                       Total
                     </th>
-                    <th className="px-3 py-2 border-b border-gray-200 w-8"></th>
+                    <th className="px-3 py-2 border-b border-gray-200 dark:border-[#212a38] w-8"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -306,16 +306,16 @@ export function ByProductTab({
                     const rowBg = isSelected
                       ? 'bg-indigo-50'
                       : idx % 2 === 0
-                        ? 'bg-white'
-                        : 'bg-gray-50/60'
+                        ? 'bg-white dark:bg-[#121823]'
+                        : 'bg-gray-50 dark:bg-[#0f1520]/60'
                     return (
                       <tr
                         key={g.product_name}
-                        className={`${rowBg} border-b border-gray-100 transition-colors cursor-pointer hover:bg-indigo-50/40`}
+                        className={`${rowBg} border-b border-gray-100 dark:border-[#212a38] transition-colors cursor-pointer hover:bg-indigo-50 dark:hover:bg-[#1a2230]/40`}
                         onClick={() => setSelectedProduct(g)}
                       >
                         <td
-                          className="px-3 py-1.5 text-center border-r border-gray-100"
+                          className="px-3 py-1.5 text-center border-r border-gray-100 dark:border-[#212a38]"
                           onClick={(e) => {
                             e.stopPropagation()
                             setSelectedRows((r) =>
@@ -332,16 +332,16 @@ export function ByProductTab({
                             className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                           />
                         </td>
-                        <td className="px-2 py-1.5 text-center text-gray-500 tabular-nums border-r border-gray-100">
+                        <td className="px-2 py-1.5 text-center text-gray-500 dark:text-[#9aa4b2] tabular-nums border-r border-gray-100 dark:border-[#212a38]">
                           {(currentPage - 1) * itemsPerPage + idx + 1}
                         </td>
-                        <td className="px-3 py-1.5 border-r border-gray-100 text-gray-600 font-medium">
+                        <td className="px-3 py-1.5 border-r border-gray-100 dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] font-medium">
                           {g.brand || '—'}
                         </td>
-                        <td className="px-3 py-1.5 font-semibold text-gray-900 border-r border-gray-100">
+                        <td className="px-3 py-1.5 font-semibold text-gray-900 dark:text-[#e8ebf0] border-r border-gray-100 dark:border-[#212a38]">
                           {g.product_name}
                         </td>
-                        <td className="px-3 py-1.5 text-center border-r border-gray-100">
+                        <td className="px-3 py-1.5 text-center border-r border-gray-100 dark:border-[#212a38]">
                           {g.active_rma > 0 ? (
                             <span className="px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700">
                               {g.active_rma}
@@ -350,7 +350,7 @@ export function ByProductTab({
                             <span className="text-gray-300">—</span>
                           )}
                         </td>
-                        <td className="px-3 py-1.5 text-center border-r border-gray-100">
+                        <td className="px-3 py-1.5 text-center border-r border-gray-100 dark:border-[#212a38]">
                           {g.company_stock > 0 ? (
                             <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-700">
                               {g.company_stock}
@@ -360,7 +360,7 @@ export function ByProductTab({
                           )}
                         </td>
 
-                        <td className="px-3 py-1.5 text-center font-bold text-gray-800 border-r border-gray-100">
+                        <td className="px-3 py-1.5 text-center font-bold text-gray-800 border-r border-gray-100 dark:border-[#212a38]">
                           {g.units.length}
                         </td>
                         <td className="px-3 py-1.5 text-center">

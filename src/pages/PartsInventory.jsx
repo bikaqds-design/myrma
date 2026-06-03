@@ -67,7 +67,7 @@ function SortBtn({ label, sortKey, activeSortKey, activeSortDir, onSort }) {
   return (
     <button
       onClick={() => onSort(sortKey)}
-      className="flex items-center gap-1 hover:text-gray-900 transition-colors"
+      className="flex items-center gap-1 hover:text-gray-900 dark:text-[#e8ebf0] transition-colors"
     >
       {label}
       {isActive ? (
@@ -159,18 +159,18 @@ function PartModal({ part, onSave, onClose, saving }) {
   }
 
   const field =
-    'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent'
-  const label = 'block text-sm font-medium text-gray-700 mb-1'
+    'w-full px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent'
+  const label = 'block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">
+      <div className="relative bg-white dark:bg-[#121823] rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-[#212a38]">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-[#e8ebf0]">
             {part ? 'Edit Part' : 'Add Part'}
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-600 transition-colors">
+          <button onClick={onClose} className="text-gray-500 dark:text-[#9aa4b2] hover:text-gray-600 dark:text-[#9aa4b2] transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -280,7 +280,7 @@ function PartModal({ part, onSave, onClose, saving }) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-[#e8ebf0] border border-gray-200 dark:border-[#212a38] rounded-xl hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] transition-colors"
             >
               Cancel
             </button>
@@ -473,7 +473,7 @@ export default function PartsInventory({
           <div className="h-8 w-40 animate-pulse bg-gray-200 rounded-lg" />
           <div className="h-4 w-64 animate-pulse bg-gray-200 rounded-lg" />
         </div>
-        <div className="h-64 animate-pulse bg-gray-100 rounded-xl" />
+        <div className="h-64 animate-pulse bg-gray-100 dark:bg-[#1a2230] rounded-xl" />
       </div>
     )
 
@@ -524,7 +524,7 @@ export default function PartsInventory({
         {canExport && (
           <button
             onClick={handleExport}
-            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 dark:border-[#212a38] rounded-lg text-sm text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -539,7 +539,7 @@ export default function PartsInventory({
         )}
         <button
           onClick={() => refetch()}
-          className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 dark:border-[#212a38] rounded-lg text-sm text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -609,10 +609,10 @@ export default function PartsInventory({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search part name or part number…"
-            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           />
           <svg
-            className="w-4 h-4 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2"
+            className="w-4 h-4 text-gray-500 dark:text-[#9aa4b2] absolute left-2.5 top-1/2 -translate-y-1/2"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -627,7 +627,7 @@ export default function PartsInventory({
         </div>
         <button
           onClick={() => setShowLowOnly((v) => !v)}
-          className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${showLowOnly ? 'bg-amber-50 border-amber-400 text-amber-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+          className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${showLowOnly ? 'bg-amber-50 border-amber-400 text-amber-700' : 'border-gray-200 dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520]'}`}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -644,14 +644,14 @@ export default function PartsInventory({
             </span>
           )}
         </button>
-        <span className="text-sm text-gray-500 ml-auto">
+        <span className="text-sm text-gray-500 dark:text-[#9aa4b2] ml-auto">
           {filtered.length} part{filtered.length !== 1 ? 's' : ''}
         </span>
       </div>
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200">
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38]">
           <EmptyState
             preset="inventory"
             title="No parts found"
@@ -670,12 +670,12 @@ export default function PartsInventory({
           />
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-gray-50 dark:bg-[#0f1520] border-b border-gray-200 dark:border-[#212a38]">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
                     <SortBtn
                       label="Part Name"
                       sortKey="part_name"
@@ -684,10 +684,10 @@ export default function PartsInventory({
                       onSort={handleSort}
                     />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
                     Part #
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
                     <SortBtn
                       label="Quantity"
                       sortKey="quantity"
@@ -696,37 +696,37 @@ export default function PartsInventory({
                       onSort={handleSort}
                     />
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
                     Unit Cost
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
                     Supplier
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
                     Location
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
                     Reorder Level
                   </th>
                   {canAdjust && (
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
                       Adjust
                     </th>
                   )}
                   {(canEdit || canDelete) && (
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
                       Actions
                     </th>
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-[#212a38]">
                 {filtered.map((part) => {
                   const isLow = part.quantity <= part.reorder_level
                   return (
                     <tr
                       key={part.id}
-                      className={`hover:bg-gray-50 transition-colors ${isLow ? 'bg-amber-50/40' : ''}`}
+                      className={`hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] transition-colors ${isLow ? 'bg-amber-50/40' : ''}`}
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
@@ -736,15 +736,15 @@ export default function PartsInventory({
                               className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"
                             />
                           )}
-                          <span className="font-medium text-gray-900">{part.part_name}</span>
+                          <span className="font-medium text-gray-900 dark:text-[#e8ebf0]">{part.part_name}</span>
                         </div>
                         {part.notes && (
-                          <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[200px]">
+                          <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5 truncate max-w-[200px]">
                             {part.notes}
                           </p>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-gray-500 font-mono text-xs">
+                      <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] font-mono text-xs">
                         {part.part_number || '—'}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -754,12 +754,12 @@ export default function PartsInventory({
                           {part.quantity ?? 0}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-700 font-medium tabular-nums">
+                      <td className="px-4 py-3 text-right text-gray-700 dark:text-[#e8ebf0] font-medium tabular-nums">
                         ${Number(part.unit_cost ?? 0).toFixed(2)}
                       </td>
-                      <td className="px-4 py-3 text-gray-500">{part.supplier || '—'}</td>
-                      <td className="px-4 py-3 text-gray-500">{part.location || '—'}</td>
-                      <td className="px-4 py-3 text-center text-gray-500">
+                      <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2]">{part.supplier || '—'}</td>
+                      <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2]">{part.location || '—'}</td>
+                      <td className="px-4 py-3 text-center text-gray-500 dark:text-[#9aa4b2]">
                         {part.reorder_level ?? 0}
                       </td>
                       {canAdjust && (
@@ -770,7 +770,7 @@ export default function PartsInventory({
                               disabled={adjusting[part.id] || part.quantity <= 0}
                               title="Remove 1"
                               aria-label="Remove 1"
-                              className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-red-50 hover:border-red-300 hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                              className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 dark:border-[#212a38] text-gray-500 dark:text-[#9aa4b2] hover:bg-red-50 hover:border-red-300 hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                             >
                               <svg
                                 className="w-3.5 h-3.5"
@@ -792,7 +792,7 @@ export default function PartsInventory({
                               disabled={adjusting[part.id]}
                               title="Add 1"
                               aria-label="Add 1"
-                              className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-green-50 hover:border-green-300 hover:text-green-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                              className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 dark:border-[#212a38] text-gray-500 dark:text-[#9aa4b2] hover:bg-green-50 hover:border-green-300 hover:text-green-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                             >
                               <svg
                                 className="w-3.5 h-3.5"
@@ -822,7 +822,7 @@ export default function PartsInventory({
                                 }}
                                 title="Edit part"
                                 aria-label="Edit part"
-                                className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 dark:text-[#9aa4b2] hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                               >
                                 <svg
                                   className="w-3.5 h-3.5"
@@ -844,7 +844,7 @@ export default function PartsInventory({
                                 onClick={() => handleDelete(part)}
                                 title="Delete part"
                                 aria-label="Delete part"
-                                className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 dark:text-[#9aa4b2] hover:text-red-600 hover:bg-red-50 transition-colors"
                               >
                                 <svg
                                   className="w-3.5 h-3.5"
@@ -875,7 +875,7 @@ export default function PartsInventory({
 
       {/* Summary footer */}
       {filtered.length > 0 && (
-        <div className="flex items-center justify-between text-xs text-gray-500 px-1">
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-[#9aa4b2] px-1">
           <span>Total parts: {filtered.length}</span>
           <span>
             Total stock value: $

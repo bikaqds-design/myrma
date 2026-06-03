@@ -1061,8 +1061,8 @@ export default function Products({
     <div className="space-y-6">
       <PageHeader title="Products" subtitle="Manage product catalog and hierarchy" />
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="border-b border-gray-200">
+      <div className="bg-white dark:bg-[#121823] rounded-xl shadow-sm border border-gray-200 dark:border-[#212a38]">
+        <div className="border-b border-gray-200 dark:border-[#212a38]">
           <nav className="flex gap-8 px-6">
             <button
               onClick={() => setActiveTab('products')}
@@ -1070,7 +1070,7 @@ export default function Products({
                 'py-4 border-b-2 font-medium transition-colors ' +
                 (activeTab === 'products'
                   ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700')
+                  : 'border-transparent text-gray-500 dark:text-[#9aa4b2] hover:text-gray-700 dark:text-[#e8ebf0]')
               }
             >
               Products
@@ -1081,7 +1081,7 @@ export default function Products({
                 'py-4 border-b-2 font-medium transition-colors ' +
                 (activeTab === 'hierarchy'
                   ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700')
+                  : 'border-transparent text-gray-500 dark:text-[#9aa4b2] hover:text-gray-700 dark:text-[#e8ebf0]')
               }
             >
               Product Hierarchy
