@@ -10,18 +10,18 @@ import { captureException } from '../lib/sentry'
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PRIORITY_CLS = {
-  Critical: 'bg-red-100 text-red-700 border border-red-200',
-  High: 'bg-orange-100 text-orange-700',
-  Medium: 'bg-yellow-100 text-yellow-700',
-  Low: 'bg-green-100 text-green-700',
+  Critical: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/30',
+  High:     'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
+  Medium:   'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
+  Low:      'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
 }
 
 const STATUS_CLS = {
-  New: 'bg-pink-100 text-pink-700',
-  'In Progress': 'bg-blue-100 text-blue-700',
-  'On Hold': 'bg-yellow-100 text-yellow-700',
-  Completed: 'bg-green-100 text-green-700',
-  Cancelled: 'bg-gray-100 text-gray-600',
+  New:          'bg-pink-100 dark:bg-pink-900/20 text-pink-700 dark:text-pink-400',
+  'In Progress':'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
+  'On Hold':    'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
+  Completed:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+  Cancelled:    'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
 }
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']

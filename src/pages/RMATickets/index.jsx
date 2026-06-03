@@ -816,13 +816,13 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     const days = Math.ceil((new Date(dueDate) - Date.now()) / 86400000)
     if (days < 0)
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400">
           Overdue {Math.abs(days)}d
         </span>
       )
     if (days === 0)
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400">
           Due today
         </span>
       )
@@ -834,7 +834,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       )
     if (days <= 5)
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400">
           {days}d left
         </span>
       )

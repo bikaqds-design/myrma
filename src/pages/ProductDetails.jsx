@@ -743,14 +743,14 @@ export default function ProductDetails({
                               className={
                                 'px-2 py-1 text-xs rounded-full ' +
                                 (ticket.ticket_status === TICKET_STATUS.OPEN
-                                  ? 'bg-blue-100 text-blue-800'
+                                  ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400'
                                   : ticket.ticket_status === TICKET_STATUS.IN_PROGRESS
-                                    ? 'bg-yellow-100 text-yellow-800'
+                                    ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
                                     : ticket.ticket_status === TICKET_STATUS.ON_HOLD
-                                      ? 'bg-orange-100 text-orange-800'
+                                      ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-400'
                                       : ticket.ticket_status === TICKET_STATUS.COMPLETED
-                                        ? 'bg-green-100 text-green-800'
-                                        : 'bg-gray-100 text-gray-800')
+                                        ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400'
+                                        : 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]')
                               }
                             >
                               {ticket.ticket_status || '-'}
@@ -763,10 +763,10 @@ export default function ProductDetails({
                                 (ticket.priority === 'Critical'
                                   ? 'bg-red-200 text-red-900'
                                   : ticket.priority === 'High'
-                                    ? 'bg-red-100 text-red-800'
+                                    ? 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
                                     : ticket.priority === 'Medium'
-                                      ? 'bg-yellow-100 text-yellow-800'
-                                      : 'bg-gray-100 text-gray-800')
+                                      ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
+                                      : 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]')
                               }
                             >
                               {ticket.priority || '-'}
@@ -807,10 +807,10 @@ function DetailField({ label, value, capitalize, badge, badgeColor }) {
           className={
             'inline-block px-3 py-1 text-sm rounded-full ' +
             (badgeColor === 'green'
-              ? 'bg-green-100 text-green-800'
+              ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400'
               : badgeColor === 'red'
-                ? 'bg-red-100 text-red-800'
-                : 'bg-gray-100 text-gray-800')
+                ? 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
+                : 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]')
           }
         >
           {value}

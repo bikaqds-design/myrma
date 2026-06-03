@@ -758,10 +758,10 @@ export default function Customers({
 
   const getStatusBadge = (status) => {
     const map = {
-      Active: 'bg-green-100 text-green-800',
-      Inactive: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
-      Suspended: 'bg-red-100 text-red-700',
-      VIP: 'bg-purple-100 text-purple-800',
+      Active:    'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400',
+      Inactive:  'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
+      Suspended: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
+      VIP:       'bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-400',
     }
     return (
       <span
@@ -1254,7 +1254,7 @@ export default function Customers({
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`px-2 py-0.5 text-xs rounded font-medium ${c.customer_type === 'B2B' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}
+                          className={`px-2 py-0.5 text-xs rounded font-medium ${c.customer_type === 'B2B' ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'}`}
                         >
                           {c.customer_type}
                         </span>

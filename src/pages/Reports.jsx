@@ -117,11 +117,11 @@ function MigrationBanner({ table, children }) {
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const map = {
-    New: 'bg-blue-100 text-blue-700',
+    New: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
     'In Progress': 'bg-yellow-100 text-yellow-700',
-    'On Hold': 'bg-orange-100 text-orange-700',
-    Completed: 'bg-green-100 text-green-700',
-    Cancelled: 'bg-gray-100 text-gray-500',
+    'On Hold': 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
+    Completed: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+    Cancelled: 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]',
   }
   return (
     <span
@@ -134,10 +134,10 @@ function StatusBadge({ status }) {
 
 function PriorityBadge({ priority }) {
   const map = {
-    Critical: 'bg-red-100 text-red-700',
-    High: 'bg-orange-100 text-orange-700',
+    Critical: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
+    High: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
     Medium: 'bg-yellow-100 text-yellow-700',
-    Low: 'bg-gray-100 text-gray-600',
+    Low: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
   }
   return (
     <span
@@ -719,13 +719,13 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400">
                           {t.completed}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         {avgRes !== null ? (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400">
                             {avgRes}h
                           </span>
                         ) : (
@@ -759,11 +759,11 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
     )
 
   const INV_STATUS_CLS = {
-    paid: 'bg-green-100 text-green-700',
-    pending: 'bg-yellow-100 text-yellow-700',
-    overdue: 'bg-red-100 text-red-700',
-    draft: 'bg-gray-100 text-gray-600',
-    voided: 'bg-gray-100 text-gray-500',
+    paid:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+    pending: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
+    overdue: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
+    draft:   'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
+    voided:  'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]',
   }
 
   const totalInvoiced = invoices.reduce((s, i) => s + (i.total_amount || i.amount || 0), 0)

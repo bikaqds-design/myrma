@@ -252,7 +252,7 @@ export default function CustomerDetails({
   }
 
   const getStatusBadge = (status) => {
-    const style = status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+    const style = status === 'Active' ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]'
     return (
       <span className={`px-3 py-1 text-sm rounded-full font-medium ${style}`}>
         {status || 'Unknown'}
@@ -261,7 +261,7 @@ export default function CustomerDetails({
   }
 
   const getTypeBadge = (type) => {
-    const style = type === 'B2B' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+    const style = type === 'B2B' ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400' : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-400'
     return (
       <span className={`px-2 py-1 text-xs rounded-full font-medium ${style}`}>
         {type === 'B2B' ? '🏢 B2B' : '👤 B2C'}
@@ -271,15 +271,15 @@ export default function CustomerDetails({
 
   const getTicketStatusBadge = (status) => {
     const styles = {
-      New: 'bg-blue-100 text-blue-800',
-      'In Progress': 'bg-yellow-100 text-yellow-800',
-      'On Hold': 'bg-orange-100 text-orange-800',
-      Completed: 'bg-green-100 text-green-800',
-      Cancelled: 'bg-gray-100 text-gray-800',
+      New: 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400',
+      'In Progress': 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400',
+      'On Hold': 'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-400',
+      Completed: 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400',
+      Cancelled: 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]',
     }
     return (
       <span
-        className={`px-2 py-1 text-xs rounded-full font-medium ${styles[status] || 'bg-gray-100 text-gray-800'}`}
+        className={`px-2 py-1 text-xs rounded-full font-medium ${styles[status] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]'}`}
       >
         {status || 'Unknown'}
       </span>
@@ -892,8 +892,8 @@ export default function CustomerDetails({
                             <span className={`px-2 py-1 text-xs rounded-full font-medium ${
                               ticket.priority === 'Critical' ? 'bg-red-200 text-red-900'
                               : ticket.priority === 'High' ? 'bg-red-100 text-red-800'
-                              : ticket.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-gray-100 text-gray-800'
+                              : ticket.priority === 'Medium' ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
+                              : 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]'
                             }`}>
                               {ticket.priority || 'Low'}
                             </span>
@@ -1425,7 +1425,7 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                 ticket.priority === 'Critical' ? 'bg-red-200 text-red-900'
                 : ticket.priority === 'High' ? 'bg-red-100 text-red-800'
-                : ticket.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800'
+                : ticket.priority === 'Medium' ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
                 : 'bg-gray-100 text-gray-700'
               }`}>{ticket.priority || 'Low'}</span>
             </div>
@@ -1474,7 +1474,7 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
                       {p.serial_number && <p className="text-xs text-gray-500 dark:text-[#9aa4b2] font-mono mt-0.5">S/N: {p.serial_number}</p>}
                       {p.issue_description && <p className="text-xs text-gray-600 dark:text-[#9aa4b2] mt-1">{p.issue_description}</p>}
                       {p.product_status && (
-                        <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full font-medium bg-blue-100 text-blue-700">
+                        <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full font-medium bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400">
                           {p.product_status}
                         </span>
                       )}

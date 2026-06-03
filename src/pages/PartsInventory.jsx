@@ -749,7 +749,7 @@ export default function PartsInventory({
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${isLow ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${isLow ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400' : 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400'}`}
                         >
                           {part.quantity ?? 0}
                         </span>
