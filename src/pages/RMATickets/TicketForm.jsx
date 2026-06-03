@@ -385,7 +385,7 @@ export function TicketForm({
           }
           // Email customer on any status change
           if (statusChanged && resolvedCustomerEmail) {
-            notifications.sendEmail(resolvedCustomerEmail, 'ticket_status_changed', {
+            notifications.sendEmail(resolvedCustomerEmail, 'status_changed', {
               recipient_name: ticketData.customer_name,
               customer_name: ticketData.customer_name,
               rma_number: editingTicket.rma_number,
@@ -393,6 +393,8 @@ export function TicketForm({
               new_status: ticketData.ticket_status,
               priority: ticketData.priority,
               status: ticketData.ticket_status,
+              updated_by: userEmail,
+              update_time: new Date().toLocaleString(),
             }).catch((err) => console.error('[email] status change:', err.message))
           }
         }
