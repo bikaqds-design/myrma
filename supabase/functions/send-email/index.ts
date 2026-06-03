@@ -25,7 +25,7 @@ serve(async (req) => {
       .eq('template_name', templateName)
       .single()
 
-    if (templateError) throw new Error('Template not found')
+    if (templateError) throw new Error(`Template not found: ${templateName}`)
 
     const { data: settings, error: settingsError } = await supabaseClient
       .from('email_settings')
@@ -36,13 +36,25 @@ serve(async (req) => {
     if (!settings.is_active) throw new Error('Email service not active')
     if (!settings.api_key) throw new Error('API key not configured')
 
+    // Auto-inject company_name from branding so callers don't need to pass it
+    let companyName = settings.from_name || 'myRMA'
+    try {
+      const { data: brandingRow } = await supabaseClient
+        .from('branding_settings')
+        .select('company_name')
+        .single()
+      if (brandingRow?.company_name) companyName = brandingRow.company_name
+    } catch { /* branding optional */ }
+
+    const allVars: Record<string, string> = { company_name: companyName, ...variables }
+
     let subject = template.template_subject
     let body = template.template_body
 
-    Object.keys(variables).forEach(key => {
+    Object.keys(allVars).forEach(key => {
       const regex = new RegExp(`{{${key}}}`, 'g')
-      subject = subject.replace(regex, variables[key] || '')
-      body = body.replace(regex, variables[key] || '')
+      subject = subject.replace(regex, allVars[key] || '')
+      body = body.replace(regex, allVars[key] || '')
     })
 
     const resendResponse = await fetch('https://api.resend.com/emails', {

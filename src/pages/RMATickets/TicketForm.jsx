@@ -386,12 +386,14 @@ export function TicketForm({
           // Email customer on any status change
           if (statusChanged && resolvedCustomerEmail) {
             notifications.sendEmail(resolvedCustomerEmail, 'ticket_status_changed', {
+              recipient_name: ticketData.customer_name,
               customer_name: ticketData.customer_name,
               rma_number: editingTicket.rma_number,
               old_status: editingTicket.ticket_status,
               new_status: ticketData.ticket_status,
               priority: ticketData.priority,
-            }).catch(() => {})
+              status: ticketData.ticket_status,
+            }).catch((err) => console.error('[email] status change:', err.message))
           }
         }
       } else {
@@ -456,13 +458,19 @@ export function TicketForm({
           })
           // Email notification to customer
           if (resolvedCustomerEmail) {
+            const productDetails = (ticketData.products || [])
+              .filter((p) => p.product_name)
+              .map((p) => `${p.product_name}${p.serial_number ? ` (SN: ${p.serial_number})` : ''}`)
+              .join('\n') || 'N/A'
             notifications.sendEmail(resolvedCustomerEmail, 'ticket_created', {
+              recipient_name: ticketData.customer_name,
               customer_name: ticketData.customer_name,
               rma_number: newTicket.rma_number || rmaNumber,
               priority: ticketData.priority,
               status: ticketData.ticket_status,
               issue_description: ticketData.general_description || '',
-            }).catch(() => {})
+              product_details: productDetails,
+            }).catch((err) => console.error('[email] ticket created:', err.message))
           }
         }
         db.userActivity
