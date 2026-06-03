@@ -77,7 +77,24 @@ export default function WATestCenter({ currentUserEmail }) {
           language: selectedTemplate?.language ?? 'en',
         },
       })
-      if (error) throw error
+
+      // On a non-2xx response, supabase-js returns a FunctionsHttpError whose
+      // `.context` is the raw Response — the real Meta error lives in its body,
+      // not in `error.message` (which is just "non-2xx status code"). Read it.
+      if (error) {
+        let detail = error.message
+        try {
+          const body = await error.context.json()
+          detail = body.error || body.details?.error?.message || detail
+          if (body.code) detail += ` (Meta code ${body.code})`
+        } catch {
+          /* body not JSON — keep generic message */
+        }
+        setLastResult({ success: false, error: detail, ts: new Date().toISOString() })
+        toast.error(`Send failed: ${detail}`)
+        return
+      }
+
       setLastResult({ success: data?.success, messageId: data?.message_id, error: data?.error, ts: new Date().toISOString() })
       if (data?.success) toast.success('Test message sent')
       else toast.error(`Send failed: ${data?.error ?? 'Unknown error'}`)
