@@ -66,6 +66,26 @@ export const auth = {
   onAuthStateChange(callback) {
     return supabase.auth.onAuthStateChange(callback)
   },
+  sessions: {
+    async list() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not authenticated')
+      // Extract current session ID from JWT claims
+      const payload = JSON.parse(atob(session.access_token.split('.')[1]))
+      const { data, error } = await supabase.functions.invoke('manage-sessions', {
+        body: { action: 'list' },
+      })
+      if (error) throw error
+      return { sessions: data.sessions ?? [], currentSessionId: payload.session_id ?? null }
+    },
+    async revoke(sessionId) {
+      const { data, error } = await supabase.functions.invoke('manage-sessions', {
+        body: { action: 'revoke', sessionId },
+      })
+      if (error) throw error
+      return data
+    },
+  },
   mfa: {
     async listFactors() {
       return supabase.auth.mfa.listFactors()

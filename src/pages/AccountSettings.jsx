@@ -219,6 +219,12 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
   const [showConfirm, setShowConfirm] = useState(false)
   const [passwordLoading, setPasswordLoading] = useState(false)
 
+  // Security — sessions
+  const [sessions, setSessions] = useState(null) // null = not loaded yet
+  const [currentSessionId, setCurrentSessionId] = useState(null)
+  const [sessionsLoading, setSessionsLoading] = useState(false)
+  const [revokingId, setRevokingId] = useState(null)
+
   // Security — MFA
   const [mfaStatus, setMfaStatus] = useState('loading') // 'loading' | 'disabled' | 'enabled'
   const [mfaFactorId, setMfaFactorId] = useState(null)
@@ -294,6 +300,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
     if (activeTab === 'Notifications' && !notifPrefs) loadNotifPrefs()
     if (activeTab === 'Activity' && isAdmin && activity.length === 0) loadActivity()
     if (activeTab === 'Security' && mfaStatus === 'loading') loadMfaStatus()
+    if (activeTab === 'Security' && sessions === null) loadSessions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isAdmin, notifPrefs, activity.length])
 
@@ -318,6 +325,44 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
       toast.error('Failed to load activity')
     } finally {
       setActivityLoading(false)
+    }
+  }
+
+  const loadSessions = async () => {
+    setSessionsLoading(true)
+    try {
+      const { sessions: list, currentSessionId: cid } = await auth.sessions.list()
+      setSessions(list)
+      setCurrentSessionId(cid)
+    } catch (err) {
+      captureException(err, { page: 'AccountSettings', context: 'loadSessions' })
+      setSessions([])
+    } finally {
+      setSessionsLoading(false)
+    }
+  }
+
+  const handleRevokeSession = async (sessionId) => {
+    setRevokingId(sessionId)
+    try {
+      await auth.sessions.revoke(sessionId)
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId))
+      toast.success('Session revoked')
+    } catch (err) {
+      toast.error(err.message || 'Failed to revoke session')
+    } finally {
+      setRevokingId(null)
+    }
+  }
+
+  const handleSignOutAll = async () => {
+    try {
+      await auth.signOutAll()
+      toast.success('Signed out from all devices')
+      db.auditLog.log(currentUser?.email, 'user_signed_out_all_devices', `Signed out all devices for ${currentUser?.email}`).catch(() => {})
+    } catch (err) {
+      captureException(err, { page: 'AccountSettings', context: 'signOutAll' })
+      toast.error(err.message || 'Failed to sign out all devices')
     }
   }
 
@@ -430,23 +475,6 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
       toast.error(err.message || 'Failed to update password')
     } finally {
       setPasswordLoading(false)
-    }
-  }
-
-  const handleSignOutAll = async () => {
-    try {
-      await auth.signOutAll()
-      toast.success('Signed out from all devices')
-      db.auditLog
-        .log(
-          currentUser?.email,
-          'user_signed_out_all_devices',
-          `Signed out all devices for ${currentUser?.email}`
-        )
-        .catch(() => {})
-    } catch (err) {
-      captureException(err, { page: 'AccountSettings', context: 'signOutAll' })
-      toast.error('Failed to sign out all devices')
     }
   }
 
@@ -701,23 +729,98 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#121823] rounded-2xl border border-gray-200 dark:border-[#212a38] p-6">
-            <div className="flex items-center justify-between">
+          <div className="bg-white dark:bg-[#121823] rounded-2xl border border-gray-200 dark:border-[#212a38] p-6 space-y-4">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0] uppercase tracking-wide">
-                  Sessions
+                  Active Sessions
                 </h2>
                 <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-1">
-                  Sign out from all other devices immediately
+                  All devices currently signed into your account
                 </p>
               </div>
-              <button
-                onClick={handleSignOutAll}
-                className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-              >
-                Sign out all devices
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={loadSessions}
+                  disabled={sessionsLoading}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-[#e8ebf0] hover:bg-gray-100 dark:hover:bg-[#0f1520] transition-colors"
+                  aria-label="Refresh sessions"
+                >
+                  <svg className={`w-4 h-4 ${sessionsLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+                <button
+                  onClick={handleSignOutAll}
+                  className="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors whitespace-nowrap"
+                >
+                  Sign out all
+                </button>
+              </div>
             </div>
+
+            {sessionsLoading && sessions === null && (
+              <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-[#9aa4b2] py-2">
+                <Spinner size="sm" /> Loading sessions…
+              </div>
+            )}
+
+            {sessions !== null && sessions.length === 0 && (
+              <p className="text-sm text-gray-400 dark:text-[#9aa4b2] py-2">No active sessions found.</p>
+            )}
+
+            {sessions !== null && sessions.length > 0 && (
+              <div className="divide-y divide-gray-100 dark:divide-[#212a38]">
+                {sessions.map((session, i) => {
+                  const isCurrent = session.id === currentSessionId
+                  const startedAt = new Date(session.created_at)
+                  const lastActive = new Date(session.updated_at || session.created_at)
+                  const now = Date.now()
+                  const diffMin = Math.floor((now - lastActive.getTime()) / 60000)
+                  const relTime = diffMin < 1 ? 'just now'
+                    : diffMin < 60 ? `${diffMin}m ago`
+                    : diffMin < 1440 ? `${Math.floor(diffMin / 60)}h ago`
+                    : `${Math.floor(diffMin / 1440)}d ago`
+
+                  return (
+                    <div key={session.id} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${isCurrent ? 'bg-green-500' : 'bg-gray-300 dark:bg-[#4a5568]'}`} />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-gray-800 dark:text-[#e8ebf0]">
+                              Session {i + 1}
+                            </span>
+                            {isCurrent && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                                This device
+                              </span>
+                            )}
+                            {session.factor_id && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">
+                                2FA
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-400 dark:text-[#9aa4b2] mt-0.5">
+                            Started {startedAt.toLocaleDateString()} · Last active {relTime}
+                          </p>
+                        </div>
+                      </div>
+                      {!isCurrent && (
+                        <button
+                          onClick={() => handleRevokeSession(session.id)}
+                          disabled={revokingId === session.id}
+                          className="shrink-0 px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors"
+                        >
+                          {revokingId === session.id ? 'Revoking…' : 'Revoke'}
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* Two-Factor Authentication */}
