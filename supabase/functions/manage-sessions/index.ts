@@ -32,49 +32,38 @@ serve(async (req: Request) => {
   )
   if (authErr || !user) return json({ error: 'Unauthorized' }, 401)
 
-  const adminBase = `${supabaseUrl}/auth/v1/admin/users/${user.id}`
-  const adminHeaders = {
-    'Authorization': `Bearer ${serviceRoleKey}`,
-    'apikey': serviceRoleKey,
-    'Content-Type': 'application/json',
-  }
+  // Decode current session from the caller's JWT (no admin API needed)
+  const token = authHeader.replace('Bearer ', '')
+  let payload: Record<string, unknown> = {}
+  try {
+    payload = JSON.parse(atob(token.split('.')[1]))
+  } catch { return json({ error: 'Failed to decode token' }) }
 
   let body: Record<string, string> = {}
   try { body = await req.json() } catch { /* empty body ok */ }
 
   // ── LIST ─────────────────────────────────────────────────────────────────
   if (body.action === 'list') {
-    const res = await fetch(`${adminBase}/sessions`, { headers: adminHeaders })
-    const text = await res.text()
-    console.log(`GoTrue sessions ${res.status}:`, text)
-    if (!res.ok) {
-      // Always 200 so Supabase SDK gives us data — error info in body
-      return json({ sessions: [], error: `GoTrue ${res.status}: ${text}` })
+    // Return current session decoded from JWT + recent login history from user_activity
+    const currentSession = {
+      id: payload.session_id as string,
+      created_at: new Date((payload.iat as number) * 1000).toISOString(),
+      updated_at: new Date().toISOString(),
+      not_after: new Date((payload.exp as number) * 1000).toISOString(),
+      factor_id: payload.aal === 'aal2' ? 'aal2' : null,
+      is_current: true,
     }
-    let data: { sessions?: unknown[] } = {}
-    try { data = JSON.parse(text) } catch { return json({ sessions: [], error: `Bad JSON: ${text}` }) }
-    return json({ sessions: data.sessions ?? [] })
-  }
 
-  // ── REVOKE ───────────────────────────────────────────────────────────────
-  if (body.action === 'revoke') {
-    const { sessionId } = body
-    if (!sessionId) return json({ error: 'sessionId required' })
+    // Fetch recent login events to show session history
+    const { data: activityRows } = await supabaseAdmin
+      .from('user_activity')
+      .select('id, action, created_at, details')
+      .eq('user_email', user.email)
+      .in('action', ['login', 'logout'])
+      .order('created_at', { ascending: false })
+      .limit(10)
 
-    const listRes = await fetch(`${adminBase}/sessions`, { headers: adminHeaders })
-    const listData = await listRes.json().catch(() => ({ sessions: [] }))
-    const belongs = (listData.sessions ?? []).some((s: { id: string }) => s.id === sessionId)
-    if (!belongs) return json({ error: 'Session not found or already expired' })
-
-    const delRes = await fetch(`${adminBase}/sessions/${sessionId}`, {
-      method: 'DELETE',
-      headers: adminHeaders,
-    })
-    if (!delRes.ok) {
-      const errText = await delRes.text()
-      return json({ error: `GoTrue ${delRes.status}: ${errText}` })
-    }
-    return json({ success: true })
+    return json({ sessions: [currentSession], currentSessionId: payload.session_id, activity: activityRows ?? [] })
   }
 
   return json({ error: 'Unknown action' })

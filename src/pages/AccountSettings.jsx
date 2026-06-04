@@ -222,8 +222,8 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
   // Security — sessions
   const [sessions, setSessions] = useState(null) // null = not loaded yet
   const [currentSessionId, setCurrentSessionId] = useState(null)
+  const [sessionActivity, setSessionActivity] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
-  const [revokingId, setRevokingId] = useState(null)
 
   // Security — MFA
   const [mfaStatus, setMfaStatus] = useState('loading') // 'loading' | 'disabled' | 'enabled'
@@ -331,28 +331,16 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
   const loadSessions = async () => {
     setSessionsLoading(true)
     try {
-      const { sessions: list, currentSessionId: cid } = await auth.sessions.list()
+      const { sessions: list, currentSessionId: cid, activity } = await auth.sessions.list()
       setSessions(list)
       setCurrentSessionId(cid)
+      setSessionActivity(activity)
     } catch (err) {
       captureException(err, { page: 'AccountSettings', context: 'loadSessions' })
       toast.error(`Failed to load sessions: ${err.message}`)
       setSessions([])
     } finally {
       setSessionsLoading(false)
-    }
-  }
-
-  const handleRevokeSession = async (sessionId) => {
-    setRevokingId(sessionId)
-    try {
-      await auth.sessions.revoke(sessionId)
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId))
-      toast.success('Session revoked')
-    } catch (err) {
-      toast.error(err.message || 'Failed to revoke session')
-    } finally {
-      setRevokingId(null)
     }
   }
 
@@ -766,60 +754,47 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
               </div>
             )}
 
-            {sessions !== null && sessions.length === 0 && (
-              <p className="text-sm text-gray-400 dark:text-[#9aa4b2] py-2">No active sessions found.</p>
-            )}
-
             {sessions !== null && sessions.length > 0 && (
-              <div className="divide-y divide-gray-100 dark:divide-[#212a38]">
-                {sessions.map((session, i) => {
-                  const isCurrent = session.id === currentSessionId
+              <div className="space-y-3">
+                {sessions.map((session) => {
                   const startedAt = new Date(session.created_at)
-                  const lastActive = new Date(session.updated_at || session.created_at)
-                  const now = Date.now()
-                  const diffMin = Math.floor((now - lastActive.getTime()) / 60000)
-                  const relTime = diffMin < 1 ? 'just now'
-                    : diffMin < 60 ? `${diffMin}m ago`
-                    : diffMin < 1440 ? `${Math.floor(diffMin / 60)}h ago`
-                    : `${Math.floor(diffMin / 1440)}d ago`
-
+                  const expiresAt = session.not_after ? new Date(session.not_after) : null
                   return (
-                    <div key={session.id} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-                      <div className="flex items-start gap-3 min-w-0">
-                        <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${isCurrent ? 'bg-green-500' : 'bg-gray-300 dark:bg-[#4a5568]'}`} />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium text-gray-800 dark:text-[#e8ebf0]">
-                              Session {i + 1}
-                            </span>
-                            {isCurrent && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
-                                This device
-                              </span>
-                            )}
-                            {session.factor_id && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">
-                                2FA
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-400 dark:text-[#9aa4b2] mt-0.5">
-                            Started {startedAt.toLocaleDateString()} · Last active {relTime}
-                          </p>
+                    <div key={session.id} className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 dark:bg-[#0f1520] border border-gray-100 dark:border-[#212a38]">
+                      <div className="mt-1 w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-gray-800 dark:text-[#e8ebf0]">Current session</span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">This device</span>
+                          {session.factor_id && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">2FA</span>
+                          )}
                         </div>
+                        <p className="text-xs text-gray-400 dark:text-[#9aa4b2] mt-0.5">
+                          Started {startedAt.toLocaleString()}
+                          {expiresAt && ` · Expires ${expiresAt.toLocaleString()}`}
+                        </p>
                       </div>
-                      {!isCurrent && (
-                        <button
-                          onClick={() => handleRevokeSession(session.id)}
-                          disabled={revokingId === session.id}
-                          className="shrink-0 px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors"
-                        >
-                          {revokingId === session.id ? 'Revoking…' : 'Revoke'}
-                        </button>
-                      )}
                     </div>
                   )
                 })}
+              </div>
+            )}
+
+            {sessionActivity.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-gray-400 dark:text-[#9aa4b2] uppercase tracking-wide mb-2">Recent login activity</p>
+                <div className="divide-y divide-gray-100 dark:divide-[#212a38]">
+                  {sessionActivity.map((a) => (
+                    <div key={a.id} className="flex items-center justify-between py-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-1.5 h-1.5 rounded-full ${a.action === 'login' ? 'bg-green-500' : 'bg-gray-300 dark:bg-[#4a5568]'}`} />
+                        <span className="text-xs text-gray-600 dark:text-[#9aa4b2] capitalize">{a.action}</span>
+                      </div>
+                      <span className="text-xs text-gray-400 dark:text-[#4a5568]">{new Date(a.created_at).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

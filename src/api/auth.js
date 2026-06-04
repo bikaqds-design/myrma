@@ -68,22 +68,16 @@ export const auth = {
   },
   sessions: {
     async list() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('Not authenticated')
-      const payload = JSON.parse(atob(session.access_token.split('.')[1]))
       const { data, error } = await supabase.functions.invoke('manage-sessions', {
         body: { action: 'list' },
       })
-      if (error) throw new Error(data?.error || error.message)
+      if (error) throw new Error(error.message)
       if (data?.error) throw new Error(data.error)
-      return { sessions: data.sessions ?? [], currentSessionId: payload.session_id ?? null }
-    },
-    async revoke(sessionId) {
-      const { data, error } = await supabase.functions.invoke('manage-sessions', {
-        body: { action: 'revoke', sessionId },
-      })
-      if (error) throw error
-      return data
+      return {
+        sessions: data.sessions ?? [],
+        currentSessionId: data.currentSessionId ?? null,
+        activity: data.activity ?? [],
+      }
     },
   },
   mfa: {
