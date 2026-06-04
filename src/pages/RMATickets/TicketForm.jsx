@@ -474,6 +474,16 @@ export function TicketForm({
             },
             triggeredBy: userEmail,
           })
+          // Email assigned technician (if different from the creator)
+          if (ticketData.assigned_technician && ticketData.assigned_technician !== userEmail) {
+            notifications.sendEmail(ticketData.assigned_technician, 'ticket_assigned', {
+              recipient_name: ticketData.assigned_technician,
+              rma_number: newTicket.rma_number || rmaNumber,
+              customer_name: ticketData.customer_name,
+              priority: ticketData.priority,
+              due_date: ticketData.due_date || 'N/A',
+            }).catch((err) => console.error('[email] ticket_assigned (create):', err.message))
+          }
           // Email notification to customer
           if (resolvedCustomerEmail) {
             const productDetails = (ticketData.products || [])
