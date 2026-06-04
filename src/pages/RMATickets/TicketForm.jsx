@@ -373,6 +373,7 @@ export function TicketForm({
           const ts = new Date().toISOString()
           const statusChanged = ticketData.ticket_status !== editingTicket.ticket_status
           const assigneeChanged = ticketData.assigned_technician !== editingTicket.assigned_technician
+          const priorityChanged = ticketData.priority !== editingTicket.priority
           const isClosed = ['Closed', 'Completed', 'Cancelled'].includes(ticketData.ticket_status)
 
           if (assigneeChanged) {
@@ -412,6 +413,16 @@ export function TicketForm({
                 toast.error(`Email notification failed: ${err.message}`, { duration: 6000 })
               })
             }
+          }
+          // Email customer on priority change
+          if (priorityChanged && resolvedCustomerEmail) {
+            notifications.sendEmail(resolvedCustomerEmail, 'priority_changed', {
+              recipient_name: ticketData.customer_name,
+              customer_name: ticketData.customer_name,
+              rma_number: editingTicket.rma_number,
+              old_priority: editingTicket.priority,
+              new_priority: ticketData.priority,
+            }).catch((err) => console.error('[email] priority_changed:', err.message))
           }
         }
       } else {
