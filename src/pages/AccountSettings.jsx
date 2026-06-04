@@ -212,12 +212,20 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
   const [profileLoading, setProfileLoading] = useState(false)
   const fileInputRef = useRef(null)
 
-  // Security
+  // Security — password
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [passwordLoading, setPasswordLoading] = useState(false)
+
+  // Security — MFA
+  const [mfaStatus, setMfaStatus] = useState('loading') // 'loading' | 'disabled' | 'enabled'
+  const [mfaFactorId, setMfaFactorId] = useState(null)
+  const [mfaStep, setMfaStep] = useState('idle') // 'idle' | 'scan' | 'disabling'
+  const [mfaEnrollData, setMfaEnrollData] = useState(null) // { id, qrCode, secret }
+  const [mfaCode, setMfaCode] = useState('')
+  const [mfaLoading, setMfaLoading] = useState(false)
 
   // Email notification preferences (DB-backed)
   const [notifPrefs, setNotifPrefs] = useState(null)
@@ -285,6 +293,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
   useEffect(() => {
     if (activeTab === 'Notifications' && !notifPrefs) loadNotifPrefs()
     if (activeTab === 'Activity' && isAdmin && activity.length === 0) loadActivity()
+    if (activeTab === 'Security' && mfaStatus === 'loading') loadMfaStatus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isAdmin, notifPrefs, activity.length])
 
@@ -310,6 +319,56 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
     } finally {
       setActivityLoading(false)
     }
+  }
+
+  const loadMfaStatus = async () => {
+    try {
+      const { data } = await auth.mfa.listFactors()
+      const totp = data?.all?.find((f) => f.factor_type === 'totp' && f.status === 'verified')
+      if (totp) { setMfaStatus('enabled'); setMfaFactorId(totp.id) }
+      else setMfaStatus('disabled')
+    } catch { setMfaStatus('disabled') }
+  }
+
+  const handleMfaEnable = async () => {
+    setMfaLoading(true)
+    try {
+      const { data, error } = await auth.mfa.enroll()
+      if (error) throw error
+      setMfaEnrollData({ id: data.id, qrCode: data.totp.qr_code, secret: data.totp.secret })
+      setMfaStep('scan')
+      setMfaCode('')
+    } catch (err) { toast.error(err.message || 'Failed to start 2FA setup') }
+    finally { setMfaLoading(false) }
+  }
+
+  const handleMfaConfirm = async () => {
+    if (mfaCode.length !== 6) return
+    setMfaLoading(true)
+    try {
+      const { error } = await auth.mfa.challengeAndVerify(mfaEnrollData.id, mfaCode)
+      if (error) throw error
+      setMfaStatus('enabled')
+      setMfaFactorId(mfaEnrollData.id)
+      setMfaStep('idle')
+      setMfaEnrollData(null)
+      setMfaCode('')
+      toast.success('Two-factor authentication enabled!')
+    } catch (err) { toast.error(err.message || 'Invalid code — try again'); setMfaCode('') }
+    finally { setMfaLoading(false) }
+  }
+
+  const handleMfaDisable = async () => {
+    setMfaLoading(true)
+    try {
+      const { error } = await auth.mfa.unenroll(mfaFactorId)
+      if (error) throw error
+      setMfaStatus('disabled')
+      setMfaFactorId(null)
+      setMfaStep('idle')
+      toast.success('Two-factor authentication disabled')
+    } catch (err) { toast.error(err.message || 'Failed to disable 2FA') }
+    finally { setMfaLoading(false) }
   }
 
   const handleAvatarChange = (e) => {
@@ -642,23 +701,107 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <div className="bg-white dark:bg-[#121823] rounded-2xl border border-gray-200 dark:border-[#212a38] p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0] uppercase tracking-wide">
                   Sessions
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-1">
                   Sign out from all other devices immediately
                 </p>
               </div>
               <button
                 onClick={handleSignOutAll}
-                className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
               >
                 Sign out all devices
               </button>
             </div>
+          </div>
+
+          {/* Two-Factor Authentication */}
+          <div className="bg-white dark:bg-[#121823] rounded-2xl border border-gray-200 dark:border-[#212a38] p-6 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0] uppercase tracking-wide">
+                  Two-Factor Authentication
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-1">
+                  Add a second layer of security using an authenticator app (Google Authenticator, Authy, etc.)
+                </p>
+              </div>
+              {mfaStatus === 'enabled' && (
+                <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                  Active
+                </span>
+              )}
+            </div>
+
+            {mfaStatus === 'loading' && (
+              <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-[#9aa4b2]">
+                <Spinner size="sm" /> Loading…
+              </div>
+            )}
+
+            {mfaStatus === 'disabled' && mfaStep === 'idle' && (
+              <Button onClick={handleMfaEnable} loading={mfaLoading} variant="secondary">
+                Enable 2FA
+              </Button>
+            )}
+
+            {mfaStep === 'scan' && mfaEnrollData && (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600 dark:text-[#9aa4b2]">
+                  Scan this QR code with your authenticator app, then enter the 6-digit code to confirm.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-6 items-start">
+                  <img
+                    src={mfaEnrollData.qrCode}
+                    alt="2FA QR code"
+                    className="w-40 h-40 border border-gray-200 dark:border-[#212a38] rounded-lg bg-white p-2"
+                  />
+                  <div className="space-y-3 flex-1">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 dark:text-[#9aa4b2] mb-1">Manual entry key</p>
+                      <code className="text-xs font-mono bg-gray-100 dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0] px-2 py-1.5 rounded break-all block">
+                        {mfaEnrollData.secret}
+                      </code>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1.5">
+                        Verification code
+                      </label>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={6}
+                        value={mfaCode}
+                        onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+                        placeholder="000000"
+                        className="font-mono tracking-widest text-center max-w-[160px]"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={handleMfaConfirm} loading={mfaLoading} disabled={mfaCode.length !== 6}>
+                        Verify &amp; Enable
+                      </Button>
+                      <Button variant="secondary" onClick={() => { setMfaStep('idle'); setMfaEnrollData(null); setMfaCode('') }}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {mfaStatus === 'enabled' && mfaStep === 'idle' && (
+              <Button variant="danger" onClick={handleMfaDisable} loading={mfaLoading}>
+                Disable 2FA
+              </Button>
+            )}
           </div>
         </div>
       )}

@@ -66,4 +66,21 @@ export const auth = {
   onAuthStateChange(callback) {
     return supabase.auth.onAuthStateChange(callback)
   },
+  mfa: {
+    async listFactors() {
+      return supabase.auth.mfa.listFactors()
+    },
+    async enroll() {
+      return supabase.auth.mfa.enroll({ factorType: 'totp' })
+    },
+    async challengeAndVerify(factorId, code) {
+      return supabase.auth.mfa.challengeAndVerify({ factorId, code })
+    },
+    async unenroll(factorId) {
+      return supabase.auth.mfa.unenroll({ factorId })
+    },
+    async getLevel() {
+      return supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    },
+  },
 }

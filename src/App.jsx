@@ -140,6 +140,77 @@ function CustomerDetailsRoute({
   )
 }
 
+// ── MFA challenge screen (shown after password login when 2FA is enrolled) ───
+function MfaChallenge({ onVerify, onCancel }) {
+  const [code, setCode] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const { darkMode } = useAppearance()
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (code.length !== 6) return
+    setLoading(true)
+    setError('')
+    try {
+      await onVerify(code)
+    } catch (err) {
+      setError(err?.message || 'Invalid code — please try again')
+      setCode('')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-[#0b0f17]' : 'bg-[#f4f6f9]'}`}>
+      <div className={`w-full max-w-sm rounded-2xl border p-8 shadow-sm ${darkMode ? 'bg-[#121823] border-[#212a38]' : 'bg-white border-[#e6e9ef]'}`}>
+        <div className="flex justify-center mb-5">
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${darkMode ? 'bg-indigo-900/40' : 'bg-indigo-50'}`}>
+            <svg className="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+        </div>
+        <h1 className={`text-lg font-semibold text-center mb-1 ${darkMode ? 'text-[#e8ebf0]' : 'text-gray-900'}`}>
+          Two-Factor Authentication
+        </h1>
+        <p className={`text-sm text-center mb-6 ${darkMode ? 'text-[#9aa4b2]' : 'text-gray-500'}`}>
+          Enter the 6-digit code from your authenticator app
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            pattern="\d{6}"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+            placeholder="000000"
+            autoFocus
+            className={`w-full text-center text-2xl font-mono tracking-[0.5em] rounded-lg border px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-[#0f1520] border-[#212a38] text-[#e8ebf0] placeholder-[#4a5568]' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'}`}
+          />
+          {error && <p className="text-xs text-red-500 text-center">{error}</p>}
+          <button
+            type="submit"
+            disabled={code.length !== 6 || loading}
+            className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+          >
+            {loading ? 'Verifying…' : 'Verify'}
+          </button>
+        </form>
+        <button
+          onClick={onCancel}
+          className={`mt-4 w-full text-xs text-center ${darkMode ? 'text-[#9aa4b2] hover:text-[#e8ebf0]' : 'text-gray-400 hover:text-gray-600'}`}
+        >
+          Cancel — sign out
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Main app ──────────────────────────────────────────────────────────────────
 export default function App() {
   const navigate = useNavigate()
@@ -156,6 +227,7 @@ export default function App() {
   const [currentUserRole, setCurrentUserRole] = useState(null)
   const [currentUserPermissions, setCurrentUserPermissions] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [mfaPending, setMfaPending] = useState(null) // { user, factorId } — waiting for TOTP code
   const [sidebarOpen, setSidebarOpen] = useState(false)
   // selectedTicketId: open a specific ticket when navigating to /rma-tickets
   // (e.g. from the notification bell or command palette)
@@ -206,16 +278,26 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const finishLogin = async (user) => {
+    setCurrentUser(user)
+    const roleData = await db.userRoles.getUserRole(user.email)
+    queryClient.setQueryData(['user-role', user.email], roleData)
+    const role = roleData?.role || 'technician'
+    setCurrentUserRole(role)
+    setCurrentUserPermissions(resolvePermissions(role, roleData?.permissions))
+  }
+
   const checkAuth = async () => {
     try {
       const user = await auth.getCurrentUser()
       if (user) {
-        setCurrentUser(user)
-        const roleData = await db.userRoles.getUserRole(user.email)
-        queryClient.setQueryData(['user-role', user.email], roleData)
-        const role = roleData?.role || 'technician'
-        setCurrentUserRole(role)
-        setCurrentUserPermissions(resolvePermissions(role, roleData?.permissions))
+        const { data: aalData } = await auth.mfa.getLevel()
+        if (aalData?.nextLevel === 'aal2' && aalData?.currentLevel !== 'aal2') {
+          const { data: factors } = await auth.mfa.listFactors()
+          const totp = factors?.all?.find((f) => f.factor_type === 'totp' && f.status === 'verified')
+          if (totp) { setMfaPending({ user, factorId: totp.id }); return }
+        }
+        await finishLogin(user)
       }
     } catch (error) {
       captureException(error, { page: 'App', context: 'checkAuth' })
@@ -365,13 +447,23 @@ export default function App() {
   const handleLogin = async (email, password) => {
     const data = await auth.signIn(email, password)
     const user = data?.user || data
-    setCurrentUser(user)
-    const roleData = await db.userRoles.getUserRole(user.email)
-    queryClient.setQueryData(['user-role', user.email], roleData)
-    const role = roleData?.role || 'technician'
-    setCurrentUserRole(role)
-    setCurrentUserPermissions(resolvePermissions(role, roleData?.permissions))
-    db.userActivity.create(user.email, 'login', `Signed in as ${role}`).catch(() => {})
+    const { data: aalData } = await auth.mfa.getLevel()
+    if (aalData?.nextLevel === 'aal2' && aalData?.currentLevel !== 'aal2') {
+      const { data: factors } = await auth.mfa.listFactors()
+      const totp = factors?.all?.find((f) => f.factor_type === 'totp' && f.status === 'verified')
+      if (totp) { setMfaPending({ user, factorId: totp.id }); return }
+    }
+    await finishLogin(user)
+    db.userActivity.create(user.email, 'login', `Signed in as ${currentUserRole || 'user'}`).catch(() => {})
+  }
+
+  const handleMfaVerify = async (code) => {
+    const { error } = await auth.mfa.challengeAndVerify(mfaPending.factorId, code)
+    if (error) throw error
+    const user = mfaPending.user
+    setMfaPending(null)
+    await finishLogin(user)
+    db.userActivity.create(user.email, 'login', 'Signed in with 2FA').catch(() => {})
   }
 
   const handleSignup = async (email, password) => {
@@ -493,6 +585,15 @@ export default function App() {
       <div className="min-h-screen flex items-center justify-center bg-[#f4f6f9] dark:bg-[#0b0f17]">
         <Spinner size="xl" />
       </div>
+    )
+  }
+
+  if (mfaPending) {
+    return (
+      <>
+        <MfaChallenge onVerify={handleMfaVerify} onCancel={() => { auth.signOut(); setMfaPending(null) }} />
+        <Toaster position="top-right" toastOptions={toastOptions} />
+      </>
     )
   }
 
