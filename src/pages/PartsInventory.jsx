@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, lazy, Suspense } from 'react'
+const BarcodeScanner = lazy(() => import('../components/BarcodeScanner'))
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -127,6 +128,7 @@ function PartModal({ part, onSave, onClose, saving }) {
   )
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+  const [showScanner, setShowScanner] = useState(false)
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -197,12 +199,29 @@ function PartModal({ part, onSave, onClose, saving }) {
             </div>
             <div>
               <label className={label}>Part Number</label>
-              <input
-                value={form.part_number}
-                onChange={(e) => set('part_number', e.target.value)}
-                className={field}
-                placeholder="e.g. CAP-100UF-25V"
-              />
+              <div className="flex gap-2">
+                <input
+                  value={form.part_number}
+                  onChange={(e) => set('part_number', e.target.value)}
+                  className={`${field} flex-1`}
+                  placeholder="e.g. CAP-100UF-25V"
+                />
+                <button type="button" onClick={() => setShowScanner(true)}
+                  title="Scan barcode"
+                  className="px-2.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-gray-500 dark:text-[#9aa4b2] hover:text-indigo-600 dark:hover:text-[#a5b4fc] hover:border-indigo-400 transition-colors bg-white dark:bg-[#0f1520]">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h2v2H4zm0 5h2v2H4zm0 5h2v2H4zm5-10h2v2H9zm0 5h2v2H9zm0 5h2v2H9zm5-10h6v2h-6zm0 5h6v2h-6zm0 5h6v2h-6z" />
+                  </svg>
+                </button>
+              </div>
+              {showScanner && (
+                <Suspense fallback={null}>
+                  <BarcodeScanner
+                    onScan={(value) => { set('part_number', value); setShowScanner(false) }}
+                    onClose={() => setShowScanner(false)}
+                  />
+                </Suspense>
+              )}
             </div>
             <div>
               <label className={label}>Location</label>
