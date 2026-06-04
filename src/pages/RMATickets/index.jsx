@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase, db, branding as brandingAPI } from '../../api/supabaseClient'
+import { supabase, db, branding as brandingAPI, notifications } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
 import toast from 'react-hot-toast'
 import QRCode from 'qrcode'
@@ -8,7 +8,7 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import { PageSkeleton } from '../../components/Skeleton'
 import { Button, PageHeader } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
-import { ROLES, TICKET_STATUS_RESOLVED } from '../../lib/constants'
+import { ROLES, TICKET_STATUS_RESOLVED, TICKET_STATUS_LIST, PRIORITY_LIST } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
 import { SortableHeader } from './_shared'
 import { getStatusColor, getPriorityColor, fmt } from './_utils'
@@ -84,6 +84,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const searchInputRef = useRef(null)
 
   const [openMenuId, setOpenMenuId] = useState(null)
+  const [inlineEdit, setInlineEdit] = useState({ ticketId: null, field: null })
 
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
@@ -161,6 +162,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     const handler = (e) => {
       if (!e.target.closest('.filter-customer-dropdown')) setShowFilterCustomerDropdown(false)
       if (!e.target.closest('.action-menu')) setOpenMenuId(null)
+      if (!e.target.closest('.inline-pill')) setInlineEdit({ ticketId: null, field: null })
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -182,6 +184,40 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const canDo = (action) => {
     if (userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN) return true
     return userPermissions?.rma_tickets?.[action] === true
+  }
+
+  const handleInlineUpdate = async (ticket, field, newValue) => {
+    const oldValue = ticket[field]
+    if (oldValue === newValue) { setInlineEdit({ ticketId: null, field: null }); return }
+    const updateData = { [field]: newValue, updated_by: userEmail, updated_date: new Date().toISOString() }
+    // Optimistic update
+    queryClient.setQueryData(['rma-tickets'], (old = []) =>
+      old.map((t) => (t.id === ticket.id ? { ...t, ...updateData } : t))
+    )
+    setInlineEdit({ ticketId: null, field: null })
+    try {
+      await db.rmaTickets.update(ticket.id, updateData)
+      queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
+      const customerEmail = ticket.customer_email || customers.find((c) => c.id === ticket.customer_id)?.email
+      if (field === 'ticket_status') {
+        db.notifications.create({ type: 'ticket_status_changed', title: 'Status Updated', message: `Ticket ${ticket.rma_number} moved from "${oldValue}" to "${newValue}"`, entityType: 'ticket', entityId: ticket.id, targetRoles: ['admin', 'manager'] }).catch(() => {})
+        if (customerEmail) {
+          notifications.sendEmail(customerEmail, 'status_changed', { recipient_name: ticket.customer_name, customer_name: ticket.customer_name, rma_number: ticket.rma_number, old_status: oldValue, new_status: newValue, updated_by: userEmail, update_time: new Date().toLocaleString() }).catch(() => {})
+        }
+      } else {
+        if (customerEmail) {
+          notifications.sendEmail(customerEmail, 'priority_changed', { recipient_name: ticket.customer_name, customer_name: ticket.customer_name, rma_number: ticket.rma_number, old_priority: oldValue, new_priority: newValue }).catch(() => {})
+        }
+      }
+      db.auditLog.log(userEmail, `ticket_${field}_changed`, `${ticket.rma_number}: ${oldValue} → ${newValue}`).catch(() => {})
+      toast.success(`${field === 'ticket_status' ? 'Status' : 'Priority'} updated`)
+    } catch {
+      // Rollback
+      queryClient.setQueryData(['rma-tickets'], (old = []) =>
+        old.map((t) => (t.id === ticket.id ? { ...t, [field]: oldValue } : t))
+      )
+      toast.error('Failed to update')
+    }
   }
 
   useEffect(() => {
@@ -1321,18 +1357,54 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-900">{t.customer_name}</td>
                 <td className="px-4 py-3">
-                  <span
-                    className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(t.ticket_status)}`}
-                  >
-                    {t.ticket_status}
-                  </span>
+                  {(canDo('edit_all') || (canDo('edit_assigned') && t.assigned_technician === userEmail)) ? (
+                    <div className="relative inline-block inline-pill">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setInlineEdit(inlineEdit.ticketId === t.id && inlineEdit.field === 'ticket_status' ? { ticketId: null, field: null } : { ticketId: t.id, field: 'ticket_status' }) }}
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(t.ticket_status)} flex items-center gap-1 hover:opacity-80 transition-opacity`}
+                      >
+                        {t.ticket_status}
+                        <svg className="w-2.5 h-2.5 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                      </button>
+                      {inlineEdit.ticketId === t.id && inlineEdit.field === 'ticket_status' && (
+                        <div className="absolute left-0 top-full mt-1 z-40 w-36 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] py-1 overflow-hidden">
+                          {TICKET_STATUS_LIST.map((s) => (
+                            <button key={s} onClick={(e) => { e.stopPropagation(); handleInlineUpdate(t, 'ticket_status', s) }}
+                              className={`w-full px-3 py-1.5 text-left text-xs font-medium flex items-center gap-2 transition-colors ${t.ticket_status === s ? 'opacity-40 cursor-default' : 'hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]'}`}>
+                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${getStatusColor(s)}`}>{s}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(t.ticket_status)}`}>{t.ticket_status}</span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
-                  <span
-                    className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(t.priority)}`}
-                  >
-                    {t.priority}
-                  </span>
+                  {(canDo('edit_all') || (canDo('edit_assigned') && t.assigned_technician === userEmail)) ? (
+                    <div className="relative inline-block inline-pill">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setInlineEdit(inlineEdit.ticketId === t.id && inlineEdit.field === 'priority' ? { ticketId: null, field: null } : { ticketId: t.id, field: 'priority' }) }}
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(t.priority)} flex items-center gap-1 hover:opacity-80 transition-opacity`}
+                      >
+                        {t.priority}
+                        <svg className="w-2.5 h-2.5 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                      </button>
+                      {inlineEdit.ticketId === t.id && inlineEdit.field === 'priority' && (
+                        <div className="absolute left-0 top-full mt-1 z-40 w-28 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] py-1 overflow-hidden">
+                          {PRIORITY_LIST.map((p) => (
+                            <button key={p} onClick={(e) => { e.stopPropagation(); handleInlineUpdate(t, 'priority', p) }}
+                              className={`w-full px-3 py-1.5 text-left text-xs font-medium flex items-center gap-2 transition-colors ${t.priority === p ? 'opacity-40 cursor-default' : 'hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]'}`}>
+                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${getPriorityColor(p)}`}>{p}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(t.priority)}`}>{t.priority}</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
                   {t.assigned_technician || 'Unassigned'}
