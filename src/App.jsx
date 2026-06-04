@@ -91,7 +91,7 @@ const Invoices = lazyWithReload(() => import('./pages/Invoices'))
 const PartsInventory = lazyWithReload(() => import('./pages/PartsInventory'))
 const Reports = lazyWithReload(() => import('./pages/Reports'))
 const NotFoundPage = lazyWithReload(() => import('./pages/NotFoundPage'))
-const CommandPalette = lazyWithReload(() => import('./components/CommandPalette'))
+import CommandPalette from './components/CommandPalette'
 
 const PageSpinner = () => (
   <div className="flex items-center justify-center h-64">
@@ -234,7 +234,7 @@ export default function App() {
   const [selectedTicketId, setSelectedTicketId] = useState(null)
   const [resetPasswordMode, setResetPasswordMode] = useState(false)
   const [companyName, setCompanyName] = useState('')
-  const [cmdPaletteOpen, setCmdPaletteOpen] = useState(false)
+  const cmdSearchRef = useRef(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [notifMissing, setNotifMissing] = useState(false)
@@ -257,7 +257,7 @@ export default function App() {
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
-        setCmdPaletteOpen((open) => !open)
+        cmdSearchRef.current?.focus()
       }
     }
     document.addEventListener('keydown', handler)
@@ -610,17 +610,6 @@ export default function App() {
     <div className="min-h-screen bg-[#f4f6f9] dark:bg-[#0b0f17] flex">
       <AnnouncementBanner />
       <Toaster position="top-right" />
-      {/* CommandPalette is React.lazy — needs its own Suspense boundary.
-          null fallback: it's a hidden modal until Ctrl+K, no placeholder needed. */}
-      <Suspense fallback={null}>
-        <CommandPalette
-          open={cmdPaletteOpen}
-          onClose={() => setCmdPaletteOpen(false)}
-          onSelectTicket={handleCmdSelectTicket}
-          onSelectProduct={handleCmdSelectProduct}
-        />
-      </Suspense>
-
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
@@ -824,17 +813,11 @@ export default function App() {
 
         {/* Desktop top bar — notifications + user menu */}
         <div className="hidden lg:flex items-center justify-between gap-1 px-6 py-2 bg-white dark:bg-[#121823] border-b border-[#e6e9ef] dark:border-[#212a38] flex-shrink-0">
-          {/* Search trigger */}
-          <button
-            onClick={() => setCmdPaletteOpen(true)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#f4f6f9] dark:bg-[#0f1520] border border-[#e6e9ef] dark:border-[#212a38] text-[#6c6760] dark:text-[#9aa4b2] hover:border-[#4338ca] dark:hover:border-[#a5b4fc] transition-colors text-sm w-64"
-          >
-            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <span className="flex-1 text-left text-xs">Search tickets, products…</span>
-            <kbd className="text-[10px] px-1.5 py-0.5 bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded font-mono">⌘K</kbd>
-          </button>
+          <CommandPalette
+            inputRef={cmdSearchRef}
+            onSelectTicket={handleCmdSelectTicket}
+            onSelectProduct={handleCmdSelectProduct}
+          />
           <div className="flex items-center gap-1">
           <NotificationBell
             notifications={notifications}
