@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import * as XLSX from 'xlsx'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../lib/sentry'
@@ -30,6 +31,44 @@ function downloadCSV(rows, columns, filename) {
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
   toast.success(`Exported ${rows.length} rows`)
+}
+
+// ─── Excel Utility ────────────────────────────────────────────────────────────
+function downloadExcel(rows, columns, filename) {
+  if (!rows.length) { toast('No data to export'); return }
+  const headers = columns.map((c) => c.label)
+  const data = rows.map((r) => columns.map((c) => r[c.key] ?? ''))
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...data])
+  // Bold header row
+  headers.forEach((_, i) => {
+    const cell = ws[XLSX.utils.encode_cell({ r: 0, c: i })]
+    if (cell) cell.s = { font: { bold: true } }
+  })
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Report')
+  XLSX.writeFile(wb, filename)
+  toast.success(`Exported ${rows.length} rows as Excel`)
+}
+
+// ─── Shared Export Buttons ────────────────────────────────────────────────────
+function ExportButtons({ onCSV, onExcel }) {
+  const btnCls = 'flex items-center gap-1.5 px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors'
+  return (
+    <div className="flex items-center gap-2">
+      <button onClick={onCSV} className={btnCls}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        CSV
+      </button>
+      <button onClick={onExcel} className={btnCls}>
+        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        Excel
+      </button>
+    </div>
+  )
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -225,6 +264,31 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
     }))
     downloadCSV(rows, columns, `tickets-report-${toYMD(new Date())}.csv`)
   }
+  const handleExportExcel = () => {
+    const columns = [
+      { key: 'rma_number', label: 'RMA #' },
+      { key: 'customer_name', label: 'Customer' },
+      { key: 'ticket_status', label: 'Status' },
+      { key: 'priority', label: 'Priority' },
+      { key: 'assigned_technician', label: 'Technician' },
+      { key: 'created_date', label: 'Created' },
+      { key: 'due_date', label: 'Due' },
+      { key: 'resolved_date', label: 'Resolved' },
+      { key: 'resolution_hrs', label: 'Resolution (hrs)' },
+    ]
+    const rows = filtered.map((t) => ({
+      rma_number: t.rma_number || '',
+      customer_name: t.customer_name || '',
+      ticket_status: t.ticket_status || '',
+      priority: t.priority || '',
+      assigned_technician: t.assigned_technician || '',
+      created_date: formatDate(t.created_date),
+      due_date: formatDate(t.due_date),
+      resolved_date: t.ticket_status === 'Completed' ? formatDate(t.updated_date) : '',
+      resolution_hrs: resolutionHours(t) ?? 'Open',
+    }))
+    downloadExcel(rows, columns, `tickets-report-${toYMD(new Date())}.xlsx`)
+  }
 
   const sel =
     'px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white dark:bg-[#0f1520] text-gray-800 dark:text-[#e8ebf0]'
@@ -301,20 +365,9 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
         <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">
           {filtered.length} ticket{filtered.length !== 1 ? 's' : ''}
         </span>
-        <button
-          onClick={handleExport}
-          className="ml-auto flex items-center gap-1.5 px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-          Export CSV
-        </button>
+        <div className="ml-auto">
+          <ExportButtons onCSV={handleExport} onExcel={handleExportExcel} />
+        </div>
       </div>
 
       {/* Table */}
@@ -479,6 +532,23 @@ function CustomersTab({ customers, tickets, formatDate }) {
     }))
     downloadCSV(rows, columns, `customers-report-${toYMD(new Date())}.csv`)
   }
+  const handleExportExcel = () => {
+    const columns = [
+      { key: 'name', label: 'Customer Name' },
+      { key: 'company', label: 'Company' },
+      { key: 'total', label: 'Total Tickets' },
+      { key: 'open', label: 'Open Tickets' },
+      { key: 'last', label: 'Last Activity' },
+    ]
+    const rows = enriched.map((c) => ({
+      name: c.contact_person || c.company_name || '',
+      company: c.company_name || '',
+      total: c.totalTickets,
+      open: c.openTickets,
+      last: formatDate(c.lastActivity),
+    }))
+    downloadExcel(rows, columns, `customers-report-${toYMD(new Date())}.xlsx`)
+  }
 
   return (
     <div className="space-y-5">
@@ -504,20 +574,7 @@ function CustomersTab({ customers, tickets, formatDate }) {
       </div>
 
       <div className="flex justify-end">
-        <button
-          onClick={handleExport}
-          className="flex items-center gap-1.5 px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-          Export CSV
-        </button>
+        <ExportButtons onCSV={handleExport} onExcel={handleExportExcel} />
       </div>
 
       {enriched.length === 0 ? (
@@ -631,6 +688,25 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
     }))
     downloadCSV(rows, columns, `technicians-report-${toYMD(new Date())}.csv`)
   }
+  const handleExportExcel = () => {
+    const columns = [
+      { key: 'email', label: 'Technician' },
+      { key: 'assigned', label: 'Assigned Tickets' },
+      { key: 'completed', label: 'Completed Tickets' },
+      { key: 'avgResolve', label: 'Avg Resolution (hrs)' },
+      { key: 'hoursLogged', label: 'Hours Logged' },
+    ]
+    const rows = stats.map((t) => ({
+      email: t.email,
+      assigned: t.assigned,
+      completed: t.completed,
+      avgResolve: t.resolveTimes.length
+        ? (t.resolveTimes.reduce((s, v) => s + v, 0) / t.resolveTimes.length).toFixed(1)
+        : '—',
+      hoursLogged: timeEntriesMissing ? 'N/A' : t.hoursLogged.toFixed(1),
+    }))
+    downloadExcel(rows, columns, `technicians-report-${toYMD(new Date())}.xlsx`)
+  }
 
   return (
     <div className="space-y-5">
@@ -663,20 +739,7 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
       )}
 
       <div className="flex justify-end">
-        <button
-          onClick={handleExport}
-          className="flex items-center gap-1.5 px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-          Export CSV
-        </button>
+        <ExportButtons onCSV={handleExport} onExcel={handleExportExcel} />
       </div>
 
       {stats.length === 0 ? (
@@ -801,6 +864,25 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
     }))
     downloadCSV(rows, columns, `financial-report-${toYMD(new Date())}.csv`)
   }
+  const handleExportExcel = () => {
+    const columns = [
+      { key: 'invoice_number', label: 'Invoice #' },
+      { key: 'customer_name', label: 'Customer' },
+      { key: 'type', label: 'Type' },
+      { key: 'status', label: 'Status' },
+      { key: 'amount', label: 'Total' },
+      { key: 'due_date', label: 'Due Date' },
+    ]
+    const rows = invoices.map((i) => ({
+      invoice_number: i.invoice_number || '',
+      customer_name: i.customer_name || '',
+      type: i.type || i.invoice_type || '',
+      status: i.status || '',
+      amount: i.total_amount || i.amount || 0,
+      due_date: formatDate(i.due_date),
+    }))
+    downloadExcel(rows, columns, `financial-report-${toYMD(new Date())}.xlsx`)
+  }
 
   return (
     <div className="space-y-5">
@@ -832,20 +914,7 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
       </div>
 
       <div className="flex justify-end">
-        <button
-          onClick={handleExport}
-          className="flex items-center gap-1.5 px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-          Export CSV
-        </button>
+        <ExportButtons onCSV={handleExport} onExcel={handleExportExcel} />
       </div>
 
       {invoices.length === 0 ? (
