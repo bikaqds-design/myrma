@@ -74,7 +74,8 @@ BEGIN
           'rma_number',     ticket.rma_number,
           'status',         ticket.ticket_status,
           'priority',       COALESCE(ticket.priority, 'Normal'),
-          'due_date',       to_char(ticket.due_date, 'DD/MM/YYYY')
+          'due_date',       to_char(ticket.due_date, 'DD/MM/YYYY'),
+          'days_overdue',   (CURRENT_DATE - ticket.due_date::date)::text
         )
       ),
       'pending',
