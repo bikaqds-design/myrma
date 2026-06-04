@@ -11,7 +11,7 @@ function ProgressBar({ step }) {
       {Array.from({ length: TOTAL }).map((_, i) => (
         <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${i < step ? 'bg-[#4338ca] dark:bg-[#a5b4fc]' : 'bg-[#e6e9ef] dark:bg-[#212a38]'}`} />
       ))}
-      <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2] ml-1 flex-shrink-0">{step}/{TOTAL}</span>
+      <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2] ml-1 flex-shrink-0 font-mono">{step} of {TOTAL}</span>
     </div>
   )
 }
