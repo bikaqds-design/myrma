@@ -1217,10 +1217,9 @@ export function TicketForm({
                 </label>
               )}
             </div>
-          </div>
 
           {/* ── Resolution ── */}
-          <div className="border-t border-gray-200 pt-5 px-6 pb-2">
+          <div className="border-t border-gray-200 pt-5">
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Resolution <span className="text-gray-400 font-normal normal-case">(optional)</span></h3>
             <div className="grid grid-cols-1 gap-3">
               <div>
@@ -1308,6 +1307,7 @@ export function TicketForm({
                 </div>
               )}
             </div>
+          </div>
           </div>
 
           {/* Footer */}
