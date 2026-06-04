@@ -1,8 +1,10 @@
 import React, { useState, useMemo, lazy, Suspense } from 'react'
+import { createPortal } from 'react-dom'
 const BarcodeScannerModule = lazy(() => import('../components/BarcodeScanner'))
 const BarcodeScanner = (props) => (
   <Suspense fallback={null}><BarcodeScannerModule {...props} /></Suspense>
 )
+const CAMERA_SUPPORTED = typeof window !== 'undefined' && 'BarcodeDetector' in window
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -204,13 +206,22 @@ function PartModal({ part, onSave, onClose, saving }) {
               <label className={label}>Part Number</label>
               <div className="relative">
                 <input
+                  id="part-number-input"
                   value={form.part_number}
                   onChange={(e) => set('part_number', e.target.value)}
                   className={`${field} pr-9`}
                   placeholder="e.g. CAP-100UF-25V"
                 />
-                <button type="button" onClick={() => setShowScanner(true)}
-                  title="Scan barcode / USB scanner"
+                <button
+                  type="button"
+                  title={CAMERA_SUPPORTED ? 'Scan with camera' : 'Click then scan with USB scanner'}
+                  onClick={() => {
+                    if (CAMERA_SUPPORTED) {
+                      setShowScanner(true)
+                    } else {
+                      document.getElementById('part-number-input')?.focus()
+                    }
+                  }}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#4a5568] hover:text-indigo-600 dark:hover:text-[#a5b4fc] transition-colors">
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <rect x="2"  y="3" width="2" height="18" rx="0.5" />
@@ -222,11 +233,12 @@ function PartModal({ part, onSave, onClose, saving }) {
                   </svg>
                 </button>
               </div>
-              {showScanner && (
+              {showScanner && CAMERA_SUPPORTED && createPortal(
                 <BarcodeScanner
                   onScan={(value) => { set('part_number', value); setShowScanner(false) }}
                   onClose={() => setShowScanner(false)}
-                />
+                />,
+                document.body
               )}
             </div>
             <div>

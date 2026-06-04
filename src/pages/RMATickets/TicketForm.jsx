@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { createPortal } from 'react-dom'
 const BarcodeScannerModule = lazy(() => import('../../components/BarcodeScanner'))
 const BarcodeScanner = (props) => (
   <Suspense fallback={null}><BarcodeScannerModule {...props} /></Suspense>
 )
+const CAMERA_SUPPORTED = typeof window !== 'undefined' && 'BarcodeDetector' in window
 import { useQueryClient } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { db, storage, notifications } from '../../api/supabaseClient'
@@ -840,13 +842,22 @@ export function TicketForm({
                       <div className="relative">
                         <input
                           type="text"
+                          data-serial-idx={idx}
                           value={product.serial_number}
                           onChange={(e) => updateProduct(idx, 'serial_number', e.target.value)}
                           className="w-full pl-3 pr-9 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm bg-white"
                           required
                         />
-                        <button type="button" onClick={() => setScanningProductIdx(idx)}
-                          title="Scan barcode / USB scanner"
+                        <button
+                          type="button"
+                          title={CAMERA_SUPPORTED ? 'Scan with camera' : 'Click then scan with USB scanner'}
+                          onClick={() => {
+                            if (CAMERA_SUPPORTED) {
+                              setScanningProductIdx(idx)
+                            } else {
+                              document.querySelector(`[data-serial-idx="${idx}"]`)?.focus()
+                            }
+                          }}
                           className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600 transition-colors">
                           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                             <rect x="2"  y="3" width="2" height="18" rx="0.5" />
@@ -1186,14 +1197,15 @@ export function TicketForm({
         </form>
       </div>
     </Modal>
-    {scanningProductIdx !== null && (
+    {scanningProductIdx !== null && CAMERA_SUPPORTED && createPortal(
       <BarcodeScanner
         onScan={(value) => {
           updateProduct(scanningProductIdx, 'serial_number', value)
           setScanningProductIdx(null)
         }}
         onClose={() => setScanningProductIdx(null)}
-      />
+      />,
+      document.body
     )}
     </>
   )
