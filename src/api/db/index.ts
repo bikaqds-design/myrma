@@ -5,7 +5,7 @@ export { auditFlushQueue } from './audit.js'
 import { userRoles, userActivity, userPreferences } from './users.js'
 import { brands, categories, subcategories, products } from './catalog.js'
 import { customers, customerNotes } from './customers.js'
-import { rmaTickets, ticketActivity, ticketComments, rmaTracker, serialHistory } from './tickets.js'
+import { rmaTickets, ticketActivity, ticketComments, rmaTracker, serialHistory, ticketResolutions } from './tickets.js'
 import {
   announcements,
   rmaConfig,
@@ -46,6 +46,7 @@ export const db = {
   ticketComments,
   rmaTracker,
   serialHistory,
+  ticketResolutions,
 
   // System / config
   announcements,
@@ -79,7 +80,7 @@ export type { AuditLogRow } from './audit.js'
 export type { AnnouncementRow, RmaConfigRow, CustomFieldRow, WebhookRow, SlaConfig, AutomationRule } from './system.js'
 export type { UserRoleRow, UserActivityRow, UserPreferencesRow } from './users.js'
 export type { NotificationRow } from './notifications.js'
-export type { RMATicketRow, TicketActivityRow, TicketCommentRow, TicketProductItem } from './tickets.js'
+export type { RMATicketRow, TicketActivityRow, TicketCommentRow, TicketProductItem, TicketResolutionRow } from './tickets.js'
 export type { CustomerRow, CustomerNoteRow } from './customers.js'
 export type { BrandRow, CategoryRow, SubcategoryRow, ProductRow } from './catalog.js'
 export type {

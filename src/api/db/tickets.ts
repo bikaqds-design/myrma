@@ -263,3 +263,52 @@ export const serialHistory = {
     }
   },
 }
+
+// ── Ticket Resolutions ────────────────────────────────────────────────────────
+
+export interface TicketResolutionRow {
+  id: string
+  ticket_id: string
+  type: 'replacement' | 'exchange' | 'credit_note' | 'refund'
+  replacement_product_name: string | null
+  replacement_serial: string | null
+  amount: number | null
+  currency: string | null
+  reason: string | null
+  reference_number: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export const ticketResolutions = {
+  async get(ticketId: string): Promise<TicketResolutionRow | null> {
+    try {
+      const { data, error } = await supabase
+        .from('ticket_resolutions')
+        .select('*')
+        .eq('ticket_id', ticketId)
+        .maybeSingle()
+      if (error?.code === '42P01') return null
+      if (error) throw error
+      return data
+    } catch {
+      return null
+    }
+  },
+
+  async upsert(ticketId: string, payload: Omit<TicketResolutionRow, 'id' | 'ticket_id' | 'created_at' | 'updated_at'>): Promise<TicketResolutionRow> {
+    const { data, error } = await supabase
+      .from('ticket_resolutions')
+      .upsert({ ...payload, ticket_id: ticketId, updated_at: new Date().toISOString() }, { onConflict: 'ticket_id' })
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async remove(id: string): Promise<void> {
+    const { error } = await supabase.from('ticket_resolutions').delete().eq('id', id)
+    if (error) throw error
+  },
+}

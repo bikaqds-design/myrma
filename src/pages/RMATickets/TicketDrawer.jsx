@@ -58,6 +58,14 @@ export function TicketDrawer({
   const [ticketParts, setTicketParts] = useState([])
   const [ticketPartsMissing, setTicketPartsMissing] = useState(false)
 
+  // Resolution state
+  const [resolution, setResolution] = useState(null)
+  const [resolutionLoading, setResolutionLoading] = useState(false)
+  const [resolutionEditing, setResolutionEditing] = useState(false)
+  const [resolutionSaving, setResolutionSaving] = useState(false)
+  const EMPTY_RES = { type: 'replacement', replacement_product_name: '', replacement_serial: '', amount: '', currency: 'USD', reason: '', reference_number: '' }
+  const [resForm, setResForm] = useState(EMPTY_RES)
+
   // Load all detail data whenever the ticket changes
   useEffect(() => {
     if (!ticket) return
@@ -71,6 +79,8 @@ export function TicketDrawer({
     setSerialHistorySerial('')
     setReplyingTo(null)
     setCommentFiles([])
+    setResolution(null)
+    setResolutionEditing(false)
 
     // Load comments
     setCommentsLoading(true)
@@ -109,7 +119,52 @@ export function TicketDrawer({
         }
       })
       .catch(() => {})
+
+    // Load resolution
+    setResolutionLoading(true)
+    db.ticketResolutions.get(ticket.id)
+      .then((res) => { setResolution(res) })
+      .catch(() => {})
+      .finally(() => setResolutionLoading(false))
   }, [ticket?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSaveResolution = async () => {
+    if (!resForm.type) return
+    setResolutionSaving(true)
+    try {
+      const payload = {
+        type: resForm.type,
+        replacement_product_name: resForm.replacement_product_name?.trim() || null,
+        replacement_serial: resForm.replacement_serial?.trim() || null,
+        amount: resForm.amount !== '' ? parseFloat(resForm.amount) : null,
+        currency: resForm.currency || 'USD',
+        reason: resForm.reason?.trim() || null,
+        reference_number: resForm.reference_number?.trim() || null,
+        created_by: userEmail,
+      }
+      const saved = await db.ticketResolutions.upsert(ticket.id, payload)
+      setResolution(saved)
+      setResolutionEditing(false)
+      toast.success('Resolution saved')
+      db.auditLog.log(userEmail, 'ticket_resolution_saved', `${ticket.rma_number}: ${resForm.type}`).catch(() => {})
+    } catch (err) {
+      toast.error('Failed to save resolution: ' + err.message)
+    } finally {
+      setResolutionSaving(false)
+    }
+  }
+
+  const handleDeleteResolution = async () => {
+    if (!resolution) return
+    try {
+      await db.ticketResolutions.remove(resolution.id)
+      setResolution(null)
+      setResolutionEditing(false)
+      toast.success('Resolution removed')
+    } catch {
+      toast.error('Failed to remove resolution')
+    }
+  }
 
   const handleAddComment = async (parentCommentId = null) => {
     if (!newComment.trim() && commentFiles.length === 0) return
@@ -640,6 +695,173 @@ export function TicketDrawer({
               )}
             </div>
           )}
+
+          {/* ── Resolution ── */}
+          <div className="border-t border-gray-200 dark:border-[#212a38] pt-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">Resolution</h3>
+              {canDo('edit_all') && !resolutionEditing && (
+                <button
+                  onClick={() => {
+                    setResForm(resolution ? {
+                      type: resolution.type,
+                      replacement_product_name: resolution.replacement_product_name || '',
+                      replacement_serial: resolution.replacement_serial || '',
+                      amount: resolution.amount != null ? String(resolution.amount) : '',
+                      currency: resolution.currency || 'USD',
+                      reason: resolution.reason || '',
+                      reference_number: resolution.reference_number || '',
+                    } : EMPTY_RES)
+                    setResolutionEditing(true)
+                  }}
+                  className="text-xs text-indigo-600 dark:text-[#a5b4fc] font-medium hover:underline"
+                >
+                  {resolution ? 'Edit' : '+ Add'}
+                </button>
+              )}
+            </div>
+
+            {resolutionLoading && <p className="text-xs text-gray-400 dark:text-[#4a5568] italic">Loading…</p>}
+
+            {/* View mode */}
+            {!resolutionLoading && resolution && !resolutionEditing && (
+              <div className="bg-gray-50 dark:bg-[#0f1520] rounded-xl p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    resolution.type === 'replacement' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
+                    resolution.type === 'exchange'    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' :
+                    resolution.type === 'credit_note' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
+                                                        'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                  }`}>
+                    {resolution.type.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                  </span>
+                  {canDo('edit_all') && (
+                    <button onClick={handleDeleteResolution} className="ml-auto text-xs text-red-500 hover:underline">Remove</button>
+                  )}
+                </div>
+                {(resolution.replacement_product_name || resolution.replacement_serial) && (
+                  <div className="text-xs text-gray-700 dark:text-[#e8ebf0] space-y-0.5">
+                    {resolution.replacement_product_name && <p><span className="text-gray-500 dark:text-[#9aa4b2]">Product: </span>{resolution.replacement_product_name}</p>}
+                    {resolution.replacement_serial && <p><span className="text-gray-500 dark:text-[#9aa4b2]">Serial: </span><span className="font-mono">{resolution.replacement_serial}</span></p>}
+                  </div>
+                )}
+                {resolution.amount != null && (
+                  <p className="text-xs text-gray-700 dark:text-[#e8ebf0]">
+                    <span className="text-gray-500 dark:text-[#9aa4b2]">Amount: </span>
+                    <span className="font-semibold">{resolution.currency} {Number(resolution.amount).toFixed(2)}</span>
+                  </p>
+                )}
+                {resolution.reason && <p className="text-xs text-gray-600 dark:text-[#9aa4b2] italic">"{resolution.reason}"</p>}
+                {resolution.reference_number && (
+                  <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">Ref: <span className="font-mono">{resolution.reference_number}</span></p>
+                )}
+                <p className="text-[10px] text-gray-400 dark:text-[#4a5568]">By {resolution.created_by} · {new Date(resolution.created_at).toLocaleDateString()}</p>
+              </div>
+            )}
+
+            {/* Empty state */}
+            {!resolutionLoading && !resolution && !resolutionEditing && (
+              <p className="text-xs text-gray-400 dark:text-[#4a5568] italic">No resolution recorded.</p>
+            )}
+
+            {/* Edit / Add form */}
+            {resolutionEditing && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">Type</label>
+                  <select
+                    value={resForm.type}
+                    onChange={(e) => setResForm(f => ({ ...f, type: e.target.value }))}
+                    className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0]"
+                  >
+                    <option value="replacement">Replacement</option>
+                    <option value="exchange">Exchange</option>
+                    <option value="credit_note">Credit Note</option>
+                    <option value="refund">Refund</option>
+                  </select>
+                </div>
+
+                {(resForm.type === 'replacement' || resForm.type === 'exchange') && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">Replacement Product</label>
+                      <input
+                        value={resForm.replacement_product_name}
+                        onChange={(e) => setResForm(f => ({ ...f, replacement_product_name: e.target.value }))}
+                        placeholder="Product name or model"
+                        className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">Serial Number</label>
+                      <input
+                        value={resForm.replacement_serial}
+                        onChange={(e) => setResForm(f => ({ ...f, replacement_serial: e.target.value }))}
+                        placeholder="Replacement unit serial"
+                        className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568] font-mono"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {(resForm.type === 'credit_note' || resForm.type === 'refund') && (
+                  <>
+                    <div className="flex gap-2">
+                      <div className="w-24">
+                        <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">Currency</label>
+                        <select
+                          value={resForm.currency}
+                          onChange={(e) => setResForm(f => ({ ...f, currency: e.target.value }))}
+                          className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0]"
+                        >
+                          {['USD','EUR','GBP','AED','SAR','EGP'].map(c => <option key={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">Amount</label>
+                        <input
+                          type="number" min="0" step="0.01"
+                          value={resForm.amount}
+                          onChange={(e) => setResForm(f => ({ ...f, amount: e.target.value }))}
+                          placeholder="0.00"
+                          className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0]"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">Reference #</label>
+                      <input
+                        value={resForm.reference_number}
+                        onChange={(e) => setResForm(f => ({ ...f, reference_number: e.target.value }))}
+                        placeholder="Invoice / credit note number"
+                        className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568]"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">Reason / Notes</label>
+                  <textarea
+                    rows={2}
+                    value={resForm.reason}
+                    onChange={(e) => setResForm(f => ({ ...f, reason: e.target.value }))}
+                    placeholder="Optional notes"
+                    className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568] resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button onClick={handleSaveResolution} loading={resolutionSaving} className="flex-1 justify-center text-sm py-1.5">
+                    Save Resolution
+                  </Button>
+                  <Button variant="secondary" onClick={() => setResolutionEditing(false)} className="text-sm py-1.5">
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Accessories */}
           {ticket.accessories_received && (
