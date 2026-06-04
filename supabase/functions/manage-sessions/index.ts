@@ -48,34 +48,34 @@ serve(async (req: Request) => {
     const text = await res.text()
     console.log(`GoTrue sessions ${res.status}:`, text)
     if (!res.ok) {
-      return json({ error: `GoTrue ${res.status}: ${text}` }, 400)
+      // Always 200 so Supabase SDK gives us data — error info in body
+      return json({ sessions: [], error: `GoTrue ${res.status}: ${text}` })
     }
     let data: { sessions?: unknown[] } = {}
-    try { data = JSON.parse(text) } catch { return json({ error: `Bad JSON: ${text}` }, 500) }
+    try { data = JSON.parse(text) } catch { return json({ sessions: [], error: `Bad JSON: ${text}` }) }
     return json({ sessions: data.sessions ?? [] })
   }
 
   // ── REVOKE ───────────────────────────────────────────────────────────────
   if (body.action === 'revoke') {
     const { sessionId } = body
-    if (!sessionId) return json({ error: 'sessionId required' }, 400)
+    if (!sessionId) return json({ error: 'sessionId required' })
 
-    // Verify session belongs to this user before deleting
     const listRes = await fetch(`${adminBase}/sessions`, { headers: adminHeaders })
     const listData = await listRes.json().catch(() => ({ sessions: [] }))
     const belongs = (listData.sessions ?? []).some((s: { id: string }) => s.id === sessionId)
-    if (!belongs) return json({ error: 'Session not found' }, 404)
+    if (!belongs) return json({ error: 'Session not found or already expired' })
 
     const delRes = await fetch(`${adminBase}/sessions/${sessionId}`, {
       method: 'DELETE',
       headers: adminHeaders,
     })
     if (!delRes.ok) {
-      const err = await delRes.json().catch(() => ({}))
-      return json({ error: err.message || 'Failed to revoke session' }, delRes.status)
+      const errText = await delRes.text()
+      return json({ error: `GoTrue ${delRes.status}: ${errText}` })
     }
     return json({ success: true })
   }
 
-  return json({ error: 'Unknown action' }, 400)
+  return json({ error: 'Unknown action' })
 })
