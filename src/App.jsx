@@ -823,7 +823,19 @@ export default function App() {
         </div>
 
         {/* Desktop top bar — notifications + user menu */}
-        <div className="hidden lg:flex items-center justify-end gap-1 px-6 py-2 bg-white dark:bg-[#121823] border-b border-[#e6e9ef] dark:border-[#212a38] flex-shrink-0">
+        <div className="hidden lg:flex items-center justify-between gap-1 px-6 py-2 bg-white dark:bg-[#121823] border-b border-[#e6e9ef] dark:border-[#212a38] flex-shrink-0">
+          {/* Search trigger */}
+          <button
+            onClick={() => setCmdPaletteOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#f4f6f9] dark:bg-[#0f1520] border border-[#e6e9ef] dark:border-[#212a38] text-[#6c6760] dark:text-[#9aa4b2] hover:border-[#4338ca] dark:hover:border-[#a5b4fc] transition-colors text-sm w-64"
+          >
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span className="flex-1 text-left text-xs">Search tickets, products…</span>
+            <kbd className="text-[10px] px-1.5 py-0.5 bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded font-mono">⌘K</kbd>
+          </button>
+          <div className="flex items-center gap-1">
           <NotificationBell
             notifications={notifications}
             currentUserEmail={currentUser?.email}
@@ -942,6 +954,7 @@ export default function App() {
                 </button>
               </div>
             )}
+          </div>
           </div>
         </div>
 
