@@ -1,23 +1,18 @@
 // ── notification-worker Edge Function ─────────────────────────────────────
 // Drains the notification_queue table — picks up to BATCH_SIZE pending jobs,
-// calls WhatsApp API for each, logs results, handles retries with exponential
-// backoff.
+// dispatches WhatsApp or Email for each, logs results, handles retries with
+// exponential backoff.
 //
 // Trigger modes:
-//   1. Immediately after event handler queues a job (best-effort, fire-and-forget)
+//   1. Immediately after event handler queues a job (fire-and-forget)
 //   2. Manual from Admin → Test Center ("Run Worker")
-//   3. pg_cron (Pro plan) — recommended for production:
-//      SELECT cron.schedule('notification-worker', '*/2 * * * *',
-//        $$SELECT net.http_post(
-//            url := 'https://<project>.supabase.co/functions/v1/notification-worker',
-//            headers := '{"x-worker-secret":"<WORKER_SECRET>"}'::jsonb
-//          )$$);
+//   3. pg_cron (Pro plan) every 2 minutes — x-trigger-source: pg_cron header
 //
 // Required Supabase secrets:
-//   WHATSAPP_ACCESS_TOKEN
-//   WHATSAPP_PHONE_NUMBER_ID
+//   WHATSAPP_ACCESS_TOKEN      (for WhatsApp jobs)
+//   WHATSAPP_PHONE_NUMBER_ID   (for WhatsApp jobs)
 // Optional:
-//   WORKER_SECRET    — shared secret for cron/external callers
+//   WORKER_SECRET              — shared secret for cron/external callers
 //   WHATSAPP_API_VERSION
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -60,15 +55,15 @@ interface WAResponse {
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
-  const supabaseAdmin = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  )
+  const supabaseUrl      = Deno.env.get('SUPABASE_URL')!
+  const serviceRoleKey   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-  // ── Auth: worker secret OR valid JWT ─────────────────────────────────────
-  const workerSecret = Deno.env.get('WORKER_SECRET')
-  const providedSecret = req.headers.get('x-worker-secret')
-  const authHeader = req.headers.get('Authorization') ?? ''
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey)
+
+  // ── Auth: worker secret OR valid JWT OR internal trigger ──────────────────
+  const workerSecret    = Deno.env.get('WORKER_SECRET')
+  const providedSecret  = req.headers.get('x-worker-secret')
+  const authHeader      = req.headers.get('Authorization') ?? ''
 
   if (workerSecret && providedSecret === workerSecret) {
     // cron / external caller with correct secret — allowed
@@ -78,19 +73,14 @@ serve(async (req: Request) => {
     )
     if (error || !user) return json({ error: 'Unauthorized' }, 401)
   } else if (!req.headers.get('x-trigger-source')) {
-    // Allow internal trigger from event handler (no auth header required)
     return json({ error: 'Unauthorized' }, 401)
   }
 
-  // ── Config ───────────────────────────────────────────────────────────────
+  // ── WhatsApp config (only needed for WA jobs; checked per-job below) ─────
   const accessToken   = Deno.env.get('WHATSAPP_ACCESS_TOKEN')
   const phoneNumberId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID')
   const apiVersion    = Deno.env.get('WHATSAPP_API_VERSION') ?? 'v20.0'
   const apiBase       = `https://graph.facebook.com/${apiVersion}`
-
-  if (!accessToken || !phoneNumberId) {
-    return json({ processed: 0, skipped: 0, error: 'WhatsApp not configured' })
-  }
 
   // ── Fetch pending jobs ────────────────────────────────────────────────────
   const now = new Date().toISOString()
@@ -116,97 +106,142 @@ serve(async (req: Request) => {
       .from('notification_queue')
       .update({ status: 'processing', started_at: new Date().toISOString() })
       .eq('id', job.id)
-      .eq('status', 'pending')   // guard: only update if still pending
+      .eq('status', 'pending')
 
     if (lockErr) continue  // another worker grabbed it
 
     try {
-      const { to, templateName: payloadTemplateName, variables = {}, params, attachmentUrl, ticketId, language = 'en', recipientName } = job.payload
 
-      // Use the explicitly-ordered `params` array when present — it is
-      // JSONB-safe (arrays keep order). Fall back to Object.values(variables)
-      // only for legacy jobs queued before the params field existed.
-      const bodyParams: string[] =
-        Array.isArray(params) && params.length
-          ? params.map((v) => String(v ?? ''))
-          : Object.values(variables).map((v) => String(v ?? ''))
+      // ── Email job ─────────────────────────────────────────────────────────
+      if (job.job_type === 'email') {
+        const { to, templateName: emailTemplate, variables = {}, ticketId } = job.payload
 
-      // Resolve template name if only templateId provided
-      let resolvedTemplateName = payloadTemplateName
-      if (!resolvedTemplateName && job.payload.templateId) {
-        const { data: tmpl } = await supabaseAdmin
-          .from('whatsapp_templates')
-          .select('template_name')
-          .eq('id', job.payload.templateId)
-          .single()
-        resolvedTemplateName = tmpl?.template_name
-      }
+        if (!to || !emailTemplate) throw new Error('Email job missing required fields (to, templateName)')
 
-      if (!resolvedTemplateName) throw new Error('No template_name resolved for job')
-
-      const phone = to.replace(/[^0-9]/g, '')
-      const components: unknown[] = []
-
-      if (bodyParams.length > 0) {
-        components.push({
-          type: 'body',
-          parameters: bodyParams.map((v) => ({ type: 'text', text: String(v ?? '') })),
+        const res = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ recipientEmail: to, templateName: emailTemplate, variables }),
         })
-      }
-      if (attachmentUrl) {
-        components.push({
-          type: 'header',
-          parameters: [{ type: 'document', document: { link: attachmentUrl, filename: 'RMA-Ticket.pdf' } }],
+
+        if (!res.ok) {
+          const errBody = await res.text()
+          throw new Error(`send-email ${res.status}: ${errBody}`)
+        }
+
+        await supabaseAdmin.from('notification_logs').insert({
+          ticket_id:       ticketId ?? null,
+          event_type:      job.event_type,
+          provider:        'email',
+          recipient:       to,
+          message_content: `Template: ${emailTemplate}`,
+          delivery_status: 'sent',
+          sent_at:         new Date().toISOString(),
+          retry_count:     job.retry_count,
         })
-      }
 
-      const waPayload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: phone,
-        type: 'template',
-        template: {
-          name: resolvedTemplateName,
-          language: { code: language },
-          components: components.length ? components : undefined,
-        },
-      }
-
-      const waRes  = await fetch(`${apiBase}/${phoneNumberId}/messages`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(waPayload),
-      })
-      const waData: WAResponse = await waRes.json()
-
-      const success   = waRes.ok && !!waData.messages?.[0]?.id
-      const messageId = waData.messages?.[0]?.id ?? null
-
-      // Log
-      await supabaseAdmin.from('notification_logs').insert({
-        ticket_id: ticketId ?? null,
-        event_type: job.event_type,
-        provider: 'whatsapp',
-        recipient: phone,
-        recipient_name: recipientName ?? variables.customer_name ?? null,
-        template_id: job.payload.templateId ?? null,
-        message_content: `Template: ${resolvedTemplateName}`,
-        delivery_status: success ? 'sent' : 'failed',
-        whatsapp_message_id: messageId,
-        sent_at: new Date().toISOString(),
-        response_data: waData,
-        error_message: success ? null : (waData.error?.message ?? 'API error'),
-        retry_count: job.retry_count,
-      })
-
-      if (success) {
         await supabaseAdmin
           .from('notification_queue')
-          .update({ status: 'completed', completed_at: new Date().toISOString(), result: { message_id: messageId } })
+          .update({ status: 'completed', completed_at: new Date().toISOString() })
           .eq('id', job.id)
+
         processed++
+
+      // ── WhatsApp job ──────────────────────────────────────────────────────
       } else {
-        throw new Error(waData.error?.message ?? 'WhatsApp API returned error')
+        if (!accessToken || !phoneNumberId) {
+          throw new Error('WhatsApp not configured')
+        }
+
+        const { to, templateName: payloadTemplateName, variables = {}, params, attachmentUrl, ticketId, language = 'en', recipientName } = job.payload
+
+        // Use the explicitly-ordered `params` array when present — it is
+        // JSONB-safe (arrays keep order). Fall back to Object.values(variables)
+        // only for legacy jobs queued before the params field existed.
+        const bodyParams: string[] =
+          Array.isArray(params) && params.length
+            ? params.map((v) => String(v ?? ''))
+            : Object.values(variables).map((v) => String(v ?? ''))
+
+        // Resolve template name if only templateId provided
+        let resolvedTemplateName = payloadTemplateName
+        if (!resolvedTemplateName && job.payload.templateId) {
+          const { data: tmpl } = await supabaseAdmin
+            .from('whatsapp_templates')
+            .select('template_name')
+            .eq('id', job.payload.templateId)
+            .single()
+          resolvedTemplateName = tmpl?.template_name
+        }
+
+        if (!resolvedTemplateName) throw new Error('No template_name resolved for job')
+
+        const phone = to.replace(/[^0-9]/g, '')
+        const components: unknown[] = []
+
+        if (bodyParams.length > 0) {
+          components.push({
+            type: 'body',
+            parameters: bodyParams.map((v) => ({ type: 'text', text: String(v ?? '') })),
+          })
+        }
+        if (attachmentUrl) {
+          components.push({
+            type: 'header',
+            parameters: [{ type: 'document', document: { link: attachmentUrl, filename: 'RMA-Ticket.pdf' } }],
+          })
+        }
+
+        const waPayload = {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: phone,
+          type: 'template',
+          template: {
+            name: resolvedTemplateName,
+            language: { code: language },
+            components: components.length ? components : undefined,
+          },
+        }
+
+        const waRes  = await fetch(`${apiBase}/${phoneNumberId}/messages`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(waPayload),
+        })
+        const waData: WAResponse = await waRes.json()
+
+        const success   = waRes.ok && !!waData.messages?.[0]?.id
+        const messageId = waData.messages?.[0]?.id ?? null
+
+        await supabaseAdmin.from('notification_logs').insert({
+          ticket_id:            ticketId ?? null,
+          event_type:           job.event_type,
+          provider:             'whatsapp',
+          recipient:            phone,
+          recipient_name:       recipientName ?? variables.customer_name ?? null,
+          template_id:          job.payload.templateId ?? null,
+          message_content:      `Template: ${resolvedTemplateName}`,
+          delivery_status:      success ? 'sent' : 'failed',
+          whatsapp_message_id:  messageId,
+          sent_at:              new Date().toISOString(),
+          response_data:        waData,
+          error_message:        success ? null : (waData.error?.message ?? 'API error'),
+          retry_count:          job.retry_count,
+        })
+
+        if (success) {
+          await supabaseAdmin
+            .from('notification_queue')
+            .update({ status: 'completed', completed_at: new Date().toISOString(), result: { message_id: messageId } })
+            .eq('id', job.id)
+          processed++
+        } else {
+          throw new Error(waData.error?.message ?? 'WhatsApp API returned error')
+        }
       }
 
     } catch (err) {
