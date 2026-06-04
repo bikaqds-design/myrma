@@ -12,6 +12,7 @@ import { registerTicketEventHandlers } from './lib/events/ticketEventHandlers'
 // Register notification event handlers once at module load
 registerTicketEventHandlers()
 import NotificationBell from './components/NotificationBell'
+import OnboardingWizard from './components/OnboardingWizard'
 import { Spinner } from './components/ui'
 import { captureException } from './lib/sentry'
 
@@ -236,6 +237,7 @@ export default function App() {
   const [companyName, setCompanyName] = useState('')
   const cmdSearchRef = useRef(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [notifMissing, setNotifMissing] = useState(false)
   const notifChannelRef = useRef(null)
@@ -292,6 +294,11 @@ export default function App() {
     const role = roleData?.role || 'technician'
     setCurrentUserRole(role)
     setCurrentUserPermissions(resolvePermissions(role, roleData?.permissions))
+    // Show onboarding wizard for admins who haven't completed it yet
+    if (role === ROLES.ADMIN || role === ROLES.SUPER_ADMIN) {
+      const done = safeStorage.get(`mrma_onboarding_v1_${user.email}`, null)
+      if (!done) setShowOnboarding(true)
+    }
   }
 
   const checkAuth = async () => {
@@ -610,6 +617,13 @@ export default function App() {
     <div className="min-h-screen bg-[#f4f6f9] dark:bg-[#0b0f17] flex">
       <AnnouncementBanner />
       <Toaster position="top-right" />
+      {showOnboarding && (
+        <OnboardingWizard
+          userEmail={currentUser?.email}
+          onClose={() => setShowOnboarding(false)}
+          onNavigate={(path) => { navigate(path) }}
+        />
+      )}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
