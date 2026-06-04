@@ -2,55 +2,76 @@ import React, { useEffect, useRef, useState } from 'react'
 
 const FORMATS = ['code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code', 'data_matrix']
 
+// Barcode icon using rect elements (path-based icons render as ⋮)
+export const BarcodeIcon = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <rect x="2"  y="3" width="2" height="18" rx="0.5" />
+    <rect x="6"  y="3" width="1" height="18" rx="0.5" />
+    <rect x="9"  y="3" width="2" height="18" rx="0.5" />
+    <rect x="13" y="3" width="1" height="18" rx="0.5" />
+    <rect x="16" y="3" width="3" height="18" rx="0.5" />
+    <rect x="21" y="3" width="1" height="18" rx="0.5" />
+  </svg>
+)
+
+const cameraSupported = 'BarcodeDetector' in window
+
 export default function BarcodeScanner({ onScan, onClose }) {
+  // ── Camera mode (Android / desktop with BarcodeDetector) ──────────────────
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const animRef = useRef(null)
-  const [error, setError] = useState(null)
-  const supported = 'BarcodeDetector' in window
+  const [camError, setCamError] = useState(null)
+
+  // ── USB / manual mode ─────────────────────────────────────────────────────
+  const usbInputRef = useRef(null)
+  const [manualValue, setManualValue] = useState('')
 
   useEffect(() => {
-    if (!supported) return
-
+    if (!cameraSupported) {
+      setTimeout(() => usbInputRef.current?.focus(), 80)
+      return
+    }
     let active = true
-    let detector
-
     const start = async () => {
       try {
-        detector = new window.BarcodeDetector({ formats: FORMATS })
+        const detector = new window.BarcodeDetector({ formats: FORMATS })
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
         })
         if (!active) { stream.getTracks().forEach((t) => t.stop()); return }
         streamRef.current = stream
         if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play() }
+        const scan = async () => {
+          if (!active) return
+          if (videoRef.current?.readyState >= 2) {
+            try {
+              const found = await detector.detect(videoRef.current)
+              if (found.length > 0) { onScan(found[0].rawValue); return }
+            } catch { /* keep looping */ }
+          }
+          animRef.current = requestAnimationFrame(scan)
+        }
         scan()
       } catch (e) {
         if (!active) return
-        setError(e.name === 'NotAllowedError'
-          ? 'Camera permission denied. Allow camera access and try again.'
+        setCamError(e.name === 'NotAllowedError'
+          ? 'Camera permission denied. Use USB mode instead.'
           : 'Could not start camera: ' + e.message)
       }
     }
-
-    const scan = async () => {
-      if (!active) return
-      if (videoRef.current?.readyState >= 2) {
-        try {
-          const found = await detector.detect(videoRef.current)
-          if (found.length > 0) { onScan(found[0].rawValue); return }
-        } catch { /* detection error — keep looping */ }
-      }
-      animRef.current = requestAnimationFrame(scan)
-    }
-
     start()
     return () => {
       active = false
       cancelAnimationFrame(animRef.current)
       streamRef.current?.getTracks().forEach((t) => t.stop())
     }
-  }, [supported, onScan])
+  }, [onScan])
+
+  const submitManual = () => {
+    const v = manualValue.trim()
+    if (v) onScan(v)
+  }
 
   return (
     <div className="fixed inset-0 z-[400] flex items-center justify-center p-4">
@@ -60,12 +81,12 @@ export default function BarcodeScanner({ onScan, onClose }) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#212a38]">
           <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-[#a5b4fc]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h2v2H4zm0 5h2v2H4zm0 5h2v2H4zm5-10h2v2H9zm0 5h2v2H9zm0 5h2v2H9zm5-10h6v2h-6zm0 5h6v2h-6zm0 5h6v2h-6z" />
-            </svg>
-            <span className="text-sm font-semibold text-[#e8ebf0]">Scan Barcode</span>
+            <BarcodeIcon className="w-4 h-4 text-[#a5b4fc]" />
+            <span className="text-sm font-semibold text-[#e8ebf0]">
+              {cameraSupported ? 'Scan Barcode' : 'USB / Manual Scan'}
+            </span>
           </div>
-          <button onClick={onClose} aria-label="Close scanner"
+          <button onClick={onClose} aria-label="Close"
             className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9aa4b2] hover:text-[#e8ebf0] hover:bg-[#1a2230] transition-colors">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -73,29 +94,11 @@ export default function BarcodeScanner({ onScan, onClose }) {
           </button>
         </div>
 
-        {/* Body */}
-        {!supported ? (
-          <div className="p-6 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-amber-900/30 flex items-center justify-center mx-auto mb-3">
-              <svg className="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              </svg>
-            </div>
-            <p className="text-sm font-semibold text-[#e8ebf0] mb-1">Browser not supported</p>
-            <p className="text-xs text-[#9aa4b2] max-w-xs mx-auto">
-              Barcode scanning requires Chrome or Edge. Use a supported browser or type the value manually.
-            </p>
-          </div>
-        ) : error ? (
-          <div className="p-6 text-center">
-            <p className="text-sm text-red-400">{error}</p>
-            <button onClick={onClose} className="mt-4 text-xs text-[#a5b4fc] hover:underline">Close</button>
-          </div>
-        ) : (
+        {/* Camera mode */}
+        {cameraSupported && !camError && (
           <>
             <div className="relative bg-black" style={{ aspectRatio: '4/3' }}>
               <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
-              {/* Viewfinder overlay */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-52 h-36 relative">
                   <div className="absolute inset-0 border border-[#a5b4fc]/30 rounded-lg" />
@@ -109,6 +112,37 @@ export default function BarcodeScanner({ onScan, onClose }) {
             </div>
             <p className="text-center text-xs text-[#9aa4b2] py-3">Point camera at a barcode or QR code</p>
           </>
+        )}
+
+        {/* Camera error fallback → show USB mode */}
+        {cameraSupported && camError && (
+          <div className="px-5 pt-4 pb-2">
+            <p className="text-xs text-amber-400 mb-3 text-center">{camError}</p>
+          </div>
+        )}
+
+        {/* USB / manual input mode */}
+        {(!cameraSupported || camError) && (
+          <div className="px-5 py-5">
+            <p className="text-xs text-[#9aa4b2] mb-3 text-center">
+              Focus the field below, then scan with your USB barcode scanner — or type manually.
+            </p>
+            <input
+              ref={usbInputRef}
+              value={manualValue}
+              onChange={(e) => setManualValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') submitManual() }}
+              placeholder="Scan or type barcode value…"
+              className="w-full px-3 py-2 rounded-lg bg-[#0f1520] border border-[#212a38] focus:border-[#a5b4fc] text-sm text-[#e8ebf0] placeholder-[#4a5568] outline-none transition-colors font-mono tracking-wider"
+            />
+            <button
+              onClick={submitManual}
+              disabled={!manualValue.trim()}
+              className="mt-3 w-full py-2 rounded-lg bg-[#4338ca] hover:bg-[#3730a3] disabled:opacity-40 text-white text-sm font-medium transition-colors"
+            >
+              Use this value
+            </button>
+          </div>
         )}
       </div>
     </div>

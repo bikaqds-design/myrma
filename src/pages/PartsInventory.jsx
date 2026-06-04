@@ -1,5 +1,8 @@
 import React, { useState, useMemo, lazy, Suspense } from 'react'
-const BarcodeScanner = lazy(() => import('../components/BarcodeScanner'))
+const BarcodeScannerModule = lazy(() => import('../components/BarcodeScanner'))
+const BarcodeScanner = (props) => (
+  <Suspense fallback={null}><BarcodeScannerModule {...props} /></Suspense>
+)
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -199,28 +202,31 @@ function PartModal({ part, onSave, onClose, saving }) {
             </div>
             <div>
               <label className={label}>Part Number</label>
-              <div className="flex gap-2">
+              <div className="relative">
                 <input
                   value={form.part_number}
                   onChange={(e) => set('part_number', e.target.value)}
-                  className={`${field} flex-1`}
+                  className={`${field} pr-9`}
                   placeholder="e.g. CAP-100UF-25V"
                 />
                 <button type="button" onClick={() => setShowScanner(true)}
-                  title="Scan barcode"
-                  className="px-2.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-gray-500 dark:text-[#9aa4b2] hover:text-indigo-600 dark:hover:text-[#a5b4fc] hover:border-indigo-400 transition-colors bg-white dark:bg-[#0f1520]">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h2v2H4zm0 5h2v2H4zm0 5h2v2H4zm5-10h2v2H9zm0 5h2v2H9zm0 5h2v2H9zm5-10h6v2h-6zm0 5h6v2h-6zm0 5h6v2h-6z" />
+                  title="Scan barcode / USB scanner"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#4a5568] hover:text-indigo-600 dark:hover:text-[#a5b4fc] transition-colors">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <rect x="2"  y="3" width="2" height="18" rx="0.5" />
+                    <rect x="6"  y="3" width="1" height="18" rx="0.5" />
+                    <rect x="9"  y="3" width="2" height="18" rx="0.5" />
+                    <rect x="13" y="3" width="1" height="18" rx="0.5" />
+                    <rect x="16" y="3" width="3" height="18" rx="0.5" />
+                    <rect x="21" y="3" width="1" height="18" rx="0.5" />
                   </svg>
                 </button>
               </div>
               {showScanner && (
-                <Suspense fallback={null}>
-                  <BarcodeScanner
-                    onScan={(value) => { set('part_number', value); setShowScanner(false) }}
-                    onClose={() => setShowScanner(false)}
-                  />
-                </Suspense>
+                <BarcodeScanner
+                  onScan={(value) => { set('part_number', value); setShowScanner(false) }}
+                  onClose={() => setShowScanner(false)}
+                />
               )}
             </div>
             <div>

@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
-const BarcodeScanner = lazy(() => import('../../components/BarcodeScanner'))
+const BarcodeScannerModule = lazy(() => import('../../components/BarcodeScanner'))
+const BarcodeScanner = (props) => (
+  <Suspense fallback={null}><BarcodeScannerModule {...props} /></Suspense>
+)
 import { useQueryClient } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { db, storage, notifications } from '../../api/supabaseClient'
@@ -834,19 +837,24 @@ export function TicketForm({
                       <label className={lbl}>
                         Serial Number <span className="text-red-500">*</span>
                       </label>
-                      <div className="flex gap-2">
+                      <div className="relative">
                         <input
                           type="text"
                           value={product.serial_number}
                           onChange={(e) => updateProduct(idx, 'serial_number', e.target.value)}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm bg-white"
+                          className="w-full pl-3 pr-9 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm bg-white"
                           required
                         />
                         <button type="button" onClick={() => setScanningProductIdx(idx)}
-                          title="Scan barcode"
-                          className="px-2.5 py-2 border border-gray-300 rounded-lg text-gray-500 hover:text-indigo-600 hover:border-indigo-400 transition-colors bg-white">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h2v2H4zm0 5h2v2H4zm0 5h2v2H4zm5-10h2v2H9zm0 5h2v2H9zm0 5h2v2H9zm5-10h6v2h-6zm0 5h6v2h-6zm0 5h6v2h-6z" />
+                          title="Scan barcode / USB scanner"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600 transition-colors">
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <rect x="2"  y="3" width="2" height="18" rx="0.5" />
+                            <rect x="6"  y="3" width="1" height="18" rx="0.5" />
+                            <rect x="9"  y="3" width="2" height="18" rx="0.5" />
+                            <rect x="13" y="3" width="1" height="18" rx="0.5" />
+                            <rect x="16" y="3" width="3" height="18" rx="0.5" />
+                            <rect x="21" y="3" width="1" height="18" rx="0.5" />
                           </svg>
                         </button>
                       </div>
@@ -1179,15 +1187,13 @@ export function TicketForm({
       </div>
     </Modal>
     {scanningProductIdx !== null && (
-      <Suspense fallback={null}>
-        <BarcodeScanner
-          onScan={(value) => {
-            updateProduct(scanningProductIdx, 'serial_number', value)
-            setScanningProductIdx(null)
-          }}
-          onClose={() => setScanningProductIdx(null)}
-        />
-      </Suspense>
+      <BarcodeScanner
+        onScan={(value) => {
+          updateProduct(scanningProductIdx, 'serial_number', value)
+          setScanningProductIdx(null)
+        }}
+        onClose={() => setScanningProductIdx(null)}
+      />
     )}
     </>
   )
