@@ -273,6 +273,13 @@ export default function App() {
         setResetPasswordMode(true)
         setLoading(false)
       }
+      if (event === 'SIGNED_OUT') {
+        setCurrentUser(null)
+        setCurrentUserRole(null)
+        setCurrentUserPermissions(null)
+        setMfaPending(null)
+        navigate('/')
+      }
     })
     return () => subscription?.unsubscribe()
     // eslint-disable-next-line react-hooks/exhaustive-deps
