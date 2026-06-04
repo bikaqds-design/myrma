@@ -518,14 +518,6 @@ export default function App() {
     [navigate]
   )
 
-  const handleCmdSelectCustomer = useCallback(
-    (customer) => {
-      navigate(`/customers/${customer.id}`)
-      setSidebarOpen(false)
-    },
-    [navigate]
-  )
-
   const handleCmdSelectProduct = useCallback(
     (product) => {
       navigate(`/products/${product.id}`)
@@ -625,7 +617,6 @@ export default function App() {
           open={cmdPaletteOpen}
           onClose={() => setCmdPaletteOpen(false)}
           onSelectTicket={handleCmdSelectTicket}
-          onSelectCustomer={handleCmdSelectCustomer}
           onSelectProduct={handleCmdSelectProduct}
         />
       </Suspense>
