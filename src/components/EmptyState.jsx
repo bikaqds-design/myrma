@@ -5,7 +5,7 @@ const PRESETS = {
   tickets: {
     icon: (
       <svg
-        className="w-10 h-10 text-gray-300"
+        className="w-10 h-10 text-[#a09d99] dark:text-[#4a5568]"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -24,7 +24,7 @@ const PRESETS = {
   customers: {
     icon: (
       <svg
-        className="w-10 h-10 text-gray-300"
+        className="w-10 h-10 text-[#a09d99] dark:text-[#4a5568]"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -43,7 +43,7 @@ const PRESETS = {
   products: {
     icon: (
       <svg
-        className="w-10 h-10 text-gray-300"
+        className="w-10 h-10 text-[#a09d99] dark:text-[#4a5568]"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -62,7 +62,7 @@ const PRESETS = {
   inventory: {
     icon: (
       <svg
-        className="w-10 h-10 text-gray-300"
+        className="w-10 h-10 text-[#a09d99] dark:text-[#4a5568]"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -81,7 +81,7 @@ const PRESETS = {
   search: {
     icon: (
       <svg
-        className="w-10 h-10 text-gray-300"
+        className="w-10 h-10 text-[#a09d99] dark:text-[#4a5568]"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -118,13 +118,13 @@ export default function EmptyState({
       className={`flex flex-col items-center justify-center py-16 px-6 text-center ${className}`}
     >
       {resolvedIcon && (
-        <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-4">
+        <div className="w-16 h-16 rounded-2xl bg-[#f8f9fb] dark:bg-[#0f1520] flex items-center justify-center mb-4 [&_svg]:text-[#a09d99] [&_svg]:dark:text-[#4a5568]">
           {resolvedIcon}
         </div>
       )}
-      <p className="text-sm font-semibold text-gray-700 mb-1">{resolvedTitle}</p>
+      <p className="text-sm font-semibold text-[#211f1b] dark:text-[#e8ebf0] mb-1">{resolvedTitle}</p>
       {resolvedDescription && (
-        <p className="text-sm text-gray-500 max-w-xs">{resolvedDescription}</p>
+        <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2] max-w-xs">{resolvedDescription}</p>
       )}
       {action && actionLabel && (
         <Button className="mt-5" onClick={action}>
