@@ -336,6 +336,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
       setCurrentSessionId(cid)
     } catch (err) {
       captureException(err, { page: 'AccountSettings', context: 'loadSessions' })
+      toast.error(`Failed to load sessions: ${err.message}`)
       setSessions([])
     } finally {
       setSessionsLoading(false)
