@@ -23,6 +23,7 @@ import {
   fmtBytes,
   isImage,
 } from './_utils'
+import { ProductSearchInput } from './_shared'
 
 const inp =
   'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm bg-white placeholder-gray-400 transition-colors'
@@ -91,6 +92,10 @@ export function TicketForm({
   )
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
   const [scanningProductIdx, setScanningProductIdx] = useState(null)
+
+  const EMPTY_RES = { type: '', replacement_product_name: '', replacement_serial: '', amount: '', currency: 'USD', reason: '', reference_number: '' }
+  const [resForm, setResForm] = useState(EMPTY_RES)
+  const [existingResolutionId, setExistingResolutionId] = useState(null)
   const [productSearches, setProductSearches] = useState(() => {
     if (editingTicket) {
       const prods = editingTicket.products?.length ? editingTicket.products : [{ ...EMPTY_PRODUCT }]
@@ -117,6 +122,25 @@ export function TicketForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userEmail])
+
+  // Load existing resolution when editing
+  useEffect(() => {
+    if (!editingTicket?.id) return
+    db.ticketResolutions.get(editingTicket.id).then((res) => {
+      if (res) {
+        setExistingResolutionId(res.id)
+        setResForm({
+          type: res.type,
+          replacement_product_name: res.replacement_product_name || '',
+          replacement_serial: res.replacement_serial || '',
+          amount: res.amount != null ? String(res.amount) : '',
+          currency: res.currency || 'USD',
+          reason: res.reason || '',
+          reference_number: res.reference_number || '',
+        })
+      }
+    }).catch(() => {})
+  }, [editingTicket?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const handler = (e) => {
@@ -527,6 +551,21 @@ export function TicketForm({
           )
           .catch(() => {})
         toast.success('Ticket created successfully!')
+      }
+
+      // Save resolution if type is selected
+      const savedTicketId = editingTicket?.id || newTicket?.id
+      if (savedTicketId && resForm.type) {
+        db.ticketResolutions.upsert(savedTicketId, {
+          type: resForm.type,
+          replacement_product_name: resForm.replacement_product_name?.trim() || null,
+          replacement_serial: resForm.replacement_serial?.trim() || null,
+          amount: resForm.amount !== '' ? parseFloat(resForm.amount) : null,
+          currency: resForm.currency || 'USD',
+          reason: resForm.reason?.trim() || null,
+          reference_number: resForm.reference_number?.trim() || null,
+          created_by: userEmail,
+        }).catch(() => {})
       }
 
       queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
@@ -1176,6 +1215,97 @@ export function TicketForm({
                     accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
                   />
                 </label>
+              )}
+            </div>
+          </div>
+
+          {/* ── Resolution ── */}
+          <div className="border-t border-gray-200 pt-5 px-6 pb-2">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Resolution <span className="text-gray-400 font-normal normal-case">(optional)</span></h3>
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <label className={lbl}>Type</label>
+                <select
+                  value={resForm.type}
+                  onChange={(e) => setResForm(f => ({ ...f, type: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600"
+                >
+                  <option value="">— None —</option>
+                  <option value="replacement">Replacement</option>
+                  <option value="exchange">Exchange</option>
+                  <option value="credit_note">Credit Note</option>
+                  <option value="refund">Refund</option>
+                </select>
+              </div>
+
+              {(resForm.type === 'replacement' || resForm.type === 'exchange') && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={lbl}>Replacement Product</label>
+                    <ProductSearchInput
+                      value={resForm.replacement_product_name}
+                      onChange={(v) => setResForm(f => ({ ...f, replacement_product_name: v }))}
+                      products={products}
+                      placeholder="Search or type product…"
+                      inputClassName="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600"
+                    />
+                  </div>
+                  <div>
+                    <label className={lbl}>Replacement Serial</label>
+                    <input
+                      value={resForm.replacement_serial}
+                      onChange={(e) => setResForm(f => ({ ...f, replacement_serial: e.target.value }))}
+                      placeholder="Serial number"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600 font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {(resForm.type === 'credit_note' || resForm.type === 'refund') && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={lbl}>Amount</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={resForm.currency}
+                        onChange={(e) => setResForm(f => ({ ...f, currency: e.target.value }))}
+                        className="w-20 px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600"
+                      >
+                        {['USD','EUR','GBP','AED','SAR','EGP'].map(c => <option key={c}>{c}</option>)}
+                      </select>
+                      <input
+                        type="number" min="0" step="0.01"
+                        value={resForm.amount}
+                        onChange={(e) => setResForm(f => ({ ...f, amount: e.target.value }))}
+                        placeholder="0.00"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={lbl}>Reference #</label>
+                    <input
+                      value={resForm.reference_number}
+                      onChange={(e) => setResForm(f => ({ ...f, reference_number: e.target.value }))}
+                      placeholder="Invoice / credit note #"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {resForm.type && (
+                <div>
+                  <label className={lbl}>Reason / Notes</label>
+                  <textarea
+                    rows={2}
+                    value={resForm.reason}
+                    onChange={(e) => setResForm(f => ({ ...f, reason: e.target.value }))}
+                    placeholder="Optional notes"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600 resize-none"
+                  />
+                </div>
               )}
             </div>
           </div>

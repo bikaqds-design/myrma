@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { db, storage, notifications } from '../../api/supabaseClient'
+import { ProductSearchInput } from './_shared'
 import toast from 'react-hot-toast'
 import Modal from '../../components/Modal'
 import { Button, Spinner } from '../../components/ui'
@@ -24,6 +26,9 @@ export function TicketDrawer({
   userRole,
   userPermissions,
 }) {
+  const queryClient = useQueryClient()
+  const products = queryClient.getQueryData(['products']) || []
+
   const canDo = (action) => {
     if (userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN) return true
     return userPermissions?.rma_tickets?.[action] === true
@@ -785,11 +790,12 @@ export function TicketDrawer({
                   <>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">Replacement Product</label>
-                      <input
+                      <ProductSearchInput
                         value={resForm.replacement_product_name}
-                        onChange={(e) => setResForm(f => ({ ...f, replacement_product_name: e.target.value }))}
-                        placeholder="Product name or model"
-                        className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568]"
+                        onChange={(v) => setResForm(f => ({ ...f, replacement_product_name: v }))}
+                        products={products}
+                        placeholder="Search or type product name…"
+                        inputClassName="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568] outline-none focus:border-indigo-400"
                       />
                     </div>
                     <div>
