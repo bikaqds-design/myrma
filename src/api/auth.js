@@ -70,12 +70,12 @@ export const auth = {
     async list() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) throw new Error('Not authenticated')
-      // Extract current session ID from JWT claims
       const payload = JSON.parse(atob(session.access_token.split('.')[1]))
       const { data, error } = await supabase.functions.invoke('manage-sessions', {
         body: { action: 'list' },
       })
-      if (error) throw error
+      if (error) throw new Error(data?.error || error.message)
+      if (data?.error) throw new Error(data.error)
       return { sessions: data.sessions ?? [], currentSessionId: payload.session_id ?? null }
     },
     async revoke(sessionId) {

@@ -45,11 +45,13 @@ serve(async (req: Request) => {
   // ── LIST ─────────────────────────────────────────────────────────────────
   if (body.action === 'list') {
     const res = await fetch(`${adminBase}/sessions`, { headers: adminHeaders })
+    const text = await res.text()
+    console.log(`GoTrue sessions ${res.status}:`, text)
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      return json({ error: err.message || 'Failed to list sessions' }, res.status)
+      return json({ error: `GoTrue ${res.status}: ${text}` }, 400)
     }
-    const data = await res.json()
+    let data: { sessions?: unknown[] } = {}
+    try { data = JSON.parse(text) } catch { return json({ error: `Bad JSON: ${text}` }, 500) }
     return json({ sessions: data.sessions ?? [] })
   }
 
