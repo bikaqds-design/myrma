@@ -1,9 +1,15 @@
 /* RTL layout overrides for Arabic */
 
-/* Sidebar: on mobile it's fixed; flip position to right side */
+/* Mobile only: sidebar is fixed; flip from left edge to right edge */
+@media (max-width: 1023px) {
+  [dir="rtl"] #app-sidebar {
+    left: auto !important;
+    right: 0;
+  }
+}
+
+/* Flip the border from right side to left side in RTL */
 [dir="rtl"] #app-sidebar {
-  left: auto !important;
-  right: 0;
   border-right: 0 !important;
   border-left: 1px solid #e6e9ef;
 }
@@ -12,9 +18,11 @@
   border-left-color: #212a38;
 }
 
-/* Flip the mobile slide animation: hide to the right instead of left */
-[dir="rtl"] #app-sidebar.-translate-x-full {
-  transform: translateX(100%) !important;
+/* Mobile only: flip the slide animation to hide off the right edge */
+@media (max-width: 1023px) {
+  [dir="rtl"] #app-sidebar.-translate-x-full {
+    transform: translateX(100%) !important;
+  }
 }
 
 /* Sidebar rounded corners: flip to left side in RTL */
