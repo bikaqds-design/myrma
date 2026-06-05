@@ -26,19 +26,19 @@ serve(async (req) => {
 
     const { context_type, data } = await req.json()
 
-    const groqKey = Deno.env.get('GROQ_API_KEY')
-    if (!groqKey) throw new Error('GROQ_API_KEY not configured in Supabase secrets')
+    const nvidiaKey = Deno.env.get('NVIDIA_API_KEY')
+    if (!nvidiaKey) throw new Error('NVIDIA_API_KEY not configured in Supabase secrets')
 
     const { systemPrompt, userPrompt } = buildPrompt(context_type, data)
 
-    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const resp = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${groqKey}`,
+        'Authorization': `Bearer ${nvidiaKey}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'meta/llama-3.3-70b-instruct',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
@@ -51,12 +51,12 @@ serve(async (req) => {
 
     if (!resp.ok) {
       const errText = await resp.text()
-      throw new Error(`Groq error ${resp.status}: ${errText}`)
+      throw new Error(`NVIDIA error ${resp.status}: ${errText}`)
     }
 
-    const groqResult = await resp.json()
-    const raw = groqResult.choices?.[0]?.message?.content
-    if (!raw) throw new Error('Empty response from Groq')
+    const nvidiaResult = await resp.json()
+    const raw = nvidiaResult.choices?.[0]?.message?.content
+    if (!raw) throw new Error('Empty response from NVIDIA')
 
     const parsed = JSON.parse(raw)
 
