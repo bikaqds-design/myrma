@@ -62,8 +62,10 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
+    // Return 200 so the JS client passes the body through as `data` instead of
+    // wrapping it in a generic FunctionsHttpError with no detail.
     return new Response(JSON.stringify({ error: (err as Error).message }), {
-      status: 400,
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
