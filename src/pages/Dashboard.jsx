@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, supabase } from '../api/supabaseClient'
+import AIAssist from '../components/AIAssist'
 import { safeStorage } from '../lib/safeStorage'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { Spinner } from '../components/ui'
@@ -388,6 +389,18 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
     (statusCounts[TICKET_STATUS.PENDING] || 0) + (statusCounts[TICKET_STATUS.ON_HOLD] || 0)
   const sparkWeekly = weeklyTrend.map((d) => d.tickets)
 
+  const dashboardAIData = useMemo(() => ({
+    range,
+    open: statusCounts[TICKET_STATUS.OPEN] || 0,
+    in_progress: statusCounts[TICKET_STATUS.IN_PROGRESS] || 0,
+    pending: statusCounts[TICKET_STATUS.PENDING] || 0,
+    overdue: overdueList.length,
+    resolved: closedTickets,
+    total: totalTickets,
+    sla_percent: slaPercent,
+    resolution_rate: resolutionPercent,
+  }), [range, statusCounts, overdueList.length, closedTickets, totalTickets, slaPercent, resolutionPercent])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -422,6 +435,8 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
           ))}
         </div>
       </div>
+
+      <AIAssist contextType="dashboard" data={dashboardAIData} className="mb-5" />
 
       {!hasWidgets && (
         <div style={{ background: tk.surface, border: `2px dashed ${tk.border}`, borderRadius: 14, padding: '56px 0', textAlign: 'center' }}>

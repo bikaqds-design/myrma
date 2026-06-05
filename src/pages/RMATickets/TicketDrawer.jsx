@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { db, storage, notifications } from '../../api/supabaseClient'
 import { ProductSearchInput } from './_shared'
+import AIAssist from '../../components/AIAssist'
 import toast from 'react-hot-toast'
 import Modal from '../../components/Modal'
 import { Button, Spinner } from '../../components/ui'
@@ -270,6 +271,10 @@ export function TicketDrawer({
             <p className="text-sm font-mono text-indigo-600 mt-0.5">{ticket.rma_number}</p>
           </div>
           <div className="flex items-center gap-2">
+            <AIAssist
+              contextType="ticket"
+              data={{ ...ticket, comments: ticketComments }}
+            />
             <button
               onClick={() => onExportPDF(ticket)}
               className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
