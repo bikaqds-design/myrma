@@ -5,15 +5,21 @@ import toast from 'react-hot-toast'
 
 const TOTAL = 5
 
-function ProgressBar({ step }) {
+function ProgressBar({ step, onDismiss }) {
   return (
-    <div className="flex items-center gap-3 px-6 pt-5 pb-4">
+    <div className="flex items-center gap-3 px-5 pt-4 pb-3">
       <span className="text-xs font-semibold text-[#4338ca] dark:text-[#a5b4fc] flex-shrink-0">Step {step}</span>
       <div className="flex items-center gap-1.5 flex-1">
         {Array.from({ length: TOTAL }).map((_, i) => (
           <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${i < step ? 'bg-[#4338ca] dark:bg-[#a5b4fc]' : 'bg-[#e6e9ef] dark:bg-[#212a38]'}`} />
         ))}
       </div>
+      <button onClick={onDismiss} aria-label="Dismiss wizard"
+        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230] transition-colors">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
     </div>
   )
 }
@@ -86,15 +92,7 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
       <div className="absolute inset-0 bg-black/60" onClick={dismiss} />
       <div className="relative w-full max-w-md bg-white dark:bg-[#121823] rounded-2xl shadow-2xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden">
 
-        {/* Close */}
-        <button onClick={dismiss} aria-label="Dismiss wizard"
-          className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-lg text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230] transition-colors z-10">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        <ProgressBar step={step} />
+        <ProgressBar step={step} onDismiss={dismiss} />
 
         <div className="px-6 pb-6">
 
