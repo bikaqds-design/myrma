@@ -1134,7 +1134,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               }}
               className="text-sm text-red-600 hover:underline"
             >
-              Clear all
+              {t('tickets.clearFilters')}
             </button>
           )}
         </div>
@@ -1145,8 +1145,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         <div className="mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex items-center gap-2">
           <span>⚠️</span>
           <span>
-            Showing first <strong>{tickets.length}</strong> of <strong>{ticketsTotalCount}</strong>{' '}
-            tickets. Use filters or search to find specific tickets.
+            {t('tickets.capWarning', { shown: tickets.length, total: ticketsTotalCount })}
           </span>
         </div>
       )}
@@ -1154,8 +1153,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       {/* Pagination top bar */}
       <div className="flex items-center justify-between text-sm text-gray-600">
         <div>
-          Showing {filteredTickets.length === 0 ? 0 : startIndex + 1}–{endIndex} of{' '}
-          {filteredTickets.length} tickets
+          {t('tickets.showingRange', { from: filteredTickets.length === 0 ? 0 : startIndex + 1, to: endIndex, total: filteredTickets.length })}
         </div>
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-600">{t('common.itemsPerPage')}:</label>
@@ -1182,13 +1180,13 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             <span className="w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
               {selectedTickets.length}
             </span>
-            ticket{selectedTickets.length !== 1 ? 's' : ''} selected
+            {t('tickets.selected')}
           </div>
           <button
             onClick={() => setSelectedTickets([])}
             className="text-xs text-indigo-500 hover:text-indigo-700 underline"
           >
-            Clear
+            {t('tickets.deselect')}
           </button>
           <div className="h-5 w-px bg-indigo-200 hidden sm:block" />
 
@@ -1200,7 +1198,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 onChange={(e) => setBulkTicketStatus(e.target.value)}
                 className="px-2.5 py-1.5 border border-indigo-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
-                <option value="">Ticket Status…</option>
+                <option value="">{t('tickets.ticketStatusPlaceholder')}</option>
                 <option>New</option>
                 <option>In Progress</option>
                 <option>On Hold</option>
@@ -1212,7 +1210,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 disabled={!bulkTicketStatus || bulkProcessing}
                 className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-40 transition-colors"
               >
-                Apply
+                {t('common.apply')}
               </button>
             </div>
           )}
@@ -1225,7 +1223,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 onChange={(e) => setBulkProductStatus(e.target.value)}
                 className="px-2.5 py-1.5 border border-indigo-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
-                <option value="">Product Status…</option>
+                <option value="">{t('tickets.productStatusPlaceholder')}</option>
                 <option>Received</option>
                 <option>Under Repair</option>
                 <option>Repaired</option>
@@ -1238,7 +1236,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 disabled={!bulkProductStatus || bulkProcessing}
                 className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-40 transition-colors"
               >
-                Apply
+                {t('common.apply')}
               </button>
             </div>
           )}
@@ -1269,7 +1267,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                     />
                   </svg>
                 )}
-                Delete Selected
+                {t('tickets.deleteSelected')}
               </button>
             </>
           )}
@@ -1473,7 +1471,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                             d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                           />
                         </svg>
-                        View
+                        {t('common.view')}
                       </button>
                       {(canDo('edit_all') || canDo('edit_assigned')) && (
                         <button
@@ -1496,7 +1494,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                               d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                             />
                           </svg>
-                          Edit
+                          {t('common.edit')}
                         </button>
                       )}
                       <button
@@ -1519,7 +1517,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                             d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                           />
                         </svg>
-                        Export PDF
+                        {t('tickets.exportPDF')}
                       </button>
                       {canDo('delete') && (
                         <button
@@ -1542,7 +1540,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                               d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                             />
                           </svg>
-                          Delete
+                          {t('common.delete')}
                         </button>
                       )}
                     </div>
@@ -1579,7 +1577,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               disabled={currentPage === 1}
               className="px-3 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Previous
+              {t('common.previous')}
             </button>
             <div className="flex items-center gap-1">{renderPageNumbers()}</div>
             <button
@@ -1587,11 +1585,11 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               disabled={currentPage === totalPages}
               className="px-3 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Next
+              {t('common.next')}
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Jump to page:</span>
+            <span className="text-sm text-gray-600">{t('common.jumpToPage')}:</span>
             <input
               type="number"
               min="1"
@@ -1606,7 +1604,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               onClick={handleJumpToPage}
               className="px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
             >
-              Go
+              {t('common.go')}
             </button>
           </div>
         </div>

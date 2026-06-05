@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 const BarcodeScannerModule = lazy(() => import('../../components/BarcodeScanner'))
 const BarcodeScanner = (props) => (
@@ -41,6 +42,7 @@ export function TicketForm({
   userRole,
   userPermissions,
 }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
 
   const canDo = (action) => {
@@ -594,11 +596,11 @@ export function TicketForm({
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
           <div>
             <h2 className="text-xl font-bold text-gray-900">
-              {editingTicket ? 'Edit RMA Ticket' : 'Create New RMA Ticket'}
+              {editingTicket ? t('ticketForm.editTitle') : t('ticketForm.createTitle')}
             </h2>
             <div className="flex items-center gap-3 mt-1">
               <p className="text-xs text-gray-500">
-                <span className="text-red-500">*</span> Required fields
+                <span className="text-red-500">*</span> {t('ticketForm.requiredFields')}
               </p>
               {!editingTicket && (
                 <span className="text-xs font-mono font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
@@ -633,7 +635,7 @@ export function TicketForm({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={lbl}>
-                  Customer Name <span className="text-red-500">*</span>
+                  {t('ticketForm.customerName')} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative customer-dropdown">
                   <input
@@ -645,7 +647,7 @@ export function TicketForm({
                       setShowCustomerDropdown(true)
                     }}
                     onFocus={() => setShowCustomerDropdown(true)}
-                    placeholder="Search customer..."
+                    placeholder={t('ticketForm.searchCustomer')}
                     className={inp}
                     required
                   />
@@ -716,7 +718,7 @@ export function TicketForm({
               </div>
               <div>
                 <label className={lbl}>
-                  Priority <span className="text-red-500">*</span>
+                  {t('ticketForm.priority')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.priority}
@@ -734,7 +736,7 @@ export function TicketForm({
             {/* Row 2: Status + Assigned To + Due Date */}
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className={lbl}>Ticket Status</label>
+                <label className={lbl}>{t('ticketForm.ticketStatus')}</label>
                 <select
                   value={formData.ticket_status}
                   onChange={(e) => setFormData({ ...formData, ticket_status: e.target.value })}
@@ -750,7 +752,7 @@ export function TicketForm({
                 </select>
               </div>
               <div>
-                <label className={lbl}>Assigned To</label>
+                <label className={lbl}>{t('ticketForm.assignedTo')}</label>
                 {userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN ? (
                   <select
                     value={formData.assigned_technician}
@@ -773,8 +775,8 @@ export function TicketForm({
               </div>
               <div>
                 <label className={lbl}>
-                  Due Date{' '}
-                  <span className="text-xs text-gray-500 font-normal ml-1">auto +7 days</span>
+                  {t('ticketForm.dueDate')}{' '}
+                  <span className="text-xs text-gray-500 font-normal ml-1">{t('ticketForm.dueDateHint')}</span>
                 </label>
                 <input
                   type="date"
@@ -788,13 +790,13 @@ export function TicketForm({
             {/* Products */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-base font-semibold text-gray-900">Products</h3>
+                <h3 className="text-base font-semibold text-gray-900">{t('ticketForm.products')}</h3>
                 <button
                   type="button"
                   onClick={addProduct}
                   className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
                 >
-                  + Add Product
+                  + {t('ticketForm.addProduct')}
                 </button>
               </div>
               {formData.products.map((product, idx) => (
@@ -803,14 +805,14 @@ export function TicketForm({
                   className="border border-gray-200 rounded-xl p-4 mb-4 bg-gray-50"
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-800 text-sm">Product {idx + 1}</h4>
+                    <h4 className="font-medium text-gray-800 text-sm">{t('ticketForm.productLabel')} {idx + 1}</h4>
                     {formData.products.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeProduct(idx)}
                         className="text-red-500 hover:text-red-700 text-xs font-medium"
                       >
-                        Remove
+                        {t('ticketForm.remove')}
                       </button>
                     )}
                   </div>
@@ -818,7 +820,7 @@ export function TicketForm({
                     {/* Product name combobox */}
                     <div>
                       <label className={lbl}>
-                        Product Name <span className="text-red-500">*</span>
+                        {t('ticketForm.productName')} <span className="text-red-500">*</span>
                       </label>
                       <div className="relative product-dropdown">
                         <input
@@ -838,7 +840,7 @@ export function TicketForm({
                             d[idx] = true
                             setShowProductDropdowns(d)
                           }}
-                          placeholder="Search or type product..."
+                          placeholder={t('ticketForm.searchProduct')}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-sm bg-white"
                           required
                         />
@@ -876,7 +878,7 @@ export function TicketForm({
                     </div>
                     <div>
                       <label className={lbl}>
-                        Serial Number <span className="text-red-500">*</span>
+                        {t('ticketForm.serialNumber')} <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
                         <input
@@ -910,7 +912,7 @@ export function TicketForm({
                       </div>
                     </div>
                     <div>
-                      <label className={lbl}>Product Status</label>
+                      <label className={lbl}>{t('ticketForm.productStatus')}</label>
                       <select
                         value={product.product_status}
                         onChange={(e) => updateProduct(idx, 'product_status', e.target.value)}
@@ -925,7 +927,7 @@ export function TicketForm({
                       </select>
                     </div>
                     <div>
-                      <label className={lbl}>Warranty Status</label>
+                      <label className={lbl}>{t('ticketForm.warrantyStatus')}</label>
                       <select
                         value={product.warranty_status}
                         onChange={(e) => updateProduct(idx, 'warranty_status', e.target.value)}
@@ -939,7 +941,7 @@ export function TicketForm({
                   </div>
                   <div className="mt-3">
                     <label className={lbl}>
-                      Issue Description <span className="text-red-500">*</span>
+                      {t('ticketForm.issueDescription')} <span className="text-red-500">*</span>
                     </label>
                     <textarea
                       value={product.issue_description}
@@ -955,13 +957,13 @@ export function TicketForm({
 
             {/* General RMA Description */}
             <div>
-              <label className={lbl}>General RMA Description</label>
+              <label className={lbl}>{t('ticketForm.generalDescription')}</label>
               <textarea
                 value={formData.general_description}
                 onChange={(e) =>
                   setFormData({ ...formData, general_description: e.target.value })
                 }
-                placeholder="General description for the RMA ticket (optional)..."
+                placeholder={t('ticketForm.generalDescPlaceholder')}
                 className={inp}
                 rows={3}
               />
@@ -969,13 +971,13 @@ export function TicketForm({
 
             {/* Accessories Received */}
             <div>
-              <label className={lbl}>Accessories Received</label>
+              <label className={lbl}>{t('ticketForm.accessories')}</label>
               <textarea
                 value={formData.accessories_received}
                 onChange={(e) =>
                   setFormData({ ...formData, accessories_received: e.target.value })
                 }
-                placeholder="List any accessories received with the device..."
+                placeholder={t('ticketForm.accessoriesPlaceholder')}
                 className={inp}
                 rows={3}
               />
@@ -984,11 +986,11 @@ export function TicketForm({
             {/* Shipping Information */}
             <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50/50">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Shipping Information
+                {t('ticketForm.shipping')}
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={lbl}>Carrier</label>
+                  <label className={lbl}>{t('ticketForm.carrier')}</label>
                   <select
                     value={formData.carrier}
                     onChange={(e) => setFormData((f) => ({ ...f, carrier: e.target.value }))}
@@ -1002,7 +1004,7 @@ export function TicketForm({
                   </select>
                 </div>
                 <div>
-                  <label className={lbl}>Tracking Number</label>
+                  <label className={lbl}>{t('ticketForm.trackingNumber')}</label>
                   <input
                     type="text"
                     value={formData.tracking_number}
@@ -1016,8 +1018,8 @@ export function TicketForm({
               </div>
               <div>
                 <label className={lbl}>
-                  Shipping Label URL{' '}
-                  <span className="text-gray-500 font-normal">(optional)</span>
+                  {t('ticketForm.shippingLabel')}{' '}
+                  <span className="text-gray-500 font-normal">({t('common.optional')})</span>
                 </label>
                 <input
                   type="url"
@@ -1057,7 +1059,7 @@ export function TicketForm({
             {/* Attachments */}
             <div>
               <label className={lbl}>
-                Attachments
+                {t('ticketForm.attachments')}
                 <span className="text-xs text-gray-500 font-normal ml-2">
                   ({(formData.attachments?.length || 0) + pendingFiles.length}/10)
                 </span>
@@ -1220,10 +1222,10 @@ export function TicketForm({
 
           {/* ── Resolution ── */}
           <div className="border-t border-gray-200 pt-5">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Resolution <span className="text-gray-400 font-normal normal-case">(optional)</span></h3>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">{t('ticketForm.resolution')} <span className="text-gray-400 font-normal normal-case">({t('common.optional')})</span></h3>
             <div className="grid grid-cols-1 gap-3">
               <div>
-                <label className={lbl}>Type</label>
+                <label className={lbl}>{t('ticketForm.resolutionType')}</label>
                 <select
                   value={resForm.type}
                   onChange={(e) => setResForm(f => ({ ...f, type: e.target.value }))}
@@ -1240,7 +1242,7 @@ export function TicketForm({
               {(resForm.type === 'replacement' || resForm.type === 'exchange') && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className={lbl}>Replacement Product</label>
+                    <label className={lbl}>{t('ticketForm.replacementProduct')}</label>
                     <ProductSearchInput
                       value={resForm.replacement_product_name}
                       onChange={(v) => setResForm(f => ({ ...f, replacement_product_name: v }))}
@@ -1250,7 +1252,7 @@ export function TicketForm({
                     />
                   </div>
                   <div>
-                    <label className={lbl}>Replacement Serial</label>
+                    <label className={lbl}>{t('ticketForm.replacementSerial')}</label>
                     <input
                       value={resForm.replacement_serial}
                       onChange={(e) => setResForm(f => ({ ...f, replacement_serial: e.target.value }))}
@@ -1264,7 +1266,7 @@ export function TicketForm({
               {(resForm.type === 'credit_note' || resForm.type === 'refund') && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className={lbl}>Amount</label>
+                    <label className={lbl}>{t('ticketForm.amount')}</label>
                     <div className="flex gap-2">
                       <select
                         value={resForm.currency}
@@ -1283,7 +1285,7 @@ export function TicketForm({
                     </div>
                   </div>
                   <div>
-                    <label className={lbl}>Reference #</label>
+                    <label className={lbl}>{t('ticketForm.referenceNumber')}</label>
                     <input
                       value={resForm.reference_number}
                       onChange={(e) => setResForm(f => ({ ...f, reference_number: e.target.value }))}
@@ -1296,7 +1298,7 @@ export function TicketForm({
 
               {resForm.type && (
                 <div>
-                  <label className={lbl}>Reason / Notes</label>
+                  <label className={lbl}>{t('ticketForm.reason')}</label>
                   <textarea
                     rows={2}
                     value={resForm.reason}
@@ -1318,10 +1320,10 @@ export function TicketForm({
               className="flex-1 justify-center"
               onClick={onClose}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" loading={uploading} className="flex-1 justify-center">
-              {editingTicket ? 'Update Ticket' : 'Create Ticket'}
+              {editingTicket ? t('ticketForm.updateTicket') : t('ticketForm.createTicket')}
             </Button>
           </div>
         </form>

@@ -938,7 +938,7 @@ export default function Customers({
                         d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                       />
                     </svg>
-                    Delete ({selectedCustomers.length})
+                    {t('common.delete')} ({selectedCustomers.length})
                   </button>
                   <select
                     onChange={(e) => {
@@ -950,7 +950,7 @@ export default function Customers({
                     defaultValue=""
                     className="px-4 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
                   >
-                    <option value="">Change Status…</option>
+                    <option value="">{t('customers.changeStatus')}</option>
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
                     <option value="Suspended">Suspended</option>
@@ -970,7 +970,7 @@ export default function Customers({
                       d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  Export
+                  {t('common.export')}
                 </button>
               )}
               {canDo('create') && (
@@ -1029,8 +1029,8 @@ export default function Customers({
                           />
                         </svg>
                         <div>
-                          <div className="font-medium text-gray-900 dark:text-[#e8ebf0]">Add Single Customer</div>
-                          <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">Create one customer</div>
+                          <div className="font-medium text-gray-900 dark:text-[#e8ebf0]">{t('customers.addSingleCustomer')}</div>
+                          <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('customers.createOneCustomer')}</div>
                         </div>
                       </button>
                       {canDo('import') && (
@@ -1055,8 +1055,8 @@ export default function Customers({
                             />
                           </svg>
                           <div>
-                            <div className="font-medium text-gray-900 dark:text-[#e8ebf0]">Bulk Add / Upload</div>
-                            <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">Upload CSV file</div>
+                            <div className="font-medium text-gray-900 dark:text-[#e8ebf0]">{t('customers.bulkImport')}</div>
+                            <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('customers.importFromCSV')}</div>
                           </div>
                         </button>
                       )}
@@ -1071,37 +1071,37 @@ export default function Customers({
           {showFilters && (
             <div id="customer-filters-panel" className="flex flex-wrap gap-3 items-center p-4 bg-gray-50 dark:bg-[#0f1520] rounded-lg">
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">Status:</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('common.status')}:</label>
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
                   className="px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm"
                 >
-                  <option value="">All</option>
+                  <option value="">{t('common.all')}</option>
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
                   <option value="Suspended">Suspended</option>
                 </select>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">Type:</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('common.type')}:</label>
                 <select
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value)}
                   className="px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm"
                 >
-                  <option value="">All</option>
+                  <option value="">{t('common.all')}</option>
                   <option value="B2B">B2B</option>
                   <option value="B2C">B2C</option>
                 </select>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">Company / Contact:</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('customers.contactCompany')}:</label>
                 <input
                   type="text"
                   value={filterCompany}
                   onChange={(e) => setFilterCompany(e.target.value)}
-                  placeholder="Type to filter…"
+                  placeholder={t('customers.filterPlaceholder')}
                   className="px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm w-44 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
@@ -1114,7 +1114,7 @@ export default function Customers({
                   }}
                   className="text-sm text-red-600 hover:underline"
                 >
-                  Clear
+                  {t('common.clearAll')}
                 </button>
               )}
             </div>
@@ -1125,9 +1125,7 @@ export default function Customers({
             <div className="mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex items-center gap-2">
               <span>⚠️</span>
               <span>
-                Showing first <strong>{customers.length}</strong> of{' '}
-                <strong>{customersTotalCount}</strong> customers. Use filters or search to find
-                specific records.
+                {t('customers.capWarning', { shown: customers.length, total: customersTotalCount })}
               </span>
             </div>
           )}
@@ -1135,8 +1133,7 @@ export default function Customers({
           {/* Count + per-page */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-gray-600 dark:text-[#9aa4b2]">
             <span>
-              Showing {filteredCustomers.length === 0 ? 0 : startIndex + 1}–{endIndex} of{' '}
-              {filteredCustomers.length} customers
+              {t('customers.showingRange', { from: filteredCustomers.length === 0 ? 0 : startIndex + 1, to: endIndex, total: filteredCustomers.length })}
             </span>
             <div className="flex items-center gap-2">
               <label className="text-sm text-gray-600 dark:text-[#9aa4b2]">{t('common.itemsPerPage')}:</label>
@@ -1317,7 +1314,7 @@ export default function Customers({
                                   d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                                 />
                               </svg>
-                              View
+                              {t('common.view')}
                             </button>
                             {canDo('edit') && (
                               <button
@@ -1340,7 +1337,7 @@ export default function Customers({
                                     d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                                   />
                                 </svg>
-                                Edit
+                                {t('common.edit')}
                               </button>
                             )}
                             {canDo('delete') && (
@@ -1364,7 +1361,7 @@ export default function Customers({
                                     d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                                   />
                                 </svg>
-                                Delete
+                                {t('common.delete')}
                               </button>
                             )}
                           </div>
@@ -1386,7 +1383,7 @@ export default function Customers({
                   disabled={currentPage === 1}
                   className="px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
-                  Previous
+                  {t('common.previous')}
                 </button>
                 <div className="flex items-center gap-1">{renderPageNumbers()}</div>
                 <button
@@ -1394,11 +1391,11 @@ export default function Customers({
                   disabled={currentPage === totalPages}
                   className="px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
-                  Next
+                  {t('common.next')}
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600 dark:text-[#9aa4b2]">Jump to page:</span>
+                <span className="text-sm text-gray-600 dark:text-[#9aa4b2]">{t('common.jumpToPage')}:</span>
                 <input
                   type="number"
                   min="1"
@@ -1413,7 +1410,7 @@ export default function Customers({
                   onClick={handleJumpToPage}
                   className="px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
                 >
-                  Go
+                  {t('common.go')}
                 </button>
               </div>
             </div>

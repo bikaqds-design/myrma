@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { db, storage, notifications } from '../../api/supabaseClient'
 import { ProductSearchInput } from './_shared'
@@ -26,6 +27,7 @@ export function TicketDrawer({
   userRole,
   userPermissions,
 }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const products = queryClient.getQueryData(['products']) || []
 
@@ -266,7 +268,7 @@ export function TicketDrawer({
       <div className="w-full">
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200 dark:border-[#212a38]">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-[#e8ebf0]">Ticket Details</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-[#e8ebf0]">{t('ticketDrawer.title')}</h2>
             <p className="text-sm font-mono text-indigo-600 mt-0.5">{ticket.rma_number}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -282,7 +284,7 @@ export function TicketDrawer({
                   d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              Export PDF
+              {t('ticketDrawer.exportPDF')}
             </button>
             <button
               onClick={onClose}
@@ -305,13 +307,13 @@ export function TicketDrawer({
           {/* Info grid */}
           <div>
             <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
-              Ticket Information
+              {t('ticketDrawer.ticketInfo')}
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {[
-                { label: 'Customer', value: ticket.customer_name },
+                { label: t('ticketDrawer.customer'), value: ticket.customer_name },
                 {
-                  label: 'Status',
+                  label: t('ticketDrawer.status'),
                   value: (
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(ticket.ticket_status)}`}
@@ -321,7 +323,7 @@ export function TicketDrawer({
                   ),
                 },
                 {
-                  label: 'Priority',
+                  label: t('ticketDrawer.priority'),
                   value: (
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(ticket.priority)}`}
@@ -331,12 +333,12 @@ export function TicketDrawer({
                   ),
                 },
                 {
-                  label: 'Assigned To',
-                  value: ticket.assigned_technician || 'Unassigned',
+                  label: t('ticketDrawer.assignedTo'),
+                  value: ticket.assigned_technician || t('ticketDrawer.unassigned'),
                 },
-                { label: 'Due Date', value: fmt(ticket.due_date) },
-                { label: 'Created', value: fmtDateTime(ticket.created_date) },
-                { label: 'Created By', value: ticket.created_by || '—' },
+                { label: t('ticketDrawer.dueDate'), value: fmt(ticket.due_date) },
+                { label: t('ticketDrawer.created'), value: fmtDateTime(ticket.created_date) },
+                { label: t('ticketDrawer.createdBy'), value: ticket.created_by || '—' },
               ].map(({ label, value }) => (
                 <div key={label}>
                   <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-1">{label}</p>
@@ -350,7 +352,7 @@ export function TicketDrawer({
           {ticket.general_description && (
             <div>
               <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
-                General RMA Description
+                {t('ticketDrawer.generalDescription')}
               </h3>
               <div className="bg-gray-50 dark:bg-[#0f1520] rounded-xl p-4 text-sm text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap">
                 {ticket.general_description}
@@ -361,16 +363,16 @@ export function TicketDrawer({
           {/* Products */}
           <div>
             <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
-              Products ({(ticket.products || []).length})
+              {t('ticketDrawer.products')} ({(ticket.products || []).length})
             </h3>
             {(ticket.products || []).map((p, i) => (
               <div key={i} className="border border-gray-200 dark:border-[#212a38] rounded-xl p-4 mb-3">
                 <h4 className="font-semibold text-gray-800 text-sm mb-3">
-                  Product {i + 1} — {p.product_name}
+                  {t('ticketDrawer.product')} {i + 1} — {p.product_name}
                 </h4>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">Serial Number</p>
+                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('ticketDrawer.serialNumber')}</p>
                     <div className="flex items-center gap-2">
                       <p className="font-mono font-medium">{p.serial_number || '—'}</p>
                       {p.serial_number && (
@@ -382,21 +384,21 @@ export function TicketDrawer({
                           }}
                           className="text-xs text-indigo-500 hover:text-indigo-700 underline"
                         >
-                          History
+                          {t('ticketDrawer.history')}
                         </button>
                       )}
                     </div>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">Product Status</p>
+                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('ticketDrawer.productStatus')}</p>
                     <p className="font-medium">{p.product_status}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">Warranty</p>
+                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('ticketDrawer.warranty')}</p>
                     <p className="font-medium">{p.warranty_status}</p>
                   </div>
                   <div className="col-span-2">
-                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">Issue Description</p>
+                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('ticketDrawer.issueDescription')}</p>
                     <p className="font-medium">{p.issue_description}</p>
                   </div>
                 </div>
@@ -409,7 +411,7 @@ export function TicketDrawer({
             <div className="border border-indigo-200 rounded-xl p-4 bg-indigo-50/50">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-xs font-semibold text-indigo-700 uppercase tracking-wider">
-                  Serial History — {serialHistorySerial}
+                  {t('ticketDrawer.serialHistory')} — {serialHistorySerial}
                 </h3>
                 <button
                   onClick={() => {
@@ -422,31 +424,31 @@ export function TicketDrawer({
                 </button>
               </div>
               <div className="space-y-2">
-                {serialHistory.map((t) => (
+                {serialHistory.map((sh) => (
                   <div
-                    key={t.id}
-                    className={`flex items-center justify-between p-2 bg-white dark:bg-[#121823] rounded-lg border text-xs ${t.id === ticket.id ? 'border-indigo-300' : 'border-gray-200 dark:border-[#212a38]'}`}
+                    key={sh.id}
+                    className={`flex items-center justify-between p-2 bg-white dark:bg-[#121823] rounded-lg border text-xs ${sh.id === ticket.id ? 'border-indigo-300' : 'border-gray-200 dark:border-[#212a38]'}`}
                   >
-                    <span className="font-mono font-medium text-indigo-700">{t.rma_number}</span>
-                    <span className="text-gray-600 dark:text-[#9aa4b2]">{t.customer_name}</span>
+                    <span className="font-mono font-medium text-indigo-700">{sh.rma_number}</span>
+                    <span className="text-gray-600 dark:text-[#9aa4b2]">{sh.customer_name}</span>
                     <span
-                      className={`px-2 py-0.5 rounded-full font-medium ${getStatusColor(t.ticket_status)}`}
+                      className={`px-2 py-0.5 rounded-full font-medium ${getStatusColor(sh.ticket_status)}`}
                     >
-                      {t.ticket_status}
+                      {sh.ticket_status}
                     </span>
                     <span className="text-gray-500 dark:text-[#9aa4b2]">
-                      {t.created_date ? new Date(t.created_date).toLocaleDateString() : '—'}
+                      {sh.created_date ? new Date(sh.created_date).toLocaleDateString() : '—'}
                     </span>
-                    {t.id !== ticket.id && (
+                    {sh.id !== ticket.id && (
                       <button
-                        onClick={() => onNavigateToTicket(t)}
+                        onClick={() => onNavigateToTicket(sh)}
                         className="text-indigo-500 hover:text-indigo-700 underline"
                       >
-                        Open
+                        {t('ticketDrawer.open')}
                       </button>
                     )}
-                    {t.id === ticket.id && (
-                      <span className="text-indigo-500 italic">Current</span>
+                    {sh.id === ticket.id && (
+                      <span className="text-indigo-500 italic">{t('ticketDrawer.current')}</span>
                     )}
                   </div>
                 ))}
@@ -459,10 +461,10 @@ export function TicketDrawer({
             <div className="border-t border-gray-200 dark:border-[#212a38] pt-5">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
-                  Time Tracking
+                  {t('ticketDrawer.timeTracking')}
                 </h3>
                 <span className="text-xs text-indigo-600 font-medium">
-                  Total:{' '}
+                  {t('ticketDrawer.total')}:{' '}
                   {Math.floor(
                     timeEntries.reduce((sum, e) => sum + (e.duration_min || 0), 0) / 60
                   )}
@@ -483,7 +485,7 @@ export function TicketDrawer({
                       <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M8 5v14l11-7z" />
                       </svg>
-                      Start Timer
+                      {t('ticketDrawer.startTimer')}
                     </button>
                   ) : (
                     <button
@@ -513,14 +515,14 @@ export function TicketDrawer({
                       <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                         <rect x="6" y="6" width="12" height="12" />
                       </svg>
-                      Stop &amp; Save
+                      {t('ticketDrawer.stopSave')}
                     </button>
                   )}
                   {timerRunning && (
                     <input
                       value={timerNotes}
                       onChange={(e) => setTimerNotes(e.target.value)}
-                      placeholder="Timer notes (optional)"
+                      placeholder={t('ticketDrawer.timerNotes')}
                       className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 dark:border-[#212a38] rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 outline-none"
                     />
                   )}
@@ -529,7 +531,7 @@ export function TicketDrawer({
                       onClick={() => setAddingManual((v) => !v)}
                       className="text-xs text-indigo-500 hover:text-indigo-700 underline transition-colors"
                     >
-                      {addingManual ? 'Cancel' : '+ Manual entry'}
+                      {addingManual ? t('ticketDrawer.cancelEntry') : t('ticketDrawer.manualEntry')}
                     </button>
                   )}
                 </div>
@@ -560,7 +562,7 @@ export function TicketDrawer({
                       <input
                         value={manualNotes}
                         onChange={(e) => setManualNotes(e.target.value)}
-                        placeholder="Notes (optional)"
+                        placeholder={t('ticketDrawer.notesOptional')}
                         className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 dark:border-[#212a38] rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 outline-none"
                       />
                       <button
@@ -597,7 +599,7 @@ export function TicketDrawer({
                         }}
                         className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors"
                       >
-                        Log
+                        {t('ticketDrawer.logBtn')}
                       </button>
                     </div>
                   </div>
@@ -650,7 +652,7 @@ export function TicketDrawer({
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-500 dark:text-[#9aa4b2] italic">No time entries yet.</p>
+                  <p className="text-xs text-gray-500 dark:text-[#9aa4b2] italic">{t('ticketDrawer.noTimeEntries')}</p>
                 )}
               </div>
             </div>
@@ -661,7 +663,7 @@ export function TicketDrawer({
             <div className="border-t border-gray-200 dark:border-[#212a38] pt-5">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
-                  Parts Used ({ticketParts.length})
+                  {t('ticketDrawer.partsUsed')} ({ticketParts.length})
                 </h3>
                 {ticketParts.length > 0 && (
                   <span className="text-xs text-indigo-600 font-medium">
@@ -696,7 +698,7 @@ export function TicketDrawer({
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-gray-500 dark:text-[#9aa4b2] italic">No parts recorded on this ticket.</p>
+                <p className="text-xs text-gray-500 dark:text-[#9aa4b2] italic">{t('ticketDrawer.noParts')}</p>
               )}
             </div>
           )}
@@ -704,7 +706,7 @@ export function TicketDrawer({
           {/* ── Resolution ── */}
           <div className="border-t border-gray-200 dark:border-[#212a38] pt-5">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">Resolution</h3>
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">{t('ticketDrawer.resolution')}</h3>
               {canDo('edit_all') && !resolutionEditing && (
                 <button
                   onClick={() => {
@@ -721,7 +723,7 @@ export function TicketDrawer({
                   }}
                   className="text-xs text-indigo-600 dark:text-[#a5b4fc] font-medium hover:underline"
                 >
-                  {resolution ? 'Edit' : '+ Add'}
+                  {resolution ? t('ticketDrawer.editResolution') : t('ticketDrawer.addResolution')}
                 </button>
               )}
             </div>
@@ -741,7 +743,7 @@ export function TicketDrawer({
                     {resolution.type.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
                   </span>
                   {canDo('edit_all') && (
-                    <button onClick={handleDeleteResolution} className="ml-auto text-xs text-red-500 hover:underline">Remove</button>
+                    <button onClick={handleDeleteResolution} className="ml-auto text-xs text-red-500 hover:underline">{t('ticketDrawer.deleteResolution')}</button>
                   )}
                 </div>
                 {(resolution.replacement_product_name || resolution.replacement_serial) && (
@@ -766,14 +768,14 @@ export function TicketDrawer({
 
             {/* Empty state */}
             {!resolutionLoading && !resolution && !resolutionEditing && (
-              <p className="text-xs text-gray-400 dark:text-[#4a5568] italic">No resolution recorded.</p>
+              <p className="text-xs text-gray-400 dark:text-[#4a5568] italic">{t('ticketDrawer.noResolution')}</p>
             )}
 
             {/* Edit / Add form */}
             {resolutionEditing && (
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">Type</label>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('ticketDrawer.resolutionType')}</label>
                   <select
                     value={resForm.type}
                     onChange={(e) => setResForm(f => ({ ...f, type: e.target.value }))}
@@ -789,7 +791,7 @@ export function TicketDrawer({
                 {(resForm.type === 'replacement' || resForm.type === 'exchange') && (
                   <>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">Replacement Product</label>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('ticketDrawer.replacementProduct')}</label>
                       <ProductSearchInput
                         value={resForm.replacement_product_name}
                         onChange={(v) => setResForm(f => ({ ...f, replacement_product_name: v }))}
@@ -799,7 +801,7 @@ export function TicketDrawer({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">Serial Number</label>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('ticketDrawer.serialNumber')}</label>
                       <input
                         value={resForm.replacement_serial}
                         onChange={(e) => setResForm(f => ({ ...f, replacement_serial: e.target.value }))}
@@ -814,7 +816,7 @@ export function TicketDrawer({
                   <>
                     <div className="flex gap-2">
                       <div className="w-24">
-                        <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">Currency</label>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('ticketDrawer.currency')}</label>
                         <select
                           value={resForm.currency}
                           onChange={(e) => setResForm(f => ({ ...f, currency: e.target.value }))}
@@ -824,7 +826,7 @@ export function TicketDrawer({
                         </select>
                       </div>
                       <div className="flex-1">
-                        <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">Amount</label>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('ticketDrawer.amount')}</label>
                         <input
                           type="number" min="0" step="0.01"
                           value={resForm.amount}
@@ -835,7 +837,7 @@ export function TicketDrawer({
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">Reference #</label>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('ticketDrawer.referenceNumber')}</label>
                       <input
                         value={resForm.reference_number}
                         onChange={(e) => setResForm(f => ({ ...f, reference_number: e.target.value }))}
@@ -847,7 +849,7 @@ export function TicketDrawer({
                 )}
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">Reason / Notes</label>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('ticketDrawer.reason')}</label>
                   <textarea
                     rows={2}
                     value={resForm.reason}
@@ -859,10 +861,10 @@ export function TicketDrawer({
 
                 <div className="flex gap-2">
                   <Button onClick={handleSaveResolution} loading={resolutionSaving} className="flex-1 justify-center text-sm py-1.5">
-                    Save Resolution
+                    {t('ticketDrawer.saveResolution')}
                   </Button>
                   <Button variant="secondary" onClick={() => setResolutionEditing(false)} className="text-sm py-1.5">
-                    Cancel
+                    {t('ticketDrawer.cancelResolution')}
                   </Button>
                 </div>
               </div>
@@ -873,7 +875,7 @@ export function TicketDrawer({
           {ticket.accessories_received && (
             <div>
               <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
-                Accessories Received
+                {t('ticketDrawer.accessories')}
               </h3>
               <div className="bg-gray-50 dark:bg-[#0f1520] rounded-xl p-4 text-sm text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap">
                 {ticket.accessories_received}
@@ -885,7 +887,7 @@ export function TicketDrawer({
           {ticket.attachments?.length > 0 && (
             <div>
               <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
-                Attachments ({ticket.attachments.length})
+                {t('ticketDrawer.attachments')} ({ticket.attachments.length})
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {ticket.attachments.map((att, i) => (
@@ -933,7 +935,7 @@ export function TicketDrawer({
           <div className="border-t border-gray-200 dark:border-[#212a38] pt-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
-                Comments & Communication
+                {t('ticketDrawer.comments')}
               </h3>
               <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">
                 {ticketComments.length} comment{ticketComments.length !== 1 ? 's' : ''}
@@ -946,7 +948,7 @@ export function TicketDrawer({
               </div>
             ) : ticketComments.filter((c) => !c.parent_comment_id).length === 0 ? (
               <div className="text-center py-6 text-gray-500 dark:text-[#9aa4b2] text-sm">
-                No comments yet. Start the conversation below.
+                {t('ticketDrawer.noComments')}
               </div>
             ) : (
               <div className="space-y-3 mb-4">
@@ -985,12 +987,12 @@ export function TicketDrawer({
                               </span>
                               {comment.is_internal && (
                                 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
-                                  Internal
+                                  {t('ticketDrawer.internalBadge')}
                                 </span>
                               )}
                               {comment.is_customer_comment && (
                                 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">
-                                  Customer
+                                  {t('ticketDrawer.customerBadge')}
                                 </span>
                               )}
                               <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">
@@ -1049,7 +1051,7 @@ export function TicketDrawer({
                                   d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
                                 />
                               </svg>
-                              Reply{replies.length > 0 ? ` (${replies.length})` : ''}
+                              {t('ticketDrawer.replyBtn')}{replies.length > 0 ? ` (${replies.length})` : ''}
                             </button>
                           </div>
                           {(userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN) && (
@@ -1098,7 +1100,7 @@ export function TicketDrawer({
                                       </span>
                                       {reply.is_internal && (
                                         <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
-                                          Internal
+                                          {t('ticketDrawer.internalBadge')}
                                         </span>
                                       )}
                                       {reply.is_customer_comment && (
@@ -1194,7 +1196,7 @@ export function TicketDrawer({
                                 />
                               </svg>
                               <span className="text-xs text-indigo-600 font-medium">
-                                Replying to {displayName}
+                                {t('ticketDrawer.replyingTo')} {displayName}
                               </span>
                             </div>
                             <textarea
@@ -1274,7 +1276,7 @@ export function TicketDrawer({
                                   }}
                                   className="text-xs text-gray-500 dark:text-[#9aa4b2] hover:text-gray-600 dark:text-[#9aa4b2]"
                                 >
-                                  Cancel
+                                  {t('ticketDrawer.cancelReply')}
                                 </button>
                                 <button
                                   onClick={() => handleAddComment(comment.id)}
@@ -1284,7 +1286,7 @@ export function TicketDrawer({
                                   {submittingComment ? (
                                     <Spinner size="sm" color="white" />
                                   ) : (
-                                    'Reply'
+                                    t('ticketDrawer.replyBtn')
                                   )}
                                 </button>
                               </div>
@@ -1360,7 +1362,7 @@ export function TicketDrawer({
                           className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white dark:bg-[#121823] rounded-full shadow transition-transform ${isInternalComment ? 'translate-x-4' : ''}`}
                         />
                       </div>
-                      <span className="text-xs text-gray-600 dark:text-[#9aa4b2]">Internal only</span>
+                      <span className="text-xs text-gray-600 dark:text-[#9aa4b2]">{t('ticketDrawer.internalOnly')}</span>
                     </label>
                   </div>
                   <button
@@ -1387,7 +1389,7 @@ export function TicketDrawer({
                         />
                       </svg>
                     )}
-                    Post
+                    {t('ticketDrawer.postComment')}
                   </button>
                 </div>
               </div>
@@ -1413,11 +1415,11 @@ export function TicketDrawer({
                 onEdit(ticket)
               }}
             >
-              Edit Ticket
+              {t('ticketDrawer.editTicket')}
             </Button>
           )}
           <Button variant="secondary" onClick={onClose}>
-            Close
+            {t('common.close')}
           </Button>
         </div>
       </div>
