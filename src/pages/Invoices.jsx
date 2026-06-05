@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -523,6 +524,7 @@ function InvoicePanel({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Invoices({ currentUserRole, currentUserEmail, currentUserPermissions }) {
+  const { t } = useTranslation()
   const { formatDate } = useAppearance()
 
   const _canDo = (s, a) =>
@@ -743,8 +745,8 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
 
       {/* Header */}
       <PageHeader
-        title="Invoices & Quotes"
-        subtitle="Manage invoices and quotes for RMA jobs"
+        title={t('invoices.title')}
+        subtitle={t('invoices.subtitle')}
         className="mb-6"
       >
         {!isViewer && !tableMissing && (
@@ -757,7 +759,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            New Invoice / Quote
+            {t('invoices.newInvoiceQuote')}
           </Button>
         )}
       </PageHeader>
@@ -774,7 +776,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
                 : 'text-gray-500 dark:text-[#9aa4b2] hover:text-gray-700 dark:text-[#e8ebf0]'
             }`}
           >
-            {tab}
+            {t(`invoices.tab${tab}`, tab)}
             {tab !== 'All' && (
               <span className="ml-1.5 text-xs text-gray-500 dark:text-[#9aa4b2]">
                 (

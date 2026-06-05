@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -104,6 +105,7 @@ export default function TechCalendar({
   currentUserPermissions,
   onNavigateToTicket,
 }) {
+  const { t } = useTranslation()
   const { formatDate: _formatDate } = useAppearance()
 
   const _canDo = (s, a) =>
@@ -206,8 +208,8 @@ export default function TechCalendar({
     <div className="p-3 sm:p-6 max-w-full">
       {/* Header */}
       <PageHeader
-        title="Tech Calendar"
-        subtitle="Weekly view of tickets by technician and due date"
+        title={t('calendar.title')}
+        subtitle={t('calendar.subtitle')}
       />
 
       {/* Controls */}
@@ -251,7 +253,7 @@ export default function TechCalendar({
             </svg>
           </button>
           <Button variant="secondary" size="sm" onClick={goToToday}>
-            Today
+            {t('calendar.today')}
           </Button>
         </div>
 

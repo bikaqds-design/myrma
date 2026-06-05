@@ -990,7 +990,7 @@ export default function Customers({
                         d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                       />
                     </svg>
-                    Add Customer
+                    {t('customers.addCustomer')}
                     <svg
                       className={`w-4 h-4 transition-transform ${showAddDropdown ? 'rotate-180' : ''}`}
                       fill="none"
@@ -1139,7 +1139,7 @@ export default function Customers({
               {filteredCustomers.length} customers
             </span>
             <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600 dark:text-[#9aa4b2]">Items per page:</label>
+              <label className="text-sm text-gray-600 dark:text-[#9aa4b2]">{t('common.itemsPerPage')}:</label>
               <select
                 value={itemsPerPage}
                 onChange={(e) => setItemsPerPage(parseInt(e.target.value))}

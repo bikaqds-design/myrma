@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useURLTab } from '../hooks/useURLTab'
 import { db } from '../api/supabaseClient'
@@ -27,12 +28,15 @@ const GROUPS = [
   {
     id: 'tickets',
     label: 'Ticket Management',
+    labelKey: 'cp.groupTickets',
     color: 'indigo',
     features: [
       {
         id: 'rmaconfig',
         label: 'RMA Configuration',
+        labelKey: 'cp.rmaConfigLabel',
         desc: 'SLA rules, auto-assignment and ticket defaults',
+        descKey: 'cp.rmaConfigDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -53,7 +57,9 @@ const GROUPS = [
       {
         id: 'customfields',
         label: 'Custom Fields',
+        labelKey: 'cp.customFieldsLabel',
         desc: 'Add extra fields to tickets and customers',
+        descKey: 'cp.customFieldsDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -68,7 +74,9 @@ const GROUPS = [
       {
         id: 'pdflayout',
         label: 'PDF Layout',
+        labelKey: 'cp.pdfLayoutLabel',
         desc: 'Customize the ticket print and export template',
+        descKey: 'cp.pdfLayoutDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -85,12 +93,15 @@ const GROUPS = [
   {
     id: 'users',
     label: 'Users & Communication',
+    labelKey: 'cp.groupUsers',
     color: 'emerald',
     features: [
       {
         id: 'users',
         label: 'User Management',
+        labelKey: 'cp.userMgmtLabel',
         desc: 'Manage accounts, roles and permissions',
+        descKey: 'cp.userMgmtDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -105,7 +116,9 @@ const GROUPS = [
       {
         id: 'announcements',
         label: 'Announcements',
+        labelKey: 'cp.announcementsLabel',
         desc: 'Post system-wide banners visible to all users',
+        descKey: 'cp.announcementsDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -120,7 +133,9 @@ const GROUPS = [
       {
         id: 'broadcast',
         label: 'Send Alert',
+        labelKey: 'cp.sendAlertLabel',
         desc: 'Send instant in-app notifications to users or groups',
+        descKey: 'cp.sendAlertDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -137,12 +152,15 @@ const GROUPS = [
   {
     id: 'appearance',
     label: 'Appearance & Notifications',
+    labelKey: 'cp.groupAppearance',
     color: 'purple',
     features: [
       {
         id: 'appearance',
         label: 'Appearance',
+        labelKey: 'cp.appearanceLabel',
         desc: 'Logo, colors, dark mode, fonts, sidebar style',
+        descKey: 'cp.appearanceDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -157,7 +175,9 @@ const GROUPS = [
       {
         id: 'email',
         label: 'Email & Notifications',
+        labelKey: 'cp.emailNotifLabel',
         desc: 'Email provider, templates and preferences',
+        descKey: 'cp.emailNotifDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -174,12 +194,15 @@ const GROUPS = [
   {
     id: 'automation',
     label: 'Automation & Integration',
+    labelKey: 'cp.groupAutomation',
     color: 'rose',
     features: [
       {
         id: 'sla',
         label: 'SLA Policies',
+        labelKey: 'cp.slaPoliciesLabel',
         desc: 'Auto-set due dates per priority; track breach rates',
+        descKey: 'cp.slaPoliciesDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -194,7 +217,9 @@ const GROUPS = [
       {
         id: 'automation',
         label: 'Automation Rules',
+        labelKey: 'cp.automationRulesLabel',
         desc: 'Trigger actions automatically when ticket events occur',
+        descKey: 'cp.automationRulesDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -209,7 +234,9 @@ const GROUPS = [
       {
         id: 'webhooks',
         label: 'Outbound Webhooks',
+        labelKey: 'cp.webhooksLabel',
         desc: 'Push ticket events to Slack, QuickBooks, and other services',
+        descKey: 'cp.webhooksDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -224,7 +251,9 @@ const GROUPS = [
       {
         id: 'integrations',
         label: 'Email & API',
+        labelKey: 'cp.emailApiLabel',
         desc: 'Configure outbound email and external connections',
+        descKey: 'cp.emailApiDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -241,12 +270,15 @@ const GROUPS = [
   {
     id: 'messaging',
     label: 'WhatsApp & Messaging',
+    labelKey: 'cp.groupMessaging',
     color: 'teal',
     features: [
       {
         id: 'wa-settings',
         label: 'Notification Settings',
+        labelKey: 'cp.notifSettingsLabel',
         desc: 'Enable providers, per-event toggles, retry and rate-limit config',
+        descKey: 'cp.notifSettingsDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -257,7 +289,9 @@ const GROUPS = [
       {
         id: 'wa-templates',
         label: 'Message Templates',
+        labelKey: 'cp.msgTemplatesLabel',
         desc: 'Create, edit and preview WhatsApp message templates with variables',
+        descKey: 'cp.msgTemplatesDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -268,7 +302,9 @@ const GROUPS = [
       {
         id: 'wa-logs',
         label: 'Notification Logs',
+        labelKey: 'cp.notifLogsLabel',
         desc: 'View sent/failed messages, delivery status, retry failed notifications',
+        descKey: 'cp.notifLogsDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -279,7 +315,9 @@ const GROUPS = [
       {
         id: 'wa-test',
         label: 'Test Center',
+        labelKey: 'cp.testCenterLabel',
         desc: 'Send test messages, simulate events, run the queue worker manually',
+        descKey: 'cp.testCenterDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -292,12 +330,15 @@ const GROUPS = [
   {
     id: 'data',
     label: 'Data & System',
+    labelKey: 'cp.groupData',
     color: 'amber',
     features: [
       {
         id: 'audit',
         label: 'Audit Log',
+        labelKey: 'cp.auditLogLabel',
         desc: 'Full trail of all user activity across the system',
+        descKey: 'cp.auditLogDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -312,7 +353,9 @@ const GROUPS = [
       {
         id: 'cleanup',
         label: 'Data Cleanup',
+        labelKey: 'cp.dataCleanupLabel',
         desc: 'Remove stale records and identify data quality issues',
+        descKey: 'cp.dataCleanupDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -327,7 +370,9 @@ const GROUPS = [
       {
         id: 'backup',
         label: 'Backup & Restore',
+        labelKey: 'cp.backupRestoreLabel',
         desc: 'Export all data and restore from backup files',
+        descKey: 'cp.backupRestoreDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -390,6 +435,7 @@ const COLOR_MAP = {
 }
 
 export default function ControlPanel({ currentUserRole, currentUserEmail }) {
+  const { t } = useTranslation()
   const [section, setSection] = useURLTab('section', null, true)
 
   if (currentUserRole !== 'admin' && currentUserRole !== 'super_admin') {
@@ -409,8 +455,8 @@ export default function ControlPanel({ currentUserRole, currentUserEmail }) {
               d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
             />
           </svg>
-          <h2 className="text-xl font-semibold text-gray-700 dark:text-[#e8ebf0]">Access Restricted</h2>
-          <p className="text-gray-500 dark:text-[#9aa4b2] mt-1">This area is for administrators only.</p>
+          <h2 className="text-xl font-semibold text-gray-700 dark:text-[#e8ebf0]">{t('cp.accessRestricted')}</h2>
+          <p className="text-gray-500 dark:text-[#9aa4b2] mt-1">{t('cp.accessRestrictedDesc')}</p>
         </div>
       </div>
     )
@@ -435,7 +481,7 @@ export default function ControlPanel({ currentUserRole, currentUserEmail }) {
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            Control Panel
+            {t('cp.title')}
           </button>
           <svg
             className="w-4 h-4 text-gray-300"
@@ -445,12 +491,12 @@ export default function ControlPanel({ currentUserRole, currentUserEmail }) {
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-          <span className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{activeFeature?.label}</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{activeFeature?.labelKey ? t(activeFeature.labelKey) : activeFeature?.label}</span>
         </div>
       ) : (
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-[#e8ebf0]">Control Panel</h1>
-          <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-0.5">System administration and configuration</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-[#e8ebf0]">{t('cp.title')}</h1>
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-0.5">{t('cp.subtitle')}</p>
         </div>
       )}
 
@@ -696,6 +742,7 @@ function SendAlert({ currentUserEmail }) {
 // ─── HOME VIEW ─────────────────────────────────────────────────────────────
 
 function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
+  const { t } = useTranslation()
   const { data: stats } = useQuery({
     queryKey: ['control-panel-stats'],
     queryFn: async () => {
@@ -736,15 +783,15 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
 
   const statCards = stats
     ? [
-        { label: 'Total Tickets', value: stats.total, sub: `${stats.open} open`, color: 'indigo' },
+        { label: t('cp.statTotalTickets'), value: stats.total, sub: `${stats.open} ${t('cp.statOpen')}`, color: 'indigo' },
         {
-          label: 'Overdue',
+          label: t('cp.statOverdue'),
           value: stats.overdue,
-          sub: 'past due date',
+          sub: t('cp.statPastDue'),
           color: stats.overdue > 0 ? 'red' : 'green',
         },
-        { label: 'Customers', value: stats.customers, sub: 'in database', color: 'emerald' },
-        { label: 'System Users', value: stats.users, sub: 'with access', color: 'purple' },
+        { label: t('cp.statCustomers'), value: stats.customers, sub: t('cp.statInDatabase'), color: 'emerald' },
+        { label: t('cp.statSystemUsers'), value: stats.users, sub: t('cp.statWithAccess'), color: 'purple' },
       ]
     : []
 
@@ -787,7 +834,7 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
               key={label}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${color}`}
             >
-              <span className="font-medium">{label}</span>
+              <span className="font-medium">{t(`statusValues.${label}`, label)}</span>
               <span className="font-bold">{stats.byStatus[label] || 0}</span>
             </div>
           ))}
@@ -799,7 +846,7 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
         const c = COLOR_MAP[group.color]
         return (
           <div key={group.id}>
-            <h2 className="text-base font-semibold text-gray-900 dark:text-[#e8ebf0] mb-3">{group.label}</h2>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-[#e8ebf0] mb-3">{group.labelKey ? t(group.labelKey) : group.label}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {group.features.map((f) => (
                 <button
@@ -813,11 +860,11 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
                     {f.icon}
                   </div>
                   <div className="font-semibold text-gray-900 dark:text-[#e8ebf0] text-sm group-hover:text-indigo-700">
-                    {f.label}
+                    {f.labelKey ? t(f.labelKey) : f.label}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-1 leading-relaxed">{f.desc}</div>
+                  <div className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-1 leading-relaxed">{f.descKey ? t(f.descKey) : f.desc}</div>
                   <div className="mt-3 flex items-center gap-1 text-xs font-medium text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                    Open
+                    {t('cp.open')}
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"

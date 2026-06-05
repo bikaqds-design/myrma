@@ -1,4 +1,5 @@
 import React, { useState, useMemo, lazy, Suspense } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 const BarcodeScannerModule = lazy(() => import('../components/BarcodeScanner'))
 const BarcodeScanner = (props) => (
@@ -337,6 +338,7 @@ export default function PartsInventory({
   currentUserEmail: _currentUserEmail,
   currentUserPermissions,
 }) {
+  const { t } = useTranslation()
   const { formatDate: _formatDate } = useAppearance()
 
   const canDo = (action) => {
@@ -557,7 +559,7 @@ export default function PartsInventory({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <PageHeader title="Parts Inventory" subtitle="Manage parts and components stock levels">
+      <PageHeader title={t('parts.title')} subtitle={t('parts.subtitle')}>
         {canExport && (
           <button
             onClick={handleExport}
@@ -571,7 +573,7 @@ export default function PartsInventory({
                 d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            Export CSV
+            {t('parts.exportCSV')}
           </button>
         )}
         <button
@@ -586,7 +588,7 @@ export default function PartsInventory({
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
             />
           </svg>
-          Refresh
+          {t('common.refresh')}
         </button>
         {canAdd && (
           <Button
@@ -603,7 +605,7 @@ export default function PartsInventory({
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            Add Part
+            {t('parts.addPart')}
           </Button>
         )}
       </PageHeader>
@@ -645,7 +647,7 @@ export default function PartsInventory({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search part name or part number…"
+            placeholder={t('parts.searchPlaceholder')}
             className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           />
           <svg
@@ -674,7 +676,7 @@ export default function PartsInventory({
               d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          {showLowOnly ? 'Showing Low Stock' : 'Low Stock'}
+          {showLowOnly ? t('parts.lowStock') : t('parts.lowStock')}
           {!showLowOnly && lowStockParts.length > 0 && (
             <span className="w-4 h-4 bg-amber-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
               {lowStockParts.length}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, db, storage } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
@@ -20,6 +21,7 @@ export default function Products({
   currentUserPermissions,
   onNavigateToProduct,
 }) {
+  const { t } = useTranslation()
   const searchRef = useRef(null)
   const [activeTab, setActiveTab] = useURLTab('tab', 'products')
   const queryClient = useQueryClient()
@@ -1059,7 +1061,7 @@ export default function Products({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Products" subtitle="Manage product catalog and hierarchy" />
+      <PageHeader title={t('products.title')} subtitle={t('products.subtitle')} />
 
       <div className="bg-white dark:bg-[#121823] rounded-xl shadow-sm border border-gray-200 dark:border-[#212a38]">
         <div className="border-b border-gray-200 dark:border-[#212a38]">
@@ -1073,7 +1075,7 @@ export default function Products({
                   : 'border-transparent text-gray-500 dark:text-[#9aa4b2] hover:text-gray-700 dark:text-[#e8ebf0]')
               }
             >
-              Products
+              {t('products.tabProducts')}
             </button>
             <button
               onClick={() => setActiveTab('hierarchy')}
@@ -1084,7 +1086,7 @@ export default function Products({
                   : 'border-transparent text-gray-500 dark:text-[#9aa4b2] hover:text-gray-700 dark:text-[#e8ebf0]')
               }
             >
-              Product Hierarchy
+              {t('products.tabHierarchy')}
             </button>
           </nav>
         </div>

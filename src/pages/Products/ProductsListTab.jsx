@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import EmptyState from '../../components/EmptyState'
 
 export default function ProductsListTab({
@@ -40,6 +41,7 @@ export default function ProductsListTab({
   sortConfig,
   handleSort,
 }) {
+  const { t } = useTranslation()
   const SortableHeader = ({ label, sortKey }) => {
     const isActive = sortConfig.key === sortKey
     const direction = isActive ? sortConfig.direction : null
@@ -332,7 +334,7 @@ export default function ProductsListTab({
           Showing {startIndex + 1}-{endIndex} of {totalProducts} products
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">Items per page:</label>
+          <label className="text-sm text-gray-600">{t('common.itemsPerPage')}:</label>
           <select
             value={itemsPerPage}
             onChange={(e) => setItemsPerPage(parseInt(e.target.value))}

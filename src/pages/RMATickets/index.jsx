@@ -1158,7 +1158,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           {filteredTickets.length} tickets
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">Items per page:</label>
+          <label className="text-sm text-gray-600">{t('common.itemsPerPage')}:</label>
           <select
             value={itemsPerPage}
             onChange={(e) => {
