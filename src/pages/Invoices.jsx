@@ -185,7 +185,7 @@ function exportPDF(invoice) {
 
   const win = window.open('', '_blank')
   if (!win) {
-    toast.error('Pop-up blocked — allow pop-ups and try again')
+    toast.error('Pop-up blocked — allow pop-ups and try again') // exportPDF is outside a component; no t() available
     return
   }
   win.document.write(html)
@@ -206,6 +206,7 @@ function InvoicePanel({
   invoices: _invoices,
   isEdit,
 }) {
+  const { t } = useTranslation()
   const totals = calcTotals(form)
 
   const handleRmaLookup = (rmaNum) => {
@@ -244,7 +245,7 @@ function InvoicePanel({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-[#212a38] flex-shrink-0">
           <h2 className="text-base font-semibold text-gray-900 dark:text-[#e8ebf0]">
-            {isEdit ? 'Edit Invoice / Quote' : 'New Invoice / Quote'}
+            {isEdit ? t('invoices.editTitle') : t('invoices.newInvoiceQuote')}
           </h2>
           <button
             onClick={onClose}
@@ -270,21 +271,21 @@ function InvoicePanel({
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {/* Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">Type</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">{t('invoices.labelType')}</label>
             <select
               value={form.type}
               onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              <option value="invoice">Invoice</option>
-              <option value="quote">Quote</option>
+              <option value="invoice">{t('invoices.optionInvoice')}</option>
+              <option value="quote">{t('invoices.optionQuote')}</option>
             </select>
           </div>
 
           {/* Invoice Number */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">
-              Invoice / Quote Number
+              {t('invoices.labelInvoiceNumber')}
             </label>
             <input
               type="text"
@@ -297,18 +298,18 @@ function InvoicePanel({
           {/* RMA Link */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">
-              Link to RMA Number (optional)
+              {t('invoices.labelRmaLink')}
             </label>
             <input
               type="text"
-              placeholder="e.g. RMA-01012025-0001"
+              placeholder={t('invoices.rmaPlaceholder')}
               value={form.rma_number_ref}
               onChange={(e) => handleRmaLookup(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             {form.ticket_id && (
               <p className="text-xs text-green-600 mt-1">
-                Ticket found — customer details auto-filled.
+                {t('invoices.ticketFound')}
               </p>
             )}
           </div>
@@ -316,7 +317,7 @@ function InvoicePanel({
           {/* Customer */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">Customer Name</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">{t('invoices.labelCustomerName')}</label>
               <input
                 type="text"
                 value={form.customer_name}
@@ -325,7 +326,7 @@ function InvoicePanel({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">Customer Email</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">{t('invoices.labelCustomerEmail')}</label>
               <input
                 type="email"
                 value={form.customer_email}
@@ -338,9 +339,9 @@ function InvoicePanel({
           {/* Line Items */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">Line Items</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('invoices.labelLineItems')}</label>
               <button onClick={addLine} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-                + Add Row
+                {t('invoices.addRow')}
               </button>
             </div>
             <div className="space-y-2">
@@ -352,7 +353,7 @@ function InvoicePanel({
                       type="text"
                       value={li.description}
                       onChange={(e) => updateLine(idx, 'description', e.target.value)}
-                      placeholder="Item description"
+                      placeholder={t('invoices.itemDescriptionPlaceholder')}
                       className="flex-1 px-2 py-1.5 border border-gray-200 dark:border-[#212a38] rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400"
                     />
                     {form.lineItems.length > 1 && (
@@ -366,7 +367,7 @@ function InvoicePanel({
                   {/* Qty | Unit $ | Line total */}
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div>
-                      <label className="block text-gray-400 mb-1">Qty</label>
+                      <label className="block text-gray-400 mb-1">{t('invoices.labelQty')}</label>
                       <input
                         type="number" min="0" value={li.qty}
                         onChange={(e) => updateLine(idx, 'qty', e.target.value)}
@@ -374,7 +375,7 @@ function InvoicePanel({
                       />
                     </div>
                     <div>
-                      <label className="block text-gray-400 mb-1">Unit $</label>
+                      <label className="block text-gray-400 mb-1">{t('invoices.labelUnitPrice')}</label>
                       <input
                         type="number" min="0" step="0.01" value={li.unitPrice}
                         onChange={(e) => updateLine(idx, 'unitPrice', e.target.value)}
@@ -382,7 +383,7 @@ function InvoicePanel({
                       />
                     </div>
                     <div>
-                      <label className="block text-gray-400 mb-1">Total</label>
+                      <label className="block text-gray-400 mb-1">{t('invoices.labelLineTotal')}</label>
                       <div className="px-2 py-1.5 bg-gray-50 dark:bg-[#0f1520] rounded text-sm text-right font-medium text-gray-700 dark:text-[#e8ebf0]">
                         ${fmt((parseFloat(li.qty) || 0) * (parseFloat(li.unitPrice) || 0))}
                       </div>
@@ -396,7 +397,7 @@ function InvoicePanel({
           {/* Labour */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">Labour Hours</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">{t('invoices.labelLabourHours')}</label>
               <input
                 type="number"
                 min="0"
@@ -408,7 +409,7 @@ function InvoicePanel({
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">
-                Labour Rate ($/h)
+                {t('invoices.labelLabourRate')}
               </label>
               <input
                 type="number"
@@ -424,7 +425,7 @@ function InvoicePanel({
           {/* Discount + Tax */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">Discount %</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">{t('invoices.labelDiscountPct')}</label>
               <input
                 type="number"
                 min="0"
@@ -436,7 +437,7 @@ function InvoicePanel({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">Tax %</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">{t('invoices.labelTaxPct')}</label>
               <input
                 type="number"
                 min="0"
@@ -452,52 +453,52 @@ function InvoicePanel({
           {/* Totals summary */}
           <div className="bg-gray-50 dark:bg-[#0f1520] rounded-lg p-4 text-sm space-y-1.5">
             <div className="flex justify-between text-gray-600 dark:text-[#9aa4b2]">
-              <span>Parts Subtotal</span>
+              <span>{t('invoices.labelPartsSubtotal')}</span>
               <span>${fmt(totals.partsSubtotal)}</span>
             </div>
             {totals.labourTotal > 0 && (
               <div className="flex justify-between text-gray-600 dark:text-[#9aa4b2]">
-                <span>Labour</span>
+                <span>{t('invoices.labelLabour')}</span>
                 <span>${fmt(totals.labourTotal)}</span>
               </div>
             )}
             <div className="flex justify-between text-gray-600 dark:text-[#9aa4b2] border-t border-gray-200 dark:border-[#212a38] pt-1.5">
-              <span>Subtotal</span>
+              <span>{t('invoices.labelSubtotal')}</span>
               <span>${fmt(totals.subtotal)}</span>
             </div>
             {totals.discountAmt > 0 && (
               <div className="flex justify-between text-gray-500 dark:text-[#9aa4b2]">
-                <span>Discount ({form.discount_pct}%)</span>
+                <span>{t('invoices.labelDiscountLine', { pct: form.discount_pct })}</span>
                 <span>−${fmt(totals.discountAmt)}</span>
               </div>
             )}
             {totals.taxAmt > 0 && (
               <div className="flex justify-between text-gray-500 dark:text-[#9aa4b2]">
-                <span>Tax ({form.tax_pct}%)</span>
+                <span>{t('invoices.labelTaxLine', { pct: form.tax_pct })}</span>
                 <span>${fmt(totals.taxAmt)}</span>
               </div>
             )}
             <div className="flex justify-between font-bold text-gray-900 dark:text-[#e8ebf0] text-base border-t border-gray-300 dark:border-[#212a38] pt-2 mt-1">
-              <span>Total</span>
+              <span>{t('invoices.labelTotal')}</span>
               <span>${fmt(totals.total)}</span>
             </div>
           </div>
 
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">Notes</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">{t('invoices.labelNotes')}</label>
             <textarea
               rows={3}
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              placeholder="Additional notes or payment terms..."
+              placeholder={t('invoices.notesPlaceholder')}
               className="w-full px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
           {/* Due Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">Due Date</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1">{t('invoices.labelDueDate')}</label>
             <input
               type="date"
               value={form.due_date}
@@ -510,10 +511,10 @@ function InvoicePanel({
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-200 dark:border-[#212a38] flex items-center justify-end gap-3 flex-shrink-0">
           <Button variant="secondary" onClick={onClose} disabled={saving}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={onSave} loading={saving}>
-            {isEdit ? 'Save Changes' : 'Create'}
+            {isEdit ? t('invoices.saveChanges') : t('invoices.createBtn')}
           </Button>
         </div>
       </div>
@@ -553,7 +554,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
   const tickets = useMemo(() => ticketsData ?? [], [ticketsData])
 
   useEffect(() => {
-    if (invoicesError) toast.error('Failed to load invoices')
+    if (invoicesError) toast.error(t('invoices.errorLoadFailed'))
   }, [invoicesError])
   const [activeTab, setActiveTab] = useState('All')
   const [panelOpen, setPanelOpen] = useState(false)
@@ -620,11 +621,11 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
   // ─── Save ─────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!form.invoice_number.trim()) {
-      toast.error('Invoice number is required')
+      toast.error(t('invoices.errorNumberRequired'))
       return
     }
     if (!form.customer_name.trim()) {
-      toast.error('Customer name is required')
+      toast.error(t('invoices.errorCustomerRequired'))
       return
     }
 
@@ -653,24 +654,24 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
       if (editingId) {
         const res = await db.invoices.update(editingId, payload)
         if (res?.missing) {
-          toast.error('Invoices table not found')
+          toast.error(t('invoices.errorTableNotFound'))
           return
         }
         queryClient.invalidateQueries({ queryKey: ['invoices'] })
-        toast.success('Invoice updated')
+        toast.success(t('invoices.successUpdated'))
       } else {
         const res = await db.invoices.create(payload)
         if (res?.missing) {
-          toast.error('Invoices table not found')
+          toast.error(t('invoices.errorTableNotFound'))
           return
         }
         queryClient.invalidateQueries({ queryKey: ['invoices'] })
-        toast.success(`${form.type === 'quote' ? 'Quote' : 'Invoice'} created`)
+        toast.success(form.type === 'quote' ? t('invoices.successCreatedQuote') : t('invoices.successCreatedInvoice'))
       }
       setPanelOpen(false)
     } catch (err) {
       captureException(err)
-      toast.error(err.message || 'Save failed')
+      toast.error(err.message || t('invoices.errorSaveFailed'))
     } finally {
       setSaving(false)
     }
@@ -681,25 +682,25 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
     try {
       await db.invoices.update(inv.id, { status: newStatus })
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
-      toast.success(`Marked as ${newStatus}`)
+      toast.success(t('invoices.markedAs', { status: newStatus }))
     } catch (err) {
-      toast.error(err.message || 'Failed to update status')
+      toast.error(err.message || t('invoices.errorUpdateStatus'))
     }
   }
 
   // ─── Delete ──────────────────────────────────────────────────────────────────
   const handleDelete = (inv) => {
     openConfirm(
-      'Delete Invoice',
-      `Delete ${inv.invoice_number}? This cannot be undone.`,
+      t('invoices.deleteTitle'),
+      t('invoices.deleteMsg', { number: inv.invoice_number }),
       async () => {
         closeConfirm()
         try {
           await db.invoices.delete(inv.id)
           queryClient.invalidateQueries({ queryKey: ['invoices'] })
-          toast.success('Invoice deleted')
+          toast.success(t('invoices.successDeleted'))
         } catch (err) {
-          toast.error(err.message || 'Delete failed')
+          toast.error(err.message || t('invoices.errorDeleteFailed'))
         }
       }
     )
@@ -733,9 +734,9 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
             />
           </svg>
           <div>
-            <p className="font-semibold text-amber-800">Invoices table not found</p>
+            <p className="font-semibold text-amber-800">{t('invoices.tableMissingTitle')}</p>
             <p className="text-amber-700 mt-0.5">
-              Run the invoices migration in your Supabase SQL editor to enable this feature. Create
+              {t('invoices.tableMissingDesc')} Create
               the <code className="font-mono bg-amber-100 px-1 rounded">invoices</code> table with
               the columns used by this page.
             </p>
@@ -794,14 +795,14 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
       {visibleInvoices.length === 0 ? (
         <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] shadow-sm">
           <EmptyState
-            title={tableMissing ? 'Invoices table not set up' : 'No invoices found'}
+            title={tableMissing ? t('invoices.emptyTableTitle') : t('invoices.emptyTitle')}
             description={
               tableMissing
-                ? 'Run the migration to get started.'
-                : 'Try a different filter or create a new invoice.'
+                ? t('invoices.emptyTableDesc')
+                : t('invoices.emptyDesc')
             }
             action={!isViewer && !tableMissing ? openCreate : undefined}
-            actionLabel="New Invoice / Quote"
+            actionLabel={t('invoices.newInvoiceQuote')}
           />
         </div>
       ) : (
@@ -818,13 +819,13 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
                 onEdit={() => openEdit(inv)}
                 onExportPDF={() => exportPDF(inv)}
                 onMarkSent={() =>
-                  openConfirm('Mark as Sent', `Mark ${inv.invoice_number} as Sent?`, () => { closeConfirm(); updateStatus(inv, 'sent') })
+                  openConfirm(t('invoices.confirmMarkSent'), t('invoices.confirmMarkSentMsg', { number: inv.invoice_number }), () => { closeConfirm(); updateStatus(inv, 'sent') })
                 }
                 onMarkPaid={() =>
-                  openConfirm('Mark as Paid', `Mark ${inv.invoice_number} as Paid?`, () => { closeConfirm(); updateStatus(inv, 'paid') })
+                  openConfirm(t('invoices.confirmMarkPaid'), t('invoices.confirmMarkPaidMsg', { number: inv.invoice_number }), () => { closeConfirm(); updateStatus(inv, 'paid') })
                 }
                 onVoid={() =>
-                  openConfirm('Void Invoice', `Void ${inv.invoice_number}?`, () => { closeConfirm(); updateStatus(inv, 'void') })
+                  openConfirm(t('invoices.confirmVoidTitle'), t('invoices.confirmVoidMsg', { number: inv.invoice_number }), () => { closeConfirm(); updateStatus(inv, 'void') })
                 }
                 onDelete={isAdmin ? () => handleDelete(inv) : undefined}
               />
@@ -837,14 +838,14 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-[#0f1520] border-b border-gray-200 dark:border-[#212a38]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">Invoice #</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">Type</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">Customer</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">Ticket</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">Status</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">Total</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">Due Date</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">Created</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('invoices.colInvoiceNum')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('invoices.colType')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('invoices.colCustomer')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('invoices.colTicket')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('invoices.colStatus')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('invoices.colTotal')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('invoices.colDueDate')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('invoices.colCreated')}</th>
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
@@ -860,13 +861,13 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
                       onEdit={() => openEdit(inv)}
                       onExportPDF={() => exportPDF(inv)}
                       onMarkSent={() =>
-                        openConfirm('Mark as Sent', `Mark ${inv.invoice_number} as Sent?`, () => { closeConfirm(); updateStatus(inv, 'sent') })
+                        openConfirm(t('invoices.confirmMarkSent'), t('invoices.confirmMarkSentMsg', { number: inv.invoice_number }), () => { closeConfirm(); updateStatus(inv, 'sent') })
                       }
                       onMarkPaid={() =>
-                        openConfirm('Mark as Paid', `Mark ${inv.invoice_number} as Paid?`, () => { closeConfirm(); updateStatus(inv, 'paid') })
+                        openConfirm(t('invoices.confirmMarkPaid'), t('invoices.confirmMarkPaidMsg', { number: inv.invoice_number }), () => { closeConfirm(); updateStatus(inv, 'paid') })
                       }
                       onVoid={() =>
-                        openConfirm('Void Invoice', `Void ${inv.invoice_number}?`, () => { closeConfirm(); updateStatus(inv, 'void') })
+                        openConfirm(t('invoices.confirmVoidTitle'), t('invoices.confirmVoidMsg', { number: inv.invoice_number }), () => { closeConfirm(); updateStatus(inv, 'void') })
                       }
                       onDelete={isAdmin ? () => handleDelete(inv) : undefined}
                     />
@@ -909,6 +910,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
 // ─── Invoice Card (mobile) ────────────────────────────────────────────────────
 
 function InvoiceCard({ inv, isAdmin, isManager, formatDate, onEdit, onExportPDF, onMarkSent, onMarkPaid, onVoid, onDelete }) {
+  const { t } = useTranslation()
   const [menuOpen, setMenuOpen] = useState(false)
   const canChangeStatus = isManager
   const canEdit = isManager
@@ -921,7 +923,7 @@ function InvoiceCard({ inv, isAdmin, isManager, formatDate, onEdit, onExportPDF,
           <span className="font-mono text-sm font-semibold text-indigo-700">{inv.invoice_number}</span>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_CLS[inv.type] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'}`}>
-              {inv.type === 'quote' ? 'Quote' : 'Invoice'}
+              {inv.type === 'quote' ? t('invoices.typeQuote') : t('invoices.typeInvoice')}
             </span>
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_CLS[inv.status] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'}`}>
               {inv.status ? inv.status.charAt(0).toUpperCase() + inv.status.slice(1) : 'Draft'}
@@ -938,8 +940,8 @@ function InvoiceCard({ inv, isAdmin, isManager, formatDate, onEdit, onExportPDF,
       {/* Meta row */}
       <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 dark:text-[#9aa4b2] flex-wrap">
         {inv.rma_number_ref && <span className="font-mono">{inv.rma_number_ref}</span>}
-        {inv.due_date && <span>Due {formatDate(inv.due_date)}</span>}
-        {inv.created_at && <span>Created {formatDate(inv.created_at)}</span>}
+        {inv.due_date && <span>{t('invoices.due', { date: formatDate(inv.due_date) })}</span>}
+        {inv.created_at && <span>{t('invoices.createdDate', { date: formatDate(inv.created_at) })}</span>}
       </div>
 
       {/* Actions */}
@@ -960,7 +962,7 @@ function InvoiceCard({ inv, isAdmin, isManager, formatDate, onEdit, onExportPDF,
               onClick={() => setMenuOpen((o) => !o)}
               className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-gray-200 dark:border-[#212a38] text-xs font-medium text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] transition-colors"
             >
-              Actions
+              {t('common.actions')}
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -970,19 +972,19 @@ function InvoiceCard({ inv, isAdmin, isManager, formatDate, onEdit, onExportPDF,
                 <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 bottom-full mb-1 w-44 bg-white dark:bg-[#121823] border border-gray-200 dark:border-[#212a38] rounded-xl shadow-xl z-40 py-1 text-sm">
                   {canEdit && (
-                    <button onClick={() => { setMenuOpen(false); onEdit() }} className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0]">Edit</button>
+                    <button onClick={() => { setMenuOpen(false); onEdit() }} className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0]">{t('common.edit')}</button>
                   )}
                   {canChangeStatus && inv.status === 'draft' && (
-                    <button onClick={() => { setMenuOpen(false); onMarkSent() }} className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0]">Mark Sent</button>
+                    <button onClick={() => { setMenuOpen(false); onMarkSent() }} className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0]">{t('invoices.markSent')}</button>
                   )}
                   {canChangeStatus && inv.status === 'sent' && (
-                    <button onClick={() => { setMenuOpen(false); onMarkPaid() }} className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0]">Mark Paid</button>
+                    <button onClick={() => { setMenuOpen(false); onMarkPaid() }} className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0]">{t('invoices.markPaid')}</button>
                   )}
                   {canChangeStatus && inv.status !== 'void' && inv.status !== 'paid' && (
-                    <button onClick={() => { setMenuOpen(false); onVoid() }} className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600">Void</button>
+                    <button onClick={() => { setMenuOpen(false); onVoid() }} className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600">{t('invoices.void')}</button>
                   )}
                   {isAdmin && onDelete && (
-                    <button onClick={() => { setMenuOpen(false); onDelete() }} className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 border-t border-gray-100 dark:border-[#212a38]">Delete</button>
+                    <button onClick={() => { setMenuOpen(false); onDelete() }} className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 border-t border-gray-100 dark:border-[#212a38]">{t('common.delete')}</button>
                   )}
                 </div>
               </>
@@ -1009,6 +1011,7 @@ function InvoiceRow({
   onVoid,
   onDelete,
 }) {
+  const { t } = useTranslation()
   const [menuOpen, setMenuOpen] = useState(false)
 
   const canChangeStatus = isManager
@@ -1024,7 +1027,7 @@ function InvoiceRow({
         <span
           className={`px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_CLS[inv.type] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'}`}
         >
-          {inv.type === 'quote' ? 'Quote' : 'Invoice'}
+          {inv.type === 'quote' ? t('invoices.typeQuote') : t('invoices.typeInvoice')}
         </span>
       </td>
       <td className="px-4 py-3">
@@ -1054,8 +1057,8 @@ function InvoiceRow({
         <div className="flex items-center justify-end gap-2 relative">
           <button
             onClick={onExportPDF}
-            title="Export PDF"
-            aria-label="Export PDF"
+            title={t('invoices.exportPDF')}
+            aria-label={t('invoices.exportPDF')}
             className="p-1.5 rounded-lg text-gray-500 dark:text-[#9aa4b2] hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1090,7 +1093,7 @@ function InvoiceRow({
                         }}
                         className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0]"
                       >
-                        Edit
+                        {t('common.edit')}
                       </button>
                     )}
                     {canChangeStatus && inv.status === 'draft' && (
@@ -1101,7 +1104,7 @@ function InvoiceRow({
                         }}
                         className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0]"
                       >
-                        Mark Sent
+                        {t('invoices.markSent')}
                       </button>
                     )}
                     {canChangeStatus && inv.status === 'sent' && (
@@ -1112,7 +1115,7 @@ function InvoiceRow({
                         }}
                         className="w-full text-left px-4 py-2 hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0]"
                       >
-                        Mark Paid
+                        {t('invoices.markPaid')}
                       </button>
                     )}
                     {canChangeStatus && inv.status !== 'void' && inv.status !== 'paid' && (
@@ -1123,7 +1126,7 @@ function InvoiceRow({
                         }}
                         className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600"
                       >
-                        Void
+                        {t('invoices.void')}
                       </button>
                     )}
                     {canDelete && (
@@ -1134,7 +1137,7 @@ function InvoiceRow({
                         }}
                         className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 border-t border-gray-100 dark:border-[#212a38]"
                       >
-                        Delete
+                        {t('common.delete')}
                       </button>
                     )}
                   </div>

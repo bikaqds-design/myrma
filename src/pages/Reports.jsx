@@ -11,9 +11,9 @@ import { useAppearance } from '../contexts/AppearanceContext'
 import { ROLES, INVOICE_STATUS } from '../lib/constants'
 
 // ─── CSV Utility ──────────────────────────────────────────────────────────────
-function downloadCSV(rows, columns, filename) {
+function downloadCSV(rows, columns, filename, t) {
   if (!rows.length) {
-    toast('No data to export')
+    toast(t ? t('reports.noDataExport') : 'No data to export')
     return
   }
   const headers = columns.map((c) => c.label)
@@ -32,12 +32,12 @@ function downloadCSV(rows, columns, filename) {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
-  toast.success(`Exported ${rows.length} rows`)
+  toast.success(t ? t('reports.exportedRows', { count: rows.length }) : `Exported ${rows.length} rows`)
 }
 
 // ─── Excel Utility ────────────────────────────────────────────────────────────
-function downloadExcel(rows, columns, filename) {
-  if (!rows.length) { toast('No data to export'); return }
+function downloadExcel(rows, columns, filename, t) {
+  if (!rows.length) { toast(t ? t('reports.noDataExport') : 'No data to export'); return }
   const headers = columns.map((c) => c.label)
   const data = rows.map((r) => columns.map((c) => r[c.key] ?? ''))
   const ws = XLSX.utils.aoa_to_sheet([headers, ...data])
@@ -49,7 +49,7 @@ function downloadExcel(rows, columns, filename) {
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Report')
   XLSX.writeFile(wb, filename)
-  toast.success(`Exported ${rows.length} rows as Excel`)
+  toast.success(t ? t('reports.exportedRowsExcel', { count: rows.length }) : `Exported ${rows.length} rows as Excel`)
 }
 
 // ─── Shared Export Buttons ────────────────────────────────────────────────────
@@ -191,51 +191,52 @@ function PriorityBadge({ priority }) {
 
 // ─── Tickets Tab ──────────────────────────────────────────────────────────────
 function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
+  const { t } = useTranslation()
   const [filterStatus, setFilterStatus] = useState('')
   const [filterPriority, setFilterPriority] = useState('')
   const [filterTechnician, setFilterTechnician] = useState('')
 
   const statuses = useMemo(
-    () => [...new Set(tickets.map((t) => t.ticket_status).filter(Boolean))].sort(),
+    () => [...new Set(tickets.map((tk) => tk.ticket_status).filter(Boolean))].sort(),
     [tickets]
   )
   const priorities = useMemo(
-    () => [...new Set(tickets.map((t) => t.priority).filter(Boolean))].sort(),
+    () => [...new Set(tickets.map((tk) => tk.priority).filter(Boolean))].sort(),
     [tickets]
   )
   const technicians = useMemo(
-    () => [...new Set(tickets.map((t) => t.assigned_technician).filter(Boolean))].sort(),
+    () => [...new Set(tickets.map((tk) => tk.assigned_technician).filter(Boolean))].sort(),
     [tickets]
   )
 
   const filtered = useMemo(() => {
     let list = [...tickets]
-    if (filterStatus) list = list.filter((t) => t.ticket_status === filterStatus)
-    if (filterPriority) list = list.filter((t) => t.priority === filterPriority)
-    if (filterTechnician) list = list.filter((t) => t.assigned_technician === filterTechnician)
+    if (filterStatus) list = list.filter((tk) => tk.ticket_status === filterStatus)
+    if (filterPriority) list = list.filter((tk) => tk.priority === filterPriority)
+    if (filterTechnician) list = list.filter((tk) => tk.assigned_technician === filterTechnician)
     return list
   }, [tickets, filterStatus, filterPriority, filterTechnician])
 
   const total = filtered.length
-  const completed = filtered.filter((t) => t.ticket_status === 'Completed')
+  const completed = filtered.filter((tk) => tk.ticket_status === 'Completed')
   const overdue = filtered.filter(
-    (t) =>
-      t.due_date &&
-      new Date(t.due_date) < new Date() &&
-      t.ticket_status !== 'Completed' &&
-      t.ticket_status !== 'Cancelled'
+    (tk) =>
+      tk.due_date &&
+      new Date(tk.due_date) < new Date() &&
+      tk.ticket_status !== 'Completed' &&
+      tk.ticket_status !== 'Cancelled'
   )
   const resolveTimes = completed
-    .map((t) => resolutionHours(t))
+    .map((tk) => resolutionHours(tk))
     .filter((v) => v !== null)
     .map(Number)
   const avgResolve = resolveTimes.length
     ? (resolveTimes.reduce((s, v) => s + v, 0) / resolveTimes.length).toFixed(1)
     : '—'
 
-  const completedWithDue = completed.filter((t) => t.due_date)
+  const completedWithDue = completed.filter((tk) => tk.due_date)
   const slaMet = completedWithDue.filter(
-    (t) => !t.due_date || new Date(t.updated_date) <= new Date(t.due_date)
+    (tk) => !tk.due_date || new Date(tk.updated_date) <= new Date(tk.due_date)
   )
   const slaPct = completedWithDue.length
     ? Math.round((slaMet.length / completedWithDue.length) * 100)
@@ -253,18 +254,18 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
       { key: 'resolved_date', label: 'Resolved' },
       { key: 'resolution_hrs', label: 'Resolution (hrs)' },
     ]
-    const rows = filtered.map((t) => ({
-      rma_number: t.rma_number || '',
-      customer_name: t.customer_name || '',
-      ticket_status: t.ticket_status || '',
-      priority: t.priority || '',
-      assigned_technician: t.assigned_technician || '',
-      created_date: formatDate(t.created_date),
-      due_date: formatDate(t.due_date),
-      resolved_date: t.ticket_status === 'Completed' ? formatDate(t.updated_date) : '',
-      resolution_hrs: resolutionHours(t) ?? 'Open',
+    const rows = filtered.map((tk) => ({
+      rma_number: tk.rma_number || '',
+      customer_name: tk.customer_name || '',
+      ticket_status: tk.ticket_status || '',
+      priority: tk.priority || '',
+      assigned_technician: tk.assigned_technician || '',
+      created_date: formatDate(tk.created_date),
+      due_date: formatDate(tk.due_date),
+      resolved_date: tk.ticket_status === 'Completed' ? formatDate(tk.updated_date) : '',
+      resolution_hrs: resolutionHours(tk) ?? 'Open',
     }))
-    downloadCSV(rows, columns, `tickets-report-${toYMD(new Date())}.csv`)
+    downloadCSV(rows, columns, `tickets-report-${toYMD(new Date())}.csv`, t)
   }
   const handleExportExcel = () => {
     const columns = [
@@ -278,18 +279,18 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
       { key: 'resolved_date', label: 'Resolved' },
       { key: 'resolution_hrs', label: 'Resolution (hrs)' },
     ]
-    const rows = filtered.map((t) => ({
-      rma_number: t.rma_number || '',
-      customer_name: t.customer_name || '',
-      ticket_status: t.ticket_status || '',
-      priority: t.priority || '',
-      assigned_technician: t.assigned_technician || '',
-      created_date: formatDate(t.created_date),
-      due_date: formatDate(t.due_date),
-      resolved_date: t.ticket_status === 'Completed' ? formatDate(t.updated_date) : '',
-      resolution_hrs: resolutionHours(t) ?? 'Open',
+    const rows = filtered.map((tk) => ({
+      rma_number: tk.rma_number || '',
+      customer_name: tk.customer_name || '',
+      ticket_status: tk.ticket_status || '',
+      priority: tk.priority || '',
+      assigned_technician: tk.assigned_technician || '',
+      created_date: formatDate(tk.created_date),
+      due_date: formatDate(tk.due_date),
+      resolved_date: tk.ticket_status === 'Completed' ? formatDate(tk.updated_date) : '',
+      resolution_hrs: resolutionHours(tk) ?? 'Open',
     }))
-    downloadExcel(rows, columns, `tickets-report-${toYMD(new Date())}.xlsx`)
+    downloadExcel(rows, columns, `tickets-report-${toYMD(new Date())}.xlsx`, t)
   }
 
   const sel =
@@ -300,29 +301,29 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <KpiCard
-          label="Total Tickets"
+          label={t('reports.kpiTotalTickets')}
           value={total}
           color="indigo"
           icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
         />
         <KpiCard
-          label="Avg Resolution Time"
+          label={t('reports.kpiAvgResolution')}
           value={avgResolve === '—' ? '—' : `${avgResolve}h`}
           color="blue"
           icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
         />
         <KpiCard
-          label="SLA Compliance"
+          label={t('reports.kpiSlaCompliance')}
           value={slaPct === '—' ? '—' : `${slaPct}%`}
           color="green"
           icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
         />
         <KpiCard
-          label="Overdue Rate"
+          label={t('reports.kpiOverdueRate')}
           value={total ? `${Math.round((overdue.length / total) * 100)}%` : '—'}
           color="red"
           icon="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          sub={`${overdue.length} overdue`}
+          sub={t('reports.overdueCount', { count: overdue.length })}
         />
       </div>
 
@@ -333,7 +334,7 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
           onChange={(e) => setFilterStatus(e.target.value)}
           className={sel}
         >
-          <option value="">All Statuses</option>
+          <option value="">{t('reports.allStatuses')}</option>
           {statuses.map((s) => (
             <option key={s} value={s}>
               {s}
@@ -345,7 +346,7 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
           onChange={(e) => setFilterPriority(e.target.value)}
           className={sel}
         >
-          <option value="">All Priorities</option>
+          <option value="">{t('reports.allPriorities')}</option>
           {priorities.map((p) => (
             <option key={p} value={p}>
               {p}
@@ -357,15 +358,15 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
           onChange={(e) => setFilterTechnician(e.target.value)}
           className={sel}
         >
-          <option value="">All Technicians</option>
-          {technicians.map((t) => (
-            <option key={t} value={t}>
-              {t}
+          <option value="">{t('reports.allTechnicians')}</option>
+          {technicians.map((tech) => (
+            <option key={tech} value={tech}>
+              {tech}
             </option>
           ))}
         </select>
         <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">
-          {filtered.length} ticket{filtered.length !== 1 ? 's' : ''}
+          {t('reports.ticketCount', { count: filtered.length })}
         </span>
         <div className="ml-auto">
           <ExportButtons onCSV={handleExport} onExcel={handleExportExcel} />
@@ -375,7 +376,7 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
       {/* Table */}
       {filtered.length === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
-          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">No tickets match the selected filters</p>
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('reports.noTicketsMatch')}</p>
         </div>
       ) : (
         <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden">
@@ -384,18 +385,18 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
               <thead className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
                 <tr>
                   {[
-                    'RMA #',
-                    'Customer',
-                    'Status',
-                    'Priority',
-                    'Technician',
-                    'Created',
-                    'Due',
-                    'Resolved',
-                    'Resolution',
-                  ].map((h) => (
+                    t('reports.colRmaNum'),
+                    t('reports.colCustomer'),
+                    t('reports.colStatus'),
+                    t('reports.colPriority'),
+                    t('reports.colTechnician'),
+                    t('reports.colCreated'),
+                    t('reports.colDue'),
+                    t('reports.colResolved'),
+                    t('reports.colResolution'),
+                  ].map((h, i) => (
                     <th
-                      key={h}
+                      key={i}
                       className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
                     >
                       {h}
@@ -404,51 +405,51 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
-                {filtered.map((t) => {
-                  const hrs = resolutionHours(t)
+                {filtered.map((tk) => {
+                  const hrs = resolutionHours(tk)
                   return (
-                    <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors">
+                    <tr key={tk.id} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors">
                       <td className="px-4 py-3">
                         <button
-                          onClick={() => onNavigateToTicket?.(t.id)}
+                          onClick={() => onNavigateToTicket?.(tk.id)}
                           className="font-mono text-indigo-600 hover:text-indigo-800 hover:underline text-xs font-medium"
                         >
-                          {t.rma_number || t.id?.slice(0, 8)}
+                          {tk.rma_number || tk.id?.slice(0, 8)}
                         </button>
                       </td>
                       <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] max-w-[160px] truncate">
-                        {t.customer_name || '—'}
+                        {tk.customer_name || '—'}
                       </td>
                       <td className="px-4 py-3">
-                        <StatusBadge status={t.ticket_status} />
+                        <StatusBadge status={tk.ticket_status} />
                       </td>
                       <td className="px-4 py-3">
-                        <PriorityBadge priority={t.priority} />
+                        <PriorityBadge priority={tk.priority} />
                       </td>
                       <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs max-w-[120px] truncate">
-                        {t.assigned_technician || '—'}
+                        {tk.assigned_technician || '—'}
                       </td>
                       <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs whitespace-nowrap">
-                        {formatDate(t.created_date)}
+                        {formatDate(tk.created_date)}
                       </td>
                       <td className="px-4 py-3 text-xs whitespace-nowrap">
-                        {t.due_date ? (
+                        {tk.due_date ? (
                           <span
                             className={
-                              new Date(t.due_date) < new Date() && t.ticket_status !== 'Completed'
+                              new Date(tk.due_date) < new Date() && tk.ticket_status !== 'Completed'
                                 ? 'text-red-600 font-medium'
                                 : 'text-gray-500'
                             }
                           >
-                            {formatDate(t.due_date)}
+                            {formatDate(tk.due_date)}
                           </span>
                         ) : (
                           <span className="text-gray-300">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs whitespace-nowrap">
-                        {t.ticket_status === 'Completed' ? (
-                          formatDate(t.updated_date)
+                        {tk.ticket_status === 'Completed' ? (
+                          formatDate(tk.updated_date)
                         ) : (
                           <span className="text-gray-300">—</span>
                         )}
@@ -459,7 +460,7 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
                             {hrs}h
                           </span>
                         ) : (
-                          <span className="text-gray-500">Open</span>
+                          <span className="text-gray-500">{t('reports.openStatus')}</span>
                         )}
                       </td>
                     </tr>
@@ -476,23 +477,24 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
 
 // ─── Customers Tab ────────────────────────────────────────────────────────────
 function CustomersTab({ customers, tickets, formatDate }) {
+  const { t } = useTranslation()
   const customerStats = useMemo(() => {
     const map = {}
-    for (const t of tickets) {
-      if (!t.customer_id && !t.customer_name) continue
-      const key = t.customer_id || t.customer_name
+    for (const tk of tickets) {
+      if (!tk.customer_id && !tk.customer_name) continue
+      const key = tk.customer_id || tk.customer_name
       if (!map[key])
         map[key] = {
           total: 0,
           open: 0,
           lastActivity: null,
-          customerId: t.customer_id,
-          customerName: t.customer_name,
+          customerId: tk.customer_id,
+          customerName: tk.customer_name,
         }
       map[key].total++
-      if (t.ticket_status !== 'Completed' && t.ticket_status !== 'Cancelled') map[key].open++
-      if (!map[key].lastActivity || t.created_date > map[key].lastActivity)
-        map[key].lastActivity = t.created_date
+      if (tk.ticket_status !== 'Completed' && tk.ticket_status !== 'Cancelled') map[key].open++
+      if (!map[key].lastActivity || tk.created_date > map[key].lastActivity)
+        map[key].lastActivity = tk.created_date
     }
     return map
   }, [tickets])
@@ -532,7 +534,7 @@ function CustomersTab({ customers, tickets, formatDate }) {
       open: c.openTickets,
       last: formatDate(c.lastActivity),
     }))
-    downloadCSV(rows, columns, `customers-report-${toYMD(new Date())}.csv`)
+    downloadCSV(rows, columns, `customers-report-${toYMD(new Date())}.csv`, t)
   }
   const handleExportExcel = () => {
     const columns = [
@@ -549,26 +551,26 @@ function CustomersTab({ customers, tickets, formatDate }) {
       open: c.openTickets,
       last: formatDate(c.lastActivity),
     }))
-    downloadExcel(rows, columns, `customers-report-${toYMD(new Date())}.xlsx`)
+    downloadExcel(rows, columns, `customers-report-${toYMD(new Date())}.xlsx`, t)
   }
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <KpiCard
-          label="Active Customers"
+          label={t('reports.kpiActiveCustomers')}
           value={totalActive}
           color="indigo"
           icon="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
         />
         <KpiCard
-          label="Avg Tickets / Customer"
+          label={t('reports.kpiAvgTicketsPerCustomer')}
           value={avgTickets}
           color="blue"
           icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
         />
         <KpiCard
-          label="Returning Customers"
+          label={t('reports.kpiReturningCustomers')}
           value={topReturning}
           color="green"
           icon="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
@@ -581,7 +583,7 @@ function CustomersTab({ customers, tickets, formatDate }) {
 
       {enriched.length === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
-          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">No customer data in range</p>
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('reports.noCustomerData')}</p>
         </div>
       ) : (
         <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden">
@@ -590,14 +592,14 @@ function CustomersTab({ customers, tickets, formatDate }) {
               <thead className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
                 <tr>
                   {[
-                    'Customer Name',
-                    'Company',
-                    'Total Tickets',
-                    'Open Tickets',
-                    'Last Activity',
-                  ].map((h) => (
+                    t('reports.colCustomerName'),
+                    t('reports.colCompany'),
+                    t('reports.colTotalTickets'),
+                    t('reports.colOpenTickets'),
+                    t('reports.colLastActivity'),
+                  ].map((h, i) => (
                     <th
-                      key={h}
+                      key={i}
                       className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider"
                     >
                       {h}
@@ -642,17 +644,18 @@ function CustomersTab({ customers, tickets, formatDate }) {
 
 // ─── Technicians Tab ──────────────────────────────────────────────────────────
 function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: _formatDate }) {
+  const { t } = useTranslation()
   const stats = useMemo(() => {
     const map = {}
-    for (const t of tickets) {
-      const tech = t.assigned_technician
+    for (const tk of tickets) {
+      const tech = tk.assigned_technician
       if (!tech) continue
       if (!map[tech])
         map[tech] = { email: tech, assigned: 0, completed: 0, resolveTimes: [], hoursLogged: 0 }
       map[tech].assigned++
-      if (t.ticket_status === 'Completed') {
+      if (tk.ticket_status === 'Completed') {
         map[tech].completed++
-        const hrs = resolutionHours(t)
+        const hrs = resolutionHours(tk)
         if (hrs !== null) map[tech].resolveTimes.push(Number(hrs))
       }
     }
@@ -669,7 +672,7 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
   const avgAssigned = activeTechs ? (tickets.length / activeTechs).toFixed(1) : '—'
   const totalHours = timeEntriesMissing
     ? null
-    : stats.reduce((s, t) => s + t.hoursLogged, 0).toFixed(1)
+    : stats.reduce((s, ts) => s + ts.hoursLogged, 0).toFixed(1)
 
   const handleExport = () => {
     const columns = [
@@ -679,16 +682,16 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
       { key: 'avgResolve', label: 'Avg Resolution (hrs)' },
       { key: 'hoursLogged', label: 'Hours Logged' },
     ]
-    const rows = stats.map((t) => ({
-      email: t.email,
-      assigned: t.assigned,
-      completed: t.completed,
-      avgResolve: t.resolveTimes.length
-        ? (t.resolveTimes.reduce((s, v) => s + v, 0) / t.resolveTimes.length).toFixed(1)
+    const rows = stats.map((ts) => ({
+      email: ts.email,
+      assigned: ts.assigned,
+      completed: ts.completed,
+      avgResolve: ts.resolveTimes.length
+        ? (ts.resolveTimes.reduce((s, v) => s + v, 0) / ts.resolveTimes.length).toFixed(1)
         : '—',
-      hoursLogged: timeEntriesMissing ? 'N/A' : t.hoursLogged.toFixed(1),
+      hoursLogged: timeEntriesMissing ? 'N/A' : ts.hoursLogged.toFixed(1),
     }))
-    downloadCSV(rows, columns, `technicians-report-${toYMD(new Date())}.csv`)
+    downloadCSV(rows, columns, `technicians-report-${toYMD(new Date())}.csv`, t)
   }
   const handleExportExcel = () => {
     const columns = [
@@ -698,45 +701,45 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
       { key: 'avgResolve', label: 'Avg Resolution (hrs)' },
       { key: 'hoursLogged', label: 'Hours Logged' },
     ]
-    const rows = stats.map((t) => ({
-      email: t.email,
-      assigned: t.assigned,
-      completed: t.completed,
-      avgResolve: t.resolveTimes.length
-        ? (t.resolveTimes.reduce((s, v) => s + v, 0) / t.resolveTimes.length).toFixed(1)
+    const rows = stats.map((ts) => ({
+      email: ts.email,
+      assigned: ts.assigned,
+      completed: ts.completed,
+      avgResolve: ts.resolveTimes.length
+        ? (ts.resolveTimes.reduce((s, v) => s + v, 0) / ts.resolveTimes.length).toFixed(1)
         : '—',
-      hoursLogged: timeEntriesMissing ? 'N/A' : t.hoursLogged.toFixed(1),
+      hoursLogged: timeEntriesMissing ? 'N/A' : ts.hoursLogged.toFixed(1),
     }))
-    downloadExcel(rows, columns, `technicians-report-${toYMD(new Date())}.xlsx`)
+    downloadExcel(rows, columns, `technicians-report-${toYMD(new Date())}.xlsx`, t)
   }
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <KpiCard
-          label="Active Technicians"
+          label={t('reports.kpiActiveTechnicians')}
           value={activeTechs}
           color="purple"
           icon="M16 7a4 4 0 11-8 0 4 4 0 018 0M12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
         />
         <KpiCard
-          label="Avg Tickets Assigned"
+          label={t('reports.kpiAvgTicketsAssigned')}
           value={avgAssigned}
           color="blue"
           icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
         />
         <KpiCard
-          label="Total Hours Logged"
-          value={totalHours !== null ? `${totalHours}h` : 'N/A'}
+          label={t('reports.kpiTotalHoursLogged')}
+          value={totalHours !== null ? `${totalHours}h` : t('reports.naValue')}
           color="green"
           icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-          sub={timeEntriesMissing ? 'time_entries table not set up' : undefined}
+          sub={timeEntriesMissing ? t('reports.timeEntriesNotSetup') : undefined}
         />
       </div>
 
       {timeEntriesMissing && (
         <MigrationBanner table="time_entries">
-          Time tracking data is unavailable until the migration is run.
+          {t('reports.timeTrackingUnavailable')}
         </MigrationBanner>
       )}
 
@@ -746,7 +749,7 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
 
       {stats.length === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
-          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">No assigned tickets in range</p>
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('reports.noAssignedTickets')}</p>
         </div>
       ) : (
         <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden">
@@ -755,14 +758,14 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
               <thead className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
                 <tr>
                   {[
-                    'Technician',
-                    'Assigned',
-                    'Completed',
-                    'Avg Resolution (hrs)',
-                    'Hours Logged',
-                  ].map((h) => (
+                    t('reports.colTechnician'),
+                    t('reports.colAssigned'),
+                    t('reports.colCompleted'),
+                    t('reports.colAvgResolutionHrs'),
+                    t('reports.colHoursLogged'),
+                  ].map((h, i) => (
                     <th
-                      key={h}
+                      key={i}
                       className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
                     >
                       {h}
@@ -771,21 +774,21 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
-                {stats.map((t) => {
-                  const avgRes = t.resolveTimes.length
-                    ? (t.resolveTimes.reduce((s, v) => s + v, 0) / t.resolveTimes.length).toFixed(1)
+                {stats.map((ts) => {
+                  const avgRes = ts.resolveTimes.length
+                    ? (ts.resolveTimes.reduce((s, v) => s + v, 0) / ts.resolveTimes.length).toFixed(1)
                     : null
                   return (
-                    <tr key={t.email} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors">
-                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-[#e8ebf0] text-xs">{t.email}</td>
+                    <tr key={ts.email} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors">
+                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-[#e8ebf0] text-xs">{ts.email}</td>
                       <td className="px-4 py-3">
                         <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
-                          {t.assigned}
+                          {ts.assigned}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400">
-                          {t.completed}
+                          {ts.completed}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -798,7 +801,7 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
                         )}
                       </td>
                       <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs">
-                        {timeEntriesMissing ? 'N/A' : `${t.hoursLogged.toFixed(1)}h`}
+                        {timeEntriesMissing ? t('reports.naValue') : `${ts.hoursLogged.toFixed(1)}h`}
                       </td>
                     </tr>
                   )
@@ -814,11 +817,12 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
 
 // ─── Financial Tab ────────────────────────────────────────────────────────────
 function FinancialTab({ invoices, invoicesMissing, formatDate }) {
+  const { t } = useTranslation()
   if (invoicesMissing)
     return (
       <div className="space-y-4">
         <MigrationBanner table="invoices">
-          Invoice data is unavailable. Set up the invoices table to enable financial reporting.
+          {t('reports.invoiceDataUnavailable')}
         </MigrationBanner>
       </div>
     )
@@ -864,7 +868,7 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
       amount: i.total_amount || i.amount || 0,
       due_date: formatDate(i.due_date),
     }))
-    downloadCSV(rows, columns, `financial-report-${toYMD(new Date())}.csv`)
+    downloadCSV(rows, columns, `financial-report-${toYMD(new Date())}.csv`, t)
   }
   const handleExportExcel = () => {
     const columns = [
@@ -883,32 +887,32 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
       amount: i.total_amount || i.amount || 0,
       due_date: formatDate(i.due_date),
     }))
-    downloadExcel(rows, columns, `financial-report-${toYMD(new Date())}.xlsx`)
+    downloadExcel(rows, columns, `financial-report-${toYMD(new Date())}.xlsx`, t)
   }
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <KpiCard
-          label="Total Invoiced"
+          label={t('reports.kpiTotalInvoiced')}
           value={fmt$(totalInvoiced)}
           color="indigo"
           icon="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
         />
         <KpiCard
-          label="Total Paid"
+          label={t('reports.kpiTotalPaid')}
           value={fmt$(totalPaid)}
           color="green"
           icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
         />
         <KpiCard
-          label="Pending / Overdue"
+          label={t('reports.kpiPendingOverdue')}
           value={fmt$(totalPending)}
           color="amber"
           icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
         />
         <KpiCard
-          label="Quotes Value"
+          label={t('reports.kpiQuotesValue')}
           value={fmt$(quotesVal)}
           color="blue"
           icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
@@ -921,7 +925,7 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
 
       {invoices.length === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
-          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">No invoices in the selected date range</p>
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('reports.noInvoicesInRange')}</p>
         </div>
       ) : (
         <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden">
@@ -929,9 +933,16 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
             <table className="w-full text-sm">
               <thead className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
                 <tr>
-                  {['Invoice #', 'Customer', 'Type', 'Status', 'Total', 'Due Date'].map((h) => (
+                  {[
+                    t('invoices.colInvoiceNum'),
+                    t('reports.colCustomer'),
+                    t('reports.colType'),
+                    t('reports.colStatus'),
+                    t('reports.colTotal'),
+                    t('reports.colDueDate'),
+                  ].map((h, i) => (
                     <th
-                      key={h}
+                      key={i}
                       className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
                     >
                       {h}
@@ -1020,12 +1031,12 @@ export default function Reports({
 
   // Tab state — viewers/technicians can only see Tickets
   const allTabs = [
-    { id: 'tickets', label: 'Tickets' },
+    { id: 'tickets', label: t('reports.tabTickets') },
     ...(isAdminOrManager
       ? [
-          { id: 'customers', label: 'Customers' },
-          { id: 'technicians', label: 'Technicians' },
-          { id: 'financial', label: 'Financial' },
+          { id: 'customers', label: t('reports.tabCustomers') },
+          { id: 'technicians', label: t('reports.tabTechnicians') },
+          { id: 'financial', label: t('reports.tabFinancial') },
         ]
       : []),
   ]
@@ -1047,7 +1058,7 @@ export default function Reports({
   useEffect(() => {
     if (isError) {
       captureException(error, { page: 'Reports', context: 'loadData' })
-      toast.error('Failed to load report data')
+      toast.error(t('reports.errorLoad'))
     }
   }, [isError, error])
 
@@ -1060,7 +1071,7 @@ export default function Reports({
 
   // Apply date range filter
   const filteredTickets = useMemo(
-    () => tickets.filter((t) => inRange(t.created_date, fromDate, toDate)),
+    () => tickets.filter((tk) => inRange(tk.created_date, fromDate, toDate)),
     [tickets, fromDate, toDate]
   )
   const filteredCustomers = useMemo(
@@ -1140,7 +1151,7 @@ export default function Reports({
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
             />
           </svg>
-          Refresh
+          {t('common.refresh')}
         </button>
       </PageHeader>
 
@@ -1148,14 +1159,14 @@ export default function Reports({
         contextType="dashboard"
         data={{
           range: `${fromDate} to ${toDate}`,
-          open: filteredTickets.filter((t) => t.ticket_status === 'Open').length,
-          in_progress: filteredTickets.filter((t) => t.ticket_status === 'In Progress').length,
-          pending: filteredTickets.filter((t) => t.ticket_status === 'Pending').length,
-          overdue: filteredTickets.filter((t) => t.due_date && !['Completed','Closed','Cancelled'].includes(t.ticket_status) && new Date(t.due_date) < new Date()).length,
-          resolved: filteredTickets.filter((t) => ['Completed','Closed'].includes(t.ticket_status)).length,
+          open: filteredTickets.filter((tk) => tk.ticket_status === 'Open').length,
+          in_progress: filteredTickets.filter((tk) => tk.ticket_status === 'In Progress').length,
+          pending: filteredTickets.filter((tk) => tk.ticket_status === 'Pending').length,
+          overdue: filteredTickets.filter((tk) => tk.due_date && !['Completed','Closed','Cancelled'].includes(tk.ticket_status) && new Date(tk.due_date) < new Date()).length,
+          resolved: filteredTickets.filter((tk) => ['Completed','Closed'].includes(tk.ticket_status)).length,
           total: filteredTickets.length,
-          sla_percent: filteredTickets.length ? Math.round((filteredTickets.filter((t) => !t.due_date || ['Completed','Closed'].includes(t.ticket_status) || new Date(t.due_date) >= new Date()).length / filteredTickets.length) * 100) : 100,
-          resolution_rate: filteredTickets.length ? Math.round((filteredTickets.filter((t) => ['Completed','Closed'].includes(t.ticket_status)).length / filteredTickets.length) * 100) : 0,
+          sla_percent: filteredTickets.length ? Math.round((filteredTickets.filter((tk) => !tk.due_date || ['Completed','Closed'].includes(tk.ticket_status) || new Date(tk.due_date) >= new Date()).length / filteredTickets.length) * 100) : 100,
+          resolution_rate: filteredTickets.length ? Math.round((filteredTickets.filter((tk) => ['Completed','Closed'].includes(tk.ticket_status)).length / filteredTickets.length) * 100) : 0,
         }}
       />
 
@@ -1181,7 +1192,7 @@ export default function Reports({
           max={toDate}
           className={inputCls}
         />
-        <span className="text-gray-500 dark:text-[#9aa4b2] text-sm">to</span>
+        <span className="text-gray-500 dark:text-[#9aa4b2] text-sm">{t('reports.to')}</span>
         <input
           type="date"
           value={toDate}
@@ -1195,22 +1206,22 @@ export default function Reports({
             onClick={() => applyPreset(7)}
             className={presetCls(isPreset7 && toDate === today)}
           >
-            Last 7 days
+            {t('reports.last7Days')}
           </button>
           <button
             onClick={() => applyPreset(30)}
             className={presetCls(isPreset30 && toDate === today)}
           >
-            Last 30 days
+            {t('reports.last30Days')}
           </button>
           <button
             onClick={() => applyPreset(90)}
             className={presetCls(isPreset90 && toDate === today)}
           >
-            Last 90 days
+            {t('reports.last90Days')}
           </button>
           <button onClick={applyThisYear} className={presetCls(isThisYear && toDate === today)}>
-            This year
+            {t('reports.thisYear')}
           </button>
         </div>
       </div>
