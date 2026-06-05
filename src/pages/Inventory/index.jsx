@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useURLTab } from '../../hooks/useURLTab'
 import { supabase, db } from '../../api/supabaseClient'
@@ -16,6 +17,7 @@ import { WarehousesTab } from './WarehousesTab'
 
 // ─── Main Inventory Component ──────────────────────────────────────────────────
 export default function Inventory({ userRole, userEmail, userPermissions, onNavigateToTicket }) {
+  const { t } = useTranslation()
   const canDo = (a) =>
     userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN
       ? true
@@ -178,19 +180,19 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
   })
 
   const tabs = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'by-product', label: `All Units (${units.length})` },
-    { id: 'received', label: `Received (${receivedProds.length})` },
-    { id: 'under-repair', label: `Under Repair (${underRepairProds.length})` },
-    { id: 'repaired', label: `Repaired (${repairedProds.length})` },
-    { id: 'cant-repair', label: `Can't Repair (${cantRepairProds.length})` },
-    { id: 'rma-stock', label: `RMA Stock (${rmaStockProds.length})` },
-    { id: 'warehouses', label: `Warehouses (${warehouses.length})` },
+    { id: 'overview', label: t('inventory.overview') },
+    { id: 'by-product', label: `${t('inventory.allUnits')} (${units.length})` },
+    { id: 'received', label: `${t('inventory.received')} (${receivedProds.length})` },
+    { id: 'under-repair', label: `${t('inventory.underRepair')} (${underRepairProds.length})` },
+    { id: 'repaired', label: `${t('inventory.repaired')} (${repairedProds.length})` },
+    { id: 'cant-repair', label: `${t('inventory.cantRepair')} (${cantRepairProds.length})` },
+    { id: 'rma-stock', label: `${t('inventory.rmaStock')} (${rmaStockProds.length})` },
+    { id: 'warehouses', label: `${t('inventory.warehouses')} (${warehouses.length})` },
   ]
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Inventory" subtitle="Track RMA units through their full lifecycle">
+      <PageHeader title={t('inventory.title')} subtitle={t('inventory.subtitle')}>
         {canDo('export') && (
           <ExportMenu units={units} batches={batches} warehouses={warehouses} brandMap={brandMap} />
         )}
@@ -206,7 +208,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
             />
           </svg>
-          Refresh
+          {t('common.refresh')}
         </button>
       </PageHeader>
 

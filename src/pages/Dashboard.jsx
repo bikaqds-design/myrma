@@ -6,6 +6,7 @@ import { safeStorage } from '../lib/safeStorage'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { Spinner } from '../components/ui'
 import { TICKET_STATUS, TICKET_STATUS_LIST, TICKET_STATUS_RESOLVED } from '../lib/constants'
+import { useTranslation } from 'react-i18next'
 
 const DashboardCharts = lazy(() => import('./DashboardCharts'))
 
@@ -193,6 +194,7 @@ function DonutWithLegend({ segments, tk }) {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Dashboard({ currentUserEmail, onNavigate }) {
   const { dashboardWidgets, darkMode } = useAppearance()
+  const { t } = useTranslation()
   const tk = tokens(darkMode)
   const chartTickStyle  = { fontSize: 10, fill: tk.textFaint }
   const chartGridColor  = tk.grid
@@ -417,8 +419,8 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
       {/* ── Page header ── */}
       <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h1 style={{ margin: 0, fontSize: 25, fontWeight: 750, letterSpacing: -0.5, color: tk.text }}>RMA Operations</h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13.5, color: tk.textMuted }}>System overview &amp; analytics · updated just now</p>
+          <h1 style={{ margin: 0, fontSize: 25, fontWeight: 750, letterSpacing: -0.5, color: tk.text }}>{t('dashboard.rmaOperations')}</h1>
+          <p style={{ margin: '4px 0 0', fontSize: 13.5, color: tk.textMuted }}>{t('dashboard.systemOverview')} · {t('dashboard.updatedJustNow')}</p>
         </div>
         <div className="flex gap-2">
           {RANGES.map((seg) => (
@@ -440,8 +442,8 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
 
       {!hasWidgets && (
         <div style={{ background: tk.surface, border: `2px dashed ${tk.border}`, borderRadius: 14, padding: '56px 0', textAlign: 'center' }}>
-          <p style={{ color: tk.textMuted, fontWeight: 600, margin: 0 }}>No widgets enabled</p>
-          <p style={{ color: tk.textFaint, fontSize: 13, marginTop: 4 }}>Go to Account Settings → Appearance to enable widgets</p>
+          <p style={{ color: tk.textMuted, fontWeight: 600, margin: 0 }}>{t('dashboard.noWidgets')}</p>
+          <p style={{ color: tk.textFaint, fontSize: 13, marginTop: 4 }}>{t('dashboard.noWidgetsHint')}</p>
         </div>
       )}
 
@@ -451,10 +453,10 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
         {on('stat_tickets') && (
           <>
             {[
-              { label: 'Total Tickets', value: totalTickets, color: tk.text, spark: sparkWeekly, delta: '+8%', deltaUp: true },
-              { label: 'Active / Open',  value: openActive,   color: tk.accent, spark: [12,14,11,17,15,16,openActive], caption: 'across 4 live states' },
-              { label: 'Overdue',        value: overdueList.length, color: tk.bad, spark: [3,4,5,4,6,6,overdueList.length], caption: 'needs attention today' },
-              { label: 'SLA On-time',    value: `${slaPercent}%`, color: tk.good, spark: [92,93,94,95,95,96,slaPercent], delta: '+2%', deltaUp: true },
+              { label: t('dashboard.totalTickets'), value: totalTickets, color: tk.text, spark: sparkWeekly, delta: '+8%', deltaUp: true },
+              { label: t('dashboard.activeOpen'),  value: openActive,   color: tk.accent, spark: [12,14,11,17,15,16,openActive], caption: t('dashboard.across4States') },
+              { label: t('dashboard.overdue'),        value: overdueList.length, color: tk.bad, spark: [3,4,5,4,6,6,overdueList.length], caption: t('dashboard.needsAttention') },
+              { label: t('dashboard.slaOntime'),    value: `${slaPercent}%`, color: tk.good, spark: [92,93,94,95,95,96,slaPercent], delta: '+2%', deltaUp: true },
             ].map(({ label, value, color, spark, delta, deltaUp, caption }) => (
               <div key={label} className="col-span-12 sm:col-span-6 lg:col-span-3"
                 style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -486,14 +488,14 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
           <div className="col-span-12"
             style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, display: 'flex', overflow: 'hidden' }}>
             {[
-              { label: 'Open',        value: statusCounts[TICKET_STATUS.OPEN],        navPath: `/rma-tickets?status=${TICKET_STATUS.OPEN}` },
-              { label: 'In Progress', value: statusCounts[TICKET_STATUS.IN_PROGRESS], navPath: `/rma-tickets?status=${TICKET_STATUS.IN_PROGRESS}` },
-              { label: 'Pending',     value: statusCounts[TICKET_STATUS.PENDING],     navPath: `/rma-tickets?status=${TICKET_STATUS.PENDING}` },
-              { label: 'On Hold',     value: statusCounts[TICKET_STATUS.ON_HOLD],     navPath: `/rma-tickets?status=${TICKET_STATUS.ON_HOLD}` },
-              { label: 'Completed',   value: statusCounts[TICKET_STATUS.COMPLETED],   navPath: `/rma-tickets?status=${TICKET_STATUS.COMPLETED}` },
-              { label: 'Closed',      value: statusCounts[TICKET_STATUS.CLOSED],      navPath: `/rma-tickets?status=${TICKET_STATUS.CLOSED}` },
-              { label: 'Cancelled',   value: statusCounts[TICKET_STATUS.CANCELLED],   navPath: `/rma-tickets?status=${TICKET_STATUS.CANCELLED}` },
-              { label: 'Overdue',     value: overdueList.length,                      navPath: '/rma-tickets?overdue=true' },
+              { label: t('statusValues.Open'),        value: statusCounts[TICKET_STATUS.OPEN],        navPath: `/rma-tickets?status=${TICKET_STATUS.OPEN}` },
+              { label: t('statusValues.In Progress'), value: statusCounts[TICKET_STATUS.IN_PROGRESS], navPath: `/rma-tickets?status=${TICKET_STATUS.IN_PROGRESS}` },
+              { label: t('statusValues.Pending'),     value: statusCounts[TICKET_STATUS.PENDING],     navPath: `/rma-tickets?status=${TICKET_STATUS.PENDING}` },
+              { label: t('statusValues.On Hold'),     value: statusCounts[TICKET_STATUS.ON_HOLD],     navPath: `/rma-tickets?status=${TICKET_STATUS.ON_HOLD}` },
+              { label: t('statusValues.Completed'),   value: statusCounts[TICKET_STATUS.COMPLETED],   navPath: `/rma-tickets?status=${TICKET_STATUS.COMPLETED}` },
+              { label: t('statusValues.Closed'),      value: statusCounts[TICKET_STATUS.CLOSED],      navPath: `/rma-tickets?status=${TICKET_STATUS.CLOSED}` },
+              { label: t('statusValues.Cancelled'),   value: statusCounts[TICKET_STATUS.CANCELLED],   navPath: `/rma-tickets?status=${TICKET_STATUS.CANCELLED}` },
+              { label: t('statusValues.Overdue'),     value: overdueList.length,                      navPath: '/rma-tickets?overdue=true' },
             ].map(({ label, value, navPath }, i) => {
               const color = STATUS_COLOR[label] || '#94a3b8'
               return (
@@ -521,16 +523,16 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
 
         {/* ── Section: Performance ── */}
         {(on('sla_health') || on('resolution_rate') || on('status_distribution') || on('priority_distribution')) && (
-          <SectionLabel tk={tk}>Performance</SectionLabel>
+          <SectionLabel tk={tk}>{t('dashboard.performance')}</SectionLabel>
         )}
 
         {on('sla_health') && (
           <div className="col-span-12 sm:col-span-6 lg:col-span-3" onClick={nav('/rma-tickets?overdue=true')}
             style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
-            <CardHead title="SLA Health" tk={tk} />
+            <CardHead title={t('dashboard.slaHealth')} tk={tk} />
             <SvgGauge percent={slaPercent} color={slaPercent >= 80 ? tk.good : slaPercent >= 60 ? tk.warn : tk.bad} tk={tk} />
             <p style={{ margin: '10px 0 0', fontSize: 11.5, color: tk.textMuted, textAlign: 'center' }}>
-              {onScheduleCount}/{trackedCount} on schedule
+              {onScheduleCount}/{trackedCount} {t('dashboard.onSchedule')}
             </p>
           </div>
         )}
@@ -538,10 +540,10 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
         {on('resolution_rate') && (
           <div className="col-span-12 sm:col-span-6 lg:col-span-3" onClick={nav(`/rma-tickets?status=${TICKET_STATUS.CLOSED}`)}
             style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
-            <CardHead title="Resolution Rate" tk={tk} />
+            <CardHead title={t('dashboard.resolutionRate')} tk={tk} />
             <SvgGauge percent={resolutionPercent} color={resolutionPercent >= 70 ? tk.good : resolutionPercent >= 40 ? tk.warn : tk.accent} tk={tk} />
             <p style={{ margin: '10px 0 0', fontSize: 11.5, color: tk.textMuted, textAlign: 'center' }}>
-              {closedTickets}/{totalTickets} resolved or closed
+              {closedTickets}/{totalTickets} {t('dashboard.resolvedOrClosed')}
             </p>
           </div>
         )}
@@ -549,7 +551,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
         {on('status_distribution') && (
           <div className="col-span-12 sm:col-span-6 lg:col-span-3" onClick={nav('/rma-tickets')}
             style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
-            <CardHead title="Status Mix" tk={tk} />
+            <CardHead title={t('dashboard.statusMix')} tk={tk} />
             {statusDist.length === 0
               ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', paddingTop: 20 }}>No data</p>
               : <DonutWithLegend segments={statusDist} tk={tk} />}
@@ -559,7 +561,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
         {on('priority_distribution') && (
           <div className="col-span-12 sm:col-span-6 lg:col-span-3" onClick={nav('/rma-tickets')}
             style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
-            <CardHead title="Priority Mix" tk={tk} />
+            <CardHead title={t('dashboard.priorityMix')} tk={tk} />
             {priorityDist.length === 0
               ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', paddingTop: 20 }}>No data</p>
               : <DonutWithLegend segments={priorityDist} tk={tk} />}
@@ -568,7 +570,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
 
         {/* ── Section: Trends ── */}
         {(on('weekly_trend') || on('monthly_trend')) && (
-          <SectionLabel tk={tk}>Trends</SectionLabel>
+          <SectionLabel tk={tk}>{t('dashboard.trends')}</SectionLabel>
         )}
         <Suspense fallback={null}>
           <DashboardCharts
@@ -581,15 +583,15 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
 
         {/* ── Section: Activity ── */}
         {(on('recent_tickets') || on('overdue_tickets') || on('top_issues')) && (
-          <SectionLabel tk={tk}>Activity</SectionLabel>
+          <SectionLabel tk={tk}>{t('dashboard.activity')}</SectionLabel>
         )}
 
         {on('recent_tickets') && (
           <div className="col-span-12 lg:col-span-5" onClick={nav('/rma-tickets')}
             style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
-            <CardHead title="Recent Tickets" action="View all" tk={tk} />
+            <CardHead title={t('dashboard.recentTickets')} action={t('common.viewAll')} tk={tk} />
             {recentTickets.length === 0
-              ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No tickets yet</p>
+              ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', padding: '20px 0' }}>{t('dashboard.noTicketsYet')}</p>
               : recentTickets.map((t, i) => (
                 <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderTop: i ? `1px solid ${tk.borderSoft}` : 'none' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
@@ -605,13 +607,13 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
         {on('overdue_tickets') && (
           <div className="col-span-12 sm:col-span-6 lg:col-span-3" onClick={nav('/rma-tickets?overdue=true')}
             style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
-            <CardHead title="Overdue" action={String(overdueList.length)} tk={tk} />
+            <CardHead title={t('dashboard.overdueTickets')} action={String(overdueList.length)} tk={tk} />
             {overdueList.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '24px 0' }}>
                 <svg className="mx-auto mb-2" width="32" height="32" fill="none" stroke={tk.good} strokeWidth="1.5" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p style={{ color: tk.good, fontSize: 13, fontWeight: 600, margin: 0 }}>All clear!</p>
+                <p style={{ color: tk.good, fontSize: 13, fontWeight: 600, margin: 0 }}>{t('dashboard.allClear')}</p>
               </div>
             ) : overdueList.slice(0, 8).map((t, i) => (
               <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderTop: i ? `1px solid ${tk.borderSoft}` : 'none' }}>
@@ -630,9 +632,9 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
         {on('top_issues') && (
           <div className="col-span-12 sm:col-span-6 lg:col-span-4"
             style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column' }}>
-            <CardHead title="Top Issues" tk={tk} />
+            <CardHead title={t('dashboard.topIssues')} tk={tk} />
             {topIssues.length === 0
-              ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', padding: '20px 0' }}>No issues recorded yet</p>
+              ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', padding: '20px 0' }}>{t('dashboard.noIssuesRecorded')}</p>
               : topIssues.map((item, idx) => {
                 const maxCount = topIssues[0]?.count || 1
                 return (
@@ -655,15 +657,15 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
 
         {/* ── Section: Team & Inventory ── */}
         {(on('technician_performance') || on('stat_inventory')) && (
-          <SectionLabel tk={tk}>Team &amp; Inventory</SectionLabel>
+          <SectionLabel tk={tk}>{t('dashboard.teamInventory')}</SectionLabel>
         )}
 
         {on('technician_performance') && (
           <div className="col-span-12 lg:col-span-7"
             style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column' }}>
-            <CardHead title="Technician Performance" action="Top 5 by close rate" tk={tk} />
+            <CardHead title={t('dashboard.technicianPerformance')} action={t('dashboard.top5ByCloseRate')} tk={tk} />
             {technicianPerformance.length === 0
-              ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', padding: '24px 0' }}>No assigned tickets</p>
+              ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', padding: '24px 0' }}>{t('dashboard.noAssignedTickets')}</p>
               : (
                 <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', gap: 12, flex: 1, paddingTop: 6 }}>
                   {technicianPerformance.map((tech) => (
@@ -674,7 +676,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
                       </div>
                       <div style={{ textAlign: 'center' }}>
                         <div style={{ fontSize: 12, fontWeight: 600, color: tk.text, lineHeight: 1.3 }}>{tech.name}</div>
-                        <div style={{ fontSize: 11, color: tk.textFaint }}>{tech.closed}/{tech.total} closed</div>
+                        <div style={{ fontSize: 11, color: tk.textFaint }}>{tech.closed}/{tech.total} {t('dashboard.closedLabel')}</div>
                       </div>
                     </div>
                   ))}
@@ -686,14 +688,14 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
         {on('stat_inventory') && (
           <div className="col-span-12 sm:col-span-6 lg:col-span-5"
             style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column' }}>
-            <CardHead title="Inventory Snapshot" action={`${invProductCounts.allUnits} units`} tk={tk} />
+            <CardHead title={t('dashboard.inventorySnapshot')} action={`${invProductCounts.allUnits} ${t('dashboard.units')}`} tk={tk} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, flex: 1 }}>
               {[
-                { label: 'Received',     value: invProductCounts.received,    color: '#0ea5e9', tab: 'received'     },
-                { label: 'Under Repair', value: invProductCounts.underRepair, color: '#f97316', tab: 'under-repair' },
-                { label: 'Repaired',     value: invProductCounts.repaired,    color: '#14b8a6', tab: 'repaired'     },
-                { label: "Can't Repair", value: invProductCounts.cantRepair,  color: '#ef4444', tab: 'cant-repair'  },
-                { label: 'RMA Stock',    value: invProductCounts.rmaStock,    color: '#6366f1', tab: 'rma-stock'    },
+                { label: t('inventory.received'),    value: invProductCounts.received,    color: '#0ea5e9', tab: 'received'     },
+                { label: t('inventory.underRepair'), value: invProductCounts.underRepair, color: '#f97316', tab: 'under-repair' },
+                { label: t('inventory.repaired'),    value: invProductCounts.repaired,    color: '#14b8a6', tab: 'repaired'     },
+                { label: t('inventory.cantRepair'),  value: invProductCounts.cantRepair,  color: '#ef4444', tab: 'cant-repair'  },
+                { label: t('inventory.rmaStock'),    value: invProductCounts.rmaStock,    color: '#6366f1', tab: 'rma-stock'    },
               ].map((c) => (
                 <button key={c.label} onClick={() => onNavigate?.(`/inventory?tab=${c.tab}`)}
                   style={{ background: tk.surfaceInset, borderRadius: 10, padding: '14px 12px', textAlign: 'left', border: 'none', cursor: 'pointer', transition: 'filter .15s' }}

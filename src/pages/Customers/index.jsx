@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { PageSkeleton } from '../../components/Skeleton'
 import { PageHeader } from '../../components/ui'
+import { useTranslation } from 'react-i18next'
 import EmptyState from '../../components/EmptyState'
 import { customerSchema, getFirstError } from '../../lib/schemas'
 import { ROLES } from '../../lib/constants'
@@ -21,6 +22,7 @@ export default function Customers({
   currentUserPermissions,
   onNavigateToCustomer,
 }) {
+  const { t } = useTranslation()
   const searchRef = useRef(null)
   const queryClient = useQueryClient()
 
@@ -867,7 +869,7 @@ export default function Customers({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <PageHeader title="Customers" subtitle="Manage B2B and B2C customer records" />
+      <PageHeader title={t('customers.title')} subtitle={t('customers.subtitle')} />
 
       {/* Table Card */}
       <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] shadow-sm">
@@ -881,7 +883,7 @@ export default function Customers({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search name, company, mobile, code... (Press / to focus)"
+                  placeholder={t('customers.searchPlaceholder')}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                 />
                 <svg
@@ -912,7 +914,7 @@ export default function Customers({
                     d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"
                   />
                 </svg>
-                Filters
+                {t('common.filters')}
                 {(filterStatus || filterType || filterCompany) && (
                   <span className="w-4 h-4 bg-indigo-600 text-white text-xs rounded-full flex items-center justify-center">
                     {[filterStatus, filterType, filterCompany].filter(Boolean).length}
@@ -1171,25 +1173,25 @@ export default function Customers({
                     #
                   </th>
                   <th className="px-4 py-3 text-left">
-                    <Th label="Code" col="customer_code" />
+                    <Th label={t('common.code')} col="customer_code" />
                   </th>
                   <th className="px-4 py-3 text-left">
-                    <Th label="Contact / Company" col="contact_person" />
+                    <Th label={t('customers.contactCompany')} col="contact_person" />
                   </th>
                   <th className="px-4 py-3 text-left">
-                    <Th label="Type" col="customer_type" />
+                    <Th label={t('common.type')} col="customer_type" />
                   </th>
                   <th className="px-4 py-3 text-left">
-                    <Th label="Mobile" col="mobile" />
+                    <Th label={t('customers.mobile')} col="mobile" />
                   </th>
                   <th className="px-4 py-3 text-left">
-                    <Th label="Email" col="email" />
+                    <Th label={t('common.email')} col="email" />
                   </th>
                   <th className="px-4 py-3 text-left">
-                    <Th label="Status" col="customer_status" />
+                    <Th label={t('common.status')} col="customer_status" />
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">
-                    Actions
+                    {t('common.actions')}
                   </th>
                 </tr>
               </thead>

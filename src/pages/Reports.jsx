@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
 import { db } from '../api/supabaseClient'
@@ -994,6 +995,7 @@ export default function Reports({
   onNavigateToTicket,
 }) {
   const { formatDate: _formatDate2, formatDateTime: _formatDateTime } = useAppearance()
+  const { t } = useTranslation()
 
   const _canDo = (action) => {
     if (currentUserRole === ROLES.SUPER_ADMIN || currentUserRole === ROLES.ADMIN) return true
@@ -1123,8 +1125,8 @@ export default function Reports({
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
-        title="Reports & Analytics"
-        subtitle="Analyse ticket performance, customer trends, and financials"
+        title={t('reports.title')}
+        subtitle={t('reports.subtitle')}
       >
         <button
           onClick={() => refetch()}

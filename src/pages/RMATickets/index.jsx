@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, db, branding as brandingAPI, notifications } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
@@ -17,6 +18,7 @@ import { TicketForm } from './TicketForm'
 import { TicketDrawer } from './TicketDrawer'
 
 export default function RMATickets({ userRole, userEmail, userPermissions, initialTicketId }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
 
   // P-1: TanStack Query — cached fetch; stale data renders instantly on re-visit
@@ -883,7 +885,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   return (
     <div className="space-y-6">
       {/* Header */}
-      <PageHeader title="RMA Tickets" subtitle="Manage return merchandise authorization" />
+      <PageHeader title={t('tickets.title')} subtitle={t('tickets.subtitle')} />
 
       <AIAssist
         contextType="dashboard"
@@ -909,7 +911,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by RMA number, customer, status, priority... (Press / to focus)"
+              placeholder={t('tickets.searchPlaceholder')}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
             />
             <svg
@@ -940,7 +942,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"
               />
             </svg>
-            Filters
+            {t('common.filters')}
             {(filterStatus || filterOverdue || filterPriority || filterAssigned || filterCustomer) && (
               <span className="w-4 h-4 bg-indigo-600 text-white text-xs rounded-full flex items-center justify-center">
                 {[filterStatus, filterOverdue, filterPriority, filterAssigned, filterCustomer].filter(Boolean).length}
@@ -959,7 +961,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              Export
+              {t('common.export')}
             </Button>
           )}
           {canDo('create') && (
@@ -972,7 +974,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                 />
               </svg>
-              Create Ticket
+              {t('tickets.createTicket')}
             </Button>
           )}
         </div>
@@ -982,20 +984,20 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       {showFilters && (
         <div id="ticket-filters-panel" className="flex flex-wrap gap-3 items-center p-4 bg-gray-50 rounded-lg">
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Status:</label>
+            <label className="text-sm font-medium text-gray-700">{t('common.status')}:</label>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
             >
-              <option value="">All</option>
-              <option value="Open">Open</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Pending">Pending</option>
-              <option value="On Hold">On Hold</option>
-              <option value="Completed">Completed</option>
-              <option value="Closed">Closed</option>
-              <option value="Cancelled">Cancelled</option>
+              <option value="">{t('common.all')}</option>
+              <option value="Open">{t('statusValues.Open')}</option>
+              <option value="In Progress">{t('statusValues.In Progress')}</option>
+              <option value="Pending">{t('statusValues.Pending')}</option>
+              <option value="On Hold">{t('statusValues.On Hold')}</option>
+              <option value="Completed">{t('statusValues.Completed')}</option>
+              <option value="Closed">{t('statusValues.Closed')}</option>
+              <option value="Cancelled">{t('statusValues.Cancelled')}</option>
             </select>
           </div>
           <div className="flex items-center gap-2">
@@ -1006,31 +1008,31 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 onChange={(e) => setFilterOverdue(e.target.checked)}
                 className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
               />
-              Overdue only
+              {t('tickets.overdueOnly')}
             </label>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Priority:</label>
+            <label className="text-sm font-medium text-gray-700">{t('common.priority')}:</label>
             <select
               value={filterPriority}
               onChange={(e) => setFilterPriority(e.target.value)}
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
             >
-              <option value="">All</option>
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-              <option value="Critical">Critical</option>
+              <option value="">{t('common.all')}</option>
+              <option value="Low">{t('priorityValues.Low')}</option>
+              <option value="Medium">{t('priorityValues.Medium')}</option>
+              <option value="High">{t('priorityValues.High')}</option>
+              <option value="Critical">{t('priorityValues.Critical')}</option>
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Assigned To:</label>
+            <label className="text-sm font-medium text-gray-700">{t('tickets.assignedTo')}:</label>
             <select
               value={filterAssigned}
               onChange={(e) => setFilterAssigned(e.target.value)}
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
             >
-              <option value="">All</option>
+              <option value="">{t('common.all')}</option>
               {[...new Set(tickets.map((t) => t.assigned_technician).filter(Boolean))]
                 .sort()
                 .map((email) => (
@@ -1041,7 +1043,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Customer:</label>
+            <label className="text-sm font-medium text-gray-700">{t('tickets.customer')}:</label>
             <div className="relative filter-customer-dropdown">
               <div className="flex items-center">
                 <input
@@ -1295,7 +1297,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader
-                  label="RMA Number"
+                  label={t('tickets.rmaNumber')}
                   sortKey="rma_number"
                   sortConfig={sortConfig}
                   onSort={handleSort}
@@ -1303,7 +1305,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader
-                  label="Customer"
+                  label={t('tickets.customer')}
                   sortKey="customer_name"
                   sortConfig={sortConfig}
                   onSort={handleSort}
@@ -1311,7 +1313,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader
-                  label="Status"
+                  label={t('common.status')}
                   sortKey="ticket_status"
                   sortConfig={sortConfig}
                   onSort={handleSort}
@@ -1319,7 +1321,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader
-                  label="Priority"
+                  label={t('common.priority')}
                   sortKey="priority"
                   sortConfig={sortConfig}
                   onSort={handleSort}
@@ -1327,7 +1329,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader
-                  label="Assigned To"
+                  label={t('tickets.assignedTo')}
                   sortKey="assigned_technician"
                   sortConfig={sortConfig}
                   onSort={handleSort}
@@ -1335,14 +1337,14 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader
-                  label="Created Date"
+                  label={t('tickets.createdDate')}
                   sortKey="created_date"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Actions
+                {t('common.actions')}
               </th>
             </tr>
           </thead>
