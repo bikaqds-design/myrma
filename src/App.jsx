@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Toaster, toast } from 'react-hot-toast'
 import { useQueryClient } from '@tanstack/react-query'
 import { auth, db, branding as brandingAPI, supabase } from './api/supabaseClient'
@@ -220,6 +221,7 @@ export default function App() {
   const queryClient = useQueryClient()
 
   const { sidebarCompact, updateAppearance, darkMode } = useAppearance()
+  const { t } = useTranslation()
   const toastOptions = darkMode
     ? { style: { background: '#121823', color: '#e8ebf0', border: '1px solid #212a38', borderRadius: 12 } }
     : { style: { borderRadius: 12 } }
@@ -632,6 +634,7 @@ export default function App() {
       )}
 
       <div
+        id="app-sidebar"
         className={`fixed lg:static inset-y-0 left-0 z-30 ${sidebarCompact ? 'w-16' : 'w-64'} bg-white dark:bg-[#121823] border-r border-[#e6e9ef] dark:border-[#212a38] flex flex-col transform transition-all duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
       >
         <div
@@ -705,15 +708,15 @@ export default function App() {
 
         <nav className={`flex-1 ${sidebarCompact ? 'p-2' : 'p-4'} space-y-0.5 overflow-y-auto`}>
           {[
-            { path: '/', label: 'Dashboard', active: pathname === '/' || pathname === '/dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-            { path: '/products', label: 'Products', active: isProductsActive, icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
-            { path: '/customers', label: 'Customers', active: isCustomersActive, icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
-            { path: '/rma-tickets', label: 'RMA Tickets', active: pathname === '/rma-tickets', icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z' },
-            { path: '/inventory', label: 'Inventory', active: pathname === '/inventory', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
-            { path: '/calendar', label: 'Calendar', active: pathname === '/calendar', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-            { path: '/invoices', label: 'Invoices', active: pathname === '/invoices', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-            { path: '/parts', label: 'Parts Inventory', active: pathname === '/parts', icon: 'M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z' },
-            { path: '/reports', label: 'Reports', active: pathname === '/reports', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+            { path: '/', label: t('nav.dashboard'), active: pathname === '/' || pathname === '/dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+            { path: '/products', label: t('nav.products'), active: isProductsActive, icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
+            { path: '/customers', label: t('nav.customers'), active: isCustomersActive, icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
+            { path: '/rma-tickets', label: t('nav.rmaTickets'), active: pathname === '/rma-tickets', icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z' },
+            { path: '/inventory', label: t('nav.inventory'), active: pathname === '/inventory', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
+            { path: '/calendar', label: t('nav.calendar'), active: pathname === '/calendar', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+            { path: '/invoices', label: t('nav.invoices'), active: pathname === '/invoices', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+            { path: '/parts', label: t('nav.parts'), active: pathname === '/parts', icon: 'M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z' },
+            { path: '/reports', label: t('nav.reports'), active: pathname === '/reports', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
           ].map(({ path, label, active, icon }) => (
             <button
               key={path}
@@ -733,7 +736,7 @@ export default function App() {
             href="/tracker"
             target="_blank"
             rel="noopener noreferrer"
-            title={sidebarCompact ? 'Customer Tracker' : undefined}
+            title={sidebarCompact ? t('nav.customerTracker') : undefined}
             className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-3 py-2.5'} rounded-[10px] text-[13.5px] font-[600] transition-colors text-[#6c6760] dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230]`}
           >
             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -741,7 +744,7 @@ export default function App() {
             </svg>
             {!sidebarCompact && (
               <span className="flex items-center gap-1.5">
-                Customer Tracker
+                {t('nav.customerTracker')}
                 <svg className="w-3 h-3 text-[#a39e95] dark:text-[#646f7e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
@@ -754,14 +757,14 @@ export default function App() {
               <div className="pt-2 border-t border-[#e6e9ef] dark:border-[#212a38] my-1" />
               <button
                 onClick={() => handleNavigate('/control-panel')}
-                title={sidebarCompact ? 'Control Panel' : undefined}
+                title={sidebarCompact ? t('nav.controlPanel') : undefined}
                 className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-3 py-2.5'} rounded-[10px] text-[13.5px] font-[600] transition-colors ${pathname === '/control-panel' ? 'bg-[rgba(67,56,202,0.11)] dark:bg-[rgba(165,180,252,0.16)] text-[#4338ca] dark:text-[#a5b4fc]' : 'text-[#6c6760] dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230]'}`}
               >
                 <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={pathname === '/control-panel' ? 2.2 : 1.7} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={pathname === '/control-panel' ? 2.2 : 1.7} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                {!sidebarCompact && 'Control Panel'}
+                {!sidebarCompact && t('nav.controlPanel')}
               </button>
             </>
           )}

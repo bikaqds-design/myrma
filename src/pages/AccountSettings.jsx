@@ -173,7 +173,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
   const [activeTab, setActiveTab] = useURLTab('tab', 'Profile')
 
   // Appearance — display settings
-  const { darkMode, fontFamily, tableDensity, dateFormat, updateAppearance } = useAppearance()
+  const { darkMode, fontFamily, tableDensity, dateFormat, updateAppearance, language, setLanguage } = useAppearance()
   const updateDisplay = (partial) => updateAppearance(partial, currentUser?.email)
 
   // Appearance — widget prefs
@@ -981,6 +981,37 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
       {/* ── APPEARANCE TAB ── */}
       {activeTab === 'Appearance' && (
         <div className="space-y-6">
+          {/* ── Language ── */}
+          <div className="bg-white dark:bg-[#121823] rounded-2xl border border-gray-200 dark:border-[#212a38] p-6">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0] uppercase tracking-wide mb-4">
+              Language
+            </h2>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-[#e8ebf0]">App Language</p>
+                <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">
+                  Choose the interface language and text direction
+                </p>
+              </div>
+              <div className="flex gap-2">
+                {[
+                  { value: 'en', label: 'English', flag: '🇺🇸' },
+                  { value: 'ar', label: 'العربية', flag: '🇸🇦' },
+                ].map((lang) => (
+                  <button
+                    key={lang.value}
+                    type="button"
+                    onClick={() => setLanguage(lang.value)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all ${language === lang.value ? 'border-indigo-600 bg-indigo-50 dark:bg-[rgba(99,102,241,0.12)] text-indigo-700 dark:text-[#a5b4fc]' : 'border-gray-200 dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] hover:border-gray-300 dark:hover:border-[#2d3a4e]'}`}
+                  >
+                    <span>{lang.flag}</span>
+                    <span>{lang.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {/* ── Display Settings ── */}
           <div className="bg-white dark:bg-[#121823] rounded-2xl border border-gray-200 dark:border-[#212a38] p-6">
             <h2 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0] uppercase tracking-wide mb-4">

@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { db } from '../api/supabaseClient'
 import { safeStorage } from '../lib/safeStorage'
+import i18n from '../lib/i18n.js'
 
 const DEFAULT = {
   darkMode: false,
@@ -43,9 +44,13 @@ const GOOGLE_FONTS = {
   poppins: 'Poppins:wght@400;500;600;700',
 }
 
+const CAIRO_FONT_STACK = "'Cairo', system-ui, sans-serif"
+
 const AppearanceContext = createContext({
   ...DEFAULT,
+  language: 'en',
   updateAppearance: () => {},
+  setLanguage: () => {},
   formatDate: (d) => d || '',
   formatDateTime: (d) => d || '',
 })
@@ -55,6 +60,8 @@ export function AppearanceProvider({ children }) {
     ...DEFAULT,
     ...safeStorage.get('mrma_appearance', {}),
   }))
+
+  const [language, setLanguageState] = useState(() => safeStorage.get('mrma_language', 'en'))
 
   useEffect(() => {
     db.rmaConfig
@@ -110,6 +117,33 @@ export function AppearanceProvider({ children }) {
     }
   }
 
+  // Apply RTL direction and Arabic font when language changes
+  useEffect(() => {
+    const html = document.documentElement
+    const isRTL = language === 'ar'
+    html.setAttribute('dir', isRTL ? 'rtl' : 'ltr')
+    html.setAttribute('lang', language)
+    if (isRTL) {
+      const id = 'gfont-cairo'
+      if (!document.getElementById(id)) {
+        const link = document.createElement('link')
+        link.id = id
+        link.rel = 'stylesheet'
+        link.href = 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap'
+        document.head.appendChild(link)
+      }
+      document.body.style.fontFamily = CAIRO_FONT_STACK
+    } else {
+      document.body.style.fontFamily = FONT_STACKS[settings.fontFamily] || FONT_STACKS.inter
+    }
+  }, [language, settings.fontFamily])
+
+  const setLanguage = useCallback((lang) => {
+    safeStorage.set('mrma_language', lang)
+    i18n.changeLanguage(lang)
+    setLanguageState(lang)
+  }, [])
+
   const updateAppearance = async (partial, userEmail) => {
     const merged = { ...settings, ...partial }
     setSettings(merged)
@@ -154,7 +188,7 @@ export function AppearanceProvider({ children }) {
 
   return (
     <AppearanceContext.Provider
-      value={{ ...settings, updateAppearance, formatDate, formatDateTime }}
+      value={{ ...settings, language, updateAppearance, setLanguage, formatDate, formatDateTime }}
     >
       {children}
     </AppearanceContext.Provider>

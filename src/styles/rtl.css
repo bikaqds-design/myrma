@@ -1,0 +1,40 @@
+/* RTL layout overrides for Arabic */
+
+/* Sidebar: on mobile it's fixed; flip position to right side */
+[dir="rtl"] #app-sidebar {
+  left: auto !important;
+  right: 0;
+  border-right: 0 !important;
+  border-left: 1px solid #e6e9ef;
+}
+
+.dark [dir="rtl"] #app-sidebar {
+  border-left-color: #212a38;
+}
+
+/* Flip the mobile slide animation: hide to the right instead of left */
+[dir="rtl"] #app-sidebar.-translate-x-full {
+  transform: translateX(100%) !important;
+}
+
+/* Sidebar rounded corners: flip to left side in RTL */
+[dir="rtl"] #app-sidebar {
+  border-radius: 0 0 0 0;
+}
+
+/* Arabic text rendering */
+[dir="rtl"] {
+  font-family: 'Cairo', system-ui, sans-serif;
+}
+
+/* Correct text alignment defaults for inputs and textareas */
+[dir="rtl"] input,
+[dir="rtl"] textarea,
+[dir="rtl"] select {
+  text-align: right;
+}
+
+/* Toast notifications: flip position */
+[dir="rtl"] .react-hot-toast {
+  direction: rtl;
+}

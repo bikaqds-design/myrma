@@ -8,6 +8,8 @@ import { initSentry } from './lib/sentry.js'
 import App from './App.jsx'
 import './index.css'
 import './styles/appearance.css'
+import './styles/rtl.css'
+import './lib/i18n.js'
 
 initSentry() // no-op if VITE_SENTRY_DSN is not set
 
