@@ -26,35 +26,37 @@ serve(async (req) => {
 
     const { context_type, data } = await req.json()
 
-    const geminiKey = Deno.env.get('GEMINI_API_KEY')
-    if (!geminiKey) throw new Error('GEMINI_API_KEY not configured in Supabase secrets')
+    const groqKey = Deno.env.get('GROQ_API_KEY')
+    if (!groqKey) throw new Error('GROQ_API_KEY not configured in Supabase secrets')
 
-    const prompt = buildPrompt(context_type, data)
+    const { systemPrompt, userPrompt } = buildPrompt(context_type, data)
 
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.3,
-            maxOutputTokens: 300,
-          },
-        }),
-      }
-    )
+    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${groqKey}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.3,
+        max_tokens: 300,
+      }),
+    })
 
     if (!resp.ok) {
       const errText = await resp.text()
-      throw new Error(`Gemini error ${resp.status}: ${errText}`)
+      throw new Error(`Groq error ${resp.status}: ${errText}`)
     }
 
-    const geminiResult = await resp.json()
-    const raw = geminiResult.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!raw) throw new Error('Empty response from Gemini')
+    const groqResult = await resp.json()
+    const raw = groqResult.choices?.[0]?.message?.content
+    if (!raw) throw new Error('Empty response from Groq')
 
     const parsed = JSON.parse(raw)
 
@@ -62,8 +64,6 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    // Return 200 so the JS client passes the body through as `data` instead of
-    // wrapping it in a generic FunctionsHttpError with no detail.
     return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -71,18 +71,14 @@ serve(async (req) => {
   }
 })
 
-function buildPrompt(contextType: string, data: Record<string, unknown>): string {
-  const base = `You are an AI assistant embedded in myRMA, a repair and RMA (Return Merchandise Authorization) management system used by repair shops and service centers.
+function buildPrompt(contextType: string, data: Record<string, unknown>): { systemPrompt: string; userPrompt: string } {
+  const systemPrompt = `You are an AI assistant embedded in myRMA, a repair and RMA management system for repair shops and service centers.
+Always respond with valid JSON in this exact format: {"summary": "...", "suggestion": "..."}
+- summary: 2-3 concise sentences describing the current situation
+- suggestion: one specific actionable next step starting with a verb
+- Be direct and professional. No markdown, no extra keys, only valid JSON.`
 
-Respond ONLY with valid JSON in this exact format: {"summary": "...", "suggestion": "..."}
-
-Rules:
-- summary: 2-3 sentences describing the current situation clearly and concisely
-- suggestion: one specific actionable next step (start with a verb)
-- Be direct, professional, and concise — no filler phrases
-- No markdown, no extra keys, only valid JSON
-
-`
+  let userPrompt = ''
 
   switch (contextType) {
     case 'ticket': {
@@ -92,8 +88,7 @@ Rules:
       const lastComment = comments.length > 0
         ? String((comments[comments.length - 1] as Record<string, unknown>).body ?? (comments[comments.length - 1] as Record<string, unknown>).content ?? '')
         : 'None'
-      return base + `Analyze this RMA ticket and suggest what to do next:
-
+      userPrompt = `Analyze this RMA ticket and suggest what to do next:
 RMA Number: ${t.rma_number}
 Customer: ${t.customer_name}
 Status: ${t.ticket_status}
@@ -104,12 +99,11 @@ Due Date: ${t.due_date || 'Not set'}
 Description: ${t.general_description || 'No description provided'}
 Products: ${products.length > 0 ? products.map((p) => `${p.product_name} (SN: ${p.serial_number || 'N/A'})`).join(', ') : 'None listed'}
 Comments: ${comments.length} total. Last: ${lastComment}`
+      break
     }
-
     case 'customer': {
       const c = data as Record<string, unknown>
-      return base + `Analyze this customer profile and suggest a useful action:
-
+      userPrompt = `Analyze this customer profile and suggest a useful action:
 Customer: ${c.contact_person}
 Company: ${c.company_name || 'N/A'}
 Type: ${c.customer_type || 'N/A'}
@@ -119,12 +113,11 @@ Open tickets: ${c.open_ticket_count ?? 0}
 Resolved tickets: ${c.resolved_count ?? 0}
 Last ticket date: ${c.last_ticket_date || 'N/A'}
 Customer since: ${c.created_date || 'N/A'}`
+      break
     }
-
     case 'dashboard': {
       const d = data as Record<string, unknown>
-      return base + `Analyze this RMA operations dashboard and give a key operational insight:
-
+      userPrompt = `Analyze this RMA operations dashboard and give a key operational insight:
 Period: ${d.range}
 Open tickets: ${d.open}
 In Progress: ${d.in_progress}
@@ -134,9 +127,11 @@ Resolved this period: ${d.resolved}
 Total tickets this period: ${d.total}
 SLA on-time rate: ${d.sla_percent}%
 Resolution rate: ${d.resolution_rate}%`
+      break
     }
-
     default:
-      return base + `Analyze this data and provide a summary and suggestion: ${JSON.stringify(data)}`
+      userPrompt = `Analyze this data: ${JSON.stringify(data)}`
   }
+
+  return { systemPrompt, userPrompt }
 }
