@@ -5,6 +5,7 @@ import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../lib/sentry'
 import { Spinner, PageHeader } from '../components/ui'
+import AIAssist from '../components/AIAssist'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { ROLES, INVOICE_STATUS } from '../lib/constants'
 
@@ -1140,6 +1141,21 @@ export default function Reports({
           Refresh
         </button>
       </PageHeader>
+
+      <AIAssist
+        contextType="dashboard"
+        data={{
+          range: `${fromDate} to ${toDate}`,
+          open: filteredTickets.filter((t) => t.ticket_status === 'Open').length,
+          in_progress: filteredTickets.filter((t) => t.ticket_status === 'In Progress').length,
+          pending: filteredTickets.filter((t) => t.ticket_status === 'Pending').length,
+          overdue: filteredTickets.filter((t) => t.due_date && !['Completed','Closed','Cancelled'].includes(t.ticket_status) && new Date(t.due_date) < new Date()).length,
+          resolved: filteredTickets.filter((t) => ['Completed','Closed'].includes(t.ticket_status)).length,
+          total: filteredTickets.length,
+          sla_percent: filteredTickets.length ? Math.round((filteredTickets.filter((t) => !t.due_date || ['Completed','Closed'].includes(t.ticket_status) || new Date(t.due_date) >= new Date()).length / filteredTickets.length) * 100) : 100,
+          resolution_rate: filteredTickets.length ? Math.round((filteredTickets.filter((t) => ['Completed','Closed'].includes(t.ticket_status)).length / filteredTickets.length) * 100) : 0,
+        }}
+      />
 
       {/* Date Range Bar */}
       <div className="flex items-center gap-3 flex-wrap bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] px-4 py-3">

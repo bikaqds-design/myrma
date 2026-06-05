@@ -7,6 +7,7 @@ import QRCode from 'qrcode'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { PageSkeleton } from '../../components/Skeleton'
 import { Button, PageHeader } from '../../components/ui'
+import AIAssist from '../../components/AIAssist'
 import EmptyState from '../../components/EmptyState'
 import { ROLES, TICKET_STATUS_RESOLVED, TICKET_STATUS_LIST, PRIORITY_LIST } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
@@ -883,6 +884,21 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     <div className="space-y-6">
       {/* Header */}
       <PageHeader title="RMA Tickets" subtitle="Manage return merchandise authorization" />
+
+      <AIAssist
+        contextType="dashboard"
+        data={{
+          range: 'All time',
+          open: tickets.filter((t) => t.ticket_status === 'Open').length,
+          in_progress: tickets.filter((t) => t.ticket_status === 'In Progress').length,
+          pending: tickets.filter((t) => t.ticket_status === 'Pending').length,
+          overdue: tickets.filter((t) => t.due_date && !TICKET_STATUS_RESOLVED.includes(t.ticket_status) && new Date(t.due_date) < new Date()).length,
+          resolved: tickets.filter((t) => TICKET_STATUS_RESOLVED.includes(t.ticket_status)).length,
+          total: tickets.length,
+          sla_percent: tickets.length ? Math.round((tickets.filter((t) => !t.due_date || TICKET_STATUS_RESOLVED.includes(t.ticket_status) || new Date(t.due_date) >= new Date()).length / tickets.length) * 100) : 100,
+          resolution_rate: tickets.length ? Math.round((tickets.filter((t) => TICKET_STATUS_RESOLVED.includes(t.ticket_status)).length / tickets.length) * 100) : 0,
+        }}
+      />
 
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
