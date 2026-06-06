@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { MigrationNotice } from './Announcements'
@@ -20,6 +21,7 @@ const PRIORITY_COLORS = {
 }
 
 export default function RMAConfig({ currentUserEmail }) {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(true)
   const [missing, setMissing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -51,7 +53,7 @@ export default function RMAConfig({ currentUserEmail }) {
       if (byKey.default_settings) setSettings(byKey.default_settings)
     } catch (err) {
       captureException(err)
-      toast.error('Failed to load config')
+      toast.error(t('cp.rmaConfig.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -65,7 +67,7 @@ export default function RMAConfig({ currentUserEmail }) {
         db.rmaConfig.set('auto_assignment_rules', rules, currentUserEmail),
         db.rmaConfig.set('default_settings', settings, currentUserEmail),
       ])
-      toast.success('Configuration saved')
+      toast.success(t('cp.rmaConfig.saved'))
       db.auditLog
         .log(
           currentUserEmail,
@@ -107,9 +109,9 @@ export default function RMAConfig({ currentUserEmail }) {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">RMA Configuration</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t('cp.rmaConfig.header')}</h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            SLA rules, auto-assignment, and ticket defaults
+            {t('cp.rmaConfig.subtitle')}
           </p>
         </div>
         <button
@@ -117,17 +119,17 @@ export default function RMAConfig({ currentUserEmail }) {
           disabled={saving}
           className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium disabled:opacity-50"
         >
-          {saving ? 'Saving...' : 'Save All Changes'}
+          {saving ? t('cp.saving') : t('cp.rmaConfig.saveAll')}
         </button>
       </div>
 
       {/* Default Settings */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-        <h3 className="text-base font-semibold text-gray-900 mb-4">Default Ticket Settings</h3>
+        <h3 className="text-base font-semibold text-gray-900 mb-4">{t('cp.rmaConfig.defaultSettings')}</h3>
         <div className="grid grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Default Priority
+              {t('cp.rmaConfig.defaultPriority')}
             </label>
             <select
               value={settings.default_priority}
@@ -140,7 +142,7 @@ export default function RMAConfig({ currentUserEmail }) {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Default Status</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('cp.rmaConfig.defaultStatus')}</label>
             <select
               value={settings.default_status}
               onChange={(e) => setSettings({ ...settings, default_status: e.target.value })}
@@ -153,7 +155,7 @@ export default function RMAConfig({ currentUserEmail }) {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Auto Due Date (days)
+              {t('cp.rmaConfig.autoDueDays')}
             </label>
             <input
               type="number"
@@ -171,17 +173,21 @@ export default function RMAConfig({ currentUserEmail }) {
 
       {/* SLA Rules */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-        <h3 className="text-base font-semibold text-gray-900 mb-1">SLA Rules by Priority</h3>
+        <h3 className="text-base font-semibold text-gray-900 mb-1">{t('cp.rmaConfig.slaRules')}</h3>
         <p className="text-sm text-gray-500 mb-4">
-          Define response and resolution time targets in hours.
+          {t('cp.rmaConfig.slaDesc')}
         </p>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                {['Priority', 'Response Target (hrs)', 'Resolution Target (hrs)'].map((h) => (
+                {[
+                  t('cp.rmaConfig.priorityCol'),
+                  t('cp.rmaConfig.responseCol'),
+                  t('cp.rmaConfig.resolutionCol'),
+                ].map((h, i) => (
                   <th
-                    key={h}
+                    key={i}
                     className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase"
                   >
                     {h}
@@ -241,9 +247,9 @@ export default function RMAConfig({ currentUserEmail }) {
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-base font-semibold text-gray-900">Auto-Assignment Rules</h3>
+            <h3 className="text-base font-semibold text-gray-900">{t('cp.rmaConfig.autoAssignment')}</h3>
             <p className="text-sm text-gray-500 mt-0.5">
-              Automatically assign tickets based on conditions.
+              {t('cp.rmaConfig.autoAssignDesc')}
             </p>
           </div>
           <button
@@ -258,18 +264,18 @@ export default function RMAConfig({ currentUserEmail }) {
                 d="M12 6v6m0 0v6m0-6h6m-6 0H6"
               />
             </svg>
-            Add Rule
+            {t('cp.rmaConfig.addRule')}
           </button>
         </div>
         {rules.length === 0 && (
           <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
-            No auto-assignment rules. Click "Add Rule" to create one.
+            {t('cp.rmaConfig.noRules')}
           </div>
         )}
         <div className="space-y-3">
           {rules.map((rule, i) => (
             <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <span className="text-sm text-gray-500 whitespace-nowrap">When</span>
+              <span className="text-sm text-gray-500 whitespace-nowrap">{t('cp.rmaConfig.when')}</span>
               <select
                 value={rule.condition_field}
                 onChange={(e) => updateRule(i, 'condition_field', e.target.value)}
@@ -278,7 +284,7 @@ export default function RMAConfig({ currentUserEmail }) {
                 <option value="priority">Priority</option>
                 <option value="customer_name">Customer Name</option>
               </select>
-              <span className="text-sm text-gray-500">is</span>
+              <span className="text-sm text-gray-500">{t('cp.rmaConfig.is')}</span>
               {rule.condition_field === 'priority' ? (
                 <select
                   value={rule.condition_value}
@@ -293,17 +299,17 @@ export default function RMAConfig({ currentUserEmail }) {
                 <input
                   value={rule.condition_value}
                   onChange={(e) => updateRule(i, 'condition_value', e.target.value)}
-                  placeholder="Customer name..."
+                  placeholder={t('cp.rmaConfig.customerNamePlaceholder')}
                   className={`${inp} flex-1`}
                 />
               )}
-              <span className="text-sm text-gray-500 whitespace-nowrap">→ assign to</span>
+              <span className="text-sm text-gray-500 whitespace-nowrap">{t('cp.rmaConfig.assignTo')}</span>
               <select
                 value={rule.assign_to}
                 onChange={(e) => updateRule(i, 'assign_to', e.target.value)}
                 className={`${sel} flex-1`}
               >
-                <option value="">Select user...</option>
+                <option value="">{t('cp.rmaConfig.selectUser')}</option>
                 {users.map((u) => (
                   <option key={u.user_email} value={u.user_email}>
                     {u.user_email}

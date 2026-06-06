@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, storage, branding as brandingAPI } from '../api/supabaseClient'
 import AIAssist from '../components/AIAssist'
@@ -20,6 +21,7 @@ export default function CustomerDetails({
   onBack,
   onNavigateToTicket,
 }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { data: customerPageData, isLoading: loading } = useQuery({
     queryKey: ['customer-details', customerId],
@@ -98,11 +100,11 @@ export default function CustomerDetails({
 
   const handleSaveEdit = async () => {
     if (!editForm.contact_person?.trim() || !editForm.mobile?.trim()) {
-      toast.error('Contact person and mobile are required')
+      toast.error(t('customerDetails.errorContactRequired'))
       return
     }
     if (editForm.customer_type === 'B2B' && !editForm.company_name?.trim()) {
-      toast.error('Company name is required for B2B customers')
+      toast.error(t('customerDetails.errorCompanyRequired'))
       return
     }
 
@@ -114,7 +116,7 @@ export default function CustomerDetails({
           const result = await storage.uploadCustomerAttachment(file, customerId)
           uploadedAttachments.push(result)
         } catch (err) {
-          toast.error(`Failed to upload ${file.name}: ${err.message}`)
+          toast.error(t('customers.failedUploadFile', { name: file.name, error: err.message }))
           return
         }
       }
@@ -144,7 +146,7 @@ export default function CustomerDetails({
       setIsEditing(false)
       queryClient.invalidateQueries({ queryKey: ['customer-details', customerId] })
       queryClient.invalidateQueries({ queryKey: ['customers'] })
-      toast.success('Customer updated successfully')
+      toast.success(t('customerDetails.successUpdated'))
       db.auditLog
         .log(
           currentUserEmail,
@@ -153,19 +155,19 @@ export default function CustomerDetails({
         )
         .catch((err) => captureException(err))
     } catch (error) {
-      toast.error(`Failed to update: ${error.message}`)
+      toast.error(t('customerDetails.failedUpdate', { error: error.message }))
     }
   }
 
   const handleDelete = () => {
     openConfirm(
-      'Delete Customer',
-      `Delete ${customer.contact_person}? This cannot be undone.`,
+      t('customerDetails.deleteCustomerTitle'),
+      t('customerDetails.deleteCustomerMsg', { name: customer.contact_person }),
       async () => {
         closeConfirm()
         try {
           await db.customers.delete(customerId)
-          toast.success('Customer deleted')
+          toast.success(t('customerDetails.successDeleted'))
           db.auditLog
             .log(
               currentUserEmail,
@@ -175,7 +177,7 @@ export default function CustomerDetails({
             .catch((err) => captureException(err))
           onBack()
         } catch {
-          toast.error('Failed to delete customer')
+          toast.error(t('customerDetails.errorDelete'))
         }
       }
     )
@@ -194,7 +196,7 @@ export default function CustomerDetails({
       })
       setNotes((prev) => [created, ...prev])
       setNewNote('')
-      toast.success('Note added')
+      toast.success(t('customerDetails.noteAdded'))
       db.auditLog
         .log(
           currentUserEmail,
@@ -203,7 +205,7 @@ export default function CustomerDetails({
         )
         .catch((err) => captureException(err))
     } catch {
-      toast.error('Failed to add note')
+      toast.error(t('customerDetails.errorAddNote'))
     } finally {
       setSavingNote(false)
     }
@@ -219,7 +221,7 @@ export default function CustomerDetails({
       setNotes((prev) => prev.map((n) => (n.id === noteId ? updated : n)))
       setEditingNote(null)
       setEditNoteText('')
-      toast.success('Note updated')
+      toast.success(t('customerDetails.noteUpdated'))
       db.auditLog
         .log(
           currentUserEmail,
@@ -228,17 +230,17 @@ export default function CustomerDetails({
         )
         .catch((err) => captureException(err))
     } catch {
-      toast.error('Failed to update note')
+      toast.error(t('customerDetails.errorUpdateNote'))
     }
   }
 
   const handleDeleteNote = (noteId) => {
-    openConfirm('Delete Note', 'Delete this note? This cannot be undone.', async () => {
+    openConfirm(t('customerDetails.deleteNoteTitle'), t('customerDetails.deleteNoteMsg'), async () => {
       closeConfirm()
       try {
         await db.customerNotes.delete(noteId)
         setNotes((prev) => prev.filter((n) => n.id !== noteId))
-        toast.success('Note deleted')
+        toast.success(t('customerDetails.noteDeleted'))
         db.auditLog
           .log(
             currentUserEmail,
@@ -247,7 +249,7 @@ export default function CustomerDetails({
           )
           .catch((err) => captureException(err))
       } catch {
-        toast.error('Failed to delete note')
+        toast.error(t('customerDetails.errorDeleteNote'))
       }
     })
   }
@@ -324,9 +326,9 @@ export default function CustomerDetails({
   if (!customer) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">Customer not found.</p>
+        <p className="text-gray-500">{t('customerDetails.notFound')}</p>
         <Button className="mt-4" onClick={onBack}>
-          Go Back
+          {t('common.back')}
         </Button>
       </div>
     )
@@ -354,7 +356,7 @@ export default function CustomerDetails({
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            Back to Customers
+            {t('customerDetails.backToCustomers')}
           </button>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-lg">
@@ -363,7 +365,7 @@ export default function CustomerDetails({
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{displayName}</h1>
               {customer.customer_type === 'B2B' && customer.contact_person && (
-                <p className="text-sm text-gray-500">Contact: {customer.contact_person}</p>
+                <p className="text-sm text-gray-500">{t('customerDetails.contactLabel')} {customer.contact_person}</p>
               )}
               <div className="flex items-center gap-2 mt-1">
                 {getStatusBadge(customer.customer_status)}
@@ -395,7 +397,7 @@ export default function CustomerDetails({
                   d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                 />
               </svg>
-              Edit
+              {t('common.edit')}
             </Button>
             <Button variant="danger" onClick={handleDelete}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -406,7 +408,7 @@ export default function CustomerDetails({
                   d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                 />
               </svg>
-              Delete
+              {t('common.delete')}
             </Button>
           </div>
         )}
@@ -421,10 +423,10 @@ export default function CustomerDetails({
                 setPendingFiles([])
               }}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button variant="success" onClick={handleSaveEdit}>
-              Save Changes
+              {t('customerDetails.saveChanges')}
             </Button>
           </div>
         )}
@@ -434,13 +436,13 @@ export default function CustomerDetails({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           {
-            label: 'Total RMAs',
+            label: t('customerDetails.totalRMAs'),
             value: tickets.length,
             icon: '🎫',
             color: 'bg-blue-50 text-blue-700',
           },
           {
-            label: 'Open Tickets',
+            label: t('customerDetails.openTickets'),
             value: tickets.filter(
               (t) =>
                 t.ticket_status === TICKET_STATUS.OPEN ||
@@ -451,13 +453,13 @@ export default function CustomerDetails({
             color: 'bg-yellow-50 text-yellow-700',
           },
           {
-            label: 'Notes',
+            label: t('common.notes'),
             value: notes.length,
             icon: '📝',
             color: 'bg-purple-50 text-purple-700',
           },
           {
-            label: 'Customer Since',
+            label: t('customerDetails.customerSince'),
             value: formatDate(customer.created_date),
             icon: '📅',
             color: 'bg-green-50 text-green-700',
@@ -501,10 +503,10 @@ export default function CustomerDetails({
         <div className="border-b border-gray-200">
           <nav className="flex gap-4 sm:gap-6 px-6">
             {[
-              { key: 'profile', label: 'Profile', icon: '👤' },
-              { key: 'rma', label: `RMA History (${tickets.length})`, icon: '🎫' },
-              { key: 'notes', label: `Notes (${notes.length})`, icon: '📝' },
-              { key: 'activity', label: 'Activity Log', icon: '📋' },
+              { key: 'profile', label: t('customerDetails.tabProfile'), icon: '👤' },
+              { key: 'rma', label: t('customerDetails.tabRMAHistory', { count: tickets.length }), icon: '🎫' },
+              { key: 'notes', label: t('customerDetails.tabNotes', { count: notes.length }), icon: '📝' },
+              { key: 'activity', label: t('customerDetails.tabActivity'), icon: '📋' },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -531,12 +533,12 @@ export default function CustomerDetails({
                   {/* Customer Type + Status */}
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
-                      Customer Type & Status
+                      {t('customerDetails.sectionTypeStatus')}
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className={labelClass}>
-                          Customer Type <span className="text-red-500">*</span>
+                          {t('customerModal.customerType')} <span className="text-red-500">*</span>
                         </label>
                         <select
                           value={editForm.customer_type || 'B2B'}
@@ -545,13 +547,13 @@ export default function CustomerDetails({
                           }
                           className={inputClass}
                         >
-                          <option value="B2B">B2B — Business</option>
-                          <option value="B2C">B2C — Individual</option>
+                          <option value="B2B">{t('customerDetails.typeB2BBusiness')}</option>
+                          <option value="B2C">{t('customerModal.typeB2C')}</option>
                         </select>
                       </div>
                       <div>
                         <label className={labelClass}>
-                          Status <span className="text-red-500">*</span>
+                          {t('common.status')} <span className="text-red-500">*</span>
                         </label>
                         <select
                           value={editForm.customer_status || 'Active'}
@@ -560,8 +562,8 @@ export default function CustomerDetails({
                           }
                           className={inputClass}
                         >
-                          <option value="Active">Active</option>
-                          <option value="Inactive">Inactive</option>
+                          <option value="Active">{t('customerModal.statusActive')}</option>
+                          <option value="Inactive">{t('customerModal.statusInactive')}</option>
                         </select>
                       </div>
                     </div>
@@ -571,12 +573,12 @@ export default function CustomerDetails({
                   {editForm.customer_type === 'B2B' && (
                     <div>
                       <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
-                        Company Information
+                        {t('customerDetails.sectionCompany')}
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className={labelClass}>
-                            Company Name <span className="text-red-500">*</span>
+                            {t('customerModal.companyName')} <span className="text-red-500">*</span>
                           </label>
                           <input
                             type="text"
@@ -588,7 +590,7 @@ export default function CustomerDetails({
                           />
                         </div>
                         <div>
-                          <label className={labelClass}>CR Number</label>
+                          <label className={labelClass}>{t('customerModal.crNumber')}</label>
                           <input
                             type="text"
                             value={editForm.cr_number || ''}
@@ -599,7 +601,7 @@ export default function CustomerDetails({
                           />
                         </div>
                         <div>
-                          <label className={labelClass}>Tax ID</label>
+                          <label className={labelClass}>{t('customerModal.taxId')}</label>
                           <input
                             type="text"
                             value={editForm.tax_id || ''}
@@ -614,12 +616,12 @@ export default function CustomerDetails({
                   {/* Contact */}
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
-                      Contact Information
+                      {t('customerDetails.sectionContact')}
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className={labelClass}>
-                          Contact Person <span className="text-red-500">*</span>
+                          {t('customerModal.contactPerson')} <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -632,7 +634,7 @@ export default function CustomerDetails({
                       </div>
                       <div>
                         <label className={labelClass}>
-                          Mobile <span className="text-red-500">*</span>
+                          {t('customerModal.mobile')} <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="tel"
@@ -642,7 +644,7 @@ export default function CustomerDetails({
                         />
                       </div>
                       <div>
-                        <label className={labelClass}>Landline</label>
+                        <label className={labelClass}>{t('customerModal.landline')}</label>
                         <input
                           type="tel"
                           value={editForm.landline || ''}
@@ -651,7 +653,7 @@ export default function CustomerDetails({
                         />
                       </div>
                       <div>
-                        <label className={labelClass}>Email</label>
+                        <label className={labelClass}>{t('common.email')}</label>
                         <input
                           type="email"
                           value={editForm.email || ''}
@@ -660,7 +662,7 @@ export default function CustomerDetails({
                         />
                       </div>
                       <div>
-                        <label className={labelClass}>Account Manager</label>
+                        <label className={labelClass}>{t('customerModal.accountManager')}</label>
                         <input
                           type="text"
                           value={editForm.account_manager || ''}
@@ -676,13 +678,13 @@ export default function CustomerDetails({
                   {/* Address */}
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
-                      Address
+                      {t('common.address')}
                     </h3>
                     <textarea
                       value={editForm.address || ''}
                       onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
                       rows={3}
-                      placeholder="Full address..."
+                      placeholder={t('customerDetails.addressPlaceholder')}
                       className={inputClass}
                     />
                   </div>
@@ -690,13 +692,13 @@ export default function CustomerDetails({
                   {/* Notes */}
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
-                      Internal Notes
+                      {t('customerDetails.internalNotes')}
                     </h3>
                     <textarea
                       value={editForm.notes || ''}
                       onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
                       rows={3}
-                      placeholder="Internal notes..."
+                      placeholder={t('customerDetails.internalNotesPlaceholder')}
                       className={inputClass}
                     />
                   </div>
@@ -704,7 +706,7 @@ export default function CustomerDetails({
                   {/* Attachments */}
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
-                      Attachments
+                      {t('customerModal.attachments')}
                     </h3>
                     <AttachmentsField
                       savedAttachments={editForm.attachments || []}
@@ -721,19 +723,19 @@ export default function CustomerDetails({
                   <div className="space-y-6">
                     <div>
                       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                        Contact Information
+                        {t('customerDetails.sectionContact')}
                       </h3>
                       <div className="space-y-3">
                         <DetailRow
                           icon="👤"
-                          label="Contact Person"
+                          label={t('customerModal.contactPerson')}
                           value={customer.contact_person}
                         />
-                        <DetailRow icon="📱" label="Mobile" value={customer.mobile} />
-                        <DetailRow icon="📞" label="Landline" value={customer.landline} />
+                        <DetailRow icon="📱" label={t('customerModal.mobile')} value={customer.mobile} />
+                        <DetailRow icon="📞" label={t('customerModal.landline')} value={customer.landline} />
                         <DetailRow
                           icon="✉️"
-                          label="Email"
+                          label={t('common.email')}
                           value={
                             customer.email ? (
                               <a
@@ -747,7 +749,7 @@ export default function CustomerDetails({
                         />
                         <DetailRow
                           icon="👔"
-                          label="Account Manager"
+                          label={t('customerModal.accountManager')}
                           value={customer.account_manager}
                         />
                       </div>
@@ -755,12 +757,12 @@ export default function CustomerDetails({
 
                     <div>
                       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                        System Info
+                        {t('customerDetails.sectionSystemInfo')}
                       </h3>
                       <div className="space-y-3">
                         <DetailRow
                           icon="🔢"
-                          label="Customer Code"
+                          label={t('customerDetails.customerCode')}
                           value={
                             customer.customer_code ? (
                               <span className="font-mono text-sm">{customer.customer_code}</span>
@@ -769,15 +771,15 @@ export default function CustomerDetails({
                         />
                         <DetailRow
                           icon="📅"
-                          label="Customer Since"
+                          label={t('customerDetails.customerSince')}
                           value={formatDate(customer.created_date)}
                         />
                         <DetailRow
                           icon="🔄"
-                          label="Last Updated"
+                          label={t('customerDetails.lastUpdated')}
                           value={formatDateTime(customer.updated_date)}
                         />
-                        <DetailRow icon="👤" label="Created By" value={customer.created_by} />
+                        <DetailRow icon="👤" label={t('customerDetails.createdBy')} value={customer.created_by} />
                       </div>
                     </div>
                   </div>
@@ -787,33 +789,33 @@ export default function CustomerDetails({
                     {customer.customer_type === 'B2B' && (
                       <div>
                         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                          Company Information
+                          {t('customerDetails.sectionCompany')}
                         </h3>
                         <div className="space-y-3">
-                          <DetailRow icon="🏢" label="Company Name" value={customer.company_name} />
-                          <DetailRow icon="📄" label="CR Number" value={customer.cr_number} />
-                          <DetailRow icon="🧾" label="Tax ID" value={customer.tax_id} />
+                          <DetailRow icon="🏢" label={t('customerModal.companyName')} value={customer.company_name} />
+                          <DetailRow icon="📄" label={t('customerModal.crNumber')} value={customer.cr_number} />
+                          <DetailRow icon="🧾" label={t('customerModal.taxId')} value={customer.tax_id} />
                         </div>
                       </div>
                     )}
 
                     <div>
                       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                        Address
+                        {t('common.address')}
                       </h3>
                       {customer.address ? (
                         <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap">
                           {customer.address}
                         </div>
                       ) : (
-                        <p className="text-gray-500 text-sm">No address on file</p>
+                        <p className="text-gray-500 text-sm">{t('customerDetails.noAddress')}</p>
                       )}
                     </div>
 
                     {customer.notes && (
                       <div>
                         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                          Internal Notes
+                          {t('customerDetails.internalNotes')}
                         </h3>
                         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap">
                           {customer.notes}
@@ -824,7 +826,7 @@ export default function CustomerDetails({
                     {(customer.attachments || []).length > 0 && (
                       <div>
                         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                          Attachments
+                          {t('customerModal.attachments')}
                         </h3>
                         <div className="space-y-2">
                           {customer.attachments.map((att, i) => (
@@ -886,19 +888,19 @@ export default function CustomerDetails({
               {tickets.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   <div className="text-4xl mb-3">🎫</div>
-                  <p className="font-medium">No RMA tickets found</p>
-                  <p className="text-sm">This customer has no RMA history yet</p>
+                  <p className="font-medium">{t('customerDetails.noTickets')}</p>
+                  <p className="text-sm">{t('customerDetails.noTicketsHint')}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50 border-y border-gray-200">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">RMA Number</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Issue</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('customerDetails.colRmaNumber')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.status')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.priority')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('customerDetails.colIssue')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('customerDetails.colCreated')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -941,11 +943,11 @@ export default function CustomerDetails({
           {activeTab === 'notes' && (
             <div className="space-y-4">
               <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                <h3 className="font-medium text-gray-900">Add a Note</h3>
+                <h3 className="font-medium text-gray-900">{t('customerDetails.addNote')}</h3>
                 <textarea
                   value={newNote}
                   onChange={(e) => setNewNote(e.target.value)}
-                  placeholder="Write an internal note about this customer..."
+                  placeholder={t('customerDetails.notePlaceholder')}
                   rows={3}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
                 />
@@ -972,7 +974,7 @@ export default function CustomerDetails({
                         />
                       </svg>
                     )}
-                    Add Note
+                    {t('customerDetails.addNoteBtn')}
                   </button>
                 </div>
               </div>
@@ -980,7 +982,7 @@ export default function CustomerDetails({
               {notes.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <div className="text-3xl mb-2">📝</div>
-                  <p>No notes yet. Add the first note above.</p>
+                  <p>{t('customerDetails.noNotes')}</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1002,13 +1004,13 @@ export default function CustomerDetails({
                               }}
                               className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition-colors"
                             >
-                              Cancel
+                              {t('common.cancel')}
                             </button>
                             <button
                               onClick={() => handleUpdateNote(note.id)}
                               className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm transition-colors"
                             >
-                              Save
+                              {t('common.save')}
                             </button>
                           </div>
                         </div>
@@ -1020,7 +1022,7 @@ export default function CustomerDetails({
                               <span className="font-medium">{note.created_by || 'Unknown'}</span>
                               {' · '}
                               {formatDateTime(note.created_date)}
-                              {note.updated_date !== note.created_date && ' (edited)'}
+                              {note.updated_date !== note.created_date && ` ${t('customerDetails.edited')}`}
                             </div>
                             <div className="flex gap-2">
                               <button
@@ -1030,13 +1032,13 @@ export default function CustomerDetails({
                                 }}
                                 className="text-indigo-600 hover:text-indigo-900 text-xs font-medium"
                               >
-                                Edit
+                                {t('common.edit')}
                               </button>
                               <button
                                 onClick={() => handleDeleteNote(note.id)}
                                 className="text-red-600 hover:text-red-900 text-xs font-medium"
                               >
-                                Delete
+                                {t('common.delete')}
                               </button>
                             </div>
                           </div>
@@ -1053,24 +1055,24 @@ export default function CustomerDetails({
           {activeTab === 'activity' && (
             <div className="space-y-3">
               <p className="text-sm text-gray-500 mb-4">
-                Timeline of all activity for this customer
+                {t('customerDetails.activityTimeline')}
               </p>
               {[
-                ...tickets.map((t) => ({
+                ...tickets.map((tk) => ({
                   type: 'ticket',
-                  date: t.created_date,
+                  date: tk.created_date,
                   icon: '🎫',
                   color: 'bg-blue-100',
-                  title: 'RMA Ticket Created',
-                  detail: `${t.rma_number || t.id?.slice(0, 8)} — ${t.issue_description || t.title || 'No description'}`,
-                  action: () => onNavigateToTicket(t.id),
+                  title: t('customerDetails.activityRmaCreated'),
+                  detail: `${tk.rma_number || tk.id?.slice(0, 8)} — ${tk.issue_description || tk.title || '—'}`,
+                  action: () => onNavigateToTicket(tk.id),
                 })),
                 ...notes.map((n) => ({
                   type: 'note',
                   date: n.created_date,
                   icon: '📝',
                   color: 'bg-yellow-100',
-                  title: 'Note Added',
+                  title: t('customerDetails.activityNoteAdded'),
                   detail: n.note.length > 80 ? n.note.slice(0, 80) + '...' : n.note,
                   by: n.created_by,
                 })),
@@ -1079,8 +1081,8 @@ export default function CustomerDetails({
                   date: customer.created_date,
                   icon: '✅',
                   color: 'bg-green-100',
-                  title: 'Customer Created',
-                  detail: `Added by ${customer.created_by || 'Unknown'}`,
+                  title: t('customerDetails.activityCustomerCreated'),
+                  detail: t('customerDetails.activityAddedBy', { by: customer.created_by || '—' }),
                 },
               ]
                 .filter((e) => e.date)
@@ -1103,7 +1105,7 @@ export default function CustomerDetails({
                           onClick={event.action}
                           className="text-xs text-indigo-600 hover:underline mt-1"
                         >
-                          View ticket →
+                          {t('customerDetails.viewTicket')}
                         </button>
                       )}
                     </div>
@@ -1112,7 +1114,7 @@ export default function CustomerDetails({
               {tickets.length === 0 && notes.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   <div className="text-3xl mb-2">📋</div>
-                  <p>No activity yet for this customer</p>
+                  <p>{t('customerDetails.noActivity')}</p>
                 </div>
               )}
             </div>
@@ -1159,7 +1161,7 @@ function DetailRow({ icon, label, value }) {
 }
 
 // ── Ticket Detail Drawer (read-only, opens from RMA History tab) ─────────────
-async function exportTicketPDF(ticket) {
+async function exportTicketPDF(ticket, t) {
   const esc = (s) =>
     String(s ?? '')
       .replace(/&/g, '&amp;')
@@ -1311,7 +1313,7 @@ async function exportTicketPDF(ticket) {
 
   const w = window.open('', '_blank')
   if (!w) {
-    toast.error('Pop-up blocked — allow pop-ups and try again')
+    toast.error(t('common.popupBlocked'))
     return
   }
   w.document.write(`<!DOCTYPE html><html><head><title>RMA Ticket - ${esc(ticket.rma_number)}</title>
@@ -1401,6 +1403,7 @@ async function exportTicketPDF(ticket) {
 }
 
 function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, formatDateTime, getTicketStatusBadge, onClose }) {
+  const { t } = useTranslation()
   const products = ticket.products || []
 
   return (
@@ -1420,7 +1423,7 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 ml-3">
             <button
-              onClick={() => exportTicketPDF(ticket)}
+              onClick={() => exportTicketPDF(ticket, t)}
               title="Export PDF"
               aria-label="Export PDF"
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-[#9aa4b2] bg-gray-100 dark:bg-[#1a2230] hover:bg-gray-200 dark:hover:bg-[#212a38] rounded-lg transition-colors"
@@ -1447,7 +1450,7 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
           {/* Key details grid */}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">Priority</p>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">{t('customerDetails.drawerPriority')}</p>
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                 ticket.priority === 'Critical' ? 'bg-red-200 text-red-900'
                 : ticket.priority === 'High' ? 'bg-red-100 text-red-800'
@@ -1456,16 +1459,16 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
               }`}>{ticket.priority || 'Low'}</span>
             </div>
             <div>
-              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">Assigned To</p>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">{t('customerDetails.drawerAssignedTo')}</p>
               <p className="font-medium text-gray-800 dark:text-[#e8ebf0] truncate">{ticket.assigned_technician || '—'}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">Created</p>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">{t('customerDetails.drawerCreated')}</p>
               <p className="font-medium text-gray-800 dark:text-[#e8ebf0]">{formatDate(ticket.created_date)}</p>
             </div>
             {ticket.due_date && (
               <div>
-                <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">Due Date</p>
+                <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">{t('customerDetails.drawerDueDate')}</p>
                 <p className="font-medium text-gray-800 dark:text-[#e8ebf0]">{formatDate(ticket.due_date)}</p>
               </div>
             )}
@@ -1474,7 +1477,7 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
           {/* Description */}
           {ticket.general_description && (
             <div>
-              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-2">Issue Description</p>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-2">{t('customerDetails.drawerIssueDesc')}</p>
               <p className="text-sm text-gray-700 dark:text-[#e8ebf0] bg-gray-50 dark:bg-[#0f1520] rounded-lg p-3 leading-relaxed whitespace-pre-wrap">
                 {ticket.general_description}
               </p>
@@ -1485,7 +1488,7 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
           {products.length > 0 && (
             <div>
               <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-3">
-                Items ({products.length})
+                {t('customerDetails.drawerItems', { count: products.length })}
               </p>
               <div className="space-y-2">
                 {products.map((p, i) => (
@@ -1514,14 +1517,14 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
           {/* Comments */}
           <div>
             <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-3">
-              Comments {!commentsLoading && `(${comments.length})`}
+              {t('customerDetails.drawerComments')}{!commentsLoading && ` (${comments.length})`}
             </p>
             {commentsLoading ? (
               <div className="flex justify-center py-6">
                 <div className="animate-spin w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full" />
               </div>
             ) : comments.length === 0 ? (
-              <p className="text-sm text-gray-400 dark:text-[#4a5568] text-center py-4">No comments yet</p>
+              <p className="text-sm text-gray-400 dark:text-[#4a5568] text-center py-4">{t('customerDetails.drawerNoComments')}</p>
             ) : (
               <div className="space-y-3">
                 {comments.map((c) => {
@@ -1535,7 +1538,7 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="font-semibold text-gray-900 dark:text-[#e8ebf0] text-xs">{name}</span>
-                          {isTeam && <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-700 rounded-full">Staff</span>}
+                          {isTeam && <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-700 rounded-full">{t('customerDetails.staffBadge')}</span>}
                           <span className="text-xs text-gray-400 dark:text-[#4a5568] ml-auto">{formatDateTime(c.created_date)}</span>
                         </div>
                         <p className="text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap leading-relaxed">{c.comment_text}</p>

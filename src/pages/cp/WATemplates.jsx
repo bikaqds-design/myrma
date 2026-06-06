@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -49,6 +50,7 @@ const SUGGESTED_VARS = [
 ]
 
 export default function WATemplates({ currentUserEmail }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [modal, setModal]       = useState(null)  // null | 'create' | 'edit' | 'preview'
   const [selected, setSelected] = useState(null)
@@ -65,60 +67,60 @@ export default function WATemplates({ currentUserEmail }) {
   const templates = result?.data ?? []
 
   const openCreate = () => { setForm(BLANK); setModal('create') }
-  const openEdit   = (t) => {
+  const openEdit   = (tmpl) => {
     setForm({
-      name: t.name, display_name: t.display_name, event_type: t.event_type,
-      provider: t.provider, language: t.language, template_name: t.template_name ?? '',
-      body_content: t.body_content, footer_content: t.footer_content ?? '',
-      variables: t.variables ?? [], attach_pdf: !!t.attach_pdf, status: t.status,
+      name: tmpl.name, display_name: tmpl.display_name, event_type: tmpl.event_type,
+      provider: tmpl.provider, language: tmpl.language, template_name: tmpl.template_name ?? '',
+      body_content: tmpl.body_content, footer_content: tmpl.footer_content ?? '',
+      variables: tmpl.variables ?? [], attach_pdf: !!tmpl.attach_pdf, status: tmpl.status,
     })
-    setSelected(t)
+    setSelected(tmpl)
     setModal('edit')
   }
-  const openPreview = (t) => {
-    setSelected(t)
+  const openPreview = (tmpl) => {
+    setSelected(tmpl)
     const vars = {}
-    for (const v of t.variables ?? []) vars[v.key] = `[${v.label}]`
+    for (const v of tmpl.variables ?? []) vars[v.key] = `[${v.label}]`
     setPreviewVars(vars)
     setModal('preview')
   }
 
   const handleSave = async () => {
     if (!form.display_name.trim() || !form.event_type || !form.body_content.trim()) {
-      toast.error('Display name, event type and body are required')
+      toast.error(t('cp.waTemplates.fieldsRequired'))
       return
     }
     setSaving(true)
     try {
       if (modal === 'create') {
         await db.whatsappTemplates.create({ ...form, created_by: currentUserEmail })
-        toast.success('Template created')
+        toast.success(t('cp.waTemplates.created'))
       } else {
         await db.whatsappTemplates.update(selected.id, form)
-        toast.success('Template updated')
+        toast.success(t('cp.waTemplates.updated'))
       }
       qc.invalidateQueries({ queryKey: ['whatsapp-templates'] })
       setModal(null)
     } catch (err) {
-      toast.error(`Save failed: ${err.message}`)
+      toast.error(err.message)
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDelete = (t) => {
+  const handleDelete = (tmpl) => {
     setConfirm({
       open: true,
-      title: 'Delete Template',
-      message: `Delete "${t.display_name}"? This cannot be undone.`,
+      title: t('cp.waTemplates.deleteConfirm'),
+      message: t('cp.waTemplates.deleteMessage', { name: tmpl.display_name }),
       onConfirm: async () => {
         setConfirm({ open: false })
         try {
-          await db.whatsappTemplates.delete(t.id)
+          await db.whatsappTemplates.delete(tmpl.id)
           qc.invalidateQueries({ queryKey: ['whatsapp-templates'] })
-          toast.success('Template deleted')
+          toast.success(t('cp.waTemplates.deleted'))
         } catch (err) {
-          toast.error(`Delete failed: ${err.message}`)
+          toast.error(err.message)
         }
       },
     })
@@ -149,54 +151,54 @@ export default function WATemplates({ currentUserEmail }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">
-          {templates.length} template{templates.length !== 1 ? 's' : ''}
+          {t('cp.waTemplates.count', { count: templates.length })}
         </p>
-        <Button variant="primary" onClick={openCreate}>+ New Template</Button>
+        <Button variant="primary" onClick={openCreate}>{t('cp.waTemplates.newTemplate')}</Button>
       </div>
 
       {templates.length === 0 ? (
         <div className="text-center py-16 bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px]">
           <div className="text-4xl mb-3">💬</div>
-          <p className="font-medium text-gray-700 dark:text-[#e8ebf0]">No templates yet</p>
-          <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-1 mb-4">Create your first message template</p>
-          <Button variant="primary" onClick={openCreate}>Create Template</Button>
+          <p className="font-medium text-gray-700 dark:text-[#e8ebf0]">{t('cp.waTemplates.noTemplates')}</p>
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-1 mb-4">{t('cp.waTemplates.createFirst')}</p>
+          <Button variant="primary" onClick={openCreate}>{t('cp.waTemplates.createBtn')}</Button>
         </div>
       ) : (
         <div className="space-y-3">
-          {templates.map((t) => (
-            <div key={t.id} className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-4">
+          {templates.map((tmpl) => (
+            <div key={tmpl.id} className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-4">
               <div className="flex items-start gap-3 flex-wrap">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold text-gray-900 dark:text-[#e8ebf0]">{t.display_name}</p>
-                    <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${STATUS_COLORS[t.status]}`}>
-                      {t.status.replace('_', ' ')}
+                    <p className="font-semibold text-gray-900 dark:text-[#e8ebf0]">{tmpl.display_name}</p>
+                    <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${STATUS_COLORS[tmpl.status]}`}>
+                      {tmpl.status.replace('_', ' ')}
                     </span>
                     <span className="px-2 py-0.5 text-xs rounded-full font-medium bg-indigo-100 text-indigo-700 dark:bg-[#1a2230] dark:text-[#a5b4fc]">
-                      {t.provider}
+                      {tmpl.provider}
                     </span>
                   </div>
                   <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">
-                    Event: <strong>{t.event_type}</strong>
-                    {t.template_name && <> · Meta name: <code className="font-mono">{t.template_name}</code></>}
-                    {t.attach_pdf && <> · 📎 PDF</>}
+                    {t('cp.waTemplates.eventLabel')} <strong>{tmpl.event_type}</strong>
+                    {tmpl.template_name && <> · {t('cp.waTemplates.metaNameLabel')} <code className="font-mono">{tmpl.template_name}</code></>}
+                    {tmpl.attach_pdf && <> · 📎 PDF</>}
                   </p>
                   <p className="text-sm text-gray-600 dark:text-[#9aa4b2] mt-2 line-clamp-2 whitespace-pre-wrap">
-                    {t.body_content}
+                    {tmpl.body_content}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <button onClick={() => openPreview(t)}
+                  <button onClick={() => openPreview(tmpl)}
                     className="px-3 py-1.5 text-xs font-medium border border-[#e6e9ef] dark:border-[#212a38] rounded-lg hover:bg-gray-50 dark:hover:bg-[#1a2230] text-gray-700 dark:text-[#e8ebf0] transition-colors">
-                    Preview
+                    {t('cp.waTemplates.previewBtn')}
                   </button>
-                  <button onClick={() => openEdit(t)}
+                  <button onClick={() => openEdit(tmpl)}
                     className="px-3 py-1.5 text-xs font-medium bg-[#4338ca] text-white rounded-lg hover:bg-[#3730a3] transition-colors">
-                    Edit
+                    {t('cp.edit')}
                   </button>
-                  <button onClick={() => handleDelete(t)}
+                  <button onClick={() => handleDelete(tmpl)}
                     className="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
-                    Delete
+                    {t('cp.delete')}
                   </button>
                 </div>
               </div>
@@ -211,7 +213,7 @@ export default function WATemplates({ currentUserEmail }) {
           <div className="w-full max-w-2xl bg-white dark:bg-[#121823] rounded-2xl shadow-2xl mt-8 mb-8">
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#e6e9ef] dark:border-[#212a38]">
               <h2 className="text-lg font-bold text-gray-900 dark:text-[#e8ebf0]">
-                {modal === 'create' ? 'New Template' : 'Edit Template'}
+                {modal === 'create' ? t('cp.waTemplates.newModal') : t('cp.waTemplates.editModal')}
               </h2>
               <button onClick={() => setModal(null)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1a2230]">
                 <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -222,41 +224,41 @@ export default function WATemplates({ currentUserEmail }) {
 
             <div className="px-6 py-5 space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField label="Display Name *" value={form.display_name}
+                <FormField label={t('cp.waTemplates.displayNameLabel')} value={form.display_name}
                   onChange={(v) => setForm((f) => ({ ...f, display_name: v }))} placeholder="e.g. Ticket Created" />
-                <FormField label="Internal Name" value={form.name}
+                <FormField label={t('cp.waTemplates.internalNameLabel')} value={form.name}
                   onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="e.g. ticket_created" />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className={lbl}>Event Type *</label>
+                  <label className={lbl}>{t('cp.waTemplates.eventTypeLabel')}</label>
                   <select value={form.event_type} onChange={(e) => setForm((f) => ({ ...f, event_type: e.target.value }))} className={sel}>
                     {EVENT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className={lbl}>Provider</label>
+                  <label className={lbl}>{t('cp.waTemplates.providerLabel')}</label>
                   <select value={form.provider} onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))} className={sel}>
                     {PROVIDER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className={lbl}>Status</label>
+                  <label className={lbl}>{t('cp.waTemplates.statusLabel')}</label>
                   <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} className={sel}>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="pending_approval">Pending Approval</option>
+                    <option value="active">{t('cp.waTemplates.statusActive')}</option>
+                    <option value="inactive">{t('cp.waTemplates.statusInactive')}</option>
+                    <option value="pending_approval">{t('cp.waTemplates.statusPending')}</option>
                   </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField label="Meta Template Name" value={form.template_name}
+                <FormField label={t('cp.waTemplates.metaTemplateLabel')} value={form.template_name}
                   onChange={(v) => setForm((f) => ({ ...f, template_name: v }))}
                   placeholder="e.g. rma_ticket_created" />
                 <div>
-                  <label className={lbl}>Language</label>
+                  <label className={lbl}>{t('cp.waTemplates.languageLabel')}</label>
                   <select value={form.language} onChange={(e) => setForm((f) => ({ ...f, language: e.target.value }))} className={sel}>
                     <option value="en">English</option>
                     <option value="ar">Arabic</option>
@@ -269,19 +271,19 @@ export default function WATemplates({ currentUserEmail }) {
 
               {/* Body content */}
               <div>
-                <label className={lbl}>Message Body * (use {'{{variable_name}}'} for placeholders)</label>
+                <label className={lbl}>{t('cp.waTemplates.bodyLabel')}</label>
                 <textarea
                   value={form.body_content}
                   onChange={(e) => setForm((f) => ({ ...f, body_content: e.target.value }))}
                   rows={6}
                   className={`w-full px-3 py-2 text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg bg-white dark:bg-[#0f1520] text-gray-800 dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] resize-none font-mono`}
-                  placeholder={'Hello {{customer_name}},\n\nYour ticket {{ticket_number}} status is {{ticket_status}}.\n\nThank you.'}
+                  placeholder={t('cp.waTemplates.bodyPlaceholder')}
                 />
               </div>
 
               {/* Suggested variables */}
               <div>
-                <p className={`${lbl} mb-2`}>Quick-insert Variables</p>
+                <p className={`${lbl} mb-2`}>{t('cp.waTemplates.quickInsert')}</p>
                 <div className="flex flex-wrap gap-2">
                   {SUGGESTED_VARS.map((sv) => {
                     const added = form.variables.some((v) => v.key === sv.key)
@@ -298,7 +300,7 @@ export default function WATemplates({ currentUserEmail }) {
               {/* Variable definitions */}
               {form.variables.length > 0 && (
                 <div>
-                  <p className={`${lbl} mb-2`}>Variable Mappings</p>
+                  <p className={`${lbl} mb-2`}>{t('cp.waTemplates.variableMappings')}</p>
                   <div className="space-y-2">
                     {form.variables.map((v) => (
                       <div key={v.key} className="flex items-center gap-2 p-2 bg-[#f8f9fb] dark:bg-[#0f1520] rounded-lg border border-[#e6e9ef] dark:border-[#212a38]">
@@ -306,11 +308,11 @@ export default function WATemplates({ currentUserEmail }) {
                         <input value={v.label} onChange={(e) => {
                           const vars = form.variables.map((vv) => vv.key === v.key ? { ...vv, label: e.target.value } : vv)
                           setForm((f) => ({ ...f, variables: vars }))
-                        }} placeholder="Label" className={`flex-1 px-2 py-1 text-xs border border-[#e6e9ef] dark:border-[#212a38] rounded bg-white dark:bg-[#121823] text-gray-800 dark:text-[#e8ebf0]`} />
+                        }} placeholder={t('cp.waTemplates.mappingLabelCol')} className={`flex-1 px-2 py-1 text-xs border border-[#e6e9ef] dark:border-[#212a38] rounded bg-white dark:bg-[#121823] text-gray-800 dark:text-[#e8ebf0]`} />
                         <input value={v.source} onChange={(e) => {
                           const vars = form.variables.map((vv) => vv.key === v.key ? { ...vv, source: e.target.value } : vv)
                           setForm((f) => ({ ...f, variables: vars }))
-                        }} placeholder="ticket field" className={`flex-1 px-2 py-1 text-xs border border-[#e6e9ef] dark:border-[#212a38] rounded bg-white dark:bg-[#121823] text-gray-800 dark:text-[#e8ebf0] font-mono`} />
+                        }} placeholder={t('cp.waTemplates.mappingFieldCol')} className={`flex-1 px-2 py-1 text-xs border border-[#e6e9ef] dark:border-[#212a38] rounded bg-white dark:bg-[#121823] text-gray-800 dark:text-[#e8ebf0] font-mono`} />
                         <button onClick={() => removeVariable(v.key)} className="text-red-500 hover:text-red-700 text-xs px-1">✕</button>
                       </div>
                     ))}
@@ -320,23 +322,23 @@ export default function WATemplates({ currentUserEmail }) {
 
               {/* Footer + options */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField label="Footer (optional)" value={form.footer_content}
+                <FormField label={t('cp.waTemplates.footerLabel')} value={form.footer_content}
                   onChange={(v) => setForm((f) => ({ ...f, footer_content: v }))} placeholder="e.g. myRMA Support" />
                 <div className="flex items-center gap-3 pt-5">
                   <input type="checkbox" id="attach_pdf" checked={!!form.attach_pdf}
                     onChange={(e) => setForm((f) => ({ ...f, attach_pdf: e.target.checked }))}
                     className="w-4 h-4 rounded border-gray-300 text-[#4338ca]" />
                   <label htmlFor="attach_pdf" className="text-sm text-gray-700 dark:text-[#e8ebf0] cursor-pointer">
-                    Attach PDF of ticket
+                    {t('cp.waTemplates.attachPdf')}
                   </label>
                 </div>
               </div>
             </div>
 
             <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#e6e9ef] dark:border-[#212a38]">
-              <Button variant="secondary" onClick={() => setModal(null)}>Cancel</Button>
+              <Button variant="secondary" onClick={() => setModal(null)}>{t('cp.cancel')}</Button>
               <Button variant="primary" onClick={handleSave} disabled={saving}>
-                {saving ? <Spinner size="sm" color="white" /> : (modal === 'create' ? 'Create Template' : 'Save Changes')}
+                {saving ? <Spinner size="sm" color="white" /> : (modal === 'create' ? t('cp.waTemplates.createTemplate') : t('cp.waTemplates.saveChanges'))}
               </Button>
             </div>
           </div>
@@ -348,7 +350,7 @@ export default function WATemplates({ currentUserEmail }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md bg-white dark:bg-[#121823] rounded-2xl shadow-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#e6e9ef] dark:border-[#212a38]">
-              <h2 className="font-bold text-gray-900 dark:text-[#e8ebf0]">Message Preview</h2>
+              <h2 className="font-bold text-gray-900 dark:text-[#e8ebf0]">{t('cp.waTemplates.previewModal')}</h2>
               <button onClick={() => setModal(null)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1a2230]">
                 <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -367,7 +369,7 @@ export default function WATemplates({ currentUserEmail }) {
               </div>
               {/* Variable overrides */}
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Fill Variables</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{t('cp.waTemplates.fillVariables')}</p>
                 <div className="space-y-2">
                   {(selected.variables ?? []).map((v) => (
                     <div key={v.key} className="flex items-center gap-2">

@@ -213,13 +213,13 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         }
       }
       db.auditLog.log(userEmail, `ticket_${field}_changed`, `${ticket.rma_number}: ${oldValue} → ${newValue}`).catch(() => {})
-      toast.success(`${field === 'ticket_status' ? 'Status' : 'Priority'} updated`)
+      toast.success(t('tickets.fieldUpdated', { field: field === 'ticket_status' ? t('common.status') : t('common.priority') }))
     } catch {
       // Rollback
       queryClient.setQueryData(['rma-tickets'], (old = []) =>
         old.map((t) => (t.id === ticket.id ? { ...t, [field]: oldValue } : t))
       )
-      toast.error('Failed to update')
+      toast.error(t('tickets.failedUpdate'))
     }
   }
 
@@ -316,7 +316,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     if (pageNum >= 1 && pageNum <= totalPages) {
       handlePageChange(pageNum)
       setJumpToPage('')
-    } else toast.error(`Page must be between 1 and ${totalPages}`)
+    } else toast.error(t('tickets.pageMustBeBetween', { total: totalPages }))
   }
 
   const renderPageNumbers = () => {
@@ -357,11 +357,11 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
   const handleEdit = (ticket) => {
     if (!canDo('edit_all') && !canDo('edit_assigned')) {
-      toast.error('You do not have permission to edit tickets')
+      toast.error(t('tickets.noPermissionEdit'))
       return
     }
     if (canDo('edit_assigned') && !canDo('edit_all') && ticket.assigned_technician !== userEmail) {
-      toast.error('You can only edit tickets assigned to you')
+      toast.error(t('tickets.editAssignedOnly'))
       return
     }
     setEditingTicket(ticket)
@@ -370,10 +370,10 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
   const handleDelete = (id) => {
     if (!canDo('delete')) {
-      toast.error('You do not have permission to delete tickets')
+      toast.error(t('tickets.noPermissionDelete'))
       return
     }
-    openConfirm('Delete Ticket', 'Delete this ticket? This cannot be undone.', async () => {
+    openConfirm(t('tickets.deleteTicketTitle'), t('tickets.deleteTicketConfirm'), async () => {
       closeConfirm()
       // UX-6 optimistic: remove from list immediately; rollback on error
       const previousTickets = queryClient.getQueryData(['rma-tickets'])
@@ -396,25 +396,25 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             targetEmails: [],
           })
           .catch(() => {})
-        toast.success('Ticket deleted!')
+        toast.success(t('tickets.ticketDeleted'))
         queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
         queryClient.invalidateQueries({ queryKey: ['rma-tickets-count'] })
       } catch (err) {
         captureException(err, { page: 'RMATickets', context: 'deleteTicket' })
         queryClient.setQueryData(['rma-tickets'], previousTickets) // rollback on error
-        toast.error('Failed to delete ticket')
+        toast.error(t('tickets.failedDelete'))
       }
     })
   }
 
   const handleBulkDelete = () => {
     if (!canDo('delete')) {
-      toast.error('You do not have permission to delete tickets')
+      toast.error(t('tickets.noPermissionDelete'))
       return
     }
     openConfirm(
-      'Delete Tickets',
-      `Delete ${selectedTickets.length} ticket${selectedTickets.length !== 1 ? 's' : ''}? This cannot be undone.`,
+      t('tickets.deleteTicketsTitle'),
+      t('tickets.deleteTicketsConfirm', { count: selectedTickets.length }),
       async () => {
         closeConfirm()
         setBulkProcessing(true)
@@ -432,7 +432,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               targetEmails: [],
             })
             .catch(() => {})
-          toast.success(`${selectedTickets.length} ticket(s) deleted`)
+          toast.success(t('tickets.ticketsBulkDeleted', { count: selectedTickets.length }))
           db.auditLog
             .log(userEmail, 'ticket_bulk_deleted', `Deleted ${selectedTickets.length} tickets`)
             .catch(() => {})
@@ -441,7 +441,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           queryClient.invalidateQueries({ queryKey: ['rma-tickets-count'] })
         } catch (err) {
           captureException(err, { page: 'RMATickets', context: 'bulkDeleteTickets' })
-          toast.error('Failed to delete tickets')
+          toast.error(t('tickets.failedBulkDelete'))
         } finally {
           setBulkProcessing(false)
         }
@@ -452,7 +452,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const handleBulkTicketStatus = async () => {
     if (!bulkTicketStatus) return
     if (!(canDo('edit_all') || canDo('change_status'))) {
-      toast.error('No permission to change status')
+      toast.error(t('tickets.noPermissionChangeStatus'))
       return
     }
     setBulkProcessing(true)
@@ -478,9 +478,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           targetEmails: [],
         })
         .catch(() => {})
-      toast.success(
-        `Status updated to "${bulkTicketStatus}" for ${selectedTickets.length} ticket(s)`
-      )
+      toast.success(t('tickets.bulkStatusUpdated', { status: bulkTicketStatus, count: selectedTickets.length }))
       db.auditLog
         .log(
           userEmail,
@@ -493,7 +491,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
     } catch (err) {
       captureException(err, { page: 'RMATickets', context: 'bulkUpdateStatus' })
-      toast.error('Failed to update status')
+      toast.error(t('tickets.failedUpdateStatus'))
     } finally {
       setBulkProcessing(false)
     }
@@ -502,7 +500,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const handleBulkProductStatus = async () => {
     if (!bulkProductStatus) return
     if (!(canDo('edit_all') || canDo('edit_assigned'))) {
-      toast.error('No permission to edit tickets')
+      toast.error(t('tickets.noPermissionEdit2'))
       return
     }
     setBulkProcessing(true)
@@ -523,9 +521,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           })
         })
       )
-      toast.success(
-        `Product status updated to "${bulkProductStatus}" for ${selectedTickets.length} ticket(s)`
-      )
+      toast.success(t('tickets.bulkProductStatusUpdated', { status: bulkProductStatus, count: selectedTickets.length }))
       db.auditLog
         .log(
           userEmail,
@@ -538,7 +534,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
     } catch (err) {
       captureException(err, { page: 'RMATickets', context: 'bulkUpdateProductStatus' })
-      toast.error('Failed to update product status')
+      toast.error(t('tickets.failedUpdateProductStatus'))
     } finally {
       setBulkProcessing(false)
     }
@@ -812,11 +808,11 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
   const handleExport = () => {
     if (!canDo('export')) {
-      toast.error('No permission to export')
+      toast.error(t('tickets.noPermissionExport'))
       return
     }
     const csv = [
-      ['RMA Number', 'Customer', 'Status', 'Priority', 'Assigned To', 'Due Date', 'Created Date'],
+      [t('tickets.csvRmaNumber'), t('tickets.csvCustomer'), t('tickets.csvStatus'), t('tickets.csvPriority'), t('tickets.csvAssignedTo'), t('tickets.csvDueDate'), t('tickets.csvCreatedDate')],
       ...filteredTickets.map((t) => [
         t.rma_number,
         t.customer_name,
@@ -833,7 +829,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
     a.download = `rma-tickets-${Date.now()}.csv`
     a.click()
-    toast.success('Exported!')
+    toast.success(t('tickets.exportedSuccess'))
     db.auditLog
       .log(userEmail, 'tickets_exported', `Exported ${filteredTickets.length} tickets to CSV`)
       .catch(() => {})
@@ -841,7 +837,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
   const handleAddNew = () => {
     if (!canDo('create')) {
-      toast.error('No permission to create tickets')
+      toast.error(t('tickets.noPermissionCreate'))
       return
     }
     setEditingTicket(null)
@@ -856,25 +852,25 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     if (days < 0)
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400">
-          Overdue {Math.abs(days)}d
+          {t('tickets.overdueDays', { days: Math.abs(days) })}
         </span>
       )
     if (days === 0)
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400">
-          Due today
+          {t('tickets.dueToday')}
         </span>
       )
     if (days <= 2)
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-          {days}d left
+          {t('tickets.daysLeft', { days })}
         </span>
       )
     if (days <= 5)
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400">
-          {days}d left
+          {t('tickets.daysLeft', { days })}
         </span>
       )
     return <span className="text-xs text-gray-500">{fmt(dueDate)}</span>
@@ -1057,7 +1053,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                     }
                   }}
                   onFocus={() => setShowFilterCustomerDropdown(true)}
-                  placeholder={filterCustomer || 'All customers...'}
+                  placeholder={filterCustomer || t('tickets.allCustomers')}
                   className={`w-full sm:w-52 px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 ${filterCustomer ? 'border-indigo-400 bg-indigo-50 pr-7' : 'border-gray-300'}`}
                 />
                 {filterCustomer && (
@@ -1423,7 +1419,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   )}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
-                  {t.assigned_technician || 'Unassigned'}
+                  {t.assigned_technician || t('common.unassigned')}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">{fmt(t.created_date)}</td>
                 <td className="px-4 py-3 relative action-menu">
@@ -1555,11 +1551,11 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                     preset="tickets"
                     description={
                       tickets.length > 0
-                        ? 'Try adjusting your filters or search term'
-                        : 'Create your first RMA ticket to get started'
+                        ? t('tickets.adjustFilters')
+                        : t('tickets.createFirstHint')
                     }
                     action={canDo('create') && tickets.length === 0 ? handleAddNew : undefined}
-                    actionLabel="Create First Ticket"
+                    actionLabel={t('tickets.createFirstTicket')}
                   />
                 </td>
               </tr>

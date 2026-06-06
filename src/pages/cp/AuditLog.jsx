@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../../lib/sentry'
 
 export default function AuditLog() {
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [filterUser, setFilterUser] = useState('')
   const [filterAction, setFilterAction] = useState('')
@@ -18,7 +20,7 @@ export default function AuditLog() {
   useEffect(() => {
     if (isError) {
       captureException(error)
-      toast.error('Failed to load audit log')
+      toast.error(t('cp.auditLog.loadFailed'))
     }
   }, [isError, error])
 
@@ -58,7 +60,7 @@ export default function AuditLog() {
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    toast.success(`Exported ${filtered.length} records`)
+    toast.success(t('cp.auditLog.exported', { count: filtered.length }))
   }
 
   const uniqueUsers = [...new Set(logs.map((l) => l.user_email).filter(Boolean))].sort()
@@ -74,6 +76,13 @@ export default function AuditLog() {
   const inp =
     'px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent'
 
+  const HEADERS = [
+    t('cp.auditLog.dateTime'),
+    t('cp.auditLog.userCol'),
+    t('cp.auditLog.actionCol'),
+    t('cp.auditLog.detailsCol'),
+  ]
+
   if (loading)
     return (
       <div className="flex justify-center py-16">
@@ -85,9 +94,9 @@ export default function AuditLog() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Audit Log</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t('cp.auditLog.header')}</h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            All user activity across the system — {logs.length} records
+            {t('cp.auditLog.subtitle', { count: logs.length })}
           </p>
         </div>
         <button
@@ -102,7 +111,7 @@ export default function AuditLog() {
               d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
-          Export CSV
+          {t('cp.auditLog.exportCsv')}
         </button>
       </div>
 
@@ -112,7 +121,7 @@ export default function AuditLog() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search user, action, details..."
+            placeholder={t('cp.auditLog.searchPlaceholder')}
             className={`w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent`}
           />
           <svg
@@ -130,7 +139,7 @@ export default function AuditLog() {
           </svg>
         </div>
         <select value={filterUser} onChange={(e) => setFilterUser(e.target.value)} className={inp}>
-          <option value="">All users</option>
+          <option value="">{t('cp.auditLog.allUsers')}</option>
           {uniqueUsers.map((u) => (
             <option key={u} value={u}>
               {u}
@@ -142,7 +151,7 @@ export default function AuditLog() {
           onChange={(e) => setFilterAction(e.target.value)}
           className={inp}
         >
-          <option value="">All actions</option>
+          <option value="">{t('cp.auditLog.allActions')}</option>
           {uniqueActions.map((a) => (
             <option key={a} value={a}>
               {a}
@@ -154,24 +163,24 @@ export default function AuditLog() {
           value={filterFrom}
           onChange={(e) => setFilterFrom(e.target.value)}
           className={inp}
-          title="From date"
+          title={t('cp.auditLog.fromDate')}
         />
         <input
           type="date"
           value={filterTo}
           onChange={(e) => setFilterTo(e.target.value)}
           className={inp}
-          title="To date"
+          title={t('cp.auditLog.toDate')}
         />
         {hasFilters && (
           <button onClick={clearFilters} className="text-sm text-red-600 hover:underline">
-            Clear
+            {t('cp.auditLog.clear')}
           </button>
         )}
       </div>
 
       <div className="text-xs text-gray-500">
-        Showing {filtered.length} of {logs.length} records
+        {t('cp.auditLog.showingOf', { filtered: filtered.length, total: logs.length })}
       </div>
 
       {/* Table */}
@@ -180,9 +189,9 @@ export default function AuditLog() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
               <tr>
-                {['Date & Time', 'User', 'Action', 'Details'].map((h) => (
+                {HEADERS.map((h, i) => (
                   <th
-                    key={h}
+                    key={i}
                     className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase"
                   >
                     {h}
@@ -194,7 +203,7 @@ export default function AuditLog() {
               {filtered.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-4 py-12 text-center text-gray-500">
-                    No log entries match your filters
+                    {t('cp.auditLog.noEntries')}
                   </td>
                 </tr>
               )}

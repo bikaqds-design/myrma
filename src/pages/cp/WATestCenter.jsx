@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
 import { supabase } from '../../api/client'
@@ -14,6 +15,7 @@ const EVENT_OPTIONS = [
 ]
 
 export default function WATestCenter({ currentUserEmail }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
 
   // ── Send test message ────────────────────────────────────────────────────
@@ -45,14 +47,14 @@ export default function WATestCenter({ currentUserEmail }) {
     queryKey: ['whatsapp-templates'],
     queryFn: () => db.whatsappTemplates.list(),
   })
-  const templates = (templatesResult?.data ?? []).filter((t) => t.status === 'active')
+  const templates = (templatesResult?.data ?? []).filter((tmpl) => tmpl.status === 'active')
 
-  const selectedTemplate = templates.find((t) => t.id === testTemplate)
+  const selectedTemplate = templates.find((tmpl) => tmpl.id === testTemplate)
 
   // Update default vars when template changes
   const handleTemplateChange = (id) => {
     setTestTemplate(id)
-    const tmpl = templates.find((t) => t.id === id)
+    const tmpl = templates.find((tmpl2) => tmpl2.id === id)
     if (!tmpl) return
     const vars = {}
     for (const v of tmpl.variables ?? []) vars[v.key] = v.key === 'customer_name' ? 'Test Customer' : `[${v.label}]`
@@ -60,8 +62,8 @@ export default function WATestCenter({ currentUserEmail }) {
   }
 
   const handleSendTest = async () => {
-    if (!testPhone.trim()) { toast.error('Enter a phone number'); return }
-    if (!testTemplate)     { toast.error('Select a template'); return }
+    if (!testPhone.trim()) { toast.error(t('cp.waTestCenter.phoneRequired')); return }
+    if (!testTemplate)     { toast.error(t('cp.waTestCenter.templateRequired')); return }
     setSending(true)
     setLastResult(null)
     try {
@@ -91,25 +93,25 @@ export default function WATestCenter({ currentUserEmail }) {
           /* body not JSON — keep generic message */
         }
         setLastResult({ success: false, error: detail, ts: new Date().toISOString() })
-        toast.error(`Send failed: ${detail}`)
+        toast.error(t('cp.waTestCenter.sendFailed', { detail }))
         return
       }
 
       setLastResult({ success: data?.success, messageId: data?.message_id, error: data?.error, ts: new Date().toISOString() })
-      if (data?.success) toast.success('Test message sent')
-      else toast.error(`Send failed: ${data?.error ?? 'Unknown error'}`)
+      if (data?.success) toast.success(t('cp.waTestCenter.sentSuccess', { id: data?.message_id ?? '—' }))
+      else toast.error(t('cp.waTestCenter.sentFailed', { error: data?.error ?? 'Unknown error' }))
       qc.invalidateQueries({ queryKey: ['notification-logs'] })
       qc.invalidateQueries({ queryKey: ['notification-log-stats'] })
     } catch (err) {
       setLastResult({ success: false, error: err.message, ts: new Date().toISOString() })
-      toast.error(`Error: ${err.message}`)
+      toast.error(t('cp.waTestCenter.sendError', { error: err.message }))
     } finally {
       setSending(false)
     }
   }
 
   const handleSimulate = async () => {
-    if (!simPhone.trim()) { toast.error('Enter a customer phone number'); return }
+    if (!simPhone.trim()) { toast.error(t('cp.waTestCenter.customerPhoneRequired')); return }
     setSimulating(true)
     try {
       // Build a synthetic ticket payload and enqueue it
@@ -135,11 +137,11 @@ export default function WATestCenter({ currentUserEmail }) {
         metadata: {},
       })
 
-      toast.success(`Event "${simEvent}" simulated — check the queue and logs`)
+      toast.success(t('cp.waTestCenter.simulated', { event: simEvent }))
       qc.invalidateQueries({ queryKey: ['queue-stats'] })
       qc.invalidateQueries({ queryKey: ['notification-logs'] })
     } catch (err) {
-      toast.error(`Simulation failed: ${err.message}`)
+      toast.error(t('cp.waTestCenter.simFailed', { error: err.message }))
     } finally {
       setSimulating(false)
     }
@@ -152,12 +154,12 @@ export default function WATestCenter({ currentUserEmail }) {
       const { data, error } = await supabase.functions.invoke('notification-worker')
       if (error) throw error
       setWorkerResult(data)
-      toast.success(`Worker ran: ${data?.processed ?? 0} processed, ${data?.failed ?? 0} failed`)
+      toast.success(t('cp.waTestCenter.workerResult', { processed: data?.processed ?? 0, failed: data?.failed ?? 0 }))
       qc.invalidateQueries({ queryKey: ['queue-stats'] })
       qc.invalidateQueries({ queryKey: ['notification-logs'] })
       qc.invalidateQueries({ queryKey: ['notification-log-stats'] })
     } catch (err) {
-      toast.error(`Worker error: ${err.message}`)
+      toast.error(t('cp.waTestCenter.workerError', { error: err.message }))
     } finally {
       setRunning(false)
       refetchQueue()
@@ -173,15 +175,15 @@ export default function WATestCenter({ currentUserEmail }) {
       {/* Queue stats */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
-          { label: 'Pending',    value: queueStats?.pending,    color: 'text-amber-600 dark:text-amber-400' },
-          { label: 'Processing', value: queueStats?.processing, color: 'text-blue-600 dark:text-blue-400' },
-          { label: 'Completed',  value: queueStats?.completed,  color: 'text-green-600 dark:text-green-400' },
-          { label: 'Failed',     value: queueStats?.failed,     color: 'text-red-600 dark:text-red-400' },
-          { label: 'Cancelled',  value: queueStats?.cancelled,  color: 'text-gray-500 dark:text-[#9aa4b2]' },
+          { labelKey: 'cp.waTestCenter.statPending',    value: queueStats?.pending,    color: 'text-amber-600 dark:text-amber-400' },
+          { labelKey: 'cp.waTestCenter.statProcessing', value: queueStats?.processing, color: 'text-blue-600 dark:text-blue-400' },
+          { labelKey: 'cp.waTestCenter.statCompleted',  value: queueStats?.completed,  color: 'text-green-600 dark:text-green-400' },
+          { labelKey: 'cp.waTestCenter.statFailed',     value: queueStats?.failed,     color: 'text-red-600 dark:text-red-400' },
+          { labelKey: 'cp.waTestCenter.statCancelled',  value: queueStats?.cancelled,  color: 'text-gray-500 dark:text-[#9aa4b2]' },
         ].map((s) => (
-          <div key={s.label} className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-xl p-3">
+          <div key={s.labelKey} className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-xl p-3">
             <p className={`text-2xl font-bold ${s.color}`}>{s.value ?? 0}</p>
-            <p className="text-xs text-gray-500 dark:text-[#9aa4b2] font-medium">{s.label}</p>
+            <p className="text-xs text-gray-500 dark:text-[#9aa4b2] font-medium">{t(s.labelKey)}</p>
           </div>
         ))}
       </div>
@@ -191,12 +193,11 @@ export default function WATestCenter({ currentUserEmail }) {
         <div className="flex items-center gap-2 mb-1">
           <span className="text-lg">⚙️</span>
           <h2 className="text-sm font-semibold text-gray-700 dark:text-[#e8ebf0] uppercase tracking-wide">
-            Queue Worker
+            {t('cp.waTestCenter.queueWorker')}
           </h2>
         </div>
         <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">
-          Manually trigger the notification worker to process all pending queue jobs immediately.
-          In production, configure pg_cron to run this every 2 minutes automatically.
+          {t('cp.waTestCenter.workerDesc')}
         </p>
         {workerResult && (
           <div className="bg-[#f8f9fb] dark:bg-[#0f1520] rounded-lg p-3 text-xs font-mono text-gray-700 dark:text-[#e8ebf0]">
@@ -206,9 +207,9 @@ export default function WATestCenter({ currentUserEmail }) {
         )}
         <div className="flex items-center gap-3">
           <Button variant="primary" onClick={handleRunWorker} disabled={running} className="min-w-[160px]">
-            {running ? <><Spinner size="sm" color="white" /><span className="ml-2">Running…</span></> : '▶ Run Worker Now'}
+            {running ? <><Spinner size="sm" color="white" /><span className="ml-2">{t('cp.waTestCenter.runningWorker')}</span></> : t('cp.waTestCenter.runWorker')}
           </Button>
-          <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">Processes up to 10 jobs per run</p>
+          <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('cp.waTestCenter.workerJobs')}</p>
         </div>
       </section>
 
@@ -217,21 +218,21 @@ export default function WATestCenter({ currentUserEmail }) {
         <div className="flex items-center gap-2 mb-1">
           <span className="text-lg">💬</span>
           <h2 className="text-sm font-semibold text-gray-700 dark:text-[#e8ebf0] uppercase tracking-wide">
-            Send Test Message
+            {t('cp.waTestCenter.sendTest')}
           </h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className={lbl}>Phone Number (E.164)</label>
+            <label className={lbl}>{t('cp.waTestCenter.phoneLabel')}</label>
             <input value={testPhone} onChange={(e) => setTestPhone(e.target.value)}
               placeholder="+966501234567" className={inp} />
           </div>
           <div>
-            <label className={lbl}>Template</label>
+            <label className={lbl}>{t('cp.waTestCenter.templateLabel')}</label>
             <select value={testTemplate} onChange={(e) => handleTemplateChange(e.target.value)} className={inp}>
-              <option value="">— Select template —</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>{t.display_name} ({t.provider})</option>
+              <option value="">{t('cp.waTestCenter.selectTemplate')}</option>
+              {templates.map((tmpl) => (
+                <option key={tmpl.id} value={tmpl.id}>{tmpl.display_name} ({tmpl.provider})</option>
               ))}
             </select>
           </div>
@@ -239,7 +240,7 @@ export default function WATestCenter({ currentUserEmail }) {
 
         {selectedTemplate && (selectedTemplate.variables ?? []).length > 0 && (
           <div>
-            <label className={lbl}>Template Variables</label>
+            <label className={lbl}>{t('cp.waTestCenter.templateVars')}</label>
             <div className="space-y-2">
               {selectedTemplate.variables.map((v) => (
                 <div key={v.key} className="flex items-center gap-2">
@@ -253,7 +254,7 @@ export default function WATestCenter({ currentUserEmail }) {
         )}
 
         <div>
-          <label className={lbl}>PDF Attachment URL (optional)</label>
+          <label className={lbl}>{t('cp.waTestCenter.pdfUrlLabel')}</label>
           <input value={testAttach} onChange={(e) => setTestAttach(e.target.value)}
             placeholder="https://…/ticket.pdf" className={inp} />
         </div>
@@ -261,13 +262,13 @@ export default function WATestCenter({ currentUserEmail }) {
         {lastResult && (
           <div className={`rounded-lg p-3 text-xs ${lastResult.success ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-800/50' : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-400 border border-red-200 dark:border-red-800/50'}`}>
             {lastResult.success
-              ? `✓ Sent · Message ID: ${lastResult.messageId ?? '—'}`
-              : `✗ Failed: ${lastResult.error ?? 'Unknown error'}`}
+              ? t('cp.waTestCenter.sentSuccess', { id: lastResult.messageId ?? '—' })
+              : t('cp.waTestCenter.sentFailed', { error: lastResult.error ?? 'Unknown error' })}
           </div>
         )}
 
         <Button variant="primary" onClick={handleSendTest} disabled={sending} className="min-w-[160px]">
-          {sending ? <><Spinner size="sm" color="white" /><span className="ml-2">Sending…</span></> : '▶ Send Test Message'}
+          {sending ? <><Spinner size="sm" color="white" /><span className="ml-2">{t('cp.waTestCenter.sending')}</span></> : t('cp.waTestCenter.sendBtn')}
         </Button>
       </section>
 
@@ -276,33 +277,32 @@ export default function WATestCenter({ currentUserEmail }) {
         <div className="flex items-center gap-2 mb-1">
           <span className="text-lg">🔁</span>
           <h2 className="text-sm font-semibold text-gray-700 dark:text-[#e8ebf0] uppercase tracking-wide">
-            Simulate Event
+            {t('cp.waTestCenter.simulateEvent')}
           </h2>
         </div>
         <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">
-          Fires a synthetic notification event to test the full pipeline: event → queue → worker → WhatsApp.
-          Requires WhatsApp to be enabled in Settings.
+          {t('cp.waTestCenter.simulateDesc')}
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className={lbl}>Event Type</label>
+            <label className={lbl}>{t('cp.waTestCenter.eventTypeLabel')}</label>
             <select value={simEvent} onChange={(e) => setSimEvent(e.target.value)} className={inp}>
               {EVENT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
           <div>
-            <label className={lbl}>Customer Phone</label>
+            <label className={lbl}>{t('cp.waTestCenter.customerPhoneLabel')}</label>
             <input value={simPhone} onChange={(e) => setSimPhone(e.target.value)}
-              placeholder="+966501234567" className={inp} />
+              placeholder={t('cp.waTestCenter.phonePlaceholder')} className={inp} />
           </div>
           <div>
-            <label className={lbl}>Ticket ID (optional)</label>
+            <label className={lbl}>{t('cp.waTestCenter.ticketIdLabel')}</label>
             <input value={simTicketId} onChange={(e) => setSimTicketId(e.target.value)}
-              placeholder="existing ticket UUID" className={inp} />
+              placeholder={t('cp.waTestCenter.ticketPlaceholder')} className={inp} />
           </div>
         </div>
         <Button variant="secondary" onClick={handleSimulate} disabled={simulating}>
-          {simulating ? <><Spinner size="sm" /><span className="ml-2">Simulating…</span></> : '⚡ Simulate Event'}
+          {simulating ? <><Spinner size="sm" /><span className="ml-2">{t('cp.waTestCenter.simulating')}</span></> : t('cp.waTestCenter.simulateBtn')}
         </Button>
       </section>
 
@@ -311,7 +311,7 @@ export default function WATestCenter({ currentUserEmail }) {
         <div className="flex items-center gap-2 mb-1">
           <span className="text-lg">📖</span>
           <h2 className="text-sm font-semibold text-gray-700 dark:text-[#e8ebf0] uppercase tracking-wide">
-            Production Setup Checklist
+            {t('cp.waTestCenter.productionChecklist')}
           </h2>
         </div>
         <ol className="space-y-2 text-sm text-gray-700 dark:text-[#e8ebf0]">

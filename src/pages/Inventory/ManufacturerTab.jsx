@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { Spinner } from '../../components/ui'
@@ -14,6 +15,7 @@ export function ManufacturerTab({
   canManageBatches,
   onReload,
 }) {
+  const { t } = useTranslation()
   const [selectedBrand, setSelectedBrand] = useState(null)
   const [selectedBatch, setSelectedBatch] = useState(null)
   const getBatchUnits = (batchId) => units.filter((u) => u.manufacturer_batch_id === batchId)
@@ -44,13 +46,13 @@ export function ManufacturerTab({
     <div className="space-y-6">
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-[#e8ebf0]">Brand Warehouses</h3>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-[#e8ebf0]">{t('inventory.brandWarehouses')}</h3>
           {selectedBrand && (
             <button
               onClick={() => setSelectedBrand(null)}
               className="text-xs text-indigo-600 hover:underline"
             >
-              Clear filter
+              {t('inventory.clearFilter')}
             </button>
           )}
         </div>
@@ -70,30 +72,29 @@ export function ManufacturerTab({
                     {brand.brand_name}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">
-                    {s.total} batch{s.total !== 1 ? 'es' : ''} · {s.units} unit
-                    {s.units !== 1 ? 's' : ''}
+                    {t('inventory.batchesCount', { count: s.total })} · {t('inventory.unitsSelected', { count: s.units })}
                   </div>
                 </div>
                 {s.total > 0 ? (
                   <div className="flex gap-1 mt-2 flex-wrap">
                     {s.draft > 0 && (
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]">
-                        {s.draft} draft
+                        {s.draft} {t('inventory.batchDraft')}
                       </span>
                     )}
                     {s.sent > 0 && (
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700">
-                        {s.sent} sent
+                        {s.sent} {t('inventory.batchSent')}
                       </span>
                     )}
                     {s.resolved > 0 && (
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">
-                        {s.resolved} done
+                        {s.resolved} {t('inventory.batchDone')}
                       </span>
                     )}
                   </div>
                 ) : (
-                  <div className="mt-2 text-[10px] text-gray-300 font-medium">No batches yet</div>
+                  <div className="mt-2 text-[10px] text-gray-300 font-medium">{t('inventory.noBatchesYet')}</div>
                 )}
               </button>
             )
@@ -107,9 +108,9 @@ export function ManufacturerTab({
                 ?
               </div>
               <div className="mt-3">
-                <div className="font-semibold text-sm text-gray-900 dark:text-[#e8ebf0]">Other</div>
+                <div className="font-semibold text-sm text-gray-900 dark:text-[#e8ebf0]">{t('inventory.otherLabel')}</div>
                 <div className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">
-                  {otherBatches.length} batch{otherBatches.length !== 1 ? 'es' : ''}
+                  {t('inventory.batchesCount', { count: otherBatches.length })}
                 </div>
               </div>
             </button>
@@ -135,10 +136,10 @@ export function ManufacturerTab({
             </svg>
           </div>
           <p className="text-gray-600 dark:text-[#9aa4b2] font-medium">
-            {selectedBrand ? `No batches for ${selectedBrand} yet` : 'No manufacturer batches yet'}
+            {selectedBrand ? t('inventory.noBatchesForBrand', { brand: selectedBrand }) : t('inventory.noBatchesYet')}
           </p>
           <p className="text-gray-500 dark:text-[#9aa4b2] text-sm">
-            Go to Company Stock, open a product, and select units to create a batch.
+            {t('inventory.noBatchesHintStock')}
           </p>
         </div>
       ) : (
@@ -147,9 +148,9 @@ export function ManufacturerTab({
             <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 dark:border-[#212a38] bg-indigo-50/60">
               <BrandAvatar name={selectedBrand} size="md" />
               <div>
-                <div className="font-semibold text-gray-900 dark:text-[#e8ebf0]">{selectedBrand} — Return Batches</div>
+                <div className="font-semibold text-gray-900 dark:text-[#e8ebf0]">{selectedBrand} — {t('inventory.returnBatches')}</div>
                 <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">
-                  {displayBatches.length} batch{displayBatches.length !== 1 ? 'es' : ''}
+                  {t('inventory.batchesCount', { count: displayBatches.length })}
                 </div>
               </div>
             </div>
@@ -159,17 +160,17 @@ export function ManufacturerTab({
               <thead className="bg-gray-50 dark:bg-[#0f1520] border-b border-gray-200 dark:border-[#212a38]">
                 <tr>
                   {[
-                    'Batch #',
-                    'Manufacturer',
-                    'Units',
-                    'Status',
-                    'Sent Date',
-                    'Tracking #',
-                    'Resolution',
-                    'Created',
-                  ].map((h) => (
+                    t('inventory.colBatchNum'),
+                    t('inventory.colManufacturer'),
+                    t('inventory.colUnits'),
+                    t('inventory.colStatus'),
+                    t('inventory.colSentDate'),
+                    t('inventory.colTracking'),
+                    t('inventory.colResolution'),
+                    t('inventory.colCreated'),
+                  ].map((h, i) => (
                     <th
-                      key={h}
+                      key={i}
                       className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider"
                     >
                       {h}
@@ -186,9 +187,9 @@ export function ManufacturerTab({
                   }
                   const resLabel =
                     b.resolution_type === 'replacement_received'
-                      ? { label: 'Replacement Rcvd', cls: 'bg-green-100 text-green-700' }
+                      ? { label: t('inventory.resolutionReplacementRcvd'), cls: 'bg-green-100 text-green-700' }
                       : b.resolution_type === 'credit_note_received'
-                        ? { label: 'Credit Note Rcvd', cls: 'bg-blue-100 text-blue-700' }
+                        ? { label: t('inventory.resolutionCreditNoteRcvd'), cls: 'bg-blue-100 text-blue-700' }
                         : null
                   return (
                     <tr
@@ -236,7 +237,7 @@ export function ManufacturerTab({
                         {fmt(b.created_date)}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className="text-xs text-indigo-600 hover:underline">View</span>
+                        <span className="text-xs text-indigo-600 hover:underline">{t('inventory.viewLink')}</span>
                       </td>
                     </tr>
                   )
@@ -265,26 +266,27 @@ export function ManufacturerTab({
 // ─── Resolve Modal ─────────────────────────────────────────────────────────────
 // eslint-disable-next-line no-unused-vars
 function ResolveModal({ count, onConfirm, onClose }) {
+  const { t } = useTranslation()
   const [resolution, setResolution] = useState('')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const options = [
     {
       value: 'return_to_customer',
-      label: 'Return to Customer',
-      desc: 'Unit returned — exits inventory.',
+      label: t('inventory.resolveReturnToCustomer'),
+      desc: t('inventory.resolveReturnToCustomerDesc'),
       active: 'border-green-400 bg-green-50',
     },
     {
       value: 'credit_note',
-      label: 'Credit Note Issued',
-      desc: 'Credit note — moves to Company Stock.',
+      label: t('inventory.resolveCreditNote'),
+      desc: t('inventory.resolveCreditNoteDesc'),
       active: 'border-orange-400 bg-orange-50',
     },
     {
       value: 'replacement',
-      label: 'Replacement Issued',
-      desc: 'Replacement sent — moves to Company Stock.',
+      label: t('inventory.resolveReplacement'),
+      desc: t('inventory.resolveReplacementDesc'),
       active: 'border-indigo-400 bg-indigo-50',
     },
   ]
@@ -298,9 +300,9 @@ function ResolveModal({ count, onConfirm, onClose }) {
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-[#121823] rounded-2xl shadow-2xl w-full max-w-md">
         <div className="p-6 border-b border-gray-100 dark:border-[#212a38]">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-[#e8ebf0]">Set Resolution</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-[#e8ebf0]">{t('inventory.setResolutionTitle')}</h3>
           <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-1">
-            {count} unit{count !== 1 ? 's' : ''} selected
+            {t('inventory.unitsSelected', { count })}
           </p>
         </div>
         <div className="p-6 space-y-3">
@@ -326,7 +328,7 @@ function ResolveModal({ count, onConfirm, onClose }) {
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Notes (optional)"
+            placeholder={t('inventory.notesOptional')}
             rows={2}
             className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
           />
@@ -336,14 +338,14 @@ function ResolveModal({ count, onConfirm, onClose }) {
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 text-gray-700 dark:text-[#e8ebf0] rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520]"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleConfirm}
             disabled={!resolution || saving}
             className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 min-w-[140px] text-center"
           >
-            {saving ? <Spinner size="sm" color="white" /> : 'Confirm Resolution'}
+            {saving ? <Spinner size="sm" color="white" /> : t('inventory.confirmResolution')}
           </button>
         </div>
       </div>
@@ -353,6 +355,7 @@ function ResolveModal({ count, onConfirm, onClose }) {
 
 // ─── Create Batch Modal ────────────────────────────────────────────────────────
 export function CreateBatchModal({ count, brands, onConfirm, onClose }) {
+  const { t } = useTranslation()
   const [brandName, setBrandName] = useState('')
   const [customName, setCustomName] = useState('')
   const [saving, setSaving] = useState(false)
@@ -367,13 +370,13 @@ export function CreateBatchModal({ count, brands, onConfirm, onClose }) {
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
       <div className="bg-white dark:bg-[#121823] rounded-2xl shadow-2xl w-full max-w-sm">
         <div className="p-6 border-b border-gray-100 dark:border-[#212a38]">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-[#e8ebf0]">Create Manufacturer Batch</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-[#e8ebf0]">{t('inventory.createMfrBatch')}</h3>
           <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-1">
-            {count} unit{count !== 1 ? 's' : ''} will be added
+            {t('inventory.unitsWillBeAdded', { count })}
           </p>
         </div>
         <div className="p-6 space-y-4">
-          <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-2">Manufacturer Name</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-2">{t('inventory.mfrNameLabel')}</label>
           {brands.length > 0 ? (
             <div className="grid grid-cols-2 gap-2">
               {brands.map((b) => (
@@ -395,7 +398,7 @@ export function CreateBatchModal({ count, brands, onConfirm, onClose }) {
                 <div className="w-5 h-5 bg-gray-200 rounded flex items-center justify-center text-xs font-bold">
                   +
                 </div>
-                Other
+                {t('inventory.otherLabel')}
               </button>
             </div>
           ) : null}
@@ -403,7 +406,7 @@ export function CreateBatchModal({ count, brands, onConfirm, onClose }) {
             <input
               value={customName}
               onChange={(e) => setCustomName(e.target.value)}
-              placeholder="Manufacturer name..."
+              placeholder={t('inventory.mfrNamePlaceholder')}
               autoFocus
               className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600"
               onKeyDown={(e) => e.key === 'Enter' && handleConfirm()}
@@ -415,14 +418,14 @@ export function CreateBatchModal({ count, brands, onConfirm, onClose }) {
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 text-gray-700 dark:text-[#e8ebf0] rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520]"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleConfirm}
             disabled={!effectiveName || saving}
             className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 min-w-[120px] text-center"
           >
-            {saving ? <Spinner size="sm" color="white" /> : 'Create Batch'}
+            {saving ? <Spinner size="sm" color="white" /> : t('inventory.createBatch')}
           </button>
         </div>
       </div>
@@ -432,6 +435,7 @@ export function CreateBatchModal({ count, brands, onConfirm, onClose }) {
 
 // ─── Batch Detail Modal ────────────────────────────────────────────────────────
 function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
+  const { t } = useTranslation()
   const [sentDate, setSentDate] = useState(
     batch.sent_date || new Date().toISOString().split('T')[0]
   )
@@ -451,10 +455,10 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
     setSaving(true)
     try {
       await db.inventory.markBatchSent(batch.id, sentDate, tracking)
-      toast.success('Batch marked as sent')
+      toast.success(t('inventory.batchMarkedSent'))
       onReload()
     } catch {
-      toast.error('Failed')
+      toast.error(t('inventory.genericFailed'))
     } finally {
       setSaving(false)
     }
@@ -464,10 +468,10 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
     setSaving(true)
     try {
       await db.inventory.markBatchResolved(batch.id, resType, resDate, resNotes)
-      toast.success('Batch resolved!')
+      toast.success(t('inventory.batchResolved'))
       onReload()
     } catch {
-      toast.error('Failed')
+      toast.error(t('inventory.genericFailed'))
     } finally {
       setSaving(false)
     }
@@ -504,13 +508,13 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
           <div className="px-6 py-3 bg-gray-50 dark:bg-[#0f1520] border-b border-gray-100 dark:border-[#212a38] flex gap-6 text-sm">
             {batch.sent_date && (
               <div>
-                <span className="text-gray-500 dark:text-[#9aa4b2] text-xs">Sent:</span>{' '}
+                <span className="text-gray-500 dark:text-[#9aa4b2] text-xs">{t('inventory.sentDate')}:</span>{' '}
                 <span className="font-medium text-gray-700 dark:text-[#e8ebf0]">{fmt(batch.sent_date)}</span>
               </div>
             )}
             {batch.tracking_number && (
               <div>
-                <span className="text-gray-500 dark:text-[#9aa4b2] text-xs">Tracking:</span>{' '}
+                <span className="text-gray-500 dark:text-[#9aa4b2] text-xs">{t('inventory.trackingNum')}:</span>{' '}
                 <span className="font-mono font-medium text-gray-700 dark:text-[#e8ebf0]">{batch.tracking_number}</span>
               </div>
             )}
@@ -518,18 +522,18 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
         )}
         <div className="p-6 border-b border-gray-100 dark:border-[#212a38]">
           <h4 className="text-sm font-semibold text-gray-700 dark:text-[#e8ebf0] mb-3">
-            Units in Batch ({batchUnits.length})
+            {t('inventory.unitsBatchCount', { count: batchUnits.length })}
           </h4>
           {batchUnits.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">No units.</p>
+            <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('inventory.noUnitsInBatch')}</p>
           ) : (
             <div className="rounded-xl border border-gray-100 dark:border-[#212a38] overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-[#0f1520]">
                   <tr>
-                    {['Product', 'Serial #', 'Warranty', 'RMA Source', 'Resolution'].map((h) => (
+                    {[t('inventory.colProduct'), t('inventory.colSerialNum'), t('inventory.colWarranty'), 'RMA Source', t('inventory.colResolution')].map((h, i) => (
                       <th
-                        key={h}
+                        key={i}
                         className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2]"
                       >
                         {h}
@@ -565,10 +569,10 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
         {canEdit && batch.status === 'draft' && (
           <div className="p-6 border-b border-gray-100 dark:border-[#212a38]">
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
-              <h4 className="text-sm font-semibold text-blue-900">Mark as Sent to Manufacturer</h4>
+              <h4 className="text-sm font-semibold text-blue-900">{t('inventory.markAsSentTitle')}</h4>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-blue-700 mb-1">Sent Date</label>
+                  <label className="block text-xs font-medium text-blue-700 mb-1">{t('inventory.sentDate')}</label>
                   <input
                     type="date"
                     value={sentDate}
@@ -578,12 +582,12 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-blue-700 mb-1">
-                    Tracking Number
+                    {t('inventory.trackingNumberLabel')}
                   </label>
                   <input
                     value={tracking}
                     onChange={(e) => setTracking(e.target.value)}
-                    placeholder="AWB / courier tracking..."
+                    placeholder={t('inventory.awbPlaceholder')}
                     className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white dark:bg-[#121823] focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -605,7 +609,7 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
                     />
                   </svg>
                 )}
-                Mark as Sent
+                {t('inventory.markAsSentBtn')}
               </button>
             </div>
           </div>
@@ -613,25 +617,25 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
         {canEdit && batch.status === 'sent' && (
           <div className="p-6 border-b border-gray-100 dark:border-[#212a38]">
             <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
-              <h4 className="text-sm font-semibold text-green-900">Mark Batch as Resolved</h4>
+              <h4 className="text-sm font-semibold text-green-900">{t('inventory.markBatchResolvedTitle')}</h4>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-green-700 mb-1">
-                    Resolution Type
+                    {t('inventory.resolutionTypeLabel')}
                   </label>
                   <select
                     value={resType}
                     onChange={(e) => setResType(e.target.value)}
                     className="w-full px-3 py-2 border border-green-200 rounded-lg text-sm bg-white dark:bg-[#121823] focus:ring-2 focus:ring-green-500"
                   >
-                    <option value="">Select...</option>
-                    <option value="replacement_received">Replacement Units Received</option>
-                    <option value="credit_note_received">Credit Note Received</option>
+                    <option value="">{t('inventory.selectResolution')}</option>
+                    <option value="replacement_received">{t('inventory.replacementUnitsReceived')}</option>
+                    <option value="credit_note_received">{t('inventory.creditNoteReceived')}</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-green-700 mb-1">
-                    Resolution Date
+                    {t('inventory.resolutionDateLabel')}
                   </label>
                   <input
                     type="date"
@@ -644,7 +648,7 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
               <textarea
                 value={resNotes}
                 onChange={(e) => setResNotes(e.target.value)}
-                placeholder="Notes..."
+                placeholder={t('inventory.notesPlaceholder')}
                 rows={2}
                 className="w-full px-3 py-2 border border-green-200 rounded-lg text-sm bg-white dark:bg-[#121823] resize-none focus:ring-2 focus:ring-green-500"
               />
@@ -665,7 +669,7 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
                     />
                   </svg>
                 )}
-                Mark as Resolved
+                {t('inventory.markAsResolvedBtn')}
               </button>
             </div>
           </div>
@@ -687,24 +691,24 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
                     d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                <span className="font-semibold text-green-900">Batch Resolved</span>
+                <span className="font-semibold text-green-900">{t('inventory.batchResolvedTitle')}</span>
               </div>
               <p className="text-sm text-green-800">
-                Resolution:{' '}
+                {t('inventory.resolutionLabelColon')}{' '}
                 <strong>
                   {batch.resolution_type === 'replacement_received'
-                    ? 'Replacement Units Received'
-                    : 'Credit Note Received'}
+                    ? t('inventory.replacementUnitsReceived')
+                    : t('inventory.creditNoteReceived')}
                 </strong>
               </p>
               {batch.resolution_date && (
                 <p className="text-sm text-green-800">
-                  Date: <strong>{fmt(batch.resolution_date)}</strong>
+                  {t('inventory.dateLabelColon')} <strong>{fmt(batch.resolution_date)}</strong>
                 </p>
               )}
               {batch.resolution_notes && (
                 <p className="text-sm text-green-800">
-                  Notes: <strong>{batch.resolution_notes}</strong>
+                  {t('inventory.notesLabelColon')} <strong>{batch.resolution_notes}</strong>
                 </p>
               )}
             </div>
@@ -715,7 +719,7 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 text-gray-700 dark:text-[#e8ebf0] rounded-xl text-sm hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520]"
           >
-            Close
+            {t('common.close')}
           </button>
         </div>
       </div>

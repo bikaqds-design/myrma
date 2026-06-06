@@ -152,10 +152,10 @@ export function TicketDrawer({
       const saved = await db.ticketResolutions.upsert(ticket.id, payload)
       setResolution(saved)
       setResolutionEditing(false)
-      toast.success('Resolution saved')
+      toast.success(t('ticketDrawer.resolutionSaved'))
       db.auditLog.log(userEmail, 'ticket_resolution_saved', `${ticket.rma_number}: ${resForm.type}`).catch(() => {})
     } catch (err) {
-      toast.error('Failed to save resolution: ' + err.message)
+      toast.error(t('ticketDrawer.failedSaveResolution', { error: err.message }))
     } finally {
       setResolutionSaving(false)
     }
@@ -167,9 +167,9 @@ export function TicketDrawer({
       await db.ticketResolutions.remove(resolution.id)
       setResolution(null)
       setResolutionEditing(false)
-      toast.success('Resolution removed')
+      toast.success(t('ticketDrawer.resolutionRemoved'))
     } catch {
-      toast.error('Failed to remove resolution')
+      toast.error(t('ticketDrawer.failedRemoveResolution'))
     }
   }
 
@@ -234,7 +234,7 @@ export function TicketDrawer({
       setReplyingTo(null)
     } catch (err) {
       captureException(err, { page: 'RMATickets', context: 'postComment' })
-      toast.error('Failed to post comment: ' + (err?.message || err?.code || 'unknown error'))
+      toast.error(t('ticketDrawer.failedPostComment', { error: err?.message || err?.code || 'unknown error' }))
     } finally {
       setSubmittingComment(false)
     }
@@ -249,7 +249,7 @@ export function TicketDrawer({
         .catch(() => {})
     } catch (err) {
       captureException(err, { page: 'RMATickets', context: 'deleteComment' })
-      toast.error('Failed to delete comment')
+      toast.error(t('ticketDrawer.failedDeleteComment'))
     }
   }
 
@@ -503,10 +503,10 @@ export function TicketDrawer({
                           })
                           setTimeEntries((prev) => [...prev, entry])
                           setTimerNotes('')
-                          toast.success(`Logged ${Math.floor(mins / 60)}h ${mins % 60}m`)
+                          toast.success(t('ticketDrawer.timeLogged', { hours: Math.floor(mins / 60), minutes: mins % 60 }))
                         } catch (err) {
                           captureException(err, { page: 'RMATickets', context: 'saveTimeEntry' })
-                          toast.error('Failed to save time entry')
+                          toast.error(t('ticketDrawer.failedSaveTime'))
                         }
                         setTimerStart(null)
                       }}
@@ -570,7 +570,7 @@ export function TicketDrawer({
                           const mins =
                             parseInt(manualHours || 0) * 60 + parseInt(manualMins || 0)
                           if (!mins) {
-                            toast.error('Enter hours or minutes')
+                            toast.error(t('ticketDrawer.enterHoursOrMinutes'))
                             return
                           }
                           try {
@@ -588,13 +588,13 @@ export function TicketDrawer({
                             setManualMins('')
                             setManualNotes('')
                             setAddingManual(false)
-                            toast.success(`Logged ${Math.floor(mins / 60)}h ${mins % 60}m`)
+                            toast.success(t('ticketDrawer.timeLogged', { hours: Math.floor(mins / 60), minutes: mins % 60 }))
                           } catch (err) {
                             captureException(err, {
                               page: 'RMATickets',
                               context: 'logTimeManual',
                             })
-                            toast.error('Failed to log time')
+                            toast.error(t('ticketDrawer.failedLogTime'))
                           }
                         }}
                         className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors"
@@ -634,13 +634,13 @@ export function TicketDrawer({
                               try {
                                 await db.timeEntries.delete(entry.id)
                                 setTimeEntries((prev) => prev.filter((e) => e.id !== entry.id))
-                                toast.success('Entry deleted')
+                                toast.success(t('ticketDrawer.timeEntryDeleted'))
                               } catch (err) {
                                 captureException(err, {
                                   page: 'RMATickets',
                                   context: 'deleteTimeEntry',
                                 })
-                                toast.error('Failed to delete')
+                                toast.error(t('ticketDrawer.failedDeleteEntry'))
                               }
                             }}
                             className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all shrink-0"

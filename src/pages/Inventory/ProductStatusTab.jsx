@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import {
@@ -37,6 +38,7 @@ export function ProductStatusTab({
   const [selectedGroups, setSelectedGroups] = useState([])
   const [showTransfer, setShowTransfer] = useState(false)
   const [transferring, setTransferring] = useState(false)
+  const { t } = useTranslation()
 
   const handleSort = (key) => {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -98,23 +100,23 @@ export function ProductStatusTab({
 
   const handleBulkTransfer = async (warehouseId) => {
     if (!selectedUnitIds.length) {
-      toast.error('No matching units found in inventory')
+      toast.error(t('inventory.noMatchingUnitsInventory'))
       return
     }
     const skipped = expectedUnitCount - selectedUnitIds.length
     if (
       skipped > 0 &&
       !window.confirm(
-        `${skipped} of ${expectedUnitCount} selected unit${expectedUnitCount !== 1 ? 's' : ''} are not tracked in inventory and will be skipped. Transfer the remaining ${selectedUnitIds.length}?`
+        t('inventory.skippedUnitsConfirm', { skipped, expected: expectedUnitCount, count: selectedUnitIds.length })
       )
     )
       return
     setTransferring(true)
     try {
       await db.inventory.transferUnits(selectedUnitIds, warehouseId)
-      toast.success(
-        `${selectedUnitIds.length} unit${selectedUnitIds.length !== 1 ? 's' : ''} transferred${skipped > 0 ? ` (${skipped} skipped)` : ''}`
-      )
+      const msg = t('inventory.unitsTransferred', { count: selectedUnitIds.length }) +
+        (skipped > 0 ? ' ' + t('inventory.unitsTransferredSkipped', { skipped }) : '')
+      toast.success(msg)
       db.auditLog
         .log(
           userEmail,
@@ -126,7 +128,7 @@ export function ProductStatusTab({
       setShowTransfer(false)
       onReload?.()
     } catch {
-      toast.error('Transfer failed')
+      toast.error(t('inventory.transferFailed'))
     } finally {
       setTransferring(false)
     }
@@ -217,7 +219,7 @@ export function ProductStatusTab({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search product, RMA#, customer, serial…"
+            placeholder={t('inventory.searchByProductBrand')}
             className="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           />
           <svg
@@ -246,7 +248,7 @@ export function ProductStatusTab({
               d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"
             />
           </svg>
-          Filters
+          {t('common.filters')}
           {activeFilterCount > 0 && (
             <span className="w-4 h-4 bg-indigo-600 text-white text-[10px] rounded-full flex items-center justify-center">
               {activeFilterCount}
@@ -254,8 +256,7 @@ export function ProductStatusTab({
           )}
         </button>
         <span className="text-xs text-gray-500 dark:text-[#9aa4b2] ml-auto whitespace-nowrap">
-          {filtered.length} product{filtered.length !== 1 ? 's' : ''} · {products.length} unit
-          {products.length !== 1 ? 's' : ''}
+          {t('inventory.productCount', { count: filtered.length })} · {t('inventory.unitsSelected', { count: products.length })}
         </span>
       </div>
 
@@ -265,25 +266,25 @@ export function ProductStatusTab({
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             <div className="space-y-1">
               <label className="text-[10px] font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">
-                Product
+                {t('inventory.colProduct')}
               </label>
               <input
                 value={filterProduct}
                 onChange={(e) => setFilterProduct(e.target.value)}
-                placeholder="Filter by product…"
+                placeholder={t('inventory.filterByProduct')}
                 className="w-full px-2.5 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-[#121823]"
               />
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">
-                Brand
+                {t('inventory.colBrand')}
               </label>
               <select
                 value={filterBrand}
                 onChange={(e) => setFilterBrand(e.target.value)}
                 className="w-full px-2.5 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-[#121823]"
               >
-                <option value="">All brands</option>
+                <option value="">{t('inventory.filterAllBrands')}</option>
                 {uniqueBrands.map((b) => (
                   <option key={b} value={b}>
                     {b}
@@ -293,14 +294,14 @@ export function ProductStatusTab({
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">
-                Product Status
+                {t('inventory.filterProductStatus')}
               </label>
               <select
                 value={filterProductStatus}
                 onChange={(e) => setFilterProductStatus(e.target.value)}
                 className="w-full px-2.5 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-[#121823]"
               >
-                <option value="">All statuses</option>
+                <option value="">{t('inventory.filterAllStatuses')}</option>
                 {uniqueStatuses.map((s) => (
                   <option key={s} value={s}>
                     {s}
@@ -310,18 +311,18 @@ export function ProductStatusTab({
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">
-                RMA Status
+                {t('inventory.filterRMAStatus')}
               </label>
               <select
                 value={filterRmaStatus}
                 onChange={(e) => setFilterRmaStatus(e.target.value)}
                 className="w-full px-2.5 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-[#121823]"
               >
-                <option value="">All</option>
-                <option value="New">New</option>
-                <option value="In Progress">In Progress</option>
-                <option value="On Hold">On Hold</option>
-                <option value="Completed">Completed</option>
+                <option value="">{t('inventory.filterAll')}</option>
+                <option value="New">{t('inventory.rmaStatusNew')}</option>
+                <option value="In Progress">{t('inventory.rmaStatusInProgress')}</option>
+                <option value="On Hold">{t('inventory.rmaStatusOnHold')}</option>
+                <option value="Completed">{t('inventory.rmaStatusCompleted')}</option>
               </select>
             </div>
           </div>
@@ -336,7 +337,7 @@ export function ProductStatusTab({
                 }}
                 className="text-xs text-red-500 hover:text-red-700 underline"
               >
-                Clear all filters
+                {t('inventory.clearAllFilters')}
               </button>
             </div>
           )}
@@ -350,10 +351,10 @@ export function ProductStatusTab({
             {selectedGroups.length}
           </span>
           <span className="text-sm font-medium text-indigo-700">
-            {selectedGroups.length} product{selectedGroups.length !== 1 ? 's' : ''} selected
+            {t('inventory.productsSelected', { count: selectedGroups.length })}
             {canTransfer && selectedUnitIds.length > 0 && (
               <span className="text-indigo-400 ml-1">
-                ({selectedUnitIds.length} unit{selectedUnitIds.length !== 1 ? 's' : ''})
+                ({t('inventory.unitsSelected', { count: selectedUnitIds.length })})
               </span>
             )}
           </span>
@@ -361,14 +362,14 @@ export function ProductStatusTab({
             onClick={() => setSelectedGroups([])}
             className="text-xs text-indigo-400 hover:text-indigo-700 underline"
           >
-            Clear
+            {t('common.clear')}
           </button>
           <div className="h-4 w-px bg-indigo-200 ml-1" />
           {canTransfer && (
             <button
               onClick={() => {
                 if (!selectedUnitIds.length) {
-                  toast.error('No matching units found in inventory')
+                  toast.error(t('inventory.noMatchingUnitsInventory'))
                   return
                 }
                 setShowTransfer(true)
@@ -384,7 +385,7 @@ export function ProductStatusTab({
                   d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
                 />
               </svg>
-              Transfer to Warehouse
+              {t('inventory.transferToWarehouse')}
             </button>
           )}
           <button
@@ -415,7 +416,7 @@ export function ProductStatusTab({
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
               />
             </svg>
-            Export
+            {t('common.export')}
           </button>
         </div>
       )}
@@ -424,8 +425,8 @@ export function ProductStatusTab({
         <div className="text-center py-12 bg-white dark:bg-[#121823] rounded-lg border border-gray-200 dark:border-[#212a38]">
           <p className="text-gray-500 dark:text-[#9aa4b2] text-sm">
             {search || activeFilterCount
-              ? 'No products match your filters'
-              : 'No products in this category'}
+              ? t('inventory.noMatchFilters')
+              : t('inventory.noProductsCategory')}
           </p>
         </div>
       ) : (
@@ -454,7 +455,7 @@ export function ProductStatusTab({
                     </th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38]">
                       <InvSortBtn
-                        label="Product"
+                        label={t('inventory.colProduct')}
                         sortKey="product_name"
                         activeSortKey={sortKey}
                         activeSortDir={sortDir}
@@ -463,7 +464,7 @@ export function ProductStatusTab({
                     </th>
                     <th className="px-3 py-2 text-center font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38] w-16">
                       <InvSortBtn
-                        label="Qty"
+                        label={t('inventory.colTotal')}
                         sortKey="qty"
                         activeSortKey={sortKey}
                         activeSortDir={sortDir}
@@ -471,18 +472,18 @@ export function ProductStatusTab({
                       />
                     </th>
                     <th className="px-3 py-2 text-center font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38] whitespace-nowrap">
-                      In Warranty
+                      {t('inventory.colInWarranty')}
                     </th>
                     <th className="px-3 py-2 text-center font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38] whitespace-nowrap">
-                      Out of Warranty
+                      {t('inventory.colOutWarranty')}
                     </th>
                     {showTypeCol && (
                       <th className="px-3 py-2 text-left font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38] min-w-[160px]">
-                        Types
+                        {t('inventory.colTypes')}
                       </th>
                     )}
                     <th className="px-3 py-2 text-left font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-gray-200 dark:border-[#212a38] w-28 whitespace-nowrap">
-                      Date
+                      {t('inventory.colDate')}
                     </th>
                   </tr>
                 </thead>
@@ -594,7 +595,7 @@ export function ProductStatusTab({
                               <td colSpan={colSpanData} className="px-4 py-1.5">
                                 <div className="flex items-center gap-4 flex-wrap pl-3 border-l-2 border-indigo-200">
                                   <span className="font-mono text-gray-500 dark:text-[#9aa4b2]">
-                                    {p.serial_number || 'No S/N'}
+                                    {p.serial_number || t('inventory.noSerialNumber')}
                                   </span>
                                   <WarrantyBadge status={p.warranty_status} />
                                   {p.rma_number ? (

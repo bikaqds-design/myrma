@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -43,6 +44,7 @@ function mergeWithDefaults(overrides) {
 }
 
 export default function WASettings({ currentUserEmail }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(DEFAULT_SETTINGS)
@@ -94,9 +96,9 @@ export default function WASettings({ currentUserEmail }) {
       }, currentUserEmail)
       setInitialized(false) // allow useEffect to re-sync from fresh query data
       qc.invalidateQueries({ queryKey: ['notification-settings'] })
-      toast.success('Notification settings saved')
+      toast.success(t('cp.waSettings.saved'))
     } catch (err) {
-      toast.error(`Save failed: ${err.message}`)
+      toast.error(t('cp.waSettings.saveFailed', { error: err.message }))
     } finally {
       setSaving(false)
     }
@@ -109,13 +111,13 @@ export default function WASettings({ currentUserEmail }) {
       {/* Provider toggles */}
       <section className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-6">
         <h2 className="text-sm font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-4">
-          Messaging Providers
+          {t('cp.waSettings.messagingProviders')}
         </h2>
         <div className="space-y-3">
           {[
-            { key: 'whatsapp_enabled', label: 'WhatsApp', icon: '💬', desc: 'Send notifications via WhatsApp Cloud API' },
-            { key: 'email_enabled',    label: 'Email',    icon: '✉️',  desc: 'Send notifications via email (existing integration)' },
-            { key: 'sms_enabled',      label: 'SMS',      icon: '📱',  desc: 'SMS notifications (future provider)' },
+            { key: 'whatsapp_enabled', label: t('cp.waSettings.whatsappLabel'), icon: '💬', desc: t('cp.waSettings.whatsappDesc') },
+            { key: 'email_enabled',    label: t('cp.waSettings.emailLabel'),    icon: '✉️',  desc: t('cp.waSettings.emailDesc') },
+            { key: 'sms_enabled',      label: t('cp.waSettings.smsLabel'),      icon: '📱',  desc: t('cp.waSettings.smsDesc') },
           ].map(({ key, label, icon, desc }) => (
             <div key={key} className="flex items-center justify-between p-3.5 rounded-xl border border-[#e6e9ef] dark:border-[#212a38] bg-[#f8f9fb] dark:bg-[#0f1520]">
               <div className="flex items-center gap-3">
@@ -140,40 +142,40 @@ export default function WASettings({ currentUserEmail }) {
           <div className="flex items-center gap-2 mb-1">
             <span className="text-lg">💬</span>
             <h2 className="text-sm font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
-              WhatsApp Cloud API
+              {t('cp.waSettings.whatsappApi')}
             </h2>
           </div>
 
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-lg p-3 text-xs text-amber-800 dark:text-amber-300">
             <strong>Secrets are stored server-side.</strong> Set <code>WHATSAPP_ACCESS_TOKEN</code> and{' '}
             <code>WHATSAPP_PHONE_NUMBER_ID</code> in your Supabase project → Edge Functions → Secrets.
-            The fields below are non-sensitive configuration only.
+            {' '}{t('cp.waSettings.tokenWarning')}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Phone Number ID" value={settings.whatsapp_config.phone_number_id}
+            <Field label={t('cp.waSettings.phoneNumberId')} value={settings.whatsapp_config.phone_number_id}
               onChange={(v) => set('whatsapp_config.phone_number_id', v)}
               placeholder="e.g. 1234567890" />
-            <Field label="Business Account ID" value={settings.whatsapp_config.business_account_id}
+            <Field label={t('cp.waSettings.businessAccountId')} value={settings.whatsapp_config.business_account_id}
               onChange={(v) => set('whatsapp_config.business_account_id', v)}
               placeholder="e.g. 9876543210" />
             <div>
               <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
-                Default Language
+                {t('cp.waSettings.defaultLanguage')}
               </label>
               <select
                 value={settings.whatsapp_config.default_language}
                 onChange={(e) => set('whatsapp_config.default_language', e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg bg-white dark:bg-[#0f1520] text-gray-800 dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca]"
               >
-                <option value="en">English (en)</option>
-                <option value="ar">Arabic (ar)</option>
-                <option value="fr">French (fr)</option>
-                <option value="es">Spanish (es)</option>
-                <option value="de">German (de)</option>
+                <option value="en">{t('cp.waSettings.langEn')}</option>
+                <option value="ar">{t('cp.waSettings.langAr')}</option>
+                <option value="fr">{t('cp.waSettings.langFr')}</option>
+                <option value="es">{t('cp.waSettings.langEs')}</option>
+                <option value="de">{t('cp.waSettings.langDe')}</option>
               </select>
             </div>
-            <Field label="API Version" value={settings.whatsapp_config.api_version}
+            <Field label={t('cp.waSettings.apiVersion')} value={settings.whatsapp_config.api_version}
               onChange={(v) => set('whatsapp_config.api_version', v)}
               placeholder="v20.0" />
           </div>
@@ -183,10 +185,10 @@ export default function WASettings({ currentUserEmail }) {
       {/* Per-event toggles */}
       <section className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-6">
         <h2 className="text-sm font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-4">
-          Notification Triggers
+          {t('cp.waSettings.notificationTriggers')}
         </h2>
         <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-4">
-          Choose which events automatically send a WhatsApp notification to the customer.
+          {t('cp.waSettings.notificationTriggersDesc')}
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {Object.entries(EVENT_LABELS).map(([key, label]) => (
@@ -205,27 +207,27 @@ export default function WASettings({ currentUserEmail }) {
       {/* Retry config */}
       <section className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-6 space-y-4">
         <h2 className="text-sm font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1">
-          Retry &amp; Rate Limit
+          {t('cp.waSettings.retryRateLimit')}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Field label="Max Retries" type="number" value={settings.retry_config.max_retries}
+          <Field label={t('cp.waSettings.maxRetries')} type="number" value={settings.retry_config.max_retries}
             onChange={(v) => set('retry_config.max_retries', parseInt(v) || 3)} min={0} max={10} />
-          <Field label="Retry Delay (sec)" type="number" value={settings.retry_config.retry_delay_seconds}
+          <Field label={t('cp.waSettings.retryDelay')} type="number" value={settings.retry_config.retry_delay_seconds}
             onChange={(v) => set('retry_config.retry_delay_seconds', parseInt(v) || 300)} min={30} />
-          <Field label="Backoff Multiplier" type="number" value={settings.retry_config.backoff_multiplier}
+          <Field label={t('cp.waSettings.backoffMultiplier')} type="number" value={settings.retry_config.backoff_multiplier}
             onChange={(v) => set('retry_config.backoff_multiplier', parseFloat(v) || 2)} min={1} max={5} step={0.5} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Messages / Minute" type="number" value={settings.rate_limit.messages_per_minute}
+          <Field label={t('cp.waSettings.messagesPerMinute')} type="number" value={settings.rate_limit.messages_per_minute}
             onChange={(v) => set('rate_limit.messages_per_minute', parseInt(v) || 60)} min={1} max={1000} />
-          <Field label="Messages / Day" type="number" value={settings.rate_limit.messages_per_day}
+          <Field label={t('cp.waSettings.messagesPerDay')} type="number" value={settings.rate_limit.messages_per_day}
             onChange={(v) => set('rate_limit.messages_per_day', parseInt(v) || 1000)} min={1} />
         </div>
       </section>
 
       <div className="flex justify-end">
         <Button variant="primary" onClick={handleSave} disabled={saving} className="min-w-[140px]">
-          {saving ? <Spinner size="sm" color="white" /> : 'Save Settings'}
+          {saving ? <Spinner size="sm" color="white" /> : t('cp.waSettings.saveSettings')}
         </Button>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 
 const TYPE_META = {
   // Tickets
@@ -32,16 +33,16 @@ const TYPE_META = {
   custom_alert: { icon: '🔔', color: 'bg-amber-100 text-amber-700' },
 }
 
-function timeAgo(dateStr) {
+function timeAgo(dateStr, t, lang = 'en') {
   const diff = Date.now() - new Date(dateStr).getTime()
   const m = Math.floor(diff / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
+  if (m < 1) return t('notifications.justNow')
+  if (m < 60) return t('notifications.minsAgo', { count: m })
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
+  if (h < 24) return t('notifications.hoursAgo', { count: h })
   const d = Math.floor(h / 24)
-  if (d < 7) return `${d}d ago`
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  if (d < 7) return t('notifications.daysAgo', { count: d })
+  return new Date(dateStr).toLocaleDateString(lang === 'ar' ? 'ar' : 'en-US', { month: 'short', day: 'numeric' })
 }
 
 export default function NotificationBell({
@@ -53,6 +54,7 @@ export default function NotificationBell({
   mobile = false,
   iconOnly = false,
 }) {
+  const { t, i18n } = useTranslation()
   const [open, setOpen] = useState(false)
   const [panelStyle, setPanelStyle] = useState({})
   const btnRef = useRef(null)
@@ -180,10 +182,10 @@ export default function NotificationBell({
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0">
             <div>
-              <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+              <h3 className="text-sm font-semibold text-gray-900">{t('notifications.title')}</h3>
               {notifications.length > 0 && (
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {notifications.length} total · {unread} unread
+                  {t('notifications.totalUnread', { total: notifications.length, unread })}
                 </p>
               )}
             </div>
@@ -221,8 +223,8 @@ export default function NotificationBell({
                     />
                   </svg>
                 </div>
-                <p className="text-sm font-medium text-gray-500">No notifications yet</p>
-                <p className="text-xs text-gray-500 mt-1">You'll see activity here as it happens</p>
+                <p className="text-sm font-medium text-gray-500">{t('notifications.noNotificationsYet')}</p>
+                <p className="text-xs text-gray-500 mt-1">{t('notifications.noNotificationsHint')}</p>
               </div>
             ) : (
               notifications.map((n) => {
@@ -253,7 +255,7 @@ export default function NotificationBell({
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-gray-500">{timeAgo(n.created_date)}</span>
+                        <span className="text-xs text-gray-500">{timeAgo(n.created_date, t, i18n.language)}</span>
                         {n.entity_ref && (
                           <>
                             <span className="text-gray-300">·</span>
@@ -265,7 +267,7 @@ export default function NotificationBell({
                         {clickable && (
                           <>
                             <span className="text-gray-300">·</span>
-                            <span className="text-xs text-indigo-500">View →</span>
+                            <span className="text-xs text-indigo-500">{t('notifications.viewTicket')}</span>
                           </>
                         )}
                       </div>
@@ -285,8 +287,8 @@ export default function NotificationBell({
       <button
         ref={btnRef}
         onClick={handleToggle}
-        title="Notifications"
-        aria-label="Notifications"
+        title={t('notifications.title')}
+        aria-label={t('notifications.title')}
         className={iconOnly ? 'relative p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors flex items-center justify-center' : `w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3'} rounded-lg transition-colors relative ${mobile ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-300 hover:bg-gray-700'}`}
       >
         <div className="relative flex-shrink-0">
@@ -307,7 +309,7 @@ export default function NotificationBell({
             </span>
           )}
         </div>
-        {showLabel && <span className="flex-1 text-left">Notifications</span>}
+        {showLabel && <span className="flex-1 text-left">{t('notifications.title')}</span>}
         {showLabel && unread > 0 && (
           <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full leading-none">
             {unread > 99 ? '99+' : unread}

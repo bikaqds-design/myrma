@@ -1,5 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react'
+import { useTranslation } from 'react-i18next'
+import i18next from 'i18next'
 import toast from 'react-hot-toast'
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -149,21 +151,21 @@ export function downloadCSV(rows, filename) {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
-  toast.success(`Exported ${rows.length} rows`)
+  toast.success(i18next.t('inventory.exportedRows', { count: rows.length }))
 }
 
 // ─── Pagination ────────────────────────────────────────────────────────────────
 export function Pagination({ total, page, itemsPerPage, setItemsPerPage, onPage }) {
+  const { t } = useTranslation()
   const pages = Math.ceil(total / itemsPerPage)
   const startIndex = (page - 1) * itemsPerPage
   return (
     <div className="flex items-center justify-between text-sm text-gray-600 pt-2">
       <div>
-        Showing {total === 0 ? 0 : startIndex + 1}–{Math.min(startIndex + itemsPerPage, total)} of{' '}
-        {total}
+        {t('inventory.showingRange', { from: total === 0 ? 0 : startIndex + 1, to: Math.min(startIndex + itemsPerPage, total), total })}
       </div>
       <div className="flex items-center gap-2">
-        <label className="text-sm text-gray-600">Per page:</label>
+        <label className="text-sm text-gray-600">{t('inventory.perPage')}</label>
         <select
           value={itemsPerPage}
           onChange={(e) => {
@@ -184,7 +186,7 @@ export function Pagination({ total, page, itemsPerPage, setItemsPerPage, onPage 
               disabled={page === 1}
               className="px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              ← Prev
+              {t('inventory.prevPage')}
             </button>
             {Array.from({ length: pages }, (_, i) => i + 1)
               .filter((p) => p === 1 || p === pages || Math.abs(p - page) <= 1)
@@ -213,7 +215,7 @@ export function Pagination({ total, page, itemsPerPage, setItemsPerPage, onPage 
               disabled={page === pages}
               className="px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Next →
+              {t('inventory.nextPage')}
             </button>
           </div>
         )}
@@ -291,6 +293,7 @@ export function BrandAvatar({ name, size = 'md' }) {
 
 // ─── Brand Filter Bar ──────────────────────────────────────────────────────────
 export function BrandBar({ brands, groups, selected, onSelect }) {
+  const { t } = useTranslation()
   const brandUnitCount = {}
   for (const g of groups) brandUnitCount[g.brand] = (brandUnitCount[g.brand] || 0) + g.units.length
   const total = groups.reduce((s, g) => s + g.units.length, 0)
@@ -307,7 +310,7 @@ export function BrandBar({ brands, groups, selected, onSelect }) {
     <div className="flex gap-2 overflow-x-auto pb-1 flex-wrap">
       <button onClick={() => onSelect(null)} className={chip(!selected)}>
         {' '}
-        All Brands {cnt(!selected, total)}
+        {t('inventory.allBrands')} {cnt(!selected, total)}
       </button>
       {brands.map((b) => {
         const isA = selected === b.brand_name
@@ -329,12 +332,13 @@ export function BrandBar({ brands, groups, selected, onSelect }) {
 
 // ─── Inventory Sort Button ────────────────────────────────────────────────────
 export function InvSortBtn({ label, sortKey, activeSortKey, activeSortDir, onSort }) {
+  const { t } = useTranslation()
   const isActive = activeSortKey === sortKey
   const ariaSort = isActive ? (activeSortDir === 'asc' ? 'ascending' : 'descending') : 'none'
   return (
     <button
       onClick={() => onSort(sortKey)}
-      aria-label={`Sort by ${label}`}
+      aria-label={t('inventory.sortBy', { label })}
       aria-sort={ariaSort}
       className="flex items-center gap-1 hover:text-gray-900 transition-colors"
     >

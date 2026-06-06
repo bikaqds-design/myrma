@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -17,6 +18,7 @@ const STATUS_STYLES = {
 const PAGE_SIZE = 25
 
 export default function WALogs() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const [page, setPage]         = useState(0)
   const [provider, setProvider] = useState('')
@@ -61,10 +63,10 @@ export default function WALogs() {
       await import('../../api/supabaseClient').then(({ db: _db }) => {})
       const { supabase } = await import('../../api/client.js')
       void supabase.functions.invoke('notification-worker').catch(() => {})
-      toast.success('Queued for retry')
+      toast.success(t('cp.waLogs.retryQueued'))
       qc.invalidateQueries({ queryKey: ['notification-logs'] })
     } catch (err) {
-      toast.error(`Retry failed: ${err.message}`)
+      toast.error(t('cp.waLogs.retryFailed', { error: err.message }))
     } finally {
       setRetrying(null)
     }
@@ -91,9 +93,9 @@ export default function WALogs() {
       a.download = `notification-logs-${new Date().toISOString().slice(0,10)}.csv`
       a.click()
       URL.revokeObjectURL(url)
-      toast.success(`Exported ${rows.length} rows`)
+      toast.success(t('cp.waLogs.exported', { count: rows.length }))
     } catch (err) {
-      toast.error(`Export failed: ${err.message}`)
+      toast.error(t('cp.waLogs.exportFailed', { error: err.message }))
     } finally {
       setExporting(false)
     }
@@ -107,15 +109,15 @@ export default function WALogs() {
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
-            { label: 'Total',     value: stats.total,     color: 'bg-gray-50 dark:bg-[#121823] text-gray-700 dark:text-[#e8ebf0]' },
-            { label: 'Sent',      value: stats.sent,      color: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-[#a5b4fc]' },
-            { label: 'Delivered', value: stats.delivered, color: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' },
-            { label: 'Read',      value: stats.read,      color: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' },
-            { label: 'Failed',    value: stats.failed,    color: 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400' },
+            { labelKey: 'cp.waLogs.statTotal',     value: stats.total,     color: 'bg-gray-50 dark:bg-[#121823] text-gray-700 dark:text-[#e8ebf0]' },
+            { labelKey: 'cp.waLogs.statSent',      value: stats.sent,      color: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-[#a5b4fc]' },
+            { labelKey: 'cp.waLogs.statDelivered', value: stats.delivered, color: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' },
+            { labelKey: 'cp.waLogs.statRead',      value: stats.read,      color: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' },
+            { labelKey: 'cp.waLogs.statFailed',    value: stats.failed,    color: 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400' },
           ].map((s) => (
-            <div key={s.label} className={`rounded-xl p-3 border border-[#e6e9ef] dark:border-[#212a38] ${s.color}`}>
+            <div key={s.labelKey} className={`rounded-xl p-3 border border-[#e6e9ef] dark:border-[#212a38] ${s.color}`}>
               <p className="text-xl font-bold">{s.value ?? 0}</p>
-              <p className="text-xs font-medium opacity-80">{s.label}</p>
+              <p className="text-xs font-medium opacity-80">{t(s.labelKey)}</p>
             </div>
           ))}
         </div>
@@ -125,14 +127,14 @@ export default function WALogs() {
       <div className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-            placeholder="Search recipient, event…"
+            placeholder={t('cp.waLogs.searchPlaceholder')}
             className={inp} />
           <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(0) }} className={inp}>
-            <option value="">All Statuses</option>
+            <option value="">{t('cp.waLogs.allStatuses')}</option>
             {Object.keys(STATUS_STYLES).map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
           <select value={provider} onChange={(e) => { setProvider(e.target.value); setPage(0) }} className={inp}>
-            <option value="">All Providers</option>
+            <option value="">{t('cp.waLogs.allProviders')}</option>
             <option value="whatsapp">WhatsApp</option>
             <option value="email">Email</option>
             <option value="sms">SMS</option>
@@ -153,7 +155,7 @@ export default function WALogs() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
             )}
-            Export CSV
+            {t('cp.waLogs.exportCsv')}
           </button>
         </div>
       </div>
@@ -165,15 +167,22 @@ export default function WALogs() {
         ) : logs.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-4xl mb-3">📭</div>
-            <p className="text-gray-500 dark:text-[#9aa4b2]">No notification logs found</p>
+            <p className="text-gray-500 dark:text-[#9aa4b2]">{t('cp.waLogs.noLogs')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
                 <tr>
-                  {['Date', 'Recipient', 'Event', 'Provider', 'Status', 'Actions'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  {[
+                    t('cp.waLogs.dateCol'),
+                    t('cp.waLogs.recipientCol'),
+                    t('cp.waLogs.eventCol'),
+                    t('cp.waLogs.providerCol'),
+                    t('cp.waLogs.statusCol'),
+                    t('cp.waLogs.actionsCol'),
+                  ].map((h, i) => (
+                    <th key={i} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -207,7 +216,7 @@ export default function WALogs() {
                       {log.delivery_status === 'failed' && (
                         <button onClick={() => handleRetry(log)} disabled={retrying === log.id}
                           className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-[#a5b4fc] border border-indigo-200 dark:border-[#212a38] rounded-lg hover:bg-indigo-50 dark:hover:bg-[#1a2230] transition-colors disabled:opacity-50">
-                          {retrying === log.id ? <Spinner size="sm" /> : '↻'} Retry
+                          {retrying === log.id ? <Spinner size="sm" /> : t('cp.waLogs.retry')}
                         </button>
                       )}
                     </td>
@@ -223,16 +232,16 @@ export default function WALogs() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">
-            Page {page + 1} of {totalPages} · {count.toLocaleString()} total
+            {t('cp.waLogs.pagination', { page: page + 1, total: totalPages, count: count.toLocaleString() })}
           </p>
           <div className="flex gap-2">
             <button disabled={page === 0} onClick={() => setPage((p) => p - 1)}
               className="px-3 py-1.5 text-xs border border-[#e6e9ef] dark:border-[#212a38] rounded-lg hover:bg-gray-50 dark:hover:bg-[#1a2230] disabled:opacity-40 text-gray-700 dark:text-[#e8ebf0]">
-              ← Prev
+              {t('cp.waLogs.prev')}
             </button>
             <button disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}
               className="px-3 py-1.5 text-xs border border-[#e6e9ef] dark:border-[#212a38] rounded-lg hover:bg-gray-50 dark:hover:bg-[#1a2230] disabled:opacity-40 text-gray-700 dark:text-[#e8ebf0]">
-              Next →
+              {t('cp.waLogs.next')}
             </button>
           </div>
         </div>

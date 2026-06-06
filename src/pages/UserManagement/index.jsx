@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, auth } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -17,6 +18,7 @@ import { RoleTemplatesTab, CustomRolesTab, CreateRoleModal, PermissionsModal } f
 const ENABLE_CUSTOM_ROLES = false
 
 export default function UserManagement({ currentUserRole, currentUserEmail }) {
+  const { t } = useTranslation()
   const [activeTab, setActiveTab] = useURLTab('umtab', 'users')
   const queryClient = useQueryClient()
   const { data: umData, isLoading: loading } = useQuery({
@@ -80,7 +82,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
     e.preventDefault()
 
     if (!newUserPassword) {
-      toast.error('Password is required')
+      toast.error(t('userManagement.passwordRequired'))
       return
     }
 
@@ -119,7 +121,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
           targetEmails: [],
         })
         .catch(() => {})
-      toast.success(`User created! ${newUserEmail} can now log in.`)
+      toast.success(t('userManagement.userCreatedToast', { email: newUserEmail }))
       db.auditLog
         .log(
           currentUserEmail,
@@ -134,14 +136,14 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       invalidate()
     } catch (error) {
       captureException(error)
-      toast.error(error.message || 'Failed to add user')
+      toast.error(error.message || t('userManagement.addUserFailed'))
     }
   }
 
   const handleUpdateRole = (email, newRole) => {
     openConfirm(
-      'Change User Role',
-      `Change ${email} to "${newRole}"? Any custom permission overrides will be reset to the new role's defaults.`,
+      t('userManagement.changeRoleTitle'),
+      t('userManagement.changeRoleMsg', { email, role: newRole }),
       async () => {
         closeConfirm()
         try {
@@ -160,14 +162,14 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
               targetEmails: [email],
             })
             .catch(() => {})
-          toast.success(`Role updated to ${newRole}. Custom permissions reset to role defaults.`)
+          toast.success(t('userManagement.roleUpdatedToast', { role: newRole }))
           db.auditLog
             .log(currentUserEmail, 'user_role_changed', `Changed role of ${email} to ${newRole} (custom permissions reset)`)
             .catch(() => {})
           invalidate()
         } catch (error) {
           captureException(error)
-          toast.error('Failed to update role')
+          toast.error(t('userManagement.roleUpdateFailed'))
         }
       }
     )
@@ -182,7 +184,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
         newRolePermissions,
         currentUserEmail
       )
-      toast.success('Custom role created successfully!')
+      toast.success(t('userManagement.customRoleCreatedToast'))
       db.auditLog
         .log(currentUserEmail, 'custom_role_created', `Created custom role ${newRoleName}`)
         .catch(() => {})
@@ -193,7 +195,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       invalidate()
     } catch (error) {
       captureException(error)
-      toast.error('Failed to create custom role')
+      toast.error(t('userManagement.customRoleCreateFailed'))
     }
   }
 
@@ -205,7 +207,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
   const handleSavePermissions = async (permissions) => {
     try {
       await db.userRoles.updateUserPermissions(selectedUser.user_email, permissions)
-      toast.success('Permissions updated successfully!')
+      toast.success(t('userManagement.permissionsUpdatedToast'))
       db.auditLog
         .log(currentUserEmail, 'user_permissions_changed', `Updated permissions for ${selectedUser.user_email}`)
         .catch(() => {})
@@ -214,27 +216,27 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       invalidate()
     } catch (error) {
       captureException(error)
-      toast.error('Failed to update permissions')
+      toast.error(t('userManagement.permissionsUpdateFailed'))
       throw error
     }
   }
 
   const handleDeleteCustomRole = (roleId) => {
     openConfirm(
-      'Delete Custom Role',
-      'Delete this custom role? Users assigned to it will lose their custom permissions.',
+      t('userManagement.deleteCustomRoleTitle'),
+      t('userManagement.deleteCustomRoleMsg'),
       async () => {
         closeConfirm()
         try {
           await db.userRoles.deleteCustomRole(roleId)
-          toast.success('Custom role deleted successfully!')
+          toast.success(t('userManagement.customRoleDeletedToast'))
           db.auditLog
             .log(currentUserEmail, 'custom_role_deleted', `Deleted custom role ${roleId}`)
             .catch(() => {})
           invalidate()
         } catch (error) {
           captureException(error)
-          toast.error('Failed to delete custom role')
+          toast.error(t('userManagement.customRoleDeleteFailed'))
         }
       }
     )
@@ -251,7 +253,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
 
   const handleUserControlAction = async () => {
     if (!controlAction) {
-      toast.error('Please select an action')
+      toast.error(t('userManagement.pleaseSelectAction'))
       return
     }
 
@@ -259,7 +261,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       switch (controlAction) {
         case 'suspend':
           if (!controlReason) {
-            toast.error('Please provide a reason for suspension')
+            toast.error(t('userManagement.pleaseProvideReason'))
             return
           }
           await db.userRoles.updateUserStatus(
@@ -286,7 +288,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
               targetEmails: [selectedUser.user_email],
             })
             .catch(() => {})
-          toast.success('User suspended successfully')
+          toast.success(t('userManagement.userSuspendedToast'))
           db.auditLog
             .log(
               currentUserEmail,
@@ -312,7 +314,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
               targetEmails: [selectedUser.user_email],
             })
             .catch(() => {})
-          toast.success('User activated successfully')
+          toast.success(t('userManagement.userActivatedToast'))
           db.auditLog
             .log(currentUserEmail, 'user_activated', `Activated ${selectedUser.user_email}`)
             .catch(() => {})
@@ -332,7 +334,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
               `Locked ${selectedUser.user_email}${controlReason ? `: ${controlReason}` : ''}`
             )
             .catch(() => {})
-          toast.success('User locked successfully')
+          toast.success(t('userManagement.userLockedToast'))
           break
 
         case 'deactivate':
@@ -345,27 +347,27 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
           db.userActivity
             .create(currentUserEmail, 'user_deactivated', `Deactivated ${selectedUser.user_email}`)
             .catch(() => {})
-          toast.success('User deactivated successfully')
+          toast.success(t('userManagement.userDeactivatedToast'))
           break
 
         case 'update_notes':
           await db.userRoles.updateUserNotes(selectedUser.user_email, controlNotes)
-          toast.success('Notes updated successfully')
+          toast.success(t('userManagement.notesUpdatedToast'))
           break
 
         case 'set_expiration':
           if (!controlExpiration) {
-            toast.error('Please set an expiration date')
+            toast.error(t('userManagement.pleaseSetExpiration'))
             return
           }
           await db.userRoles.setUserExpiration(selectedUser.user_email, controlExpiration)
-          toast.success('Expiration date set successfully')
+          toast.success(t('userManagement.expirationSetToast'))
           break
 
         case 'delete':
           openConfirm(
-            'Delete User',
-            `Permanently delete ${selectedUser.user_email}? This action cannot be undone.`,
+            t('userManagement.deleteUserTitle'),
+            t('userManagement.deleteUserMsg', { email: selectedUser.user_email }),
             async () => {
               closeConfirm()
               try {
@@ -385,7 +387,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
                     targetEmails: [],
                   })
                   .catch(() => {})
-                toast.success('User deleted successfully')
+                toast.success(t('userManagement.userDeletedToast'))
                 db.auditLog
                   .log(currentUserEmail, 'user_deleted', `Deleted user ${deletedEmail}`)
                   .catch(() => {})
@@ -393,7 +395,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
                 setSelectedUser(null)
                 invalidate()
               } catch {
-                toast.error('Failed to delete user')
+                toast.error(t('userManagement.userDeleteFailed'))
               }
             }
           )
@@ -408,7 +410,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       invalidate()
     } catch (error) {
       captureException(error)
-      toast.error('Failed to perform action')
+      toast.error(t('userManagement.actionFailed'))
     }
   }
 
@@ -420,7 +422,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       setShowActivityModal(true)
     } catch (error) {
       captureException(error)
-      toast.error('Failed to load user activity')
+      toast.error(t('userManagement.activityLoadFailed'))
     }
   }
 
@@ -435,11 +437,11 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       if (currentUserRole === ROLES.SUPER_ADMIN) {
         // Direct password set via Edge Function (super_admin only)
         if (resetPassword.length < 6) {
-          toast.error('Password must be at least 6 characters')
+          toast.error(t('userManagement.passwordMinLength'))
           return
         }
         await auth.adminSetPassword(selectedUser.user_email, resetPassword)
-        toast.success(`Password updated for ${selectedUser.user_email}`)
+        toast.success(t('userManagement.passwordUpdatedToast', { email: selectedUser.user_email }))
         db.auditLog
           .log(
             currentUserEmail,
@@ -450,7 +452,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       } else {
         // Admin: send a reset email link instead
         await auth.resetPassword(selectedUser.user_email)
-        toast.success(`Password reset email sent to ${selectedUser.user_email}`)
+        toast.success(t('userManagement.resetEmailSentToast', { email: selectedUser.user_email }))
         db.auditLog
           .log(
             currentUserEmail,
@@ -464,7 +466,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
       setResetPassword('')
     } catch (error) {
       captureException(error)
-      toast.error('Failed to reset password: ' + (error?.message || 'unknown error'))
+      toast.error(t('userManagement.passwordResetFailed') + (error?.message ? ': ' + error.message : ''))
     }
   }
 
@@ -484,8 +486,8 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
             d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
           />
         </svg>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-        <p className="text-gray-600">Only administrators can access user management.</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('userManagement.accessDeniedTitle')}</h2>
+        <p className="text-gray-600">{t('userManagement.accessDeniedMessage')}</p>
       </div>
     )
   }
@@ -502,8 +504,8 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Manage users, roles, and permissions</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('userManagement.title')}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{t('userManagement.subtitle')}</p>
         </div>
         {currentUserRole === ROLES.SUPER_ADMIN && (
           <button
@@ -513,7 +515,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Add User
+            {t('userManagement.inviteUser')}
           </button>
         )}
       </div>
@@ -530,7 +532,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
                   : 'border-transparent text-gray-500 hover:text-gray-700')
               }
             >
-              Users
+              {t('userManagement.tabUsers')}
             </button>
             <button
               onClick={() => setActiveTab('roles')}
@@ -541,7 +543,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
                   : 'border-transparent text-gray-500 hover:text-gray-700')
               }
             >
-              Role Reference
+              {t('userManagement.tabRoles')}
             </button>
             {ENABLE_CUSTOM_ROLES && (
               <button
@@ -553,7 +555,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
                     : 'border-transparent text-gray-500 hover:text-gray-700')
                 }
               >
-                Custom Roles
+                {t('userManagement.customRolesCount')}
               </button>
             )}
           </nav>

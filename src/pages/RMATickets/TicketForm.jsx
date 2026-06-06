@@ -203,10 +203,10 @@ export function TicketForm({
     try {
       if (att.path) await storage.deleteFile(att.path)
       setFormData({ ...formData, attachments: formData.attachments.filter((_, idx) => idx !== i) })
-      toast.success('Attachment removed')
+      toast.success(t('ticketForm.attachmentRemoved'))
     } catch (err) {
       captureException(err, { page: 'RMATickets', context: 'removeAttachment' })
-      toast.error('Failed to remove attachment')
+      toast.error(t('ticketForm.failedRemoveAttachment'))
     }
   }
 
@@ -214,7 +214,7 @@ export function TicketForm({
     const files = Array.from(e.target.files)
     const total = (formData.attachments?.length || 0) + pendingFiles.length + files.length
     if (total > 10) {
-      toast.error('Maximum 10 attachments per ticket')
+      toast.error(t('ticketForm.maxAttachments'))
       return
     }
     setPendingFiles((prev) => [...prev, ...files])
@@ -224,11 +224,11 @@ export function TicketForm({
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (editingTicket && !canDo('edit_all') && !canDo('edit_assigned')) {
-      toast.error('You do not have permission to edit tickets')
+      toast.error(t('ticketForm.noPermissionEdit'))
       return
     }
     if (!editingTicket && !canDo('create')) {
-      toast.error('You do not have permission to create tickets')
+      toast.error(t('ticketForm.noPermissionCreate'))
       return
     }
 
@@ -249,7 +249,7 @@ export function TicketForm({
           newAttachments.push(uploaded)
         } catch (err) {
           captureException(err, { page: 'RMATickets', context: 'uploadAttachment' })
-          toast.error(`Failed to upload ${file.name}`)
+          toast.error(t('ticketForm.failedUploadFile', { name: file.name }))
         }
       }
 
@@ -362,7 +362,7 @@ export function TicketForm({
             })
             .catch(() => {})
         }
-        toast.success('Ticket updated successfully!')
+        toast.success(t('ticketForm.ticketUpdated'))
         // Fire automation rules + webhook on update
         db.automationRules
           .evaluate('ticket_updated', { ...editingTicket, ...ticketData })
@@ -443,7 +443,7 @@ export function TicketForm({
                 update_time: new Date().toLocaleString(),
               }).catch((err) => {
                 console.error('[email] status change failed:', err.message)
-                toast.error(`Email notification failed: ${err.message}`, { duration: 6000 })
+                toast.error(t('ticketForm.emailNotifFailed', { error: err.message }), { duration: 6000 })
               })
             }
           }
@@ -552,7 +552,7 @@ export function TicketForm({
             `Created ticket ${rmaNumber} for ${ticketData.customer_name}`
           )
           .catch(() => {})
-        toast.success('Ticket created successfully!')
+        toast.success(t('ticketForm.ticketCreated'))
       }
 
       // Save resolution if type is selected
@@ -575,7 +575,7 @@ export function TicketForm({
       onSaved({ ...ticketData, id: editingTicket?.id })
     } catch (error) {
       captureException(error, { page: 'RMATickets', context: 'saveTicket' })
-      toast.error(`Failed to save ticket: ${error.message}`)
+      toast.error(t('ticketForm.failedSaveTicket', { error: error.message }))
     } finally {
       setUploading(false)
     }

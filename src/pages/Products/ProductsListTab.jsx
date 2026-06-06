@@ -162,7 +162,7 @@ export default function ProductsListTab({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name, SKU, brand, model, or description... (Press / to focus)"
+              placeholder={t('products.searchPlaceholder')}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
             />
             <svg
@@ -196,7 +196,7 @@ export default function ProductsListTab({
                     d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                   />
                 </svg>
-                Delete ({selectedProducts.length})
+                {t('products.deleteCount', { count: selectedProducts.length })}
               </button>
               <select
                 onChange={(e) => {
@@ -208,10 +208,10 @@ export default function ProductsListTab({
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600"
                 defaultValue=""
               >
-                <option value="">Change Status...</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="discontinued">Discontinued</option>
+                <option value="">{t('products.changeStatus')}</option>
+                <option value="active">{t('products.statusActive')}</option>
+                <option value="inactive">{t('products.statusInactive')}</option>
+                <option value="discontinued">{t('products.statusDiscontinued')}</option>
               </select>
             </div>
           )}
@@ -229,7 +229,7 @@ export default function ProductsListTab({
                   d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              Export
+              {t('common.export')}
             </button>
           )}
 
@@ -250,7 +250,7 @@ export default function ProductsListTab({
                     d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                   />
                 </svg>
-                Add Product
+                {t('products.addProduct')}
                 <svg
                   className={
                     'w-4 h-4 transition-transform ' + (showAddDropdown ? 'rotate-180' : '')
@@ -290,8 +290,8 @@ export default function ProductsListTab({
                       />
                     </svg>
                     <div>
-                      <div className="font-medium text-gray-900">Add Single Product</div>
-                      <div className="text-xs text-gray-500">Create one product</div>
+                      <div className="font-medium text-gray-900">{t('products.addSingleProduct')}</div>
+                      <div className="text-xs text-gray-500">{t('products.createOneProduct')}</div>
                     </div>
                   </button>
                   {canImport && (
@@ -316,8 +316,8 @@ export default function ProductsListTab({
                         />
                       </svg>
                       <div>
-                        <div className="font-medium text-gray-900">Bulk Add / Upload</div>
-                        <div className="text-xs text-gray-500">Upload CSV file</div>
+                        <div className="font-medium text-gray-900">{t('products.bulkUpload')}</div>
+                        <div className="text-xs text-gray-500">{t('products.uploadCSVFile')}</div>
                       </div>
                     </button>
                   )}
@@ -331,7 +331,7 @@ export default function ProductsListTab({
       {/* Pagination Top Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-gray-600">
         <div>
-          Showing {startIndex + 1}-{endIndex} of {totalProducts} products
+          {t('products.showingRange', { from: startIndex + 1, to: endIndex, total: totalProducts })}
         </div>
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-600">{t('common.itemsPerPage')}:</label>
@@ -365,28 +365,28 @@ export default function ProductsListTab({
                 #
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Image
+                {t('products.imageHeader')}
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                <SortableHeader label="SKU" sortKey="sku" />
+                <SortableHeader label={t('products.sku')} sortKey="sku" />
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                <SortableHeader label="Product Name" sortKey="product_name" />
+                <SortableHeader label={t('products.productName')} sortKey="product_name" />
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
-                <SortableHeader label="Brand" sortKey="brand" />
+                <SortableHeader label={t('products.brand')} sortKey="brand" />
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
-                <SortableHeader label="Category" sortKey="category" />
+                <SortableHeader label={t('products.category')} sortKey="category" />
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                <SortableHeader label="Type" sortKey="product_type" />
+                <SortableHeader label={t('common.type')} sortKey="product_type" />
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                <SortableHeader label="Status" sortKey="status" />
+                <SortableHeader label={t('common.status')} sortKey="status" />
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Actions
+                {t('products.actionsHeader')}
               </th>
             </tr>
           </thead>
@@ -396,9 +396,9 @@ export default function ProductsListTab({
                 <td colSpan="10">
                   <EmptyState
                     preset="products"
-                    description="Add your first product to start managing your catalog"
+                    description={t('products.emptyDescription')}
                     action={canCreate ? () => setShowAddProduct(true) : undefined}
-                    actionLabel="Add First Product"
+                    actionLabel={t('products.addFirstProduct')}
                   />
                 </td>
               </tr>
@@ -525,7 +525,7 @@ export default function ProductsListTab({
                               d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                             />
                           </svg>
-                          View
+                          {t('common.view')}
                         </button>
                         {canEdit && (
                           <button
@@ -548,7 +548,7 @@ export default function ProductsListTab({
                                 d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                               />
                             </svg>
-                            Edit
+                            {t('common.edit')}
                           </button>
                         )}
                         {canDelete && (
@@ -572,7 +572,7 @@ export default function ProductsListTab({
                                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                               />
                             </svg>
-                            Delete
+                            {t('common.delete')}
                           </button>
                         )}
                       </div>
@@ -594,7 +594,7 @@ export default function ProductsListTab({
               disabled={currentPage === 1}
               className="px-3 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Previous
+              {t('common.previous')}
             </button>
             <div className="flex items-center gap-1">{renderPageNumbers()}</div>
             <button
@@ -602,12 +602,12 @@ export default function ProductsListTab({
               disabled={currentPage === totalPages}
               className="px-3 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Next
+              {t('common.next')}
             </button>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Jump to page:</span>
+            <span className="text-sm text-gray-600">{t('common.jumpToPage')}:</span>
             <input
               type="number"
               min="1"
@@ -622,7 +622,7 @@ export default function ProductsListTab({
               onClick={handleJumpToPage}
               className="px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
             >
-              Go
+              {t('common.go')}
             </button>
           </div>
         </div>

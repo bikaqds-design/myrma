@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { db, branding as brandingAPI } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../../lib/sentry'
@@ -47,32 +48,19 @@ const FONTS = [
   { label: 'Courier New', value: "'Courier New', monospace" },
 ]
 
-const SECTIONS_META = [
-  {
-    key: 'ticketInfo',
-    label: 'Ticket Information',
-    desc: 'Customer, assigned to, dates, status, priority',
-  },
-  {
-    key: 'generalDescription',
-    label: 'General Description',
-    desc: 'RMA description / reason for return',
-  },
-  {
-    key: 'products',
-    label: 'Products',
-    desc: 'Product list with serial numbers and issue details',
-  },
-  {
-    key: 'accessories',
-    label: 'Accessories Received',
-    desc: 'Items received alongside the products',
-  },
-  { key: 'attachments', label: 'Attachments', desc: 'List of uploaded files' },
-  { key: 'signatureLine', label: 'Signature Line', desc: 'Customer / technician signature space' },
-]
 
 export default function PDFLayout({ currentUserEmail }) {
+  const { t } = useTranslation()
+
+  const SECTIONS_META = [
+    { key: 'ticketInfo',          label: t('cp.pdfLayout.sectionTicketInfo'),     desc: t('cp.pdfLayout.sectionTicketInfoDesc') },
+    { key: 'generalDescription',  label: t('cp.pdfLayout.sectionGeneralDesc'),    desc: t('cp.pdfLayout.sectionGeneralDescDesc') },
+    { key: 'products',            label: t('cp.pdfLayout.sectionProducts'),       desc: t('cp.pdfLayout.sectionProductsDesc') },
+    { key: 'accessories',         label: t('cp.pdfLayout.sectionAccessories'),    desc: t('cp.pdfLayout.sectionAccessoriesDesc') },
+    { key: 'attachments',         label: t('cp.pdfLayout.sectionAttachments'),    desc: t('cp.pdfLayout.sectionAttachmentsDesc') },
+    { key: 'signatureLine',       label: t('cp.pdfLayout.sectionSignature'),      desc: t('cp.pdfLayout.sectionSignatureDesc') },
+  ]
+
   const [config, setConfig] = useState(DEFAULT)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -126,7 +114,7 @@ export default function PDFLayout({ currentUserEmail }) {
     setSaving(true)
     try {
       await db.rmaConfig.set('pdf_layout', config, currentUserEmail)
-      toast.success('PDF layout saved')
+      toast.success(t('cp.pdfLayout.saved'))
     } catch (err) {
       captureException(err)
       toast.error(err.message)
@@ -169,9 +157,9 @@ export default function PDFLayout({ currentUserEmail }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">PDF Layout</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t('cp.pdfLayout.header')}</h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            Customize how RMA tickets look when printed or exported to PDF
+            {t('cp.pdfLayout.subtitle')}
           </p>
         </div>
         <button
@@ -179,7 +167,7 @@ export default function PDFLayout({ currentUserEmail }) {
           disabled={saving}
           className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium disabled:opacity-50"
         >
-          {saving ? 'Saving...' : 'Save Layout'}
+          {saving ? t('cp.saving') : t('cp.pdfLayout.saveLayout')}
         </button>
       </div>
 
@@ -202,11 +190,11 @@ export default function PDFLayout({ currentUserEmail }) {
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              Page Setup
+              {t('cp.pdfLayout.pageSetup')}
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">Paper Size</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">{t('cp.pdfLayout.paperSize')}</label>
                 <select
                   value={config.paperSize}
                   onChange={(e) => set('paperSize', e.target.value)}
@@ -219,17 +207,20 @@ export default function PDFLayout({ currentUserEmail }) {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                  Orientation
+                  {t('cp.pdfLayout.orientation')}
                 </label>
                 <div className="flex gap-2">
-                  {['portrait', 'landscape'].map((o) => (
+                  {[
+                    { v: 'portrait', l: t('cp.pdfLayout.portrait') },
+                    { v: 'landscape', l: t('cp.pdfLayout.landscape') },
+                  ].map(({ v, l }) => (
                     <button
-                      key={o}
+                      key={v}
                       type="button"
-                      onClick={() => set('orientation', o)}
-                      className={`flex-1 py-2 rounded-lg border text-sm font-medium capitalize transition-colors ${config.orientation === o ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                      onClick={() => set('orientation', v)}
+                      className={`flex-1 py-2 rounded-lg border text-sm font-medium capitalize transition-colors ${config.orientation === v ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
                     >
-                      {o}
+                      {l}
                     </button>
                   ))}
                 </div>
@@ -253,12 +244,12 @@ export default function PDFLayout({ currentUserEmail }) {
                   d="M4 6h16M4 12h8m-8 6h16"
                 />
               </svg>
-              Typography
+              {t('cp.pdfLayout.typography')}
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                  Font Family
+                  {t('cp.pdfLayout.fontFamily')}
                 </label>
                 <select
                   value={config.font}
@@ -273,7 +264,7 @@ export default function PDFLayout({ currentUserEmail }) {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">Font Size</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">{t('cp.pdfLayout.fontSize')}</label>
                 <div className="flex gap-2">
                   {[9, 10, 11, 12].map((s) => (
                     <button
@@ -306,18 +297,18 @@ export default function PDFLayout({ currentUserEmail }) {
                   d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
                 />
               </svg>
-              Branding & Header
+              {t('cp.pdfLayout.brandingHeader')}
             </h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                  Header Style
+                  {t('cp.pdfLayout.headerStyle')}
                 </label>
                 <div className="flex gap-2">
                   {[
-                    { v: 'colored', l: 'Colored' },
-                    { v: 'minimal', l: 'Minimal' },
-                    { v: 'none', l: 'None' },
+                    { v: 'colored', l: t('cp.pdfLayout.headerColored') },
+                    { v: 'minimal', l: t('cp.pdfLayout.headerMinimal') },
+                    { v: 'none', l: t('cp.pdfLayout.headerNone') },
                   ].map(({ v, l }) => (
                     <button
                       key={v}
@@ -333,7 +324,7 @@ export default function PDFLayout({ currentUserEmail }) {
               <div className="flex items-center gap-4">
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                    Primary Color
+                    {t('cp.pdfLayout.primaryColor')}
                   </label>
                   <div className="flex items-center gap-2">
                     <input
@@ -355,14 +346,14 @@ export default function PDFLayout({ currentUserEmail }) {
                 {[
                   {
                     key: 'showLogo',
-                    label: 'Show Company Logo',
+                    label: t('cp.pdfLayout.showLogo'),
                     sub: logoUrl
-                      ? 'Using logo from Appearance settings'
-                      : 'No logo set — upload one in Appearance',
+                      ? t('cp.pdfLayout.logoFromAppearance')
+                      : t('cp.pdfLayout.noLogoSet'),
                   },
-                  { key: 'showCompanyName', label: 'Show Company Name' },
-                  { key: 'showRmaNumber', label: 'Show RMA Number in Header' },
-                  { key: 'showDate', label: 'Show Print Date' },
+                  { key: 'showCompanyName', label: t('cp.pdfLayout.showCompanyName') },
+                  { key: 'showRmaNumber', label: t('cp.pdfLayout.showRmaNumber') },
+                  { key: 'showDate', label: t('cp.pdfLayout.showDate') },
                 ].map(({ key, label, sub }) => (
                   <div key={key} className="flex items-center justify-between">
                     <div>
@@ -375,17 +366,20 @@ export default function PDFLayout({ currentUserEmail }) {
                 {config.showLogo && (
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                      Logo Position
+                      {t('cp.pdfLayout.logoPosition')}
                     </label>
                     <div className="flex gap-2">
-                      {['left', 'right'].map((p) => (
+                      {[
+                        { v: 'left', l: t('cp.pdfLayout.logoLeft') },
+                        { v: 'right', l: t('cp.pdfLayout.logoRight') },
+                      ].map(({ v, l }) => (
                         <button
-                          key={p}
+                          key={v}
                           type="button"
-                          onClick={() => set('logoPosition', p)}
-                          className={`flex-1 py-1.5 rounded-lg border text-sm font-medium capitalize transition-colors ${config.logoPosition === p ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                          onClick={() => set('logoPosition', v)}
+                          className={`flex-1 py-1.5 rounded-lg border text-sm font-medium capitalize transition-colors ${config.logoPosition === v ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
                         >
-                          {p}
+                          {l}
                         </button>
                       ))}
                     </div>
@@ -411,10 +405,10 @@ export default function PDFLayout({ currentUserEmail }) {
                   d="M4 6h16M4 10h16M4 14h16M4 18h16"
                 />
               </svg>
-              Content Sections
+              {t('cp.pdfLayout.contentSections')}
             </h3>
             <p className="text-xs text-gray-500 mb-4">
-              Toggle sections on/off and drag the arrows to reorder them in the PDF
+              {t('cp.pdfLayout.contentSectionsHint')}
             </p>
             <div className="space-y-2">
               {(config.sectionOrder || DEFAULT_SECTION_ORDER).map((key, idx, arr) => {
@@ -509,22 +503,22 @@ export default function PDFLayout({ currentUserEmail }) {
                   d="M3 10h18M3 14h18"
                 />
               </svg>
-              Footer
+              {t('cp.pdfLayout.footer')}
             </h3>
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                  Custom Footer Text
+                  {t('cp.pdfLayout.footerText')}
                 </label>
                 <input
                   value={config.footerText}
                   onChange={(e) => set('footerText', e.target.value)}
                   className={inp}
-                  placeholder="e.g. Confidential — For internal use only"
+                  placeholder={t('cp.pdfLayout.footerPlaceholder')}
                 />
               </div>
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-700">Show Generated Date</p>
+                <p className="text-sm text-gray-700">{t('cp.pdfLayout.showGeneratedDate')}</p>
                 <Toggle
                   checked={!!config.showGeneratedDate}
                   onChange={(v) => set('showGeneratedDate', v)}
@@ -538,7 +532,7 @@ export default function PDFLayout({ currentUserEmail }) {
         <div className="sticky top-0">
           <div className="bg-gray-100 rounded-xl p-6 border border-gray-200">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">
-              Preview
+              {t('cp.pdfLayout.previewLabel')}
             </p>
             <div
               className={`bg-white shadow-xl mx-auto overflow-hidden ${isLandscape ? 'max-w-full' : 'max-w-xs'}`}
@@ -750,7 +744,7 @@ export default function PDFLayout({ currentUserEmail }) {
               </div>
             </div>
             <p className="text-center text-xs text-gray-500 mt-3">
-              {config.paperSize} · {config.orientation} · {config.fontSize}pt
+              {t('cp.pdfLayout.previewInfo', { paperSize: config.paperSize, orientation: config.orientation, fontSize: config.fontSize })}
             </p>
           </div>
         </div>

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../../lib/sentry'
 
 export default function DataCleanup() {
+  const { t } = useTranslation()
   const [tickets, setTickets] = useState([])
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -24,7 +26,7 @@ export default function DataCleanup() {
       setCustomers(c)
     } catch (err) {
       captureException(err)
-      toast.error('Failed to load data')
+      toast.error(t('cp.dataCleanup.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -64,13 +66,13 @@ export default function DataCleanup() {
 
   const handleDeleteTickets = async (list, label) => {
     if (!list.length) return
-    if (!confirm(`Delete ${list.length} ${label} tickets? This cannot be undone.`)) return
+    if (!confirm(t('cp.dataCleanup.deleteConfirm', { count: list.length, label }))) return
     setWorking(true)
     try {
       ;(await db.rmaTickets.bulkDelete)
         ? db.rmaTickets.bulkDelete(list.map((t) => t.id))
         : Promise.all(list.map((t) => db.rmaTickets.delete(t.id)))
-      toast.success(`Deleted ${list.length} ${label} tickets`)
+      toast.success(t('cp.dataCleanup.deleted', { count: list.length, label }))
       load()
     } catch (err) {
       captureException(err)
@@ -106,7 +108,7 @@ export default function DataCleanup() {
               : 'border-gray-300 text-gray-700 hover:bg-gray-50'
           }`}
         >
-          {working ? 'Working...' : actionLabel}
+          {working ? t('cp.dataCleanup.working') : actionLabel}
         </button>
       )}
     </div>
@@ -122,20 +124,20 @@ export default function DataCleanup() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">Data Cleanup</h2>
+        <h2 className="text-lg font-semibold text-gray-900">{t('cp.dataCleanup.header')}</h2>
         <p className="text-sm text-gray-500 mt-0.5">
-          Remove stale records and identify data quality issues
+          {t('cp.dataCleanup.subtitle')}
         </p>
       </div>
 
       {/* Ticket cleanup */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-5">
-        <h3 className="text-base font-semibold text-gray-900">Ticket Cleanup</h3>
+        <h3 className="text-base font-semibold text-gray-900">{t('cp.dataCleanup.ticketCleanup')}</h3>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Completed tickets older than (days)
+              {t('cp.dataCleanup.completedOlderThan')}
             </label>
             <div className="flex items-center gap-2">
               <input
@@ -146,13 +148,13 @@ export default function DataCleanup() {
                 className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
               />
               <span className="text-sm text-gray-500">
-                days — <strong>{staleCompleted.length}</strong> tickets found
+                {t('cp.dataCleanup.daysFound', { count: staleCompleted.length })}
               </span>
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Cancelled tickets older than (days)
+              {t('cp.dataCleanup.cancelledOlderThan')}
             </label>
             <div className="flex items-center gap-2">
               <input
@@ -163,7 +165,7 @@ export default function DataCleanup() {
                 className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
               />
               <span className="text-sm text-gray-500">
-                days — <strong>{staleCancelled.length}</strong> tickets found
+                {t('cp.dataCleanup.daysFound', { count: staleCancelled.length })}
               </span>
             </div>
           </div>
@@ -174,8 +176,8 @@ export default function DataCleanup() {
             <div className="flex items-center justify-between mb-2">
               <div>
                 <span className="text-2xl font-bold text-gray-900">{staleCompleted.length}</span>
-                <p className="text-sm text-gray-600">Stale completed tickets</p>
-                <p className="text-xs text-gray-500">Completed &gt;{completedDays} days ago</p>
+                <p className="text-sm text-gray-600">{t('cp.dataCleanup.staleCompleted')}</p>
+                <p className="text-xs text-gray-500">{t('cp.dataCleanup.completedAgo', { days: completedDays })}</p>
               </div>
               <span className="text-3xl">✅</span>
             </div>
@@ -184,15 +186,15 @@ export default function DataCleanup() {
               disabled={staleCompleted.length === 0 || working}
               className="w-full py-1.5 text-sm font-medium rounded-lg border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Delete {staleCompleted.length} tickets
+              {t('cp.dataCleanup.deleteCompleted', { count: staleCompleted.length })}
             </button>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <span className="text-2xl font-bold text-gray-900">{staleCancelled.length}</span>
-                <p className="text-sm text-gray-600">Stale cancelled tickets</p>
-                <p className="text-xs text-gray-500">Cancelled &gt;{cancelledDays} days ago</p>
+                <p className="text-sm text-gray-600">{t('cp.dataCleanup.staleCancelled')}</p>
+                <p className="text-xs text-gray-500">{t('cp.dataCleanup.cancelledAgo', { days: cancelledDays })}</p>
               </div>
               <span className="text-3xl">❌</span>
             </div>
@@ -201,7 +203,7 @@ export default function DataCleanup() {
               disabled={staleCancelled.length === 0 || working}
               className="w-full py-1.5 text-sm font-medium rounded-lg border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Delete {staleCancelled.length} tickets
+              {t('cp.dataCleanup.deleteCancelled', { count: staleCancelled.length })}
             </button>
           </div>
         </div>
@@ -209,14 +211,14 @@ export default function DataCleanup() {
 
       {/* Customer quality */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-5">
-        <h3 className="text-base font-semibold text-gray-900">Customer Data Quality</h3>
+        <h3 className="text-base font-semibold text-gray-900">{t('cp.dataCleanup.customerQuality')}</h3>
         <div className="grid grid-cols-2 gap-4">
           <div className="p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <span className="text-2xl font-bold text-gray-900">{orphanCustomers.length}</span>
-                <p className="text-sm text-gray-600">Customers with no tickets</p>
-                <p className="text-xs text-gray-500">Have never submitted an RMA</p>
+                <p className="text-sm text-gray-600">{t('cp.dataCleanup.noTickets')}</p>
+                <p className="text-xs text-gray-500">{t('cp.dataCleanup.neverSubmitted')}</p>
               </div>
               <span className="text-3xl">👤</span>
             </div>
@@ -225,15 +227,15 @@ export default function DataCleanup() {
               disabled={orphanCustomers.length === 0}
               className="w-full py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Review list
+              {t('cp.dataCleanup.reviewList')}
             </button>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <span className="text-2xl font-bold text-amber-600">{duplicateGroups.length}</span>
-                <p className="text-sm text-gray-600">Potential duplicate groups</p>
-                <p className="text-xs text-gray-500">Same company or contact name</p>
+                <p className="text-sm text-gray-600">{t('cp.dataCleanup.duplicates')}</p>
+                <p className="text-xs text-gray-500">{t('cp.dataCleanup.sameCompany')}</p>
               </div>
               <span className="text-3xl">⚠️</span>
             </div>
@@ -242,7 +244,7 @@ export default function DataCleanup() {
               disabled={duplicateGroups.length === 0}
               className="w-full py-1.5 text-sm font-medium rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Review duplicates
+              {t('cp.dataCleanup.reviewDuplicates')}
             </button>
           </div>
         </div>
@@ -254,8 +256,8 @@ export default function DataCleanup() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-semibold text-gray-900">
               {preview.type === 'orphans'
-                ? `Customers with no tickets (${preview.items.length})`
-                : `Duplicate groups (${preview.items.length})`}
+                ? t('cp.dataCleanup.noTicketsHeader', { count: preview.items.length })
+                : t('cp.dataCleanup.duplicatesHeader', { count: preview.items.length })}
             </h3>
             <button onClick={() => setPreview(null)} className="text-gray-500 hover:text-gray-600">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -285,7 +287,7 @@ export default function DataCleanup() {
               preview.items.map((group, i) => (
                 <div key={i} className="mb-3 p-3 bg-amber-50 rounded-lg">
                   <p className="text-xs font-semibold text-amber-800 mb-1.5">
-                    {group.length} records with same name:
+                    {t('cp.dataCleanup.groupRecords', { count: group.length })}
                   </p>
                   {group.map((c) => (
                     <div key={c.id} className="text-xs text-gray-700 py-0.5">
@@ -297,7 +299,7 @@ export default function DataCleanup() {
               ))}
           </div>
           <p className="text-xs text-gray-500 mt-3">
-            To merge or delete records, go to the Customers page and edit them directly.
+            {t('cp.dataCleanup.mergeHint')}
           </p>
         </div>
       )}

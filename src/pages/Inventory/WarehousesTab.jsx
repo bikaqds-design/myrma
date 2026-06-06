@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { supabase, db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { Spinner } from '../../components/ui'
@@ -16,7 +17,9 @@ import {
 import { TransferModal } from './TransferModal'
 
 // ─── Warehouse export helpers ──────────────────────────────────────────────────
-async function exportWarehouseExcel(wh, units, brandMap, ticketMap) {
+// Note: toast messages in these module-level async functions are left hardcoded
+// because hooks cannot be used at module scope. Pass `t` as a parameter to translate.
+async function exportWarehouseExcel(wh, units, brandMap, ticketMap, t) {
   const XLSX = await import('xlsx')
   const rows = units.map((u, i) => ({
     '#': i + 1,
@@ -38,10 +41,10 @@ async function exportWarehouseExcel(wh, units, brandMap, ticketMap) {
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Units')
   XLSX.writeFile(wb, `${wh.code || wh.name}-${new Date().toISOString().split('T')[0]}.xlsx`)
-  toast.success(`Exported ${rows.length} rows to Excel`)
+  toast.success(t ? t('inventory:exportedExcelRows', { count: rows.length }) : `Exported ${rows.length} rows to Excel`)
 }
 
-async function exportWarehousePDF(wh, units, brandMap, ticketMap) {
+async function exportWarehousePDF(wh, units, brandMap, ticketMap, t) {
   const { default: jsPDF } = await import('jspdf')
   const date = new Date().toLocaleDateString()
   const rows = units.map((u, i) => [
@@ -133,7 +136,7 @@ async function exportWarehousePDF(wh, units, brandMap, ticketMap) {
   })
 
   doc.save(`${wh.code || wh.name}-${new Date().toISOString().split('T')[0]}.pdf`)
-  toast.success(`PDF saved`)
+  toast.success(t ? t('inventory:pdfSaved') : 'PDF saved')
 }
 
 // ─── Warehouses Tab ────────────────────────────────────────────────────────────
@@ -148,6 +151,7 @@ export function WarehousesTab({
   canTransfer,
   onReload,
 }) {
+  const { t } = useTranslation()
   const [selectedWh, setSelectedWh] = useState(null)
   const [editingWh, setEditingWh] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
@@ -168,26 +172,28 @@ export function WarehousesTab({
 
   const handleDelete = (wh) => {
     openConfirm(
-      'Delete Warehouse',
-      `Delete warehouse "${wh.name}"? Units will become unassigned.`,
+      t('inventory:deleteWarehouseTitle'),
+      t('inventory:deleteWarehouseConfirm', { name: wh.name }),
       async () => {
         closeConfirm()
         setDeleting(wh.id)
         try {
           await db.warehouses.delete(wh.id)
-          toast.success('Warehouse deleted')
+          toast.success(t('inventory:warehouseDeletedToast'))
           db.auditLog
             .log(userEmail, 'warehouse_deleted', `Deleted warehouse ${wh.name}`)
             .catch(() => {})
           onReload()
         } catch {
-          toast.error('Failed to delete warehouse')
+          toast.error(t('inventory:warehouseDeleteFailed'))
         } finally {
           setDeleting(null)
         }
       }
     )
   }
+
+  const totalUnits = warehouses.reduce((n, w) => n + whUnits(w.id).length, 0)
 
   return (
     <div className="space-y-4">
@@ -212,11 +218,10 @@ export function WarehousesTab({
               </div>
               <div>
                 <p className="text-sm font-semibold text-amber-900">
-                  Warehouse tables not set up yet
+                  {t('inventory:warehouseTablesNotSetup')}
                 </p>
                 <p className="text-xs text-amber-700 mt-0.5">
-                  Run the SQL below in your Supabase SQL Editor to enable custom warehouses and unit
-                  transfer.
+                  {t('inventory:warehouseTablesSetupHint')}
                 </p>
               </div>
             </div>
@@ -224,7 +229,7 @@ export function WarehousesTab({
               onClick={() => setShowSQL(false)}
               className="text-amber-500 hover:text-amber-700 text-xs underline flex-shrink-0"
             >
-              Hide
+              {t('inventory:hideBtn')}
             </button>
           </div>
           <pre className="bg-amber-100 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 overflow-x-auto whitespace-pre">
@@ -234,7 +239,7 @@ export function WarehousesTab({
             onClick={onReload}
             className="px-4 py-1.5 bg-amber-600 text-white rounded-xl text-xs font-medium hover:bg-amber-700"
           >
-            Retry after running SQL
+            {t('inventory:retryAfterSQL')}
           </button>
         </div>
       )}
@@ -242,10 +247,12 @@ export function WarehousesTab({
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm text-gray-500">
-          {warehouses.length} warehouse{warehouses.length !== 1 ? 's' : ''}
+          {warehouses.length === 1
+            ? t('inventory:warehouseCountSingle', { count: warehouses.length })
+            : t('inventory:warehouseCountPlural', { count: warehouses.length })}
           {warehouses.length > 0 && (
             <span className="ml-2 text-gray-500">
-              · {warehouses.reduce((n, w) => n + whUnits(w.id).length, 0)} total units
+              {t('inventory:warehouseTotalUnits', { count: totalUnits })}
             </span>
           )}
         </p>
@@ -262,7 +269,7 @@ export function WarehousesTab({
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            New Warehouse
+            {t('inventory:newWarehouse')}
           </button>
         )}
       </div>
@@ -270,7 +277,7 @@ export function WarehousesTab({
       {/* Warehouse table */}
       {whMissing ? (
         <div className="rounded-2xl border border-dashed border-gray-300 p-8 text-center text-gray-500 text-sm">
-          Run the SQL above to enable custom warehouses
+          {t('inventory:runSQLToEnableWarehouses')}
         </div>
       ) : warehouses.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-300 p-16 text-center space-y-3">
@@ -289,10 +296,8 @@ export function WarehousesTab({
               />
             </svg>
           </div>
-          <p className="text-gray-500 font-medium text-sm">No warehouses yet</p>
-          <p className="text-gray-500 text-xs">
-            Create a warehouse to start transferring RMA stock units
-          </p>
+          <p className="text-gray-500 font-medium text-sm">{t('inventory:noWarehousesYet')}</p>
+          <p className="text-gray-500 text-xs">{t('inventory:createWarehouseHint')}</p>
           {canManage && (
             <button
               onClick={() => setShowCreate(true)}
@@ -306,7 +311,7 @@ export function WarehousesTab({
                   d="M12 4v16m8-8H4"
                 />
               </svg>
-              New Warehouse
+              {t('inventory:newWarehouse')}
             </button>
           )}
         </div>
@@ -316,25 +321,25 @@ export function WarehousesTab({
             <thead className="bg-gray-100 sticky top-0 z-10">
               <tr>
                 <th className="px-4 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200 w-28">
-                  Code
+                  {t('inventory:colCode')}
                 </th>
                 <th className="px-4 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200">
-                  Name
+                  {t('inventory:colName')}
                 </th>
                 <th className="px-4 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200">
-                  Location
+                  {t('inventory:colLocation')}
                 </th>
                 <th className="px-4 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200">
-                  Description
+                  {t('inventory:colDescription')}
                 </th>
                 <th className="px-4 py-2.5 text-center font-semibold text-gray-600 border-b border-r border-gray-200 w-20">
-                  Units
+                  {t('inventory:warehouseUnits')}
                 </th>
                 <th className="px-4 py-2.5 text-center font-semibold text-gray-600 border-b border-r border-gray-200 w-20">
-                  Status
+                  {t('inventory:colStatus')}
                 </th>
                 <th className="px-4 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200 w-32">
-                  Created
+                  {t('inventory:colCreated')}
                 </th>
                 {canManage && <th className="px-4 py-2.5 border-b border-gray-200 w-20" />}
               </tr>
@@ -373,7 +378,7 @@ export function WarehousesTab({
                       <span
                         className={`px-2 py-0.5 rounded text-[10px] font-medium ${wh.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
                       >
-                        {wh.is_active ? 'Active' : 'Inactive'}
+                        {wh.is_active ? t('inventory:statusActive') : t('inventory:statusInactive')}
                       </span>
                     </td>
                     <td className="px-4 py-2.5 border-r border-gray-100 text-gray-500">
@@ -458,7 +463,7 @@ export function WarehousesTab({
               created_by: userEmail,
               created_date: new Date().toISOString(),
             })
-            toast.success('Warehouse created!')
+            toast.success(t('inventory:warehouseCreatedToast'))
             db.auditLog
               .log(userEmail, 'warehouse_created', `Created warehouse ${d.name}`)
               .catch(() => {})
@@ -474,7 +479,7 @@ export function WarehousesTab({
           warehouses={warehouses}
           onSave={async (d) => {
             await db.warehouses.update(editingWh.id, d)
-            toast.success('Warehouse updated!')
+            toast.success(t('inventory:warehouseUpdatedToast'))
             db.auditLog
               .log(userEmail, 'warehouse_updated', `Updated warehouse ${d.name || editingWh.name}`)
               .catch(() => {})
@@ -506,6 +511,7 @@ function WarehouseDetailModal({
   onClose,
   onReload,
 }) {
+  const { t } = useTranslation()
   const [selected, setSelected] = useState([])
   const [showTransfer, setShowTransfer] = useState(false)
   const [search, setSearch] = useState('')
@@ -520,7 +526,7 @@ function WarehouseDetailModal({
       .in('rma_number', nums)
       .then(({ data }) => {
         const m = {}
-        for (const t of data || []) m[t.rma_number] = t
+        for (const tk of data || []) m[tk.rma_number] = tk
         setTicketMap(m)
       })
   }, [units])
@@ -547,7 +553,7 @@ function WarehouseDetailModal({
     const ids = selected.length > 0 ? selected : filtered.map((u) => u.id)
     try {
       await db.inventory.transferUnits(ids, warehouseId)
-      toast.success(`${ids.length} unit(s) transferred`)
+      toast.success(t('inventory:unitsTransferredCount', { count: ids.length }))
       db.auditLog
         .log(
           userEmail,
@@ -559,7 +565,7 @@ function WarehouseDetailModal({
       setShowTransfer(false)
       onReload()
     } catch {
-      toast.error('Transfer failed')
+      toast.error(t('inventory:transferFailed'))
     }
   }
 
@@ -580,7 +586,7 @@ function WarehouseDetailModal({
               <h3 className="text-lg font-bold text-gray-900">{wh.name}</h3>
               {!wh.isSystem && wh.is_active === false && (
                 <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
-                  Inactive
+                  {t('inventory:statusInactive')}
                 </span>
               )}
             </div>
@@ -594,7 +600,7 @@ function WarehouseDetailModal({
             {units.length > 0 && (
               <>
                 <button
-                  onClick={() => exportWarehouseExcel(wh, filtered, brandMap, ticketMap)}
+                  onClick={() => exportWarehouseExcel(wh, filtered, brandMap, ticketMap, t)}
                   className="flex items-center gap-1.5 px-3 py-1.5 border border-green-300 text-green-700 rounded-lg text-xs font-medium hover:bg-green-50"
                 >
                   <svg
@@ -613,7 +619,7 @@ function WarehouseDetailModal({
                   Excel
                 </button>
                 <button
-                  onClick={() => exportWarehousePDF(wh, filtered, brandMap, ticketMap)}
+                  onClick={() => exportWarehousePDF(wh, filtered, brandMap, ticketMap, t)}
                   className="flex items-center gap-1.5 px-3 py-1.5 border border-red-300 text-red-700 rounded-lg text-xs font-medium hover:bg-red-50"
                 >
                   <svg
@@ -646,7 +652,9 @@ function WarehouseDetailModal({
                     d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
                   />
                 </svg>
-                Transfer{selected.length > 0 ? ` (${selected.length})` : ''}
+                {selected.length > 0
+                  ? t('inventory:transferWithCount', { count: selected.length })
+                  : t('inventory:transferBtn')}
               </button>
             )}
             <button
@@ -671,7 +679,7 @@ function WarehouseDetailModal({
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search product, serial, RMA#, customer…"
+              placeholder={t('inventory:searchUnitPlaceholder')}
               className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
             <svg
@@ -694,7 +702,9 @@ function WarehouseDetailModal({
         <div className="flex-1 overflow-auto">
           {filtered.length === 0 ? (
             <div className="text-center py-16 text-gray-500 text-sm">
-              {search ? 'No units match your search' : 'No units in this warehouse'}
+              {search
+                ? t('inventory:noUnitsMatchSearch')
+                : t('inventory:noUnitsInWarehouse')}
             </div>
           ) : (
             <table className="w-full text-xs border-collapse">
@@ -713,39 +723,26 @@ function WarehouseDetailModal({
                   <th className="w-8 px-2 py-2.5 border-b border-r border-gray-200 text-center text-gray-500 font-semibold">
                     #
                   </th>
-                  <th className="px-3 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200 min-w-[140px]">
-                    Product
-                  </th>
-                  <th className="px-3 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200 w-24">
-                    Brand
-                  </th>
-                  <th className="px-3 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200 w-28">
-                    Serial #
-                  </th>
-                  <th className="px-3 py-2.5 text-center font-semibold text-gray-600 border-b border-r border-gray-200 w-28">
-                    Warranty
-                  </th>
-                  <th className="px-3 py-2.5 text-center font-semibold text-gray-600 border-b border-r border-gray-200 w-28">
-                    Status
-                  </th>
-                  <th className="px-3 py-2.5 text-center font-semibold text-gray-600 border-b border-r border-gray-200 w-28">
-                    Resolution
-                  </th>
-                  <th className="px-3 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200 w-32">
-                    RMA #
-                  </th>
-                  <th className="px-3 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200 min-w-[120px]">
-                    Customer
-                  </th>
-                  <th className="px-3 py-2.5 text-center font-semibold text-gray-600 border-b border-r border-gray-200 w-24">
-                    RMA Status
-                  </th>
-                  <th className="px-3 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200 w-28">
-                    Date Added
-                  </th>
-                  <th className="px-3 py-2.5 text-center font-semibold text-gray-600 border-b border-gray-200 w-16">
-                    Days
-                  </th>
+                  {[
+                    { key: 'colProduct', cls: 'min-w-[140px]' },
+                    { key: 'colBrand', cls: 'w-24' },
+                    { key: 'colSerialNum', cls: 'w-28' },
+                    { key: 'colWarranty', cls: 'w-28 text-center' },
+                    { key: 'colStatus', cls: 'w-28 text-center' },
+                    { key: 'colResolution', cls: 'w-28 text-center' },
+                    { key: 'colRmaNum', cls: 'w-32' },
+                    { key: 'colCustomer', cls: 'min-w-[120px]' },
+                    { key: 'colTicketStatus', cls: 'w-24 text-center' },
+                    { key: 'colDateAdded', cls: 'w-28' },
+                    { key: 'colDays', cls: 'w-16 text-center' },
+                  ].map((h, i) => (
+                    <th
+                      key={i}
+                      className={`px-3 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200 ${h.cls || ''}`}
+                    >
+                      {t(`inventory:${h.key}`)}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -832,17 +829,19 @@ function WarehouseDetailModal({
         <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
           <span className="text-xs text-gray-500">
             {search
-              ? `${filtered.length} of ${units.length} units`
-              : `${units.length} unit${units.length !== 1 ? 's' : ''} total`}
+              ? t('inventory:footerUnitsOf', { filtered: filtered.length, total: units.length })
+              : t('inventory:footerUnitsTotal', { count: units.length })}
             {selected.length > 0 && (
-              <span className="ml-2 text-indigo-600 font-medium">{selected.length} selected</span>
+              <span className="ml-2 text-indigo-600 font-medium">
+                {t('inventory:footerSelected', { count: selected.length })}
+              </span>
             )}
           </span>
           <button
             onClick={onClose}
             className="px-4 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50"
           >
-            Close
+            {t('inventory:closeBtn')}
           </button>
         </div>
       </div>
@@ -861,6 +860,7 @@ function WarehouseDetailModal({
 
 // ─── Create / Edit Warehouse Modal ─────────────────────────────────────────────
 function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose }) {
+  const { t } = useTranslation()
   const isEdit = !!initialData?.id
 
   const autoCode = React.useMemo(() => {
@@ -894,7 +894,7 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
         is_active: active,
       })
     } catch {
-      toast.error('Failed to save warehouse')
+      toast.error(t('inventory:failedToSaveWarehouse'))
     } finally {
       setSaving(false)
     }
@@ -905,11 +905,11 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
         <div className="p-6 border-b border-gray-100">
           <h3 className="text-lg font-semibold text-gray-900">
-            {isEdit ? 'Edit Warehouse' : 'New Warehouse'}
+            {isEdit ? t('inventory:editWarehouse') : t('inventory:newWarehouse')}
           </h3>
           {!isEdit && (
             <p className="text-xs text-gray-500 mt-0.5">
-              Auto-assigned code:{' '}
+              {t('inventory:autoAssignedCode')}{' '}
               <span className="font-mono font-semibold text-indigo-600">{autoCode}</span>
             </p>
           )}
@@ -917,19 +917,21 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
         <div className="p-6 space-y-4">
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-              Warehouse Name <span className="text-red-500">*</span>
+              {t('inventory:warehouseNameRequired')}
             </label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Dubai Main Warehouse"
+              placeholder={t('inventory:warehouseNamePlaceholder')}
               className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
               autoFocus
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">Code</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                {t('inventory:warehouseCodeLabel')}
+              </label>
               <input
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
@@ -937,22 +939,26 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">Location</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                {t('inventory:warehouseLocationLabel')}
+              </label>
               <input
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                placeholder="City, Area"
+                placeholder={t('inventory:locationPlaceholder')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
               />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">Description</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+              {t('inventory:warehouseDescLabel')}
+            </label>
             <textarea
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               rows={2}
-              placeholder="Optional notes…"
+              placeholder={t('inventory:descriptionPlaceholder')}
               className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
             />
           </div>
@@ -964,7 +970,7 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
                 onChange={(e) => setActive(e.target.checked)}
                 className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
               />
-              <span className="text-sm text-gray-700">Active</span>
+              <span className="text-sm text-gray-700">{t('inventory:activeLabel')}</span>
             </label>
           )}
         </div>
@@ -973,14 +979,20 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50"
           >
-            Cancel
+            {t('inventory:cancelBtn')}
           </button>
           <button
             onClick={handleSave}
             disabled={!name.trim() || saving}
             className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 min-w-[100px] text-center"
           >
-            {saving ? <Spinner size="sm" color="white" /> : isEdit ? 'Save Changes' : 'Create'}
+            {saving ? (
+              <Spinner size="sm" color="white" />
+            ) : isEdit ? (
+              t('inventory:saveChangesBtn')
+            ) : (
+              t('inventory:createBtn')
+            )}
           </button>
         </div>
       </div>

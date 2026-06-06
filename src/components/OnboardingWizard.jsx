@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { db, branding as brandingAPI } from '../api/supabaseClient'
 import { safeStorage } from '../lib/safeStorage'
 import toast from 'react-hot-toast'
+import { useTranslation } from 'react-i18next'
 
 const TOTAL = 5
 
@@ -25,6 +26,7 @@ function ProgressBar({ step, onDismiss }) {
 }
 
 export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
+  const { t } = useTranslation()
   const [step, setStep] = useState(1)
   const [companyName, setCompanyName] = useState('')
   const [savingBranding, setSavingBranding] = useState(false)
@@ -48,14 +50,14 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
     setSavingBranding(true)
     try {
       await brandingAPI.update({ company_name: companyName.trim() })
-      toast.success('Company name saved')
+      toast.success(t('onboarding.companySaved'))
     } catch { /* non-critical — continue */ }
     finally { setSavingBranding(false) }
     next()
   }
 
   const saveCustomer = async () => {
-    if (!custName.trim()) { toast.error('Customer name is required'); return }
+    if (!custName.trim()) { toast.error(t('onboarding.customerNameRequired')); return }
     setSavingCust(true)
     try {
       const created = await db.customers.create({
@@ -64,10 +66,10 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
         mobile: custPhone.trim() || null,
       })
       setSavedCust(created)
-      toast.success('Customer added!')
+      toast.success(t('onboarding.customerAdded'))
       next()
     } catch (err) {
-      toast.error('Failed to add customer: ' + err.message)
+      toast.error(t('onboarding.failedAddCustomer', { error: err.message }))
     } finally {
       setSavingCust(false)
     }

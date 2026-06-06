@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 // Single list of assignable roles, used by both the Add-User modal and the
 // per-user "Change Role" dropdown so they never drift (UM-7). `superAdminOnly`
 // roles are only offered when the acting user is a super admin.
@@ -11,6 +13,7 @@ export const ASSIGNABLE_ROLES = [
 ]
 
 export function StatusBadge({ status }) {
+  const { t } = useTranslation()
   const badges = {
     active:      'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400',
     suspended:   'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400',
@@ -20,11 +23,11 @@ export function StatusBadge({ status }) {
   }
 
   const labels = {
-    active: '🟢 Active',
-    suspended: '⏸️ Suspended',
-    locked: '🔒 Locked',
-    deactivated: '❌ Deactivated',
-    pending: '⏳ Pending',
+    active: t('userManagement.statusActive'),
+    suspended: t('userManagement.statusSuspended'),
+    locked: t('userManagement.statusLocked'),
+    deactivated: t('userManagement.statusDeactivated'),
+    pending: t('userManagement.statusPending'),
   }
 
   return (

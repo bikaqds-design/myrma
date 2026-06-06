@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../../lib/sentry'
@@ -28,6 +29,7 @@ export function CompanyStockTab({
   const [itemsPerPage, setItemsPerPage] = useState(
     () => safeStorage.get('invStockPerPage', 25)
   )
+  const { t } = useTranslation()
   const [selectedRows, setSelectedRows] = useState([])
   const [showTransfer, setShowTransfer] = useState(false)
   const [showBatch, setShowBatch] = useState(false)
@@ -110,15 +112,13 @@ export function CompanyStockTab({
 
   const handleBulkTransfer = async (warehouseId) => {
     if (!selectedUnitIds.length) {
-      toast.error('No transferable units in selection')
+      toast.error(t('inventory.noTransferableUnits'))
       return
     }
     setBulkProcessing(true)
     try {
       await db.inventory.transferUnits(selectedUnitIds, warehouseId)
-      toast.success(
-        `${selectedUnitIds.length} unit${selectedUnitIds.length !== 1 ? 's' : ''} transferred`
-      )
+      toast.success(t('inventory.unitsTransferred', { count: selectedUnitIds.length }))
       db.auditLog
         .log(
           userEmail,
@@ -131,7 +131,7 @@ export function CompanyStockTab({
       onReload()
     } catch (err) {
       captureException(err)
-      toast.error('Transfer failed')
+      toast.error(t('inventory.transferFailed'))
     } finally {
       setBulkProcessing(false)
     }
@@ -139,15 +139,13 @@ export function CompanyStockTab({
 
   const handleBulkBatch = async (brandName) => {
     if (!selectedUnitIds.length) {
-      toast.error('No unbatched units in selection')
+      toast.error(t('inventory.noUnbatchedUnitsSelection'))
       return
     }
     setBulkProcessing(true)
     try {
       await db.inventory.createBatch(selectedUnitIds, brandName, userEmail)
-      toast.success(
-        `Batch created with ${selectedUnitIds.length} unit${selectedUnitIds.length !== 1 ? 's' : ''}`
-      )
+      toast.success(t('inventory.batchCreated', { count: selectedUnitIds.length }))
       db.auditLog
         .log(
           userEmail,
@@ -159,7 +157,7 @@ export function CompanyStockTab({
       setShowBatch(false)
       onReload()
     } catch {
-      toast.error('Failed to create batch')
+      toast.error(t('inventory.batchCreateFailed'))
     } finally {
       setBulkProcessing(false)
     }
@@ -184,9 +182,9 @@ export function CompanyStockTab({
           </svg>
         </div>
         <div>
-          <p className="font-semibold text-gray-600 dark:text-[#9aa4b2] text-sm">No company stock yet</p>
+          <p className="font-semibold text-gray-600 dark:text-[#9aa4b2] text-sm">{t('inventory.noCompanyStockYet')}</p>
           <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">
-            Units resolved as "Company Stock" from RMA tickets will appear here
+            {t('inventory.noCompanyStockHint')}
           </p>
         </div>
       </div>
@@ -203,7 +201,7 @@ export function CompanyStockTab({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by product name or brand... (Press / to focus)"
+              placeholder={t('inventory.searchByProductBrand')}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
             />
             <svg
@@ -232,7 +230,7 @@ export function CompanyStockTab({
                 d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"
               />
             </svg>
-            Filters
+            {t('common.filters')}
             {activeFilterCount > 0 && (
               <span className="w-4 h-4 bg-indigo-600 text-white text-xs rounded-full flex items-center justify-center">
                 {activeFilterCount}
@@ -241,7 +239,7 @@ export function CompanyStockTab({
           </button>
         </div>
         <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">
-          {filtered.length} product{filtered.length !== 1 ? 's' : ''}
+          {t('inventory.productCount', { count: filtered.length })}
         </span>
       </div>
 
@@ -249,23 +247,23 @@ export function CompanyStockTab({
       {showFilters && (
         <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-[#0f1520] rounded-lg flex-wrap">
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">Product:</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('inventory.filterProduct')}</label>
             <input
               type="text"
               value={filterProduct}
               onChange={(e) => setFilterProduct(e.target.value)}
-              placeholder="Type product name..."
+              placeholder={t('inventory.typeProductName')}
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 w-44"
             />
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">Brand:</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('inventory.filterBrand')}</label>
             <select
               value={filterBrand}
               onChange={(e) => setFilterBrand(e.target.value)}
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
             >
-              <option value="">All</option>
+              <option value="">{t('inventory.filterAll')}</option>
               {brands.map((b) => (
                 <option key={b.id} value={b.brand_name}>
                   {b.brand_name}
@@ -274,16 +272,16 @@ export function CompanyStockTab({
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">Resolution:</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('inventory.filterTypeResolution')}</label>
             <select
               value={filterResolution}
               onChange={(e) => setFilterResolution(e.target.value)}
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
             >
-              <option value="">All</option>
-              <option value="replacement">Replacement</option>
-              <option value="credit_note">Credit Note</option>
-              <option value="other">Other</option>
+              <option value="">{t('inventory.filterAllResolutions')}</option>
+              <option value="replacement">{t('inventory.resolutionReplacement')}</option>
+              <option value="credit_note">{t('inventory.resolutionCreditNote')}</option>
+              <option value="other">{t('inventory.resolutionOther')}</option>
             </select>
           </div>
           {activeFilterCount > 0 && (
@@ -295,7 +293,7 @@ export function CompanyStockTab({
               }}
               className="text-sm text-red-600 hover:underline ml-auto"
             >
-              Clear filters
+              {t('inventory.clearFilters')}
             </button>
           )}
         </div>
@@ -308,10 +306,10 @@ export function CompanyStockTab({
               {selectedRows.length}
             </span>
             <span className="text-sm font-medium text-indigo-700">
-              {selectedRows.length} product{selectedRows.length !== 1 ? 's' : ''} selected
+              {t('inventory.productsSelected', { count: selectedRows.length })}
               {selectedUnitIds.length > 0 && (
                 <span className="text-indigo-400 ml-1">
-                  ({selectedUnitIds.length} unit{selectedUnitIds.length !== 1 ? 's' : ''})
+                  ({t('inventory.unitsSelected', { count: selectedUnitIds.length })})
                 </span>
               )}
             </span>
@@ -319,7 +317,7 @@ export function CompanyStockTab({
               onClick={() => setSelectedRows([])}
               className="text-xs text-indigo-400 hover:text-indigo-700 underline"
             >
-              Clear
+              {t('common.clear')}
             </button>
           </div>
           <div className="h-5 w-px bg-indigo-200 flex-shrink-0" />
@@ -327,7 +325,7 @@ export function CompanyStockTab({
             <button
               onClick={() => {
                 if (!selectedUnitIds.length) {
-                  toast.error('No unbatched units in selection')
+                  toast.error(t('inventory.noUnbatchedUnitsSelection'))
                   return
                 }
                 setShowTransfer(true)
@@ -343,14 +341,14 @@ export function CompanyStockTab({
                   d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
                 />
               </svg>
-              Transfer to Warehouse
+              {t('inventory.transferToWarehouse')}
             </button>
           )}
           {canManageBatches && (
             <button
               onClick={() => {
                 if (!selectedUnitIds.length) {
-                  toast.error('No unbatched units in selection')
+                  toast.error(t('inventory.noUnbatchedUnitsSelection'))
                   return
                 }
                 setShowBatch(true)
@@ -366,7 +364,7 @@ export function CompanyStockTab({
                   d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
                 />
               </svg>
-              Send to Manufacturer
+              {t('inventory.sendToManufacturer')}
             </button>
           )}
           <button
@@ -382,14 +380,14 @@ export function CompanyStockTab({
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
               />
             </svg>
-            Export
+            {t('common.export')}
           </button>
         </div>
       )}
 
       {filtered.length === 0 ? (
         <div className="text-center py-16 bg-white dark:bg-[#121823] rounded-lg border border-gray-200 dark:border-[#212a38]">
-          <p className="text-gray-500 dark:text-[#9aa4b2] text-sm">No products match filter</p>
+          <p className="text-gray-500 dark:text-[#9aa4b2] text-sm">{t('inventory.noCompanyStockMatchFilter')}</p>
         </div>
       ) : (
         <>
@@ -417,16 +415,22 @@ export function CompanyStockTab({
                     <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider w-10">
                       #
                     </th>
-                    {['Brand', 'Product', 'Replacement', 'Credit Note', 'Other', 'Total', ''].map(
-                      (h) => (
-                        <th
-                          key={h}
-                          className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider"
-                        >
-                          {h}
-                        </th>
-                      )
-                    )}
+                    {[
+                      t('inventory.colBrand'),
+                      t('inventory.colProduct'),
+                      t('inventory.colReplacement'),
+                      t('inventory.colCreditNote'),
+                      t('inventory.colOther'),
+                      t('inventory.colTotal'),
+                      '',
+                    ].map((h, i) => (
+                      <th
+                        key={i}
+                        className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider"
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -497,7 +501,7 @@ export function CompanyStockTab({
                         </td>
                         <td className="px-4 py-3 font-bold text-gray-800">{g.units.length}</td>
                         <td className="px-4 py-3 text-right">
-                          <span className="text-xs text-indigo-600 font-medium">Manage →</span>
+                          <span className="text-xs text-indigo-600 font-medium">{t('inventory.manageLink')}</span>
                         </td>
                       </tr>
                     )

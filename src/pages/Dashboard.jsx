@@ -553,7 +553,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
             style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
             <CardHead title={t('dashboard.statusMix')} tk={tk} />
             {statusDist.length === 0
-              ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', paddingTop: 20 }}>No data</p>
+              ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', paddingTop: 20 }}>{t('common.noData')}</p>
               : <DonutWithLegend segments={statusDist} tk={tk} />}
           </div>
         )}
@@ -563,7 +563,7 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
             style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
             <CardHead title={t('dashboard.priorityMix')} tk={tk} />
             {priorityDist.length === 0
-              ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', paddingTop: 20 }}>No data</p>
+              ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', paddingTop: 20 }}>{t('common.noData')}</p>
               : <DonutWithLegend segments={priorityDist} tk={tk} />}
           </div>
         )}

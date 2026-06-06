@@ -83,7 +83,7 @@ function generateInvoiceNumber(existing = []) {
 
 // ─── PDF Export ───────────────────────────────────────────────────────────────
 
-function exportPDF(invoice) {
+function exportPDF(invoice, t) {
   const totals = calcTotals({
     lineItems: invoice.line_items || [],
     labour_hours: invoice.labour_hours || 0,
@@ -185,7 +185,7 @@ function exportPDF(invoice) {
 
   const win = window.open('', '_blank')
   if (!win) {
-    toast.error('Pop-up blocked — allow pop-ups and try again') // exportPDF is outside a component; no t() available
+    toast.error(t('common.popupBlocked'))
     return
   }
   win.document.write(html)
@@ -817,7 +817,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
                 isManager={isManager}
                 formatDate={formatDate}
                 onEdit={() => openEdit(inv)}
-                onExportPDF={() => exportPDF(inv)}
+                onExportPDF={() => exportPDF(inv, t)}
                 onMarkSent={() =>
                   openConfirm(t('invoices.confirmMarkSent'), t('invoices.confirmMarkSentMsg', { number: inv.invoice_number }), () => { closeConfirm(); updateStatus(inv, 'sent') })
                 }
@@ -859,7 +859,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
                       isTech={isTech}
                       formatDate={formatDate}
                       onEdit={() => openEdit(inv)}
-                      onExportPDF={() => exportPDF(inv)}
+                      onExportPDF={() => exportPDF(inv, t)}
                       onMarkSent={() =>
                         openConfirm(t('invoices.confirmMarkSent'), t('invoices.confirmMarkSentMsg', { number: inv.invoice_number }), () => { closeConfirm(); updateStatus(inv, 'sent') })
                       }

@@ -231,7 +231,7 @@ export default function Customers({
     if (pageNum >= 1 && pageNum <= totalPages) {
       handlePageChange(pageNum)
       setJumpToPage('')
-    } else toast.error(`Page must be between 1 and ${totalPages}`)
+    } else toast.error(t('customers.pageMustBeBetween', { total: totalPages }))
   }
 
   const handleSelectCustomer = (id) =>
@@ -247,13 +247,13 @@ export default function Customers({
 
   const handleBulkDelete = () => {
     openConfirm(
-      'Delete Customers',
-      `Delete ${selectedCustomers.length} selected customer${selectedCustomers.length !== 1 ? 's' : ''}? This cannot be undone.`,
+      t('customers.deleteCustomersTitle'),
+      t('customers.deleteCustomersConfirm', { count: selectedCustomers.length }),
       async () => {
         closeConfirm()
         try {
           await db.customers.bulkDelete(selectedCustomers)
-          toast.success(`Deleted ${selectedCustomers.length} customers`)
+          toast.success(t('customers.bulkDeletedCustomers', { count: selectedCustomers.length }))
           db.auditLog
             .log(
               currentUserEmail,
@@ -265,7 +265,7 @@ export default function Customers({
           queryClient.invalidateQueries({ queryKey: ['customers'] })
           queryClient.invalidateQueries({ queryKey: ['customers-count'] })
         } catch {
-          toast.error('Failed to delete customers')
+          toast.error(t('customers.failedDeleteCustomers'))
         }
       }
     )
@@ -274,7 +274,7 @@ export default function Customers({
   const handleBulkStatusChange = async (status) => {
     try {
       await db.customers.bulkUpdateStatus(selectedCustomers, status)
-      toast.success(`Updated ${selectedCustomers.length} customers`)
+      toast.success(t('customers.bulkUpdatedCustomers', { count: selectedCustomers.length }))
       db.auditLog
         .log(
           currentUserEmail,
@@ -285,7 +285,7 @@ export default function Customers({
       setSelectedCustomers([])
       queryClient.invalidateQueries({ queryKey: ['customers'] })
     } catch {
-      toast.error('Failed to update status')
+      toast.error(t('customers.failedUpdateStatus'))
     }
   }
 
@@ -306,7 +306,7 @@ export default function Customers({
           const result = await storage.uploadCustomerAttachment(file, folderId)
           uploadedAttachments.push(result)
         } catch (err) {
-          toast.error(`Failed to upload ${file.name}: ${err.message}`)
+          toast.error(t('customers.failedUploadFile', { name: file.name, error: err.message }))
           return
         }
       }
@@ -363,7 +363,7 @@ export default function Customers({
             targetEmails: [],
           })
           .catch(() => {})
-        toast.success('Customer updated')
+        toast.success(t('customers.customerUpdated'))
         db.auditLog
           .log(
             currentUserEmail,
@@ -397,7 +397,7 @@ export default function Customers({
             targetEmails: [],
           })
           .catch(() => {})
-        toast.success('Customer created')
+        toast.success(t('customers.customerCreated'))
         db.auditLog
           .log(
             currentUserEmail,
@@ -412,7 +412,7 @@ export default function Customers({
       queryClient.invalidateQueries({ queryKey: ['customers-count'] })
     } catch (error) {
       if (previousCustomers !== null) queryClient.setQueryData(['customers'], previousCustomers) // rollback
-      toast.error(`Failed to save: ${error.message}`)
+      toast.error(t('customers.failedSave', { error: error.message }))
     }
   }
 
@@ -470,7 +470,7 @@ export default function Customers({
               targetEmails: [],
             })
             .catch(() => {})
-          toast.success('Customer deleted')
+          toast.success(t('customers.customerDeleted'))
           db.auditLog
             .log(
               currentUserEmail,
@@ -482,7 +482,7 @@ export default function Customers({
           queryClient.invalidateQueries({ queryKey: ['customers-count'] })
         } catch {
           queryClient.setQueryData(['customers'], previousCustomers) // rollback on error
-          toast.error('Failed to delete customer')
+          toast.error(t('customers.failedDeleteCustomer'))
         }
       }
     )
@@ -497,17 +497,17 @@ export default function Customers({
   const handleExportCSV = () => {
     const csv = [
       [
-        'Code',
-        'Type',
-        'Status',
-        'Company',
-        'Contact Person',
-        'Mobile',
-        'Landline',
-        'Email',
-        'Address',
-        'Account Manager',
-        'Created',
+        t('customers.csvCode'),
+        t('customers.csvType'),
+        t('customers.csvStatus'),
+        t('customers.csvCompany'),
+        t('customers.csvContactPerson'),
+        t('customers.csvMobile'),
+        t('customers.csvLandline'),
+        t('customers.csvEmail'),
+        t('customers.csvAddress'),
+        t('customers.csvAccountManager'),
+        t('customers.csvCreated'),
       ].join(','),
       ...filteredCustomers.map((c) =>
         [
@@ -534,7 +534,7 @@ export default function Customers({
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-    toast.success(`Exported ${filteredCustomers.length} customers`)
+    toast.success(t('customers.exportedCustomers', { count: filteredCustomers.length }))
     db.auditLog
       .log(
         currentUserEmail,
@@ -598,7 +598,7 @@ export default function Customers({
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-    toast.success('Template downloaded')
+    toast.success(t('customers.templateDownloaded'))
   }
 
   const parseCSVLine = (line) => {
@@ -630,7 +630,7 @@ export default function Customers({
       const text = (await file.text()).replace(/^\uFEFF/, '')
       const lines = text.split('\n').filter((line) => line.trim())
       if (lines.length < 2) {
-        toast.error('CSV file is empty or invalid')
+        toast.error(t('customers.csvEmpty'))
         return
       }
 
@@ -638,7 +638,7 @@ export default function Customers({
       const requiredColumns = ['company_name', 'contact_person']
       const missing = requiredColumns.filter((f) => !headers.includes(f))
       if (missing.length > 0) {
-        toast.error(`Missing required columns: ${missing.join(', ')}`)
+        toast.error(t('customers.csvMissingColumns', { columns: missing.join(', ') }))
         return
       }
 
@@ -719,11 +719,9 @@ export default function Customers({
 
       if (toImport.length === 0) {
         if (skippedCount > 0) {
-          toast.error(
-            `All ${skippedCount} customer${skippedCount !== 1 ? 's' : ''} already exist in the system — nothing to import.`
-          )
+          toast.error(t('customers.allExistSkipped', { count: skippedCount }))
         } else {
-          toast.error('No valid customers to import')
+          toast.error(t('customers.noValidCustomers'))
           if (errors.length > 0) captureException(new Error('CSV import errors'), { errors })
         }
         return
@@ -731,13 +729,9 @@ export default function Customers({
 
       await db.customers.bulkCreate(toImport)
       if (skippedCount > 0) {
-        toast.success(
-          `Imported ${toImport.length} new customer${toImport.length !== 1 ? 's' : ''}. Skipped ${skippedCount} duplicate${skippedCount !== 1 ? 's' : ''}.`
-        )
+        toast.success(t('customers.importedWithSkipped', { count: toImport.length, skipped: skippedCount }))
       } else {
-        toast.success(
-          `Successfully imported ${toImport.length} customer${toImport.length !== 1 ? 's' : ''}`
-        )
+        toast.success(t('customers.importedSuccess', { count: toImport.length }))
       }
       db.auditLog
         .log(
@@ -747,14 +741,14 @@ export default function Customers({
         )
         .catch(() => {})
       if (errors.length > 0) {
-        toast.error(`${errors.length} rows had errors — check console`)
+        toast.error(t('customers.importRowErrors', { count: errors.length }))
         captureException(new Error('CSV import errors'), { errors })
       }
       setShowBulkUpload(false)
       queryClient.invalidateQueries({ queryKey: ['customers'] })
       queryClient.invalidateQueries({ queryKey: ['customers-count'] })
     } catch (error) {
-      toast.error(`Failed to import: ${error.message}`)
+      toast.error(t('customers.failedImport', { error: error.message }))
     }
   }
 
@@ -1200,15 +1194,15 @@ export default function Customers({
                         preset="customers"
                         description={
                           customers.length > 0
-                            ? 'Try adjusting your filters or search term'
-                            : 'Add your first customer to get started'
+                            ? t('customers.adjustFilters')
+                            : t('customers.noCustomersHint')
                         }
                         action={
                           canDo('create') && customers.length === 0
                             ? () => setShowAddCustomer(true)
                             : undefined
                         }
-                        actionLabel="Add First Customer"
+                        actionLabel={t('customers.addFirstCustomer')}
                       />
                     </td>
                   </tr>

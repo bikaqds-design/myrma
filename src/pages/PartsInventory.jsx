@@ -1,5 +1,6 @@
 import React, { useState, useMemo, lazy, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
+import i18next from 'i18next'
 import { createPortal } from 'react-dom'
 const BarcodeScannerModule = lazy(() => import('../components/BarcodeScanner'))
 const BarcodeScanner = (props) => (
@@ -38,7 +39,7 @@ function downloadCSV(rows, columns, filename) {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
-  toast.success(`Exported ${rows.length} rows`)
+  toast.success(i18next.t('inventory.exportedRows', { count: rows.length }))
 }
 
 const MIGRATION_SQL = `-- Run in Supabase SQL Editor to enable parts inventory:
@@ -118,6 +119,7 @@ function SortBtn({ label, sortKey, activeSortKey, activeSortDir, onSort }) {
 
 // ─── Part Form Modal ──────────────────────────────────────────────────────────
 function PartModal({ part, onSave, onClose, saving }) {
+  const { t } = useTranslation()
   const [form, setForm] = useState(
     part
       ? {
@@ -139,19 +141,19 @@ function PartModal({ part, onSave, onClose, saving }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!form.part_name.trim()) {
-      toast.error('Part name is required')
+      toast.error(t('parts.errorPartNameRequired'))
       return
     }
     if (form.quantity === '' || isNaN(Number(form.quantity))) {
-      toast.error('Quantity is required')
+      toast.error(t('parts.errorQuantityRequired'))
       return
     }
     if (form.unit_cost === '' || isNaN(Number(form.unit_cost))) {
-      toast.error('Unit cost is required')
+      toast.error(t('parts.errorUnitCostRequired'))
       return
     }
     if (form.reorder_level === '' || isNaN(Number(form.reorder_level))) {
-      toast.error('Reorder level is required')
+      toast.error(t('parts.errorReorderRequired'))
       return
     }
     onSave({
@@ -176,7 +178,7 @@ function PartModal({ part, onSave, onClose, saving }) {
       <div className="relative bg-white dark:bg-[#121823] rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-[#212a38]">
           <h2 className="text-base font-semibold text-gray-900 dark:text-[#e8ebf0]">
-            {part ? 'Edit Part' : 'Add Part'}
+            {part ? t('parts.editPart') : t('parts.addPart')}
           </h2>
           <button onClick={onClose} className="text-gray-500 dark:text-[#9aa4b2] hover:text-gray-600 dark:text-[#9aa4b2] transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -193,7 +195,7 @@ function PartModal({ part, onSave, onClose, saving }) {
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className={label}>
-                Part Name <span className="text-red-500">*</span>
+                {t('parts.labelPartName')} <span className="text-red-500">*</span>
               </label>
               <input
                 value={form.part_name}
@@ -204,7 +206,7 @@ function PartModal({ part, onSave, onClose, saving }) {
               />
             </div>
             <div>
-              <label className={label}>Part Number</label>
+              <label className={label}>{t('parts.labelPartNumber')}</label>
               <div className="relative">
                 <input
                   id="part-number-input"
@@ -243,7 +245,7 @@ function PartModal({ part, onSave, onClose, saving }) {
               )}
             </div>
             <div>
-              <label className={label}>Location</label>
+              <label className={label}>{t('parts.labelLocation')}</label>
               <input
                 value={form.location}
                 onChange={(e) => set('location', e.target.value)}
@@ -253,7 +255,7 @@ function PartModal({ part, onSave, onClose, saving }) {
             </div>
             <div>
               <label className={label}>
-                Quantity <span className="text-red-500">*</span>
+                {t('parts.labelQuantity')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -267,7 +269,7 @@ function PartModal({ part, onSave, onClose, saving }) {
             </div>
             <div>
               <label className={label}>
-                Reorder Level <span className="text-red-500">*</span>
+                {t('parts.labelReorderLevel')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -281,7 +283,7 @@ function PartModal({ part, onSave, onClose, saving }) {
             </div>
             <div>
               <label className={label}>
-                Unit Cost ($) <span className="text-red-500">*</span>
+                {t('parts.labelUnitCost')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -295,7 +297,7 @@ function PartModal({ part, onSave, onClose, saving }) {
               />
             </div>
             <div>
-              <label className={label}>Supplier</label>
+              <label className={label}>{t('parts.labelSupplier')}</label>
               <input
                 value={form.supplier}
                 onChange={(e) => set('supplier', e.target.value)}
@@ -304,7 +306,7 @@ function PartModal({ part, onSave, onClose, saving }) {
               />
             </div>
             <div className="col-span-2">
-              <label className={label}>Notes</label>
+              <label className={label}>{t('parts.labelNotes')}</label>
               <textarea
                 value={form.notes}
                 onChange={(e) => set('notes', e.target.value)}
@@ -320,10 +322,10 @@ function PartModal({ part, onSave, onClose, saving }) {
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-[#e8ebf0] border border-gray-200 dark:border-[#212a38] rounded-xl hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] transition-colors"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <Button type="submit" loading={saving}>
-              {part ? 'Save Changes' : 'Add Part'}
+              {part ? t('customerDetails.saveChanges') : t('parts.addPart')}
             </Button>
           </div>
         </form>
@@ -415,14 +417,14 @@ export default function PartsInventory({
     mutationFn: (data) =>
       editingPart ? db.parts.update(editingPart.id, data) : db.parts.create(data),
     onSuccess: () => {
-      toast.success(editingPart ? 'Part updated' : 'Part added')
+      toast.success(editingPart ? t('parts.partUpdated') : t('parts.partAdded'))
       setShowModal(false)
       setEditingPart(null)
       queryClient.invalidateQueries({ queryKey: ['parts'] })
     },
     onError: (err) => {
       captureException(err, { page: 'PartsInventory', context: 'savePart' })
-      toast.error(err.message || 'Failed to save part')
+      toast.error(err.message || t('parts.errorSavePart'))
     },
   })
   const saving = saveMutation.isPending
@@ -430,12 +432,12 @@ export default function PartsInventory({
   const deleteMutation = useMutation({
     mutationFn: (id) => db.parts.delete(id),
     onSuccess: () => {
-      toast.success('Part deleted')
+      toast.success(t('parts.partDeleted'))
       queryClient.invalidateQueries({ queryKey: ['parts'] })
     },
     onError: (err) => {
       captureException(err, { page: 'PartsInventory', context: 'deletePart' })
-      toast.error('Failed to delete part')
+      toast.error(t('parts.errorDeletePart'))
     },
   })
 
@@ -449,12 +451,12 @@ export default function PartsInventory({
           data: prev.data.map((p) => (p.id === id ? { ...p, quantity: updated.quantity } : p)),
         }
       })
-      if (delta > 0) toast.success(`+${delta} added to ${name}`)
-      else toast.success(`${delta} removed from ${name}`)
+      if (delta > 0) toast.success(t('parts.stockAdded', { delta, name }))
+      else toast.success(t('parts.stockRemoved', { delta: Math.abs(delta), name }))
     },
     onError: (err) => {
       captureException(err, { page: 'PartsInventory', context: 'adjustQuantity' })
-      toast.error('Failed to adjust quantity')
+      toast.error(t('parts.errorAdjustQty'))
     },
     onSettled: (_d, _e, { id }) => {
       setAdjusting((a) => ({ ...a, [id]: false }))
@@ -465,8 +467,8 @@ export default function PartsInventory({
 
   const handleDelete = (part) => {
     openConfirm(
-      'Delete Part',
-      `Are you sure you want to delete "${part.part_name}"? This cannot be undone.`,
+      t('parts.deletePartTitle'),
+      t('parts.deletePartMsg', { name: part.part_name }),
       () => {
         closeConfirm()
         deleteMutation.mutate(part.id)
@@ -537,11 +539,8 @@ export default function PartsInventory({
             </svg>
           </div>
           <div>
-            <h2 className="text-base font-semibold text-amber-900">Database Setup Required</h2>
-            <p className="text-sm text-amber-800 mt-0.5">
-              The <code className="font-mono bg-amber-100 px-1 rounded">parts</code> table is not
-              set up yet. Run the SQL below in your Supabase SQL Editor, then click Retry.
-            </p>
+            <h2 className="text-base font-semibold text-amber-900">{t('parts.dbSetupTitle')}</h2>
+            <p className="text-sm text-amber-800 mt-0.5">{t('parts.dbSetupDesc')}</p>
           </div>
         </div>
         <pre className="bg-amber-100 border border-amber-200 rounded-xl p-4 text-xs text-amber-900 overflow-x-auto whitespace-pre">
@@ -551,7 +550,7 @@ export default function PartsInventory({
           onClick={() => refetch()}
           className="px-5 py-2 bg-amber-600 text-white rounded-xl text-sm font-medium hover:bg-amber-700 transition-colors"
         >
-          Retry
+          {t('common.retry')}
         </button>
       </div>
     )
@@ -628,14 +627,14 @@ export default function PartsInventory({
           </svg>
           <p className="text-sm text-amber-800 flex-1">
             <span className="font-semibold">
-              {lowStockParts.length} part{lowStockParts.length !== 1 ? 's are' : ' is'} low on stock
+              {t('parts.lowStockBanner', { count: lowStockParts.length })}
             </span>
             {' — '}
             <button
               onClick={() => setShowLowOnly((v) => !v)}
               className="underline text-amber-700 hover:text-amber-900 font-medium"
             >
-              {showLowOnly ? 'Show all parts' : 'Show low stock only'}
+              {showLowOnly ? t('parts.showAll') : t('parts.showLowOnly')}
             </button>
           </p>
         </div>
@@ -684,7 +683,7 @@ export default function PartsInventory({
           )}
         </button>
         <span className="text-sm text-gray-500 dark:text-[#9aa4b2] ml-auto">
-          {filtered.length} part{filtered.length !== 1 ? 's' : ''}
+          {t('parts.partsCount', { count: filtered.length })}
         </span>
       </div>
 
@@ -693,9 +692,9 @@ export default function PartsInventory({
         <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38]">
           <EmptyState
             preset="inventory"
-            title="No parts found"
+            title={t('parts.noPartsFound')}
             description={
-              search || showLowOnly ? 'No parts match your filters' : 'No parts in inventory yet'
+              search || showLowOnly ? t('parts.noPartsFiltered') : t('parts.noPartsYet')
             }
             action={
               canAdd && !search && !showLowOnly
@@ -705,7 +704,7 @@ export default function PartsInventory({
                   }
                 : undefined
             }
-            actionLabel="Add First Part"
+            actionLabel={t('parts.addFirstPart')}
           />
         </div>
       ) : (
@@ -716,7 +715,7 @@ export default function PartsInventory({
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
                     <SortBtn
-                      label="Part Name"
+                      label={t('parts.colPartName')}
                       sortKey="part_name"
                       activeSortKey={sortKey}
                       activeSortDir={sortDir}
@@ -724,11 +723,11 @@ export default function PartsInventory({
                     />
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
-                    Part #
+                    {t('parts.colPartNumber')}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
                     <SortBtn
-                      label="Quantity"
+                      label={t('parts.colQuantity')}
                       sortKey="quantity"
                       activeSortKey={sortKey}
                       activeSortDir={sortDir}
@@ -736,25 +735,25 @@ export default function PartsInventory({
                     />
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
-                    Unit Cost
+                    {t('parts.colUnitCost')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
-                    Supplier
+                    {t('parts.colSupplier')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
-                    Location
+                    {t('parts.colLocation')}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
-                    Reorder Level
+                    {t('parts.colReorderLevel')}
                   </th>
                   {canAdjust && (
                     <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
-                      Adjust
+                      {t('parts.colAdjust')}
                     </th>
                   )}
                   {(canEdit || canDelete) && (
                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
-                      Actions
+                      {t('common.actions')}
                     </th>
                   )}
                 </tr>
@@ -915,10 +914,9 @@ export default function PartsInventory({
       {/* Summary footer */}
       {filtered.length > 0 && (
         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-[#9aa4b2] px-1">
-          <span>Total parts: {filtered.length}</span>
+          <span>{t('parts.totalParts', { count: filtered.length })}</span>
           <span>
-            Total stock value: $
-            {filtered.reduce((s, p) => s + (p.quantity ?? 0) * (p.unit_cost ?? 0), 0).toFixed(2)}
+            {t('parts.totalValue', { value: filtered.reduce((s, p) => s + (p.quantity ?? 0) * (p.unit_cost ?? 0), 0).toFixed(2) })}
           </span>
         </div>
       )}
@@ -941,7 +939,7 @@ export default function PartsInventory({
         open={confirmDialog.open}
         title={confirmDialog.title}
         message={confirmDialog.message}
-        confirmLabel="Delete"
+        confirmLabel={t('common.delete')}
         onConfirm={confirmDialog.onConfirm}
         onCancel={closeConfirm}
       />

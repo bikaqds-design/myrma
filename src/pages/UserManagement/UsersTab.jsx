@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import Modal from '../../components/Modal'
 import { ROLES } from '../../lib/constants'
@@ -16,6 +17,7 @@ export function UsersTab({
   openMenuId,
   setOpenMenuId,
 }) {
+  const { t } = useTranslation()
   const isSuperAdmin = currentUserRole === ROLES.SUPER_ADMIN
   // Admin + super_admin can manage permissions (consistent with admin bypass; the
   // whole page is already admin-only). Was hardcoded super_admin-only before (UM-5).
@@ -31,22 +33,22 @@ export function UsersTab({
         <thead className="bg-gray-50">
           <tr>
             <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-              User
+              {t('userManagement.colUser')}
             </th>
             <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-              Status
+              {t('userManagement.colStatus')}
             </th>
             <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-              Role
+              {t('userManagement.colRole')}
             </th>
             <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-              Change Role
+              {t('userManagement.colChangeRole')}
             </th>
             <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-              Permissions
+              {t('userManagement.colPermissions')}
             </th>
             <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-              Actions
+              {t('userManagement.colActions')}
             </th>
           </tr>
         </thead>
@@ -62,7 +64,7 @@ export function UsersTab({
                     <p className="text-sm font-medium text-gray-900">{user.user_email}</p>
                     {user.last_login && (
                       <p className="text-xs text-gray-500">
-                        Last login: {new Date(user.last_login).toLocaleDateString()}
+                        {t('userManagement.lastLoginDate', { date: new Date(user.last_login).toLocaleDateString() })}
                       </p>
                     )}
                   </div>
@@ -76,7 +78,7 @@ export function UsersTab({
               </td>
               <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                 {user.user_email === currentUserEmail ? (
-                  <span className="text-sm text-gray-500 italic">current user</span>
+                  <span className="text-sm text-gray-500 italic">{t('userManagement.currentUser')}</span>
                 ) : (
                   <select
                     value={user.role}
@@ -110,11 +112,11 @@ export function UsersTab({
                         d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
                       />
                     </svg>
-                    {hasCustomPerms(user) ? 'Custom' : 'Role Default'}
+                    {hasCustomPerms(user) ? t('userManagement.custom') : t('userManagement.roleDefault')}
                   </button>
                 ) : (
                   <span className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-500">
-                    {hasCustomPerms(user) ? 'Custom' : 'Role Default'}
+                    {hasCustomPerms(user) ? t('userManagement.custom') : t('userManagement.roleDefault')}
                   </span>
                 )}
               </td>
@@ -160,7 +162,7 @@ export function UsersTab({
                           d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                         />
                       </svg>
-                      Controls
+                      {t('userManagement.controls')}
                     </button>
                     <button
                       onClick={() => {
@@ -182,7 +184,7 @@ export function UsersTab({
                           d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
                         />
                       </svg>
-                      Reset Password
+                      {t('userManagement.resetPassword')}
                     </button>
                     <button
                       onClick={() => {
@@ -204,7 +206,7 @@ export function UsersTab({
                           d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
                         />
                       </svg>
-                      Activity
+                      {t('accountSettings.recentActivity')}
                     </button>
                   </div>
                 )}
@@ -227,6 +229,7 @@ export function AddUserModal({
   onSubmit,
   onClose,
 }) {
+  const { t } = useTranslation()
   const [showPassword, setShowPassword] = useState(false)
 
   const generatePassword = () => {
@@ -237,15 +240,15 @@ export function AddUserModal({
     }
     onPasswordChange(pass)
     setShowPassword(true)
-    toast.success('Password generated! Make sure to copy it!')
+    toast.success(t('userManagement.passwordGeneratedCopy'))
   }
 
   return (
-    <Modal open={true} onClose={onClose} title="Add New User" className="max-w-md" hideHeader>
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Add New User</h2>
+    <Modal open={true} onClose={onClose} title={t('userManagement.inviteUser')} className="max-w-md" hideHeader>
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">{t('userManagement.inviteUser')}</h2>
       <form onSubmit={onSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.email')} *</label>
           <input
             type="email"
             value={email}
@@ -257,7 +260,7 @@ export function AddUserModal({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Password *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('accountSettings.newPassword')} *</label>
           <div className="relative">
             <input
               type={showPassword ? 'text' : 'password'}
@@ -282,12 +285,12 @@ export function AddUserModal({
             onClick={generatePassword}
             className="mt-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium"
           >
-            🎲 Generate Strong Password
+            {t('userManagement.generateStrongPassword')}
           </button>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Role *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('userManagement.colRole')} *</label>
           <select
             value={role}
             onChange={(e) => onRoleChange(e.target.value)}
@@ -307,13 +310,13 @@ export function AddUserModal({
             onClick={onClose}
             className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="submit"
             className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
           >
-            Create User
+            {t('common.create')}
           </button>
         </div>
       </form>
@@ -322,6 +325,7 @@ export function AddUserModal({
 }
 
 export function PasswordResetModal({ user, isSuperAdmin, password, onPasswordChange, onSubmit, onClose }) {
+  const { t } = useTranslation()
   const [showPassword, setShowPassword] = useState(false)
 
   const generatePassword = () => {
@@ -330,28 +334,28 @@ export function PasswordResetModal({ user, isSuperAdmin, password, onPasswordCha
     for (let i = 0; i < 12; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length))
     onPasswordChange(pass)
     setShowPassword(true)
-    toast.success('Password generated! Copy it before closing.')
+    toast.success(t('userManagement.passwordGeneratedClose'))
   }
 
   return (
-    <Modal open={true} onClose={onClose} title="Reset Password" className="max-w-md" hideHeader>
-      <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Reset Password</h2>
+    <Modal open={true} onClose={onClose} title={t('userManagement.resetPasswordTitle')} className="max-w-md" hideHeader>
+      <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">{t('userManagement.resetPasswordTitle')}</h2>
       <p className="text-sm text-gray-500 mb-4">
-        User: <strong className="text-gray-800">{user.user_email}</strong>
+        {t('userManagement.userForLabel')} <strong className="text-gray-800">{user.user_email}</strong>
       </p>
 
       {isSuperAdmin ? (
         /* Super-admin: set password directly via Edge Function */
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">New Password</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('userManagement.newPasswordLabel')}</label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => onPasswordChange(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent pr-10 text-sm"
-                placeholder="Min 6 characters"
+                placeholder={t('userManagement.minSixChars')}
                 minLength={6}
                 autoFocus
               />
@@ -369,12 +373,12 @@ export function PasswordResetModal({ user, isSuperAdmin, password, onPasswordCha
               onClick={generatePassword}
               className="mt-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium"
             >
-              🎲 Generate Strong Password
+              {t('userManagement.generateStrongPassword')}
             </button>
           </div>
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
             <p className="text-sm text-yellow-800">
-              ⚠️ The user will be able to log in immediately with this new password.
+              {t('userManagement.immediateLoginWarning')}
             </p>
           </div>
           <div className="flex gap-3 pt-1">
@@ -382,14 +386,14 @@ export function PasswordResetModal({ user, isSuperAdmin, password, onPasswordCha
               onClick={onClose}
               className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={onSubmit}
               disabled={password.length < 6}
               className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
-              Set Password
+              {t('userManagement.setPasswordBtn')}
             </button>
           </div>
         </div>
@@ -398,7 +402,7 @@ export function PasswordResetModal({ user, isSuperAdmin, password, onPasswordCha
         <div className="space-y-4">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <p className="text-sm text-blue-800">
-              A password reset link will be emailed to the user. The link expires after 1 hour.
+              {t('userManagement.resetEmailInfo')}
             </p>
           </div>
           <div className="flex gap-3">
@@ -406,13 +410,13 @@ export function PasswordResetModal({ user, isSuperAdmin, password, onPasswordCha
               onClick={onClose}
               className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={onSubmit}
               className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
             >
-              Send Reset Email
+              {t('userManagement.sendResetEmailBtn')}
             </button>
           </div>
         </div>
@@ -434,61 +438,62 @@ export function UserControlModal({
   onSubmit,
   onClose,
 }) {
+  const { t } = useTranslation()
   return (
     <Modal
       open={true}
       onClose={onClose}
-      title={`User Controls: ${user.user_email}`}
+      title={t('userManagement.userControlsTitle', { email: user.user_email })}
       className="max-w-2xl"
       hideHeader
     >
       <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-        User Controls: {user.user_email}
+        {t('userManagement.userControlsTitle', { email: user.user_email })}
       </h2>
 
       <div className="space-y-4">
         <div className="bg-gray-50 p-4 rounded-lg">
-          <p className="text-sm text-gray-600 mb-2">Current Status:</p>
+          <p className="text-sm text-gray-600 mb-2">{t('userManagement.currentStatusLabel')}</p>
           <StatusBadge status={user.status || 'active'} />
           {user.suspended_reason && (
             <div className="mt-2 text-sm text-gray-600">
               <p>
-                <strong>Reason:</strong> {user.suspended_reason}
+                <strong>{t('userManagement.suspendedReasonLabel')}</strong> {user.suspended_reason}
               </p>
               <p>
-                <strong>Suspended by:</strong> {user.suspended_by}
+                <strong>{t('userManagement.suspendedByLabel')}</strong> {user.suspended_by}
               </p>
             </div>
           )}
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Action</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('userManagement.actionLabel')}</label>
           <select
             value={action}
             onChange={(e) => onActionChange(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600"
           >
-            <option value="">Select action...</option>
-            <option value="activate">✅ Activate User</option>
-            <option value="suspend">⏸️ Suspend User</option>
-            <option value="lock">🔒 Lock Account</option>
-            <option value="deactivate">❌ Deactivate User</option>
-            <option value="update_notes">📝 Update Notes</option>
-            <option value="set_expiration">⏳ Set Expiration Date</option>
-            <option value="delete">🗑️ Delete User (Permanent)</option>
+            <option value="">{t('userManagement.selectAction')}</option>
+            <option value="activate">{t('userManagement.actionActivate')}</option>
+            <option value="suspend">{t('userManagement.actionSuspend')}</option>
+            <option value="lock">{t('userManagement.actionLock')}</option>
+            <option value="deactivate">{t('userManagement.actionDeactivate')}</option>
+            <option value="update_notes">{t('userManagement.actionUpdateNotes')}</option>
+            <option value="set_expiration">{t('userManagement.actionSetExpiration')}</option>
+            <option value="delete">{t('userManagement.actionDeletePermanent')}</option>
           </select>
         </div>
 
         {(action === 'suspend' || action === 'lock' || action === 'deactivate') && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Reason *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('userManagement.reasonLabel')}</label>
             <textarea
               value={reason}
               onChange={(e) => onReasonChange(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600"
               rows="3"
-              placeholder="Provide a reason for this action..."
+              placeholder={t('userManagement.reasonPlaceholder')}
               required
             />
           </div>
@@ -496,35 +501,35 @@ export function UserControlModal({
 
         {action === 'update_notes' && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('userManagement.notesLabel')}</label>
             <textarea
               value={notes}
               onChange={(e) => onNotesChange(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600"
               rows="4"
-              placeholder="Add notes about this user..."
+              placeholder={t('userManagement.notesPlaceholder')}
             />
           </div>
         )}
 
         {action === 'set_expiration' && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Expiration Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('userManagement.expirationLabel')}</label>
             <input
               type="datetime-local"
               value={expiration}
               onChange={(e) => onExpirationChange(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600"
             />
-            <p className="text-xs text-gray-500 mt-1">User access will expire on this date</p>
+            <p className="text-xs text-gray-500 mt-1">{t('userManagement.expirationHint')}</p>
           </div>
         )}
 
         {action === 'delete' && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800 font-medium">⚠️ Warning: This action cannot be undone!</p>
+            <p className="text-red-800 font-medium">{t('userManagement.deleteWarningTitle')}</p>
             <p className="text-sm text-red-600 mt-1">
-              All user data and permissions will be permanently deleted.
+              {t('userManagement.deleteWarningBody')}
             </p>
           </div>
         )}
@@ -535,14 +540,14 @@ export function UserControlModal({
           onClick={onClose}
           className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           onClick={onSubmit}
           disabled={!action}
           className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Execute Action
+          {t('userManagement.executeActionBtn')}
         </button>
       </div>
     </Modal>
@@ -550,20 +555,21 @@ export function UserControlModal({
 }
 
 export function ActivityModal({ user, activity, onClose }) {
+  const { t } = useTranslation()
   return (
     <Modal
       open={true}
       onClose={onClose}
-      title={`Activity Log: ${user.user_email}`}
+      title={t('userManagement.activityLogTitle', { email: user.user_email })}
       className="max-w-3xl"
       hideHeader
     >
       <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-        Activity Log: {user.user_email}
+        {t('userManagement.activityLogTitle', { email: user.user_email })}
       </h2>
 
       {activity.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">No activity recorded yet</div>
+        <div className="text-center py-12 text-gray-500">{t('userManagement.noActivityRecorded')}</div>
       ) : (
         <div className="space-y-3">
           {activity.map((log) => (
@@ -591,7 +597,7 @@ export function ActivityModal({ user, activity, onClose }) {
           onClick={onClose}
           className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
         >
-          Close
+          {t('common.close')}
         </button>
       </div>
     </Modal>

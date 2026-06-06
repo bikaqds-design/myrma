@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { captureException } from '../lib/sentry'
 import { Button, Input } from '../components/ui'
+import { useTranslation } from 'react-i18next'
 
 export default function BrandingSettings({
   currentUserRole,
@@ -11,6 +12,7 @@ export default function BrandingSettings({
   initialTab,
   visibleTabs,
 }) {
+  const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState(initialTab || 'branding')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -82,7 +84,7 @@ export default function BrandingSettings({
       }
     } catch (error) {
       captureException(error)
-      toast.error('Failed to load settings')
+      toast.error(t('brandingSettings.failedLoad'))
     } finally {
       setLoading(false)
     }
@@ -92,12 +94,12 @@ export default function BrandingSettings({
     const file = e.target.files[0]
     if (file) {
       if (!file.type.startsWith('image/')) {
-        toast.error('Please select an image file')
+        toast.error(t('brandingSettings.selectImageFile'))
         return
       }
 
       if (file.size > 2 * 1024 * 1024) {
-        toast.error('Logo must be less than 2MB')
+        toast.error(t('brandingSettings.logoTooLarge'))
         return
       }
 
@@ -129,14 +131,14 @@ export default function BrandingSettings({
 
       await brandingAPI.updateBranding(updates, currentUserEmail)
 
-      toast.success('Branding settings saved successfully!')
+      toast.success(t('brandingSettings.brandingSaved'))
       loadData()
       setLogoFile(null)
 
       applyBrandingToApp(updates)
     } catch (error) {
       captureException(error)
-      toast.error('Failed to save branding settings')
+      toast.error(t('brandingSettings.failedSaveBranding'))
     } finally {
       setSaving(false)
     }
@@ -158,10 +160,10 @@ export default function BrandingSettings({
     setSaving(true)
     try {
       await notificationsAPI.updatePreferences(currentUserEmail, notificationPreferences)
-      toast.success('Notification preferences saved successfully!')
+      toast.success(t('brandingSettings.notifPrefsSaved'))
     } catch (error) {
       captureException(error)
-      toast.error('Failed to save notification preferences')
+      toast.error(t('brandingSettings.failedSaveNotifPrefs'))
     } finally {
       setSaving(false)
     }
@@ -171,11 +173,11 @@ export default function BrandingSettings({
     setSaving(true)
     try {
       await notificationsAPI.updateEmailSettings(emailSettings, currentUserEmail)
-      toast.success('Email settings saved successfully!')
+      toast.success(t('brandingSettings.emailSettingsSaved'))
       loadData()
     } catch (error) {
       captureException(error)
-      toast.error('Failed to save email settings')
+      toast.error(t('brandingSettings.failedSaveEmailSettings'))
     } finally {
       setSaving(false)
     }
@@ -199,12 +201,12 @@ export default function BrandingSettings({
         },
         currentUserEmail
       )
-      toast.success('Email template updated successfully!')
+      toast.success(t('brandingSettings.templateUpdated'))
       setShowTemplateModal(false)
       loadData()
     } catch (error) {
       captureException(error)
-      toast.error('Failed to save email template')
+      toast.error(t('brandingSettings.failedSaveTemplate'))
     } finally {
       setSaving(false)
     }
@@ -232,10 +234,10 @@ export default function BrandingSettings({
       }
 
       await notificationsAPI.sendTestEmail(currentUserEmail, templateName, testVariables)
-      toast.success('Test email sent successfully! Check your inbox.')
+      toast.success(t('brandingSettings.testEmailSent'))
     } catch (error) {
       captureException(error)
-      toast.error('Failed to send test email')
+      toast.error(t('brandingSettings.failedSendTestEmail'))
     }
   }
 
@@ -255,8 +257,8 @@ export default function BrandingSettings({
             d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
           />
         </svg>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-        <p className="text-gray-600">Only administrators can access settings.</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('brandingSettings.accessDenied')}</h2>
+        <p className="text-gray-600">{t('brandingSettings.adminOnly')}</p>
       </div>
     )
   }
@@ -516,6 +518,7 @@ function BrandingTab({
     updateAppearance,
   } = useAppearance()
   const update = (partial) => updateAppearance(partial, currentUserEmail)
+  const { t } = useTranslation()
 
   // Local draft for tabTitle — prevents context re-render on every keystroke
   const [draftTabTitle, setDraftTabTitle] = React.useState(tabTitle || '')
@@ -531,15 +534,15 @@ function BrandingTab({
     const file = e.target.files[0]
     if (!file) return
     if (file.size > 1024 * 1024) {
-      toast.error('Favicon must be under 1 MB')
+      toast.error(t('brandingSettings.faviconTooLarge'))
       return
     }
     const reader = new FileReader()
     reader.onloadend = () => {
       update({ faviconUrl: reader.result })
-      toast.success('Favicon updated')
+      toast.success(t('brandingSettings.faviconUpdated'))
     }
-    reader.onerror = () => toast.error('Failed to read favicon')
+    reader.onerror = () => toast.error(t('brandingSettings.failedReadFavicon'))
     reader.readAsDataURL(file)
   }
 

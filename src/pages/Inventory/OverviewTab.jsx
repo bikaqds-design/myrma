@@ -1,8 +1,10 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import { groupByProduct } from './_shared'
 
 // ─── Overview ──────────────────────────────────────────────────────────────────
 export function OverviewTab({ stats: _stats, units, brands: _brands, brandMap, onNavigate }) {
+  const { t } = useTranslation()
   const brandGroups = groupByProduct(units, brandMap)
   const perBrand = {}
   for (const g of brandGroups) {
@@ -17,21 +19,21 @@ export function OverviewTab({ stats: _stats, units, brands: _brands, brandMap, o
     <div className="space-y-4">
       {Object.keys(perBrand).length === 0 ? (
         <div className="text-center py-20 bg-white dark:bg-[#121823] rounded-lg border border-gray-200 dark:border-[#212a38]">
-          <p className="text-gray-500 dark:text-[#9aa4b2] text-sm">No inventory data yet</p>
+          <p className="text-gray-500 dark:text-[#9aa4b2] text-sm">{t('inventory.noInventoryData')}</p>
         </div>
       ) : (
         <div className="bg-white dark:bg-[#121823] rounded-lg border border-gray-200 dark:border-[#212a38]">
           <div className="px-5 py-4 border-b border-gray-100 dark:border-[#212a38] flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#e8ebf0]">Stock by Brand</h3>
-            <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">{units.length} total units</span>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#e8ebf0]">{t('inventory.stockByBrand')}</h3>
+            <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('inventory.totalUnits', { count: units.length })}</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-[#0f1520] border-b border-gray-100 dark:border-[#212a38]">
                 <tr>
-                  {['Brand', 'Active RMA', 'Company Stock', 'Sent to Mfr', 'Total'].map((h) => (
+                  {[t('inventory.colBrand'), t('inventory.colActiveRMA'), t('inventory.colCompanyStock'), t('inventory.colSentToMfr'), t('inventory.colTotal')].map((h, i) => (
                     <th
-                      key={h}
+                      key={i}
                       className="px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider"
                     >
                       {h}

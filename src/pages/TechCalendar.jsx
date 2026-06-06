@@ -25,8 +25,6 @@ const STATUS_CLS = {
   Cancelled:    'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
 }
 
-const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Returns the Monday of the week containing `date` */
@@ -105,7 +103,7 @@ export default function TechCalendar({
   currentUserPermissions,
   onNavigateToTicket,
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { formatDate: _formatDate } = useAppearance()
 
   const _canDo = (s, a) =>
@@ -124,7 +122,7 @@ export default function TechCalendar({
   useEffect(() => {
     if (isError) {
       captureException(error)
-      toast.error('Failed to load tickets')
+      toast.error(t('calendar.errorLoadTickets'))
     }
   }, [isError, error])
 
@@ -198,8 +196,8 @@ export default function TechCalendar({
   if (isError) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[320px] gap-3">
-        <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">Failed to load calendar data.</p>
-        <Button variant="secondary" size="sm" onClick={() => refetch()}>Retry</Button>
+        <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('calendar.errorLoadCalendar')}</p>
+        <Button variant="secondary" size="sm" onClick={() => refetch()}>{t('common.retry')}</Button>
       </div>
     )
   }
@@ -260,13 +258,13 @@ export default function TechCalendar({
         {/* Technician filter — admin/manager only */}
         {isAdminOrManager && (
           <div className="ml-auto flex items-center gap-2">
-            <label className="text-sm text-gray-500 dark:text-[#9aa4b2]">Technician:</label>
+            <label className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('calendar.technician')}:</label>
             <select
               value={selectedTech}
               onChange={(e) => setSelectedTech(e.target.value)}
               className="px-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-800 dark:text-[#e8ebf0] focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              <option value="">All Technicians</option>
+              <option value="">{t('calendar.allTechnicians')}</option>
               {technicians.map((t) => (
                 <option key={t} value={t}>
                   {t}
@@ -294,7 +292,7 @@ export default function TechCalendar({
                 <p
                   className={`text-xs font-semibold uppercase tracking-wide ${isToday ? 'text-indigo-600 dark:text-[#a5b4fc]' : 'text-gray-500 dark:text-[#9aa4b2]'}`}
                 >
-                  {DAY_NAMES[i]}
+                  {d.toLocaleDateString(i18n.language, { weekday: 'short' }).toUpperCase()}
                 </p>
                 <p
                   className={`text-lg font-bold mt-0.5 ${isToday ? 'text-indigo-700 dark:text-[#a5b4fc]' : 'text-gray-800 dark:text-[#e8ebf0]'}`}
@@ -365,7 +363,7 @@ export default function TechCalendar({
               d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
             />
           </svg>
-          Unscheduled Tickets
+          {t('calendar.unscheduledTickets')}
           {unscheduled.length > 0 && (
             <span className="ml-1 px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2] text-xs font-medium">
               {unscheduled.length}
@@ -374,8 +372,8 @@ export default function TechCalendar({
         </h3>
         {unscheduled.length === 0 ? (
           <EmptyState
-            title="No unscheduled tickets"
-            description="All active tickets have a due date assigned."
+            title={t('calendar.noUnscheduled')}
+            description={t('calendar.noUnscheduledDesc')}
             className="py-8"
           />
         ) : (

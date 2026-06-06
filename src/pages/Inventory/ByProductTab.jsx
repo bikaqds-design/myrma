@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { safeStorage } from '../../lib/safeStorage'
 import { Pagination, downloadCSV } from './_shared'
 import { ProductDetailModal } from './ProductDetailModal'
@@ -14,6 +15,7 @@ export function ByProductTab({
   onReload,
   onNavigateToTicket,
 }) {
+  const { t } = useTranslation()
   const searchRef = useRef(null)
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [search, setSearch] = useState('')
@@ -98,7 +100,7 @@ export function ByProductTab({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by product name or brand... (Press / to focus)"
+              placeholder={t('inventory.searchByProductBrand')}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
             />
             <svg
@@ -127,7 +129,7 @@ export function ByProductTab({
                 d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"
               />
             </svg>
-            Filters
+            {t('common.filters')}
             {activeFilterCount > 0 && (
               <span className="w-4 h-4 bg-indigo-600 text-white text-xs rounded-full flex items-center justify-center">
                 {activeFilterCount}
@@ -136,7 +138,7 @@ export function ByProductTab({
           </button>
         </div>
         <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">
-          {filtered.length} product{filtered.length !== 1 ? 's' : ''}
+          {t('inventory.productCount', { count: filtered.length })}
         </span>
       </div>
 
@@ -146,13 +148,13 @@ export function ByProductTab({
             {selectedRows.length}
           </span>
           <span className="text-sm font-medium text-indigo-700">
-            {selectedRows.length} product{selectedRows.length !== 1 ? 's' : ''} selected
+            {t('inventory.productsSelected', { count: selectedRows.length })}
           </span>
           <button
             onClick={() => setSelectedRows([])}
             className="text-xs text-indigo-500 hover:text-indigo-700 underline"
           >
-            Clear
+            {t('common.clear')}
           </button>
           <div className="h-5 w-px bg-indigo-200" />
           <button
@@ -167,7 +169,7 @@ export function ByProductTab({
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
               />
             </svg>
-            Export selected
+            {t('inventory.exportSelected')}
           </button>
         </div>
       )}
@@ -176,23 +178,23 @@ export function ByProductTab({
       {showFilters && (
         <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-[#0f1520] rounded-lg flex-wrap">
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">Product:</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('inventory.filterProduct')}</label>
             <input
               type="text"
               value={filterProduct}
               onChange={(e) => setFilterProduct(e.target.value)}
-              placeholder="Type product name..."
+              placeholder={t('inventory.typeProductName')}
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 w-44"
             />
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">Brand:</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('inventory.filterBrand')}</label>
             <select
               value={filterBrand}
               onChange={(e) => setFilterBrand(e.target.value)}
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
             >
-              <option value="">All</option>
+              <option value="">{t('inventory.filterAll')}</option>
               {brands.map((b) => (
                 <option key={b.id} value={b.brand_name}>
                   {b.brand_name}
@@ -201,17 +203,17 @@ export function ByProductTab({
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">Status:</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('inventory.filterStatus')}</label>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
             >
-              <option value="">All</option>
-              <option value="active_rma">Active RMA</option>
-              <option value="company_stock">Company Stock</option>
-              <option value="sent_to_manufacturer">Sent to Manufacturer</option>
-              <option value="closed">Closed</option>
+              <option value="">{t('inventory.filterAll')}</option>
+              <option value="active_rma">{t('inventory.statusActiveRMA')}</option>
+              <option value="company_stock">{t('inventory.statusCompanyStock')}</option>
+              <option value="sent_to_manufacturer">{t('inventory.statusSentToManufacturer')}</option>
+              <option value="closed">{t('inventory.statusClosed')}</option>
             </select>
           </div>
           {activeFilterCount > 0 && (
@@ -223,7 +225,7 @@ export function ByProductTab({
               }}
               className="text-sm text-red-600 hover:underline ml-auto"
             >
-              Clear filters
+              {t('inventory.clearFilters')}
             </button>
           )}
         </div>
@@ -247,11 +249,11 @@ export function ByProductTab({
             </svg>
           </div>
           <div>
-            <p className="font-semibold text-gray-600 dark:text-[#9aa4b2] text-sm">No products found</p>
+            <p className="font-semibold text-gray-600 dark:text-[#9aa4b2] text-sm">{t('inventory.noProductsFound')}</p>
             <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">
               {search || filterBrand || filterStatus || filterProduct
-                ? 'Try adjusting your filters'
-                : 'Products appear here once inventory units are added via RMA tickets'}
+                ? t('common.noResults')
+                : t('inventory.noProductsHint')}
             </p>
           </div>
         </div>
@@ -282,20 +284,20 @@ export function ByProductTab({
                       #
                     </th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38]">
-                      Brand
+                      {t('inventory.colBrand')}
                     </th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38]">
-                      Product
+                      {t('inventory.colProduct')}
                     </th>
                     <th className="px-3 py-2 text-center font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38] whitespace-nowrap">
-                      Active RMA
+                      {t('inventory.statusActiveRMA')}
                     </th>
                     <th className="px-3 py-2 text-center font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38] whitespace-nowrap">
-                      Company Stock
+                      {t('inventory.statusCompanyStock')}
                     </th>
 
                     <th className="px-3 py-2 text-center font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38]">
-                      Total
+                      {t('inventory.colTotal')}
                     </th>
                     <th className="px-3 py-2 border-b border-gray-200 dark:border-[#212a38] w-8"></th>
                   </tr>

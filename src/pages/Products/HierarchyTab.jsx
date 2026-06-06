@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 export default function HierarchyTab({
   brands,
@@ -22,6 +23,7 @@ export default function HierarchyTab({
   const [brandMenuId, setBrandMenuId] = useState(null)
   const [catMenuId, setCatMenuId] = useState(null)
 
+  const { t } = useTranslation()
   const selectedBrand = brands.find((b) => b.id === selectedBrandId)
   const selectedCategory = categories.find((c) => c.id === selectedCategoryId)
   const visibleCategories = selectedBrandId ? getBrandCategories(selectedBrandId) : []
@@ -52,7 +54,7 @@ export default function HierarchyTab({
       <div className="grid grid-cols-3 gap-4">
         {[
           {
-            label: 'Brands',
+            label: t('products.brandsColumn'),
             value: brands.length,
             color: 'bg-violet-50 text-violet-700',
             icon: (
@@ -65,7 +67,7 @@ export default function HierarchyTab({
             ),
           },
           {
-            label: 'Categories',
+            label: t('products.categoriesColumn'),
             value: categories.length,
             color: 'bg-blue-50 text-blue-700',
             icon: (
@@ -78,7 +80,7 @@ export default function HierarchyTab({
             ),
           },
           {
-            label: 'Products',
+            label: t('products.productsColumn'),
             value: products.length,
             color: 'bg-emerald-50 text-emerald-700',
             icon: (
@@ -114,7 +116,7 @@ export default function HierarchyTab({
         <div className="flex flex-col border-r border-gray-200">
           <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Brands
+              {t('products.brandsColumn')}
             </span>
             <button
               onClick={() => setShowAddBrand(true)}
@@ -128,7 +130,7 @@ export default function HierarchyTab({
                   d="M12 4v16m8-8H4"
                 />
               </svg>
-              Add
+              {t('common.add')}
             </button>
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
@@ -149,12 +151,12 @@ export default function HierarchyTab({
                     />
                   </svg>
                 </div>
-                <p className="text-sm text-gray-500">No brands yet</p>
+                <p className="text-sm text-gray-500">{t('products.noBrandsYet')}</p>
                 <button
                   onClick={() => setShowAddBrand(true)}
                   className="text-xs text-indigo-600 hover:underline"
                 >
-                  Add your first brand
+                  {t('products.addFirstBrand')}
                 </button>
               </div>
             ) : (
@@ -182,7 +184,7 @@ export default function HierarchyTab({
                       {brand.brand_name}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {getCategoryCount(brand.id)} cats · {getBrandProductCount(brand.id)} products
+                      {t('products.brandStats', { cats: getCategoryCount(brand.id), products: getBrandProductCount(brand.id) })}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
@@ -221,7 +223,7 @@ export default function HierarchyTab({
                                 d="M12 4v16m8-8H4"
                               />
                             </svg>
-                            Add Category
+                            {t('products.addCategoryAction')}
                           </button>
                           <button
                             onClick={() => {
@@ -243,7 +245,7 @@ export default function HierarchyTab({
                                 d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                               />
                             </svg>
-                            Edit Brand
+                            {t('products.editBrand')}
                           </button>
                           <div className="border-t border-gray-100 my-0.5" />
                           <button
@@ -266,7 +268,7 @@ export default function HierarchyTab({
                                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                               />
                             </svg>
-                            Delete Brand
+                            {t('products.deleteBrand')}
                           </button>
                         </div>
                       )}
@@ -283,7 +285,7 @@ export default function HierarchyTab({
           <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                Categories
+                {t('products.categoriesColumn')}
               </span>
               {selectedBrand && (
                 <span className="text-xs text-indigo-600 font-medium bg-indigo-50 px-2 py-0.5 rounded-full">
@@ -307,7 +309,7 @@ export default function HierarchyTab({
                     d="M12 4v16m8-8H4"
                   />
                 </svg>
-                Add
+                {t('common.add')}
               </button>
             )}
           </div>
@@ -327,7 +329,7 @@ export default function HierarchyTab({
                     d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"
                   />
                 </svg>
-                <p className="text-sm text-gray-500">Select a brand to view categories</p>
+                <p className="text-sm text-gray-500">{t('products.selectBrandPrompt')}</p>
               </div>
             ) : visibleCategories.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 px-4 text-center gap-2">
@@ -346,7 +348,7 @@ export default function HierarchyTab({
                     />
                   </svg>
                 </div>
-                <p className="text-sm text-gray-500">No categories yet</p>
+                <p className="text-sm text-gray-500">{t('products.noCategoriesYet')}</p>
                 <button
                   onClick={() => {
                     setCategoryForm((prev) => ({ ...prev, brand_id: selectedBrandId }))
@@ -354,7 +356,7 @@ export default function HierarchyTab({
                   }}
                   className="text-xs text-indigo-600 hover:underline"
                 >
-                  Add first category
+                  {t('products.addFirstCategory')}
                 </button>
               </div>
             ) : (
@@ -384,7 +386,7 @@ export default function HierarchyTab({
                       {cat.category_name}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {getCategoryProducts(cat.id).length} products
+                      {t('products.itemsCount', { count: getCategoryProducts(cat.id).length })}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
@@ -422,7 +424,7 @@ export default function HierarchyTab({
                                 d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                               />
                             </svg>
-                            Edit
+                            {t('common.edit')}
                           </button>
                           <div className="border-t border-gray-100 my-0.5" />
                           <button
@@ -445,7 +447,7 @@ export default function HierarchyTab({
                                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                               />
                             </svg>
-                            Delete
+                            {t('common.delete')}
                           </button>
                         </div>
                       )}
@@ -462,7 +464,7 @@ export default function HierarchyTab({
           <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                Products
+                {t('products.productsColumn')}
               </span>
               {selectedCategory && (
                 <span className="text-xs text-indigo-600 font-medium bg-indigo-50 px-2 py-0.5 rounded-full">
@@ -471,7 +473,7 @@ export default function HierarchyTab({
               )}
             </div>
             {selectedCategoryId && (
-              <span className="text-xs text-gray-500">{visibleProducts.length} items</span>
+              <span className="text-xs text-gray-500">{t('products.itemsCount', { count: visibleProducts.length })}</span>
             )}
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
@@ -490,7 +492,7 @@ export default function HierarchyTab({
                     d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
                   />
                 </svg>
-                <p className="text-sm text-gray-500">Select a category to view products</p>
+                <p className="text-sm text-gray-500">{t('products.selectCategoryPrompt')}</p>
               </div>
             ) : visibleProducts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 px-4 text-center gap-2">
@@ -509,7 +511,7 @@ export default function HierarchyTab({
                     />
                   </svg>
                 </div>
-                <p className="text-sm text-gray-500">No products in this category</p>
+                <p className="text-sm text-gray-500">{t('products.noProductsInCategory')}</p>
               </div>
             ) : (
               visibleProducts.map((product) => (

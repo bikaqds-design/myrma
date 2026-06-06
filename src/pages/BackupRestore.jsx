@@ -2,8 +2,10 @@ import React, { useState } from 'react'
 import { backup as backupAPI, db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../lib/sentry'
+import { useTranslation } from 'react-i18next'
 
 export default function BackupRestore({ currentUserRole, currentUserEmail }) {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [restoring, setRestoring] = useState(false)
 
@@ -24,13 +26,13 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
     try {
       const data = await backupAPI.exportProducts()
       downloadJSON(data, `products-backup-${new Date().toISOString().split('T')[0]}.json`)
-      toast.success(`Exported ${data.length} products successfully!`)
+      toast.success(t('backupRestore.exportedCount', { count: data.length, type: t('backupRestore.typeProducts') }))
       db.auditLog
         .log(currentUserEmail, 'backup_exported', `Exported ${data.length} products backup`)
         .catch(() => {})
     } catch (error) {
       captureException(error)
-      toast.error('Failed to export products')
+      toast.error(t('backupRestore.failedExportProducts'))
     } finally {
       setLoading(false)
     }
@@ -41,13 +43,13 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
     try {
       const data = await backupAPI.exportCustomers()
       downloadJSON(data, `customers-backup-${new Date().toISOString().split('T')[0]}.json`)
-      toast.success(`Exported ${data.length} customers successfully!`)
+      toast.success(t('backupRestore.exportedCount', { count: data.length, type: t('backupRestore.typeCustomers') }))
       db.auditLog
         .log(currentUserEmail, 'backup_exported', `Exported ${data.length} customers backup`)
         .catch(() => {})
     } catch (error) {
       captureException(error)
-      toast.error('Failed to export customers')
+      toast.error(t('backupRestore.failedExportCustomers'))
     } finally {
       setLoading(false)
     }
@@ -58,13 +60,13 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
     try {
       const data = await backupAPI.exportTickets()
       downloadJSON(data, `tickets-backup-${new Date().toISOString().split('T')[0]}.json`)
-      toast.success(`Exported ${data.length} tickets successfully!`)
+      toast.success(t('backupRestore.exportedCount', { count: data.length, type: t('backupRestore.typeTickets') }))
       db.auditLog
         .log(currentUserEmail, 'backup_exported', `Exported ${data.length} tickets backup`)
         .catch(() => {})
     } catch (error) {
       captureException(error)
-      toast.error('Failed to export tickets')
+      toast.error(t('backupRestore.failedExportTickets'))
     } finally {
       setLoading(false)
     }
@@ -75,13 +77,13 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
     try {
       const data = await backupAPI.exportAll()
       downloadJSON(data, `myrma-full-backup-${new Date().toISOString().split('T')[0]}.json`)
-      toast.success('Complete backup exported successfully!')
+      toast.success(t('backupRestore.exportAllSuccess'))
       db.auditLog
         .log(currentUserEmail, 'backup_exported', 'Exported complete system backup')
         .catch(() => {})
     } catch (error) {
       captureException(error)
-      toast.error('Failed to export complete backup')
+      toast.error(t('backupRestore.failedExportAll'))
     } finally {
       setLoading(false)
     }
@@ -92,7 +94,7 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
     if (!file) return
 
     if (!file.name.endsWith('.json')) {
-      toast.error('Please upload a valid JSON backup file')
+      toast.error(t('backupRestore.invalidJsonFile'))
       event.target.value = ''
       return
     }
@@ -116,7 +118,7 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
             data.products?.length > 0 || data.customers?.length > 0 || data.tickets?.length > 0
 
           if (!hasData) {
-            toast.error('Backup file contains no data to restore')
+            toast.error(t('backupRestore.noDataToRestore'))
             setRestoring(false)
             event.target.value = ''
             return
@@ -164,7 +166,7 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
           const successCount = results.products + results.customers + results.tickets
 
           if (successCount > 0) {
-            const message = `Restored: ${results.products} products, ${results.customers} customers, ${results.tickets} tickets`
+            const message = t('backupRestore.restoreSuccess', { products: results.products, customers: results.customers, tickets: results.tickets })
             toast.success(message)
             db.auditLog
               .log(
@@ -176,16 +178,16 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
 
             if (results.errors.length > 0) {
               console.warn('Some errors occurred:', results.errors)
-              toast.error('Some data could not be restored. Check console for details.')
+              toast.error(t('backupRestore.partialRestoreError'))
             } else {
-              toast.success('Refresh the page to see restored data')
+              toast.success(t('backupRestore.refreshToSeeData'))
             }
           } else {
-            toast.error('Failed to restore any data')
+            toast.error(t('backupRestore.failedRestoreAny'))
           }
         } catch (error) {
           captureException(error)
-          toast.error('Failed to restore data: ' + error.message)
+          toast.error(t('backupRestore.failedRestoreData', { error: error.message }))
         } finally {
           setRestoring(false)
           event.target.value = ''
@@ -193,7 +195,7 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
       }
 
       reader.onerror = () => {
-        toast.error('Failed to read backup file')
+        toast.error(t('backupRestore.failedReadFile'))
         setRestoring(false)
         event.target.value = ''
       }
@@ -201,7 +203,7 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
       reader.readAsText(file)
     } catch (error) {
       captureException(error)
-      toast.error('Failed to read backup file')
+      toast.error(t('backupRestore.failedReadFile'))
       setRestoring(false)
       event.target.value = ''
     }
@@ -223,8 +225,8 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
             d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
           />
         </svg>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-        <p className="text-gray-600">Only administrators can access backup & restore.</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('backupRestore.accessDenied')}</h2>
+        <p className="text-gray-600">{t('backupRestore.adminOnly')}</p>
       </div>
     )
   }
@@ -232,8 +234,8 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Backup & Restore</h1>
-        <p className="text-gray-600 mt-2">Export and import your system data</p>
+        <h1 className="text-3xl font-bold text-gray-900">{t('backupRestore.title')}</h1>
+        <p className="text-gray-600 mt-2">{t('backupRestore.subtitle')}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -256,8 +258,8 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
               </svg>
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Export Data</h2>
-              <p className="text-sm text-gray-600">Download backup files</p>
+              <h2 className="text-xl font-bold text-gray-900">{t('backupRestore.exportTitle')}</h2>
+              <p className="text-sm text-gray-600">{t('backupRestore.exportSubtitle')}</p>
             </div>
           </div>
 
@@ -281,7 +283,7 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
                     d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
                   />
                 </svg>
-                Export Products
+                {t('backupRestore.exportProducts')}
               </span>
               <svg
                 className="w-5 h-5 text-gray-500 group-hover:text-blue-600"
@@ -317,7 +319,7 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
                     d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
                   />
                 </svg>
-                Export Customers
+                {t('backupRestore.exportCustomers')}
               </span>
               <svg
                 className="w-5 h-5 text-gray-500 group-hover:text-blue-600"
@@ -353,7 +355,7 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
                     d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
                   />
                 </svg>
-                Export RMA Tickets
+                {t('backupRestore.exportTickets')}
               </span>
               <svg
                 className="w-5 h-5 text-gray-500 group-hover:text-blue-600"
@@ -379,7 +381,7 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
                 {loading ? (
                   <>
                     <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
-                    Exporting...
+                    {t('backupRestore.exporting')}
                   </>
                 ) : (
                   <>
@@ -391,7 +393,7 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                       />
                     </svg>
-                    Export Complete Backup
+                    {t('backupRestore.exportAll')}
                   </>
                 )}
               </button>
@@ -414,11 +416,11 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
                 />
               </svg>
               <div className="text-sm text-blue-800">
-                <p className="font-medium mb-1">Backup Tips:</p>
+                <p className="font-medium mb-1">{t('backupRestore.tipsTitle')}</p>
                 <ul className="list-disc list-inside space-y-1 text-blue-700">
-                  <li>Download regular backups (weekly recommended)</li>
-                  <li>Store backups in a safe location</li>
-                  <li>Complete backup includes all system data</li>
+                  <li>{t('backupRestore.tip1')}</li>
+                  <li>{t('backupRestore.tip2')}</li>
+                  <li>{t('backupRestore.tip3')}</li>
                 </ul>
               </div>
             </div>
@@ -444,8 +446,8 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
               </svg>
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Restore Data</h2>
-              <p className="text-sm text-gray-600">Upload backup files</p>
+              <h2 className="text-xl font-bold text-gray-900">{t('backupRestore.restoreTitle')}</h2>
+              <p className="text-sm text-gray-600">{t('backupRestore.restoreSubtitle')}</p>
             </div>
           </div>
 
@@ -462,8 +464,8 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
               {restoring ? (
                 <div className="flex flex-col items-center gap-3">
                   <div className="animate-spin w-12 h-12 border-4 border-green-600 border-t-transparent rounded-full"></div>
-                  <p className="text-lg font-medium text-gray-900">Restoring data...</p>
-                  <p className="text-sm text-gray-600">Please wait, do not close this page</p>
+                  <p className="text-lg font-medium text-gray-900">{t('backupRestore.restoringData')}</p>
+                  <p className="text-sm text-gray-600">{t('backupRestore.pleaseWait')}</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-3">
@@ -483,10 +485,10 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
                     </svg>
                   </div>
                   <div>
-                    <p className="text-lg font-medium text-gray-900">Click to upload backup file</p>
-                    <p className="text-sm text-gray-600 mt-1">or drag and drop</p>
+                    <p className="text-lg font-medium text-gray-900">{t('backupRestore.clickToUpload')}</p>
+                    <p className="text-sm text-gray-600 mt-1">{t('backupRestore.orDragDrop')}</p>
                   </div>
-                  <p className="text-xs text-gray-500">JSON files only</p>
+                  <p className="text-xs text-gray-500">{t('backupRestore.jsonOnly')}</p>
                 </div>
               )}
             </div>
@@ -508,24 +510,24 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
                 />
               </svg>
               <div className="text-sm text-yellow-800">
-                <p className="font-medium mb-1">⚠️ Warning:</p>
+                <p className="font-medium mb-1">{t('backupRestore.warningTitle')}</p>
                 <ul className="list-disc list-inside space-y-1 text-yellow-700">
-                  <li>Restore will merge data with existing records</li>
-                  <li>Duplicate IDs will be updated</li>
-                  <li>Create a backup before restoring</li>
-                  <li>Only Products, Customers, and Tickets can be restored</li>
+                  <li>{t('backupRestore.warn1')}</li>
+                  <li>{t('backupRestore.warn2')}</li>
+                  <li>{t('backupRestore.warn3')}</li>
+                  <li>{t('backupRestore.warn4')}</li>
                 </ul>
               </div>
             </div>
           </div>
 
           <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <h3 className="font-medium text-gray-900 mb-2">How to Restore:</h3>
+            <h3 className="font-medium text-gray-900 mb-2">{t('backupRestore.howToRestoreTitle')}</h3>
             <ol className="list-decimal list-inside space-y-1 text-sm text-gray-700">
-              <li>Click the upload area above</li>
-              <li>Select your backup JSON file</li>
-              <li>Wait for the restore process to complete</li>
-              <li>Refresh the page to see restored data</li>
+              <li>{t('backupRestore.step1')}</li>
+              <li>{t('backupRestore.step2')}</li>
+              <li>{t('backupRestore.step3')}</li>
+              <li>{t('backupRestore.step4')}</li>
             </ol>
           </div>
         </div>

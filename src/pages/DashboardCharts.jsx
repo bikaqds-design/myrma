@@ -1,7 +1,9 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Area, AreaChart, ResponsiveContainer } from 'recharts'
 
 export default function DashboardCharts({ on, nav, weeklyTrend, monthlyTrend, chartGridColor, chartTickStyle, chartTooltipStyle, tk }) {
+  const { t } = useTranslation()
   const cardStyle = {
     background: tk?.surface || '#fff',
     border: `1px solid ${tk?.border || '#e6e9ef'}`,
@@ -16,8 +18,8 @@ export default function DashboardCharts({ on, nav, weeklyTrend, monthlyTrend, ch
       {on('weekly_trend') && (
         <div className="col-span-12 lg:col-span-6" style={{ ...cardStyle, cursor: 'pointer' }} onClick={nav('/rma-tickets')}>
           <h3 style={headStyle}>
-            Weekly Trend
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: tk?.textFaint || '#a39e95' }}>Last 7 days</span>
+            {t('dashboard.weeklyTrend')}
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: tk?.textFaint || '#a39e95' }}>{t('dashboard.last7Days')}</span>
           </h3>
           <ResponsiveContainer width="100%" height={196}>
             <AreaChart data={weeklyTrend}>
@@ -32,7 +34,7 @@ export default function DashboardCharts({ on, nav, weeklyTrend, monthlyTrend, ch
               <YAxis tick={chartTickStyle} axisLine={false} tickLine={false} allowDecimals={false} width={24} />
               <Tooltip contentStyle={chartTooltipStyle} />
               <Area type="monotone" dataKey="tickets" stroke={accent} strokeWidth={2}
-                fill="url(#wArea)" dot={{ fill: accent, r: 2.6 }} activeDot={{ r: 4 }} name="Tickets" />
+                fill="url(#wArea)" dot={{ fill: accent, r: 2.6 }} activeDot={{ r: 4 }} name={t('dashboard.ticketsLabel')} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -41,8 +43,8 @@ export default function DashboardCharts({ on, nav, weeklyTrend, monthlyTrend, ch
       {on('monthly_trend') && (
         <div className="col-span-12 lg:col-span-6" style={{ ...cardStyle, cursor: 'pointer' }} onClick={nav('/rma-tickets')}>
           <h3 style={headStyle}>
-            Monthly Trend
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: tk?.textFaint || '#a39e95' }}>Last 30 days</span>
+            {t('dashboard.monthlyTrend')}
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: tk?.textFaint || '#a39e95' }}>{t('dashboard.last30Days')}</span>
           </h3>
           <ResponsiveContainer width="100%" height={196}>
             <BarChart data={monthlyTrend}>
@@ -51,7 +53,7 @@ export default function DashboardCharts({ on, nav, weeklyTrend, monthlyTrend, ch
               <YAxis tick={chartTickStyle} axisLine={false} tickLine={false} allowDecimals={false} width={24} />
               <Tooltip contentStyle={chartTooltipStyle}
                 labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''} />
-              <Bar dataKey="tickets" fill={accent} fillOpacity={0.85} radius={[3, 3, 0, 0]} name="Tickets" />
+              <Bar dataKey="tickets" fill={accent} fillOpacity={0.85} radius={[3, 3, 0, 0]} name={t('dashboard.ticketsLabel')} />
             </BarChart>
           </ResponsiveContainer>
         </div>

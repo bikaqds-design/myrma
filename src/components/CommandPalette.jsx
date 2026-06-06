@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../api/supabaseClient'
+import { useTranslation } from 'react-i18next'
 
 const STATUS_COLORS = {
   Open: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
@@ -13,6 +14,7 @@ const STATUS_COLORS = {
 const statusBadge = (s) => STATUS_COLORS[s] || 'bg-[#f0f2f6] dark:bg-[#1a2230] text-[#6c6760] dark:text-[#9aa4b2]'
 
 export default function CommandPalette({ onSelectTicket, onSelectProduct, inputRef: externalRef }) {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
@@ -133,7 +135,7 @@ export default function CommandPalette({ onSelectTicket, onSelectProduct, inputR
           value={query}
           onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
-          placeholder="Search tickets, products…"
+          placeholder={t('commandPalette.searchPlaceholder')}
           className="flex-1 text-xs outline-none bg-transparent text-[#211f1b] dark:text-[#e8ebf0] placeholder-[#a09d99] dark:placeholder-[#4a5568] min-w-0"
         />
         {loading ? (
@@ -154,7 +156,7 @@ export default function CommandPalette({ onSelectTicket, onSelectProduct, inputR
               {ticketResults.length > 0 && (
                 <>
                   <li className="px-4 pt-2 pb-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[#a09d99] dark:text-[#4a5568]">Tickets</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[#a09d99] dark:text-[#4a5568]">{t('commandPalette.ticketsSection')}</span>
                   </li>
                   {ticketResults.map((item) => {
                     const idx = results.indexOf(item)
@@ -181,7 +183,7 @@ export default function CommandPalette({ onSelectTicket, onSelectProduct, inputR
               {productResults.length > 0 && (
                 <>
                   <li className={`px-4 pb-1 ${ticketResults.length > 0 ? 'pt-3 mt-1 border-t border-[#f0f2f6] dark:border-[#1a2230]' : 'pt-2'}`}>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[#a09d99] dark:text-[#4a5568]">Products</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[#a09d99] dark:text-[#4a5568]">{t('commandPalette.productsSection')}</span>
                   </li>
                   {productResults.map((item) => {
                     const idx = results.indexOf(item)
@@ -206,7 +208,7 @@ export default function CommandPalette({ onSelectTicket, onSelectProduct, inputR
           ) : !loading ? (
             <div className="py-8 text-center">
               <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
-                No results for <span className="font-medium text-[#211f1b] dark:text-[#e8ebf0]">"{query}"</span>
+                {t('commandPalette.noResults', { query })}
               </p>
             </div>
           ) : null}

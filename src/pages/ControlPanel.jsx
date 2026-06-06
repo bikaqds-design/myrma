@@ -567,6 +567,7 @@ const ALERT_TARGETS = [
 ]
 
 function SendAlert({ currentUserEmail }) {
+  const { t } = useTranslation()
   const [type, setType] = useState('system_announcement')
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
@@ -577,11 +578,11 @@ function SendAlert({ currentUserEmail }) {
 
   const handleSend = async () => {
     if (!title.trim() || !message.trim()) {
-      toast.error('Title and message are required')
+      toast.error(t('cp.sendAlert.titleRequired'))
       return
     }
     if (target === 'email' && !specificEmail.trim()) {
-      toast.error('Enter a recipient email address')
+      toast.error(t('cp.sendAlert.recipientRequired'))
       return
     }
     setSending(true)
@@ -595,7 +596,7 @@ function SendAlert({ currentUserEmail }) {
         targetRoles: targetConfig.roles,
         targetEmails: target === 'email' ? [specificEmail.trim()] : [],
       })
-      toast.success('Alert sent')
+      toast.success(t('cp.sendAlert.successSent'))
       db.auditLog
         .log(currentUserEmail, 'alert_sent', `Sent alert "${title.trim()}" to ${target}`)
         .catch(() => {})
@@ -606,7 +607,7 @@ function SendAlert({ currentUserEmail }) {
       setTimeout(() => setSent(false), 3000)
     } catch (err) {
       captureException(err, { page: 'ControlPanel', context: 'sendAlert' })
-      toast.error(`Failed to send: ${err.message}`)
+      toast.error(t('cp.sendAlert.failedSend', { error: err.message }))
     } finally {
       setSending(false)
     }
@@ -618,19 +619,19 @@ function SendAlert({ currentUserEmail }) {
         {/* Type */}
         <div>
           <p className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
-            Alert Type
+            {t('cp.sendAlert.alertType')}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {ALERT_TYPES.map((t) => (
+            {ALERT_TYPES.map((at) => (
               <button
-                key={t.value}
-                onClick={() => setType(t.value)}
-                className={`flex items-center gap-3 p-3.5 rounded-xl border-2 text-left transition-colors ${type === t.value ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 dark:border-[#212a38] hover:border-gray-300 dark:border-[#212a38] bg-white dark:bg-[#121823]'}`}
+                key={at.value}
+                onClick={() => setType(at.value)}
+                className={`flex items-center gap-3 p-3.5 rounded-xl border-2 text-left transition-colors ${type === at.value ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 dark:border-[#212a38] hover:border-gray-300 dark:border-[#212a38] bg-white dark:bg-[#121823]'}`}
               >
-                <span className="text-2xl">{t.icon}</span>
+                <span className="text-2xl">{at.icon}</span>
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">{t.label}</p>
-                  <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t.desc}</p>
+                  <p className="text-sm font-semibold text-gray-800">{at.value === 'system_announcement' ? t('cp.sendAlert.typeAnnouncement') : t('cp.sendAlert.typeWarning')}</p>
+                  <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{at.desc}</p>
                 </div>
               </button>
             ))}
@@ -640,7 +641,7 @@ function SendAlert({ currentUserEmail }) {
         {/* Title */}
         <div>
           <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
-            Title <span className="text-red-500">*</span>
+            {t('cp.sendAlert.titleLabel')}
           </label>
           <input
             value={title}
@@ -654,7 +655,7 @@ function SendAlert({ currentUserEmail }) {
         {/* Message */}
         <div>
           <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
-            Message <span className="text-red-500">*</span>
+            {t('cp.sendAlert.messageLabel')}
           </label>
           <textarea
             value={message}
@@ -670,17 +671,17 @@ function SendAlert({ currentUserEmail }) {
         {/* Target */}
         <div>
           <p className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
-            Send To
+            {t('cp.sendAlert.sendTo')}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {ALERT_TARGETS.map((t) => (
+            {ALERT_TARGETS.map((tgt) => (
               <button
-                key={t.value}
-                onClick={() => setTarget(t.value)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-colors ${target === t.value ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] hover:border-gray-300 dark:border-[#212a38] bg-white dark:bg-[#121823]'}`}
+                key={tgt.value}
+                onClick={() => setTarget(tgt.value)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-colors ${target === tgt.value ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] hover:border-gray-300 dark:border-[#212a38] bg-white dark:bg-[#121823]'}`}
               >
-                <span>{t.icon}</span>
-                {t.label}
+                <span>{tgt.icon}</span>
+                {tgt.value === 'all' ? t('cp.sendAlert.targetEveryone') : tgt.value === 'admins' ? t('cp.sendAlert.targetAdmins') : tgt.value === 'technicians' ? t('cp.sendAlert.targetTechnicians') : t('cp.sendAlert.targetEmail')}
               </button>
             ))}
           </div>
@@ -705,7 +706,7 @@ function SendAlert({ currentUserEmail }) {
             {sending ? (
               <>
                 <Spinner size="sm" color="white" />
-                Sending...
+                {t('cp.sendAlert.sending')}
               </>
             ) : sent ? (
               <>
@@ -717,7 +718,7 @@ function SendAlert({ currentUserEmail }) {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                Alert Sent!
+                {t('cp.sendAlert.sent')}
               </>
             ) : (
               <>
@@ -729,7 +730,7 @@ function SendAlert({ currentUserEmail }) {
                     d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
                   />
                 </svg>
-                Send Alert
+                {t('cp.sendAlert.sendBtn')}
               </>
             )}
           </button>
@@ -889,6 +890,7 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
 const PRIORITIES = ['Critical', 'High', 'Medium', 'Low']
 
 function SLAPolicies({ currentUserEmail }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { data: config, isLoading: slaLoading } = useQuery({
     queryKey: ['sla-config'],
@@ -916,13 +918,13 @@ function SLAPolicies({ currentUserEmail }) {
     try {
       await db.slaConfig.save(localConfig, currentUserEmail)
       queryClient.invalidateQueries({ queryKey: ['sla-config'] })
-      toast.success('SLA policies saved')
+      toast.success(t('cp.slaPolicies.saved'))
       db.auditLog
         .log(currentUserEmail, 'sla_updated', 'Updated SLA policy configuration')
         .catch(() => {})
     } catch (e) {
       captureException(e, { page: 'ControlPanel', context: 'saveSLA' })
-      toast.error('Failed to save: ' + e.message)
+      toast.error(t('cp.slaPolicies.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -940,13 +942,13 @@ function SLAPolicies({ currentUserEmail }) {
       <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-6 space-y-5">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">SLA Policies</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{t('cp.slaPolicies.header')}</h3>
             <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">
               Auto-set ticket due dates based on priority when a new ticket is created.
             </p>
           </div>
           <label className="flex items-center gap-2 cursor-pointer select-none">
-            <span className="text-sm text-gray-600 dark:text-[#9aa4b2] font-medium">Enabled</span>
+            <span className="text-sm text-gray-600 dark:text-[#9aa4b2] font-medium">{t('cp.slaPolicies.enabled')}</span>
             <button
               onClick={() => setLocalConfig((c) => ({ ...c, enabled: !c.enabled }))}
               className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${localConfig.enabled ? 'bg-indigo-600' : 'bg-gray-300'}`}
@@ -982,7 +984,7 @@ function SLAPolicies({ currentUserEmail }) {
                     onChange={(e) => updatePolicy(p, e.target.value)}
                     className="w-24 px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
                   />
-                  <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">hours</span>
+                  <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('cp.slaPolicies.hours')}</span>
                   <span className="text-xs text-gray-500 dark:text-[#9aa4b2] ml-2">
                     (
                     {policy.hours >= 24 ? `${(policy.hours / 24).toFixed(1)}d` : `${policy.hours}h`}
@@ -1016,13 +1018,13 @@ function SLAPolicies({ currentUserEmail }) {
             disabled={saving}
             className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
           >
-            {saving ? <Spinner size="sm" color="white" /> : null} Save Policies
+            {saving ? <Spinner size="sm" color="white" /> : null} {t('cp.slaPolicies.savePolicies')}
           </button>
         </div>
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-700">
-        <strong>How it works:</strong> When SLA is enabled, creating a new ticket will automatically
+        <strong>{t('cp.slaPolicies.howItWorks')}</strong> When SLA is enabled, creating a new ticket will automatically
         set its due date based on the priority selected. The due date can always be overridden
         manually in the ticket form.
       </div>
@@ -1070,6 +1072,7 @@ const EMPTY_RULE = () => ({
 })
 
 function AutomationRules({ currentUserEmail }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { data: fetchedRules } = useQuery({
     queryKey: ['automation-rules'],
@@ -1089,7 +1092,7 @@ function AutomationRules({ currentUserEmail }) {
       await db.automationRules.save(newRules, currentUserEmail)
       setRules(newRules)
       queryClient.invalidateQueries({ queryKey: ['automation-rules'] })
-      toast.success('Automation rules saved')
+      toast.success(t('cp.automationRules.saved'))
     } catch (e) {
       captureException(e, { page: 'ControlPanel', context: 'saveAutomationRules' })
       toast.error(e.message)
@@ -1103,7 +1106,7 @@ function AutomationRules({ currentUserEmail }) {
     saveAll(rules.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)))
   const saveEdit = () => {
     if (!editing.name.trim()) {
-      toast.error('Rule name is required')
+      toast.error(t('cp.automationRules.ruleRequired'))
       return
     }
     const exists = rules.find((r) => r.id === editing.id)
@@ -1136,15 +1139,15 @@ function AutomationRules({ currentUserEmail }) {
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            Back
+            {t('cp.back')}
           </button>
-          <span className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{editing.name || 'New Rule'}</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{editing.name || t('cp.automationRules.newRule')}</span>
         </div>
 
         <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-5 space-y-5">
           <div>
             <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
-              Rule Name
+              {t('cp.automationRules.ruleName')}
             </label>
             <input
               value={editing.name}
@@ -1155,16 +1158,16 @@ function AutomationRules({ currentUserEmail }) {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
-              Trigger Event
+              {t('cp.automationRules.triggerEvent')}
             </label>
             <select
               value={editing.trigger}
               onChange={(e) => setEditing((r) => ({ ...r, trigger: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 bg-white dark:bg-[#121823]"
             >
-              {TRIGGER_OPTIONS.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
+              {TRIGGER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
                 </option>
               ))}
             </select>
@@ -1174,7 +1177,7 @@ function AutomationRules({ currentUserEmail }) {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
-                Conditions <span className="font-normal text-gray-500 dark:text-[#9aa4b2]">(all must match)</span>
+                {t('cp.automationRules.conditions')}
               </label>
               <button
                 onClick={() =>
@@ -1188,12 +1191,12 @@ function AutomationRules({ currentUserEmail }) {
                 }
                 className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
               >
-                + Add Condition
+                {t('cp.automationRules.addCondition')}
               </button>
             </div>
             {editing.conditions.length === 0 && (
               <p className="text-xs text-gray-500 dark:text-[#9aa4b2] italic">
-                No conditions — rule runs on all tickets
+                {t('cp.automationRules.noConditions')}
               </p>
             )}
             {editing.conditions.map((c, i) => (
@@ -1242,7 +1245,7 @@ function AutomationRules({ currentUserEmail }) {
                     })
                   }
                   className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded text-sm"
-                  placeholder="value"
+                  placeholder={t('cp.automationRules.valuePlaceholder')}
                 />
                 <button
                   onClick={() =>
@@ -1270,7 +1273,7 @@ function AutomationRules({ currentUserEmail }) {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
-                Actions <span className="font-normal text-gray-500 dark:text-[#9aa4b2]">(executed in order)</span>
+                {t('cp.automationRules.actions')}
               </label>
               <button
                 onClick={() =>
@@ -1284,7 +1287,7 @@ function AutomationRules({ currentUserEmail }) {
                 }
                 className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
               >
-                + Add Action
+                {t('cp.automationRules.addAction')}
               </button>
             </div>
             {editing.actions.map((a, i) => (
@@ -1381,13 +1384,13 @@ function AutomationRules({ currentUserEmail }) {
               disabled={saving}
               className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
             >
-              {saving ? <Spinner size="sm" color="white" /> : null} Save Rule
+              {saving ? <Spinner size="sm" color="white" /> : null} {t('cp.automationRules.saveRule')}
             </button>
             <button
               onClick={() => setEditing(null)}
               className="px-5 py-2 bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#e8ebf0] text-sm font-medium rounded-lg hover:bg-gray-200"
             >
-              Cancel
+              {t('cp.cancel')}
             </button>
           </div>
         </div>
@@ -1399,7 +1402,7 @@ function AutomationRules({ currentUserEmail }) {
     <div className="max-w-2xl space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">
-          {rules.length} rule{rules.length !== 1 ? 's' : ''} configured
+          {t('cp.automationRules.count', { count: rules.length })}
         </p>
         <button
           onClick={() => setEditing(EMPTY_RULE())}
@@ -1408,7 +1411,7 @@ function AutomationRules({ currentUserEmail }) {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          New Rule
+          {t('cp.automationRules.newRule')}
         </button>
       </div>
 
@@ -1427,9 +1430,9 @@ function AutomationRules({ currentUserEmail }) {
               d="M13 10V3L4 14h7v7l9-11h-7z"
             />
           </svg>
-          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">No automation rules yet</p>
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('cp.automationRules.noRules')}</p>
           <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-1">
-            Rules automatically act on tickets when events occur
+            {t('cp.automationRules.subtitle')}
           </p>
         </div>
       ) : (
@@ -1443,22 +1446,21 @@ function AutomationRules({ currentUserEmail }) {
                     <span
                       className={`px-2 py-0.5 text-xs rounded-full font-medium ${rule.enabled ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'}`}
                     >
-                      {rule.enabled ? 'Active' : 'Disabled'}
+                      {rule.enabled ? t('cp.active') : t('cp.disabled')}
                     </span>
                   </div>
                   <div className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-1">
-                    Trigger:{' '}
+                    {t('cp.automationRules.trigger')}{' '}
                     <span className="font-medium text-gray-700 dark:text-[#e8ebf0]">
-                      {TRIGGER_OPTIONS.find((t) => t.value === rule.trigger)?.label}
+                      {TRIGGER_OPTIONS.find((opt) => opt.value === rule.trigger)?.label}
                     </span>
                     {rule.conditions.length > 0 && (
                       <>
                         {' '}
-                        · {rule.conditions.length} condition
-                        {rule.conditions.length !== 1 ? 's' : ''}
+                        · {t('cp.automationRules.conditionCount', { count: rule.conditions.length })}
                       </>
                     )}
-                    · {rule.actions.length} action{rule.actions.length !== 1 ? 's' : ''}
+                    · {t('cp.automationRules.actionCount', { count: rule.actions.length })}
                   </div>
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
@@ -1466,19 +1468,19 @@ function AutomationRules({ currentUserEmail }) {
                     onClick={() => toggleRule(rule.id)}
                     className={`text-xs px-3 py-1 rounded-lg font-medium ${rule.enabled ? 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}
                   >
-                    {rule.enabled ? 'Disable' : 'Enable'}
+                    {rule.enabled ? t('cp.disable') : t('cp.enable')}
                   </button>
                   <button
                     onClick={() => setEditing({ ...rule })}
                     className="text-xs px-3 py-1 rounded-lg font-medium bg-gray-50 dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-100 dark:bg-[#1a2230]"
                   >
-                    Edit
+                    {t('cp.edit')}
                   </button>
                   <button
                     onClick={() => deleteRule(rule.id)}
                     className="text-xs px-3 py-1 rounded-lg font-medium bg-red-50 text-red-600 hover:bg-red-100"
                   >
-                    Delete
+                    {t('cp.delete')}
                   </button>
                 </div>
               </div>
@@ -1514,6 +1516,7 @@ const EMPTY_HOOK = () => ({
 })
 
 function WebhooksConfig({ currentUserEmail }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { data: fetchedHooks } = useQuery({
     queryKey: ['webhooks'],
@@ -1534,7 +1537,7 @@ function WebhooksConfig({ currentUserEmail }) {
       await db.webhooks.save(newHooks, currentUserEmail)
       setHooks(newHooks)
       queryClient.invalidateQueries({ queryKey: ['webhooks'] })
-      toast.success('Webhooks saved')
+      toast.success(t('cp.webhooks.saved'))
     } catch (e) {
       captureException(e, { page: 'ControlPanel', context: 'saveWebhooks' })
       toast.error(e.message)
@@ -1545,13 +1548,13 @@ function WebhooksConfig({ currentUserEmail }) {
 
   const saveEdit = () => {
     if (!editing.name.trim() || !editing.url.trim()) {
-      toast.error('Name and URL are required')
+      toast.error(t('cp.webhooks.nameRequired'))
       return
     }
     try {
       new URL(editing.url)
     } catch {
-      toast.error('Invalid URL')
+      toast.error(t('cp.webhooks.invalidUrl'))
       return
     }
     const exists = hooks.find((h) => h.id === editing.id)
@@ -1577,11 +1580,11 @@ function WebhooksConfig({ currentUserEmail }) {
         }),
       })
       res.ok
-        ? toast.success(`Webhook responded: ${res.status}`)
-        : toast.error(`Webhook returned ${res.status}`)
+        ? toast.success(t('cp.webhooks.responded', { status: res.status }))
+        : toast.error(t('cp.webhooks.returned', { status: res.status }))
     } catch (err) {
       captureException(err, { page: 'ControlPanel', context: 'testWebhook' })
-      toast.error('Failed to reach webhook URL')
+      toast.error(t('cp.webhooks.failed'))
     } finally {
       setTesting(null)
     }
@@ -1610,10 +1613,10 @@ function WebhooksConfig({ currentUserEmail }) {
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            Back
+            {t('cp.back')}
           </button>
           <span className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">
-            {editing.name || 'New Webhook'}
+            {editing.name || t('cp.webhooks.addWebhook')}
           </span>
         </div>
         <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-5 space-y-4">
@@ -1648,7 +1651,7 @@ function WebhooksConfig({ currentUserEmail }) {
 
           <div>
             <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-2">
-              Events to Send <span className="font-normal">(leave empty = all events)</span>
+              {t('cp.webhooks.eventsLabel')}
             </label>
             <div className="flex flex-wrap gap-2">
               {WEBHOOK_EVENTS.map((ev) => (
@@ -1676,13 +1679,13 @@ function WebhooksConfig({ currentUserEmail }) {
               disabled={saving}
               className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
             >
-              {saving ? <Spinner size="sm" color="white" /> : null} Save Webhook
+              {saving ? <Spinner size="sm" color="white" /> : null} {t('cp.webhooks.saveWebhook')}
             </button>
             <button
               onClick={() => setEditing(null)}
               className="px-5 py-2 bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#e8ebf0] text-sm font-medium rounded-lg hover:bg-gray-200"
             >
-              Cancel
+              {t('cp.cancel')}
             </button>
           </div>
         </div>
@@ -1693,7 +1696,7 @@ function WebhooksConfig({ currentUserEmail }) {
     <div className="max-w-2xl space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">
-          {hooks.length} webhook{hooks.length !== 1 ? 's' : ''} configured
+          {t('cp.webhooks.count', { count: hooks.length })}
         </p>
         <button
           onClick={() => setEditing(EMPTY_HOOK())}
@@ -1702,7 +1705,7 @@ function WebhooksConfig({ currentUserEmail }) {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          Add Webhook
+          {t('cp.webhooks.addWebhook')}
         </button>
       </div>
 
@@ -1714,9 +1717,9 @@ function WebhooksConfig({ currentUserEmail }) {
 
       {hooks.length === 0 ? (
         <div className="bg-white dark:bg-[#121823] rounded-xl border border-dashed border-gray-300 dark:border-[#212a38] p-10 text-center">
-          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">No webhooks configured</p>
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('cp.webhooks.noWebhooks')}</p>
           <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-1">
-            Push ticket events to Slack, QuickBooks, Zapier, and more
+            {t('cp.webhooks.subtitle')}
           </p>
         </div>
       ) : (
@@ -1730,7 +1733,7 @@ function WebhooksConfig({ currentUserEmail }) {
                     <span
                       className={`px-2 py-0.5 text-xs rounded-full font-medium ${h.enabled ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'}`}
                     >
-                      {h.enabled ? 'Active' : 'Disabled'}
+                      {h.enabled ? t('cp.active') : t('cp.disabled')}
                     </span>
                   </div>
                   <div className="text-xs text-gray-500 dark:text-[#9aa4b2] font-mono mt-0.5 truncate">{h.url}</div>
@@ -1753,19 +1756,19 @@ function WebhooksConfig({ currentUserEmail }) {
                     disabled={testing === h.id}
                     className="text-xs px-3 py-1 rounded-lg font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
                   >
-                    {testing === h.id ? '…' : 'Test'}
+                    {testing === h.id ? '…' : t('cp.test')}
                   </button>
                   <button
                     onClick={() => setEditing({ ...h })}
                     className="text-xs px-3 py-1 rounded-lg font-medium bg-gray-50 dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-100 dark:bg-[#1a2230]"
                   >
-                    Edit
+                    {t('cp.edit')}
                   </button>
                   <button
                     onClick={() => saveAll(hooks.filter((wh) => wh.id !== h.id))}
                     className="text-xs px-3 py-1 rounded-lg font-medium bg-red-50 text-red-600 hover:bg-red-100"
                   >
-                    Delete
+                    {t('cp.delete')}
                   </button>
                 </div>
               </div>
