@@ -99,29 +99,31 @@ export default function NotificationBell({
     const reposition = () => {
       if (!btnRef.current) return
       const r = btnRef.current.getBoundingClientRect()
+      const isRtl = i18n.language === 'ar'
       if (mobile) {
-        setPanelStyle({
-          position: 'fixed',
-          top: r.bottom + 6,
-          right: 8,
-          width: 340,
-          maxHeight: 480,
-          zIndex: 9999,
-        })
+        const panelW = 340
+        if (isRtl) {
+          // RTL: bell is on the left side of the header — anchor panel to left of button
+          let left = r.left
+          if (left + panelW > window.innerWidth - 8) left = window.innerWidth - panelW - 8
+          if (left < 8) left = 8
+          setPanelStyle({ position: 'fixed', top: r.bottom + 6, left, width: panelW, maxHeight: 480, zIndex: 9999 })
+        } else {
+          setPanelStyle({ position: 'fixed', top: r.bottom + 6, right: 8, width: panelW, maxHeight: 480, zIndex: 9999 })
+        }
       } else {
-        // Anchor to the right edge of the sidebar button, vertically centered on button
         const panelH = Math.min(520, window.innerHeight - 32)
         let top = r.top
         if (top + panelH > window.innerHeight - 16) top = window.innerHeight - panelH - 16
         if (top < 16) top = 16
-        setPanelStyle({
-          position: 'fixed',
-          top,
-          left: r.right + 8,
-          width: 360,
-          maxHeight: panelH,
-          zIndex: 9999,
-        })
+        const isMobileViewport = window.innerWidth < 1024
+        if (isRtl && isMobileViewport) {
+          // RTL mobile: sidebar slides in from the right — open panel to the left of it
+          setPanelStyle({ position: 'fixed', top, right: window.innerWidth - r.left + 8, width: 360, maxHeight: panelH, zIndex: 9999 })
+        } else {
+          // LTR desktop OR RTL desktop (sidebar stays left on desktop)
+          setPanelStyle({ position: 'fixed', top, left: r.right + 8, width: 360, maxHeight: panelH, zIndex: 9999 })
+        }
       }
     }
     reposition()
@@ -131,33 +133,33 @@ export default function NotificationBell({
       window.removeEventListener('resize', reposition)
       window.removeEventListener('scroll', reposition, true)
     }
-  }, [open, mobile])
+  }, [open, mobile, i18n.language])
 
   const handleToggle = async () => {
     if (!open && btnRef.current) {
       const r = btnRef.current.getBoundingClientRect()
+      const isRtl = i18n.language === 'ar'
       if (mobile) {
-        setPanelStyle({
-          position: 'fixed',
-          top: r.bottom + 6,
-          right: 8,
-          width: 340,
-          maxHeight: 480,
-          zIndex: 9999,
-        })
+        const panelW = 340
+        if (isRtl) {
+          let left = r.left
+          if (left + panelW > window.innerWidth - 8) left = window.innerWidth - panelW - 8
+          if (left < 8) left = 8
+          setPanelStyle({ position: 'fixed', top: r.bottom + 6, left, width: panelW, maxHeight: 480, zIndex: 9999 })
+        } else {
+          setPanelStyle({ position: 'fixed', top: r.bottom + 6, right: 8, width: panelW, maxHeight: 480, zIndex: 9999 })
+        }
       } else {
         const panelH = Math.min(520, window.innerHeight - 32)
         let top = r.top
         if (top + panelH > window.innerHeight - 16) top = window.innerHeight - panelH - 16
         if (top < 16) top = 16
-        setPanelStyle({
-          position: 'fixed',
-          top,
-          left: r.right + 8,
-          width: 360,
-          maxHeight: panelH,
-          zIndex: 9999,
-        })
+        const isMobileViewport = window.innerWidth < 1024
+        if (isRtl && isMobileViewport) {
+          setPanelStyle({ position: 'fixed', top, right: window.innerWidth - r.left + 8, width: 360, maxHeight: panelH, zIndex: 9999 })
+        } else {
+          setPanelStyle({ position: 'fixed', top, left: r.right + 8, width: 360, maxHeight: panelH, zIndex: 9999 })
+        }
       }
     }
     const next = !open
@@ -172,26 +174,29 @@ export default function NotificationBell({
     }
   }
 
+  const isRtl = i18n.language === 'ar'
+
   const panel = open
     ? createPortal(
         <div
           ref={panelRef}
           style={panelStyle}
-          className="bg-white rounded-xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden"
+          dir={isRtl ? 'rtl' : 'ltr'}
+          className="bg-white dark:bg-[#121823] rounded-xl shadow-2xl border border-gray-200 dark:border-[#212a38] flex flex-col overflow-hidden"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#212a38] flex-shrink-0">
             <div>
-              <h3 className="text-sm font-semibold text-gray-900">{t('notifications.title')}</h3>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{t('notifications.title')}</h3>
               {notifications.length > 0 && (
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">
                   {t('notifications.totalUnread', { total: notifications.length, unread })}
                 </p>
               )}
             </div>
             <button
               onClick={() => setOpen(false)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 dark:text-[#9aa4b2] hover:text-gray-600 dark:hover:text-[#e8ebf0] hover:bg-gray-100 dark:hover:bg-[#1a2230] transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -208,9 +213,9 @@ export default function NotificationBell({
           <div className="flex-1 overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-14 px-6 text-center">
-                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                <div className="w-12 h-12 bg-gray-100 dark:bg-[#1a2230] rounded-full flex items-center justify-center mb-3">
                   <svg
-                    className="w-6 h-6 text-gray-500"
+                    className="w-6 h-6 text-gray-500 dark:text-[#9aa4b2]"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -223,8 +228,8 @@ export default function NotificationBell({
                     />
                   </svg>
                 </div>
-                <p className="text-sm font-medium text-gray-500">{t('notifications.noNotificationsYet')}</p>
-                <p className="text-xs text-gray-500 mt-1">{t('notifications.noNotificationsHint')}</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-[#9aa4b2]">{t('notifications.noNotificationsYet')}</p>
+                <p className="text-xs text-gray-500 dark:text-[#4a5568] mt-1">{t('notifications.noNotificationsHint')}</p>
               </div>
             ) : (
               notifications.map((n) => {
@@ -235,7 +240,7 @@ export default function NotificationBell({
                   <div
                     key={n.id}
                     onClick={() => handleClickNotif(n)}
-                    className={`flex gap-3 px-4 py-3 border-b border-gray-50 last:border-0 transition-colors ${clickable ? 'cursor-pointer hover:bg-indigo-50' : ''} ${isUnread ? 'bg-blue-50/40' : ''}`}
+                    className={`flex gap-3 px-4 py-3 border-b border-gray-50 dark:border-[#1a2230] last:border-0 transition-colors ${clickable ? 'cursor-pointer hover:bg-indigo-50 dark:hover:bg-[#1a2230]' : ''} ${isUnread ? 'bg-blue-50/40 dark:bg-blue-900/10' : ''}`}
                   >
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm ${meta.color}`}
@@ -245,7 +250,7 @@ export default function NotificationBell({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <p
-                          className={`text-sm leading-snug ${isUnread ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}
+                          className={`text-sm leading-snug ${isUnread ? 'font-semibold text-gray-900 dark:text-[#e8ebf0]' : 'font-medium text-gray-700 dark:text-[#9aa4b2]'}`}
                         >
                           {n.title}
                         </p>
@@ -253,21 +258,21 @@ export default function NotificationBell({
                           <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
+                      <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5 line-clamp-2">{n.message}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-gray-500">{timeAgo(n.created_date, t, i18n.language)}</span>
+                        <span className="text-xs text-gray-500 dark:text-[#4a5568]">{timeAgo(n.created_date, t, i18n.language)}</span>
                         {n.entity_ref && (
                           <>
-                            <span className="text-gray-300">·</span>
-                            <span className="text-xs font-mono text-indigo-600">
+                            <span className="text-gray-300 dark:text-[#212a38]">·</span>
+                            <span className="text-xs font-mono text-indigo-600 dark:text-[#a5b4fc]">
                               {n.entity_ref}
                             </span>
                           </>
                         )}
                         {clickable && (
                           <>
-                            <span className="text-gray-300">·</span>
-                            <span className="text-xs text-indigo-500">{t('notifications.viewTicket')}</span>
+                            <span className="text-gray-300 dark:text-[#212a38]">·</span>
+                            <span className="text-xs text-indigo-500 dark:text-[#a5b4fc]">{t('notifications.viewTicket')}</span>
                           </>
                         )}
                       </div>
