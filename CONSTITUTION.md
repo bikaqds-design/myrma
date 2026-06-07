@@ -1558,7 +1558,35 @@ auth.is_admin()
 auth.current_user_email()
 ```
 
-### 17.7 Code Generation Quality Standards
+### 17.7 Internationalisation (i18n) Requirements
+
+**LAW: Every new page, component, modal, or function must use `t()` for all user-visible strings. Translation is part of the definition of done — never commit hardcoded English strings in new code.**
+
+The app supports English and Arabic (RTL) via `react-i18next`. Translation files live in `src/locales/en.json` and `src/locales/ar.json`.
+
+**MUST: Add every new key to both locale files simultaneously** — never add to `en.json` without a matching key in `ar.json`.
+
+**MUST: Use `useTranslation()` hook in components:**
+```jsx
+import { useTranslation } from 'react-i18next'
+const { t, i18n } = useTranslation()
+t('section.key')
+t('section.key', { param: value })  // interpolation
+```
+
+**MUST: Module-level functions that cannot use hooks choose one of two patterns:**
+- Pass `t` as a parameter when called from a single component: `exportPDF(invoice, t)`
+- Import the `i18next` singleton directly when called from many places: `import i18next from 'i18next'; i18next.t('key')`
+
+**MUST: Portaled elements get an explicit `dir` attribute** — `createPortal` bypasses `<html dir="rtl">` inheritance:
+```jsx
+const isRtl = i18n.language === 'ar'
+<div dir={isRtl ? 'rtl' : 'ltr'}>...</div>
+```
+
+**MUST: Floating panels anchored to buttons check direction** — in RTL mode a button may appear on the opposite side of the screen; compute panel position from `getBoundingClientRect()` rather than using a fixed `right: Npx`.
+
+### 17.8 Code Generation Quality Standards
 
 **MUST: Generated code follows all naming conventions** in Section 12.
 
@@ -1574,7 +1602,7 @@ auth.current_user_email()
 
 **SHOULD: Generated code includes JSDoc comments** for non-obvious logic.
 
-### 17.8 Testing Generated Code
+### 17.9 Testing Generated Code
 
 **MUST: After generating or modifying `src/lib/` code, the agent MUST run `npm test`** to verify existing tests still pass.
 
@@ -1582,7 +1610,7 @@ auth.current_user_email()
 
 **SHOULD: For critical paths (auth, permissions, storage), the agent SHOULD add tests** if none exist for the modified function.
 
-### 17.9 Documenting Changes
+### 17.10 Documenting Changes
 
 **MUST: When making changes that affect the audit record, update `AUDIT_LOG.md`** changelog section with:
 - Date (YYYY-MM-DD)
@@ -1616,6 +1644,7 @@ These rules have no exceptions. Any violation must be reverted immediately:
 | L-13 | No service role key in browser-side code. Edge Functions only. |
 | L-14 | No skipping optimistic rollback on failed mutations (if optimistic updates are used). |
 | L-15 | No new framework-level dependency without written team approval in the PR. |
+| L-16 | No hardcoded English strings in new code. Every user-visible string in new pages/components/modals uses `t()` from `react-i18next`. Both `en.json` and `ar.json` must be updated together. |
 
 ### 18.2 Forbidden Anti-Patterns
 

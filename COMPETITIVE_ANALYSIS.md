@@ -1,5 +1,5 @@
 # myRMA — Competitive Analysis & Feature-Gap Audit
-*Prepared: June 4, 2026 | Analyst: Principal PM + Senior SaaS Architect*
+*Prepared: June 4, 2026 | Last updated: June 6, 2026 | Analyst: Principal PM + Senior SaaS Architect*
 
 ---
 
@@ -21,14 +21,14 @@ The weaknesses are not in the core workflow but in **depth at the edges**: no cu
 
 | Dimension | Score | Why |
 |---|---|---|
-| **Feature Completeness** | **7.2 / 10** | Core workflow is solid. Missing: customer portal for return initiation, payment processing, AI, mobile app, advanced analytics |
-| **User Experience** | **6.8 / 10** | Clean Direction B design, good dark mode, fast. Loses points on mobile (no native app), empty states, limited inline guidance |
-| **Security** | **6.5 / 10** | RBAC + RLS + Supabase JWT auth is solid. No MFA, no SOC2, no SSO, no session management UI |
+| **Feature Completeness** | **8.5 / 10** | Core workflow solid + MFA, session management, barcode scanner, replacement/exchange, credit notes, AI assist, pg_cron, report builder, onboarding wizard, Arabic/RTL all shipped. Missing: customer return portal, payment processing, mobile app, public API |
+| **User Experience** | **8.0 / 10** | Direction B design, dark mode, Arabic/RTL, Cmd+K search, inline ticket actions, empty states, onboarding wizard. Loses points on mobile (no native app), no skeleton loaders |
+| **Security** | **8.0 / 10** | RBAC + RLS + Supabase JWT + MFA (TOTP) + session management UI + granular permissions. No SSO, no SOC2 |
 | **Scalability** | **7.0 / 10** | Supabase + Vite architecture scales well. 5,000-row client-side cap is a future bottleneck. No multi-tenancy |
-| **Maintainability** | **8.0 / 10** | TypeScript lib layer, Zod schemas, audit logs, migration files, clean component architecture — above average |
-| **Competitive Position** | **7.5 / 10** | Best SMB-priced product combining RMA + repair + WhatsApp. Threatened by RepairDesk Advanced as they scale up |
-| **Enterprise Readiness** | **4.5 / 10** | Single-tenant, no SSO, no MFA, no SLA enforcement automation, no multi-org — not enterprise-ready today |
-| **Customer Experience** | **6.0 / 10** | Email + WhatsApp notifications are strong. But customer portal is read-only, no self-service return initiation, no customer knowledge base |
+| **Maintainability** | **8.5 / 10** | TypeScript lib layer, Zod schemas, audit logs, migration files, clean component architecture, full i18n — above average |
+| **Competitive Position** | **8.5 / 10** | Only SMB RMA tool with WhatsApp + Arabic/RTL + MFA + barcode + replacement/exchange workflow. Strong MENA positioning |
+| **Enterprise Readiness** | **6.5 / 10** | MFA + session management + granular RBAC added. Still missing: SSO, public API, multi-org, SOC2 |
+| **Customer Experience** | **7.5 / 10** | Email + WhatsApp + Arabic/RTL + AI assist + pg_cron overdue alerts. Portal still read-only; no self-service return initiation |
 
 ---
 
@@ -51,7 +51,7 @@ The weaknesses are not in the core workflow but in **depth at the edges**: no cu
 | Role-based access control | ✅ | ✅ | ✅ | ⚡ basic | ⚡ basic | ✅ | ✅ |
 | Granular per-section permissions | ✅ | ✅ | ⚡ | ❌ | ❌ | ⚡ | ✅ |
 | Authentication | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| MFA / 2FA | ❌ | ✅ | ✅ | ⚡ | ❌ | ✅ | ✅ |
+| MFA / 2FA | ✅ | ✅ | ✅ | ⚡ | ❌ | ✅ | ✅ |
 | SSO (SAML/OAuth) | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ (Enterprise) | ✅ |
 | Dashboard & widgets | ✅ | ✅ | ⚡ | ✅ | ⚡ | ✅ | ✅ |
 | Real-time notifications (in-app) | ✅ | ⚡ | ❌ | ⚡ | ⚡ | ✅ | ✅ |
@@ -74,7 +74,7 @@ The weaknesses are not in the core workflow but in **depth at the edges**: no cu
 | PWA support | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Native mobile app | ❌ | ❌ | ❌ | ✅ | ⚡ | ✅ | ✅ |
 | Public API | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Multi-language support | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
+| Multi-language support (Arabic/English, RTL) | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
 
 ---
 
@@ -82,12 +82,12 @@ The weaknesses are not in the core workflow but in **depth at the edges**: no cu
 
 | Feature | **myRMA** | ReverseLogix | Claimlane | RepairDesk | Freshdesk | Zendesk | Salesforce |
 |---|---|---|---|---|---|---|---|
-| AI ticket summarization | ❌ | ❌ | ⚡ | ❌ | ⚡ (add-on) | ✅ | ✅ |
-| AI recommendations | ❌ | ✅ (disposition) | ⚡ | ❌ | ⚡ | ✅ | ✅ |
+| AI ticket summarization | ⚡ (page-level) | ❌ | ⚡ | ❌ | ⚡ (add-on) | ✅ | ✅ |
+| AI recommendations | ⚡ (next action) | ✅ (disposition) | ⚡ | ❌ | ⚡ | ✅ | ✅ |
 | AI workflow automation | ❌ | ✅ | ⚡ | ❌ | ⚡ | ✅ | ✅ (Agentforce) |
 | Predictive analytics | ❌ | ✅ | ❌ | ❌ | ❌ | ⚡ | ✅ |
 | Automation engine | ✅ rule-based | ✅ | ✅ | ⚡ | ✅ | ✅ | ✅ |
-| Scheduled actions | ❌ wired | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Scheduled actions | ✅ pg_cron | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Custom workflows / no-code builder | ❌ | ✅ | ✅ | ⚡ | ✅ | ✅ | ✅ (Flow) |
 | Activity timeline per ticket | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Customer self-service portal (full) | ⚡ read-only | ✅ | ✅ | ⚡ | ✅ | ✅ | ✅ |
@@ -100,14 +100,14 @@ The weaknesses are not in the core workflow but in **depth at the edges**: no cu
 | Stock movement tracking | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
 | Parts supplier integration | ❌ | ❌ | ❌ | ✅ (US vendors) | ❌ | ❌ | ⚡ |
 | POS / payment processing | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ⚡ |
-| Replacement / exchange workflow | ❌ | ✅ | ✅ | ⚡ | ❌ | ❌ | ⚡ |
-| Credit notes | ❌ | ✅ | ⚡ | ⚡ | ❌ | ❌ | ⚡ |
+| Replacement / exchange workflow | ✅ | ✅ | ✅ | ⚡ | ❌ | ❌ | ⚡ |
+| Credit notes | ✅ | ✅ | ⚡ | ⚡ | ❌ | ❌ | ⚡ |
 | Supplier / vendor portal | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ⚡ |
 | Branding / white-label | ✅ | ✅ | ✅ | ✅ | ✅ (Pro+) | ✅ (Enterprise) | ✅ |
 | Announcement system | ✅ | ❌ | ❌ | ❌ | ⚡ | ⚡ | ⚡ |
 | Tech calendar / scheduling | ✅ | ❌ | ❌ | ⚡ | ❌ | ❌ | ✅ (FSL) |
-| QR code / barcode support | ❌ | ⚡ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| Session management (admin UI) | ❌ | ✅ | ⚡ | ⚡ | ✅ | ✅ | ✅ |
+| QR code / barcode support | ✅ | ⚡ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Session management (admin UI) | ✅ | ✅ | ⚡ | ⚡ | ✅ | ✅ | ✅ |
 | Impersonation (admin view-as) | ❌ | ⚡ | ❌ | ❌ | ✅ (Enterprise) | ✅ (Enterprise) | ✅ |
 | Feature flags | ⚡ (code-level) | ✅ | ⚡ | ❌ | ✅ | ✅ | ✅ |
 
@@ -183,39 +183,39 @@ The weaknesses are not in the core workflow but in **depth at the edges**: no cu
 
 ## 5. Product Roadmap Recommendation
 
-### Immediate Fixes (1–2 Weeks)
+### ✅ Immediate Fixes — SHIPPED (June 2026)
 
-1. **Wire pg_cron for scheduled notifications** — `ticket_overdue` email + SLA breach alerts. SQL written, just needs the cron job configured in Supabase. ~0.5 days.
-2. **MFA (TOTP)** — Add Supabase's built-in MFA to login and account settings. ~1 day. Removes a hard objection from enterprise buyers immediately.
-3. **Session management UI** — Show active sessions, allow force-logout. ~1 day. Security hygiene baseline.
-4. **Empty states** — Add contextual empty states with CTAs to the 5 most-visited pages. ~2 days.
-5. **Inline ticket actions** — Status and priority dropdowns directly in the ticket list row. ~1 day. Removes 2 clicks per update.
-6. **`Cmd+K` global search** — Search tickets + customers + products from anywhere. ~3 days.
-7. **`ticket_overdue` email notification** — Template exists in DB. Wire pg_cron + Edge Function call. ~1 day.
-
----
-
-### Short-Term Improvements (1–2 Months)
-
-8. **Full customer self-service portal** — Authenticated portal (magic link / email OTP) where customers see ticket history, add comments, and approve quotes. Highest single-feature impact on support overhead reduction.
-9. **Payment processing** — Integrate Stripe for invoice payment links and in-app payment collection. Start with Stripe payment links on PDFs/invoices (~2 weeks), then build toward full POS.
-10. **SMS notifications via Twilio** — Reuse existing notification_queue + send-whatsapp pattern. ~1 week. Universal reach where WhatsApp penetration is lower.
-11. **Barcode / QR code scanner** — Browser camera API to scan IMEI/serial barcodes when creating tickets or checking in inventory. ~1 week. Massive workflow impact for depot operations.
-12. **Replacement / exchange workflow** — Add "Exchange" outcome to RMA flow: ticket resolved → create new ticket/invoice for replacement unit. ~2 weeks. Required for warranty center use cases.
-13. **Report builder** — Date-range selector + CSV/Excel export on all major entities. At minimum, an export button on every table. ~1 week.
-14. **Onboarding wizard** — A dismissible 5-step wizard that guides new accounts to their first ticket.
+1. ✅ **Wire pg_cron for scheduled notifications** — `ticket_overdue` email + SLA breach alerts. Daily 08:00 UTC cron, every-2-min queue drain. Done.
+2. ✅ **MFA (TOTP)** — Supabase built-in MFA on login + Account Settings. Done.
+3. ✅ **Session management UI** — Active sessions list + force-logout from Account Settings. Done.
+4. ✅ **Empty states** — Contextual empty states with CTAs on 5 pages. Done.
+5. ✅ **Inline ticket actions** — Status/priority dropdowns in the ticket list row. Done.
+6. ✅ **`Cmd+K` global search** — Searches tickets + products from anywhere. Done.
+7. ✅ **`ticket_overdue` email notification** — pg_cron + Edge Function firing correctly. Done.
 
 ---
 
-### Mid-Term Improvements (3–6 Months)
+### ✅ Short-Term Improvements — SHIPPED (June 2026)
 
-15. **Return initiation portal** — Customers initiate their own RMAs via a public form (no login required). Uploads photos, selects product, describes issue, gets an RMA number. Turns myRMA from a "shop management tool" into a true "RMA platform."
-16. **Public REST API + developer documentation** — Versioned API (`/api/v1/`) with JWT auth, rate limiting, and developer docs site. The multiplier that unlocks integrations, resellers, and enterprise IT departments.
-17. **Native mobile app (React Native / Expo)** — Share 90% of code with web app. Target technician workflows first: scan device → create ticket → update status → add photo. Biggest competitive gap vs. RepairDesk.
-18. **AI ticket assist** — "Summarize this ticket" button (Claude/OpenAI API) that reads ticket history and generates a one-paragraph summary. Add "Suggest next action" based on ticket type. Fast to implement, highly visible in demos.
-19. **Credit notes and refund workflow** — When a repair cannot be completed, generate a credit note against the invoice. Required for accounting completeness.
-20. **Warranty validation engine** — Define warranty rules (product + purchase date + coverage window) and auto-validate incoming tickets. Flag out-of-warranty tickets automatically.
-21. **Multi-language / RTL support** — Arabic RTL is the #1 growth lever for MENA market. Use `react-i18next` + locale files + Tailwind `dir` attribute. Could double the addressable market.
+8. ⏳ **Full customer self-service portal** — Authenticated portal (magic link / email OTP) where customers see ticket history, add comments, and approve quotes. **Not yet built.**
+9. ⏳ **Payment processing** — Integrate Stripe for invoice payment links and in-app payment collection. **Not yet built.**
+10. ⏳ **SMS notifications via Twilio** — Reuse existing notification_queue + send-whatsapp pattern. **Not yet built.**
+11. ✅ **Barcode / QR code scanner** — Browser camera API to scan IMEI/serial barcodes. Done.
+12. ✅ **Replacement / exchange workflow** — Exchange + credit note outcome on RMA flow. Done.
+13. ✅ **Report builder** — Date-range selector + CSV/Excel export on all major entities. Done.
+14. ✅ **Onboarding wizard** — Dismissible 5-step wizard for new accounts. Done.
+
+---
+
+### Mid-Term Improvements (3–6 Months) — partially shipped
+
+15. ⏳ **Return initiation portal** — Customers initiate their own RMAs via a public form (no login required). Highest-impact remaining feature.
+16. ⏳ **Public REST API + developer documentation** — Versioned API (`/api/v1/`) with JWT auth, rate limiting, and developer docs site.
+17. ⏳ **Native mobile app (React Native / Expo)** — Share 90% of code with web app. Target technician workflows first.
+18. ✅ **AI ticket assist** — "Summarize this ticket" + "Suggest next action" on Tickets, Reports, and Inventory pages. Done (NVIDIA NIM / Llama 3.3 70B).
+19. ✅ **Credit notes and refund workflow** — Credit note generation when a repair cannot be completed. Done.
+20. ⏳ **Warranty validation engine** — Define warranty rules + auto-flag out-of-warranty tickets. **Not yet built.**
+21. ✅ **Multi-language / RTL support** — Full Arabic/English with RTL layout via `react-i18next`. 200+ translation keys across all pages, components, modals, toasts. Done.
 
 ---
 
@@ -234,15 +234,15 @@ The weaknesses are not in the core workflow but in **depth at the edges**: no cu
 
 | Dimension | Score | Commentary |
 |---|---|---|
-| Feature Completeness | **7.2 / 10** | Excellent core, meaningful gaps at edges (payment, return initiation, mobile, AI) |
-| User Experience | **6.8 / 10** | Modern and clean; loses ground on mobile, onboarding, and empty states |
-| Security | **6.5 / 10** | RLS + RBAC is solid; no MFA, no SSO, no SOC2 — enterprise-blocking |
-| Scalability | **7.0 / 10** | Architecture is sound; client-side 5K row cap and single-tenancy are future ceilings |
-| Maintainability | **8.0 / 10** | TypeScript, Zod, migrations, audit logs — codebase is above-average quality |
-| Enterprise Readiness | **4.5 / 10** | Single-tenant, no MFA, no SSO, no public API, no SOC2 — not enterprise-ready today |
-| Customer Experience | **6.0 / 10** | Notifications strong (email + WhatsApp), but portal is read-only; return initiation missing |
+| Feature Completeness | **8.5 / 10** | MFA, session mgmt, barcode, replacement/exchange, credit notes, AI assist, pg_cron, report builder, onboarding wizard, Arabic/RTL all shipped. Remaining gaps: payment, return initiation portal, mobile app, public API |
+| User Experience | **8.0 / 10** | Direction B design, dark mode, Arabic/RTL, Cmd+K, inline actions, empty states, onboarding wizard. Still needs skeleton loaders, native mobile |
+| Security | **8.0 / 10** | RLS + RBAC + MFA (TOTP) + session management. No SSO, no SOC2 |
+| Scalability | **7.0 / 10** | Architecture sound; 5K client-side cap and single-tenancy remain future ceilings |
+| Maintainability | **8.5 / 10** | TypeScript, Zod, migrations, audit logs, full i18n — codebase is high quality |
+| Enterprise Readiness | **6.5 / 10** | MFA + session management added. Still blocked by: no SSO, no public API, no multi-org, no SOC2 |
+| Customer Experience | **7.5 / 10** | Email + WhatsApp + Arabic/RTL + AI assist + pg_cron overdue alerts. Portal read-only; no self-service return initiation |
 
-**Overall: 6.6 / 10** — A strong foundation with clear, fixable gaps.
+**Overall: 7.7 / 10** — Major feature gaps closed (June 2026 sprint). Remaining ceiling: payment processing, return initiation portal, native mobile, public API.
 
 ---
 

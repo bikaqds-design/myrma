@@ -206,3 +206,30 @@ Uses Tailwind's `class` strategy. Dark tokens are listed above. The
 `AppearanceContext`'s `darkMode` boolean should toggle `dark` on `<html>` or
 `<body>` — check `src/contexts/AppearanceContext.jsx` and ensure the toggle
 writes `document.documentElement.classList.toggle('dark', darkMode)`.
+
+## RTL / Arabic Layout
+
+The app supports Arabic with full RTL layout. `AppearanceContext` sets `dir="rtl"`
+on `<html>` when `language === 'ar'`. Tailwind's logical-property utilities
+(`ms-*`, `me-*`, `ps-*`, `pe-*`, `start-*`, `end-*`) flip automatically.
+
+**Key rules for RTL-aware components:**
+
+- Use `ms-` / `me-` (margin-start/end) and `ps-` / `pe-` (padding-start/end)
+  instead of `ml-`/`mr-` for any spacing that should mirror in RTL.
+- Icons placed beside text: use `ltr:mr-2 rtl:ml-2` or the logical `me-2`.
+- Portaled elements (dropdowns, panels rendered via `createPortal`) do NOT
+  inherit `dir` from `<html>`. Always add `dir={isRtl ? 'rtl' : 'ltr'}` to the
+  root element of any portaled component.
+- Floating panels anchored to a button: in RTL the button may be on the opposite
+  side of the viewport. Compute position from `button.getBoundingClientRect()`
+  and branch on `i18n.language === 'ar'`. See `NotificationBell.jsx` for the
+  reference implementation.
+- Never use `text-right` or `text-left` for content alignment that should follow
+  reading direction — use `text-start` / `text-end` instead.
+- SVG arrows and chevrons that indicate direction (→ / ←) should be flipped in
+  RTL via `rtl:rotate-180` or by swapping the icon entirely.
+
+**Font:** Hanken Grotesk works for both scripts (Latin + Arabic numerals in
+mixed UI). For Arabic body text, the system fallback handles Arabic glyphs
+naturally. No additional Arabic font loading is required for the current scope.

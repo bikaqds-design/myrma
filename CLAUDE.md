@@ -156,6 +156,44 @@ const [activeTab, setActiveTab] = useURLTab('tab', 'products')
 
 **Dark mode:** `AppearanceContext` toggles the `dark` class on `<html>` (`darkMode: 'class'` Tailwind strategy). Use `dark:` Tailwind prefix classes with Direction B design tokens — see the Design tokens section below.
 
+### Internationalisation (i18n) / RTL
+
+The app supports **Arabic** and **English** with full RTL layout via `react-i18next`.
+
+**Files:**
+- `src/i18n.js` — i18next config (language detection, `en` default)
+- `src/locales/en.json` — English strings (~500+ keys)
+- `src/locales/ar.json` — Arabic strings (same key structure)
+
+**Usage in components:**
+```jsx
+import { useTranslation } from 'react-i18next'
+const { t, i18n } = useTranslation()
+// simple key
+t('tickets.createTicket')
+// interpolation
+t('tickets.pageMustBeBetween', { total: totalPages })
+```
+
+**Language toggle:** `AppearanceContext` exposes `language` / `setLanguage`. Changing language sets `i18n.changeLanguage(lang)` and toggles `dir="rtl"` on `<html>` (applied via `AppearanceContext` — same mechanism as dark mode).
+
+**Module-level functions** cannot use React hooks. Two patterns:
+
+| Situation | Pattern |
+|-----------|---------|
+| Function called from one component that already has `t` | Pass `t` as parameter: `exportPDF(invoice, t)` |
+| Utility called from many places | Import singleton: `import i18next from 'i18next'` then `i18next.t('key')` |
+
+**RTL portals:** Elements rendered via `createPortal` do NOT inherit `dir="rtl"` from `<html>` automatically. Always add an explicit `dir` attribute:
+```jsx
+const isRtl = i18n.language === 'ar'
+<div dir={isRtl ? 'rtl' : 'ltr'} ...>
+```
+
+**RTL floating panel positioning:** When a button moves in RTL (e.g. notification bell shifts to the left side of the header), anchor the panel to match — use `getBoundingClientRect().left` + clamp logic instead of a fixed `right: 8`. See `NotificationBell.jsx` for the reference implementation.
+
+**LAW: Every new page, component, modal, or function must use `t()` for all user-visible strings at build time.** Translation is part of the definition of done — never leave hardcoded English strings in new code.
+
 ### Design tokens (Direction B "Command")
 
 All new UI uses these hex token pairs. Never use `dark:bg-slate-*` or `dark:bg-gray-*` for new components.

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useURLTab } from '../hooks/useURLTab'
 import { useQuery } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
 import { db } from '../api/supabaseClient'
@@ -1040,7 +1041,7 @@ export default function Reports({
         ]
       : []),
   ]
-  const [activeTab, setActiveTab] = useState('tickets')
+  const [activeTab, setActiveTab] = useURLTab('tab', 'tickets')
 
   const { data: reportData, isLoading: loading, isError, error, refetch } = useQuery({
     queryKey: ['reports', isAdminOrManager],
