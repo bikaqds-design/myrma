@@ -213,6 +213,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         }
       }
       db.auditLog.log(userEmail, `ticket_${field}_changed`, `${ticket.rma_number}: ${oldValue} → ${newValue}`).catch(() => {})
+      db.ticketActivity.create({ ticket_id: ticket.id, action_type: field === 'ticket_status' ? 'status_changed' : 'priority_changed', details: `${oldValue} → ${newValue}`, user_email: userEmail, created_date: new Date().toISOString() }).catch(() => {})
       toast.success(t('tickets.fieldUpdated', { field: field === 'ticket_status' ? t('common.status') : t('common.priority') }))
     } catch {
       // Rollback
@@ -458,13 +459,15 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     setBulkProcessing(true)
     try {
       await Promise.all(
-        selectedTickets.map((id) =>
-          db.rmaTickets.update(id, {
+        selectedTickets.map((id) => {
+          const prev = tickets.find((t) => t.id === id)
+          db.ticketActivity.create({ ticket_id: id, action_type: 'status_changed', details: `${prev?.ticket_status || '?'} → ${bulkTicketStatus} (bulk)`, user_email: userEmail, created_date: new Date().toISOString() }).catch(() => {})
+          return db.rmaTickets.update(id, {
             ticket_status: bulkTicketStatus,
             updated_by: userEmail,
             updated_date: new Date().toISOString(),
           })
-        )
+        })
       )
       db.notifications
         .create({

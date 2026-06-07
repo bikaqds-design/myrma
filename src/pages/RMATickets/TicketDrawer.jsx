@@ -145,6 +145,13 @@ export function TicketDrawer({
       .finally(() => setResolutionLoading(false))
   }, [ticket?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const logActivity = (actionType, details) => {
+    db.ticketActivity
+      .create({ ticket_id: ticket.id, action_type: actionType, details, user_email: userEmail, created_date: new Date().toISOString() })
+      .then((entry) => { if (entry) setActivityLog((prev) => [entry, ...prev]) })
+      .catch(() => {})
+  }
+
   const handleSaveResolution = async () => {
     if (!resForm.type) return
     setResolutionSaving(true)
@@ -163,6 +170,7 @@ export function TicketDrawer({
       setResolution(saved)
       setResolutionEditing(false)
       toast.success(t('ticketDrawer.resolutionSaved'))
+      logActivity('resolution_saved', `Resolution: ${resForm.type}`)
       db.auditLog.log(userEmail, 'ticket_resolution_saved', `${ticket.rma_number}: ${resForm.type}`).catch(() => {})
     } catch (err) {
       toast.error(t('ticketDrawer.failedSaveResolution', { error: err.message }))
@@ -178,6 +186,7 @@ export function TicketDrawer({
       setResolution(null)
       setResolutionEditing(false)
       toast.success(t('ticketDrawer.resolutionRemoved'))
+      logActivity('resolution_deleted', `Resolution removed (was: ${resolution.type})`)
     } catch {
       toast.error(t('ticketDrawer.failedRemoveResolution'))
     }
@@ -254,6 +263,7 @@ export function TicketDrawer({
     try {
       await db.ticketComments.delete(commentId)
       setTicketComments((prev) => prev.filter((c) => c.id !== commentId))
+      logActivity('comment_deleted', 'Deleted a comment')
       db.auditLog
         .log(userEmail, 'ticket_comment_deleted', `Deleted comment ${commentId}`)
         .catch(() => {})
@@ -514,6 +524,7 @@ export function TicketDrawer({
                           setTimeEntries((prev) => [...prev, entry])
                           setTimerNotes('')
                           toast.success(t('ticketDrawer.timeLogged', { hours: Math.floor(mins / 60), minutes: mins % 60 }))
+                          logActivity('time_entry_added', `Logged ${Math.floor(mins / 60)}h ${mins % 60}m${timerNotes ? ` — ${timerNotes}` : ''}`)
                         } catch (err) {
                           captureException(err, { page: 'RMATickets', context: 'saveTimeEntry' })
                           toast.error(t('ticketDrawer.failedSaveTime'))
@@ -599,6 +610,7 @@ export function TicketDrawer({
                             setManualNotes('')
                             setAddingManual(false)
                             toast.success(t('ticketDrawer.timeLogged', { hours: Math.floor(mins / 60), minutes: mins % 60 }))
+                            logActivity('time_entry_added', `Logged ${Math.floor(mins / 60)}h ${mins % 60}m${manualNotes ? ` — ${manualNotes}` : ''}`)
                           } catch (err) {
                             captureException(err, {
                               page: 'RMATickets',
@@ -645,6 +657,7 @@ export function TicketDrawer({
                                 await db.timeEntries.delete(entry.id)
                                 setTimeEntries((prev) => prev.filter((e) => e.id !== entry.id))
                                 toast.success(t('ticketDrawer.timeEntryDeleted'))
+                                logActivity('time_entry_deleted', `Deleted time entry: ${Math.floor((entry.duration_min || 0) / 60)}h ${(entry.duration_min || 0) % 60}m`)
                               } catch (err) {
                                 captureException(err, {
                                   page: 'RMATickets',
@@ -949,6 +962,20 @@ export function TicketDrawer({
               ...activityLog.map((a) => ({ ...a, _type: 'activity' })),
             ].sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
 
+            const ACTIVITY_CFG = {
+              ticket_created:      { bg: 'bg-blue-500/10',     dot: 'bg-blue-500' },
+              ticket_updated:      { bg: 'bg-[#e6e9ef] dark:bg-[#212a38]', dot: 'bg-[#6c6760] dark:bg-[#9aa4b2]' },
+              status_changed:      { bg: 'bg-amber-500/10',    dot: 'bg-amber-500' },
+              priority_changed:    { bg: 'bg-rose-500/10',     dot: 'bg-rose-500' },
+              technician_assigned: { bg: 'bg-violet-500/10',   dot: 'bg-violet-500' },
+              attachment_added:    { bg: 'bg-sky-500/10',      dot: 'bg-sky-500' },
+              resolution_saved:    { bg: 'bg-emerald-500/10',  dot: 'bg-emerald-500' },
+              resolution_deleted:  { bg: 'bg-rose-500/10',     dot: 'bg-rose-400' },
+              time_entry_added:    { bg: 'bg-emerald-500/10',  dot: 'bg-emerald-500' },
+              time_entry_deleted:  { bg: 'bg-[#e6e9ef] dark:bg-[#212a38]', dot: 'bg-[#a09d99] dark:bg-[#4a5568]' },
+              comment_deleted:     { bg: 'bg-[#e6e9ef] dark:bg-[#212a38]', dot: 'bg-[#a09d99] dark:bg-[#4a5568]' },
+            }
+
             const typeIcon = (type, actionType) => {
               if (type === 'comment')
                 return (
@@ -966,27 +993,24 @@ export function TicketDrawer({
                     </svg>
                   </div>
                 )
-              const isCreate = actionType?.includes('creat') || actionType?.includes('open')
+              const cfg = ACTIVITY_CFG[actionType] || ACTIVITY_CFG.ticket_updated
               return (
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${isCreate ? 'bg-blue-500/10' : 'bg-[#e6e9ef] dark:bg-[#212a38]'}`}>
-                  <div className={`w-2.5 h-2.5 rounded-full ${isCreate ? 'bg-blue-500' : 'bg-[#6c6760] dark:bg-[#9aa4b2]'}`} />
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${cfg.bg}`}>
+                  <div className={`w-2.5 h-2.5 rounded-full ${cfg.dot}`} />
                 </div>
               )
             }
 
             const typeLabel = (entry) => {
-              if (entry._type === 'comment') {
-                const who = entry.author_name || entry.user_email || '?'
-                return <span><span className="font-medium text-[#211f1b] dark:text-[#e8ebf0]">{who}</span> {t('ticketDrawer.timelineCommented')}</span>
-              }
+              const who = <span className="font-medium text-[#211f1b] dark:text-[#e8ebf0]">{entry.author_name || entry.user_email || 'System'}</span>
+              if (entry._type === 'comment')
+                return <span>{who} {t('ticketDrawer.timelineCommented')}</span>
               if (entry._type === 'time') {
                 const h = Math.floor((entry.duration_min || 0) / 60)
                 const m = (entry.duration_min || 0) % 60
-                return <span><span className="font-medium text-[#211f1b] dark:text-[#e8ebf0]">{entry.user_email || '?'}</span> {t('ticketDrawer.timelineTimeLogged')} <span className="font-medium text-emerald-600 dark:text-emerald-400">{h}h {m}m</span></span>
+                return <span>{who} {t('ticketDrawer.timelineTimeLogged')} <span className="font-medium text-emerald-600 dark:text-emerald-400">{h}h {m}m</span></span>
               }
-              const who = entry.user_email || 'System'
-              const action = entry.action_type?.replace(/_/g, ' ') || ''
-              return <span><span className="font-medium text-[#211f1b] dark:text-[#e8ebf0]">{who}</span> {action}</span>
+              return <span>{who} {entry.details || entry.action_type?.replace(/_/g, ' ')}</span>
             }
 
             return (

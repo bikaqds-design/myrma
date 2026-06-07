@@ -297,8 +297,27 @@ export function TicketForm({
         updated_date: new Date().toISOString(),
       }
 
+      let newTicket = null
       if (editingTicket) {
         await db.rmaTickets.update(editingTicket.id, ticketData)
+        // Activity log — one entry per changed dimension
+        const logAct = (type, details) =>
+          db.ticketActivity.create({ ticket_id: editingTicket.id, action_type: type, details, user_email: userEmail, created_date: new Date().toISOString() }).catch(() => {})
+        if (ticketData.ticket_status !== editingTicket.ticket_status)
+          logAct('status_changed', `${editingTicket.ticket_status} → ${ticketData.ticket_status}`)
+        if (ticketData.priority !== editingTicket.priority)
+          logAct('priority_changed', `${editingTicket.priority} → ${ticketData.priority}`)
+        if (ticketData.assigned_technician !== editingTicket.assigned_technician)
+          logAct('technician_assigned', `Assigned to ${ticketData.assigned_technician || 'Unassigned'}`)
+        if (newAttachments.length > 0)
+          logAct('attachment_added', `Added ${newAttachments.length} file(s): ${newAttachments.map((a) => a.name).join(', ')}`)
+        if (
+          ticketData.ticket_status === editingTicket.ticket_status &&
+          ticketData.priority === editingTicket.priority &&
+          ticketData.assigned_technician === editingTicket.assigned_technician &&
+          newAttachments.length === 0
+        )
+          logAct('ticket_updated', 'Updated ticket details')
         db.userActivity
           .create(
             userEmail,
@@ -459,7 +478,7 @@ export function TicketForm({
           }
         }
       } else {
-        const newTicket = await db.rmaTickets.create({
+        newTicket = await db.rmaTickets.create({
           ...ticketData,
           created_by: userEmail,
           created_date: new Date().toISOString(),
@@ -552,6 +571,14 @@ export function TicketForm({
             `Created ticket ${rmaNumber} for ${ticketData.customer_name}`
           )
           .catch(() => {})
+        if (newTicket?.id)
+          db.ticketActivity.create({
+            ticket_id: newTicket.id,
+            action_type: 'ticket_created',
+            details: `Created for ${ticketData.customer_name} · ${ticketData.priority} priority · ${ticketData.ticket_status}`,
+            user_email: userEmail,
+            created_date: new Date().toISOString(),
+          }).catch(() => {})
         toast.success(t('ticketForm.ticketCreated'))
       }
 
