@@ -14,6 +14,7 @@ import { registerTicketEventHandlers } from './lib/events/ticketEventHandlers'
 registerTicketEventHandlers()
 import NotificationBell from './components/NotificationBell'
 import Breadcrumb from './components/Breadcrumb'
+import { RouteSkeleton } from './components/Skeleton'
 import OnboardingWizard from './components/OnboardingWizard'
 import { Spinner } from './components/ui'
 import { captureException } from './lib/sentry'
@@ -96,11 +97,7 @@ const Reports = lazyWithReload(() => import('./pages/Reports'))
 const NotFoundPage = lazyWithReload(() => import('./pages/NotFoundPage'))
 import CommandPalette from './components/CommandPalette'
 
-const PageSpinner = () => (
-  <div className="flex items-center justify-center h-64">
-    <Spinner size="xl" />
-  </div>
-)
+const PageSpinner = () => <RouteSkeleton />
 
 // ── Thin route wrappers — extract useParams() so page components stay unchanged ──
 function ProductDetailsRoute({

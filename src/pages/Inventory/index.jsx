@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useURLTab } from '../../hooks/useURLTab'
 import { supabase, db } from '../../api/supabaseClient'
-import { StatCardSkeleton, CardSkeleton } from '../../components/Skeleton'
+import { PageSkeleton } from '../../components/Skeleton'
 import { PageHeader } from '../../components/ui'
 import AIAssist from '../../components/AIAssist'
 import { ROLES } from '../../lib/constants'
@@ -75,17 +75,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
     }
   }, [invalidateInventory])
 
-  if (loading)
-    return (
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <div className="h-8 w-32 animate-pulse bg-gray-200 rounded-lg" />
-          <div className="h-4 w-56 animate-pulse bg-gray-200 rounded-lg" />
-        </div>
-        <StatCardSkeleton count={4} />
-        <CardSkeleton lines={6} />
-      </div>
-    )
+  if (loading) return <PageSkeleton cols={7} />
 
   if (tableMissing)
     return (
