@@ -1343,6 +1343,7 @@
     "statusPending": "⏳ Pending"
   },
   "customerDetails": {
+    "title": "Customer Details",
     "notFound": "Customer not found.",
     "backToCustomers": "Back to Customers",
     "contactLabel": "Contact:",

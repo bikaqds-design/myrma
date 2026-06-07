@@ -1343,6 +1343,7 @@
     "statusPending": "⏳ قيد الانتظار"
   },
   "customerDetails": {
+    "title": "تفاصيل العميل",
     "notFound": "العميل غير موجود.",
     "backToCustomers": "العودة إلى العملاء",
     "contactLabel": "جهة الاتصال:",
