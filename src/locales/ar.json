@@ -1161,7 +1161,13 @@
     "enterHoursOrMinutes": "أدخل الساعات أو الدقائق",
     "failedLogTime": "فشل تسجيل الوقت",
     "timeEntryDeleted": "تم حذف الإدخال",
-    "failedDeleteEntry": "فشل الحذف"
+    "failedDeleteEntry": "فشل الحذف",
+    "timeline": "سجل النشاط",
+    "timelineEmpty": "لا يوجد نشاط مسجل حتى الآن.",
+    "timelineCommented": "علّق",
+    "timelineTimeLogged": "سجّل وقتًا",
+    "timelineStatusChanged": "غيّر الحالة",
+    "timelineCreated": "أنشأ هذه التذكرة"
   },
   "customerModal": {
     "addTitle": "إضافة عميل جديد",

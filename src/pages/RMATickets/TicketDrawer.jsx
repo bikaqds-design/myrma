@@ -65,6 +65,9 @@ export function TicketDrawer({
   const [ticketParts, setTicketParts] = useState([])
   const [ticketPartsMissing, setTicketPartsMissing] = useState(false)
 
+  // Activity log state
+  const [activityLog, setActivityLog] = useState([])
+
   // Resolution state
   const [resolution, setResolution] = useState(null)
   const [resolutionLoading, setResolutionLoading] = useState(false)
@@ -88,6 +91,7 @@ export function TicketDrawer({
     setCommentFiles([])
     setResolution(null)
     setResolutionEditing(false)
+    setActivityLog([])
 
     // Load comments
     setCommentsLoading(true)
@@ -125,6 +129,12 @@ export function TicketDrawer({
           setTicketParts(res.data)
         }
       })
+      .catch(() => {})
+
+    // Load activity log
+    db.ticketActivity
+      .list(ticket.id)
+      .then((rows) => setActivityLog(rows))
       .catch(() => {})
 
     // Load resolution
@@ -930,6 +940,99 @@ export function TicketDrawer({
               </div>
             </div>
           )}
+
+          {/* ── Activity Timeline ── */}
+          {(() => {
+            const entries = [
+              ...ticketComments.map((c) => ({ ...c, _type: 'comment' })),
+              ...timeEntries.map((e) => ({ ...e, _type: 'time' })),
+              ...activityLog.map((a) => ({ ...a, _type: 'activity' })),
+            ].sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
+
+            const typeIcon = (type, actionType) => {
+              if (type === 'comment')
+                return (
+                  <div className="w-7 h-7 rounded-full bg-[#4338ca] dark:bg-[#a5b4fc]/20 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-3.5 h-3.5 text-white dark:text-[#a5b4fc]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                )
+              if (type === 'time')
+                return (
+                  <div className="w-7 h-7 rounded-full bg-emerald-500/10 dark:bg-emerald-400/10 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                )
+              const isCreate = actionType?.includes('creat') || actionType?.includes('open')
+              return (
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${isCreate ? 'bg-blue-500/10' : 'bg-[#e6e9ef] dark:bg-[#212a38]'}`}>
+                  <div className={`w-2.5 h-2.5 rounded-full ${isCreate ? 'bg-blue-500' : 'bg-[#6c6760] dark:bg-[#9aa4b2]'}`} />
+                </div>
+              )
+            }
+
+            const typeLabel = (entry) => {
+              if (entry._type === 'comment') {
+                const who = entry.author_name || entry.user_email || '?'
+                return <span><span className="font-medium text-[#211f1b] dark:text-[#e8ebf0]">{who}</span> {t('ticketDrawer.timelineCommented')}</span>
+              }
+              if (entry._type === 'time') {
+                const h = Math.floor((entry.duration_min || 0) / 60)
+                const m = (entry.duration_min || 0) % 60
+                return <span><span className="font-medium text-[#211f1b] dark:text-[#e8ebf0]">{entry.user_email || '?'}</span> {t('ticketDrawer.timelineTimeLogged')} <span className="font-medium text-emerald-600 dark:text-emerald-400">{h}h {m}m</span></span>
+              }
+              const who = entry.user_email || 'System'
+              const action = entry.action_type?.replace(/_/g, ' ') || ''
+              return <span><span className="font-medium text-[#211f1b] dark:text-[#e8ebf0]">{who}</span> {action}</span>
+            }
+
+            return (
+              <div className="border-t border-gray-200 dark:border-[#212a38] pt-5">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-4">
+                  {t('ticketDrawer.timeline')}
+                </h3>
+                {entries.length === 0 ? (
+                  <p className="text-xs text-gray-500 dark:text-[#9aa4b2] italic">{t('ticketDrawer.timelineEmpty')}</p>
+                ) : (
+                  <div className="relative">
+                    <div className="absolute start-3.5 top-4 bottom-0 w-px bg-[#e6e9ef] dark:bg-[#212a38]" />
+                    <div className="space-y-4">
+                      {entries.map((entry, i) => {
+                        const ts = new Date(entry.created_date)
+                        const dateStr = ts.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+                        const timeStr = ts.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+                        return (
+                          <div key={entry.id ?? i} className="relative flex gap-3">
+                            {typeIcon(entry._type, entry.action_type)}
+                            <div className="flex-1 min-w-0 pt-0.5">
+                              <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2] leading-snug">
+                                {typeLabel(entry)}
+                              </p>
+                              {entry._type === 'comment' && entry.comment_text && (
+                                <p className="mt-1 text-xs text-[#211f1b] dark:text-[#e8ebf0] bg-[#f8f9fb] dark:bg-[#0f1520] rounded-lg px-3 py-2 line-clamp-3 whitespace-pre-wrap">
+                                  {entry.comment_text}
+                                </p>
+                              )}
+                              {entry._type === 'time' && entry.notes && (
+                                <p className="mt-1 text-xs text-[#6c6760] dark:text-[#9aa4b2] italic truncate">{entry.notes}</p>
+                              )}
+                              {entry._type === 'activity' && entry.details && (
+                                <p className="mt-1 text-xs text-[#6c6760] dark:text-[#9aa4b2] italic truncate">{entry.details}</p>
+                              )}
+                              <p className="mt-1 text-[11px] text-[#a09d99] dark:text-[#4a5568]">{dateStr} · {timeStr}</p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* ── Comments & Communication ── */}
           <div className="border-t border-gray-200 dark:border-[#212a38] pt-5">

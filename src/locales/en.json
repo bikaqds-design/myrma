@@ -1161,7 +1161,13 @@
     "enterHoursOrMinutes": "Enter hours or minutes",
     "failedLogTime": "Failed to log time",
     "timeEntryDeleted": "Entry deleted",
-    "failedDeleteEntry": "Failed to delete"
+    "failedDeleteEntry": "Failed to delete",
+    "timeline": "Activity Timeline",
+    "timelineEmpty": "No activity recorded yet.",
+    "timelineCommented": "commented",
+    "timelineTimeLogged": "logged time",
+    "timelineStatusChanged": "changed status",
+    "timelineCreated": "created this ticket"
   },
   "customerModal": {
     "addTitle": "Add New Customer",
