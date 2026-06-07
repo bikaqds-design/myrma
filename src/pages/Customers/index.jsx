@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { PageSkeleton } from '../../components/Skeleton'
 import { PageHeader } from '../../components/ui'
+import { useTranslation } from 'react-i18next'
 import EmptyState from '../../components/EmptyState'
 import { customerSchema, getFirstError } from '../../lib/schemas'
 import { ROLES } from '../../lib/constants'
@@ -21,6 +22,7 @@ export default function Customers({
   currentUserPermissions,
   onNavigateToCustomer,
 }) {
+  const { t } = useTranslation()
   const searchRef = useRef(null)
   const queryClient = useQueryClient()
 
@@ -229,7 +231,7 @@ export default function Customers({
     if (pageNum >= 1 && pageNum <= totalPages) {
       handlePageChange(pageNum)
       setJumpToPage('')
-    } else toast.error(`Page must be between 1 and ${totalPages}`)
+    } else toast.error(t('customers.pageMustBeBetween', { total: totalPages }))
   }
 
   const handleSelectCustomer = (id) =>
@@ -245,13 +247,13 @@ export default function Customers({
 
   const handleBulkDelete = () => {
     openConfirm(
-      'Delete Customers',
-      `Delete ${selectedCustomers.length} selected customer${selectedCustomers.length !== 1 ? 's' : ''}? This cannot be undone.`,
+      t('customers.deleteCustomersTitle'),
+      t('customers.deleteCustomersConfirm', { count: selectedCustomers.length }),
       async () => {
         closeConfirm()
         try {
           await db.customers.bulkDelete(selectedCustomers)
-          toast.success(`Deleted ${selectedCustomers.length} customers`)
+          toast.success(t('customers.bulkDeletedCustomers', { count: selectedCustomers.length }))
           db.auditLog
             .log(
               currentUserEmail,
@@ -263,7 +265,7 @@ export default function Customers({
           queryClient.invalidateQueries({ queryKey: ['customers'] })
           queryClient.invalidateQueries({ queryKey: ['customers-count'] })
         } catch {
-          toast.error('Failed to delete customers')
+          toast.error(t('customers.failedDeleteCustomers'))
         }
       }
     )
@@ -272,7 +274,7 @@ export default function Customers({
   const handleBulkStatusChange = async (status) => {
     try {
       await db.customers.bulkUpdateStatus(selectedCustomers, status)
-      toast.success(`Updated ${selectedCustomers.length} customers`)
+      toast.success(t('customers.bulkUpdatedCustomers', { count: selectedCustomers.length }))
       db.auditLog
         .log(
           currentUserEmail,
@@ -283,7 +285,7 @@ export default function Customers({
       setSelectedCustomers([])
       queryClient.invalidateQueries({ queryKey: ['customers'] })
     } catch {
-      toast.error('Failed to update status')
+      toast.error(t('customers.failedUpdateStatus'))
     }
   }
 
@@ -304,7 +306,7 @@ export default function Customers({
           const result = await storage.uploadCustomerAttachment(file, folderId)
           uploadedAttachments.push(result)
         } catch (err) {
-          toast.error(`Failed to upload ${file.name}: ${err.message}`)
+          toast.error(t('customers.failedUploadFile', { name: file.name, error: err.message }))
           return
         }
       }
@@ -361,7 +363,7 @@ export default function Customers({
             targetEmails: [],
           })
           .catch(() => {})
-        toast.success('Customer updated')
+        toast.success(t('customers.customerUpdated'))
         db.auditLog
           .log(
             currentUserEmail,
@@ -395,7 +397,7 @@ export default function Customers({
             targetEmails: [],
           })
           .catch(() => {})
-        toast.success('Customer created')
+        toast.success(t('customers.customerCreated'))
         db.auditLog
           .log(
             currentUserEmail,
@@ -410,7 +412,7 @@ export default function Customers({
       queryClient.invalidateQueries({ queryKey: ['customers-count'] })
     } catch (error) {
       if (previousCustomers !== null) queryClient.setQueryData(['customers'], previousCustomers) // rollback
-      toast.error(`Failed to save: ${error.message}`)
+      toast.error(t('customers.failedSave', { error: error.message }))
     }
   }
 
@@ -468,7 +470,7 @@ export default function Customers({
               targetEmails: [],
             })
             .catch(() => {})
-          toast.success('Customer deleted')
+          toast.success(t('customers.customerDeleted'))
           db.auditLog
             .log(
               currentUserEmail,
@@ -480,7 +482,7 @@ export default function Customers({
           queryClient.invalidateQueries({ queryKey: ['customers-count'] })
         } catch {
           queryClient.setQueryData(['customers'], previousCustomers) // rollback on error
-          toast.error('Failed to delete customer')
+          toast.error(t('customers.failedDeleteCustomer'))
         }
       }
     )
@@ -495,17 +497,17 @@ export default function Customers({
   const handleExportCSV = () => {
     const csv = [
       [
-        'Code',
-        'Type',
-        'Status',
-        'Company',
-        'Contact Person',
-        'Mobile',
-        'Landline',
-        'Email',
-        'Address',
-        'Account Manager',
-        'Created',
+        t('customers.csvCode'),
+        t('customers.csvType'),
+        t('customers.csvStatus'),
+        t('customers.csvCompany'),
+        t('customers.csvContactPerson'),
+        t('customers.csvMobile'),
+        t('customers.csvLandline'),
+        t('customers.csvEmail'),
+        t('customers.csvAddress'),
+        t('customers.csvAccountManager'),
+        t('customers.csvCreated'),
       ].join(','),
       ...filteredCustomers.map((c) =>
         [
@@ -532,7 +534,7 @@ export default function Customers({
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-    toast.success(`Exported ${filteredCustomers.length} customers`)
+    toast.success(t('customers.exportedCustomers', { count: filteredCustomers.length }))
     db.auditLog
       .log(
         currentUserEmail,
@@ -596,7 +598,7 @@ export default function Customers({
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-    toast.success('Template downloaded')
+    toast.success(t('customers.templateDownloaded'))
   }
 
   const parseCSVLine = (line) => {
@@ -628,7 +630,7 @@ export default function Customers({
       const text = (await file.text()).replace(/^\uFEFF/, '')
       const lines = text.split('\n').filter((line) => line.trim())
       if (lines.length < 2) {
-        toast.error('CSV file is empty or invalid')
+        toast.error(t('customers.csvEmpty'))
         return
       }
 
@@ -636,7 +638,7 @@ export default function Customers({
       const requiredColumns = ['company_name', 'contact_person']
       const missing = requiredColumns.filter((f) => !headers.includes(f))
       if (missing.length > 0) {
-        toast.error(`Missing required columns: ${missing.join(', ')}`)
+        toast.error(t('customers.csvMissingColumns', { columns: missing.join(', ') }))
         return
       }
 
@@ -717,11 +719,9 @@ export default function Customers({
 
       if (toImport.length === 0) {
         if (skippedCount > 0) {
-          toast.error(
-            `All ${skippedCount} customer${skippedCount !== 1 ? 's' : ''} already exist in the system — nothing to import.`
-          )
+          toast.error(t('customers.allExistSkipped', { count: skippedCount }))
         } else {
-          toast.error('No valid customers to import')
+          toast.error(t('customers.noValidCustomers'))
           if (errors.length > 0) captureException(new Error('CSV import errors'), { errors })
         }
         return
@@ -729,13 +729,9 @@ export default function Customers({
 
       await db.customers.bulkCreate(toImport)
       if (skippedCount > 0) {
-        toast.success(
-          `Imported ${toImport.length} new customer${toImport.length !== 1 ? 's' : ''}. Skipped ${skippedCount} duplicate${skippedCount !== 1 ? 's' : ''}.`
-        )
+        toast.success(t('customers.importedWithSkipped', { count: toImport.length, skipped: skippedCount }))
       } else {
-        toast.success(
-          `Successfully imported ${toImport.length} customer${toImport.length !== 1 ? 's' : ''}`
-        )
+        toast.success(t('customers.importedSuccess', { count: toImport.length }))
       }
       db.auditLog
         .log(
@@ -745,27 +741,27 @@ export default function Customers({
         )
         .catch(() => {})
       if (errors.length > 0) {
-        toast.error(`${errors.length} rows had errors — check console`)
+        toast.error(t('customers.importRowErrors', { count: errors.length }))
         captureException(new Error('CSV import errors'), { errors })
       }
       setShowBulkUpload(false)
       queryClient.invalidateQueries({ queryKey: ['customers'] })
       queryClient.invalidateQueries({ queryKey: ['customers-count'] })
     } catch (error) {
-      toast.error(`Failed to import: ${error.message}`)
+      toast.error(t('customers.failedImport', { error: error.message }))
     }
   }
 
   const getStatusBadge = (status) => {
     const map = {
-      Active: 'bg-green-100 text-green-800',
-      Inactive: 'bg-gray-100 text-gray-600',
-      Suspended: 'bg-red-100 text-red-700',
-      VIP: 'bg-purple-100 text-purple-800',
+      Active:    'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400',
+      Inactive:  'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
+      Suspended: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
+      VIP:       'bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-400',
     }
     return (
       <span
-        className={`px-2 py-0.5 text-xs rounded-full font-medium ${map[status] || 'bg-gray-100 text-gray-600'}`}
+        className={`px-2 py-0.5 text-xs rounded-full font-medium ${map[status] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'}`}
       >
         {status || '—'}
       </span>
@@ -818,7 +814,7 @@ export default function Customers({
         onClick={() => handleSort(col)}
         aria-label={`Sort by ${label}`}
         aria-sort={ariaSort}
-        className="flex items-center text-xs font-semibold text-gray-500 uppercase hover:text-gray-800"
+        className="flex items-center text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase hover:text-gray-800"
       >
         {label}
         <SortIcon col={col} />
@@ -847,14 +843,14 @@ export default function Customers({
     }
     return pages.map((p, i) =>
       p === '...' ? (
-        <span key={`e${i}`} className="px-2 text-gray-500">
+        <span key={`e${i}`} className="px-2 text-gray-500 dark:text-[#9aa4b2]">
           …
         </span>
       ) : (
         <button
           key={p}
           onClick={() => handlePageChange(p)}
-          className={`w-8 h-8 rounded text-sm ${currentPage === p ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+          className={`w-8 h-8 rounded text-sm ${currentPage === p ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-100 dark:bg-[#1a2230]'}`}
         >
           {p}
         </button>
@@ -867,13 +863,13 @@ export default function Customers({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <PageHeader title="Customers" subtitle="Manage B2B and B2C customer records" />
+      <PageHeader title={t('customers.title')} subtitle={t('customers.subtitle')} />
 
       {/* Table Card */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+      <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] shadow-sm">
         <div className="p-5 space-y-4">
           {/* Toolbar */}
-          <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 flex-1">
               <div className="relative flex-1 max-w-md">
                 <input
@@ -881,11 +877,11 @@ export default function Customers({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search name, company, mobile, code... (Press / to focus)"
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                  placeholder={t('customers.searchPlaceholder')}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                 />
                 <svg
-                  className="w-5 h-5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2"
+                  className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -902,7 +898,7 @@ export default function Customers({
                 onClick={() => setShowFilters(!showFilters)}
                 aria-expanded={showFilters}
                 aria-controls="customer-filters-panel"
-                className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || filterStatus || filterType || filterCompany ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || filterStatus || filterType || filterCompany ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 dark:border-[#212a38] text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520]'}`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -912,7 +908,7 @@ export default function Customers({
                     d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"
                   />
                 </svg>
-                Filters
+                {t('common.filters')}
                 {(filterStatus || filterType || filterCompany) && (
                   <span className="w-4 h-4 bg-indigo-600 text-white text-xs rounded-full flex items-center justify-center">
                     {[filterStatus, filterType, filterCompany].filter(Boolean).length}
@@ -936,7 +932,7 @@ export default function Customers({
                         d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                       />
                     </svg>
-                    Delete ({selectedCustomers.length})
+                    {t('common.delete')} ({selectedCustomers.length})
                   </button>
                   <select
                     onChange={(e) => {
@@ -946,9 +942,9 @@ export default function Customers({
                       }
                     }}
                     defaultValue=""
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
+                    className="px-4 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
                   >
-                    <option value="">Change Status…</option>
+                    <option value="">{t('customers.changeStatus')}</option>
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
                     <option value="Suspended">Suspended</option>
@@ -958,7 +954,7 @@ export default function Customers({
               {canDo('export') && (
                 <button
                   onClick={handleExportCSV}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm"
+                  className="px-4 py-2 border border-gray-300 dark:border-[#212a38] text-gray-700 dark:text-[#e8ebf0] rounded-lg hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-2 text-sm"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -968,7 +964,7 @@ export default function Customers({
                       d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  Export
+                  {t('common.export')}
                 </button>
               )}
               {canDo('create') && (
@@ -988,7 +984,7 @@ export default function Customers({
                         d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                       />
                     </svg>
-                    Add Customer
+                    {t('customers.addCustomer')}
                     <svg
                       className={`w-4 h-4 transition-transform ${showAddDropdown ? 'rotate-180' : ''}`}
                       fill="none"
@@ -1004,17 +1000,17 @@ export default function Customers({
                     </svg>
                   </button>
                   {showAddDropdown && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#121823] rounded-lg shadow-lg border border-gray-200 dark:border-[#212a38] z-20">
                       <button
                         onClick={() => {
                           resetForm()
                           setShowAddCustomer(true)
                           setShowAddDropdown(false)
                         }}
-                        className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 border-b border-gray-100 rounded-t-lg"
+                        className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-3 border-b border-gray-100 dark:border-[#212a38] rounded-t-lg"
                       >
                         <svg
-                          className="w-5 h-5 text-gray-500"
+                          className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2]"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -1027,8 +1023,8 @@ export default function Customers({
                           />
                         </svg>
                         <div>
-                          <div className="font-medium text-gray-900">Add Single Customer</div>
-                          <div className="text-xs text-gray-500">Create one customer</div>
+                          <div className="font-medium text-gray-900 dark:text-[#e8ebf0]">{t('customers.addSingleCustomer')}</div>
+                          <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('customers.createOneCustomer')}</div>
                         </div>
                       </button>
                       {canDo('import') && (
@@ -1037,10 +1033,10 @@ export default function Customers({
                             setShowBulkUpload(true)
                             setShowAddDropdown(false)
                           }}
-                          className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 rounded-b-lg"
+                          className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-3 rounded-b-lg"
                         >
                           <svg
-                            className="w-5 h-5 text-gray-500"
+                            className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2]"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -1053,8 +1049,8 @@ export default function Customers({
                             />
                           </svg>
                           <div>
-                            <div className="font-medium text-gray-900">Bulk Add / Upload</div>
-                            <div className="text-xs text-gray-500">Upload CSV file</div>
+                            <div className="font-medium text-gray-900 dark:text-[#e8ebf0]">{t('customers.bulkImport')}</div>
+                            <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('customers.importFromCSV')}</div>
                           </div>
                         </button>
                       )}
@@ -1067,40 +1063,40 @@ export default function Customers({
 
           {/* Filters */}
           {showFilters && (
-            <div id="customer-filters-panel" className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg flex-wrap">
+            <div id="customer-filters-panel" className="flex flex-wrap gap-3 items-center p-4 bg-gray-50 dark:bg-[#0f1520] rounded-lg">
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700">Status:</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('common.status')}:</label>
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+                  className="px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm"
                 >
-                  <option value="">All</option>
+                  <option value="">{t('common.all')}</option>
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
                   <option value="Suspended">Suspended</option>
                 </select>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700">Type:</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('common.type')}:</label>
                 <select
                   value={filterType}
                   onChange={(e) => setFilterType(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+                  className="px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm"
                 >
-                  <option value="">All</option>
+                  <option value="">{t('common.all')}</option>
                   <option value="B2B">B2B</option>
                   <option value="B2C">B2C</option>
                 </select>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700">Company / Contact:</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('customers.contactCompany')}:</label>
                 <input
                   type="text"
                   value={filterCompany}
                   onChange={(e) => setFilterCompany(e.target.value)}
-                  placeholder="Type to filter…"
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm w-44 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder={t('customers.filterPlaceholder')}
+                  className="px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm w-44 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
               {(filterStatus || filterType || filterCompany) && (
@@ -1112,7 +1108,7 @@ export default function Customers({
                   }}
                   className="text-sm text-red-600 hover:underline"
                 >
-                  Clear
+                  {t('common.clearAll')}
                 </button>
               )}
             </div>
@@ -1123,25 +1119,22 @@ export default function Customers({
             <div className="mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex items-center gap-2">
               <span>⚠️</span>
               <span>
-                Showing first <strong>{customers.length}</strong> of{' '}
-                <strong>{customersTotalCount}</strong> customers. Use filters or search to find
-                specific records.
+                {t('customers.capWarning', { shown: customers.length, total: customersTotalCount })}
               </span>
             </div>
           )}
 
           {/* Count + per-page */}
-          <div className="flex items-center justify-between text-sm text-gray-600">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-gray-600 dark:text-[#9aa4b2]">
             <span>
-              Showing {filteredCustomers.length === 0 ? 0 : startIndex + 1}–{endIndex} of{' '}
-              {filteredCustomers.length} customers
+              {t('customers.showingRange', { from: filteredCustomers.length === 0 ? 0 : startIndex + 1, to: endIndex, total: filteredCustomers.length })}
             </span>
             <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600">Items per page:</label>
+              <label className="text-sm text-gray-600 dark:text-[#9aa4b2]">{t('common.itemsPerPage')}:</label>
               <select
                 value={itemsPerPage}
                 onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
-                className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
+                className="px-3 py-1 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
               >
                 <option value={10}>10</option>
                 <option value={25}>25</option>
@@ -1154,7 +1147,7 @@ export default function Customers({
           {/* Table */}
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-y border-gray-200">
+              <thead className="bg-gray-50 dark:bg-[#0f1520] border-y border-gray-200 dark:border-[#212a38]">
                 <tr>
                   <th className="px-4 py-3 text-left w-10">
                     <input
@@ -1167,29 +1160,29 @@ export default function Customers({
                       className="w-4 h-4 text-indigo-600 rounded"
                     />
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase w-10">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase w-10">
                     #
                   </th>
                   <th className="px-4 py-3 text-left">
-                    <Th label="Code" col="customer_code" />
+                    <Th label={t('common.code')} col="customer_code" />
                   </th>
                   <th className="px-4 py-3 text-left">
-                    <Th label="Contact / Company" col="contact_person" />
+                    <Th label={t('customers.contactCompany')} col="contact_person" />
                   </th>
                   <th className="px-4 py-3 text-left">
-                    <Th label="Type" col="customer_type" />
+                    <Th label={t('common.type')} col="customer_type" />
                   </th>
                   <th className="px-4 py-3 text-left">
-                    <Th label="Mobile" col="mobile" />
+                    <Th label={t('customers.mobile')} col="mobile" />
                   </th>
                   <th className="px-4 py-3 text-left">
-                    <Th label="Email" col="email" />
+                    <Th label={t('common.email')} col="email" />
                   </th>
                   <th className="px-4 py-3 text-left">
-                    <Th label="Status" col="customer_status" />
+                    <Th label={t('common.status')} col="customer_status" />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                    Actions
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">
+                    {t('common.actions')}
                   </th>
                 </tr>
               </thead>
@@ -1201,21 +1194,21 @@ export default function Customers({
                         preset="customers"
                         description={
                           customers.length > 0
-                            ? 'Try adjusting your filters or search term'
-                            : 'Add your first customer to get started'
+                            ? t('customers.adjustFilters')
+                            : t('customers.noCustomersHint')
                         }
                         action={
                           canDo('create') && customers.length === 0
                             ? () => setShowAddCustomer(true)
                             : undefined
                         }
-                        actionLabel="Add First Customer"
+                        actionLabel={t('customers.addFirstCustomer')}
                       />
                     </td>
                   </tr>
                 ) : (
                   paginatedCustomers.map((c, idx) => (
-                    <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] transition-colors">
                       <td className="px-4 py-3">
                         <input
                           type="checkbox"
@@ -1224,11 +1217,11 @@ export default function Customers({
                           className="w-4 h-4 text-indigo-600 rounded"
                         />
                       </td>
-                      <td className="px-3 py-3 text-xs text-gray-500 tabular-nums">
+                      <td className="px-3 py-3 text-xs text-gray-500 dark:text-[#9aa4b2] tabular-nums">
                         {(currentPage - 1) * itemsPerPage + idx + 1}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-xs font-mono text-gray-500">
+                        <span className="text-xs font-mono text-gray-500 dark:text-[#9aa4b2]">
                           {c.customer_code || '—'}
                         </span>
                       </td>
@@ -1242,31 +1235,31 @@ export default function Customers({
                           <div>
                             <button
                               onClick={() => onNavigateToCustomer(c.id)}
-                              className="font-medium text-gray-900 hover:text-indigo-600 text-sm text-left"
+                              className="font-medium text-gray-900 dark:text-[#e8ebf0] hover:text-indigo-600 text-sm text-left"
                             >
                               {c.contact_person || '—'}
                             </button>
                             {c.company_name && (
-                              <div className="text-xs text-gray-500">{c.company_name}</div>
+                              <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">{c.company_name}</div>
                             )}
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`px-2 py-0.5 text-xs rounded font-medium ${c.customer_type === 'B2B' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}
+                          className={`px-2 py-0.5 text-xs rounded font-medium ${c.customer_type === 'B2B' ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'}`}
                         >
                           {c.customer_type}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{c.mobile || '—'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-[#9aa4b2]">{c.mobile || '—'}</td>
                       <td className="px-4 py-3 text-sm">
                         {c.email ? (
                           <a href={`mailto:${c.email}`} className="text-indigo-600 hover:underline">
                             {c.email}
                           </a>
                         ) : (
-                          <span className="text-gray-500">—</span>
+                          <span className="text-gray-500 dark:text-[#9aa4b2]">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3">{getStatusBadge(c.customer_status)}</td>
@@ -1279,7 +1272,7 @@ export default function Customers({
                           aria-label={`Actions for ${c.contact_person || c.company_name || 'customer'}`}
                           aria-expanded={openMenuId === c.id}
                           aria-haspopup="menu"
-                          className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                          className="p-1.5 rounded-lg text-gray-500 dark:text-[#9aa4b2] hover:text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-100 dark:bg-[#1a2230] transition-colors"
                         >
                           <svg className="w-4 h-4" aria-hidden="true" fill="currentColor" viewBox="0 0 24 24">
                             <circle cx="12" cy="5" r="1.5" />
@@ -1288,16 +1281,16 @@ export default function Customers({
                           </svg>
                         </button>
                         {openMenuId === c.id && (
-                          <div className="absolute right-0 top-9 z-30 w-44 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
+                          <div className="absolute right-0 top-9 z-30 w-44 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-gray-200 dark:border-[#212a38] py-1 overflow-hidden">
                             <button
                               onClick={() => {
                                 onNavigateToCustomer(c.id)
                                 setOpenMenuId(null)
                               }}
-                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
+                              className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-2.5"
                             >
                               <svg
-                                className="w-4 h-4 text-gray-500"
+                                className="w-4 h-4 text-gray-500 dark:text-[#9aa4b2]"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -1315,7 +1308,7 @@ export default function Customers({
                                   d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                                 />
                               </svg>
-                              View
+                              {t('common.view')}
                             </button>
                             {canDo('edit') && (
                               <button
@@ -1323,10 +1316,10 @@ export default function Customers({
                                   handleEditCustomer(c)
                                   setOpenMenuId(null)
                                 }}
-                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-2.5"
                               >
                                 <svg
-                                  className="w-4 h-4 text-gray-500"
+                                  className="w-4 h-4 text-gray-500 dark:text-[#9aa4b2]"
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -1338,7 +1331,7 @@ export default function Customers({
                                     d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                                   />
                                 </svg>
-                                Edit
+                                {t('common.edit')}
                               </button>
                             )}
                             {canDo('delete') && (
@@ -1362,7 +1355,7 @@ export default function Customers({
                                     d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                                   />
                                 </svg>
-                                Delete
+                                {t('common.delete')}
                               </button>
                             )}
                           </div>
@@ -1377,26 +1370,26 @@ export default function Customers({
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-200 dark:border-[#212a38]">
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="px-3 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
-                  Previous
+                  {t('common.previous')}
                 </button>
                 <div className="flex items-center gap-1">{renderPageNumbers()}</div>
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
-                  Next
+                  {t('common.next')}
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600">Jump to page:</span>
+                <span className="text-sm text-gray-600 dark:text-[#9aa4b2]">{t('common.jumpToPage')}:</span>
                 <input
                   type="number"
                   min="1"
@@ -1405,13 +1398,13 @@ export default function Customers({
                   onChange={(e) => setJumpToPage(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleJumpToPage()}
                   placeholder={currentPage.toString()}
-                  className="w-20 px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
+                  className="w-20 px-3 py-1 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
                 />
                 <button
                   onClick={handleJumpToPage}
                   className="px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
                 >
-                  Go
+                  {t('common.go')}
                 </button>
               </div>
             </div>

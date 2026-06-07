@@ -377,11 +377,7 @@ text-3xl+   — 30px+ — Reserved for dashboard KPI numbers
 
 ### 4.4 Dark Mode
 
-#### Current implementation (CSS override approach)
-
-Dark mode is currently implemented via CSS `!important` rules in `src/styles/appearance.css`. When the user enables dark mode, `AppearanceContext` adds a `.dark-mode` class to `<html>`. The `appearance.css` file then applies global overrides for backgrounds, text colors, and borders using that class.
-
-This means most existing page components do **not** have `dark:` Tailwind classes — the CSS overrides handle them globally. This approach works but has gaps (inline `style={{}}` values, dynamic color injections, and chart colors are not covered by the overrides).
+Dark mode is implemented via Tailwind's `class` strategy. `AppearanceContext` toggles the `dark` class on `<html>` (`html.classList.toggle('dark', !!s.darkMode)`) when the user's preference is active. All `dark:` prefix classes in the codebase activate automatically.
 
 **Accessing dark mode state in a component:**
 
@@ -389,38 +385,45 @@ This means most existing page components do **not** have `dark:` Tailwind classe
 import { useAppearance } from '../contexts/AppearanceContext'
 
 const { darkMode } = useAppearance()
-// darkMode is a boolean; use it to conditionally apply values
-// that CSS overrides cannot reach (e.g., inline styles, chart colors)
+// Use the darkMode boolean for values Tailwind dark: cannot reach:
+// inline styles, SVG fill/stroke, Recharts axis/tick colors
 ```
 
-#### Preferred approach for new code
+**MUST: Use the Direction B design token color pairs** for all new UI:
 
-New components added to the codebase SHOULD use Tailwind `dark:` prefix classes rather than relying on the CSS override. The `dark` variant is enabled via Tailwind's `class` strategy (class `dark` on `<html>`) which `AppearanceContext` applies automatically when dark mode is active.
+| Token | Light | Dark | Use |
+|-------|-------|------|-----|
+| Page background | `bg-[#f4f6f9]` | `dark:bg-[#0b0f17]` | Body / page fill |
+| Surface (card) | `bg-white` | `dark:bg-[#121823]` | Cards, panels, sidebar |
+| Surface inset | `bg-[#f8f9fb]` | `dark:bg-[#0f1520]` | Inset sections, inputs |
+| Border | `border-[#e6e9ef]` | `dark:border-[#212a38]` | Card and divider borders |
+| Border soft | `border-[#f0f2f6]` | `dark:border-[#1a2230]` | Subtle separators |
+| Accent | `text-[#4338ca]` | `dark:text-[#a5b4fc]` | Active nav, highlights |
+| Text primary | `text-[#211f1b]` | `dark:text-[#e8ebf0]` | Headings, body text |
+| Text muted | `text-[#6c6760]` | `dark:text-[#9aa4b2]` | Subtitles, secondary |
+| Text faint | `text-[#a09d99]` | `dark:text-[#4a5568]` | Metadata, labels |
 
 ```jsx
-// ✅ CORRECT — explicit dark mode classes (preferred for new components)
-<div className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+// ✅ CORRECT — Direction B design tokens
+<div className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38]">
 
-// ⚠️ ACCEPTABLE — CSS override covers this for existing components
-<div className="bg-white text-gray-900">
+// ✅ CORRECT — inline style for dynamic/SVG values
+<div style={{ color: darkMode ? '#a5b4fc' : '#4338ca' }}>
 
-// ❌ WRONG — inline style bypasses both mechanisms; use darkMode boolean instead
+// ❌ WRONG — stale slate-* classes; do not use for new code
+<div className="dark:bg-slate-800 dark:border-slate-700">
+
+// ❌ WRONG — inline style without darkMode boolean (bypasses dark mode)
 <div style={{ backgroundColor: 'white' }}>
 ```
 
-**MUST: Use semantic color pairs** for all new components:
+**Card style:** Flat hairline cards — no shadows. Use:
+```
+bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-[18px]
+```
+Never add `shadow-sm`, `shadow-md`, or `shadow-lg` to card surfaces.
 
-| Light | Dark | Use |
-|-------|------|-----|
-| `bg-white` | `dark:bg-gray-800` | Card backgrounds |
-| `bg-gray-50` | `dark:bg-gray-900` | Page backgrounds |
-| `bg-gray-100` | `dark:bg-gray-700` | Input backgrounds |
-| `text-gray-900` | `dark:text-white` | Primary text |
-| `text-gray-600` | `dark:text-gray-400` | Secondary text |
-| `text-gray-500` | `dark:text-gray-500` | Placeholder, metadata |
-| `border-gray-200` | `dark:border-gray-700` | Dividers, borders |
-
-> **Migration note:** Full Tailwind `dark:` migration of existing pages is tracked as MED-NEW-5 in `AUDIT_LOG.md`. Until that migration is complete, do not remove the CSS overrides in `appearance.css`.
+> **Legacy note:** ~46 page files still carry stale `dark:bg-slate-*` / `dark:border-slate-*` classes from before the Direction B migration. These are being swept file-by-file. Do not introduce new slate-* dark classes. `appearance.css` may still exist for override compatibility with not-yet-migrated components — do not remove it until the sweep is complete.
 
 ### 4.5 Color Usage
 
@@ -436,7 +439,11 @@ gray     — Inactive, disabled, archived
 purple   — Special status (escalated, VIP)
 ```
 
-**MUST: Never use hard-coded hex colors** in className strings. All colors through Tailwind palette names.
+**MUST: Use semantic color values** for all new UI. Two permitted forms:
+- Tailwind palette names (`bg-indigo-600`, `text-gray-500`) for component states: buttons, badges, status alerts.
+- Direction B design token hex values (`bg-[#f4f6f9]`, `dark:bg-[#121823]`) for the page/card/text/border layer — see the token table in §4.4. These are the **only** permitted hex values in `className` strings; do not invent new hex values.
+
+**MUST: Never hard-code arbitrary hex values** in `className` strings beyond the design token set in §4.4.
 
 ### 4.6 Forbidden Anti-Patterns
 
@@ -665,14 +672,16 @@ The following keys are used by the app — do not reuse them:
 src/api/supabaseClient.js     ← barrel re-export (21 lines, nothing else)
 src/api/client.js             ← creates the supabase client instance
 src/api/auth.js               ← authentication helpers
-src/api/db/index.js           ← aggregates all domain modules
-src/api/db/tickets.js         ← RMA ticket CRUD
-src/api/db/customers.js       ← customer CRUD
-src/api/db/products.js        ← product CRUD
-src/api/db/inventory.js       ← inventory CRUD
-src/api/db/users.js           ← user role management
-src/api/db/notifications.js   ← notification table ops
-... (15 domain files total)
+src/api/db/index.ts           ← aggregates all domain modules + re-exports all Row types
+src/api/db/tickets.ts         ← RMA ticket CRUD (exports RMATicketRow, TicketCommentRow …)
+src/api/db/customers.ts       ← customer CRUD (exports CustomerRow …)
+src/api/db/catalog.ts         ← product/catalog CRUD (exports ProductRow, BrandRow …)
+src/api/db/inventory.ts       ← inventory, parts, invoices (exports PartRow, InvoiceRow …)
+src/api/db/users.ts           ← user role management (exports UserRoleRow …)
+src/api/db/notifications.ts   ← notification table ops (exports NotificationRow)
+src/api/db/system.ts          ← system config, announcements, webhooks, SLA, automation
+src/api/db/audit.ts           ← audit log with resilient write queue (H-9)
+src/api/db/whatsappNotifications.ts ← WhatsApp templates, logs, settings, queue
 src/api/storage.js            ← file upload/download
 src/api/branding.js           ← company branding settings
 src/api/email.js              ← notification dispatch + Edge Function call
@@ -781,6 +790,21 @@ return new Response(JSON.stringify({ error: 'Human-readable message' }), {
 **MUST: Migrations are idempotent** — use `CREATE TABLE IF NOT EXISTS`, `DROP POLICY IF EXISTS`, `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
 
 **LAW: Never alter production schema by running ad-hoc SQL in the Supabase dashboard.** All changes through migration files committed to git.
+
+### 7.5a JSONB Key-Order Rule
+
+**LAW: Never rely on JavaScript object key order for data that round-trips through a `jsonb` column.** PostgreSQL `jsonb` does **not** preserve object key insertion order — it normalizes keys by (length, then bytewise). Code that does `Object.values(obj)` or `Object.keys(obj)` to produce *ordered* output after the object has been read back from a `jsonb` column will be silently scrambled.
+
+```js
+// ❌ WRONG — order is lost when `variables` came from a jsonb column
+parameters: Object.values(variables).map((v) => ({ text: v }))
+
+// ✅ CORRECT — store an explicitly ordered array (jsonb preserves array order)
+// producer:  payload.params = defs.map((d) => variables[d.key])
+// consumer:  parameters: payload.params.map((v) => ({ text: v }))
+```
+
+This bit the WhatsApp queue (positional `{{1}}..{{n}}` params scrambled). For any ordered data crossing `jsonb`, use an **array**, never object key order. See `reference-jsonb-key-order-gotcha` in project memory.
 
 ### 7.6 Storage Bucket Rules
 
@@ -1211,7 +1235,7 @@ d:\myrma-app\
 |-------------|--------------|
 | New page component | `src/pages/NewPage.jsx` |
 | New shared UI component | `src/components/NewComponent.jsx` (or extend `ui.jsx` if primitive) |
-| New Supabase domain module | `src/api/db/newdomain.js` + export from `src/api/db/index.js` |
+| New Supabase domain module | `src/api/db/newdomain.ts` + export from `src/api/db/index.ts`; export Row types |
 | New React hook | `src/hooks/useNewHook.js` |
 | New TypeScript utility | `src/lib/newutil.ts` with corresponding test |
 | New Edge Function | `supabase/functions/new-function/index.ts` |
@@ -1297,15 +1321,17 @@ Key utilities that already exist and must not be duplicated:
 
 ### 14.5 TypeScript Adoption Rules
 
-TypeScript is adopted incrementally — currently in `src/lib/` only.
+TypeScript is adopted in `src/lib/` and `src/api/db/`.
 
-**MUST: All new files in `src/lib/` are `.ts`.**
+**MUST: All new files in `src/lib/` and `src/api/db/` are `.ts`.**
+
+**MUST: Every `src/api/db/` module exports Row type interfaces** for its DB tables (e.g. `RMATicketRow`, `CustomerRow`). Import them from `src/api/db/index.ts` — all Row types are re-exported there.
 
 **MUST: TypeScript files use strict typing** — no `any` without a `// eslint-disable-next-line @typescript-eslint/no-explicit-any` and an explanation comment.
 
 **MUST: `.js` imports in TypeScript files are valid** — the Vite bundler resolves `import foo from './foo.js'` to `./foo.ts`. Do not change this pattern.
 
-**SHOULD: New `src/api/` modules use JSDoc type annotations** as a stepping stone toward TypeScript.
+**MUST: New Supabase domain module files are `.ts`** and export their Row types from `index.ts`.
 
 ### 14.6 ESLint & Prettier
 
@@ -1532,11 +1558,39 @@ auth.is_admin()
 auth.current_user_email()
 ```
 
-### 17.7 Code Generation Quality Standards
+### 17.7 Internationalisation (i18n) Requirements
+
+**LAW: Every new page, component, modal, or function must use `t()` for all user-visible strings. Translation is part of the definition of done — never commit hardcoded English strings in new code.**
+
+The app supports English and Arabic (RTL) via `react-i18next`. Translation files live in `src/locales/en.json` and `src/locales/ar.json`.
+
+**MUST: Add every new key to both locale files simultaneously** — never add to `en.json` without a matching key in `ar.json`.
+
+**MUST: Use `useTranslation()` hook in components:**
+```jsx
+import { useTranslation } from 'react-i18next'
+const { t, i18n } = useTranslation()
+t('section.key')
+t('section.key', { param: value })  // interpolation
+```
+
+**MUST: Module-level functions that cannot use hooks choose one of two patterns:**
+- Pass `t` as a parameter when called from a single component: `exportPDF(invoice, t)`
+- Import the `i18next` singleton directly when called from many places: `import i18next from 'i18next'; i18next.t('key')`
+
+**MUST: Portaled elements get an explicit `dir` attribute** — `createPortal` bypasses `<html dir="rtl">` inheritance:
+```jsx
+const isRtl = i18n.language === 'ar'
+<div dir={isRtl ? 'rtl' : 'ltr'}>...</div>
+```
+
+**MUST: Floating panels anchored to buttons check direction** — in RTL mode a button may appear on the opposite side of the screen; compute panel position from `getBoundingClientRect()` rather than using a fixed `right: Npx`.
+
+### 17.8 Code Generation Quality Standards
 
 **MUST: Generated code follows all naming conventions** in Section 12.
 
-**MUST: Generated components include dark mode classes** (`dark:bg-gray-800`, etc.) — never generate a component with light-mode-only Tailwind classes.
+**MUST: Generated components include dark mode classes** using Direction B design tokens (`dark:bg-[#121823]`, `dark:border-[#212a38]`, `dark:text-[#e8ebf0]`, etc.) — never generate a component with light-mode-only Tailwind classes. See §4.4 for the full token table. Do not use stale `dark:bg-slate-*` or `dark:bg-gray-*` on new components.
 
 **MUST: Generated API calls use the barrel import** (`from '../api/supabaseClient.js'`).
 
@@ -1548,7 +1602,7 @@ auth.current_user_email()
 
 **SHOULD: Generated code includes JSDoc comments** for non-obvious logic.
 
-### 17.8 Testing Generated Code
+### 17.9 Testing Generated Code
 
 **MUST: After generating or modifying `src/lib/` code, the agent MUST run `npm test`** to verify existing tests still pass.
 
@@ -1556,7 +1610,7 @@ auth.current_user_email()
 
 **SHOULD: For critical paths (auth, permissions, storage), the agent SHOULD add tests** if none exist for the modified function.
 
-### 17.9 Documenting Changes
+### 17.10 Documenting Changes
 
 **MUST: When making changes that affect the audit record, update `AUDIT_LOG.md`** changelog section with:
 - Date (YYYY-MM-DD)
@@ -1590,6 +1644,7 @@ These rules have no exceptions. Any violation must be reverted immediately:
 | L-13 | No service role key in browser-side code. Edge Functions only. |
 | L-14 | No skipping optimistic rollback on failed mutations (if optimistic updates are used). |
 | L-15 | No new framework-level dependency without written team approval in the PR. |
+| L-16 | No hardcoded English strings in new code. Every user-visible string in new pages/components/modals uses `t()` from `react-i18next`. Both `en.json` and `ar.json` must be updated together. |
 
 ### 18.2 Forbidden Anti-Patterns
 

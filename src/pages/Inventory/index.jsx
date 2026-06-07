@@ -1,9 +1,11 @@
 import React, { useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useURLTab } from '../../hooks/useURLTab'
 import { supabase, db } from '../../api/supabaseClient'
-import { StatCardSkeleton, CardSkeleton } from '../../components/Skeleton'
+import { PageSkeleton } from '../../components/Skeleton'
 import { PageHeader } from '../../components/ui'
+import AIAssist from '../../components/AIAssist'
 import { ROLES } from '../../lib/constants'
 import { groupByProduct } from './_shared'
 import { ExportMenu } from './ExportMenu'
@@ -15,6 +17,7 @@ import { WarehousesTab } from './WarehousesTab'
 
 // ─── Main Inventory Component ──────────────────────────────────────────────────
 export default function Inventory({ userRole, userEmail, userPermissions, onNavigateToTicket }) {
+  const { t } = useTranslation()
   const canDo = (a) =>
     userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN
       ? true
@@ -72,17 +75,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
     }
   }, [invalidateInventory])
 
-  if (loading)
-    return (
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <div className="h-8 w-32 animate-pulse bg-gray-200 rounded-lg" />
-          <div className="h-4 w-56 animate-pulse bg-gray-200 rounded-lg" />
-        </div>
-        <StatCardSkeleton count={4} />
-        <CardSkeleton lines={6} />
-      </div>
-    )
+  if (loading) return <PageSkeleton cols={7} />
 
   if (tableMissing)
     return (
@@ -104,9 +97,9 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
             </svg>
           </div>
           <div>
-            <h2 className="text-base font-semibold text-amber-900">Database Setup Required</h2>
+            <h2 className="text-base font-semibold text-amber-900">{t('inventory.databaseSetupRequired')}</h2>
             <p className="text-sm text-amber-800 mt-0.5">
-              Run the SQL below in your Supabase SQL Editor, then click Retry.
+              {t('inventory.databaseSetupHint')}
             </p>
           </div>
         </div>
@@ -115,7 +108,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
           onClick={invalidateInventory}
           className="px-5 py-2 bg-amber-600 text-white rounded-xl text-sm font-medium hover:bg-amber-700"
         >
-          Retry
+          {t('common.refresh')}
         </button>
       </div>
     )
@@ -177,25 +170,25 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
   })
 
   const tabs = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'by-product', label: `All Units (${units.length})` },
-    { id: 'received', label: `Received (${receivedProds.length})` },
-    { id: 'under-repair', label: `Under Repair (${underRepairProds.length})` },
-    { id: 'repaired', label: `Repaired (${repairedProds.length})` },
-    { id: 'cant-repair', label: `Can't Repair (${cantRepairProds.length})` },
-    { id: 'rma-stock', label: `RMA Stock (${rmaStockProds.length})` },
-    { id: 'warehouses', label: `Warehouses (${warehouses.length})` },
+    { id: 'overview', label: t('inventory.overview') },
+    { id: 'by-product', label: `${t('inventory.allUnits')} (${units.length})` },
+    { id: 'received', label: `${t('inventory.received')} (${receivedProds.length})` },
+    { id: 'under-repair', label: `${t('inventory.underRepair')} (${underRepairProds.length})` },
+    { id: 'repaired', label: `${t('inventory.repaired')} (${repairedProds.length})` },
+    { id: 'cant-repair', label: `${t('inventory.cantRepair')} (${cantRepairProds.length})` },
+    { id: 'rma-stock', label: `${t('inventory.rmaStock')} (${rmaStockProds.length})` },
+    { id: 'warehouses', label: `${t('inventory.warehouses')} (${warehouses.length})` },
   ]
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Inventory" subtitle="Track RMA units through their full lifecycle">
+      <PageHeader title={t('inventory.title')} subtitle={t('inventory.subtitle')}>
         {canDo('export') && (
           <ExportMenu units={units} batches={batches} warehouses={warehouses} brandMap={brandMap} />
         )}
         <button
           onClick={invalidateInventory}
-          className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 dark:border-[#212a38] rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -205,17 +198,32 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
             />
           </svg>
-          Refresh
+          {t('common.refresh')}
         </button>
       </PageHeader>
 
-      <div className="border-b border-gray-200">
+      <AIAssist
+        contextType="dashboard"
+        data={{
+          range: 'Current inventory snapshot',
+          open: stats?.total ?? units.length,
+          in_progress: units.filter((u) => u.status === 'Under Repair').length,
+          pending: units.filter((u) => u.status === 'Received').length,
+          overdue: units.filter((u) => u.status === "Can't Repair").length,
+          resolved: units.filter((u) => u.status === 'Repaired').length,
+          total: units.length,
+          sla_percent: 100,
+          resolution_rate: units.length ? Math.round((units.filter((u) => u.status === 'Repaired').length / units.length) * 100) : 0,
+        }}
+      />
+
+      <div className="border-b border-gray-200 dark:border-[#212a38]">
         <div className="flex gap-1 overflow-x-auto">
           {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${tab === t.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${tab === t.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 dark:text-[#9aa4b2] hover:text-gray-700 dark:text-[#e8ebf0]'}`}
             >
               {t.label}
             </button>

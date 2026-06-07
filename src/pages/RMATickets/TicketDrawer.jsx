@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { db, storage } from '../../api/supabaseClient'
+import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
+import { db, storage, notifications } from '../../api/supabaseClient'
+import { ProductSearchInput } from './_shared'
 import toast from 'react-hot-toast'
 import Modal from '../../components/Modal'
 import { Button, Spinner } from '../../components/ui'
@@ -24,6 +27,10 @@ export function TicketDrawer({
   userRole,
   userPermissions,
 }) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const products = queryClient.getQueryData(['products']) || []
+
   const canDo = (action) => {
     if (userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN) return true
     return userPermissions?.rma_tickets?.[action] === true
@@ -58,6 +65,17 @@ export function TicketDrawer({
   const [ticketParts, setTicketParts] = useState([])
   const [ticketPartsMissing, setTicketPartsMissing] = useState(false)
 
+  // Activity log state
+  const [activityLog, setActivityLog] = useState([])
+
+  // Resolution state
+  const [resolution, setResolution] = useState(null)
+  const [resolutionLoading, setResolutionLoading] = useState(false)
+  const [resolutionEditing, setResolutionEditing] = useState(false)
+  const [resolutionSaving, setResolutionSaving] = useState(false)
+  const EMPTY_RES = { type: 'replacement', replacement_product_name: '', replacement_serial: '', amount: '', currency: 'USD', reason: '', reference_number: '' }
+  const [resForm, setResForm] = useState(EMPTY_RES)
+
   // Load all detail data whenever the ticket changes
   useEffect(() => {
     if (!ticket) return
@@ -71,6 +89,9 @@ export function TicketDrawer({
     setSerialHistorySerial('')
     setReplyingTo(null)
     setCommentFiles([])
+    setResolution(null)
+    setResolutionEditing(false)
+    setActivityLog([])
 
     // Load comments
     setCommentsLoading(true)
@@ -109,7 +130,67 @@ export function TicketDrawer({
         }
       })
       .catch(() => {})
+
+    // Load activity log
+    db.ticketActivity
+      .list(ticket.id)
+      .then((rows) => setActivityLog(rows))
+      .catch(() => {})
+
+    // Load resolution
+    setResolutionLoading(true)
+    db.ticketResolutions.get(ticket.id)
+      .then((res) => { setResolution(res) })
+      .catch(() => {})
+      .finally(() => setResolutionLoading(false))
   }, [ticket?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const logActivity = (actionType, details) => {
+    db.ticketActivity
+      .create({ ticket_id: ticket.id, action_type: actionType, details, user_email: userEmail, created_date: new Date().toISOString() })
+      .then((entry) => { if (entry) setActivityLog((prev) => [entry, ...prev]) })
+      .catch(() => {})
+  }
+
+  const handleSaveResolution = async () => {
+    if (!resForm.type) return
+    setResolutionSaving(true)
+    try {
+      const payload = {
+        type: resForm.type,
+        replacement_product_name: resForm.replacement_product_name?.trim() || null,
+        replacement_serial: resForm.replacement_serial?.trim() || null,
+        amount: resForm.amount !== '' ? parseFloat(resForm.amount) : null,
+        currency: resForm.currency || 'USD',
+        reason: resForm.reason?.trim() || null,
+        reference_number: resForm.reference_number?.trim() || null,
+        created_by: userEmail,
+      }
+      const saved = await db.ticketResolutions.upsert(ticket.id, payload)
+      setResolution(saved)
+      setResolutionEditing(false)
+      toast.success(t('ticketDrawer.resolutionSaved'))
+      logActivity('resolution_saved', `Resolution: ${resForm.type}`)
+      db.auditLog.log(userEmail, 'ticket_resolution_saved', `${ticket.rma_number}: ${resForm.type}`).catch(() => {})
+    } catch (err) {
+      toast.error(t('ticketDrawer.failedSaveResolution', { error: err.message }))
+    } finally {
+      setResolutionSaving(false)
+    }
+  }
+
+  const handleDeleteResolution = async () => {
+    if (!resolution) return
+    try {
+      await db.ticketResolutions.remove(resolution.id)
+      setResolution(null)
+      setResolutionEditing(false)
+      toast.success(t('ticketDrawer.resolutionRemoved'))
+      logActivity('resolution_deleted', `Resolution removed (was: ${resolution.type})`)
+    } catch {
+      toast.error(t('ticketDrawer.failedRemoveResolution'))
+    }
+  }
 
   const handleAddComment = async (parentCommentId = null) => {
     if (!newComment.trim() && commentFiles.length === 0) return
@@ -154,6 +235,15 @@ export function TicketDrawer({
             targetEmails,
           })
           .catch(() => {})
+        // Email customer for public comments only
+        if (!isInternalComment && ticket.customer_email) {
+          notifications.sendEmail(ticket.customer_email, 'comment_added', {
+            recipient_name: ticket.customer_name,
+            rma_number: ticket.rma_number,
+            comment_author: userEmail,
+            comment_text: newComment.trim(),
+          }).catch((err) => console.error('[email] comment_added:', err.message))
+        }
       }
       setNewComment('')
       db.auditLog
@@ -163,7 +253,7 @@ export function TicketDrawer({
       setReplyingTo(null)
     } catch (err) {
       captureException(err, { page: 'RMATickets', context: 'postComment' })
-      toast.error('Failed to post comment: ' + (err?.message || err?.code || 'unknown error'))
+      toast.error(t('ticketDrawer.failedPostComment', { error: err?.message || err?.code || 'unknown error' }))
     } finally {
       setSubmittingComment(false)
     }
@@ -173,12 +263,13 @@ export function TicketDrawer({
     try {
       await db.ticketComments.delete(commentId)
       setTicketComments((prev) => prev.filter((c) => c.id !== commentId))
+      logActivity('comment_deleted', 'Deleted a comment')
       db.auditLog
         .log(userEmail, 'ticket_comment_deleted', `Deleted comment ${commentId}`)
         .catch(() => {})
     } catch (err) {
       captureException(err, { page: 'RMATickets', context: 'deleteComment' })
-      toast.error('Failed to delete comment')
+      toast.error(t('ticketDrawer.failedDeleteComment'))
     }
   }
 
@@ -195,9 +286,9 @@ export function TicketDrawer({
       scrollable={false}
     >
       <div className="w-full">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200 dark:border-[#212a38]">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Ticket Details</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-[#e8ebf0]">{t('ticketDrawer.title')}</h2>
             <p className="text-sm font-mono text-indigo-600 mt-0.5">{ticket.rma_number}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -213,12 +304,12 @@ export function TicketDrawer({
                   d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              Export PDF
+              {t('ticketDrawer.exportPDF')}
             </button>
             <button
               onClick={onClose}
               aria-label="Close ticket details"
-              className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100"
+              className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 dark:text-[#9aa4b2] hover:bg-gray-100 dark:bg-[#1a2230]"
             >
               <svg className="w-5 h-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -235,14 +326,14 @@ export function TicketDrawer({
         <div className="px-6 py-5 space-y-6 max-h-[72vh] overflow-y-auto">
           {/* Info grid */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-              Ticket Information
+            <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
+              {t('ticketDrawer.ticketInfo')}
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {[
-                { label: 'Customer', value: ticket.customer_name },
+                { label: t('ticketDrawer.customer'), value: ticket.customer_name },
                 {
-                  label: 'Status',
+                  label: t('ticketDrawer.status'),
                   value: (
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(ticket.ticket_status)}`}
@@ -252,7 +343,7 @@ export function TicketDrawer({
                   ),
                 },
                 {
-                  label: 'Priority',
+                  label: t('ticketDrawer.priority'),
                   value: (
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(ticket.priority)}`}
@@ -262,16 +353,16 @@ export function TicketDrawer({
                   ),
                 },
                 {
-                  label: 'Assigned To',
-                  value: ticket.assigned_technician || 'Unassigned',
+                  label: t('ticketDrawer.assignedTo'),
+                  value: ticket.assigned_technician || t('ticketDrawer.unassigned'),
                 },
-                { label: 'Due Date', value: fmt(ticket.due_date) },
-                { label: 'Created', value: fmtDateTime(ticket.created_date) },
-                { label: 'Created By', value: ticket.created_by || '—' },
+                { label: t('ticketDrawer.dueDate'), value: fmt(ticket.due_date) },
+                { label: t('ticketDrawer.created'), value: fmtDateTime(ticket.created_date) },
+                { label: t('ticketDrawer.createdBy'), value: ticket.created_by || '—' },
               ].map(({ label, value }) => (
                 <div key={label}>
-                  <p className="text-xs text-gray-500 mb-1">{label}</p>
-                  <div className="text-sm font-medium text-gray-900">{value}</div>
+                  <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-1">{label}</p>
+                  <div className="text-sm font-medium text-gray-900 dark:text-[#e8ebf0]">{value}</div>
                 </div>
               ))}
             </div>
@@ -280,10 +371,10 @@ export function TicketDrawer({
           {/* General description */}
           {ticket.general_description && (
             <div>
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                General RMA Description
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
+                {t('ticketDrawer.generalDescription')}
               </h3>
-              <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap">
+              <div className="bg-gray-50 dark:bg-[#0f1520] rounded-xl p-4 text-sm text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap">
                 {ticket.general_description}
               </div>
             </div>
@@ -291,17 +382,17 @@ export function TicketDrawer({
 
           {/* Products */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-              Products ({(ticket.products || []).length})
+            <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
+              {t('ticketDrawer.products')} ({(ticket.products || []).length})
             </h3>
             {(ticket.products || []).map((p, i) => (
-              <div key={i} className="border border-gray-200 rounded-xl p-4 mb-3">
+              <div key={i} className="border border-gray-200 dark:border-[#212a38] rounded-xl p-4 mb-3">
                 <h4 className="font-semibold text-gray-800 text-sm mb-3">
-                  Product {i + 1} — {p.product_name}
+                  {t('ticketDrawer.product')} {i + 1} — {p.product_name}
                 </h4>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <p className="text-xs text-gray-500">Serial Number</p>
+                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('ticketDrawer.serialNumber')}</p>
                     <div className="flex items-center gap-2">
                       <p className="font-mono font-medium">{p.serial_number || '—'}</p>
                       {p.serial_number && (
@@ -313,21 +404,21 @@ export function TicketDrawer({
                           }}
                           className="text-xs text-indigo-500 hover:text-indigo-700 underline"
                         >
-                          History
+                          {t('ticketDrawer.history')}
                         </button>
                       )}
                     </div>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">Product Status</p>
+                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('ticketDrawer.productStatus')}</p>
                     <p className="font-medium">{p.product_status}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">Warranty</p>
+                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('ticketDrawer.warranty')}</p>
                     <p className="font-medium">{p.warranty_status}</p>
                   </div>
                   <div className="col-span-2">
-                    <p className="text-xs text-gray-500">Issue Description</p>
+                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('ticketDrawer.issueDescription')}</p>
                     <p className="font-medium">{p.issue_description}</p>
                   </div>
                 </div>
@@ -340,7 +431,7 @@ export function TicketDrawer({
             <div className="border border-indigo-200 rounded-xl p-4 bg-indigo-50/50">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-xs font-semibold text-indigo-700 uppercase tracking-wider">
-                  Serial History — {serialHistorySerial}
+                  {t('ticketDrawer.serialHistory')} — {serialHistorySerial}
                 </h3>
                 <button
                   onClick={() => {
@@ -353,31 +444,31 @@ export function TicketDrawer({
                 </button>
               </div>
               <div className="space-y-2">
-                {serialHistory.map((t) => (
+                {serialHistory.map((sh) => (
                   <div
-                    key={t.id}
-                    className={`flex items-center justify-between p-2 bg-white rounded-lg border text-xs ${t.id === ticket.id ? 'border-indigo-300' : 'border-gray-200'}`}
+                    key={sh.id}
+                    className={`flex items-center justify-between p-2 bg-white dark:bg-[#121823] rounded-lg border text-xs ${sh.id === ticket.id ? 'border-indigo-300' : 'border-gray-200 dark:border-[#212a38]'}`}
                   >
-                    <span className="font-mono font-medium text-indigo-700">{t.rma_number}</span>
-                    <span className="text-gray-600">{t.customer_name}</span>
+                    <span className="font-mono font-medium text-indigo-700">{sh.rma_number}</span>
+                    <span className="text-gray-600 dark:text-[#9aa4b2]">{sh.customer_name}</span>
                     <span
-                      className={`px-2 py-0.5 rounded-full font-medium ${getStatusColor(t.ticket_status)}`}
+                      className={`px-2 py-0.5 rounded-full font-medium ${getStatusColor(sh.ticket_status)}`}
                     >
-                      {t.ticket_status}
+                      {sh.ticket_status}
                     </span>
-                    <span className="text-gray-500">
-                      {t.created_date ? new Date(t.created_date).toLocaleDateString() : '—'}
+                    <span className="text-gray-500 dark:text-[#9aa4b2]">
+                      {sh.created_date ? new Date(sh.created_date).toLocaleDateString() : '—'}
                     </span>
-                    {t.id !== ticket.id && (
+                    {sh.id !== ticket.id && (
                       <button
-                        onClick={() => onNavigateToTicket(t)}
+                        onClick={() => onNavigateToTicket(sh)}
                         className="text-indigo-500 hover:text-indigo-700 underline"
                       >
-                        Open
+                        {t('ticketDrawer.open')}
                       </button>
                     )}
-                    {t.id === ticket.id && (
-                      <span className="text-indigo-500 italic">Current</span>
+                    {sh.id === ticket.id && (
+                      <span className="text-indigo-500 italic">{t('ticketDrawer.current')}</span>
                     )}
                   </div>
                 ))}
@@ -387,13 +478,13 @@ export function TicketDrawer({
 
           {/* ── Time Tracking ── */}
           {!timeEntriesMissing && (
-            <div className="border-t border-gray-200 pt-5">
+            <div className="border-t border-gray-200 dark:border-[#212a38] pt-5">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Time Tracking
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
+                  {t('ticketDrawer.timeTracking')}
                 </h3>
                 <span className="text-xs text-indigo-600 font-medium">
-                  Total:{' '}
+                  {t('ticketDrawer.total')}:{' '}
                   {Math.floor(
                     timeEntries.reduce((sum, e) => sum + (e.duration_min || 0), 0) / 60
                   )}
@@ -414,7 +505,7 @@ export function TicketDrawer({
                       <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M8 5v14l11-7z" />
                       </svg>
-                      Start Timer
+                      {t('ticketDrawer.startTimer')}
                     </button>
                   ) : (
                     <button
@@ -432,10 +523,11 @@ export function TicketDrawer({
                           })
                           setTimeEntries((prev) => [...prev, entry])
                           setTimerNotes('')
-                          toast.success(`Logged ${Math.floor(mins / 60)}h ${mins % 60}m`)
+                          toast.success(t('ticketDrawer.timeLogged', { hours: Math.floor(mins / 60), minutes: mins % 60 }))
+                          logActivity('time_entry_added', `Logged ${Math.floor(mins / 60)}h ${mins % 60}m${timerNotes ? ` — ${timerNotes}` : ''}`)
                         } catch (err) {
                           captureException(err, { page: 'RMATickets', context: 'saveTimeEntry' })
-                          toast.error('Failed to save time entry')
+                          toast.error(t('ticketDrawer.failedSaveTime'))
                         }
                         setTimerStart(null)
                       }}
@@ -444,15 +536,15 @@ export function TicketDrawer({
                       <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                         <rect x="6" y="6" width="12" height="12" />
                       </svg>
-                      Stop &amp; Save
+                      {t('ticketDrawer.stopSave')}
                     </button>
                   )}
                   {timerRunning && (
                     <input
                       value={timerNotes}
                       onChange={(e) => setTimerNotes(e.target.value)}
-                      placeholder="Timer notes (optional)"
-                      className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 outline-none"
+                      placeholder={t('ticketDrawer.timerNotes')}
+                      className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 dark:border-[#212a38] rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 outline-none"
                     />
                   )}
                   {!timerRunning && (
@@ -460,13 +552,13 @@ export function TicketDrawer({
                       onClick={() => setAddingManual((v) => !v)}
                       className="text-xs text-indigo-500 hover:text-indigo-700 underline transition-colors"
                     >
-                      {addingManual ? 'Cancel' : '+ Manual entry'}
+                      {addingManual ? t('ticketDrawer.cancelEntry') : t('ticketDrawer.manualEntry')}
                     </button>
                   )}
                 </div>
                 {/* Manual entry form */}
                 {addingManual && !timerRunning && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                  <div className="bg-gray-50 dark:bg-[#0f1520] border border-gray-200 dark:border-[#212a38] rounded-xl p-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       <input
                         type="number"
@@ -475,9 +567,9 @@ export function TicketDrawer({
                         value={manualHours}
                         onChange={(e) => setManualHours(e.target.value)}
                         placeholder="0"
-                        className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-center focus:ring-1 focus:ring-indigo-400 outline-none"
+                        className="w-16 px-2 py-1.5 border border-gray-200 dark:border-[#212a38] rounded-lg text-xs text-center focus:ring-1 focus:ring-indigo-400 outline-none"
                       />
-                      <span className="text-xs text-gray-500 font-medium">h</span>
+                      <span className="text-xs text-gray-500 dark:text-[#9aa4b2] font-medium">h</span>
                       <input
                         type="number"
                         min="0"
@@ -485,21 +577,21 @@ export function TicketDrawer({
                         value={manualMins}
                         onChange={(e) => setManualMins(e.target.value)}
                         placeholder="0"
-                        className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-center focus:ring-1 focus:ring-indigo-400 outline-none"
+                        className="w-16 px-2 py-1.5 border border-gray-200 dark:border-[#212a38] rounded-lg text-xs text-center focus:ring-1 focus:ring-indigo-400 outline-none"
                       />
-                      <span className="text-xs text-gray-500 font-medium">m</span>
+                      <span className="text-xs text-gray-500 dark:text-[#9aa4b2] font-medium">m</span>
                       <input
                         value={manualNotes}
                         onChange={(e) => setManualNotes(e.target.value)}
-                        placeholder="Notes (optional)"
-                        className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 outline-none"
+                        placeholder={t('ticketDrawer.notesOptional')}
+                        className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 dark:border-[#212a38] rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 outline-none"
                       />
                       <button
                         onClick={async () => {
                           const mins =
                             parseInt(manualHours || 0) * 60 + parseInt(manualMins || 0)
                           if (!mins) {
-                            toast.error('Enter hours or minutes')
+                            toast.error(t('ticketDrawer.enterHoursOrMinutes'))
                             return
                           }
                           try {
@@ -517,18 +609,19 @@ export function TicketDrawer({
                             setManualMins('')
                             setManualNotes('')
                             setAddingManual(false)
-                            toast.success(`Logged ${Math.floor(mins / 60)}h ${mins % 60}m`)
+                            toast.success(t('ticketDrawer.timeLogged', { hours: Math.floor(mins / 60), minutes: mins % 60 }))
+                            logActivity('time_entry_added', `Logged ${Math.floor(mins / 60)}h ${mins % 60}m${manualNotes ? ` — ${manualNotes}` : ''}`)
                           } catch (err) {
                             captureException(err, {
                               page: 'RMATickets',
                               context: 'logTimeManual',
                             })
-                            toast.error('Failed to log time')
+                            toast.error(t('ticketDrawer.failedLogTime'))
                           }
                         }}
                         className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors"
                       >
-                        Log
+                        {t('ticketDrawer.logBtn')}
                       </button>
                     </div>
                   </div>
@@ -539,18 +632,18 @@ export function TicketDrawer({
                     {[...timeEntries].reverse().map((entry) => (
                       <div
                         key={entry.id}
-                        className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs group"
+                        className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-[#0f1520] rounded-lg text-xs group"
                       >
-                        <span className="text-gray-500 shrink-0">{entry.user_email}</span>
+                        <span className="text-gray-500 dark:text-[#9aa4b2] shrink-0">{entry.user_email}</span>
                         <span className="font-semibold text-gray-800 shrink-0">
                           {Math.floor((entry.duration_min || 0) / 60)}h{' '}
                           {(entry.duration_min || 0) % 60}m
                         </span>
                         {entry.notes && (
-                          <span className="text-gray-500 flex-1 truncate">{entry.notes}</span>
+                          <span className="text-gray-500 dark:text-[#9aa4b2] flex-1 truncate">{entry.notes}</span>
                         )}
                         {!entry.notes && <span className="flex-1" />}
-                        <span className="text-gray-500 shrink-0">
+                        <span className="text-gray-500 dark:text-[#9aa4b2] shrink-0">
                           {entry.created_date
                             ? new Date(entry.created_date).toLocaleDateString()
                             : '—'}
@@ -563,13 +656,14 @@ export function TicketDrawer({
                               try {
                                 await db.timeEntries.delete(entry.id)
                                 setTimeEntries((prev) => prev.filter((e) => e.id !== entry.id))
-                                toast.success('Entry deleted')
+                                toast.success(t('ticketDrawer.timeEntryDeleted'))
+                                logActivity('time_entry_deleted', `Deleted time entry: ${Math.floor((entry.duration_min || 0) / 60)}h ${(entry.duration_min || 0) % 60}m`)
                               } catch (err) {
                                 captureException(err, {
                                   page: 'RMATickets',
                                   context: 'deleteTimeEntry',
                                 })
-                                toast.error('Failed to delete')
+                                toast.error(t('ticketDrawer.failedDeleteEntry'))
                               }
                             }}
                             className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all shrink-0"
@@ -581,7 +675,7 @@ export function TicketDrawer({
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-500 italic">No time entries yet.</p>
+                  <p className="text-xs text-gray-500 dark:text-[#9aa4b2] italic">{t('ticketDrawer.noTimeEntries')}</p>
                 )}
               </div>
             </div>
@@ -589,10 +683,10 @@ export function TicketDrawer({
 
           {/* ── Parts Used ── */}
           {!ticketPartsMissing && (
-            <div className="border-t border-gray-200 pt-5">
+            <div className="border-t border-gray-200 dark:border-[#212a38] pt-5">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Parts Used ({ticketParts.length})
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
+                  {t('ticketDrawer.partsUsed')} ({ticketParts.length})
                 </h3>
                 {ticketParts.length > 0 && (
                   <span className="text-xs text-indigo-600 font-medium">
@@ -608,37 +702,205 @@ export function TicketDrawer({
                   {ticketParts.map((tp) => (
                     <div
                       key={tp.id}
-                      className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg text-xs"
+                      className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-[#0f1520] rounded-lg text-xs"
                     >
                       <span className="font-medium text-gray-800 flex-1">
                         {tp.parts?.part_name || '—'}
                       </span>
                       {tp.parts?.part_number && (
-                        <span className="text-gray-500 font-mono">{tp.parts.part_number}</span>
+                        <span className="text-gray-500 dark:text-[#9aa4b2] font-mono">{tp.parts.part_number}</span>
                       )}
-                      <span className="text-gray-500">×{tp.quantity}</span>
-                      <span className="font-semibold text-gray-700">
+                      <span className="text-gray-500 dark:text-[#9aa4b2]">×{tp.quantity}</span>
+                      <span className="font-semibold text-gray-700 dark:text-[#e8ebf0]">
                         ${(tp.quantity * tp.unit_cost).toFixed(2)}
                       </span>
                       {tp.notes && (
-                        <span className="text-gray-500 truncate max-w-[8rem]">{tp.notes}</span>
+                        <span className="text-gray-500 dark:text-[#9aa4b2] truncate max-w-[8rem]">{tp.notes}</span>
                       )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-gray-500 italic">No parts recorded on this ticket.</p>
+                <p className="text-xs text-gray-500 dark:text-[#9aa4b2] italic">{t('ticketDrawer.noParts')}</p>
               )}
             </div>
           )}
 
+          {/* ── Resolution ── */}
+          <div className="border-t border-gray-200 dark:border-[#212a38] pt-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">{t('ticketDrawer.resolution')}</h3>
+              {canDo('edit_all') && !resolutionEditing && (
+                <button
+                  onClick={() => {
+                    setResForm(resolution ? {
+                      type: resolution.type,
+                      replacement_product_name: resolution.replacement_product_name || '',
+                      replacement_serial: resolution.replacement_serial || '',
+                      amount: resolution.amount != null ? String(resolution.amount) : '',
+                      currency: resolution.currency || 'USD',
+                      reason: resolution.reason || '',
+                      reference_number: resolution.reference_number || '',
+                    } : EMPTY_RES)
+                    setResolutionEditing(true)
+                  }}
+                  className="text-xs text-indigo-600 dark:text-[#a5b4fc] font-medium hover:underline"
+                >
+                  {resolution ? t('ticketDrawer.editResolution') : t('ticketDrawer.addResolution')}
+                </button>
+              )}
+            </div>
+
+            {resolutionLoading && <p className="text-xs text-gray-400 dark:text-[#4a5568] italic">Loading…</p>}
+
+            {/* View mode */}
+            {!resolutionLoading && resolution && !resolutionEditing && (
+              <div className="bg-gray-50 dark:bg-[#0f1520] rounded-xl p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    resolution.type === 'replacement' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
+                    resolution.type === 'exchange'    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' :
+                    resolution.type === 'credit_note' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
+                                                        'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                  }`}>
+                    {resolution.type.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                  </span>
+                  {canDo('edit_all') && (
+                    <button onClick={handleDeleteResolution} className="ml-auto text-xs text-red-500 hover:underline">{t('ticketDrawer.deleteResolution')}</button>
+                  )}
+                </div>
+                {(resolution.replacement_product_name || resolution.replacement_serial) && (
+                  <div className="text-xs text-gray-700 dark:text-[#e8ebf0] space-y-0.5">
+                    {resolution.replacement_product_name && <p><span className="text-gray-500 dark:text-[#9aa4b2]">Product: </span>{resolution.replacement_product_name}</p>}
+                    {resolution.replacement_serial && <p><span className="text-gray-500 dark:text-[#9aa4b2]">Serial: </span><span className="font-mono">{resolution.replacement_serial}</span></p>}
+                  </div>
+                )}
+                {resolution.amount != null && (
+                  <p className="text-xs text-gray-700 dark:text-[#e8ebf0]">
+                    <span className="text-gray-500 dark:text-[#9aa4b2]">Amount: </span>
+                    <span className="font-semibold">{resolution.currency} {Number(resolution.amount).toFixed(2)}</span>
+                  </p>
+                )}
+                {resolution.reason && <p className="text-xs text-gray-600 dark:text-[#9aa4b2] italic">"{resolution.reason}"</p>}
+                {resolution.reference_number && (
+                  <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">Ref: <span className="font-mono">{resolution.reference_number}</span></p>
+                )}
+                <p className="text-[10px] text-gray-400 dark:text-[#4a5568]">By {resolution.created_by} · {new Date(resolution.created_at).toLocaleDateString()}</p>
+              </div>
+            )}
+
+            {/* Empty state */}
+            {!resolutionLoading && !resolution && !resolutionEditing && (
+              <p className="text-xs text-gray-400 dark:text-[#4a5568] italic">{t('ticketDrawer.noResolution')}</p>
+            )}
+
+            {/* Edit / Add form */}
+            {resolutionEditing && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('ticketDrawer.resolutionType')}</label>
+                  <select
+                    value={resForm.type}
+                    onChange={(e) => setResForm(f => ({ ...f, type: e.target.value }))}
+                    className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0]"
+                  >
+                    <option value="replacement">Replacement</option>
+                    <option value="exchange">Exchange</option>
+                    <option value="credit_note">Credit Note</option>
+                    <option value="refund">Refund</option>
+                  </select>
+                </div>
+
+                {(resForm.type === 'replacement' || resForm.type === 'exchange') && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('ticketDrawer.replacementProduct')}</label>
+                      <ProductSearchInput
+                        value={resForm.replacement_product_name}
+                        onChange={(v) => setResForm(f => ({ ...f, replacement_product_name: v }))}
+                        products={products}
+                        placeholder="Search or type product name…"
+                        inputClassName="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568] outline-none focus:border-indigo-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('ticketDrawer.serialNumber')}</label>
+                      <input
+                        value={resForm.replacement_serial}
+                        onChange={(e) => setResForm(f => ({ ...f, replacement_serial: e.target.value }))}
+                        placeholder="Replacement unit serial"
+                        className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568] font-mono"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {(resForm.type === 'credit_note' || resForm.type === 'refund') && (
+                  <>
+                    <div className="flex gap-2">
+                      <div className="w-24">
+                        <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('ticketDrawer.currency')}</label>
+                        <select
+                          value={resForm.currency}
+                          onChange={(e) => setResForm(f => ({ ...f, currency: e.target.value }))}
+                          className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0]"
+                        >
+                          {['USD','EUR','GBP','AED','SAR','EGP'].map(c => <option key={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('ticketDrawer.amount')}</label>
+                        <input
+                          type="number" min="0" step="0.01"
+                          value={resForm.amount}
+                          onChange={(e) => setResForm(f => ({ ...f, amount: e.target.value }))}
+                          placeholder="0.00"
+                          className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0]"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('ticketDrawer.referenceNumber')}</label>
+                      <input
+                        value={resForm.reference_number}
+                        onChange={(e) => setResForm(f => ({ ...f, reference_number: e.target.value }))}
+                        placeholder="Invoice / credit note number"
+                        className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568]"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('ticketDrawer.reason')}</label>
+                  <textarea
+                    rows={2}
+                    value={resForm.reason}
+                    onChange={(e) => setResForm(f => ({ ...f, reason: e.target.value }))}
+                    placeholder="Optional notes"
+                    className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568] resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button onClick={handleSaveResolution} loading={resolutionSaving} className="flex-1 justify-center text-sm py-1.5">
+                    {t('ticketDrawer.saveResolution')}
+                  </Button>
+                  <Button variant="secondary" onClick={() => setResolutionEditing(false)} className="text-sm py-1.5">
+                    {t('ticketDrawer.cancelResolution')}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Accessories */}
           {ticket.accessories_received && (
             <div>
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                Accessories Received
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
+                {t('ticketDrawer.accessories')}
               </h3>
-              <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap">
+              <div className="bg-gray-50 dark:bg-[#0f1520] rounded-xl p-4 text-sm text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap">
                 {ticket.accessories_received}
               </div>
             </div>
@@ -647,8 +909,8 @@ export function TicketDrawer({
           {/* Attachments */}
           {ticket.attachments?.length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                Attachments ({ticket.attachments.length})
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
+                {t('ticketDrawer.attachments')} ({ticket.attachments.length})
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {ticket.attachments.map((att, i) => (
@@ -657,7 +919,7 @@ export function TicketDrawer({
                     href={att.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex flex-col items-center p-3 border border-gray-200 rounded-xl hover:bg-indigo-50 hover:border-indigo-300 transition-colors group"
+                    className="flex flex-col items-center p-3 border border-gray-200 dark:border-[#212a38] rounded-xl hover:bg-indigo-50 dark:hover:bg-[#1a2230] hover:border-indigo-300 transition-colors group"
                   >
                     {isImage(att.type) ? (
                       <img
@@ -666,9 +928,9 @@ export function TicketDrawer({
                         className="w-full h-24 object-cover rounded-lg mb-2"
                       />
                     ) : (
-                      <div className="w-full h-24 bg-gray-100 rounded-lg flex items-center justify-center mb-2">
+                      <div className="w-full h-24 bg-gray-100 dark:bg-[#1a2230] rounded-lg flex items-center justify-center mb-2">
                         <svg
-                          className="w-10 h-10 text-gray-500"
+                          className="w-10 h-10 text-gray-500 dark:text-[#9aa4b2]"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -682,23 +944,127 @@ export function TicketDrawer({
                         </svg>
                       </div>
                     )}
-                    <p className="text-xs font-medium text-gray-700 group-hover:text-indigo-600 truncate w-full text-center">
+                    <p className="text-xs font-medium text-gray-700 dark:text-[#e8ebf0] group-hover:text-indigo-600 truncate w-full text-center">
                       {att.name}
                     </p>
-                    <p className="text-xs text-gray-500">{fmtBytes(att.size)}</p>
+                    <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{fmtBytes(att.size)}</p>
                   </a>
                 ))}
               </div>
             </div>
           )}
 
+          {/* ── Activity Timeline ── */}
+          {(() => {
+            const entries = [
+              ...ticketComments.map((c) => ({ ...c, _type: 'comment' })),
+              ...timeEntries.map((e) => ({ ...e, _type: 'time' })),
+              ...activityLog.map((a) => ({ ...a, _type: 'activity' })),
+            ].sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
+
+            const ACTIVITY_CFG = {
+              ticket_created:      { bg: 'bg-blue-500/10',     dot: 'bg-blue-500' },
+              ticket_updated:      { bg: 'bg-[#e6e9ef] dark:bg-[#212a38]', dot: 'bg-[#6c6760] dark:bg-[#9aa4b2]' },
+              status_changed:      { bg: 'bg-amber-500/10',    dot: 'bg-amber-500' },
+              priority_changed:    { bg: 'bg-rose-500/10',     dot: 'bg-rose-500' },
+              technician_assigned: { bg: 'bg-violet-500/10',   dot: 'bg-violet-500' },
+              attachment_added:    { bg: 'bg-sky-500/10',      dot: 'bg-sky-500' },
+              resolution_saved:    { bg: 'bg-emerald-500/10',  dot: 'bg-emerald-500' },
+              resolution_deleted:  { bg: 'bg-rose-500/10',     dot: 'bg-rose-400' },
+              time_entry_added:    { bg: 'bg-emerald-500/10',  dot: 'bg-emerald-500' },
+              time_entry_deleted:  { bg: 'bg-[#e6e9ef] dark:bg-[#212a38]', dot: 'bg-[#a09d99] dark:bg-[#4a5568]' },
+              comment_deleted:     { bg: 'bg-[#e6e9ef] dark:bg-[#212a38]', dot: 'bg-[#a09d99] dark:bg-[#4a5568]' },
+            }
+
+            const typeIcon = (type, actionType) => {
+              if (type === 'comment')
+                return (
+                  <div className="w-7 h-7 rounded-full bg-[#4338ca] dark:bg-[#a5b4fc]/20 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-3.5 h-3.5 text-white dark:text-[#a5b4fc]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                )
+              if (type === 'time')
+                return (
+                  <div className="w-7 h-7 rounded-full bg-emerald-500/10 dark:bg-emerald-400/10 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                )
+              const cfg = ACTIVITY_CFG[actionType] || ACTIVITY_CFG.ticket_updated
+              return (
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${cfg.bg}`}>
+                  <div className={`w-2.5 h-2.5 rounded-full ${cfg.dot}`} />
+                </div>
+              )
+            }
+
+            const typeLabel = (entry) => {
+              const who = <span className="font-medium text-[#211f1b] dark:text-[#e8ebf0]">{entry.author_name || entry.user_email || 'System'}</span>
+              if (entry._type === 'comment')
+                return <span>{who} {t('ticketDrawer.timelineCommented')}</span>
+              if (entry._type === 'time') {
+                const h = Math.floor((entry.duration_min || 0) / 60)
+                const m = (entry.duration_min || 0) % 60
+                return <span>{who} {t('ticketDrawer.timelineTimeLogged')} <span className="font-medium text-emerald-600 dark:text-emerald-400">{h}h {m}m</span></span>
+              }
+              return <span>{who} {entry.details || entry.action_type?.replace(/_/g, ' ')}</span>
+            }
+
+            return (
+              <div className="border-t border-gray-200 dark:border-[#212a38] pt-5">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-4">
+                  {t('ticketDrawer.timeline')}
+                </h3>
+                {entries.length === 0 ? (
+                  <p className="text-xs text-gray-500 dark:text-[#9aa4b2] italic">{t('ticketDrawer.timelineEmpty')}</p>
+                ) : (
+                  <div className="relative">
+                    <div className="absolute start-3.5 top-4 bottom-0 w-px bg-[#e6e9ef] dark:bg-[#212a38]" />
+                    <div className="space-y-4">
+                      {entries.map((entry, i) => {
+                        const ts = new Date(entry.created_date)
+                        const dateStr = ts.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+                        const timeStr = ts.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+                        return (
+                          <div key={entry.id ?? i} className="relative flex gap-3">
+                            {typeIcon(entry._type, entry.action_type)}
+                            <div className="flex-1 min-w-0 pt-0.5">
+                              <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2] leading-snug">
+                                {typeLabel(entry)}
+                              </p>
+                              {entry._type === 'comment' && entry.comment_text && (
+                                <p className="mt-1 text-xs text-[#211f1b] dark:text-[#e8ebf0] bg-[#f8f9fb] dark:bg-[#0f1520] rounded-lg px-3 py-2 line-clamp-3 whitespace-pre-wrap">
+                                  {entry.comment_text}
+                                </p>
+                              )}
+                              {entry._type === 'time' && entry.notes && (
+                                <p className="mt-1 text-xs text-[#6c6760] dark:text-[#9aa4b2] italic truncate">{entry.notes}</p>
+                              )}
+                              {entry._type === 'activity' && entry.details && (
+                                <p className="mt-1 text-xs text-[#6c6760] dark:text-[#9aa4b2] italic truncate">{entry.details}</p>
+                              )}
+                              <p className="mt-1 text-[11px] text-[#a09d99] dark:text-[#4a5568]">{dateStr} · {timeStr}</p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
           {/* ── Comments & Communication ── */}
-          <div className="border-t border-gray-200 pt-5">
+          <div className="border-t border-gray-200 dark:border-[#212a38] pt-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Comments & Communication
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
+                {t('ticketDrawer.comments')}
               </h3>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">
                 {ticketComments.length} comment{ticketComments.length !== 1 ? 's' : ''}
               </span>
             </div>
@@ -708,8 +1074,8 @@ export function TicketDrawer({
                 <Spinner size="md" />
               </div>
             ) : ticketComments.filter((c) => !c.parent_comment_id).length === 0 ? (
-              <div className="text-center py-6 text-gray-500 text-sm">
-                No comments yet. Start the conversation below.
+              <div className="text-center py-6 text-gray-500 dark:text-[#9aa4b2] text-sm">
+                {t('ticketDrawer.noComments')}
               </div>
             ) : (
               <div className="space-y-3 mb-4">
@@ -734,7 +1100,7 @@ export function TicketDrawer({
                     return (
                       <div key={comment.id}>
                         <div
-                          className={`flex gap-3 p-4 rounded-xl border ${comment.is_internal ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}
+                          className={`flex gap-3 p-4 rounded-xl border ${comment.is_internal ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 dark:bg-[#0f1520] border-gray-200 dark:border-[#212a38]'}`}
                         >
                           <div
                             className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 ${comment.is_internal ? 'bg-amber-500' : comment.is_customer_comment ? 'bg-green-500' : 'bg-indigo-500'}`}
@@ -743,24 +1109,24 @@ export function TicketDrawer({
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <span className="text-sm font-semibold text-gray-900">
+                              <span className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">
                                 {displayName}
                               </span>
                               {comment.is_internal && (
                                 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
-                                  Internal
+                                  {t('ticketDrawer.internalBadge')}
                                 </span>
                               )}
                               {comment.is_customer_comment && (
                                 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">
-                                  Customer
+                                  {t('ticketDrawer.customerBadge')}
                                 </span>
                               )}
-                              <span className="text-xs text-gray-500">
+                              <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">
                                 {dateStr} · {timeStr}
                               </span>
                             </div>
-                            <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                            <p className="text-sm text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap">
                               {comment.comment_text}
                             </p>
                             {comment.attachments?.length > 0 && (
@@ -771,7 +1137,7 @@ export function TicketDrawer({
                                     href={att.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs text-indigo-600 hover:text-indigo-800 hover:border-indigo-300 transition-colors"
+                                    className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-[#121823] border border-gray-200 dark:border-[#212a38] rounded-lg text-xs text-indigo-600 hover:text-indigo-800 hover:border-indigo-300 transition-colors"
                                   >
                                     <svg
                                       className="w-3 h-3"
@@ -797,7 +1163,7 @@ export function TicketDrawer({
                                 setNewComment('')
                                 setCommentFiles([])
                               }}
-                              className="mt-2 text-xs text-gray-500 hover:text-indigo-600 transition-colors flex items-center gap-1"
+                              className="mt-2 text-xs text-gray-500 dark:text-[#9aa4b2] hover:text-indigo-600 transition-colors flex items-center gap-1"
                             >
                               <svg
                                 className="w-3 h-3"
@@ -812,7 +1178,7 @@ export function TicketDrawer({
                                   d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
                                 />
                               </svg>
-                              Reply{replies.length > 0 ? ` (${replies.length})` : ''}
+                              {t('ticketDrawer.replyBtn')}{replies.length > 0 ? ` (${replies.length})` : ''}
                             </button>
                           </div>
                           {(userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN) && (
@@ -847,7 +1213,7 @@ export function TicketDrawer({
                               return (
                                 <div
                                   key={reply.id}
-                                  className={`flex gap-3 p-3 rounded-xl border ${reply.is_internal ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}
+                                  className={`flex gap-3 p-3 rounded-xl border ${reply.is_internal ? 'bg-amber-50 border-amber-200' : 'bg-white dark:bg-[#121823] border-gray-200 dark:border-[#212a38]'}`}
                                 >
                                   <div
                                     className={`w-7 h-7 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 ${reply.is_internal ? 'bg-amber-400' : reply.is_customer_comment ? 'bg-green-400' : 'bg-indigo-400'}`}
@@ -856,12 +1222,12 @@ export function TicketDrawer({
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                                      <span className="text-xs font-semibold text-gray-900">
+                                      <span className="text-xs font-semibold text-gray-900 dark:text-[#e8ebf0]">
                                         {rName}
                                       </span>
                                       {reply.is_internal && (
                                         <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
-                                          Internal
+                                          {t('ticketDrawer.internalBadge')}
                                         </span>
                                       )}
                                       {reply.is_customer_comment && (
@@ -869,7 +1235,7 @@ export function TicketDrawer({
                                           Customer
                                         </span>
                                       )}
-                                      <span className="text-xs text-gray-500">
+                                      <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">
                                         {rTs.toLocaleDateString('en-US', {
                                           month: 'short',
                                           day: 'numeric',
@@ -881,7 +1247,7 @@ export function TicketDrawer({
                                         })}
                                       </span>
                                     </div>
-                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                                    <p className="text-sm text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap">
                                       {reply.comment_text}
                                     </p>
                                     {reply.attachments?.length > 0 && (
@@ -892,7 +1258,7 @@ export function TicketDrawer({
                                             href={att.url}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs text-indigo-600 hover:text-indigo-800 hover:border-indigo-300 transition-colors"
+                                            className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-[#121823] border border-gray-200 dark:border-[#212a38] rounded-lg text-xs text-indigo-600 hover:text-indigo-800 hover:border-indigo-300 transition-colors"
                                           >
                                             <svg
                                               className="w-3 h-3"
@@ -941,7 +1307,7 @@ export function TicketDrawer({
                         )}
 
                         {replyingTo === comment.id && (
-                          <div className="ml-8 mt-2 bg-white border border-indigo-200 rounded-xl p-3 space-y-2">
+                          <div className="ml-8 mt-2 bg-white dark:bg-[#121823] border border-indigo-200 rounded-xl p-3 space-y-2">
                             <div className="flex items-center gap-1.5 mb-1">
                               <svg
                                 className="w-3 h-3 text-indigo-500"
@@ -957,7 +1323,7 @@ export function TicketDrawer({
                                 />
                               </svg>
                               <span className="text-xs text-indigo-600 font-medium">
-                                Replying to {displayName}
+                                {t('ticketDrawer.replyingTo')} {displayName}
                               </span>
                             </div>
                             <textarea
@@ -969,7 +1335,7 @@ export function TicketDrawer({
                               }}
                               rows={2}
                               placeholder="Write a reply... (Ctrl+Enter to submit)"
-                              className="w-full text-sm text-gray-700 resize-none outline-none placeholder-gray-400"
+                              className="w-full text-sm text-gray-700 dark:text-[#e8ebf0] resize-none outline-none placeholder-gray-400"
                               autoFocus
                             />
                             {commentFiles.length > 0 && (
@@ -977,7 +1343,7 @@ export function TicketDrawer({
                                 {commentFiles.map((f, i) => (
                                   <span
                                     key={i}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600"
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-[#1a2230] rounded text-xs text-gray-600 dark:text-[#9aa4b2]"
                                   >
                                     {f.name}
                                     <button
@@ -986,7 +1352,7 @@ export function TicketDrawer({
                                           prev.filter((_, j) => j !== i)
                                         )
                                       }
-                                      className="text-gray-500 hover:text-red-500"
+                                      className="text-gray-500 dark:text-[#9aa4b2] hover:text-red-500"
                                     >
                                       ×
                                     </button>
@@ -998,7 +1364,7 @@ export function TicketDrawer({
                               <div className="flex items-center gap-3">
                                 <button
                                   onClick={() => commentFileInputRef.current?.click()}
-                                  className="text-gray-500 hover:text-indigo-600 transition-colors"
+                                  className="text-gray-500 dark:text-[#9aa4b2] hover:text-indigo-600 transition-colors"
                                   title="Attach file"
                                   aria-label="Attach file"
                                 >
@@ -1022,10 +1388,10 @@ export function TicketDrawer({
                                     className={`relative w-8 h-4 rounded-full transition-colors ${isInternalComment ? 'bg-amber-500' : 'bg-gray-200'}`}
                                   >
                                     <div
-                                      className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${isInternalComment ? 'translate-x-4' : ''}`}
+                                      className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white dark:bg-[#121823] rounded-full shadow transition-transform ${isInternalComment ? 'translate-x-4' : ''}`}
                                     />
                                   </div>
-                                  <span className="text-xs text-gray-500">Internal</span>
+                                  <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">Internal</span>
                                 </label>
                               </div>
                               <div className="flex items-center gap-2">
@@ -1035,9 +1401,9 @@ export function TicketDrawer({
                                     setNewComment('')
                                     setCommentFiles([])
                                   }}
-                                  className="text-xs text-gray-500 hover:text-gray-600"
+                                  className="text-xs text-gray-500 dark:text-[#9aa4b2] hover:text-gray-600 dark:text-[#9aa4b2]"
                                 >
-                                  Cancel
+                                  {t('ticketDrawer.cancelReply')}
                                 </button>
                                 <button
                                   onClick={() => handleAddComment(comment.id)}
@@ -1047,7 +1413,7 @@ export function TicketDrawer({
                                   {submittingComment ? (
                                     <Spinner size="sm" color="white" />
                                   ) : (
-                                    'Reply'
+                                    t('ticketDrawer.replyBtn')
                                   )}
                                 </button>
                               </div>
@@ -1061,7 +1427,7 @@ export function TicketDrawer({
             )}
 
             {!replyingTo && (
-              <div className="bg-white border border-gray-200 rounded-xl p-3 space-y-3">
+              <div className="bg-white dark:bg-[#121823] border border-gray-200 dark:border-[#212a38] rounded-xl p-3 space-y-3">
                 <textarea
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
@@ -1070,21 +1436,21 @@ export function TicketDrawer({
                   }}
                   rows={3}
                   placeholder="Write a comment... (Ctrl+Enter to submit)"
-                  className="w-full text-sm text-gray-700 resize-none outline-none placeholder-gray-400"
+                  className="w-full text-sm text-gray-700 dark:text-[#e8ebf0] resize-none outline-none placeholder-gray-400"
                 />
                 {commentFiles.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {commentFiles.map((f, i) => (
                       <span
                         key={i}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-[#1a2230] rounded text-xs text-gray-600 dark:text-[#9aa4b2]"
                       >
                         {f.name}
                         <button
                           onClick={() =>
                             setCommentFiles((prev) => prev.filter((_, j) => j !== i))
                           }
-                          className="text-gray-500 hover:text-red-500"
+                          className="text-gray-500 dark:text-[#9aa4b2] hover:text-red-500"
                         >
                           ×
                         </button>
@@ -1096,7 +1462,7 @@ export function TicketDrawer({
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => commentFileInputRef.current?.click()}
-                      className="text-gray-500 hover:text-indigo-600 transition-colors"
+                      className="text-gray-500 dark:text-[#9aa4b2] hover:text-indigo-600 transition-colors"
                       title="Attach file"
                       aria-label="Attach file"
                     >
@@ -1120,10 +1486,10 @@ export function TicketDrawer({
                         className={`relative w-9 h-5 rounded-full transition-colors ${isInternalComment ? 'bg-amber-500' : 'bg-gray-200'}`}
                       >
                         <div
-                          className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${isInternalComment ? 'translate-x-4' : ''}`}
+                          className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white dark:bg-[#121823] rounded-full shadow transition-transform ${isInternalComment ? 'translate-x-4' : ''}`}
                         />
                       </div>
-                      <span className="text-xs text-gray-600">Internal only</span>
+                      <span className="text-xs text-gray-600 dark:text-[#9aa4b2]">{t('ticketDrawer.internalOnly')}</span>
                     </label>
                   </div>
                   <button
@@ -1150,7 +1516,7 @@ export function TicketDrawer({
                         />
                       </svg>
                     )}
-                    Post
+                    {t('ticketDrawer.postComment')}
                   </button>
                 </div>
               </div>
@@ -1168,7 +1534,7 @@ export function TicketDrawer({
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200">
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-[#212a38]">
           {(canDo('edit_all') || canDo('edit_assigned')) && (
             <Button
               onClick={() => {
@@ -1176,11 +1542,11 @@ export function TicketDrawer({
                 onEdit(ticket)
               }}
             >
-              Edit Ticket
+              {t('ticketDrawer.editTicket')}
             </Button>
           )}
           <Button variant="secondary" onClick={onClose}>
-            Close
+            {t('common.close')}
           </Button>
         </div>
       </div>

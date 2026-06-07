@@ -107,11 +107,41 @@ export function Badge({ variant = 'neutral', dot = false, children, className = 
 export function Card({ children, className = '', padding = true, ...props }) {
   return (
     <div
-      className={`bg-white rounded-xl border border-gray-200 shadow-sm ${padding ? 'p-6' : ''} ${className}`}
+      className={`bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] ${padding ? 'p-[18px]' : ''} ${className}`}
       {...props}
     >
       {children}
     </div>
+  )
+}
+
+// ─── STATUS PILL ──────────────────────────────────────────────────────────────
+const STATUS_PILL_COLORS = {
+  Open:          '#3b82f6',
+  'In Progress': '#6366f1',
+  Pending:       '#f59e0b',
+  'On Hold':     '#eab308',
+  Completed:     '#14b8a6',
+  Closed:        '#10b981',
+  Cancelled:     '#94a3b8',
+  Overdue:       '#ef4444',
+}
+
+export function StatusPill({ status, className = '' }) {
+  const color = STATUS_PILL_COLORS[status] || '#94a3b8'
+  return (
+    <span
+      className={className}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '3px 10px', borderRadius: 9999,
+        fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap',
+        color, background: color + '1e', flexShrink: 0,
+      }}
+    >
+      <span style={{ width: 6, height: 6, borderRadius: 3, background: color, display: 'inline-block', flexShrink: 0 }} />
+      {status}
+    </span>
   )
 }
 
@@ -167,28 +197,27 @@ export function PageHeader({
   className = '',
 }) {
   return (
-    <div className={`flex items-center justify-between flex-wrap gap-4 ${className}`}>
+    <div className={`flex items-center justify-between flex-wrap gap-4 mb-6 ${className}`}>
       <div className="flex items-center gap-3">
         {onBack && (
           <button
             onClick={onBack}
             aria-label={backLabel}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+            className="flex items-center gap-1.5 text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0] transition-colors"
           >
             <svg className="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             {backLabel}
           </button>
         )}
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-          {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
+          <h1 className="text-[22px] font-[750] tracking-[-0.4px] text-[#211f1b] dark:text-[#e8ebf0] m-0 leading-tight">
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="text-[13px] text-[#6c6760] dark:text-[#9aa4b2] mt-0.5 m-0">{subtitle}</p>
+          )}
         </div>
       </div>
       {children && <div className="flex items-center gap-2">{children}</div>}

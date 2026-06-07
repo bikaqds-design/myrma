@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { STATUS_META, RESOLUTION_META, BATCH_STATUS_META, downloadCSV, daysSince, fmt } from './_shared'
 
 // ─── Export Menu ───────────────────────────────────────────────────────────────
 export function ExportMenu({ units, batches, warehouses, brandMap }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const ref = useRef()
   useEffect(() => {
@@ -85,26 +87,26 @@ export function ExportMenu({ units, batches, warehouses, brandMap }) {
 
   const options = [
     {
-      label: 'All Inventory Units',
-      sub: `${units.length} units`,
+      label: t('inventory.exportAllUnits'),
+      sub: t('inventory.countUnits', { count: units.length }),
       fn: exportAll,
       icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
     },
     {
-      label: 'Company Stock',
-      sub: `${units.filter((u) => u.status === 'company_stock').length} units`,
+      label: t('inventory.exportCompanyStock'),
+      sub: t('inventory.countUnits', { count: units.filter((u) => u.status === 'company_stock').length }),
       fn: exportStock,
       icon: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4',
     },
     {
-      label: 'Manufacturer Batches',
-      sub: `${batches.length} batches`,
+      label: t('inventory.exportMfBatches'),
+      sub: t('inventory.countBatches', { count: batches.length }),
       fn: exportBatches,
       icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
     },
     {
-      label: 'Warehouses',
-      sub: `${warehouses.length} warehouses`,
+      label: t('inventory.exportWarehouses'),
+      sub: t('inventory.countWarehouses', { count: warehouses.length }),
       fn: exportWarehouses,
       icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
     },
@@ -124,7 +126,7 @@ export function ExportMenu({ units, batches, warehouses, brandMap }) {
             d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
           />
         </svg>
-        Export
+        {t('common.export')}
         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -132,7 +134,7 @@ export function ExportMenu({ units, batches, warehouses, brandMap }) {
       {open && (
         <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl border border-gray-200 shadow-xl z-30 py-1 overflow-hidden">
           <p className="px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
-            Export as CSV
+            {t('inventory.exportAsCSV')}
           </p>
           {options.map((o) => (
             <button

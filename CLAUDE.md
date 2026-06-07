@@ -96,18 +96,21 @@ All Supabase access goes through `src/api/supabaseClient.js`, which exports:
 
 **Never query `supabase` directly from page components; use these helpers.**
 
-Domain modules in `src/api/db/`:
+Domain modules in `src/api/db/` (all TypeScript — export Row types):
 
-| Module | Covers |
-|--------|--------|
-| `tickets.js` | RMA ticket CRUD + `rmaTracker` public lookup (via Edge Function) |
-| `customers.js` | Customer CRUD |
-| `catalog.js` | Product/catalog CRUD |
-| `inventory.js` | Inventory CRUD |
-| `users.js` | User role management |
-| `notifications.js` | Notification table ops |
-| `system.js` | System config (`rma_config` table) |
-| `audit.js` | Audit log reads |
+| Module | Covers | Key Row Types |
+|--------|--------|---------------|
+| `tickets.ts` | RMA ticket CRUD + `rmaTracker` public lookup (via Edge Function) | `RMATicketRow`, `TicketCommentRow`, `TicketActivityRow` |
+| `customers.ts` | Customer CRUD | `CustomerRow`, `CustomerNoteRow` |
+| `catalog.ts` | Product/catalog CRUD | `ProductRow`, `BrandRow`, `CategoryRow`, `SubcategoryRow` |
+| `inventory.ts` | Inventory, warehouses, parts, time entries, invoices | `InventoryUnitRow`, `PartRow`, `InvoiceRow`, `WarehouseRow` |
+| `users.ts` | User role management | `UserRoleRow`, `UserActivityRow`, `UserPreferencesRow` |
+| `notifications.ts` | Notification table ops | `NotificationRow` |
+| `system.ts` | System config, announcements, webhooks, SLA, automation rules | `RmaConfigRow`, `WebhookRow`, `SlaConfig`, `AutomationRule` |
+| `audit.ts` | Audit log reads + resilient write queue (H-9) | `AuditLogRow` |
+| `whatsappNotifications.ts` | WhatsApp templates, notification logs, settings, queue | `WhatsAppTemplateRow`, `NotificationLogRow`, `NotificationQueueRow` |
+
+Import Row types from `src/api/db/index.ts` — all are re-exported there for convenience.
 
 Many optional tables (e.g. `announcements`, `custom_field_definitions`, `inventory_units`, `warehouses`) may not exist in every deployment. All `db.*` helpers that target these tables guard with `error.code === '42P01'` (table not found) and return `{ missing: true, data: [] }` instead of throwing.
 
@@ -149,9 +152,97 @@ const [activeTab, setActiveTab] = useURLTab('tab', 'products')
 
 `src/contexts/AppearanceContext.jsx` provides global theming (dark mode, font, date/time format, sidebar compact mode, dashboard widget order). Settings are persisted to `rma_config` (key `appearance_settings`) and also cached via `safeStorage` under the key `mrma_appearance`. Access via `useAppearance()`.
 
+**Font:** Primary font is **Hanken Grotesk** (Google Fonts, weights 400–800). Loaded via `index.html` preconnect + stylesheet, and dynamically by `AppearanceContext` when selected. `tailwind.config.js` sets `fontFamily.sans: ['Hanken Grotesk', 'system-ui', 'sans-serif']`. `FONT_STACKS` and `GOOGLE_FONTS` in `AppearanceContext.jsx` include `hanken` as a selectable option.
+
+**Dark mode:** `AppearanceContext` toggles the `dark` class on `<html>` (`darkMode: 'class'` Tailwind strategy). Use `dark:` Tailwind prefix classes with Direction B design tokens — see the Design tokens section below.
+
+### Internationalisation (i18n) / RTL
+
+The app supports **Arabic** and **English** with full RTL layout via `react-i18next`.
+
+**Files:**
+- `src/i18n.js` — i18next config (language detection, `en` default)
+- `src/locales/en.json` — English strings (~500+ keys)
+- `src/locales/ar.json` — Arabic strings (same key structure)
+
+**Usage in components:**
+```jsx
+import { useTranslation } from 'react-i18next'
+const { t, i18n } = useTranslation()
+// simple key
+t('tickets.createTicket')
+// interpolation
+t('tickets.pageMustBeBetween', { total: totalPages })
+```
+
+**Language toggle:** `AppearanceContext` exposes `language` / `setLanguage`. Changing language sets `i18n.changeLanguage(lang)` and toggles `dir="rtl"` on `<html>` (applied via `AppearanceContext` — same mechanism as dark mode).
+
+**Module-level functions** cannot use React hooks. Two patterns:
+
+| Situation | Pattern |
+|-----------|---------|
+| Function called from one component that already has `t` | Pass `t` as parameter: `exportPDF(invoice, t)` |
+| Utility called from many places | Import singleton: `import i18next from 'i18next'` then `i18next.t('key')` |
+
+**RTL portals:** Elements rendered via `createPortal` do NOT inherit `dir="rtl"` from `<html>` automatically. Always add an explicit `dir` attribute:
+```jsx
+const isRtl = i18n.language === 'ar'
+<div dir={isRtl ? 'rtl' : 'ltr'} ...>
+```
+
+**RTL floating panel positioning:** When a button moves in RTL (e.g. notification bell shifts to the left side of the header), anchor the panel to match — use `getBoundingClientRect().left` + clamp logic instead of a fixed `right: 8`. See `NotificationBell.jsx` for the reference implementation.
+
+**LAW: Every new page, component, modal, or function must use `t()` for all user-visible strings at build time.** Translation is part of the definition of done — never leave hardcoded English strings in new code.
+
+### Design tokens (Direction B "Command")
+
+All new UI uses these hex token pairs. Never use `dark:bg-slate-*` or `dark:bg-gray-*` for new components.
+
+| Token | Light | Dark |
+|-------|-------|------|
+| Page background | `#f4f6f9` | `#0b0f17` |
+| Surface (card) | `#ffffff` | `#121823` |
+| Surface inset | `#f8f9fb` | `#0f1520` |
+| Border | `#e6e9ef` | `#212a38` |
+| Border soft | `#f0f2f6` | `#1a2230` |
+| Accent | `#4338ca` | `#a5b4fc` |
+| Text primary | `#211f1b` | `#e8ebf0` |
+| Text muted | `#6c6760` | `#9aa4b2` |
+| Text faint | `#a09d99` | `#4a5568` |
+
+Card style: `bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-[18px]` — no shadow.
+
+In `Dashboard.jsx`, these tokens are computed at render time via `tokens(darkMode)` and passed as a `tk` prop to sub-components. For SVG/inline-style values, use the `darkMode` boolean from `useAppearance()` and pick from the table above.
+
+### WhatsApp / Messaging system
+
+Provider-agnostic notification layer that fires on ticket lifecycle events. Ticket saves emit events via `notificationEventBus.emitAsync()` → handlers in `src/lib/events/ticketEventHandlers.ts` check settings → INSERT into `notification_queue` → invoke `notification-worker` for fast delivery with queue persistence for retry.
+
+**Library (`src/lib/`):**
+- `messaging/types.ts` — `IMessagingProvider`, `NotificationEvent`, `EventType`, `DeliveryStatus`
+- `messaging/TemplateEngine.ts` — `{{key}}` substitution + `{{#key}}…{{/key}}` conditionals; `toWhatsAppParams()` builds positional Meta API params
+- `messaging/MessagingService.ts` — `messagingService` singleton; `registerProvider()`, `send()`, `sendBatch()`
+- `messaging/providers/WhatsAppProvider.ts` — calls `send-whatsapp` Edge Function; never calls Meta API directly
+- `events/NotificationEventBus.ts` — `notificationEventBus` singleton; `on()`, `emit()`, `emitAsync()`
+- `events/ticketEventHandlers.ts` — `registerTicketEventHandlers()` called once from `App.jsx`
+
+**DB tables** (`20260602_whatsapp_notifications.sql`): `whatsapp_templates`, `notification_logs`, `notification_settings`, `notification_queue`.
+
+**Required Supabase secrets:** `WHATSAPP_ACCESS_TOKEN` (use a permanent **System User** token — the temporary API-Setup token expires every 24h → Meta error 190), `WHATSAPP_PHONE_NUMBER_ID` (all digits — a letter `O` for zero `0` causes Meta error 100), `WHATSAPP_WEBHOOK_VERIFY_TOKEN`.
+
+**Control Panel UI:** `src/pages/cp/WASettings.jsx` (provider + per-event toggles), `WATemplates.jsx` (CRUD + phone preview), `WALogs.jsx` (paginated delivery log), `WATestCenter.jsx` (send test, simulate event, run worker).
+
+**Template param ordering (CRITICAL — JSONB pitfall):** WhatsApp templates use positional `{{1}}…{{n}}` params. The handler stores an explicitly-ordered `params: string[]` array in `notification_queue.payload` and the worker sends *that* — **never** rely on `Object.values(variables)` for the param order. **Postgres JSONB does not preserve object key order** (it reorders keys by length, then alphabetically), so an object round-tripped through the JSONB `payload` column comes back scrambled. Arrays preserve order in JSONB; objects do not. The number of params must exactly equal the Meta template's `{{n}}` count, and no param may be empty (Meta rejects empty positional params with error 131008 — the handler substitutes `—` for blanks).
+
+**`whatsapp_templates.template_name`** is the Meta-registered template name actually sent to the API (e.g. `rma_ticket_created_v2`). The DB `body_content` is only for the in-app preview; only the `{{n}}` count must match Meta. To point the system at a renamed Meta template, `UPDATE whatsapp_templates SET template_name = '<new>' WHERE event_type = '<event>'` — no code change.
+
+**Meta template category:** transactional notifications (ticket created/updated/closed) must be **Utility** category. **Marketing** templates are throttled by Meta (error 131049 "not delivered to maintain healthy ecosystem engagement"). Category can't be changed by editing — delete + recreate as Utility, and keep the body purely transactional (no "thank you for choosing us" promo lines, which trigger Marketing classification).
+
+**Meta error cheat sheet** (all logged to `notification_logs.error_message` / `response_data`): 190 token expired · 100 bad phone number ID · 131008 empty/missing param · 132000 param count ≠ template `{{n}}` · 131049 Marketing-throttle (use Utility).
+
 ### Control Panel
 
-`src/pages/ControlPanel.jsx` hosts all admin-only sub-pages (User Management, Branding, RMA Config, Custom Fields, PDF Layout, Announcements, Audit Log, Data Cleanup, Backup/Restore, Integrations). It uses `useURLTab` to keep the active feature in the URL as `?feature=...`.
+`src/pages/ControlPanel.jsx` hosts all admin-only sub-pages (User Management, Branding, RMA Config, Custom Fields, PDF Layout, Announcements, Audit Log, Data Cleanup, Backup/Restore, Integrations, **WhatsApp & Messaging**). It uses `useURLTab` to keep the active feature in the URL as `?feature=...`.
 
 ### CSV bulk upload
 
@@ -167,6 +258,9 @@ Live in `supabase/functions/`:
 - `admin-reset-password` — handles password reset (existing user) AND account creation (new user, create-if-missing logic)
 - `public-track` — rate-limited public RMA lookup by RMA number (used by `/tracker`)
 - `send-email` — email dispatch via the notifications system
+- `send-whatsapp` — WhatsApp message dispatch via Meta Cloud API; reads `WHATSAPP_ACCESS_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` from Supabase secrets; writes audit log to `notification_logs`
+- `notification-worker` — queue processor; fetches up to 10 pending `notification_queue` jobs, invokes `send-whatsapp`, exponential-backoff retry (5 min → 10 min → 20 min), 200 ms rate limit
+- `whatsapp-webhook` — Meta delivery-status callbacks (GET: verification handshake via `WHATSAPP_WEBHOOK_VERIFY_TOKEN`; POST: updates `notification_logs` delivery status on sent/delivered/read/failed)
 
 All Edge Functions validate the caller's JWT before performing privileged operations. Never expose the service role key to the browser.
 
@@ -213,6 +307,8 @@ Current migrations:
 - `20260528_ticket_cascade_fk.sql`
 - `20260529_repair_permissions.sql`
 - `20260531_relax_ticket_status_constraint.sql`
+- `20260602_whatsapp_notifications.sql`
+- `20260603_user_preferences_rls.sql`
 
 ### RLS SQL helper functions
 
@@ -230,7 +326,7 @@ public.rma_current_user_email() -- current user's email
 
 ### Shared component library
 
-All UI primitives come from `src/components/ui.jsx`. Never re-implement buttons, inputs, modals, badges, or spinners in page components. Key exports: `Button` (variants: primary, secondary, danger, success, ghost, warning), `Spinner` (has built-in `role="status"` and `aria-label="Loading"`), `Badge`, `Card`, `Input`, `Select`, `Textarea`, `Label`, `PageHeader`, `SectionTitle`, `Divider`, `IconButton`, `ModalOverlay`, `ModalCard`.
+All UI primitives come from `src/components/ui.jsx`. Never re-implement buttons, inputs, modals, badges, or spinners in page components. Key exports: `Button` (variants: primary, secondary, danger, success, ghost, warning), `Spinner` (has built-in `role="status"` and `aria-label="Loading"`), `Badge`, `Card` (flat hairline, no shadow), `Input`, `Select`, `Textarea`, `Label`, `PageHeader`, `SectionTitle`, `Divider`, `IconButton`, `ModalOverlay`, `ModalCard`, `StatusPill` (dot + label pill, colored by status string — uses its own internal color map, no props beyond `status` and optional `className`).
 
 ### CI/CD
 

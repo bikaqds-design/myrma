@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useURLTab } from '../hooks/useURLTab'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../lib/sentry'
+import { TICKET_STATUS } from '../lib/constants'
 import { Spinner } from '../components/ui'
 import UserManagement from './UserManagement'
 import BrandingSettings from './BrandingSettings'
@@ -15,6 +17,10 @@ import DataCleanup from './cp/DataCleanup'
 import Integrations from './cp/Integrations'
 import CustomFields from './cp/CustomFields'
 import PDFLayout from './cp/PDFLayout'
+import WASettings from './cp/WASettings'
+import WATemplates from './cp/WATemplates'
+import WALogs from './cp/WALogs'
+import WATestCenter from './cp/WATestCenter'
 
 // ─── Feature registry ──────────────────────────────────────────────────────
 
@@ -22,12 +28,15 @@ const GROUPS = [
   {
     id: 'tickets',
     label: 'Ticket Management',
+    labelKey: 'cp.groupTickets',
     color: 'indigo',
     features: [
       {
         id: 'rmaconfig',
         label: 'RMA Configuration',
+        labelKey: 'cp.rmaConfigLabel',
         desc: 'SLA rules, auto-assignment and ticket defaults',
+        descKey: 'cp.rmaConfigDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -48,7 +57,9 @@ const GROUPS = [
       {
         id: 'customfields',
         label: 'Custom Fields',
+        labelKey: 'cp.customFieldsLabel',
         desc: 'Add extra fields to tickets and customers',
+        descKey: 'cp.customFieldsDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -63,7 +74,9 @@ const GROUPS = [
       {
         id: 'pdflayout',
         label: 'PDF Layout',
+        labelKey: 'cp.pdfLayoutLabel',
         desc: 'Customize the ticket print and export template',
+        descKey: 'cp.pdfLayoutDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -80,12 +93,15 @@ const GROUPS = [
   {
     id: 'users',
     label: 'Users & Communication',
+    labelKey: 'cp.groupUsers',
     color: 'emerald',
     features: [
       {
         id: 'users',
         label: 'User Management',
+        labelKey: 'cp.userMgmtLabel',
         desc: 'Manage accounts, roles and permissions',
+        descKey: 'cp.userMgmtDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -100,7 +116,9 @@ const GROUPS = [
       {
         id: 'announcements',
         label: 'Announcements',
+        labelKey: 'cp.announcementsLabel',
         desc: 'Post system-wide banners visible to all users',
+        descKey: 'cp.announcementsDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -115,7 +133,9 @@ const GROUPS = [
       {
         id: 'broadcast',
         label: 'Send Alert',
+        labelKey: 'cp.sendAlertLabel',
         desc: 'Send instant in-app notifications to users or groups',
+        descKey: 'cp.sendAlertDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -132,12 +152,15 @@ const GROUPS = [
   {
     id: 'appearance',
     label: 'Appearance & Notifications',
+    labelKey: 'cp.groupAppearance',
     color: 'purple',
     features: [
       {
         id: 'appearance',
         label: 'Appearance',
+        labelKey: 'cp.appearanceLabel',
         desc: 'Logo, colors, dark mode, fonts, sidebar style',
+        descKey: 'cp.appearanceDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -152,7 +175,9 @@ const GROUPS = [
       {
         id: 'email',
         label: 'Email & Notifications',
+        labelKey: 'cp.emailNotifLabel',
         desc: 'Email provider, templates and preferences',
+        descKey: 'cp.emailNotifDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -169,12 +194,15 @@ const GROUPS = [
   {
     id: 'automation',
     label: 'Automation & Integration',
+    labelKey: 'cp.groupAutomation',
     color: 'rose',
     features: [
       {
         id: 'sla',
         label: 'SLA Policies',
+        labelKey: 'cp.slaPoliciesLabel',
         desc: 'Auto-set due dates per priority; track breach rates',
+        descKey: 'cp.slaPoliciesDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -189,7 +217,9 @@ const GROUPS = [
       {
         id: 'automation',
         label: 'Automation Rules',
+        labelKey: 'cp.automationRulesLabel',
         desc: 'Trigger actions automatically when ticket events occur',
+        descKey: 'cp.automationRulesDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -204,7 +234,9 @@ const GROUPS = [
       {
         id: 'webhooks',
         label: 'Outbound Webhooks',
+        labelKey: 'cp.webhooksLabel',
         desc: 'Push ticket events to Slack, QuickBooks, and other services',
+        descKey: 'cp.webhooksDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -219,7 +251,9 @@ const GROUPS = [
       {
         id: 'integrations',
         label: 'Email & API',
+        labelKey: 'cp.emailApiLabel',
         desc: 'Configure outbound email and external connections',
+        descKey: 'cp.emailApiDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -234,14 +268,77 @@ const GROUPS = [
     ],
   },
   {
+    id: 'messaging',
+    label: 'WhatsApp & Messaging',
+    labelKey: 'cp.groupMessaging',
+    color: 'teal',
+    features: [
+      {
+        id: 'wa-settings',
+        label: 'Notification Settings',
+        labelKey: 'cp.notifSettingsLabel',
+        desc: 'Enable providers, per-event toggles, retry and rate-limit config',
+        descKey: 'cp.notifSettingsDesc',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+        ),
+      },
+      {
+        id: 'wa-templates',
+        label: 'Message Templates',
+        labelKey: 'cp.msgTemplatesLabel',
+        desc: 'Create, edit and preview WhatsApp message templates with variables',
+        descKey: 'cp.msgTemplatesDesc',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3v-3z" />
+          </svg>
+        ),
+      },
+      {
+        id: 'wa-logs',
+        label: 'Notification Logs',
+        labelKey: 'cp.notifLogsLabel',
+        desc: 'View sent/failed messages, delivery status, retry failed notifications',
+        descKey: 'cp.notifLogsDesc',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+        ),
+      },
+      {
+        id: 'wa-test',
+        label: 'Test Center',
+        labelKey: 'cp.testCenterLabel',
+        desc: 'Send test messages, simulate events, run the queue worker manually',
+        descKey: 'cp.testCenterDesc',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
     id: 'data',
     label: 'Data & System',
+    labelKey: 'cp.groupData',
     color: 'amber',
     features: [
       {
         id: 'audit',
         label: 'Audit Log',
+        labelKey: 'cp.auditLogLabel',
         desc: 'Full trail of all user activity across the system',
+        descKey: 'cp.auditLogDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -256,7 +353,9 @@ const GROUPS = [
       {
         id: 'cleanup',
         label: 'Data Cleanup',
+        labelKey: 'cp.dataCleanupLabel',
         desc: 'Remove stale records and identify data quality issues',
+        descKey: 'cp.dataCleanupDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -271,7 +370,9 @@ const GROUPS = [
       {
         id: 'backup',
         label: 'Backup & Restore',
+        labelKey: 'cp.backupRestoreLabel',
         desc: 'Export all data and restore from backup files',
+        descKey: 'cp.backupRestoreDesc',
         icon: (
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -324,9 +425,17 @@ const COLOR_MAP = {
     label: 'text-rose-900',
     hover: 'hover:border-rose-300 hover:bg-rose-50/80',
   },
+  teal: {
+    bg: 'bg-teal-50',
+    border: 'border-teal-100',
+    icon: 'bg-teal-100 text-teal-600',
+    label: 'text-teal-900',
+    hover: 'hover:border-teal-300 hover:bg-teal-50/80',
+  },
 }
 
 export default function ControlPanel({ currentUserRole, currentUserEmail }) {
+  const { t } = useTranslation()
   const [section, setSection] = useURLTab('section', null, true)
 
   if (currentUserRole !== 'admin' && currentUserRole !== 'super_admin') {
@@ -346,8 +455,8 @@ export default function ControlPanel({ currentUserRole, currentUserEmail }) {
               d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
             />
           </svg>
-          <h2 className="text-xl font-semibold text-gray-700">Access Restricted</h2>
-          <p className="text-gray-500 mt-1">This area is for administrators only.</p>
+          <h2 className="text-xl font-semibold text-gray-700 dark:text-[#e8ebf0]">{t('cp.accessRestricted')}</h2>
+          <p className="text-gray-500 dark:text-[#9aa4b2] mt-1">{t('cp.accessRestrictedDesc')}</p>
         </div>
       </div>
     )
@@ -372,7 +481,7 @@ export default function ControlPanel({ currentUserRole, currentUserEmail }) {
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            Control Panel
+            {t('cp.title')}
           </button>
           <svg
             className="w-4 h-4 text-gray-300"
@@ -382,12 +491,12 @@ export default function ControlPanel({ currentUserRole, currentUserEmail }) {
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-          <span className="text-sm font-semibold text-gray-900">{activeFeature?.label}</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{activeFeature?.labelKey ? t(activeFeature.labelKey) : activeFeature?.label}</span>
         </div>
       ) : (
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Control Panel</h1>
-          <p className="text-sm text-gray-500 mt-0.5">System administration and configuration</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-[#e8ebf0]">{t('cp.title')}</h1>
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-0.5">{t('cp.subtitle')}</p>
         </div>
       )}
 
@@ -430,6 +539,10 @@ export default function ControlPanel({ currentUserRole, currentUserEmail }) {
       {section === 'sla' && <SLAPolicies currentUserEmail={currentUserEmail} />}
       {section === 'automation' && <AutomationRules currentUserEmail={currentUserEmail} />}
       {section === 'webhooks' && <WebhooksConfig currentUserEmail={currentUserEmail} />}
+      {section === 'wa-settings' && <WASettings currentUserEmail={currentUserEmail} />}
+      {section === 'wa-templates' && <WATemplates currentUserEmail={currentUserEmail} />}
+      {section === 'wa-logs' && <WALogs currentUserEmail={currentUserEmail} />}
+      {section === 'wa-test' && <WATestCenter currentUserEmail={currentUserEmail} />}
     </div>
   )
 }
@@ -454,6 +567,7 @@ const ALERT_TARGETS = [
 ]
 
 function SendAlert({ currentUserEmail }) {
+  const { t } = useTranslation()
   const [type, setType] = useState('system_announcement')
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
@@ -464,11 +578,11 @@ function SendAlert({ currentUserEmail }) {
 
   const handleSend = async () => {
     if (!title.trim() || !message.trim()) {
-      toast.error('Title and message are required')
+      toast.error(t('cp.sendAlert.titleRequired'))
       return
     }
     if (target === 'email' && !specificEmail.trim()) {
-      toast.error('Enter a recipient email address')
+      toast.error(t('cp.sendAlert.recipientRequired'))
       return
     }
     setSending(true)
@@ -482,7 +596,7 @@ function SendAlert({ currentUserEmail }) {
         targetRoles: targetConfig.roles,
         targetEmails: target === 'email' ? [specificEmail.trim()] : [],
       })
-      toast.success('Alert sent')
+      toast.success(t('cp.sendAlert.successSent'))
       db.auditLog
         .log(currentUserEmail, 'alert_sent', `Sent alert "${title.trim()}" to ${target}`)
         .catch(() => {})
@@ -493,7 +607,7 @@ function SendAlert({ currentUserEmail }) {
       setTimeout(() => setSent(false), 3000)
     } catch (err) {
       captureException(err, { page: 'ControlPanel', context: 'sendAlert' })
-      toast.error(`Failed to send: ${err.message}`)
+      toast.error(t('cp.sendAlert.failedSend', { error: err.message }))
     } finally {
       setSending(false)
     }
@@ -501,23 +615,23 @@ function SendAlert({ currentUserEmail }) {
 
   return (
     <div className="max-w-2xl space-y-5">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+      <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-6 space-y-6">
         {/* Type */}
         <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            Alert Type
+          <p className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
+            {t('cp.sendAlert.alertType')}
           </p>
-          <div className="grid grid-cols-2 gap-3">
-            {ALERT_TYPES.map((t) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {ALERT_TYPES.map((at) => (
               <button
-                key={t.value}
-                onClick={() => setType(t.value)}
-                className={`flex items-center gap-3 p-3.5 rounded-xl border-2 text-left transition-colors ${type === t.value ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
+                key={at.value}
+                onClick={() => setType(at.value)}
+                className={`flex items-center gap-3 p-3.5 rounded-xl border-2 text-left transition-colors ${type === at.value ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 dark:border-[#212a38] hover:border-gray-300 dark:border-[#212a38] bg-white dark:bg-[#121823]'}`}
               >
-                <span className="text-2xl">{t.icon}</span>
+                <span className="text-2xl">{at.icon}</span>
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">{t.label}</p>
-                  <p className="text-xs text-gray-500">{t.desc}</p>
+                  <p className="text-sm font-semibold text-gray-800">{at.value === 'system_announcement' ? t('cp.sendAlert.typeAnnouncement') : t('cp.sendAlert.typeWarning')}</p>
+                  <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{at.desc}</p>
                 </div>
               </button>
             ))}
@@ -526,48 +640,48 @@ function SendAlert({ currentUserEmail }) {
 
         {/* Title */}
         <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-            Title <span className="text-red-500">*</span>
+          <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
+            {t('cp.sendAlert.titleLabel')}
           </label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={100}
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+            className="w-full px-3 py-2.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
             placeholder="e.g. System maintenance tonight at 11pm"
           />
         </div>
 
         {/* Message */}
         <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-            Message <span className="text-red-500">*</span>
+          <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
+            {t('cp.sendAlert.messageLabel')}
           </label>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={4}
             maxLength={500}
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent resize-none"
+            className="w-full px-3 py-2.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent resize-none"
             placeholder="Describe the alert in detail..."
           />
-          <p className="text-xs text-gray-500 text-right mt-1">{message.length}/500</p>
+          <p className="text-xs text-gray-500 dark:text-[#9aa4b2] text-right mt-1">{message.length}/500</p>
         </div>
 
         {/* Target */}
         <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            Send To
+          <p className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-3">
+            {t('cp.sendAlert.sendTo')}
           </p>
-          <div className="grid grid-cols-2 gap-2">
-            {ALERT_TARGETS.map((t) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {ALERT_TARGETS.map((tgt) => (
               <button
-                key={t.value}
-                onClick={() => setTarget(t.value)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-colors ${target === t.value ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600 hover:border-gray-300 bg-white'}`}
+                key={tgt.value}
+                onClick={() => setTarget(tgt.value)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-colors ${target === tgt.value ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] hover:border-gray-300 dark:border-[#212a38] bg-white dark:bg-[#121823]'}`}
               >
-                <span>{t.icon}</span>
-                {t.label}
+                <span>{tgt.icon}</span>
+                {tgt.value === 'all' ? t('cp.sendAlert.targetEveryone') : tgt.value === 'admins' ? t('cp.sendAlert.targetAdmins') : tgt.value === 'technicians' ? t('cp.sendAlert.targetTechnicians') : t('cp.sendAlert.targetEmail')}
               </button>
             ))}
           </div>
@@ -576,14 +690,14 @@ function SendAlert({ currentUserEmail }) {
               value={specificEmail}
               onChange={(e) => setSpecificEmail(e.target.value)}
               type="email"
-              className="w-full mt-3 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+              className="w-full mt-3 px-3 py-2.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
               placeholder="recipient@example.com"
             />
           )}
         </div>
 
         {/* Send */}
-        <div className="pt-2 border-t border-gray-100">
+        <div className="pt-2 border-t border-gray-100 dark:border-[#212a38]">
           <button
             onClick={handleSend}
             disabled={sending || !title.trim() || !message.trim()}
@@ -592,7 +706,7 @@ function SendAlert({ currentUserEmail }) {
             {sending ? (
               <>
                 <Spinner size="sm" color="white" />
-                Sending...
+                {t('cp.sendAlert.sending')}
               </>
             ) : sent ? (
               <>
@@ -604,7 +718,7 @@ function SendAlert({ currentUserEmail }) {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                Alert Sent!
+                {t('cp.sendAlert.sent')}
               </>
             ) : (
               <>
@@ -616,7 +730,7 @@ function SendAlert({ currentUserEmail }) {
                     d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
                   />
                 </svg>
-                Send Alert
+                {t('cp.sendAlert.sendBtn')}
               </>
             )}
           </button>
@@ -629,6 +743,7 @@ function SendAlert({ currentUserEmail }) {
 // ─── HOME VIEW ─────────────────────────────────────────────────────────────
 
 function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
+  const { t } = useTranslation()
   const { data: stats } = useQuery({
     queryKey: ['control-panel-stats'],
     queryFn: async () => {
@@ -643,19 +758,21 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
         return a
       }, {})
       const open =
-        (byStatus['Open'] || 0) + (byStatus['In Progress'] || 0) + (byStatus['On Hold'] || 0)
+        (byStatus[TICKET_STATUS.OPEN] || 0) +
+        (byStatus[TICKET_STATUS.IN_PROGRESS] || 0) +
+        (byStatus[TICKET_STATUS.ON_HOLD] || 0)
       const overdue = tickets.filter(
         (t) =>
           t.due_date &&
           new Date(t.due_date) < new Date() &&
-          t.ticket_status !== 'Closed' &&
-          t.ticket_status !== 'Cancelled'
+          t.ticket_status !== TICKET_STATUS.CLOSED &&
+          t.ticket_status !== TICKET_STATUS.CANCELLED
       ).length
       return {
         total: tickets.length,
         open,
         overdue,
-        completed: byStatus['Closed'] || 0,
+        completed: byStatus[TICKET_STATUS.CLOSED] || 0,
         customers: customers.length,
         products: products.length,
         users: users.length,
@@ -667,15 +784,15 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
 
   const statCards = stats
     ? [
-        { label: 'Total Tickets', value: stats.total, sub: `${stats.open} open`, color: 'indigo' },
+        { label: t('cp.statTotalTickets'), value: stats.total, sub: `${stats.open} ${t('cp.statOpen')}`, color: 'indigo' },
         {
-          label: 'Overdue',
+          label: t('cp.statOverdue'),
           value: stats.overdue,
-          sub: 'past due date',
+          sub: t('cp.statPastDue'),
           color: stats.overdue > 0 ? 'red' : 'green',
         },
-        { label: 'Customers', value: stats.customers, sub: 'in database', color: 'emerald' },
-        { label: 'System Users', value: stats.users, sub: 'with access', color: 'purple' },
+        { label: t('cp.statCustomers'), value: stats.customers, sub: t('cp.statInDatabase'), color: 'emerald' },
+        { label: t('cp.statSystemUsers'), value: stats.users, sub: t('cp.statWithAccess'), color: 'purple' },
       ]
     : []
 
@@ -691,14 +808,14 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
     <div className="space-y-8">
       {/* Quick stats */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {statCards.map((c) => (
-            <div key={c.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+            <div key={c.label} className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-4 shadow-sm">
               <div className={`text-2xl font-bold ${colorStat[c.color].split(' ')[1]}`}>
                 {c.value}
               </div>
-              <div className="text-sm font-medium text-gray-700 mt-0.5">{c.label}</div>
-              <div className="text-xs text-gray-500">{c.sub}</div>
+              <div className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mt-0.5">{c.label}</div>
+              <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">{c.sub}</div>
             </div>
           ))}
         </div>
@@ -712,13 +829,13 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
             { label: 'In Progress', color: 'bg-blue-100 text-blue-800' },
             { label: 'On Hold', color: 'bg-yellow-100 text-yellow-800' },
             { label: 'Completed', color: 'bg-green-100 text-green-800' },
-            { label: 'Cancelled', color: 'bg-gray-100 text-gray-700' },
+            { label: 'Cancelled', color: 'bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#e8ebf0]' },
           ].map(({ label, color }) => (
             <div
               key={label}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${color}`}
             >
-              <span className="font-medium">{label}</span>
+              <span className="font-medium">{t(`statusValues.${label}`, label)}</span>
               <span className="font-bold">{stats.byStatus[label] || 0}</span>
             </div>
           ))}
@@ -730,25 +847,25 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
         const c = COLOR_MAP[group.color]
         return (
           <div key={group.id}>
-            <h2 className="text-base font-semibold text-gray-900 mb-3">{group.label}</h2>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-[#e8ebf0] mb-3">{group.labelKey ? t(group.labelKey) : group.label}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {group.features.map((f) => (
                 <button
                   key={f.id}
                   onClick={() => onNavigate(f.id)}
-                  className={`group bg-white border border-gray-200 rounded-xl p-4 text-left transition-all hover:shadow-md ${c.hover}`}
+                  className={`group bg-white dark:bg-[#121823] border border-gray-200 dark:border-[#212a38] rounded-xl p-4 text-left transition-all hover:shadow-md ${c.hover}`}
                 >
                   <div
                     className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${c.icon}`}
                   >
                     {f.icon}
                   </div>
-                  <div className="font-semibold text-gray-900 text-sm group-hover:text-indigo-700">
-                    {f.label}
+                  <div className="font-semibold text-gray-900 dark:text-[#e8ebf0] text-sm group-hover:text-indigo-700">
+                    {f.labelKey ? t(f.labelKey) : f.label}
                   </div>
-                  <div className="text-xs text-gray-500 mt-1 leading-relaxed">{f.desc}</div>
+                  <div className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-1 leading-relaxed">{f.descKey ? t(f.descKey) : f.desc}</div>
                   <div className="mt-3 flex items-center gap-1 text-xs font-medium text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                    Open
+                    {t('cp.open')}
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"
@@ -773,6 +890,7 @@ function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
 const PRIORITIES = ['Critical', 'High', 'Medium', 'Low']
 
 function SLAPolicies({ currentUserEmail }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { data: config, isLoading: slaLoading } = useQuery({
     queryKey: ['sla-config'],
@@ -800,13 +918,13 @@ function SLAPolicies({ currentUserEmail }) {
     try {
       await db.slaConfig.save(localConfig, currentUserEmail)
       queryClient.invalidateQueries({ queryKey: ['sla-config'] })
-      toast.success('SLA policies saved')
+      toast.success(t('cp.slaPolicies.saved'))
       db.auditLog
         .log(currentUserEmail, 'sla_updated', 'Updated SLA policy configuration')
         .catch(() => {})
     } catch (e) {
       captureException(e, { page: 'ControlPanel', context: 'saveSLA' })
-      toast.error('Failed to save: ' + e.message)
+      toast.error(t('cp.slaPolicies.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -821,22 +939,22 @@ function SLAPolicies({ currentUserEmail }) {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+      <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-6 space-y-5">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">SLA Policies</h3>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{t('cp.slaPolicies.header')}</h3>
+            <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">
               Auto-set ticket due dates based on priority when a new ticket is created.
             </p>
           </div>
           <label className="flex items-center gap-2 cursor-pointer select-none">
-            <span className="text-sm text-gray-600 font-medium">Enabled</span>
+            <span className="text-sm text-gray-600 dark:text-[#9aa4b2] font-medium">{t('cp.slaPolicies.enabled')}</span>
             <button
               onClick={() => setLocalConfig((c) => ({ ...c, enabled: !c.enabled }))}
               className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${localConfig.enabled ? 'bg-indigo-600' : 'bg-gray-300'}`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${localConfig.enabled ? 'translate-x-4' : 'translate-x-0'}`}
+                className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white dark:bg-[#121823] shadow transition-transform ${localConfig.enabled ? 'translate-x-4' : 'translate-x-0'}`}
               />
             </button>
           </label>
@@ -855,7 +973,7 @@ function SLAPolicies({ currentUserEmail }) {
               Low: 'text-green-600',
             }
             return (
-              <div key={p} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+              <div key={p} className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-[#0f1520] rounded-lg">
                 <span className={`w-20 text-sm font-semibold ${colors[p]}`}>{p}</span>
                 <div className="flex items-center gap-2 flex-1">
                   <input
@@ -864,10 +982,10 @@ function SLAPolicies({ currentUserEmail }) {
                     max={8760}
                     value={policy.hours}
                     onChange={(e) => updatePolicy(p, e.target.value)}
-                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
+                    className="w-24 px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
                   />
-                  <span className="text-sm text-gray-500">hours</span>
-                  <span className="text-xs text-gray-500 ml-2">
+                  <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('cp.slaPolicies.hours')}</span>
+                  <span className="text-xs text-gray-500 dark:text-[#9aa4b2] ml-2">
                     (
                     {policy.hours >= 24 ? `${(policy.hours / 24).toFixed(1)}d` : `${policy.hours}h`}
                     )
@@ -884,29 +1002,29 @@ function SLAPolicies({ currentUserEmail }) {
                 className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${localConfig.pauseOnHold ? 'bg-indigo-600' : 'bg-gray-300'}`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${localConfig.pauseOnHold ? 'translate-x-4' : 'translate-x-0'}`}
+                  className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white dark:bg-[#121823] shadow transition-transform ${localConfig.pauseOnHold ? 'translate-x-4' : 'translate-x-0'}`}
                 />
               </button>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-gray-600 dark:text-[#9aa4b2]">
                 Pause SLA clock when ticket is "On Hold"
               </span>
             </label>
           </div>
         </div>
 
-        <div className="pt-3 border-t border-gray-100">
+        <div className="pt-3 border-t border-gray-100 dark:border-[#212a38]">
           <button
             onClick={handleSave}
             disabled={saving}
             className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
           >
-            {saving ? <Spinner size="sm" color="white" /> : null} Save Policies
+            {saving ? <Spinner size="sm" color="white" /> : null} {t('cp.slaPolicies.savePolicies')}
           </button>
         </div>
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-700">
-        <strong>How it works:</strong> When SLA is enabled, creating a new ticket will automatically
+        <strong>{t('cp.slaPolicies.howItWorks')}</strong> When SLA is enabled, creating a new ticket will automatically
         set its due date based on the priority selected. The due date can always be overridden
         manually in the ticket form.
       </div>
@@ -954,6 +1072,7 @@ const EMPTY_RULE = () => ({
 })
 
 function AutomationRules({ currentUserEmail }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { data: fetchedRules } = useQuery({
     queryKey: ['automation-rules'],
@@ -973,7 +1092,7 @@ function AutomationRules({ currentUserEmail }) {
       await db.automationRules.save(newRules, currentUserEmail)
       setRules(newRules)
       queryClient.invalidateQueries({ queryKey: ['automation-rules'] })
-      toast.success('Automation rules saved')
+      toast.success(t('cp.automationRules.saved'))
     } catch (e) {
       captureException(e, { page: 'ControlPanel', context: 'saveAutomationRules' })
       toast.error(e.message)
@@ -987,7 +1106,7 @@ function AutomationRules({ currentUserEmail }) {
     saveAll(rules.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)))
   const saveEdit = () => {
     if (!editing.name.trim()) {
-      toast.error('Rule name is required')
+      toast.error(t('cp.automationRules.ruleRequired'))
       return
     }
     const exists = rules.find((r) => r.id === editing.id)
@@ -1020,35 +1139,35 @@ function AutomationRules({ currentUserEmail }) {
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            Back
+            {t('cp.back')}
           </button>
-          <span className="text-sm font-semibold text-gray-900">{editing.name || 'New Rule'}</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{editing.name || t('cp.automationRules.newRule')}</span>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-5">
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-5 space-y-5">
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-              Rule Name
+            <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
+              {t('cp.automationRules.ruleName')}
             </label>
             <input
               value={editing.name}
               onChange={(e) => setEditing((r) => ({ ...r, name: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
               placeholder="e.g. Auto-escalate critical tickets"
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-              Trigger Event
+            <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
+              {t('cp.automationRules.triggerEvent')}
             </label>
             <select
               value={editing.trigger}
               onChange={(e) => setEditing((r) => ({ ...r, trigger: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 bg-white"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 bg-white dark:bg-[#121823]"
             >
-              {TRIGGER_OPTIONS.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
+              {TRIGGER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
                 </option>
               ))}
             </select>
@@ -1057,8 +1176,8 @@ function AutomationRules({ currentUserEmail }) {
           {/* Conditions */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Conditions <span className="font-normal text-gray-500">(all must match)</span>
+              <label className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
+                {t('cp.automationRules.conditions')}
               </label>
               <button
                 onClick={() =>
@@ -1072,12 +1191,12 @@ function AutomationRules({ currentUserEmail }) {
                 }
                 className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
               >
-                + Add Condition
+                {t('cp.automationRules.addCondition')}
               </button>
             </div>
             {editing.conditions.length === 0 && (
-              <p className="text-xs text-gray-500 italic">
-                No conditions — rule runs on all tickets
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] italic">
+                {t('cp.automationRules.noConditions')}
               </p>
             )}
             {editing.conditions.map((c, i) => (
@@ -1091,7 +1210,7 @@ function AutomationRules({ currentUserEmail }) {
                       return { ...r, conditions: conds }
                     })
                   }
-                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                  className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded text-sm bg-white dark:bg-[#121823]"
                 >
                   {FIELD_OPTIONS.map((f) => (
                     <option key={f.value} value={f.value}>
@@ -1108,7 +1227,7 @@ function AutomationRules({ currentUserEmail }) {
                       return { ...r, conditions: conds }
                     })
                   }
-                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                  className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded text-sm bg-white dark:bg-[#121823]"
                 >
                   {OP_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -1125,8 +1244,8 @@ function AutomationRules({ currentUserEmail }) {
                       return { ...r, conditions: conds }
                     })
                   }
-                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
-                  placeholder="value"
+                  className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded text-sm"
+                  placeholder={t('cp.automationRules.valuePlaceholder')}
                 />
                 <button
                   onClick={() =>
@@ -1153,8 +1272,8 @@ function AutomationRules({ currentUserEmail }) {
           {/* Actions */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Actions <span className="font-normal text-gray-500">(executed in order)</span>
+              <label className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider">
+                {t('cp.automationRules.actions')}
               </label>
               <button
                 onClick={() =>
@@ -1168,7 +1287,7 @@ function AutomationRules({ currentUserEmail }) {
                 }
                 className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
               >
-                + Add Action
+                {t('cp.automationRules.addAction')}
               </button>
             </div>
             {editing.actions.map((a, i) => (
@@ -1182,7 +1301,7 @@ function AutomationRules({ currentUserEmail }) {
                       return { ...r, actions: acts }
                     })
                   }
-                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                  className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded text-sm bg-white dark:bg-[#121823]"
                 >
                   {ACTION_TYPES.map((at) => (
                     <option key={at.value} value={at.value}>
@@ -1200,7 +1319,7 @@ function AutomationRules({ currentUserEmail }) {
                         return { ...r, actions: acts }
                       })
                     }
-                    className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                    className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded text-sm bg-white dark:bg-[#121823]"
                   >
                     {STATUS_OPTIONS.map((s) => (
                       <option key={s}>{s}</option>
@@ -1217,7 +1336,7 @@ function AutomationRules({ currentUserEmail }) {
                         return { ...r, actions: acts }
                       })
                     }
-                    className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm bg-white"
+                    className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded text-sm bg-white dark:bg-[#121823]"
                   >
                     {PRIORITY_OPTIONS.map((p) => (
                       <option key={p}>{p}</option>
@@ -1234,7 +1353,7 @@ function AutomationRules({ currentUserEmail }) {
                         return { ...r, actions: acts }
                       })
                     }
-                    className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                    className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded text-sm"
                     placeholder={
                       a.type === 'assign_technician' ? 'email@example.com' : 'Notification message'
                     }
@@ -1259,19 +1378,19 @@ function AutomationRules({ currentUserEmail }) {
             ))}
           </div>
 
-          <div className="flex gap-3 pt-2 border-t border-gray-100">
+          <div className="flex gap-3 pt-2 border-t border-gray-100 dark:border-[#212a38]">
             <button
               onClick={saveEdit}
               disabled={saving}
               className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
             >
-              {saving ? <Spinner size="sm" color="white" /> : null} Save Rule
+              {saving ? <Spinner size="sm" color="white" /> : null} {t('cp.automationRules.saveRule')}
             </button>
             <button
               onClick={() => setEditing(null)}
-              className="px-5 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200"
+              className="px-5 py-2 bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#e8ebf0] text-sm font-medium rounded-lg hover:bg-gray-200"
             >
-              Cancel
+              {t('cp.cancel')}
             </button>
           </div>
         </div>
@@ -1282,8 +1401,8 @@ function AutomationRules({ currentUserEmail }) {
   return (
     <div className="max-w-2xl space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
-          {rules.length} rule{rules.length !== 1 ? 's' : ''} configured
+        <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">
+          {t('cp.automationRules.count', { count: rules.length })}
         </p>
         <button
           onClick={() => setEditing(EMPTY_RULE())}
@@ -1292,12 +1411,12 @@ function AutomationRules({ currentUserEmail }) {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          New Rule
+          {t('cp.automationRules.newRule')}
         </button>
       </div>
 
       {rules.length === 0 ? (
-        <div className="bg-white rounded-xl border border-dashed border-gray-300 p-10 text-center">
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-dashed border-gray-300 dark:border-[#212a38] p-10 text-center">
           <svg
             className="w-10 h-10 text-gray-300 mx-auto mb-3"
             fill="none"
@@ -1311,38 +1430,37 @@ function AutomationRules({ currentUserEmail }) {
               d="M13 10V3L4 14h7v7l9-11h-7z"
             />
           </svg>
-          <p className="text-sm text-gray-500">No automation rules yet</p>
-          <p className="text-xs text-gray-500 mt-1">
-            Rules automatically act on tickets when events occur
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('cp.automationRules.noRules')}</p>
+          <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-1">
+            {t('cp.automationRules.subtitle')}
           </p>
         </div>
       ) : (
         <div className="space-y-3">
           {rules.map((rule) => (
-            <div key={rule.id} className="bg-white rounded-xl border border-gray-200 p-4">
+            <div key={rule.id} className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm text-gray-900">{rule.name}</span>
+                    <span className="font-semibold text-sm text-gray-900 dark:text-[#e8ebf0]">{rule.name}</span>
                     <span
-                      className={`px-2 py-0.5 text-xs rounded-full font-medium ${rule.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+                      className={`px-2 py-0.5 text-xs rounded-full font-medium ${rule.enabled ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'}`}
                     >
-                      {rule.enabled ? 'Active' : 'Disabled'}
+                      {rule.enabled ? t('cp.active') : t('cp.disabled')}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    Trigger:{' '}
-                    <span className="font-medium text-gray-700">
-                      {TRIGGER_OPTIONS.find((t) => t.value === rule.trigger)?.label}
+                  <div className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-1">
+                    {t('cp.automationRules.trigger')}{' '}
+                    <span className="font-medium text-gray-700 dark:text-[#e8ebf0]">
+                      {TRIGGER_OPTIONS.find((opt) => opt.value === rule.trigger)?.label}
                     </span>
                     {rule.conditions.length > 0 && (
                       <>
                         {' '}
-                        · {rule.conditions.length} condition
-                        {rule.conditions.length !== 1 ? 's' : ''}
+                        · {t('cp.automationRules.conditionCount', { count: rule.conditions.length })}
                       </>
                     )}
-                    · {rule.actions.length} action{rule.actions.length !== 1 ? 's' : ''}
+                    · {t('cp.automationRules.actionCount', { count: rule.actions.length })}
                   </div>
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
@@ -1350,19 +1468,19 @@ function AutomationRules({ currentUserEmail }) {
                     onClick={() => toggleRule(rule.id)}
                     className={`text-xs px-3 py-1 rounded-lg font-medium ${rule.enabled ? 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}
                   >
-                    {rule.enabled ? 'Disable' : 'Enable'}
+                    {rule.enabled ? t('cp.disable') : t('cp.enable')}
                   </button>
                   <button
                     onClick={() => setEditing({ ...rule })}
-                    className="text-xs px-3 py-1 rounded-lg font-medium bg-gray-50 text-gray-700 hover:bg-gray-100"
+                    className="text-xs px-3 py-1 rounded-lg font-medium bg-gray-50 dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-100 dark:bg-[#1a2230]"
                   >
-                    Edit
+                    {t('cp.edit')}
                   </button>
                   <button
                     onClick={() => deleteRule(rule.id)}
                     className="text-xs px-3 py-1 rounded-lg font-medium bg-red-50 text-red-600 hover:bg-red-100"
                   >
-                    Delete
+                    {t('cp.delete')}
                   </button>
                 </div>
               </div>
@@ -1398,6 +1516,7 @@ const EMPTY_HOOK = () => ({
 })
 
 function WebhooksConfig({ currentUserEmail }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { data: fetchedHooks } = useQuery({
     queryKey: ['webhooks'],
@@ -1418,7 +1537,7 @@ function WebhooksConfig({ currentUserEmail }) {
       await db.webhooks.save(newHooks, currentUserEmail)
       setHooks(newHooks)
       queryClient.invalidateQueries({ queryKey: ['webhooks'] })
-      toast.success('Webhooks saved')
+      toast.success(t('cp.webhooks.saved'))
     } catch (e) {
       captureException(e, { page: 'ControlPanel', context: 'saveWebhooks' })
       toast.error(e.message)
@@ -1429,13 +1548,13 @@ function WebhooksConfig({ currentUserEmail }) {
 
   const saveEdit = () => {
     if (!editing.name.trim() || !editing.url.trim()) {
-      toast.error('Name and URL are required')
+      toast.error(t('cp.webhooks.nameRequired'))
       return
     }
     try {
       new URL(editing.url)
     } catch {
-      toast.error('Invalid URL')
+      toast.error(t('cp.webhooks.invalidUrl'))
       return
     }
     const exists = hooks.find((h) => h.id === editing.id)
@@ -1461,11 +1580,11 @@ function WebhooksConfig({ currentUserEmail }) {
         }),
       })
       res.ok
-        ? toast.success(`Webhook responded: ${res.status}`)
-        : toast.error(`Webhook returned ${res.status}`)
+        ? toast.success(t('cp.webhooks.responded', { status: res.status }))
+        : toast.error(t('cp.webhooks.returned', { status: res.status }))
     } catch (err) {
       captureException(err, { page: 'ControlPanel', context: 'testWebhook' })
-      toast.error('Failed to reach webhook URL')
+      toast.error(t('cp.webhooks.failed'))
     } finally {
       setTesting(null)
     }
@@ -1494,13 +1613,13 @@ function WebhooksConfig({ currentUserEmail }) {
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            Back
+            {t('cp.back')}
           </button>
-          <span className="text-sm font-semibold text-gray-900">
-            {editing.name || 'New Webhook'}
+          <span className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">
+            {editing.name || t('cp.webhooks.addWebhook')}
           </span>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-5 space-y-4">
           {[
             { label: 'Name', key: 'name', placeholder: 'e.g. Notify Slack', type: 'text' },
             {
@@ -1517,22 +1636,22 @@ function WebhooksConfig({ currentUserEmail }) {
             },
           ].map((f) => (
             <div key={f.key}>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
                 {f.label}
               </label>
               <input
                 type={f.type}
                 value={editing[f.key]}
                 onChange={(e) => setEditing((h) => ({ ...h, [f.key]: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
                 placeholder={f.placeholder}
               />
             </div>
           ))}
 
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-              Events to Send <span className="font-normal">(leave empty = all events)</span>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-2">
+              {t('cp.webhooks.eventsLabel')}
             </label>
             <div className="flex flex-wrap gap-2">
               {WEBHOOK_EVENTS.map((ev) => (
@@ -1546,7 +1665,7 @@ function WebhooksConfig({ currentUserEmail }) {
                         : [...h.events, ev],
                     }))
                   }
-                  className={`px-2.5 py-1 text-xs rounded-full font-medium border transition-colors ${editing.events.includes(ev) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'}`}
+                  className={`px-2.5 py-1 text-xs rounded-full font-medium border transition-colors ${editing.events.includes(ev) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-[#121823] text-gray-600 dark:text-[#9aa4b2] border-gray-300 dark:border-[#212a38] hover:border-indigo-400'}`}
                 >
                   {ev}
                 </button>
@@ -1554,19 +1673,19 @@ function WebhooksConfig({ currentUserEmail }) {
             </div>
           </div>
 
-          <div className="flex gap-3 pt-2 border-t border-gray-100">
+          <div className="flex gap-3 pt-2 border-t border-gray-100 dark:border-[#212a38]">
             <button
               onClick={saveEdit}
               disabled={saving}
               className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
             >
-              {saving ? <Spinner size="sm" color="white" /> : null} Save Webhook
+              {saving ? <Spinner size="sm" color="white" /> : null} {t('cp.webhooks.saveWebhook')}
             </button>
             <button
               onClick={() => setEditing(null)}
-              className="px-5 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200"
+              className="px-5 py-2 bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#e8ebf0] text-sm font-medium rounded-lg hover:bg-gray-200"
             >
-              Cancel
+              {t('cp.cancel')}
             </button>
           </div>
         </div>
@@ -1576,8 +1695,8 @@ function WebhooksConfig({ currentUserEmail }) {
   return (
     <div className="max-w-2xl space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
-          {hooks.length} webhook{hooks.length !== 1 ? 's' : ''} configured
+        <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">
+          {t('cp.webhooks.count', { count: hooks.length })}
         </p>
         <button
           onClick={() => setEditing(EMPTY_HOOK())}
@@ -1586,7 +1705,7 @@ function WebhooksConfig({ currentUserEmail }) {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          Add Webhook
+          {t('cp.webhooks.addWebhook')}
         </button>
       </div>
 
@@ -1597,33 +1716,33 @@ function WebhooksConfig({ currentUserEmail }) {
       </div>
 
       {hooks.length === 0 ? (
-        <div className="bg-white rounded-xl border border-dashed border-gray-300 p-10 text-center">
-          <p className="text-sm text-gray-500">No webhooks configured</p>
-          <p className="text-xs text-gray-500 mt-1">
-            Push ticket events to Slack, QuickBooks, Zapier, and more
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-dashed border-gray-300 dark:border-[#212a38] p-10 text-center">
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('cp.webhooks.noWebhooks')}</p>
+          <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-1">
+            {t('cp.webhooks.subtitle')}
           </p>
         </div>
       ) : (
         <div className="space-y-3">
           {hooks.map((h) => (
-            <div key={h.id} className="bg-white rounded-xl border border-gray-200 p-4">
+            <div key={h.id} className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm text-gray-900">{h.name}</span>
+                    <span className="font-semibold text-sm text-gray-900 dark:text-[#e8ebf0]">{h.name}</span>
                     <span
-                      className={`px-2 py-0.5 text-xs rounded-full font-medium ${h.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+                      className={`px-2 py-0.5 text-xs rounded-full font-medium ${h.enabled ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'}`}
                     >
-                      {h.enabled ? 'Active' : 'Disabled'}
+                      {h.enabled ? t('cp.active') : t('cp.disabled')}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 font-mono mt-0.5 truncate">{h.url}</div>
+                  <div className="text-xs text-gray-500 dark:text-[#9aa4b2] font-mono mt-0.5 truncate">{h.url}</div>
                   {h.events.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {h.events.map((e) => (
                         <span
                           key={e}
-                          className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded"
+                          className="px-1.5 py-0.5 bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2] text-xs rounded"
                         >
                           {e}
                         </span>
@@ -1637,19 +1756,19 @@ function WebhooksConfig({ currentUserEmail }) {
                     disabled={testing === h.id}
                     className="text-xs px-3 py-1 rounded-lg font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
                   >
-                    {testing === h.id ? '…' : 'Test'}
+                    {testing === h.id ? '…' : t('cp.test')}
                   </button>
                   <button
                     onClick={() => setEditing({ ...h })}
-                    className="text-xs px-3 py-1 rounded-lg font-medium bg-gray-50 text-gray-700 hover:bg-gray-100"
+                    className="text-xs px-3 py-1 rounded-lg font-medium bg-gray-50 dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-100 dark:bg-[#1a2230]"
                   >
-                    Edit
+                    {t('cp.edit')}
                   </button>
                   <button
                     onClick={() => saveAll(hooks.filter((wh) => wh.id !== h.id))}
                     className="text-xs px-3 py-1 rounded-lg font-medium bg-red-50 text-red-600 hover:bg-red-100"
                   >
-                    Delete
+                    {t('cp.delete')}
                   </button>
                 </div>
               </div>

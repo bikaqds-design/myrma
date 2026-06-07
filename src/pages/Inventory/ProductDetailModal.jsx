@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { supabase, db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { Spinner } from '../../components/ui'
@@ -14,6 +15,7 @@ import { CreateBatchModal } from './ManufacturerTab'
 
 // ─── Ticket Preview Modal ─────────────────────────────────────────────────────
 export function TicketPreviewModal({ rmaNumber, onClose, onOpenFull }) {
+  const { t } = useTranslation()
   const [ticket, setTicket] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -53,7 +55,7 @@ export function TicketPreviewModal({ rmaNumber, onClose, onOpenFull }) {
           <div>
             <p className="text-xs text-gray-500 font-mono mb-0.5">{rmaNumber}</p>
             <h3 className="text-base font-bold text-gray-900">
-              {loading ? 'Loading…' : ticket?.products?.[0]?.product_name || 'Ticket Details'}
+              {loading ? t('inventory.loadingTicketDots') : ticket?.products?.[0]?.product_name || t('inventory.ticketDetailsTitle')}
             </h3>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-600">
@@ -71,12 +73,12 @@ export function TicketPreviewModal({ rmaNumber, onClose, onOpenFull }) {
           {loading && (
             <div className="flex items-center justify-center py-8 gap-2 text-gray-500">
               <Spinner size="sm" />
-              <span className="text-sm">Loading ticket…</span>
+              <span className="text-sm">{t('inventory.loadingTicketDots')}</span>
             </div>
           )}
           {!loading && !ticket && (
             <p className="text-center text-sm text-gray-500 py-6">
-              Ticket not found for {rmaNumber}
+              {t('inventory.ticketNotFound', { rma: rmaNumber })}
             </p>
           )}
           {!loading && ticket && (
@@ -99,19 +101,19 @@ export function TicketPreviewModal({ rmaNumber, onClose, onOpenFull }) {
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 <div>
-                  <p className="text-xs text-gray-500">Customer</p>
+                  <p className="text-xs text-gray-500">{t('inventory.customerLabel')}</p>
                   <p className="font-medium text-gray-800">{ticket.customer_name || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Assigned To</p>
+                  <p className="text-xs text-gray-500">{t('inventory.assignedToLabel')}</p>
                   <p className="font-medium text-gray-800">{ticket.assigned_to || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Created</p>
+                  <p className="text-xs text-gray-500">{t('inventory.createdLabel')}</p>
                   <p className="font-medium text-gray-800">{fmt(ticket.created_date)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Due Date</p>
+                  <p className="text-xs text-gray-500">{t('inventory.dueDateLabel')}</p>
                   <p className="font-medium text-gray-800">{fmt(ticket.due_date)}</p>
                 </div>
               </div>
@@ -128,14 +130,14 @@ export function TicketPreviewModal({ rmaNumber, onClose, onOpenFull }) {
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50"
           >
-            Close
+            {t('common.close')}
           </button>
           {!loading && ticket && onOpenFull && (
             <button
               onClick={() => onOpenFull(ticket.id)}
               className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700"
             >
-              Open Ticket →
+              {t('inventory.openTicketBtn')}
             </button>
           )}
         </div>
@@ -156,6 +158,7 @@ export function ProductDetailModal({
   onReload,
   onNavigateToTicket,
 }) {
+  const { t } = useTranslation()
   const [tickets, setTickets] = useState({})
   const [selected, setSelected] = useState([])
   const [showBatch, setShowBatch] = useState(false)
@@ -195,7 +198,7 @@ export function ProductDetailModal({
   const handleCreateBatch = async (brandName) => {
     try {
       await db.inventory.createBatch(selected, brandName, userEmail)
-      toast.success('Batch created!')
+      toast.success(t('inventory.batchCreatedSuccess'))
       db.auditLog
         .log(
           userEmail,
@@ -208,7 +211,7 @@ export function ProductDetailModal({
       onClose()
       onReload()
     } catch {
-      toast.error('Failed to create batch')
+      toast.error(t('inventory.batchCreateFailed'))
     }
   }
 
@@ -216,7 +219,7 @@ export function ProductDetailModal({
     const ids = selected.length > 0 ? selected : group.units.map((u) => u.id)
     try {
       await db.inventory.transferUnits(ids, warehouseId)
-      toast.success(`${ids.length} unit(s) transferred`)
+      toast.success(t('inventory.unitsTransferred', { count: ids.length }))
       db.auditLog
         .log(
           userEmail,
@@ -228,7 +231,7 @@ export function ProductDetailModal({
       setShowTransfer(false)
       onReload()
     } catch {
-      toast.error('Transfer failed')
+      toast.error(t('inventory.transferFailed'))
     }
   }
 
@@ -254,7 +257,7 @@ export function ProductDetailModal({
             <div>
               <h3 className="text-lg font-bold text-gray-900">{group.product_name}</h3>
               <div className="flex items-center gap-3 mt-0.5">
-                <span className="text-sm text-gray-500">{group.brand || 'Unknown Brand'}</span>
+                <span className="text-sm text-gray-500">{group.brand || t('inventory.unknownBrand')}</span>
                 <span className="text-gray-300">·</span>
                 <span className="text-sm text-gray-500">
                   {group.units.length} unit{group.units.length !== 1 ? 's' : ''}
@@ -276,7 +279,7 @@ export function ProductDetailModal({
                     d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
                   />
                 </svg>
-                Transfer{selected.length > 0 ? ` (${selected.length})` : ' All'}
+                {selected.length > 0 ? t('inventory.transferSelected', { count: selected.length }) : t('inventory.transferAll')}
               </button>
             )}
             <button onClick={onClose} className="text-gray-500 hover:text-gray-600">
@@ -296,14 +299,14 @@ export function ProductDetailModal({
         {isStock && (
           <div className="flex gap-3 px-6 py-3 bg-gray-50 border-b border-gray-100 flex-wrap">
             <span className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
-              {group.replacement} Replacement
+              {group.replacement} {t('inventory.resolutionReplacement')}
             </span>
             <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
-              {group.credit_note} Credit Note
+              {group.credit_note} {t('inventory.resolutionCreditNote')}
             </span>
             {group.units.length - group.replacement - group.credit_note > 0 && (
               <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                {group.units.length - group.replacement - group.credit_note} Other
+                {group.units.length - group.replacement - group.credit_note} {t('inventory.resolutionOther')}
               </span>
             )}
           </div>
@@ -320,7 +323,7 @@ export function ProductDetailModal({
                 className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
               />
               <span className="text-sm text-gray-600">
-                {selected.length > 0 ? `${selected.length} selected` : 'Select to batch'}
+                {selected.length > 0 ? t('inventory.unitsSelected', { count: selected.length }) : t('inventory.selectToBatch')}
               </span>
             </div>
             {selected.length > 0 && (
@@ -336,7 +339,7 @@ export function ProductDetailModal({
                     d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
                   />
                 </svg>
-                Send to Manufacturer ({selected.length})
+                {t('inventory.sendToMfrCount', { count: selected.length })}
               </button>
             )}
           </div>
@@ -347,14 +350,14 @@ export function ProductDetailModal({
           {loadingTickets && (
             <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
               <Spinner size="sm" />
-              Loading RMA details...
+              {t('inventory.loadingRmaDetails')}
             </div>
           )}
 
           <div className="rounded-xl border border-gray-200 overflow-hidden">
             {isStock && stockUnits.length > 0 && (
               <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Pending Batch ({stockUnits.length})
+                {t('inventory.pendingBatchCount', { count: stockUnits.length })}
               </div>
             )}
             <table className="w-full text-sm">
@@ -362,32 +365,32 @@ export function ProductDetailModal({
                 <tr>
                   {isStock && canManageBatches && <th className="px-4 py-3 w-10" />}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
-                    Serial #
+                    {t('inventory.colSerialNum')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
-                    Warranty
+                    {t('inventory.colWarranty')}
                   </th>
                   {!isStock && (
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
-                      Status
+                      {t('inventory.colStatus')}
                     </th>
                   )}
                   {isStock && (
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
-                      Resolution
+                      {t('inventory.colResolution')}
                     </th>
                   )}
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">RMA #</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">{t('inventory.colRmaNum')}</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
-                    Ticket Status
+                    {t('inventory.colTicketStatus')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
-                    Customer
+                    {t('inventory.colCustomer')}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
-                    Warehouse
+                    {t('inventory.colWarehouse')}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Days</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">{t('inventory.colDays')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -460,7 +463,7 @@ export function ProductDetailModal({
                             {wName(u.warehouse_id) || 'Custom'}
                           </span>
                         ) : (
-                          <span className="text-gray-300 text-xs">System</span>
+                          <span className="text-gray-300 text-xs">{t('inventory.systemLabel')}</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -476,7 +479,7 @@ export function ProductDetailModal({
                 {unitRows.length === 0 && (
                   <tr>
                     <td colSpan={9} className="px-4 py-8 text-center text-gray-500 text-sm">
-                      No units
+                      {t('inventory.noUnitsInGroup')}
                     </td>
                   </tr>
                 )}
@@ -487,7 +490,7 @@ export function ProductDetailModal({
           {isStock && batchedUnits.length > 0 && (
             <div className="rounded-xl border border-purple-200 overflow-hidden">
               <div className="px-4 py-2 bg-purple-50 border-b border-purple-100 text-xs font-semibold text-purple-700 uppercase tracking-wider">
-                In Manufacturer Batch ({batchedUnits.length})
+                {t('inventory.inMfrBatchCount', { count: batchedUnits.length })}
               </div>
               <table className="w-full text-sm">
                 <tbody className="divide-y divide-gray-50">
@@ -521,7 +524,7 @@ export function ProductDetailModal({
                         </td>
                         <td className="px-4 py-3">
                           <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                            Batched
+                            {t('inventory.batched')}
                           </span>
                         </td>
                       </tr>
@@ -538,7 +541,7 @@ export function ProductDetailModal({
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50"
           >
-            Close
+            {t('common.close')}
           </button>
         </div>
       </div>

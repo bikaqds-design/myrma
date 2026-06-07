@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { db, storage } from '../api/supabaseClient'
+import { db, storage, branding as brandingAPI } from '../api/supabaseClient'
+import AIAssist from '../components/AIAssist'
+import QRCode from 'qrcode'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { CardSkeleton } from '../components/Skeleton'
 import AttachmentsField from '../components/AttachmentsField'
 import { Button, Spinner } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
-import { ROLES } from '../lib/constants'
+import { ROLES, TICKET_STATUS } from '../lib/constants'
 import { captureException } from '../lib/sentry'
 
 export default function CustomerDetails({
@@ -18,15 +21,22 @@ export default function CustomerDetails({
   onBack,
   onNavigateToTicket,
 }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { data: customerPageData, isLoading: loading } = useQuery({
     queryKey: ['customer-details', customerId],
     queryFn: async () => {
-      const [customerData, ticketsData, notesData] = await Promise.all([
+      // Fetch customer + notes in parallel first, then tickets using both
+      // customer_id FK and customer_name string so legacy tickets are found too.
+      const [customerData, notesData] = await Promise.all([
         db.customers.get(customerId),
-        db.customers.getRelatedTickets(customerId),
         db.customerNotes.list(customerId),
       ])
+      const displayNames = [
+        customerData?.company_name,
+        customerData?.contact_person,
+      ].filter(Boolean)
+      const ticketsData = await db.customers.getRelatedTickets(customerId, displayNames)
       return { customerData, ticketsData, notesData }
     },
     enabled: !!customerId,
@@ -43,6 +53,24 @@ export default function CustomerDetails({
   const [editingNote, setEditingNote] = useState(null)
   const [editNoteText, setEditNoteText] = useState('')
   const [savingNote, setSavingNote] = useState(false)
+  const [drawerTicket, setDrawerTicket] = useState(null)   // ticket shown in the RMA detail drawer
+  const [drawerComments, setDrawerComments] = useState([])
+  const [drawerCommentsLoading, setDrawerCommentsLoading] = useState(false)
+
+  const openTicketDrawer = async (ticket) => {
+    setDrawerTicket(ticket)
+    setDrawerComments([])
+    setDrawerCommentsLoading(true)
+    try {
+      const result = await db.ticketComments.list(ticket.id)
+      const comments = result?.data ?? result ?? []
+      setDrawerComments(Array.isArray(comments) ? comments : [])
+    } catch {
+      setDrawerComments([])
+    } finally {
+      setDrawerCommentsLoading(false)
+    }
+  }
 
   const isSuperAdmin = currentUserRole === ROLES.SUPER_ADMIN
   const canDo = (action) => {
@@ -72,11 +100,11 @@ export default function CustomerDetails({
 
   const handleSaveEdit = async () => {
     if (!editForm.contact_person?.trim() || !editForm.mobile?.trim()) {
-      toast.error('Contact person and mobile are required')
+      toast.error(t('customerDetails.errorContactRequired'))
       return
     }
     if (editForm.customer_type === 'B2B' && !editForm.company_name?.trim()) {
-      toast.error('Company name is required for B2B customers')
+      toast.error(t('customerDetails.errorCompanyRequired'))
       return
     }
 
@@ -88,7 +116,7 @@ export default function CustomerDetails({
           const result = await storage.uploadCustomerAttachment(file, customerId)
           uploadedAttachments.push(result)
         } catch (err) {
-          toast.error(`Failed to upload ${file.name}: ${err.message}`)
+          toast.error(t('customers.failedUploadFile', { name: file.name, error: err.message }))
           return
         }
       }
@@ -118,7 +146,7 @@ export default function CustomerDetails({
       setIsEditing(false)
       queryClient.invalidateQueries({ queryKey: ['customer-details', customerId] })
       queryClient.invalidateQueries({ queryKey: ['customers'] })
-      toast.success('Customer updated successfully')
+      toast.success(t('customerDetails.successUpdated'))
       db.auditLog
         .log(
           currentUserEmail,
@@ -127,19 +155,19 @@ export default function CustomerDetails({
         )
         .catch((err) => captureException(err))
     } catch (error) {
-      toast.error(`Failed to update: ${error.message}`)
+      toast.error(t('customerDetails.failedUpdate', { error: error.message }))
     }
   }
 
   const handleDelete = () => {
     openConfirm(
-      'Delete Customer',
-      `Delete ${customer.contact_person}? This cannot be undone.`,
+      t('customerDetails.deleteCustomerTitle'),
+      t('customerDetails.deleteCustomerMsg', { name: customer.contact_person }),
       async () => {
         closeConfirm()
         try {
           await db.customers.delete(customerId)
-          toast.success('Customer deleted')
+          toast.success(t('customerDetails.successDeleted'))
           db.auditLog
             .log(
               currentUserEmail,
@@ -149,7 +177,7 @@ export default function CustomerDetails({
             .catch((err) => captureException(err))
           onBack()
         } catch {
-          toast.error('Failed to delete customer')
+          toast.error(t('customerDetails.errorDelete'))
         }
       }
     )
@@ -168,7 +196,7 @@ export default function CustomerDetails({
       })
       setNotes((prev) => [created, ...prev])
       setNewNote('')
-      toast.success('Note added')
+      toast.success(t('customerDetails.noteAdded'))
       db.auditLog
         .log(
           currentUserEmail,
@@ -177,7 +205,7 @@ export default function CustomerDetails({
         )
         .catch((err) => captureException(err))
     } catch {
-      toast.error('Failed to add note')
+      toast.error(t('customerDetails.errorAddNote'))
     } finally {
       setSavingNote(false)
     }
@@ -193,7 +221,7 @@ export default function CustomerDetails({
       setNotes((prev) => prev.map((n) => (n.id === noteId ? updated : n)))
       setEditingNote(null)
       setEditNoteText('')
-      toast.success('Note updated')
+      toast.success(t('customerDetails.noteUpdated'))
       db.auditLog
         .log(
           currentUserEmail,
@@ -202,17 +230,17 @@ export default function CustomerDetails({
         )
         .catch((err) => captureException(err))
     } catch {
-      toast.error('Failed to update note')
+      toast.error(t('customerDetails.errorUpdateNote'))
     }
   }
 
   const handleDeleteNote = (noteId) => {
-    openConfirm('Delete Note', 'Delete this note? This cannot be undone.', async () => {
+    openConfirm(t('customerDetails.deleteNoteTitle'), t('customerDetails.deleteNoteMsg'), async () => {
       closeConfirm()
       try {
         await db.customerNotes.delete(noteId)
         setNotes((prev) => prev.filter((n) => n.id !== noteId))
-        toast.success('Note deleted')
+        toast.success(t('customerDetails.noteDeleted'))
         db.auditLog
           .log(
             currentUserEmail,
@@ -221,13 +249,13 @@ export default function CustomerDetails({
           )
           .catch((err) => captureException(err))
       } catch {
-        toast.error('Failed to delete note')
+        toast.error(t('customerDetails.errorDeleteNote'))
       }
     })
   }
 
   const getStatusBadge = (status) => {
-    const style = status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+    const style = status === 'Active' ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]'
     return (
       <span className={`px-3 py-1 text-sm rounded-full font-medium ${style}`}>
         {status || 'Unknown'}
@@ -236,7 +264,7 @@ export default function CustomerDetails({
   }
 
   const getTypeBadge = (type) => {
-    const style = type === 'B2B' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+    const style = type === 'B2B' ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400' : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-400'
     return (
       <span className={`px-2 py-1 text-xs rounded-full font-medium ${style}`}>
         {type === 'B2B' ? '🏢 B2B' : '👤 B2C'}
@@ -246,15 +274,15 @@ export default function CustomerDetails({
 
   const getTicketStatusBadge = (status) => {
     const styles = {
-      New: 'bg-blue-100 text-blue-800',
-      'In Progress': 'bg-yellow-100 text-yellow-800',
-      'On Hold': 'bg-orange-100 text-orange-800',
-      Completed: 'bg-green-100 text-green-800',
-      Cancelled: 'bg-gray-100 text-gray-800',
+      New: 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400',
+      'In Progress': 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400',
+      'On Hold': 'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-400',
+      Completed: 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400',
+      Cancelled: 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]',
     }
     return (
       <span
-        className={`px-2 py-1 text-xs rounded-full font-medium ${styles[status] || 'bg-gray-100 text-gray-800'}`}
+        className={`px-2 py-1 text-xs rounded-full font-medium ${styles[status] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]'}`}
       >
         {status || 'Unknown'}
       </span>
@@ -298,9 +326,9 @@ export default function CustomerDetails({
   if (!customer) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">Customer not found.</p>
+        <p className="text-gray-500">{t('customerDetails.notFound')}</p>
         <Button className="mt-4" onClick={onBack}>
-          Go Back
+          {t('common.back')}
         </Button>
       </div>
     )
@@ -328,7 +356,7 @@ export default function CustomerDetails({
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            Back to Customers
+            {t('customerDetails.backToCustomers')}
           </button>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-lg">
@@ -337,7 +365,7 @@ export default function CustomerDetails({
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{displayName}</h1>
               {customer.customer_type === 'B2B' && customer.contact_person && (
-                <p className="text-sm text-gray-500">Contact: {customer.contact_person}</p>
+                <p className="text-sm text-gray-500">{t('customerDetails.contactLabel')} {customer.contact_person}</p>
               )}
               <div className="flex items-center gap-2 mt-1">
                 {getStatusBadge(customer.customer_status)}
@@ -369,7 +397,7 @@ export default function CustomerDetails({
                   d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                 />
               </svg>
-              Edit
+              {t('common.edit')}
             </Button>
             <Button variant="danger" onClick={handleDelete}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -380,7 +408,7 @@ export default function CustomerDetails({
                   d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                 />
               </svg>
-              Delete
+              {t('common.delete')}
             </Button>
           </div>
         )}
@@ -395,10 +423,10 @@ export default function CustomerDetails({
                 setPendingFiles([])
               }}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button variant="success" onClick={handleSaveEdit}>
-              Save Changes
+              {t('customerDetails.saveChanges')}
             </Button>
           </div>
         )}
@@ -408,30 +436,30 @@ export default function CustomerDetails({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           {
-            label: 'Total RMAs',
+            label: t('customerDetails.totalRMAs'),
             value: tickets.length,
             icon: '🎫',
             color: 'bg-blue-50 text-blue-700',
           },
           {
-            label: 'Open Tickets',
+            label: t('customerDetails.openTickets'),
             value: tickets.filter(
               (t) =>
-                t.ticket_status === 'New' ||
-                t.ticket_status === 'In Progress' ||
-                t.ticket_status === 'On Hold'
+                t.ticket_status === TICKET_STATUS.OPEN ||
+                t.ticket_status === TICKET_STATUS.IN_PROGRESS ||
+                t.ticket_status === TICKET_STATUS.ON_HOLD
             ).length,
             icon: '🔓',
             color: 'bg-yellow-50 text-yellow-700',
           },
           {
-            label: 'Notes',
+            label: t('common.notes'),
             value: notes.length,
             icon: '📝',
             color: 'bg-purple-50 text-purple-700',
           },
           {
-            label: 'Customer Since',
+            label: t('customerDetails.customerSince'),
             value: formatDate(customer.created_date),
             icon: '📅',
             color: 'bg-green-50 text-green-700',
@@ -445,15 +473,40 @@ export default function CustomerDetails({
         ))}
       </div>
 
+      {/* AI Assist */}
+      <AIAssist
+        contextType="customer"
+        data={{
+          contact_person: customer.contact_person,
+          company_name: customer.company_name,
+          customer_type: customer.customer_type,
+          email: customer.email,
+          created_date: customer.created_date,
+          ticket_count: tickets.length,
+          open_ticket_count: tickets.filter((t) =>
+            t.ticket_status === TICKET_STATUS.OPEN ||
+            t.ticket_status === TICKET_STATUS.IN_PROGRESS ||
+            t.ticket_status === TICKET_STATUS.ON_HOLD
+          ).length,
+          resolved_count: tickets.filter((t) =>
+            t.ticket_status === TICKET_STATUS.COMPLETED ||
+            t.ticket_status === TICKET_STATUS.CLOSED
+          ).length,
+          last_ticket_date: tickets.length > 0
+            ? tickets.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]?.created_date
+            : null,
+        }}
+      />
+
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="border-b border-gray-200">
-          <nav className="flex gap-6 px-6">
+          <nav className="flex gap-4 sm:gap-6 px-6">
             {[
-              { key: 'profile', label: 'Profile', icon: '👤' },
-              { key: 'rma', label: `RMA History (${tickets.length})`, icon: '🎫' },
-              { key: 'notes', label: `Notes (${notes.length})`, icon: '📝' },
-              { key: 'activity', label: 'Activity Log', icon: '📋' },
+              { key: 'profile', label: t('customerDetails.tabProfile'), icon: '👤' },
+              { key: 'rma', label: t('customerDetails.tabRMAHistory', { count: tickets.length }), icon: '🎫' },
+              { key: 'notes', label: t('customerDetails.tabNotes', { count: notes.length }), icon: '📝' },
+              { key: 'activity', label: t('customerDetails.tabActivity'), icon: '📋' },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -480,12 +533,12 @@ export default function CustomerDetails({
                   {/* Customer Type + Status */}
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
-                      Customer Type & Status
+                      {t('customerDetails.sectionTypeStatus')}
                     </h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className={labelClass}>
-                          Customer Type <span className="text-red-500">*</span>
+                          {t('customerModal.customerType')} <span className="text-red-500">*</span>
                         </label>
                         <select
                           value={editForm.customer_type || 'B2B'}
@@ -494,13 +547,13 @@ export default function CustomerDetails({
                           }
                           className={inputClass}
                         >
-                          <option value="B2B">B2B — Business</option>
-                          <option value="B2C">B2C — Individual</option>
+                          <option value="B2B">{t('customerDetails.typeB2BBusiness')}</option>
+                          <option value="B2C">{t('customerModal.typeB2C')}</option>
                         </select>
                       </div>
                       <div>
                         <label className={labelClass}>
-                          Status <span className="text-red-500">*</span>
+                          {t('common.status')} <span className="text-red-500">*</span>
                         </label>
                         <select
                           value={editForm.customer_status || 'Active'}
@@ -509,8 +562,8 @@ export default function CustomerDetails({
                           }
                           className={inputClass}
                         >
-                          <option value="Active">Active</option>
-                          <option value="Inactive">Inactive</option>
+                          <option value="Active">{t('customerModal.statusActive')}</option>
+                          <option value="Inactive">{t('customerModal.statusInactive')}</option>
                         </select>
                       </div>
                     </div>
@@ -520,12 +573,12 @@ export default function CustomerDetails({
                   {editForm.customer_type === 'B2B' && (
                     <div>
                       <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
-                        Company Information
+                        {t('customerDetails.sectionCompany')}
                       </h3>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className={labelClass}>
-                            Company Name <span className="text-red-500">*</span>
+                            {t('customerModal.companyName')} <span className="text-red-500">*</span>
                           </label>
                           <input
                             type="text"
@@ -537,7 +590,7 @@ export default function CustomerDetails({
                           />
                         </div>
                         <div>
-                          <label className={labelClass}>CR Number</label>
+                          <label className={labelClass}>{t('customerModal.crNumber')}</label>
                           <input
                             type="text"
                             value={editForm.cr_number || ''}
@@ -548,7 +601,7 @@ export default function CustomerDetails({
                           />
                         </div>
                         <div>
-                          <label className={labelClass}>Tax ID</label>
+                          <label className={labelClass}>{t('customerModal.taxId')}</label>
                           <input
                             type="text"
                             value={editForm.tax_id || ''}
@@ -563,12 +616,12 @@ export default function CustomerDetails({
                   {/* Contact */}
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
-                      Contact Information
+                      {t('customerDetails.sectionContact')}
                     </h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className={labelClass}>
-                          Contact Person <span className="text-red-500">*</span>
+                          {t('customerModal.contactPerson')} <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -581,7 +634,7 @@ export default function CustomerDetails({
                       </div>
                       <div>
                         <label className={labelClass}>
-                          Mobile <span className="text-red-500">*</span>
+                          {t('customerModal.mobile')} <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="tel"
@@ -591,7 +644,7 @@ export default function CustomerDetails({
                         />
                       </div>
                       <div>
-                        <label className={labelClass}>Landline</label>
+                        <label className={labelClass}>{t('customerModal.landline')}</label>
                         <input
                           type="tel"
                           value={editForm.landline || ''}
@@ -600,7 +653,7 @@ export default function CustomerDetails({
                         />
                       </div>
                       <div>
-                        <label className={labelClass}>Email</label>
+                        <label className={labelClass}>{t('common.email')}</label>
                         <input
                           type="email"
                           value={editForm.email || ''}
@@ -609,7 +662,7 @@ export default function CustomerDetails({
                         />
                       </div>
                       <div>
-                        <label className={labelClass}>Account Manager</label>
+                        <label className={labelClass}>{t('customerModal.accountManager')}</label>
                         <input
                           type="text"
                           value={editForm.account_manager || ''}
@@ -625,13 +678,13 @@ export default function CustomerDetails({
                   {/* Address */}
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
-                      Address
+                      {t('common.address')}
                     </h3>
                     <textarea
                       value={editForm.address || ''}
                       onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
                       rows={3}
-                      placeholder="Full address..."
+                      placeholder={t('customerDetails.addressPlaceholder')}
                       className={inputClass}
                     />
                   </div>
@@ -639,13 +692,13 @@ export default function CustomerDetails({
                   {/* Notes */}
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
-                      Internal Notes
+                      {t('customerDetails.internalNotes')}
                     </h3>
                     <textarea
                       value={editForm.notes || ''}
                       onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
                       rows={3}
-                      placeholder="Internal notes..."
+                      placeholder={t('customerDetails.internalNotesPlaceholder')}
                       className={inputClass}
                     />
                   </div>
@@ -653,7 +706,7 @@ export default function CustomerDetails({
                   {/* Attachments */}
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
-                      Attachments
+                      {t('customerModal.attachments')}
                     </h3>
                     <AttachmentsField
                       savedAttachments={editForm.attachments || []}
@@ -670,19 +723,19 @@ export default function CustomerDetails({
                   <div className="space-y-6">
                     <div>
                       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                        Contact Information
+                        {t('customerDetails.sectionContact')}
                       </h3>
                       <div className="space-y-3">
                         <DetailRow
                           icon="👤"
-                          label="Contact Person"
+                          label={t('customerModal.contactPerson')}
                           value={customer.contact_person}
                         />
-                        <DetailRow icon="📱" label="Mobile" value={customer.mobile} />
-                        <DetailRow icon="📞" label="Landline" value={customer.landline} />
+                        <DetailRow icon="📱" label={t('customerModal.mobile')} value={customer.mobile} />
+                        <DetailRow icon="📞" label={t('customerModal.landline')} value={customer.landline} />
                         <DetailRow
                           icon="✉️"
-                          label="Email"
+                          label={t('common.email')}
                           value={
                             customer.email ? (
                               <a
@@ -696,7 +749,7 @@ export default function CustomerDetails({
                         />
                         <DetailRow
                           icon="👔"
-                          label="Account Manager"
+                          label={t('customerModal.accountManager')}
                           value={customer.account_manager}
                         />
                       </div>
@@ -704,12 +757,12 @@ export default function CustomerDetails({
 
                     <div>
                       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                        System Info
+                        {t('customerDetails.sectionSystemInfo')}
                       </h3>
                       <div className="space-y-3">
                         <DetailRow
                           icon="🔢"
-                          label="Customer Code"
+                          label={t('customerDetails.customerCode')}
                           value={
                             customer.customer_code ? (
                               <span className="font-mono text-sm">{customer.customer_code}</span>
@@ -718,15 +771,15 @@ export default function CustomerDetails({
                         />
                         <DetailRow
                           icon="📅"
-                          label="Customer Since"
+                          label={t('customerDetails.customerSince')}
                           value={formatDate(customer.created_date)}
                         />
                         <DetailRow
                           icon="🔄"
-                          label="Last Updated"
+                          label={t('customerDetails.lastUpdated')}
                           value={formatDateTime(customer.updated_date)}
                         />
-                        <DetailRow icon="👤" label="Created By" value={customer.created_by} />
+                        <DetailRow icon="👤" label={t('customerDetails.createdBy')} value={customer.created_by} />
                       </div>
                     </div>
                   </div>
@@ -736,33 +789,33 @@ export default function CustomerDetails({
                     {customer.customer_type === 'B2B' && (
                       <div>
                         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                          Company Information
+                          {t('customerDetails.sectionCompany')}
                         </h3>
                         <div className="space-y-3">
-                          <DetailRow icon="🏢" label="Company Name" value={customer.company_name} />
-                          <DetailRow icon="📄" label="CR Number" value={customer.cr_number} />
-                          <DetailRow icon="🧾" label="Tax ID" value={customer.tax_id} />
+                          <DetailRow icon="🏢" label={t('customerModal.companyName')} value={customer.company_name} />
+                          <DetailRow icon="📄" label={t('customerModal.crNumber')} value={customer.cr_number} />
+                          <DetailRow icon="🧾" label={t('customerModal.taxId')} value={customer.tax_id} />
                         </div>
                       </div>
                     )}
 
                     <div>
                       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                        Address
+                        {t('common.address')}
                       </h3>
                       {customer.address ? (
                         <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap">
                           {customer.address}
                         </div>
                       ) : (
-                        <p className="text-gray-500 text-sm">No address on file</p>
+                        <p className="text-gray-500 text-sm">{t('customerDetails.noAddress')}</p>
                       )}
                     </div>
 
                     {customer.notes && (
                       <div>
                         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                          Internal Notes
+                          {t('customerDetails.internalNotes')}
                         </h3>
                         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap">
                           {customer.notes}
@@ -773,7 +826,7 @@ export default function CustomerDetails({
                     {(customer.attachments || []).length > 0 && (
                       <div>
                         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                          Attachments
+                          {t('customerModal.attachments')}
                         </h3>
                         <div className="space-y-2">
                           {customer.attachments.map((att, i) => (
@@ -835,77 +888,48 @@ export default function CustomerDetails({
               {tickets.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   <div className="text-4xl mb-3">🎫</div>
-                  <p className="font-medium">No RMA tickets found</p>
-                  <p className="text-sm">This customer has no RMA history yet</p>
+                  <p className="font-medium">{t('customerDetails.noTickets')}</p>
+                  <p className="text-sm">{t('customerDetails.noTicketsHint')}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50 border-y border-gray-200">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          RMA Number
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Status
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Priority
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Issue
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Created
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Action
-                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('customerDetails.colRmaNumber')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.status')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.priority')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('customerDetails.colIssue')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('customerDetails.colCreated')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {tickets.map((ticket) => (
-                        <tr key={ticket.id} className="hover:bg-gray-50">
+                        <tr
+                          key={ticket.id}
+                          className="hover:bg-indigo-50 cursor-pointer transition-colors"
+                          onClick={() => openTicketDrawer(ticket)}
+                        >
                           <td className="px-4 py-3">
-                            <span className="font-mono text-sm font-medium text-indigo-600">
+                            <span className="font-mono text-sm font-semibold text-indigo-600 hover:underline">
                               {ticket.rma_number || ticket.id?.slice(0, 8)}
                             </span>
                           </td>
+                          <td className="px-4 py-3">{getTicketStatusBadge(ticket.ticket_status)}</td>
                           <td className="px-4 py-3">
-                            {getTicketStatusBadge(ticket.ticket_status)}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={`px-2 py-1 text-xs rounded-full font-medium ${
-                                ticket.priority === 'High'
-                                  ? 'bg-red-100 text-red-800'
-                                  : ticket.priority === 'Medium'
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : ticket.priority === 'Critical'
-                                      ? 'bg-red-200 text-red-900'
-                                      : 'bg-gray-100 text-gray-800'
-                              }`}
-                            >
+                            <span className={`px-2 py-1 text-xs rounded-full font-medium ${
+                              ticket.priority === 'Critical' ? 'bg-red-200 text-red-900'
+                              : ticket.priority === 'High' ? 'bg-red-100 text-red-800'
+                              : ticket.priority === 'Medium' ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
+                              : 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]'
+                            }`}>
                               {ticket.priority || 'Low'}
                             </span>
                           </td>
-                          <td
-                            className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate"
-                            title={ticket.general_description || ''}
-                          >
+                          <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate" title={ticket.general_description || ''}>
                             {ticket.general_description || '—'}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-500">
-                            {formatDate(ticket.created_date)}
-                          </td>
-                          <td className="px-4 py-3">
-                            <button
-                              onClick={() => onNavigateToTicket(ticket.id)}
-                              className="text-indigo-600 hover:text-indigo-900 text-sm font-medium hover:underline"
-                            >
-                              View →
-                            </button>
-                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{formatDate(ticket.created_date)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -919,11 +943,11 @@ export default function CustomerDetails({
           {activeTab === 'notes' && (
             <div className="space-y-4">
               <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                <h3 className="font-medium text-gray-900">Add a Note</h3>
+                <h3 className="font-medium text-gray-900">{t('customerDetails.addNote')}</h3>
                 <textarea
                   value={newNote}
                   onChange={(e) => setNewNote(e.target.value)}
-                  placeholder="Write an internal note about this customer..."
+                  placeholder={t('customerDetails.notePlaceholder')}
                   rows={3}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
                 />
@@ -950,7 +974,7 @@ export default function CustomerDetails({
                         />
                       </svg>
                     )}
-                    Add Note
+                    {t('customerDetails.addNoteBtn')}
                   </button>
                 </div>
               </div>
@@ -958,7 +982,7 @@ export default function CustomerDetails({
               {notes.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <div className="text-3xl mb-2">📝</div>
-                  <p>No notes yet. Add the first note above.</p>
+                  <p>{t('customerDetails.noNotes')}</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -980,13 +1004,13 @@ export default function CustomerDetails({
                               }}
                               className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition-colors"
                             >
-                              Cancel
+                              {t('common.cancel')}
                             </button>
                             <button
                               onClick={() => handleUpdateNote(note.id)}
                               className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm transition-colors"
                             >
-                              Save
+                              {t('common.save')}
                             </button>
                           </div>
                         </div>
@@ -998,7 +1022,7 @@ export default function CustomerDetails({
                               <span className="font-medium">{note.created_by || 'Unknown'}</span>
                               {' · '}
                               {formatDateTime(note.created_date)}
-                              {note.updated_date !== note.created_date && ' (edited)'}
+                              {note.updated_date !== note.created_date && ` ${t('customerDetails.edited')}`}
                             </div>
                             <div className="flex gap-2">
                               <button
@@ -1008,13 +1032,13 @@ export default function CustomerDetails({
                                 }}
                                 className="text-indigo-600 hover:text-indigo-900 text-xs font-medium"
                               >
-                                Edit
+                                {t('common.edit')}
                               </button>
                               <button
                                 onClick={() => handleDeleteNote(note.id)}
                                 className="text-red-600 hover:text-red-900 text-xs font-medium"
                               >
-                                Delete
+                                {t('common.delete')}
                               </button>
                             </div>
                           </div>
@@ -1031,24 +1055,24 @@ export default function CustomerDetails({
           {activeTab === 'activity' && (
             <div className="space-y-3">
               <p className="text-sm text-gray-500 mb-4">
-                Timeline of all activity for this customer
+                {t('customerDetails.activityTimeline')}
               </p>
               {[
-                ...tickets.map((t) => ({
+                ...tickets.map((tk) => ({
                   type: 'ticket',
-                  date: t.created_date,
+                  date: tk.created_date,
                   icon: '🎫',
                   color: 'bg-blue-100',
-                  title: 'RMA Ticket Created',
-                  detail: `${t.rma_number || t.id?.slice(0, 8)} — ${t.issue_description || t.title || 'No description'}`,
-                  action: () => onNavigateToTicket(t.id),
+                  title: t('customerDetails.activityRmaCreated'),
+                  detail: `${tk.rma_number || tk.id?.slice(0, 8)} — ${tk.issue_description || tk.title || '—'}`,
+                  action: () => onNavigateToTicket(tk.id),
                 })),
                 ...notes.map((n) => ({
                   type: 'note',
                   date: n.created_date,
                   icon: '📝',
                   color: 'bg-yellow-100',
-                  title: 'Note Added',
+                  title: t('customerDetails.activityNoteAdded'),
                   detail: n.note.length > 80 ? n.note.slice(0, 80) + '...' : n.note,
                   by: n.created_by,
                 })),
@@ -1057,8 +1081,8 @@ export default function CustomerDetails({
                   date: customer.created_date,
                   icon: '✅',
                   color: 'bg-green-100',
-                  title: 'Customer Created',
-                  detail: `Added by ${customer.created_by || 'Unknown'}`,
+                  title: t('customerDetails.activityCustomerCreated'),
+                  detail: t('customerDetails.activityAddedBy', { by: customer.created_by || '—' }),
                 },
               ]
                 .filter((e) => e.date)
@@ -1081,7 +1105,7 @@ export default function CustomerDetails({
                           onClick={event.action}
                           className="text-xs text-indigo-600 hover:underline mt-1"
                         >
-                          View ticket →
+                          {t('customerDetails.viewTicket')}
                         </button>
                       )}
                     </div>
@@ -1090,7 +1114,7 @@ export default function CustomerDetails({
               {tickets.length === 0 && notes.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   <div className="text-3xl mb-2">📋</div>
-                  <p>No activity yet for this customer</p>
+                  <p>{t('customerDetails.noActivity')}</p>
                 </div>
               )}
             </div>
@@ -1105,6 +1129,19 @@ export default function CustomerDetails({
         onConfirm={confirmDialog.onConfirm}
         onCancel={closeConfirm}
       />
+
+      {/* ── RMA Ticket Detail Drawer ── */}
+      {drawerTicket && (
+        <TicketDetailDrawer
+          ticket={drawerTicket}
+          comments={drawerComments}
+          commentsLoading={drawerCommentsLoading}
+          formatDate={formatDate}
+          formatDateTime={formatDateTime}
+          getTicketStatusBadge={getTicketStatusBadge}
+          onClose={() => setDrawerTicket(null)}
+        />
+      )}
     </div>
   )
 }
@@ -1117,6 +1154,401 @@ function DetailRow({ icon, label, value }) {
         <p className="text-xs font-medium text-gray-500">{label}</p>
         <div className="text-sm text-gray-900">
           {value || <span className="text-gray-500">—</span>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Ticket Detail Drawer (read-only, opens from RMA History tab) ─────────────
+async function exportTicketPDF(ticket, t) {
+  const esc = (s) =>
+    String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+
+  let qrCodeUrl = ''
+  try {
+    qrCodeUrl = await QRCode.toDataURL(ticket.rma_number)
+  } catch {}
+
+  const PDF_DEFAULT = {
+    paperSize: 'A4',
+    orientation: 'portrait',
+    font: 'Arial, sans-serif',
+    fontSize: 11,
+    primaryColor: '#4F46E5',
+    headerStyle: 'colored',
+    showLogo: false,
+    logoPosition: 'right',
+    showCompanyName: true,
+    showRmaNumber: true,
+    showDate: true,
+    sections: {
+      ticketInfo: true,
+      generalDescription: true,
+      products: true,
+      accessories: true,
+      attachments: true,
+      signatureLine: false,
+    },
+    sectionOrder: [
+      'ticketInfo',
+      'generalDescription',
+      'products',
+      'accessories',
+      'attachments',
+      'signatureLine',
+    ],
+    footerText: '',
+    showGeneratedDate: true,
+    showWatermark: false,
+  }
+  let pdfCfg = PDF_DEFAULT
+  let brandingData = {}
+  try {
+    const [cfgResult, brd] = await Promise.all([db.rmaConfig.getAll(), brandingAPI.getBranding()])
+    if (!cfgResult.missing) {
+      const row = cfgResult.data.find((r) => r.config_key === 'pdf_layout')
+      if (row?.config_value) {
+        const val = typeof row.config_value === 'string' ? JSON.parse(row.config_value) : row.config_value
+        pdfCfg = {
+          ...PDF_DEFAULT,
+          ...val,
+          sections: { ...PDF_DEFAULT.sections, ...(val.sections || {}) },
+          sectionOrder: val.sectionOrder?.length ? val.sectionOrder : PDF_DEFAULT.sectionOrder,
+        }
+      }
+    }
+    if (brd) brandingData = brd
+  } catch {}
+
+  const color = pdfCfg.primaryColor || '#4F46E5'
+  const font = pdfCfg.font || 'Arial, sans-serif'
+  const fontSize = pdfCfg.fontSize || 11
+  const sec = pdfCfg.sections || PDF_DEFAULT.sections
+  const companyName = brandingData.company_name || 'myRMA'
+  const logoUrl = pdfCfg.showLogo ? brandingData.logo_url || null : null
+
+  const fmtPdf = (d) =>
+    d
+      ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+      : 'N/A'
+  const fmtTS = (d) => {
+    if (!d) return 'N/A'
+    const dt = new Date(d)
+    return (
+      dt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) +
+      ' at ' +
+      dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    )
+  }
+
+  const productsHtml = (ticket.products || [])
+    .map(
+      (p, i) => `
+    <div style="border:1px solid #E5E7EB;border-radius:6px;padding:12px;margin-bottom:12px">
+      <h4 style="margin:0 0 8px;font-size:${fontSize + 1}px;color:#1F2937">Product ${i + 1}: ${esc(p.product_name) || '—'}</h4>
+      <table style="width:100%;font-size:${fontSize}px;border-collapse:collapse">
+        <tr><td style="color:#6B7280;padding:3px 8px;width:40%">Serial Number</td><td style="font-family:monospace"><strong>${esc(p.serial_number) || '—'}</strong></td></tr>
+        <tr><td style="color:#6B7280;padding:3px 8px">Product Status</td><td><strong>${esc(p.product_status) || '—'}</strong></td></tr>
+        <tr><td style="color:#6B7280;padding:3px 8px">Warranty Status</td><td><strong>${esc(p.warranty_status) || '—'}</strong></td></tr>
+        <tr><td colspan="2" style="padding:6px 8px 0"><strong>Issue:</strong> ${esc(p.issue_description) || '—'}</td></tr>
+      </table>
+    </div>`
+    )
+    .join('')
+
+  const attachHtml = (ticket.attachments || []).length
+    ? (ticket.attachments || [])
+        .map(
+          (a) =>
+            `<li style="margin-bottom:4px">${esc(a.name)} <span style="color:#9CA3AF">(${(a.size / 1024).toFixed(1)} KB)</span></li>`
+        )
+        .join('')
+    : '<li style="color:#9CA3AF">No attachments</li>'
+
+  const priorityColors = {
+    Critical: '#FEE2E2;color:#991B1B',
+    High: '#FFEDD5;color:#9A3412',
+    Medium: '#DBEAFE;color:#1E40AF',
+    Low: '#F3F4F6;color:#374151',
+  }
+  const pc = priorityColors[ticket.priority] || priorityColors.Medium
+
+  const headerBorderStyle =
+    pdfCfg.headerStyle === 'colored'
+      ? `border-bottom:3px solid ${color};background:linear-gradient(135deg,${color}15 0%,transparent 100%)`
+      : pdfCfg.headerStyle === 'minimal'
+        ? 'border-bottom:1px solid #E5E7EB'
+        : 'border-bottom:none'
+
+  const logoHtml = logoUrl
+    ? `<img src="${logoUrl}" style="max-height:60px;max-width:140px;object-fit:contain" />`
+    : ''
+
+  const headerLeft =
+    pdfCfg.logoPosition === 'left'
+      ? `<div style="display:flex;align-items:center;gap:12px">${logoHtml}<div>${pdfCfg.showCompanyName ? `<div style="font-size:${fontSize + 4}px;font-weight:bold;color:${color}">${esc(companyName)}</div>` : ''}${pdfCfg.showRmaNumber ? `<div style="font-size:${fontSize + 2}px;color:#6B7280;margin-top:2px">${esc(ticket.rma_number)}</div>` : ''}${pdfCfg.showDate ? `<div style="font-size:${fontSize - 1}px;color:#9CA3AF;margin-top:2px">${esc(fmtTS(ticket.created_date))}</div>` : ''}<div style="margin-top:6px"><span class="badge" style="background:#DBEAFE;color:#1E40AF">${esc(ticket.ticket_status)}</span><span class="badge" style="background:${pc}">${esc(ticket.priority)}</span></div></div></div>`
+      : `<div>${pdfCfg.showCompanyName ? `<div style="font-size:${fontSize + 4}px;font-weight:bold;color:${color}">${esc(companyName)}</div>` : ''}${pdfCfg.showRmaNumber ? `<div style="font-size:${fontSize + 2}px;color:#6B7280;margin-top:2px">${esc(ticket.rma_number)}</div>` : ''}${pdfCfg.showDate ? `<div style="font-size:${fontSize - 1}px;color:#9CA3AF;margin-top:2px">${esc(fmtTS(ticket.created_date))}</div>` : ''}<div style="margin-top:6px"><span class="badge" style="background:#DBEAFE;color:#1E40AF">${esc(ticket.ticket_status)}</span><span class="badge" style="background:${pc}">${esc(ticket.priority)}</span></div></div>`
+
+  const headerRight =
+    pdfCfg.logoPosition === 'right'
+      ? `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">${logoHtml}${qrCodeUrl ? `<div style="text-align:center"><img src="${qrCodeUrl}" width="80" height="80"/><div style="font-size:10px;color:#6B7280;margin-top:2px">Scan to view</div></div>` : ''}</div>`
+      : qrCodeUrl
+        ? `<div style="text-align:center"><img src="${qrCodeUrl}" width="80" height="80"/><div style="font-size:10px;color:#6B7280;margin-top:2px">Scan to view</div></div>`
+        : ''
+
+  const watermarkHtml = pdfCfg.showWatermark
+    ? `<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);font-size:80px;font-weight:bold;color:${color};opacity:0.05;pointer-events:none;z-index:-1">DRAFT</div>`
+    : ''
+
+  const footerContent = [
+    pdfCfg.showGeneratedDate ? `Generated: ${new Date().toLocaleString()}` : '',
+    pdfCfg.footerText || companyName,
+  ].filter(Boolean)
+
+  const w = window.open('', '_blank')
+  if (!w) {
+    toast.error(t('common.popupBlocked'))
+    return
+  }
+  w.document.write(`<!DOCTYPE html><html><head><title>RMA Ticket - ${esc(ticket.rma_number)}</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:${font};font-size:${fontSize}px;color:#1F2937;padding:30px}
+      .header{display:flex;justify-content:space-between;align-items:flex-start;${headerBorderStyle};padding-bottom:20px;margin-bottom:24px}
+      .badge{display:inline-block;padding:3px 10px;border-radius:9999px;font-size:${fontSize - 1}px;font-weight:bold;margin-right:6px;margin-top:6px}
+      .section{margin-bottom:20px}
+      .section-title{font-size:${fontSize - 1}px;text-transform:uppercase;letter-spacing:0.05em;color:${color};border-bottom:2px solid ${color}33;padding-bottom:6px;margin-bottom:12px;font-weight:600}
+      .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+      .info-label{font-size:${fontSize - 2}px;color:#6B7280;margin-bottom:2px}
+      .info-value{font-size:${fontSize}px;font-weight:bold}
+      .desc-box{background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:12px;white-space:pre-wrap}
+      .footer{margin-top:30px;border-top:1px solid #E5E7EB;padding-top:12px;display:flex;justify-content:space-between;color:#9CA3AF;font-size:${fontSize - 2}px}
+      .sig-box{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px}
+      .sig-line{border-top:1px solid #374151;padding-top:6px;font-size:${fontSize - 1}px;color:#6B7280;text-align:center}
+      @media print{body{padding:15px}}
+    </style></head>
+    <body>
+    ${watermarkHtml}
+    <div class="header">
+      ${headerLeft}
+      ${headerRight}
+    </div>
+
+    ${pdfCfg.sectionOrder
+      .map((key) => {
+        if (!sec[key]) return ''
+        if (key === 'ticketInfo')
+          return `
+      <div class="section">
+        <div class="section-title">Ticket Information</div>
+        <div class="grid">
+          <div><div class="info-label">Customer</div><div class="info-value">${esc(ticket.customer_name) || '—'}</div></div>
+          <div><div class="info-label">Assigned To</div><div class="info-value">${esc(ticket.assigned_technician) || 'Unassigned'}</div></div>
+          <div><div class="info-label">Due Date</div><div class="info-value">${esc(fmtPdf(ticket.due_date))}</div></div>
+          <div><div class="info-label">Created</div><div class="info-value">${esc(fmtTS(ticket.created_date))}</div></div>
+          <div><div class="info-label">Created By</div><div class="info-value">${esc(ticket.created_by) || '—'}</div></div>
+        </div>
+      </div>`
+        if (key === 'generalDescription')
+          return ticket.general_description
+            ? `
+      <div class="section">
+        <div class="section-title">General RMA Description</div>
+        <div class="desc-box">${esc(ticket.general_description)}</div>
+      </div>`
+            : ''
+        if (key === 'products')
+          return `
+      <div class="section">
+        <div class="section-title">Products (${(ticket.products || []).length})</div>
+        ${productsHtml || '<p style="color:#9CA3AF">No products listed</p>'}
+      </div>`
+        if (key === 'accessories')
+          return ticket.accessories_received
+            ? `
+      <div class="section">
+        <div class="section-title">Accessories Received</div>
+        <div class="desc-box">${esc(ticket.accessories_received)}</div>
+      </div>`
+            : ''
+        if (key === 'attachments')
+          return `
+      <div class="section">
+        <div class="section-title">Attachments</div>
+        <ul style="padding-left:20px">${attachHtml}</ul>
+      </div>`
+        if (key === 'signatureLine')
+          return `
+      <div class="sig-box">
+        <div><div class="sig-line">Customer Signature</div></div>
+        <div><div class="sig-line">Technician Signature</div></div>
+      </div>`
+        return ''
+      })
+      .join('')}
+
+    <div class="footer">
+      <span>${esc(footerContent[0]) || ''}</span>
+      <span>${esc(footerContent[1]) || ''}</span>
+    </div>
+    <script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>
+    </body></html>`)
+  w.document.close()
+}
+
+function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, formatDateTime, getTicketStatusBadge, onClose }) {
+  const { t } = useTranslation()
+  const products = ticket.products || []
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      {/* Backdrop */}
+      <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Panel */}
+      <div className="w-full max-w-lg bg-white dark:bg-[#121823] shadow-2xl flex flex-col h-full overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-[#212a38] flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="font-mono text-base font-bold text-indigo-600 dark:text-[#a5b4fc] truncate">
+              {ticket.rma_number}
+            </span>
+            {getTicketStatusBadge(ticket.ticket_status)}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+            <button
+              onClick={() => exportTicketPDF(ticket, t)}
+              title="Export PDF"
+              aria-label="Export PDF"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-[#9aa4b2] bg-gray-100 dark:bg-[#1a2230] hover:bg-gray-200 dark:hover:bg-[#212a38] rounded-lg transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              PDF
+            </button>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1a2230] transition-colors"
+            >
+              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+          {/* Key details grid */}
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">{t('customerDetails.drawerPriority')}</p>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                ticket.priority === 'Critical' ? 'bg-red-200 text-red-900'
+                : ticket.priority === 'High' ? 'bg-red-100 text-red-800'
+                : ticket.priority === 'Medium' ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
+                : 'bg-gray-100 text-gray-700'
+              }`}>{ticket.priority || 'Low'}</span>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">{t('customerDetails.drawerAssignedTo')}</p>
+              <p className="font-medium text-gray-800 dark:text-[#e8ebf0] truncate">{ticket.assigned_technician || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">{t('customerDetails.drawerCreated')}</p>
+              <p className="font-medium text-gray-800 dark:text-[#e8ebf0]">{formatDate(ticket.created_date)}</p>
+            </div>
+            {ticket.due_date && (
+              <div>
+                <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">{t('customerDetails.drawerDueDate')}</p>
+                <p className="font-medium text-gray-800 dark:text-[#e8ebf0]">{formatDate(ticket.due_date)}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Description */}
+          {ticket.general_description && (
+            <div>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-2">{t('customerDetails.drawerIssueDesc')}</p>
+              <p className="text-sm text-gray-700 dark:text-[#e8ebf0] bg-gray-50 dark:bg-[#0f1520] rounded-lg p-3 leading-relaxed whitespace-pre-wrap">
+                {ticket.general_description}
+              </p>
+            </div>
+          )}
+
+          {/* Products */}
+          {products.length > 0 && (
+            <div>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-3">
+                {t('customerDetails.drawerItems', { count: products.length })}
+              </p>
+              <div className="space-y-2">
+                {products.map((p, i) => (
+                  <div key={i} className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-[#0f1520] rounded-lg border border-gray-100 dark:border-[#212a38]">
+                    <div className="w-8 h-8 bg-indigo-100 dark:bg-[#1a2230] rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-indigo-600 dark:text-[#a5b4fc]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 dark:text-[#e8ebf0]">{p.product_name || `Item ${i + 1}`}</p>
+                      {p.serial_number && <p className="text-xs text-gray-500 dark:text-[#9aa4b2] font-mono mt-0.5">S/N: {p.serial_number}</p>}
+                      {p.issue_description && <p className="text-xs text-gray-600 dark:text-[#9aa4b2] mt-1">{p.issue_description}</p>}
+                      {p.product_status && (
+                        <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full font-medium bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400">
+                          {p.product_status}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Comments */}
+          <div>
+            <p className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-3">
+              {t('customerDetails.drawerComments')}{!commentsLoading && ` (${comments.length})`}
+            </p>
+            {commentsLoading ? (
+              <div className="flex justify-center py-6">
+                <div className="animate-spin w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full" />
+              </div>
+            ) : comments.length === 0 ? (
+              <p className="text-sm text-gray-400 dark:text-[#4a5568] text-center py-4">{t('customerDetails.drawerNoComments')}</p>
+            ) : (
+              <div className="space-y-3">
+                {comments.map((c) => {
+                  const isTeam = !c.is_customer_comment
+                  const name = c.author_name || c.user_email || (isTeam ? 'Team' : 'Customer')
+                  return (
+                    <div key={c.id} className={`flex gap-3 p-3 rounded-xl border text-sm ${isTeam ? 'bg-indigo-50 dark:bg-[#1a2230] border-indigo-100 dark:border-[#212a38]' : 'bg-gray-50 dark:bg-[#0f1520] border-gray-100 dark:border-[#212a38]'}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 ${isTeam ? 'bg-indigo-500' : 'bg-gray-400'}`}>
+                        {name[0]?.toUpperCase() || '?'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="font-semibold text-gray-900 dark:text-[#e8ebf0] text-xs">{name}</span>
+                          {isTeam && <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-700 rounded-full">{t('customerDetails.staffBadge')}</span>}
+                          <span className="text-xs text-gray-400 dark:text-[#4a5568] ml-auto">{formatDateTime(c.created_date)}</span>
+                        </div>
+                        <p className="text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap leading-relaxed">{c.comment_text}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

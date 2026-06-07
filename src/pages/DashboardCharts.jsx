@@ -1,255 +1,62 @@
 import React from 'react'
-import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts'
+import { useTranslation } from 'react-i18next'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Area, AreaChart, ResponsiveContainer } from 'recharts'
 
-const COLORS = [
-  '#6366f1',
-  '#8b5cf6',
-  '#ec4899',
-  '#f59e0b',
-  '#10b981',
-  '#3b82f6',
-  '#ef4444',
-  '#14b8a6',
-]
-const PRIORITY_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#10b981']
+export default function DashboardCharts({ on, nav, weeklyTrend, monthlyTrend, chartGridColor, chartTickStyle, chartTooltipStyle, tk }) {
+  const { t } = useTranslation()
+  const cardStyle = {
+    background: tk?.surface || '#fff',
+    border: `1px solid ${tk?.border || '#e6e9ef'}`,
+    borderRadius: 14,
+    padding: 18,
+  }
+  const headStyle = { margin: '0 0 14px', fontSize: 13.5, fontWeight: 650, color: tk?.text || '#211f1b', letterSpacing: -0.1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+  const accent = tk?.accent || '#4338ca'
 
-function WidgetCard({ title, icon, onClick, children, className = '' }) {
-  return (
-    <div
-      onClick={onClick}
-      className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6 ${onClick ? 'cursor-pointer hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-500 transition-all' : ''} ${className}`}
-    >
-      {title && (
-        <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100 mb-4 flex items-center gap-2">
-          {icon && <span className="text-indigo-600 dark:text-indigo-400">{icon}</span>}
-          {title}
-          {onClick && (
-            <svg
-              className="w-3.5 h-3.5 text-gray-500 dark:text-slate-500 ml-auto flex-shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          )}
-        </h2>
-      )}
-      {children}
-    </div>
-  )
-}
-
-export default function DashboardCharts({
-  on,
-  nav,
-  weeklyTrend,
-  monthlyTrend,
-  statusDist,
-  priorityDist,
-  technicianPerformance,
-  chartGridColor,
-  chartTickStyle,
-  chartTooltipStyle,
-}) {
   return (
     <>
       {on('weekly_trend') && (
-        <WidgetCard
-          title="Weekly Trend"
-          onClick={nav('rma-tickets')}
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"
-              />
-            </svg>
-          }
-        >
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={weeklyTrend}>
-              <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
-              <XAxis dataKey="date" tick={chartTickStyle} />
-              <YAxis tick={chartTickStyle} allowDecimals={false} />
+        <div className="col-span-12 lg:col-span-6" style={{ ...cardStyle, cursor: 'pointer' }} onClick={nav('/rma-tickets')}>
+          <h3 style={headStyle}>
+            {t('dashboard.weeklyTrend')}
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: tk?.textFaint || '#a39e95' }}>{t('dashboard.last7Days')}</span>
+          </h3>
+          <ResponsiveContainer width="100%" height={196}>
+            <AreaChart data={weeklyTrend}>
+              <defs>
+                <linearGradient id="wArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={accent} stopOpacity="0.15" />
+                  <stop offset="100%" stopColor={accent} stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="" stroke={chartGridColor} vertical={false} />
+              <XAxis dataKey="date" tick={chartTickStyle} axisLine={false} tickLine={false} />
+              <YAxis tick={chartTickStyle} axisLine={false} tickLine={false} allowDecimals={false} width={24} />
               <Tooltip contentStyle={chartTooltipStyle} />
-              <Line
-                type="monotone"
-                dataKey="tickets"
-                stroke="#6366f1"
-                strokeWidth={2}
-                dot={{ fill: '#6366f1', r: 3 }}
-                name="Tickets"
-              />
-            </LineChart>
+              <Area type="monotone" dataKey="tickets" stroke={accent} strokeWidth={2}
+                fill="url(#wArea)" dot={{ fill: accent, r: 2.6 }} activeDot={{ r: 4 }} name={t('dashboard.ticketsLabel')} />
+            </AreaChart>
           </ResponsiveContainer>
-        </WidgetCard>
+        </div>
       )}
 
       {on('monthly_trend') && (
-        <WidgetCard
-          title="Monthly Trend (30 days)"
-          onClick={nav('rma-tickets')}
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-              />
-            </svg>
-          }
-        >
-          <ResponsiveContainer width="100%" height={220}>
+        <div className="col-span-12 lg:col-span-6" style={{ ...cardStyle, cursor: 'pointer' }} onClick={nav('/rma-tickets')}>
+          <h3 style={headStyle}>
+            {t('dashboard.monthlyTrend')}
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: tk?.textFaint || '#a39e95' }}>{t('dashboard.last30Days')}</span>
+          </h3>
+          <ResponsiveContainer width="100%" height={196}>
             <BarChart data={monthlyTrend}>
-              <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
-              <XAxis dataKey="date" tick={{ ...chartTickStyle, fontSize: 10 }} />
-              <YAxis tick={chartTickStyle} allowDecimals={false} />
-              <Tooltip
-                contentStyle={chartTooltipStyle}
-                labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''}
-              />
-              <Bar dataKey="tickets" fill="#6366f1" radius={[2, 2, 0, 0]} name="Tickets" />
+              <CartesianGrid strokeDasharray="" stroke={chartGridColor} vertical={false} />
+              <XAxis dataKey="date" tick={{ ...chartTickStyle, fontSize: 9 }} axisLine={false} tickLine={false} />
+              <YAxis tick={chartTickStyle} axisLine={false} tickLine={false} allowDecimals={false} width={24} />
+              <Tooltip contentStyle={chartTooltipStyle}
+                labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''} />
+              <Bar dataKey="tickets" fill={accent} fillOpacity={0.85} radius={[3, 3, 0, 0]} name={t('dashboard.ticketsLabel')} />
             </BarChart>
           </ResponsiveContainer>
-        </WidgetCard>
-      )}
-
-      {on('status_distribution') && (
-        <WidgetCard
-          title="Status Distribution"
-          onClick={nav('rma-tickets')}
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"
-              />
-            </svg>
-          }
-        >
-          {statusDist.length === 0 ? (
-            <p className="text-center text-gray-500 py-8 text-sm">No data</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie
-                  data={statusDist}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={85}
-                  dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  labelLine={false}
-                >
-                  {statusDist.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={chartTooltipStyle} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </WidgetCard>
-      )}
-
-      {on('priority_distribution') && (
-        <WidgetCard
-          title="Priority Distribution"
-          onClick={nav('rma-tickets')}
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
-              />
-            </svg>
-          }
-        >
-          {priorityDist.length === 0 ? (
-            <p className="text-center text-gray-500 py-8 text-sm">No data</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie
-                  data={priorityDist}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={85}
-                  dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  labelLine={false}
-                >
-                  {priorityDist.map((_, i) => (
-                    <Cell key={i} fill={PRIORITY_COLORS[i % PRIORITY_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={chartTooltipStyle} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </WidgetCard>
-      )}
-
-      {on('technician_performance') && (
-        <WidgetCard
-          className="lg:col-span-2"
-          title="Technician Performance"
-          onClick={nav('rma-tickets')}
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-              />
-            </svg>
-          }
-        >
-          {technicianPerformance.length === 0 ? (
-            <p className="text-center text-gray-500 py-8 text-sm">No assigned tickets</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={technicianPerformance} layout="vertical" margin={{ left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} horizontal={false} />
-                <XAxis type="number" tick={chartTickStyle} allowDecimals={false} />
-                <YAxis type="category" dataKey="name" tick={chartTickStyle} width={110} />
-                <Tooltip contentStyle={chartTooltipStyle} />
-                <Legend />
-                <Bar dataKey="total" fill="#6366f1" name="Total Tickets" radius={[0, 2, 2, 0]} />
-                <Bar dataKey="closed" fill="#10b981" name="Closed" radius={[0, 2, 2, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </WidgetCard>
+        </div>
       )}
     </>
   )

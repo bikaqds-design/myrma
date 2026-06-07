@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { MigrationNotice } from './Announcements'
+import { captureException } from '../../lib/sentry'
 
 const WEBHOOK_EVENTS = [
   'ticket.created',
@@ -15,6 +17,7 @@ const WEBHOOK_EVENTS = [
 const EMPTY_FORM = { name: '', url: '', events: [], is_active: true, secret_key: '' }
 
 export default function Integrations({ currentUserEmail }) {
+  const { t } = useTranslation()
   const [webhooks, setWebhooks] = useState([])
   const [loading, setLoading] = useState(true)
   const [missing, setMissing] = useState(false)
@@ -64,15 +67,15 @@ export default function Integrations({ currentUserEmail }) {
   const handleSave = async (e) => {
     e.preventDefault()
     if (!form.name.trim()) {
-      toast.error('Name is required')
+      toast.error(t('cp.integrations.nameRequired'))
       return
     }
     if (!form.url.trim() || !form.url.startsWith('http')) {
-      toast.error('Valid URL is required')
+      toast.error(t('cp.integrations.urlRequired'))
       return
     }
     if (form.events.length === 0) {
-      toast.error('Select at least one event')
+      toast.error(t('cp.integrations.eventsRequired'))
       return
     }
     setSaving(true)
@@ -80,18 +83,19 @@ export default function Integrations({ currentUserEmail }) {
       const payload = { ...form, updated_date: new Date().toISOString() }
       if (editing) {
         await db.webhooks.update(editing.id, payload)
-        toast.success('Webhook updated')
+        toast.success(t('cp.integrations.updated'))
       } else {
         await db.webhooks.create({
           ...payload,
           created_by: currentUserEmail,
           created_date: new Date().toISOString(),
         })
-        toast.success('Webhook created')
+        toast.success(t('cp.integrations.created'))
       }
       setShowModal(false)
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     } finally {
       setSaving(false)
@@ -99,12 +103,13 @@ export default function Integrations({ currentUserEmail }) {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this webhook?')) return
+    if (!confirm(t('cp.integrations.deleteConfirm'))) return
     try {
       await db.webhooks.delete(id)
-      toast.success('Deleted')
+      toast.success(t('cp.integrations.deleted'))
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     }
   }
@@ -114,6 +119,7 @@ export default function Integrations({ currentUserEmail }) {
       await db.webhooks.update(w.id, { is_active: !w.is_active })
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     }
   }
@@ -134,9 +140,9 @@ export default function Integrations({ currentUserEmail }) {
         },
         body: JSON.stringify(payload),
       })
-      toast.success('Test payload sent')
+      toast.success(t('cp.integrations.testSent'))
     } catch {
-      toast.error('Failed to reach webhook URL — check CORS or the URL')
+      toast.error(t('cp.integrations.testFailed'))
     } finally {
       setTesting(null)
     }
@@ -162,9 +168,9 @@ export default function Integrations({ currentUserEmail }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Integrations</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t('cp.integrations.header')}</h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            Configure outbound webhooks for ticket and customer events
+            {t('cp.integrations.subtitle')}
           </p>
         </div>
         <button
@@ -179,7 +185,7 @@ export default function Integrations({ currentUserEmail }) {
               d="M12 6v6m0 0v6m0-6h6m-6 0H6"
             />
           </svg>
-          Add Webhook
+          {t('cp.integrations.addWebhook')}
         </button>
       </div>
 
@@ -199,9 +205,7 @@ export default function Integrations({ currentUserEmail }) {
           />
         </svg>
         <div>
-          Webhooks send a POST request with a JSON payload to your URL when events occur. Use them
-          to connect Slack, Teams, Zapier, or custom systems. The optional secret key is sent as{' '}
-          <code className="bg-blue-100 px-1 rounded">X-Webhook-Secret</code> header.
+          {t('cp.integrations.infoText')}
         </div>
       </div>
 
@@ -210,9 +214,15 @@ export default function Integrations({ currentUserEmail }) {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              {['Name', 'URL', 'Events', 'Active', 'Actions'].map((h) => (
+              {[
+                t('cp.integrations.nameCol'),
+                t('cp.integrations.urlCol'),
+                t('cp.integrations.eventsCol'),
+                t('cp.integrations.activeCol'),
+                t('cp.integrations.actionsCol'),
+              ].map((h, i) => (
                 <th
-                  key={h}
+                  key={i}
                   className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase"
                 >
                   {h}
@@ -224,7 +234,7 @@ export default function Integrations({ currentUserEmail }) {
             {webhooks.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
-                  No webhooks configured yet
+                  {t('cp.integrations.noWebhooks')}
                 </td>
               </tr>
             )}
@@ -293,7 +303,7 @@ export default function Integrations({ currentUserEmail }) {
                             d="M13 10V3L4 14h7v7l9-11h-7z"
                           />
                         </svg>
-                        {testing === w.id ? 'Sending...' : 'Test Webhook'}
+                        {testing === w.id ? t('cp.integrations.testSending') : t('cp.integrations.testWebhook')}
                       </button>
                       <button
                         onClick={() => {
@@ -315,7 +325,7 @@ export default function Integrations({ currentUserEmail }) {
                             d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                           />
                         </svg>
-                        Edit
+                        {t('cp.edit')}
                       </button>
                       <button
                         onClick={() => {
@@ -337,7 +347,7 @@ export default function Integrations({ currentUserEmail }) {
                             d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                           />
                         </svg>
-                        Delete
+                        {t('cp.delete')}
                       </button>
                     </div>
                   )}
@@ -354,7 +364,7 @@ export default function Integrations({ currentUserEmail }) {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-bold text-gray-900">
-                {editing ? 'Edit Webhook' : 'Add Webhook'}
+                {editing ? t('cp.integrations.editModal') : t('cp.integrations.newModal')}
               </h3>
               <button
                 onClick={() => setShowModal(false)}
@@ -373,7 +383,7 @@ export default function Integrations({ currentUserEmail }) {
             <form onSubmit={handleSave} className="px-6 py-5 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Name <span className="text-red-500">*</span>
+                  {t('cp.integrations.nameLabel')}
                 </label>
                 <input
                   value={form.name}
@@ -385,7 +395,7 @@ export default function Integrations({ currentUserEmail }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Endpoint URL <span className="text-red-500">*</span>
+                  {t('cp.integrations.urlLabel')}
                 </label>
                 <input
                   type="url"
@@ -398,7 +408,7 @@ export default function Integrations({ currentUserEmail }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Secret Key <span className="text-xs text-gray-500">(optional)</span>
+                  {t('cp.integrations.secretLabel')}
                 </label>
                 <input
                   value={form.secret_key}
@@ -409,7 +419,7 @@ export default function Integrations({ currentUserEmail }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Events <span className="text-red-500">*</span>
+                  {t('cp.integrations.eventsLabel')}
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {WEBHOOK_EVENTS.map((ev) => (
@@ -432,7 +442,7 @@ export default function Integrations({ currentUserEmail }) {
                   onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
                   className="w-4 h-4 text-indigo-600 rounded"
                 />
-                <span className="text-sm font-medium text-gray-700">Active</span>
+                <span className="text-sm font-medium text-gray-700">{t('cp.integrations.activeCheck')}</span>
               </label>
               <div className="flex justify-end gap-3 pt-2">
                 <button
@@ -440,14 +450,14 @@ export default function Integrations({ currentUserEmail }) {
                   onClick={() => setShowModal(false)}
                   className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
-                  Cancel
+                  {t('cp.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
                   className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {saving ? 'Saving...' : editing ? 'Save Changes' : 'Create Webhook'}
+                  {saving ? t('cp.saving') : editing ? t('cp.integrations.saveChanges') : t('cp.integrations.createWebhook')}
                 </button>
               </div>
             </form>

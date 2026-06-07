@@ -1,6 +1,52 @@
 // React component(s) shared across the RMATickets module.
 // Pure helpers and constants live in _utils.js (no React imports needed there).
 
+import React, { useState, useEffect, useRef } from 'react'
+
+export function ProductSearchInput({ value, onChange, products = [], placeholder = 'Search or type product name…', className = '', inputClassName = '' }) {
+  const [query, setQuery] = useState(value || '')
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef(null)
+
+  // Sync external value changes (e.g. reset)
+  useEffect(() => { setQuery(value || '') }, [value])
+
+  const filtered = query.trim().length >= 1
+    ? products.filter((p) => p.product_name?.toLowerCase().includes(query.toLowerCase())).slice(0, 8)
+    : []
+
+  useEffect(() => {
+    const handler = (e) => { if (!containerRef.current?.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <input
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); onChange(e.target.value); setOpen(true) }}
+        onFocus={() => { if (query.trim()) setOpen(true) }}
+        placeholder={placeholder}
+        className={inputClassName}
+        autoComplete="off"
+      />
+      {open && filtered.length > 0 && (
+        <div className="absolute top-full left-0 mt-1 w-full z-30 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] py-1 max-h-48 overflow-y-auto">
+          {filtered.map((p) => (
+            <button key={p.id} type="button"
+              onClick={() => { setQuery(p.product_name); onChange(p.product_name); setOpen(false) }}
+              className="w-full px-3 py-2 text-left text-sm hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520] flex items-center justify-between gap-2">
+              <span className="font-medium text-[#211f1b] dark:text-[#e8ebf0] truncate">{p.product_name}</span>
+              {p.brand?.brand_name && <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2] flex-shrink-0">{p.brand.brand_name}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function SortableHeader({ label, sortKey, sortConfig, onSort }) {
   const isActive = sortConfig.key === sortKey
   const ariaSort = isActive

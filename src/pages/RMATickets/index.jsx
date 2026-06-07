@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase, db, branding as brandingAPI } from '../../api/supabaseClient'
+import { supabase, db, branding as brandingAPI, notifications } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
 import toast from 'react-hot-toast'
 import QRCode from 'qrcode'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { PageSkeleton } from '../../components/Skeleton'
 import { Button, PageHeader } from '../../components/ui'
+import AIAssist from '../../components/AIAssist'
 import EmptyState from '../../components/EmptyState'
-import { ROLES } from '../../lib/constants'
+import { ROLES, TICKET_STATUS_RESOLVED, TICKET_STATUS_LIST, PRIORITY_LIST } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
 import { SortableHeader } from './_shared'
 import { getStatusColor, getPriorityColor, fmt } from './_utils'
@@ -16,6 +18,7 @@ import { TicketForm } from './TicketForm'
 import { TicketDrawer } from './TicketDrawer'
 
 export default function RMATickets({ userRole, userEmail, userPermissions, initialTicketId }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
 
   // P-1: TanStack Query — cached fetch; stale data renders instantly on re-visit
@@ -60,8 +63,16 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     safeStorage.get('rmaTicketsSortConfig', { key: 'created_date', direction: 'desc' })
   )
 
-  const [showFilters, setShowFilters] = useState(false)
-  const [filterStatus, setFilterStatus] = useState('')
+  const [filterStatus, setFilterStatus] = useState(
+    () => new URLSearchParams(window.location.search).get('status') || ''
+  )
+  const [filterOverdue, setFilterOverdue] = useState(
+    () => new URLSearchParams(window.location.search).get('overdue') === 'true'
+  )
+  const [showFilters, setShowFilters] = useState(() => {
+    const p = new URLSearchParams(window.location.search)
+    return !!(p.get('status') || p.get('overdue'))
+  })
   const [filterPriority, setFilterPriority] = useState('')
   const [filterAssigned, setFilterAssigned] = useState('')
   const [filterCustomer, setFilterCustomer] = useState('')
@@ -76,6 +87,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const searchInputRef = useRef(null)
 
   const [openMenuId, setOpenMenuId] = useState(null)
+  const [inlineEdit, setInlineEdit] = useState({ ticketId: null, field: null })
 
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
@@ -100,6 +112,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     tickets,
     sortConfig,
     filterStatus,
+    filterOverdue,
     filterPriority,
     filterAssigned,
     filterCustomer,
@@ -152,6 +165,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     const handler = (e) => {
       if (!e.target.closest('.filter-customer-dropdown')) setShowFilterCustomerDropdown(false)
       if (!e.target.closest('.action-menu')) setOpenMenuId(null)
+      if (!e.target.closest('.inline-pill')) setInlineEdit({ ticketId: null, field: null })
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -173,6 +187,41 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const canDo = (action) => {
     if (userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN) return true
     return userPermissions?.rma_tickets?.[action] === true
+  }
+
+  const handleInlineUpdate = async (ticket, field, newValue) => {
+    const oldValue = ticket[field]
+    if (oldValue === newValue) { setInlineEdit({ ticketId: null, field: null }); return }
+    const updateData = { [field]: newValue, updated_by: userEmail, updated_date: new Date().toISOString() }
+    // Optimistic update
+    queryClient.setQueryData(['rma-tickets'], (old = []) =>
+      old.map((t) => (t.id === ticket.id ? { ...t, ...updateData } : t))
+    )
+    setInlineEdit({ ticketId: null, field: null })
+    try {
+      await db.rmaTickets.update(ticket.id, updateData)
+      queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
+      const customerEmail = ticket.customer_email || customers.find((c) => c.id === ticket.customer_id)?.email
+      if (field === 'ticket_status') {
+        db.notifications.create({ type: 'ticket_status_changed', title: 'Status Updated', message: `Ticket ${ticket.rma_number} moved from "${oldValue}" to "${newValue}"`, entityType: 'ticket', entityId: ticket.id, targetRoles: ['admin', 'manager'] }).catch(() => {})
+        if (customerEmail) {
+          notifications.sendEmail(customerEmail, 'status_changed', { recipient_name: ticket.customer_name, customer_name: ticket.customer_name, rma_number: ticket.rma_number, old_status: oldValue, new_status: newValue, updated_by: userEmail, update_time: new Date().toLocaleString() }).catch(() => {})
+        }
+      } else {
+        if (customerEmail) {
+          notifications.sendEmail(customerEmail, 'priority_changed', { recipient_name: ticket.customer_name, customer_name: ticket.customer_name, rma_number: ticket.rma_number, old_priority: oldValue, new_priority: newValue }).catch(() => {})
+        }
+      }
+      db.auditLog.log(userEmail, `ticket_${field}_changed`, `${ticket.rma_number}: ${oldValue} → ${newValue}`).catch(() => {})
+      db.ticketActivity.create({ ticket_id: ticket.id, action_type: field === 'ticket_status' ? 'status_changed' : 'priority_changed', details: `${oldValue} → ${newValue}`, user_email: userEmail, created_date: new Date().toISOString() }).catch(() => {})
+      toast.success(t('tickets.fieldUpdated', { field: field === 'ticket_status' ? t('common.status') : t('common.priority') }))
+    } catch {
+      // Rollback
+      queryClient.setQueryData(['rma-tickets'], (old = []) =>
+        old.map((t) => (t.id === ticket.id ? { ...t, [field]: oldValue } : t))
+      )
+      toast.error(t('tickets.failedUpdate'))
+    }
   }
 
   useEffect(() => {
@@ -213,6 +262,12 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       )
     }
     if (filterStatus) filtered = filtered.filter((t) => t.ticket_status === filterStatus)
+    if (filterOverdue) {
+      const now = new Date()
+      filtered = filtered.filter(
+        (t) => t.due_date && new Date(t.due_date) < now && !TICKET_STATUS_RESOLVED.includes(t.ticket_status)
+      )
+    }
     if (filterPriority) filtered = filtered.filter((t) => t.priority === filterPriority)
     if (filterAssigned) filtered = filtered.filter((t) => t.assigned_technician === filterAssigned)
     if (filterCustomer) filtered = filtered.filter((t) => t.customer_name === filterCustomer)
@@ -262,7 +317,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     if (pageNum >= 1 && pageNum <= totalPages) {
       handlePageChange(pageNum)
       setJumpToPage('')
-    } else toast.error(`Page must be between 1 and ${totalPages}`)
+    } else toast.error(t('tickets.pageMustBeBetween', { total: totalPages }))
   }
 
   const renderPageNumbers = () => {
@@ -303,11 +358,11 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
   const handleEdit = (ticket) => {
     if (!canDo('edit_all') && !canDo('edit_assigned')) {
-      toast.error('You do not have permission to edit tickets')
+      toast.error(t('tickets.noPermissionEdit'))
       return
     }
     if (canDo('edit_assigned') && !canDo('edit_all') && ticket.assigned_technician !== userEmail) {
-      toast.error('You can only edit tickets assigned to you')
+      toast.error(t('tickets.editAssignedOnly'))
       return
     }
     setEditingTicket(ticket)
@@ -316,10 +371,10 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
   const handleDelete = (id) => {
     if (!canDo('delete')) {
-      toast.error('You do not have permission to delete tickets')
+      toast.error(t('tickets.noPermissionDelete'))
       return
     }
-    openConfirm('Delete Ticket', 'Delete this ticket? This cannot be undone.', async () => {
+    openConfirm(t('tickets.deleteTicketTitle'), t('tickets.deleteTicketConfirm'), async () => {
       closeConfirm()
       // UX-6 optimistic: remove from list immediately; rollback on error
       const previousTickets = queryClient.getQueryData(['rma-tickets'])
@@ -342,25 +397,25 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             targetEmails: [],
           })
           .catch(() => {})
-        toast.success('Ticket deleted!')
+        toast.success(t('tickets.ticketDeleted'))
         queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
         queryClient.invalidateQueries({ queryKey: ['rma-tickets-count'] })
       } catch (err) {
         captureException(err, { page: 'RMATickets', context: 'deleteTicket' })
         queryClient.setQueryData(['rma-tickets'], previousTickets) // rollback on error
-        toast.error('Failed to delete ticket')
+        toast.error(t('tickets.failedDelete'))
       }
     })
   }
 
   const handleBulkDelete = () => {
     if (!canDo('delete')) {
-      toast.error('You do not have permission to delete tickets')
+      toast.error(t('tickets.noPermissionDelete'))
       return
     }
     openConfirm(
-      'Delete Tickets',
-      `Delete ${selectedTickets.length} ticket${selectedTickets.length !== 1 ? 's' : ''}? This cannot be undone.`,
+      t('tickets.deleteTicketsTitle'),
+      t('tickets.deleteTicketsConfirm', { count: selectedTickets.length }),
       async () => {
         closeConfirm()
         setBulkProcessing(true)
@@ -378,7 +433,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               targetEmails: [],
             })
             .catch(() => {})
-          toast.success(`${selectedTickets.length} ticket(s) deleted`)
+          toast.success(t('tickets.ticketsBulkDeleted', { count: selectedTickets.length }))
           db.auditLog
             .log(userEmail, 'ticket_bulk_deleted', `Deleted ${selectedTickets.length} tickets`)
             .catch(() => {})
@@ -387,7 +442,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           queryClient.invalidateQueries({ queryKey: ['rma-tickets-count'] })
         } catch (err) {
           captureException(err, { page: 'RMATickets', context: 'bulkDeleteTickets' })
-          toast.error('Failed to delete tickets')
+          toast.error(t('tickets.failedBulkDelete'))
         } finally {
           setBulkProcessing(false)
         }
@@ -398,19 +453,21 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const handleBulkTicketStatus = async () => {
     if (!bulkTicketStatus) return
     if (!(canDo('edit_all') || canDo('change_status'))) {
-      toast.error('No permission to change status')
+      toast.error(t('tickets.noPermissionChangeStatus'))
       return
     }
     setBulkProcessing(true)
     try {
       await Promise.all(
-        selectedTickets.map((id) =>
-          db.rmaTickets.update(id, {
+        selectedTickets.map((id) => {
+          const prev = tickets.find((t) => t.id === id)
+          db.ticketActivity.create({ ticket_id: id, action_type: 'status_changed', details: `${prev?.ticket_status || '?'} → ${bulkTicketStatus} (bulk)`, user_email: userEmail, created_date: new Date().toISOString() }).catch(() => {})
+          return db.rmaTickets.update(id, {
             ticket_status: bulkTicketStatus,
             updated_by: userEmail,
             updated_date: new Date().toISOString(),
           })
-        )
+        })
       )
       db.notifications
         .create({
@@ -424,9 +481,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           targetEmails: [],
         })
         .catch(() => {})
-      toast.success(
-        `Status updated to "${bulkTicketStatus}" for ${selectedTickets.length} ticket(s)`
-      )
+      toast.success(t('tickets.bulkStatusUpdated', { status: bulkTicketStatus, count: selectedTickets.length }))
       db.auditLog
         .log(
           userEmail,
@@ -439,7 +494,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
     } catch (err) {
       captureException(err, { page: 'RMATickets', context: 'bulkUpdateStatus' })
-      toast.error('Failed to update status')
+      toast.error(t('tickets.failedUpdateStatus'))
     } finally {
       setBulkProcessing(false)
     }
@@ -448,7 +503,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const handleBulkProductStatus = async () => {
     if (!bulkProductStatus) return
     if (!(canDo('edit_all') || canDo('edit_assigned'))) {
-      toast.error('No permission to edit tickets')
+      toast.error(t('tickets.noPermissionEdit2'))
       return
     }
     setBulkProcessing(true)
@@ -469,9 +524,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           })
         })
       )
-      toast.success(
-        `Product status updated to "${bulkProductStatus}" for ${selectedTickets.length} ticket(s)`
-      )
+      toast.success(t('tickets.bulkProductStatusUpdated', { status: bulkProductStatus, count: selectedTickets.length }))
       db.auditLog
         .log(
           userEmail,
@@ -484,7 +537,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
     } catch (err) {
       captureException(err, { page: 'RMATickets', context: 'bulkUpdateProductStatus' })
-      toast.error('Failed to update product status')
+      toast.error(t('tickets.failedUpdateProductStatus'))
     } finally {
       setBulkProcessing(false)
     }
@@ -758,11 +811,11 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
   const handleExport = () => {
     if (!canDo('export')) {
-      toast.error('No permission to export')
+      toast.error(t('tickets.noPermissionExport'))
       return
     }
     const csv = [
-      ['RMA Number', 'Customer', 'Status', 'Priority', 'Assigned To', 'Due Date', 'Created Date'],
+      [t('tickets.csvRmaNumber'), t('tickets.csvCustomer'), t('tickets.csvStatus'), t('tickets.csvPriority'), t('tickets.csvAssignedTo'), t('tickets.csvDueDate'), t('tickets.csvCreatedDate')],
       ...filteredTickets.map((t) => [
         t.rma_number,
         t.customer_name,
@@ -779,7 +832,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
     a.download = `rma-tickets-${Date.now()}.csv`
     a.click()
-    toast.success('Exported!')
+    toast.success(t('tickets.exportedSuccess'))
     db.auditLog
       .log(userEmail, 'tickets_exported', `Exported ${filteredTickets.length} tickets to CSV`)
       .catch(() => {})
@@ -787,7 +840,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
   const handleAddNew = () => {
     if (!canDo('create')) {
-      toast.error('No permission to create tickets')
+      toast.error(t('tickets.noPermissionCreate'))
       return
     }
     setEditingTicket(null)
@@ -801,26 +854,26 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     const days = Math.ceil((new Date(dueDate) - Date.now()) / 86400000)
     if (days < 0)
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
-          Overdue {Math.abs(days)}d
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400">
+          {t('tickets.overdueDays', { days: Math.abs(days) })}
         </span>
       )
     if (days === 0)
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
-          Due today
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400">
+          {t('tickets.dueToday')}
         </span>
       )
     if (days <= 2)
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-          {days}d left
+          {t('tickets.daysLeft', { days })}
         </span>
       )
     if (days <= 5)
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">
-          {days}d left
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400">
+          {t('tickets.daysLeft', { days })}
         </span>
       )
     return <span className="text-xs text-gray-500">{fmt(dueDate)}</span>
@@ -831,7 +884,22 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   return (
     <div className="space-y-6">
       {/* Header */}
-      <PageHeader title="RMA Tickets" subtitle="Manage return merchandise authorization" />
+      <PageHeader title={t('tickets.title')} subtitle={t('tickets.subtitle')} />
+
+      <AIAssist
+        contextType="dashboard"
+        data={{
+          range: 'All time',
+          open: tickets.filter((t) => t.ticket_status === 'Open').length,
+          in_progress: tickets.filter((t) => t.ticket_status === 'In Progress').length,
+          pending: tickets.filter((t) => t.ticket_status === 'Pending').length,
+          overdue: tickets.filter((t) => t.due_date && !TICKET_STATUS_RESOLVED.includes(t.ticket_status) && new Date(t.due_date) < new Date()).length,
+          resolved: tickets.filter((t) => TICKET_STATUS_RESOLVED.includes(t.ticket_status)).length,
+          total: tickets.length,
+          sla_percent: tickets.length ? Math.round((tickets.filter((t) => !t.due_date || TICKET_STATUS_RESOLVED.includes(t.ticket_status) || new Date(t.due_date) >= new Date()).length / tickets.length) * 100) : 100,
+          resolution_rate: tickets.length ? Math.round((tickets.filter((t) => TICKET_STATUS_RESOLVED.includes(t.ticket_status)).length / tickets.length) * 100) : 0,
+        }}
+      />
 
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -842,7 +910,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by RMA number, customer, status, priority... (Press / to focus)"
+              placeholder={t('tickets.searchPlaceholder')}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
             />
             <svg
@@ -863,7 +931,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             onClick={() => setShowFilters(!showFilters)}
             aria-expanded={showFilters}
             aria-controls="ticket-filters-panel"
-            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || filterStatus || filterPriority || filterAssigned || filterCustomer ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || filterStatus || filterOverdue || filterPriority || filterAssigned || filterCustomer ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -873,13 +941,10 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"
               />
             </svg>
-            Filters
-            {(filterStatus || filterPriority || filterAssigned || filterCustomer) && (
+            {t('common.filters')}
+            {(filterStatus || filterOverdue || filterPriority || filterAssigned || filterCustomer) && (
               <span className="w-4 h-4 bg-indigo-600 text-white text-xs rounded-full flex items-center justify-center">
-                {
-                  [filterStatus, filterPriority, filterAssigned, filterCustomer].filter(Boolean)
-                    .length
-                }
+                {[filterStatus, filterOverdue, filterPriority, filterAssigned, filterCustomer].filter(Boolean).length}
               </span>
             )}
           </button>
@@ -895,7 +960,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              Export
+              {t('common.export')}
             </Button>
           )}
           {canDo('create') && (
@@ -908,7 +973,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                 />
               </svg>
-              Create Ticket
+              {t('tickets.createTicket')}
             </Button>
           )}
         </div>
@@ -916,45 +981,57 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
       {/* Filter panel */}
       {showFilters && (
-        <div id="ticket-filters-panel" className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg flex-wrap">
+        <div id="ticket-filters-panel" className="flex flex-wrap gap-3 items-center p-4 bg-gray-50 rounded-lg">
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Status:</label>
+            <label className="text-sm font-medium text-gray-700">{t('common.status')}:</label>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
             >
-              <option value="">All</option>
-              <option value="Open">Open</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Pending">Pending</option>
-              <option value="On Hold">On Hold</option>
-              <option value="Closed">Closed</option>
-              <option value="Cancelled">Cancelled</option>
+              <option value="">{t('common.all')}</option>
+              <option value="Open">{t('statusValues.Open')}</option>
+              <option value="In Progress">{t('statusValues.In Progress')}</option>
+              <option value="Pending">{t('statusValues.Pending')}</option>
+              <option value="On Hold">{t('statusValues.On Hold')}</option>
+              <option value="Completed">{t('statusValues.Completed')}</option>
+              <option value="Closed">{t('statusValues.Closed')}</option>
+              <option value="Cancelled">{t('statusValues.Cancelled')}</option>
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Priority:</label>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={filterOverdue}
+                onChange={(e) => setFilterOverdue(e.target.checked)}
+                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              {t('tickets.overdueOnly')}
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700">{t('common.priority')}:</label>
             <select
               value={filterPriority}
               onChange={(e) => setFilterPriority(e.target.value)}
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
             >
-              <option value="">All</option>
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-              <option value="Critical">Critical</option>
+              <option value="">{t('common.all')}</option>
+              <option value="Low">{t('priorityValues.Low')}</option>
+              <option value="Medium">{t('priorityValues.Medium')}</option>
+              <option value="High">{t('priorityValues.High')}</option>
+              <option value="Critical">{t('priorityValues.Critical')}</option>
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Assigned To:</label>
+            <label className="text-sm font-medium text-gray-700">{t('tickets.assignedTo')}:</label>
             <select
               value={filterAssigned}
               onChange={(e) => setFilterAssigned(e.target.value)}
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
             >
-              <option value="">All</option>
+              <option value="">{t('common.all')}</option>
               {[...new Set(tickets.map((t) => t.assigned_technician).filter(Boolean))]
                 .sort()
                 .map((email) => (
@@ -965,7 +1042,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Customer:</label>
+            <label className="text-sm font-medium text-gray-700">{t('tickets.customer')}:</label>
             <div className="relative filter-customer-dropdown">
               <div className="flex items-center">
                 <input
@@ -979,8 +1056,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                     }
                   }}
                   onFocus={() => setShowFilterCustomerDropdown(true)}
-                  placeholder={filterCustomer || 'All customers...'}
-                  className={`w-52 px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 ${filterCustomer ? 'border-indigo-400 bg-indigo-50 pr-7' : 'border-gray-300'}`}
+                  placeholder={filterCustomer || t('tickets.allCustomers')}
+                  className={`w-full sm:w-52 px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 ${filterCustomer ? 'border-indigo-400 bg-indigo-50 pr-7' : 'border-gray-300'}`}
                 />
                 {filterCustomer && (
                   <button
@@ -1056,7 +1133,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               }}
               className="text-sm text-red-600 hover:underline"
             >
-              Clear all
+              {t('tickets.clearFilters')}
             </button>
           )}
         </div>
@@ -1067,8 +1144,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         <div className="mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex items-center gap-2">
           <span>⚠️</span>
           <span>
-            Showing first <strong>{tickets.length}</strong> of <strong>{ticketsTotalCount}</strong>{' '}
-            tickets. Use filters or search to find specific tickets.
+            {t('tickets.capWarning', { shown: tickets.length, total: ticketsTotalCount })}
           </span>
         </div>
       )}
@@ -1076,11 +1152,10 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       {/* Pagination top bar */}
       <div className="flex items-center justify-between text-sm text-gray-600">
         <div>
-          Showing {filteredTickets.length === 0 ? 0 : startIndex + 1}–{endIndex} of{' '}
-          {filteredTickets.length} tickets
+          {t('tickets.showingRange', { from: filteredTickets.length === 0 ? 0 : startIndex + 1, to: endIndex, total: filteredTickets.length })}
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">Items per page:</label>
+          <label className="text-sm text-gray-600">{t('common.itemsPerPage')}:</label>
           <select
             value={itemsPerPage}
             onChange={(e) => {
@@ -1104,13 +1179,13 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             <span className="w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
               {selectedTickets.length}
             </span>
-            ticket{selectedTickets.length !== 1 ? 's' : ''} selected
+            {t('tickets.selected')}
           </div>
           <button
             onClick={() => setSelectedTickets([])}
             className="text-xs text-indigo-500 hover:text-indigo-700 underline"
           >
-            Clear
+            {t('tickets.deselect')}
           </button>
           <div className="h-5 w-px bg-indigo-200 hidden sm:block" />
 
@@ -1122,7 +1197,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 onChange={(e) => setBulkTicketStatus(e.target.value)}
                 className="px-2.5 py-1.5 border border-indigo-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
-                <option value="">Ticket Status…</option>
+                <option value="">{t('tickets.ticketStatusPlaceholder')}</option>
                 <option>New</option>
                 <option>In Progress</option>
                 <option>On Hold</option>
@@ -1134,7 +1209,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 disabled={!bulkTicketStatus || bulkProcessing}
                 className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-40 transition-colors"
               >
-                Apply
+                {t('common.apply')}
               </button>
             </div>
           )}
@@ -1147,7 +1222,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 onChange={(e) => setBulkProductStatus(e.target.value)}
                 className="px-2.5 py-1.5 border border-indigo-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
-                <option value="">Product Status…</option>
+                <option value="">{t('tickets.productStatusPlaceholder')}</option>
                 <option>Received</option>
                 <option>Under Repair</option>
                 <option>Repaired</option>
@@ -1160,7 +1235,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 disabled={!bulkProductStatus || bulkProcessing}
                 className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-40 transition-colors"
               >
-                Apply
+                {t('common.apply')}
               </button>
             </div>
           )}
@@ -1191,7 +1266,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                     />
                   </svg>
                 )}
-                Delete Selected
+                {t('tickets.deleteSelected')}
               </button>
             </>
           )}
@@ -1219,7 +1294,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader
-                  label="RMA Number"
+                  label={t('tickets.rmaNumber')}
                   sortKey="rma_number"
                   sortConfig={sortConfig}
                   onSort={handleSort}
@@ -1227,7 +1302,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader
-                  label="Customer"
+                  label={t('tickets.customer')}
                   sortKey="customer_name"
                   sortConfig={sortConfig}
                   onSort={handleSort}
@@ -1235,7 +1310,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader
-                  label="Status"
+                  label={t('common.status')}
                   sortKey="ticket_status"
                   sortConfig={sortConfig}
                   onSort={handleSort}
@@ -1243,7 +1318,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader
-                  label="Priority"
+                  label={t('common.priority')}
                   sortKey="priority"
                   sortConfig={sortConfig}
                   onSort={handleSort}
@@ -1251,7 +1326,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader
-                  label="Assigned To"
+                  label={t('tickets.assignedTo')}
                   sortKey="assigned_technician"
                   sortConfig={sortConfig}
                   onSort={handleSort}
@@ -1259,14 +1334,14 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader
-                  label="Created Date"
+                  label={t('tickets.createdDate')}
                   sortKey="created_date"
                   sortConfig={sortConfig}
                   onSort={handleSort}
                 />
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Actions
+                {t('common.actions')}
               </th>
             </tr>
           </thead>
@@ -1297,21 +1372,57 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-900">{t.customer_name}</td>
                 <td className="px-4 py-3">
-                  <span
-                    className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(t.ticket_status)}`}
-                  >
-                    {t.ticket_status}
-                  </span>
+                  {(canDo('edit_all') || (canDo('edit_assigned') && t.assigned_technician === userEmail)) ? (
+                    <div className="relative inline-block inline-pill">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setInlineEdit(inlineEdit.ticketId === t.id && inlineEdit.field === 'ticket_status' ? { ticketId: null, field: null } : { ticketId: t.id, field: 'ticket_status' }) }}
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(t.ticket_status)} flex items-center gap-1 hover:opacity-80 transition-opacity`}
+                      >
+                        {t.ticket_status}
+                        <svg className="w-2.5 h-2.5 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                      </button>
+                      {inlineEdit.ticketId === t.id && inlineEdit.field === 'ticket_status' && (
+                        <div className="absolute left-0 top-full mt-1 z-40 w-36 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] py-1 overflow-hidden">
+                          {TICKET_STATUS_LIST.map((s) => (
+                            <button key={s} onClick={(e) => { e.stopPropagation(); handleInlineUpdate(t, 'ticket_status', s) }}
+                              className={`w-full px-3 py-1.5 text-left text-xs font-medium flex items-center gap-2 transition-colors ${t.ticket_status === s ? 'opacity-40 cursor-default' : 'hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]'}`}>
+                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${getStatusColor(s)}`}>{s}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(t.ticket_status)}`}>{t.ticket_status}</span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
-                  <span
-                    className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(t.priority)}`}
-                  >
-                    {t.priority}
-                  </span>
+                  {(canDo('edit_all') || (canDo('edit_assigned') && t.assigned_technician === userEmail)) ? (
+                    <div className="relative inline-block inline-pill">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setInlineEdit(inlineEdit.ticketId === t.id && inlineEdit.field === 'priority' ? { ticketId: null, field: null } : { ticketId: t.id, field: 'priority' }) }}
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(t.priority)} flex items-center gap-1 hover:opacity-80 transition-opacity`}
+                      >
+                        {t.priority}
+                        <svg className="w-2.5 h-2.5 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                      </button>
+                      {inlineEdit.ticketId === t.id && inlineEdit.field === 'priority' && (
+                        <div className="absolute left-0 top-full mt-1 z-40 w-28 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] py-1 overflow-hidden">
+                          {PRIORITY_LIST.map((p) => (
+                            <button key={p} onClick={(e) => { e.stopPropagation(); handleInlineUpdate(t, 'priority', p) }}
+                              className={`w-full px-3 py-1.5 text-left text-xs font-medium flex items-center gap-2 transition-colors ${t.priority === p ? 'opacity-40 cursor-default' : 'hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]'}`}>
+                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${getPriorityColor(p)}`}>{p}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(t.priority)}`}>{t.priority}</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
-                  {t.assigned_technician || 'Unassigned'}
+                  {t.assigned_technician || t('common.unassigned')}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">{fmt(t.created_date)}</td>
                 <td className="px-4 py-3 relative action-menu">
@@ -1359,7 +1470,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                             d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                           />
                         </svg>
-                        View
+                        {t('common.view')}
                       </button>
                       {(canDo('edit_all') || canDo('edit_assigned')) && (
                         <button
@@ -1382,7 +1493,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                               d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                             />
                           </svg>
-                          Edit
+                          {t('common.edit')}
                         </button>
                       )}
                       <button
@@ -1405,7 +1516,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                             d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                           />
                         </svg>
-                        Export PDF
+                        {t('tickets.exportPDF')}
                       </button>
                       {canDo('delete') && (
                         <button
@@ -1428,7 +1539,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                               d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                             />
                           </svg>
-                          Delete
+                          {t('common.delete')}
                         </button>
                       )}
                     </div>
@@ -1443,11 +1554,11 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                     preset="tickets"
                     description={
                       tickets.length > 0
-                        ? 'Try adjusting your filters or search term'
-                        : 'Create your first RMA ticket to get started'
+                        ? t('tickets.adjustFilters')
+                        : t('tickets.createFirstHint')
                     }
                     action={canDo('create') && tickets.length === 0 ? handleAddNew : undefined}
-                    actionLabel="Create First Ticket"
+                    actionLabel={t('tickets.createFirstTicket')}
                   />
                 </td>
               </tr>
@@ -1458,14 +1569,14 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
       {/* Pagination footer */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-200">
           <div className="flex items-center gap-2">
             <button
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
               className="px-3 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Previous
+              {t('common.previous')}
             </button>
             <div className="flex items-center gap-1">{renderPageNumbers()}</div>
             <button
@@ -1473,11 +1584,11 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               disabled={currentPage === totalPages}
               className="px-3 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Next
+              {t('common.next')}
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Jump to page:</span>
+            <span className="text-sm text-gray-600">{t('common.jumpToPage')}:</span>
             <input
               type="number"
               min="1"
@@ -1492,7 +1603,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               onClick={handleJumpToPage}
               className="px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
             >
-              Go
+              {t('common.go')}
             </button>
           </div>
         </div>

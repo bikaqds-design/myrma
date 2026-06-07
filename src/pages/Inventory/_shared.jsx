@@ -1,27 +1,26 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react'
+import { useTranslation } from 'react-i18next'
+import i18next from 'i18next'
 import toast from 'react-hot-toast'
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 export const STATUS_META = {
-  active_rma: { label: 'Active RMA', cls: 'bg-blue-100 text-blue-700 border-blue-200' },
-  company_stock: { label: 'Company Stock', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
-  sent_to_manufacturer: {
-    label: 'Sent to Mfr',
-    cls: 'bg-purple-100 text-purple-700 border-purple-200',
-  },
-  closed: { label: 'Closed', cls: 'bg-gray-100 text-gray-500 border-gray-200' },
+  active_rma:           { label: 'Active RMA',    cls: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/30' },
+  company_stock:        { label: 'Company Stock', cls: 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/30' },
+  sent_to_manufacturer: { label: 'Sent to Mfr',  cls: 'bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-900/30' },
+  closed:               { label: 'Closed',        cls: 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2] border-gray-200 dark:border-[#212a38]' },
 }
 export const RESOLUTION_META = {
-  return_to_customer: { label: 'Return to Customer', cls: 'bg-green-100 text-green-700' },
-  credit_note: { label: 'Credit Note', cls: 'bg-orange-100 text-orange-700' },
-  replacement: { label: 'Replacement', cls: 'bg-indigo-100 text-indigo-700' },
-  can_t_repair: { label: "Can't Repair", cls: 'bg-red-100 text-red-700' },
+  return_to_customer: { label: 'Return to Customer', cls: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' },
+  credit_note:        { label: 'Credit Note',         cls: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400' },
+  replacement:        { label: 'Replacement',          cls: 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400' },
+  can_t_repair:       { label: "Can't Repair",         cls: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400' },
 }
 export const BATCH_STATUS_META = {
-  draft: { label: 'Draft', cls: 'bg-gray-100 text-gray-600' },
-  sent: { label: 'Sent', cls: 'bg-blue-100 text-blue-700' },
-  resolved: { label: 'Resolved', cls: 'bg-green-100 text-green-700' },
+  draft:    { label: 'Draft',    cls: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]' },
+  sent:     { label: 'Sent',     cls: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' },
+  resolved: { label: 'Resolved', cls: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' },
 }
 export const _SYSTEM_WAREHOUSES = [
   {
@@ -76,18 +75,18 @@ ALTER TABLE inventory_units
 // Product statuses that map to inventory tabs
 
 export const PRODUCT_STATUS_CLS = {
-  Received: 'bg-gray-100 text-gray-700',
-  'Under Repair': 'bg-amber-100 text-amber-700',
-  Repaired: 'bg-green-100 text-green-700',
-  "Can't Repair": 'bg-red-100 text-red-700',
-  Replacement: 'bg-indigo-100 text-indigo-700',
-  'Credit Note': 'bg-orange-100 text-orange-700',
+  Received:      'bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#9aa4b2]',
+  'Under Repair':'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
+  Repaired:      'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+  "Can't Repair":'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
+  Replacement:   'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400',
+  'Credit Note': 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
 }
 export const TICKET_STATUS_CLS = {
-  New: 'bg-blue-100 text-blue-700',
-  'In Progress': 'bg-yellow-100 text-yellow-700',
-  'On Hold': 'bg-orange-100 text-orange-700',
-  Completed: 'bg-green-100 text-green-700',
+  New:          'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
+  'In Progress':'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
+  'On Hold':    'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
+  Completed:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
 }
 
 // ─── Utilities ─────────────────────────────────────────────────────────────────
@@ -152,21 +151,21 @@ export function downloadCSV(rows, filename) {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
-  toast.success(`Exported ${rows.length} rows`)
+  toast.success(i18next.t('inventory.exportedRows', { count: rows.length }))
 }
 
 // ─── Pagination ────────────────────────────────────────────────────────────────
 export function Pagination({ total, page, itemsPerPage, setItemsPerPage, onPage }) {
+  const { t } = useTranslation()
   const pages = Math.ceil(total / itemsPerPage)
   const startIndex = (page - 1) * itemsPerPage
   return (
     <div className="flex items-center justify-between text-sm text-gray-600 pt-2">
       <div>
-        Showing {total === 0 ? 0 : startIndex + 1}–{Math.min(startIndex + itemsPerPage, total)} of{' '}
-        {total}
+        {t('inventory.showingRange', { from: total === 0 ? 0 : startIndex + 1, to: Math.min(startIndex + itemsPerPage, total), total })}
       </div>
       <div className="flex items-center gap-2">
-        <label className="text-sm text-gray-600">Per page:</label>
+        <label className="text-sm text-gray-600">{t('inventory.perPage')}</label>
         <select
           value={itemsPerPage}
           onChange={(e) => {
@@ -187,7 +186,7 @@ export function Pagination({ total, page, itemsPerPage, setItemsPerPage, onPage 
               disabled={page === 1}
               className="px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              ← Prev
+              {t('inventory.prevPage')}
             </button>
             {Array.from({ length: pages }, (_, i) => i + 1)
               .filter((p) => p === 1 || p === pages || Math.abs(p - page) <= 1)
@@ -216,7 +215,7 @@ export function Pagination({ total, page, itemsPerPage, setItemsPerPage, onPage 
               disabled={page === pages}
               className="px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Next →
+              {t('inventory.nextPage')}
             </button>
           </div>
         )}
@@ -254,10 +253,10 @@ export function WarrantyBadge({ status }) {
   if (!status) return <span className="text-gray-500 text-xs">—</span>
   const cls =
     status === 'In Warranty'
-      ? 'bg-green-100 text-green-700'
+      ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400'
       : status === 'Unknown'
-        ? 'bg-gray-100 text-gray-500'
-        : 'bg-red-100 text-red-700'
+        ? 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'
+        : 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400'
   return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>{status}</span>
 }
 export function BrandAvatar({ name, size = 'md' }) {
@@ -294,6 +293,7 @@ export function BrandAvatar({ name, size = 'md' }) {
 
 // ─── Brand Filter Bar ──────────────────────────────────────────────────────────
 export function BrandBar({ brands, groups, selected, onSelect }) {
+  const { t } = useTranslation()
   const brandUnitCount = {}
   for (const g of groups) brandUnitCount[g.brand] = (brandUnitCount[g.brand] || 0) + g.units.length
   const total = groups.reduce((s, g) => s + g.units.length, 0)
@@ -310,7 +310,7 @@ export function BrandBar({ brands, groups, selected, onSelect }) {
     <div className="flex gap-2 overflow-x-auto pb-1 flex-wrap">
       <button onClick={() => onSelect(null)} className={chip(!selected)}>
         {' '}
-        All Brands {cnt(!selected, total)}
+        {t('inventory.allBrands')} {cnt(!selected, total)}
       </button>
       {brands.map((b) => {
         const isA = selected === b.brand_name
@@ -332,12 +332,13 @@ export function BrandBar({ brands, groups, selected, onSelect }) {
 
 // ─── Inventory Sort Button ────────────────────────────────────────────────────
 export function InvSortBtn({ label, sortKey, activeSortKey, activeSortDir, onSort }) {
+  const { t } = useTranslation()
   const isActive = activeSortKey === sortKey
   const ariaSort = isActive ? (activeSortDir === 'asc' ? 'ascending' : 'descending') : 'none'
   return (
     <button
       onClick={() => onSort(sortKey)}
-      aria-label={`Sort by ${label}`}
+      aria-label={t('inventory.sortBy', { label })}
       aria-sort={ariaSort}
       className="flex items-center gap-1 hover:text-gray-900 transition-colors"
     >

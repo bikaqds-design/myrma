@@ -1,8 +1,8 @@
 # myRMA Enterprise — Audit Log
 
-> **Audit period:** 2026-05-26 → 2026-05-27 (initial) · 2026-05-27 (full system test) · 2026-05-28 (Sprints 0–3 complete) · 2026-05-28 (full re-audit) · 2026-05-28 (Sprints 4–6 deployed) · 2026-05-29 (Sprint 7 complete)
+> **Audit period:** 2026-05-26 → 2026-05-27 (initial) · 2026-05-27 (full system test) · 2026-05-28 (Sprints 0–3 complete) · 2026-05-28 (full re-audit) · 2026-05-28 (Sprints 4–6 deployed) · 2026-05-29 (Sprint 7 complete) · 2026-05-31 (Sprint 10 surgical fixes) · 2026-06-01 (Direction B theme + TS fix) · 2026-06-05 (AI assist, full i18n/RTL, bug fixes)
 > **Baseline commit:** `5085ad2` + post-rollback UI fixes
-> **Latest score:** 9.3/10 — Sprint 7 complete 2026-05-29. All 5 mega-files decomposed into folders (Inventory 4861→11 files, RMATickets 3765→5 files, Products/UserManagement/Customers into folders). safeStorage helper, lazy CommandPalette, ARIA pass on 5 pages, @axe-core/react in dev. One optional item remaining: L-6 TypeScript db layer.
+> **Latest score:** 9.3/10 — Sprint 10 all phases complete 2026-06-01. Direction B "Command" design system applied: Dashboard rewritten (hero KPIs, SVG gauges/donuts, 12-col grid), full-app theme transformation (App shell, ui.jsx, index.css, AppearanceContext, ErrorBoundary, Modal, NotFoundPage). TypeScript noImplicitAny fix. Remaining: L-6 TypeScript db layer; ~46 page files with stale slate-* Tailwind classes pending sweep.
 
 ---
 
@@ -1133,15 +1133,15 @@ This is the riskiest task. `jspdf 4.2.1` is a major-version library bump. The AP
 
 ---
 
-### Sprint 10 Scorecard (projected)
+### Sprint 10 Scorecard
 
-| Domain | Current (post-hotfix) | After Phase A | After Phase B | After Phase C | After Phase D |
-|--------|----------------------|---------------|---------------|---------------|---------------|
-| Security | 8/10 | **8.5** (SEC-3 fixed) | 8.5 | 8.5 | **9** (jspdf CVEs fixed) |
-| Architecture | 9/10 | 9 | **9.5** (constants clean) | **10** (all pages on useQuery) | 10 |
-| Code quality | 9/10 | **9.5** (cp pages have Sentry) | 9.5 | 9.5 | 9.5 |
-| Production readiness | 8/10 | 8 | 8 | 8 | **9** |
-| **Overall** | **8.8/10** | **8.9** | **9.0** | **9.1** | **9.3** |
+| Domain | Pre-Sprint 10 | After Phase A | After Phase B | After Phase C | After Phase D |
+| ------ | ------------ | ------------- | ------------- | ------------- | ------------- |
+| Security | 8/10 | **8.5** (SEC-3 fixed) | 8.5 | 8.5 | **9** ✅ (jspdf CVEs fixed) |
+| Architecture | 9/10 | 9 | **9.5** (constants clean) | **10** ✅ (all pages on useQuery) | 10 |
+| Code quality | 9/10 | **9.5** ✅ (cp pages have Sentry) | 9.5 | 9.5 | 9.5 |
+| Production readiness | 8/10 | 8 | 8 | 8 | **9** ✅ |
+| **Overall** | **8.8/10** | **8.9** | **9.0** | **9.1** | **9.3** ✅ |
 
 ---
 
@@ -1290,3 +1290,77 @@ This is the riskiest task. `jspdf 4.2.1` is a major-version library bump. The AP
 - **2026-05-29** — ✅ Sprint 7 H-3 (commit `bc25181`). `Products.jsx` (3,142) → `Products/` (4 files: `index`, `ProductsListTab`, `HierarchyTab`, `_modals`). `UserManagement.jsx` (2,200) → `UserManagement/` (5 files: `index`, `UsersTab`, `RolesTab`, `_shared`, `_utils`). `Customers.jsx` (1,859) → `Customers/` (3 files: `index`, `_modals`, `_constants`).
 - **2026-05-29** — ✅ Sprint 7 H-5 (commit `550bed6`). `@axe-core/react` v4.11.3 installed; mounted in `main.jsx` behind `import.meta.env.DEV`. 34 ARIA gaps closed: `aria-sort` + `aria-label` on all sort buttons in `SortableHeader` (RMATickets) and `InvSortBtn` (Inventory) — propagates to every table; `aria-expanded` + `aria-haspopup="menu"` + `aria-label` on all three-dot action menus (RMATickets, Products, Customers); `aria-expanded` + `aria-controls` on filter-panel toggles with matching `id`s; `aria-label` + SVG `aria-hidden` on modal close buttons. Score: **8.7 → 9.3/10**.
 - **2026-05-31** — 🔍 **Full system audit** (user-requested, post-hotfix-batch). Static analysis of all layers. Automated gates: 80/80 tests, 0 lint warnings, clean build. **15 findings (2 critical ops, 1 high, 5 moderate, 5 accepted/clean)**. Critical: two DB migrations unconfirmed in production (ticket constraint + permission repair). High: Add User button visible to `admin` but Edge Function is `super_admin`-only (S9-2b, carried over). Moderate: `cp/*.jsx` (7 files) have no captureException; TechCalendar + AuditLog not on useQuery; hardcoded status strings in 4 pages; jspdf DOMPurify CVEs (fixable). Accepted: xlsx CVE (no vendor fix, write-only), raw Supabase reads in 3 Inventory files (intentional column subset). All CI gates green. Score: **8.8/10**. Sprint 10 plan written — surgical, one-file-one-commit approach to avoid regression cascade.
+- **2026-06-01** — ✅ **DB migrations applied** (user-applied in Supabase SQL Editor). DB-1: `20260531_relax_ticket_status_constraint.sql` — dropped hard-coded `ticket_status` CHECK constraint, replaced with non-empty guard. DB-2: `20260529_repair_permissions.sql` — cleared corrupt `permissions` column for all manager/technician/viewer rows; verification query returned 0 rows.
+- **2026-06-01** — ✅ **Sprint 10 Phase A complete** (commits `30dad6f`–`35a7935`, branch `test`). 8 tasks: (1) S10-SEC-3: `Add User` button gated to `ROLES.SUPER_ADMIN` only in `UserManagement/index.jsx` — admin no longer sees a button that silently 403s. (2–8) S10-CQ-1: `captureException` added to all catch blocks in 7 `cp/*.jsx` files (Announcements, RMAConfig, CustomFields, PDFLayout, DataCleanup, Integrations, AuditLog) — Control Panel errors now report to Sentry. CI: 80/80 · 0 warnings · clean build.
+- **2026-06-01** — ✅ **Sprint 10 Phase B complete** (commits `4148533`–`9dadadb`, branch `test`). 4 tasks: S10-ARCH-4a–d: Raw status strings replaced with `TICKET_STATUS.*` / `TICKET_STATUS_RESOLVED` constants in `Dashboard.jsx`, `CustomerDetails.jsx`, `ProductDetails.jsx`, `ControlPanel.jsx`. Also removed stale `'Resolved'` string from Dashboard (status never existed in DB). CI: 80/80 · 0 warnings · clean build.
+- **2026-06-01** — ✅ **Sprint 10 Phase C complete** (commits `cb34fd3`–`416e538`, branch `test`). 2 tasks: S10-ARCH-2: `TechCalendar.jsx` migrated from `useEffect+setState` to `useQuery(['tech-calendar-tickets'])`. S10-ARCH-3: `cp/AuditLog.jsx` migrated — `load()+2×useEffect+setFiltered` replaced with `useQuery(['audit-log'])` + `useMemo` for filters; removed the `eslint-disable` suppressor that was masking the bad deps pattern. All pages now on TanStack Query. CI: 80/80 · 0 warnings · clean build.
+- **2026-06-01** — ✅ **Sprint 10 Phase D complete** (commit `a072c03`, branch `test`). S10-SEC-2: `jspdf` upgraded `4.2.0 → 4.2.1` via `npm audit fix --force`. Fixes 3 CVEs in `dompurify ≤3.3.3` (1 moderate, 1 high, 1 critical). CI: 80/80 · 0 warnings · clean build. **Pending:** user browser smoke test of PDF export on Invoices page before merge to `main`.
+- **2026-06-01** — ✅ **Dashboard redesign — Direction B "Command" layout** (commit `bebb6ff`, branch `test`). Complete render layer rewrite of `src/pages/Dashboard.jsx`: `tokens(darkMode)` design-token function, inline SVG primitives (`SvgGauge`, `SvgDonut`, `Sparkline`, `StatusPill`, `CardHead`, `SectionLabel`, `DonutWithLegend`), STATUS_COLOR + PRIORITY_COLOR maps, 12-col grid with hero KPI tiles × 4, status strip, Performance section (4 × span-3 gauge cards), Trends section (lazy `DashboardCharts`), Activity section (span-5/3/4), Team & Inventory section. `DashboardCharts.jsx` stripped to weekly + monthly trend charts only (status/priority distribution moved inline as SVG donuts; `LineChart`/`Line` imports removed). Hanken Grotesk added to `index.html` (preconnect + Google Fonts link). All data fetching (TanStack Query, realtime, useMemo aggregations) preserved unchanged. `WIDGET_CATALOG` unchanged.
+- **2026-06-01** — ✅ **Full-app Direction B "Command" theme transformation** (commit `30b2ae7`, branch `test`). Visual-only sweep — no data, routing, or business logic changed. Files updated: `src/App.jsx` (sidebar bg/border/nav active+inactive tokens, top bar, user dropdown, toast dark options), `src/components/ui.jsx` (Card flat hairline no-shadow, PageHeader updated, `StatusPill` export added), `src/contexts/AppearanceContext.jsx` (Hanken Grotesk in `FONT_STACKS` + `GOOGLE_FONTS`), `src/index.css` (page bg + font smoothing), `tailwind.config.js` (`fontFamily.sans = ['Hanken Grotesk', ...]`, page color token), `src/components/ErrorBoundary.jsx` + `src/components/Modal.jsx` + `src/pages/NotFoundPage.jsx` (slate-* → design token hex). Design tokens: page `#f4f6f9`/`#0b0f17`, surface `#ffffff`/`#121823`, border `#e6e9ef`/`#212a38`, accent `#4338ca`/`#a5b4fc`, text `#211f1b`/`#e8ebf0`, muted `#6c6760`/`#9aa4b2`. ~46 other page files retain stale slate-* classes pending a future file-by-file sweep.
+- **2026-06-01** — ✅ **TypeScript noImplicitAny fix** (commit `07f6df5`, branch `test`). `src/utils/index.ts`: `createPageUrl(pageName)` → `createPageUrl(pageName: string)`. Root cause: `tsconfig.json` `"strict": true` enables `noImplicitAny`; the untyped parameter was surfacing as a red squiggly on the tsconfig file in VS Code. Pre-existing bug unrelated to the theme work.
+- **2026-06-02** — ✅ **WhatsApp notification system + Customer PDF export** (multiple commits, branch `test`). Full enterprise WhatsApp notification system: provider-agnostic messaging layer (`src/lib/messaging/`), event bus (`src/lib/events/`), 3 Edge Functions (`send-whatsapp`, `notification-worker`, `whatsapp-webhook`), 4 DB tables (`whatsapp_templates`, `notification_logs`, `notification_settings`, `notification_queue` — migration `20260602_whatsapp_notifications.sql`), 4 Control Panel sub-pages (`WASettings`, `WATemplates`, `WALogs`, `WATestCenter`), ticket event handlers wired into `TicketForm.jsx` + `App.jsx`. Customer drawer PDF export updated to match RMA Tickets page layout (pdf_layout config, branding, QR code, section order). Supabase secrets configured; templates submitted to Meta for approval (status: In review).
+- **2026-06-03** — ✅ **Backfill `customer_id` on existing tickets** (SQL run in Supabase). Legacy tickets linked to customers via `contact_person = customer_name` OR `company_name = customer_name` join. Column was `contact_person` not `name` — SQL corrected before run.
+- **2026-06-03** — ✅ **7 open audit findings closed** (commit `fca60ab`, branch `test`). NEW-4: `AGENTS.md` created — full WhatsApp system docs, correct tool name (was "Codex"). S9-2a: migration `20260603_user_preferences_rls.sql` — per-user RLS on `user_preferences` (4 policies). S9-2d: same migration — staff read/write on `rma_config` scoped to `appearance_settings` key only; non-admin users now get cross-device theme sync. S9-3b: Zod schemas wired to 4 previously unwired forms — `ticketSchema` → `TicketForm.jsx`, `productSchema` → `Products/index.jsx`, `addUserSchema` → `UserManagement/index.jsx`, `resetPasswordSchema` → `AccountSettings.jsx`; password hint text corrected from 6 → 8 chars. S9-2c: `PermissionsModal` now shows amber warning banner listing any granted permissions that exceed the role's RLS enforcement tier (`RLS_CEILING` map + `getCrossTierPermissions()` helper in `RolesTab.jsx`). Gates: 80/80 tests · 0 lint warnings · build clean.
+- **2026-06-03** — ✅ **TypeScript db layer conversion — S9-8/L-6** (commit `94a428c`, branch `test`). All 9 `src/api/db/*.js` modules converted to `.ts` and old `.js` files deleted. 18 Row type interfaces added across all modules. `index.ts` re-exports all Row types for single-import convenience. Function signatures fully typed (params + return types). Logic identical to original `.js` files. Gates: 80/80 tests · 0 lint warnings · build clean (10.8s).
+- **2026-06-03** — ✅ **Dark mode — TechCalendar + Reports** (commit `378a267`, branch `test`). `TechCalendar.jsx` had 1 dark class in 394 lines; `Reports.jsx` had 0 dark classes in 1186 lines. Both now fully tokenised with Direction B hex pairs: card containers, table headers/rows/cells, export buttons, filter selects, date range bar, tab bar. Status/priority badge colors preserved (semantic, work in both modes).
+- **2026-06-03** — ✅ **Dark mode flash prevention** (commit `2d69b92`, branch `test`). Added blocking inline `<script>` to `index.html` that reads `mrma_appearance` from localStorage and applies `dark` class to `<html>` synchronously before React renders. Eliminates white flash for dark mode users on every page load.
+- **2026-06-03** — ✅ **Static cross-role QA pass** (no commit — analysis only). Verified `canDo` wiring consistent across all 12 page files: admin bypass pattern identical everywhere; manager/technician/viewer permission defaults match `ROLE_DEFAULT_PERMISSIONS`; `/control-panel` route guard confirmed (`Navigate to="/"` for non-admin); technician `edit_assigned` check correctly gates on `assigned_technician !== userEmail`; RLS server-side enforcement confirmed from `20260526_enable_rls.sql`. Verdict: all 3 roles correctly gated, no discrepancies found.
+- **2026-06-03** — ✅ **Doc sync** (commit `cb6cf4b`, branch `test`). `CLAUDE.md` updated: domain modules table updated to TypeScript with Row types, 2 new migrations added, WhatsApp system section added, 3 new Edge Functions added, Control Panel updated. `AUDIT_LOG.md` updated with 2026-06-03 entries. `CONSTITUTION.md` and `README.md` updated.
+- **2026-06-05** — ✅ **AI ticket assist — Feature #12** (commits on `test` branch). AI summarize + suggest-next-action added to Tickets, Reports, and Inventory pages at page level. Model: NVIDIA NIM / Llama 3.3 70B (free tier). Removed from TicketDrawer to avoid clutter. Button visible to admin/manager; results shown inline.
+- **2026-06-05** — ✅ **Full system i18n — Feature #13** (commit `f2a5bad`, branch `test`). Complete Arabic/English multi-language support with RTL layout. Stack: `react-i18next`, `src/locales/en.json` + `src/locales/ar.json` (~500+ keys), `src/i18n.js` config. `AppearanceContext` manages language toggle; `dir="rtl"` applied to `<html>`. Every page, component, modal, toast, button, action, and label wrapped in `t()`. Key patterns documented: module-level functions use `import i18next from 'i18next'` singleton or receive `t` as parameter; portaled elements (NotificationBell panel) need explicit `dir` attribute since `createPortal` bypasses HTML inheritance.
+- **2026-06-05** — ✅ **RTL notification bell fix.** In Arabic mode the bell button moves to the LEFT side of the header but the panel was anchored `right: 8` (far right edge). Fixed: panel positioning is now direction-aware — `i18n.language === 'ar'` triggers left-anchored logic using `button.getBoundingClientRect().left`, clamped to viewport. Added `dir={isRtl ? 'rtl' : 'ltr'}` to the portaled panel div. Added `i18n.language` to the `useEffect` dependency array.
+- **2026-06-06** — ✅ **TicketForm `newTicket is not defined` bug fix.** When creating a new ticket, two toasts fired simultaneously: "Ticket created successfully!" (correct) and "Failed to save ticket: newTicket is not defined" (ReferenceError). Root cause: `const newTicket = await db.rmaTickets.create({...})` was declared with `const` inside the `else {}` block (line 462) but referenced on line 559 *outside* the block at `const savedTicketId = editingTicket?.id || newTicket?.id`. Fix: hoisted to `let newTicket = null` before the `if/else` block; removed `const` from the inner assignment. Ticket was always created successfully; only the post-creation resolution-save was erroring.
+
+---
+
+## 🧪 Session 2 — 2026-06-03 (dark mode polish + WhatsApp end-to-end bring-up)
+
+> Long working session. Two themes: (1) finish dark mode across every page; (2) get WhatsApp notifications actually delivering to a real phone. Also includes a self-inflicted regression and its recovery — documented honestly as a lesson.
+
+### Dark mode — completed
+
+| Commit | Work |
+|--------|------|
+| `c63c643` | Full dark sweep across 12 zero-coverage pages (Inventory sub-tabs, TicketDrawer, Invoices, PartsInventory, ControlPanel, Customers, Products). Fixed the **white-row bug** in Inventory OverviewTab (`hover:bg-indigo-50` = near-white on dark). |
+| `9816e06` | Badge/pill colors: `bg-*-100 text-*-700/800` → added `dark:bg-*-900/20 dark:text-*-400` so status/priority/type badges aren't washed out on dark. |
+| `2d69b92` | Blocking inline script in `index.html` reads `mrma_appearance` and sets `html.dark` before React renders — kills the white flash on load for dark-mode users. |
+| `378a267` | TechCalendar + Reports (had 0–1 dark classes) fully tokenised. |
+| `ead2a03` | Notification bell: removed duplicate count badge (corner badge + trailing badge both rendered). |
+
+### ⚠️ Regression + recovery (lesson)
+
+| Commit | What |
+|--------|------|
+| `2b8d3e6` | **BAD** — a badge-color sweep was run via a background agent in a git **worktree based on a stale, pre-WhatsApp commit** (`961e787`). Copying its 33 files back **reverted WhatsApp wiring in ControlPanel, mobile responsiveness, and other recent work** — keeping only badge edits. Also broke the Dashboard layout (Overdue widget text overlap). |
+| `995b003` | Restored `Dashboard.jsx` from the good commit. |
+| `2e3b2af` | Restored **all 33 files** from `9816e06` (last fully-good commit) → WhatsApp + mobile + dark all back. Verified: ControlPanel WhatsApp imports present, messaging lib intact, App.jsx handler wiring intact, build + 160 tests clean. |
+
+**Lesson (now a rule):** never bulk-copy files out of a stale worktree; never delegate edits to files carrying critical wiring (WhatsApp/ControlPanel). Patch high-value files directly. See `feedback-git-branch-workflow` memory.
+
+### WhatsApp — debugged to working delivery
+
+The integration was code-complete but had never actually delivered to a phone. Walked through every gate:
+
+| Issue | Root cause | Fix |
+|-------|-----------|-----|
+| Send failed, Meta **190** | Temporary 24h Meta token kept expiring | Created a permanent **System User token** (never expires); updated `WHATSAPP_ACCESS_TOKEN` secret |
+| Send failed, Meta **100** "Object does not exist" | `WHATSAPP_PHONE_NUMBER_ID` had a **letter `O` instead of zero** (`11758049O5609358`) | Corrected to `1175804905609358` |
+| Generic "non-2xx" hid the real error | `supabase.functions.invoke` puts the Meta error in `error.context`, not `error.message` | `4d19804` — Test Center now reads `error.context.json()` and shows the real Meta error + code |
+| Queued sends arrived **scrambled** (variables in wrong order) | **Postgres JSONB does not preserve object key order** — it reorders by (length, then a–z). `notification_queue.payload` is JSONB; the worker's `Object.values(variables)` got reordered keys | `8ecfc81` — handler now also stores an explicitly-ordered `params: string[]` array (JSONB keeps array order); worker uses `payload.params`. See `reference-jsonb-key-order-gotcha` memory |
+| Real tickets failed Meta **131008** "required parameter missing" | `ticket.created` emit used `{...ticketData}` which lacks `created_date` → `{{created_date}}` empty (Meta rejects empty positional params) | `40abcd7` — spread the saved DB row (`newTicket`) into the event payload; safety net in handler replaces any blank param with `—` |
+| Message accepted but **not delivered**, webhook reports **131049** "not delivered to maintain healthy ecosystem engagement" | Templates are **Marketing** category — Meta throttles marketing template messages | ⏳ **User action:** recreate templates as **Utility** category (transactional). Marketing→Utility can't be changed by editing — must delete+recreate. `rma_ticket_created` recreated as `rma_ticket_created_v2`; DB `template_name` updated via SQL. Awaiting Meta approval. |
+
+**Meta error-code cheat sheet** (all land in `notification_logs.error_message` / `response_data`): 190 = token expired · 100 = bad phone number ID · 131008 = empty/missing positional param · 132000 = param count ≠ template `{{n}}` count · 131049 = Marketing-category delivery throttle (use Utility).
+
+### WhatsApp — still open
+
+- ⏳ `rma_ticket_created_v2` awaiting Meta **Utility** approval. Once Active → real tickets deliver.
+- ⏳ The other 3 templates (`rma_ticket_updated`, `rma_ticket_assigned`, `rma_ticket_closed`) are still **Marketing** and must be recreated as **Utility** too. Also: param counts to reconcile — our DB has updated=5, assigned=3, closed=3 vars; each must equal the Meta template's `{{n}}` count (the seed `updated` body uses `{{#notes}}` conditionals which Meta doesn't support, so its Meta `{{n}}` count likely differs from 5).
+- Test recipient limited to `+201000121585` until Meta **Production setup** (verify own business number).
+- pg_cron not yet set up to auto-run `notification-worker` (currently relies on the handler's best-effort immediate invoke).
+
+### Other
+
+- `94a428c` — `src/api/db/*.js` → TypeScript with Row types (S9-8/L-6) earlier same day.
+
+> **Current state:** `test` is **56 commits ahead of `main`** — **not merged** (user testing features first). WhatsApp pipeline proven working end-to-end (Meta accepts + returns `wamid`); only blocker to delivery is the Utility template approval. jsPDF browser smoke test still pending. test → main merge awaiting user approval.

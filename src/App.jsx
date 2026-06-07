@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Toaster, toast } from 'react-hot-toast'
 import { useQueryClient } from '@tanstack/react-query'
 import { auth, db, branding as brandingAPI, supabase } from './api/supabaseClient'
@@ -7,7 +8,14 @@ import { useAppearance } from './contexts/AppearanceContext'
 import { resolvePermissions } from './lib/permissions'
 import { ROLES } from './lib/constants'
 import { safeStorage } from './lib/safeStorage'
+import { registerTicketEventHandlers } from './lib/events/ticketEventHandlers'
+
+// Register notification event handlers once at module load
+registerTicketEventHandlers()
 import NotificationBell from './components/NotificationBell'
+import Breadcrumb from './components/Breadcrumb'
+import { RouteSkeleton } from './components/Skeleton'
+import OnboardingWizard from './components/OnboardingWizard'
 import { Spinner } from './components/ui'
 import { captureException } from './lib/sentry'
 
@@ -87,13 +95,9 @@ const Invoices = lazyWithReload(() => import('./pages/Invoices'))
 const PartsInventory = lazyWithReload(() => import('./pages/PartsInventory'))
 const Reports = lazyWithReload(() => import('./pages/Reports'))
 const NotFoundPage = lazyWithReload(() => import('./pages/NotFoundPage'))
-const CommandPalette = lazyWithReload(() => import('./components/CommandPalette'))
+import CommandPalette from './components/CommandPalette'
 
-const PageSpinner = () => (
-  <div className="flex items-center justify-center h-64">
-    <Spinner size="xl" />
-  </div>
-)
+const PageSpinner = () => <RouteSkeleton />
 
 // ── Thin route wrappers — extract useParams() so page components stay unchanged ──
 function ProductDetailsRoute({
@@ -136,6 +140,77 @@ function CustomerDetailsRoute({
   )
 }
 
+// ── MFA challenge screen (shown after password login when 2FA is enrolled) ───
+function MfaChallenge({ onVerify, onCancel }) {
+  const [code, setCode] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const { darkMode } = useAppearance()
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (code.length !== 6) return
+    setLoading(true)
+    setError('')
+    try {
+      await onVerify(code)
+    } catch (err) {
+      setError(err?.message || 'Invalid code — please try again')
+      setCode('')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-[#0b0f17]' : 'bg-[#f4f6f9]'}`}>
+      <div className={`w-full max-w-sm rounded-2xl border p-8 shadow-sm ${darkMode ? 'bg-[#121823] border-[#212a38]' : 'bg-white border-[#e6e9ef]'}`}>
+        <div className="flex justify-center mb-5">
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${darkMode ? 'bg-indigo-900/40' : 'bg-indigo-50'}`}>
+            <svg className="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+        </div>
+        <h1 className={`text-lg font-semibold text-center mb-1 ${darkMode ? 'text-[#e8ebf0]' : 'text-gray-900'}`}>
+          Two-Factor Authentication
+        </h1>
+        <p className={`text-sm text-center mb-6 ${darkMode ? 'text-[#9aa4b2]' : 'text-gray-500'}`}>
+          Enter the 6-digit code from your authenticator app
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            pattern="\d{6}"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+            placeholder="000000"
+            autoFocus
+            className={`w-full text-center text-2xl font-mono tracking-[0.5em] rounded-lg border px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-[#0f1520] border-[#212a38] text-[#e8ebf0] placeholder-[#4a5568]' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'}`}
+          />
+          {error && <p className="text-xs text-red-500 text-center">{error}</p>}
+          <button
+            type="submit"
+            disabled={code.length !== 6 || loading}
+            className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+          >
+            {loading ? 'Verifying…' : 'Verify'}
+          </button>
+        </form>
+        <button
+          onClick={onCancel}
+          className={`mt-4 w-full text-xs text-center ${darkMode ? 'text-[#9aa4b2] hover:text-[#e8ebf0]' : 'text-gray-400 hover:text-gray-600'}`}
+        >
+          Cancel — sign out
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Main app ──────────────────────────────────────────────────────────────────
 export default function App() {
   const navigate = useNavigate()
@@ -144,24 +219,34 @@ export default function App() {
   const queryClient = useQueryClient()
 
   const { sidebarCompact, updateAppearance, darkMode } = useAppearance()
+  const { t } = useTranslation()
   const toastOptions = darkMode
-    ? { style: { background: '#1e293b', color: '#f1f5f9', border: '1px solid #334155' } }
-    : undefined
+    ? { style: { background: '#121823', color: '#e8ebf0', border: '1px solid #212a38', borderRadius: 12 } }
+    : { style: { borderRadius: 12 } }
 
   const [currentUser, setCurrentUser] = useState(null)
   const [currentUserRole, setCurrentUserRole] = useState(null)
   const [currentUserPermissions, setCurrentUserPermissions] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [mfaPending, setMfaPending] = useState(null) // { user, factorId } — waiting for TOTP code
   const [sidebarOpen, setSidebarOpen] = useState(false)
   // selectedTicketId: open a specific ticket when navigating to /rma-tickets
   // (e.g. from the notification bell or command palette)
   const [selectedTicketId, setSelectedTicketId] = useState(null)
   const [resetPasswordMode, setResetPasswordMode] = useState(false)
   const [companyName, setCompanyName] = useState('')
-  const [cmdPaletteOpen, setCmdPaletteOpen] = useState(false)
+  const cmdSearchRef = useRef(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [notifMissing, setNotifMissing] = useState(false)
+  const [expandedItems, setExpandedItems] = useState(() => {
+    const s = new Set()
+    ;['/products', '/inventory', '/reports', '/control-panel'].forEach((p) => {
+      if (pathname === p || pathname.startsWith(p + '/')) s.add(p)
+    })
+    return s
+  })
   const notifChannelRef = useRef(null)
   const userMenuRef = useRef(null)
   const hamburgerRef = useRef(null)
@@ -181,7 +266,7 @@ export default function App() {
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
-        setCmdPaletteOpen((open) => !open)
+        cmdSearchRef.current?.focus()
       }
     }
     document.addEventListener('keydown', handler)
@@ -197,21 +282,43 @@ export default function App() {
         setResetPasswordMode(true)
         setLoading(false)
       }
+      if (event === 'SIGNED_OUT') {
+        setCurrentUser(null)
+        setCurrentUserRole(null)
+        setCurrentUserPermissions(null)
+        setMfaPending(null)
+        navigate('/')
+      }
     })
     return () => subscription?.unsubscribe()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const finishLogin = async (user) => {
+    setCurrentUser(user)
+    const roleData = await db.userRoles.getUserRole(user.email)
+    queryClient.setQueryData(['user-role', user.email], roleData)
+    const role = roleData?.role || 'technician'
+    setCurrentUserRole(role)
+    setCurrentUserPermissions(resolvePermissions(role, roleData?.permissions))
+    // Show onboarding wizard for admins who haven't completed it yet
+    if (role === ROLES.ADMIN || role === ROLES.SUPER_ADMIN) {
+      const done = safeStorage.get(`mrma_onboarding_v1_${user.email}`, null)
+      if (!done) setShowOnboarding(true)
+    }
+  }
+
   const checkAuth = async () => {
     try {
       const user = await auth.getCurrentUser()
       if (user) {
-        setCurrentUser(user)
-        const roleData = await db.userRoles.getUserRole(user.email)
-        queryClient.setQueryData(['user-role', user.email], roleData)
-        const role = roleData?.role || 'technician'
-        setCurrentUserRole(role)
-        setCurrentUserPermissions(resolvePermissions(role, roleData?.permissions))
+        const { data: aalData } = await auth.mfa.getLevel()
+        if (aalData?.nextLevel === 'aal2' && aalData?.currentLevel !== 'aal2') {
+          const { data: factors } = await auth.mfa.listFactors()
+          const totp = factors?.all?.find((f) => f.factor_type === 'totp' && f.status === 'verified')
+          if (totp) { setMfaPending({ user, factorId: totp.id }); return }
+        }
+        await finishLogin(user)
       }
     } catch (error) {
       captureException(error, { page: 'App', context: 'checkAuth' })
@@ -345,6 +452,19 @@ export default function App() {
     if (pathname !== '/rma-tickets') setSelectedTicketId(null)
   }, [pathname])
 
+  // Auto-expand accordion when navigating to a page with sub-items
+  useEffect(() => {
+    const parent = ['/products', '/inventory', '/reports', '/control-panel'].find(
+      (p) => pathname === p || pathname.startsWith(p + '/')
+    )
+    if (parent) {
+      setExpandedItems((prev) => {
+        if (prev.has(parent)) return prev
+        return new Set([...prev, parent])
+      })
+    }
+  }, [pathname])
+
   const markAllNotifsRead = useCallback(async () => {
     if (!currentUser?.email || !currentUserRole) return
     await db.notifications.markAllRead(currentUser.email, currentUserRole)
@@ -361,13 +481,23 @@ export default function App() {
   const handleLogin = async (email, password) => {
     const data = await auth.signIn(email, password)
     const user = data?.user || data
-    setCurrentUser(user)
-    const roleData = await db.userRoles.getUserRole(user.email)
-    queryClient.setQueryData(['user-role', user.email], roleData)
-    const role = roleData?.role || 'technician'
-    setCurrentUserRole(role)
-    setCurrentUserPermissions(resolvePermissions(role, roleData?.permissions))
-    db.userActivity.create(user.email, 'login', `Signed in as ${role}`).catch(() => {})
+    const { data: aalData } = await auth.mfa.getLevel()
+    if (aalData?.nextLevel === 'aal2' && aalData?.currentLevel !== 'aal2') {
+      const { data: factors } = await auth.mfa.listFactors()
+      const totp = factors?.all?.find((f) => f.factor_type === 'totp' && f.status === 'verified')
+      if (totp) { setMfaPending({ user, factorId: totp.id }); return }
+    }
+    await finishLogin(user)
+    db.userActivity.create(user.email, 'login', `Signed in as ${currentUserRole || 'user'}`).catch(() => {})
+  }
+
+  const handleMfaVerify = async (code) => {
+    const { error } = await auth.mfa.challengeAndVerify(mfaPending.factorId, code)
+    if (error) throw error
+    const user = mfaPending.user
+    setMfaPending(null)
+    await finishLogin(user)
+    db.userActivity.create(user.email, 'login', 'Signed in with 2FA').catch(() => {})
   }
 
   const handleSignup = async (email, password) => {
@@ -415,13 +545,14 @@ export default function App() {
     [navigate]
   )
 
-  const handleCmdSelectCustomer = useCallback(
-    (customer) => {
-      navigate(`/customers/${customer.id}`)
-      setSidebarOpen(false)
-    },
-    [navigate]
-  )
+  const toggleExpanded = useCallback((path) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }, [])
 
   const handleCmdSelectProduct = useCallback(
     (product) => {
@@ -438,6 +569,138 @@ export default function App() {
   // ── Active state derived from URL ─────────────────────────────────────────
   const isProductsActive = pathname === '/products' || pathname.startsWith('/products/')
   const isCustomersActive = pathname === '/customers' || pathname.startsWith('/customers/')
+  const isAdminOrManagerRole =
+    currentUserRole === ROLES.ADMIN ||
+    currentUserRole === ROLES.SUPER_ADMIN ||
+    currentUserRole === ROLES.MANAGER
+
+  const navItems = [
+    {
+      path: '/',
+      label: t('nav.dashboard'),
+      active: pathname === '/' || pathname === '/dashboard',
+      icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+    },
+    {
+      path: '/products',
+      label: t('nav.products'),
+      active: isProductsActive,
+      icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
+      tabParam: 'tab',
+      children: [
+        { tabId: 'products', label: t('products.tabProducts') },
+        { tabId: 'hierarchy', label: t('products.tabHierarchy') },
+      ],
+    },
+    {
+      path: '/customers',
+      label: t('nav.customers'),
+      active: isCustomersActive,
+      icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',
+    },
+    {
+      path: '/rma-tickets',
+      label: t('nav.rmaTickets'),
+      active: pathname === '/rma-tickets',
+      icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z',
+    },
+    {
+      path: '/inventory',
+      label: t('nav.inventory'),
+      active: pathname === '/inventory',
+      icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
+      tabParam: 'tab',
+      children: [
+        { tabId: 'overview', label: t('inventory.overview') },
+        { tabId: 'by-product', label: t('inventory.allUnits') },
+        { tabId: 'received', label: t('inventory.received') },
+        { tabId: 'under-repair', label: t('inventory.underRepair') },
+        { tabId: 'repaired', label: t('inventory.repaired') },
+        { tabId: 'cant-repair', label: t('inventory.cantRepair') },
+        { tabId: 'rma-stock', label: t('inventory.rmaStock') },
+        { tabId: 'warehouses', label: t('inventory.warehouses') },
+      ],
+    },
+    {
+      path: '/calendar',
+      label: t('nav.calendar'),
+      active: pathname === '/calendar',
+      icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+    },
+    {
+      path: '/invoices',
+      label: t('nav.invoices'),
+      active: pathname === '/invoices',
+      icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+    },
+    {
+      path: '/parts',
+      label: t('nav.parts'),
+      active: pathname === '/parts',
+      icon: 'M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z',
+    },
+    {
+      path: '/reports',
+      label: t('nav.reports'),
+      active: pathname === '/reports',
+      icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+      tabParam: 'tab',
+      children: [
+        { tabId: 'tickets', label: t('reports.tabTickets') },
+        ...(isAdminOrManagerRole
+          ? [
+              { tabId: 'customers', label: t('reports.tabCustomers') },
+              { tabId: 'technicians', label: t('reports.tabTechnicians') },
+              { tabId: 'financial', label: t('reports.tabFinancial') },
+            ]
+          : []),
+      ],
+    },
+    ...(currentUserRole === ROLES.ADMIN || currentUserRole === ROLES.SUPER_ADMIN
+      ? [
+          {
+            path: '/control-panel',
+            label: t('nav.controlPanel'),
+            active: pathname === '/control-panel',
+            icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+            separator: true,
+            tabParam: 'section',
+            children: [
+              {
+                tabId: 'rmaconfig',
+                label: t('cp.groupTickets'),
+                activeSections: ['rmaconfig', 'customfields', 'pdflayout'],
+              },
+              {
+                tabId: 'users',
+                label: t('cp.groupUsers'),
+                activeSections: ['users', 'announcements', 'broadcast'],
+              },
+              {
+                tabId: 'appearance',
+                label: t('cp.groupAppearance'),
+                activeSections: ['appearance', 'email'],
+              },
+              {
+                tabId: 'sla',
+                label: t('cp.groupAutomation'),
+                activeSections: ['sla', 'automation', 'webhooks', 'integrations'],
+              },
+              {
+                tabId: 'wa-settings',
+                label: t('cp.groupMessaging'),
+                activeSections: ['wa-settings', 'wa-templates', 'wa-logs', 'wa-test'],
+              },
+              {
+                tabId: 'audit',
+                label: t('cp.groupData'),
+                activeSections: ['audit', 'cleanup', 'backup'],
+              },
+            ],
+          },
+        ]
+      : []),
+  ]
 
   // ── Derive page title for mobile header ───────────────────────────────────
   const mobileTitle = (() => {
@@ -486,9 +749,18 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-[#f4f6f9] dark:bg-[#0b0f17]">
         <Spinner size="xl" />
       </div>
+    )
+  }
+
+  if (mfaPending) {
+    return (
+      <>
+        <MfaChallenge onVerify={handleMfaVerify} onCancel={() => { auth.signOut(); setMfaPending(null) }} />
+        <Toaster position="top-right" toastOptions={toastOptions} />
+      </>
     )
   }
 
@@ -503,21 +775,16 @@ export default function App() {
 
   // ── Authenticated app shell ───────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-[#f4f6f9] dark:bg-[#0b0f17] flex">
       <AnnouncementBanner />
       <Toaster position="top-right" />
-      {/* CommandPalette is React.lazy — needs its own Suspense boundary.
-          null fallback: it's a hidden modal until Ctrl+K, no placeholder needed. */}
-      <Suspense fallback={null}>
-        <CommandPalette
-          open={cmdPaletteOpen}
-          onClose={() => setCmdPaletteOpen(false)}
-          onSelectTicket={handleCmdSelectTicket}
-          onSelectCustomer={handleCmdSelectCustomer}
-          onSelectProduct={handleCmdSelectProduct}
+      {showOnboarding && (
+        <OnboardingWizard
+          userEmail={currentUser?.email}
+          onClose={() => setShowOnboarding(false)}
+          onNavigate={(path) => { navigate(path) }}
         />
-      </Suspense>
-
+      )}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
@@ -526,85 +793,71 @@ export default function App() {
       )}
 
       <div
-        className={`fixed lg:static inset-y-0 left-0 z-30 ${sidebarCompact ? 'w-16' : 'w-64'} bg-gradient-to-b from-gray-900 to-gray-800 text-white flex flex-col transform transition-all duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+        id="app-sidebar"
+        className={`fixed lg:static inset-y-0 left-0 z-30 ${sidebarCompact ? 'w-16' : 'w-64'} bg-white dark:bg-[#121823] border-r border-[#e6e9ef] dark:border-[#212a38] flex flex-col transform transition-all duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
       >
         <div
-          className={`border-b border-gray-700 flex items-center ${sidebarCompact ? 'flex-col gap-2 p-3' : 'px-4 py-3 justify-between'}`}
+          className={`border-b border-[#e6e9ef] dark:border-[#212a38] flex items-center ${sidebarCompact ? 'flex-col gap-2 p-3' : 'px-4 py-3 justify-between'}`}
         >
           {sidebarCompact ? (
             <>
-              <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
+              <button
+                onClick={() => handleNavigate('/')}
+                title="Go to Dashboard"
+                aria-label="Go to Dashboard"
+                className="w-10 h-10 bg-[#4338ca] rounded-lg flex items-center justify-center flex-shrink-0 hover:bg-[#3730a3] transition-colors"
+              >
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-              </div>
+              </button>
               <button
                 onClick={() => updateAppearance({ sidebarCompact: false }, currentUser?.email)}
                 title="Expand sidebar"
                 aria-label="Expand sidebar"
-                className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-500 hover:text-white hover:bg-gray-700 transition-colors"
+                className="w-10 h-10 flex items-center justify-center rounded-lg text-[#a39e95] dark:text-[#646f7e] hover:text-[#211f1b] dark:hover:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 5l7 7-7 7M5 5l7 7-7 7"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
                 </svg>
               </button>
             </>
           ) : (
             <>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
+              <button
+                onClick={() => handleNavigate('/')}
+                title="Go to Dashboard"
+                aria-label="Go to Dashboard"
+                className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+              >
+                <div className="w-10 h-10 bg-[#4338ca] rounded-lg flex items-center justify-center flex-shrink-0">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
-                <div>
-                  <h1 className="text-xl font-bold">myRMA</h1>
-                  <p className="text-xs text-gray-500">{companyName || 'RMA Management'}</p>
+                <div className="text-left">
+                  <h1 className="text-[15px] font-[750] tracking-tight text-[#211f1b] dark:text-[#e8ebf0] leading-none">myRMA</h1>
+                  <p className="text-[12px] text-[#6c6760] dark:text-[#9aa4b2] mt-0.5">{companyName || 'RMA Management'}</p>
                 </div>
-              </div>
+              </button>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => updateAppearance({ sidebarCompact: true }, currentUser?.email)}
                   title="Collapse sidebar"
                   aria-label="Collapse sidebar"
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-white hover:bg-gray-700 transition-colors lg:flex hidden"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a39e95] dark:text-[#646f7e] hover:text-[#211f1b] dark:hover:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors lg:flex hidden"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
-                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
                   </svg>
                 </button>
                 <button
                   onClick={() => setSidebarOpen(false)}
                   aria-label="Close navigation"
-                  className="lg:hidden w-8 h-8 flex items-center justify-center text-gray-500 hover:text-white"
+                  className="lg:hidden w-8 h-8 flex items-center justify-center text-[#a39e95] dark:text-[#646f7e] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
@@ -612,179 +865,106 @@ export default function App() {
           )}
         </div>
 
-        <nav className={`flex-1 ${sidebarCompact ? 'p-2' : 'p-4'} space-y-1 overflow-y-auto`}>
-          {[
-            {
-              path: '/',
-              label: 'Dashboard',
-              active: pathname === '/' || pathname === '/dashboard',
-              icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
-            },
-            {
-              path: '/products',
-              label: 'Products',
-              active: isProductsActive,
-              icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
-            },
-            {
-              path: '/customers',
-              label: 'Customers',
-              active: isCustomersActive,
-              icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',
-            },
-            {
-              path: '/rma-tickets',
-              label: 'RMA Tickets',
-              active: pathname === '/rma-tickets',
-              icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z',
-            },
-            {
-              path: '/inventory',
-              label: 'Inventory',
-              active: pathname === '/inventory',
-              icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
-            },
-            {
-              path: '/calendar',
-              label: 'Calendar',
-              active: pathname === '/calendar',
-              icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
-            },
-            {
-              path: '/reports',
-              label: 'Reports',
-              active: pathname === '/reports',
-              icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
-            },
-          ].map(({ path, label, active, icon }) => (
-            <button
-              key={path}
-              onClick={() => handleNavigate(path)}
-              title={sidebarCompact ? label : undefined}
-              className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3'} rounded-lg text-sm font-medium transition-colors ${active ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
-            >
-              <svg
-                className="w-5 h-5 flex-shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
-              </svg>
-              {!sidebarCompact && label}
-            </button>
-          ))}
+        <nav className={`flex-1 ${sidebarCompact ? 'p-2' : 'p-4'} space-y-0.5 overflow-y-auto`}>
+          {navItems.map(({ path, label, active, icon, tabParam, children, separator }) => {
+            const hasChildren = !sidebarCompact && !!children?.length
+            const isExpanded = expandedItems.has(path)
+            const activeTabId = tabParam ? new URLSearchParams(location.search).get(tabParam) : null
 
-          <div className="pt-2 border-t border-gray-700/60 my-1" />
+            return (
+              <div key={path}>
+                {separator && (
+                  <div className="pt-2 border-t border-[#e6e9ef] dark:border-[#212a38] my-1" />
+                )}
+                <button
+                  onClick={() => {
+                    if (!active) handleNavigate(path)
+                    if (children?.length) toggleExpanded(path)
+                  }}
+                  title={sidebarCompact ? label : undefined}
+                  className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-3 py-2.5'} rounded-[10px] text-[13.5px] font-[600] transition-colors ${active ? 'bg-[rgba(67,56,202,0.11)] dark:bg-[rgba(165,180,252,0.16)] text-[#4338ca] dark:text-[#a5b4fc]' : 'text-[#6c6760] dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230]'}`}
+                >
+                  <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.2 : 1.7} d={icon} />
+                  </svg>
+                  {!sidebarCompact && (
+                    <>
+                      <span className="flex-1 text-start">{label}</span>
+                      {children?.length > 0 && (
+                        <svg
+                          className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      )}
+                    </>
+                  )}
+                </button>
+
+                {hasChildren && isExpanded && (
+                  <div className="ms-3 mt-0.5 mb-1 space-y-0.5 border-s-2 border-[#e6e9ef] dark:border-[#212a38] ps-2">
+                    {children.map((child) => {
+                      const childActive =
+                        active &&
+                        ((child.activeSections
+                          ? child.activeSections.includes(activeTabId)
+                          : activeTabId === child.tabId) ||
+                          (!activeTabId && children[0].tabId === child.tabId))
+                      return (
+                        <button
+                          key={child.tabId}
+                          onClick={() => {
+                            navigate(`${path}?${tabParam}=${child.tabId}`)
+                            setSidebarOpen(false)
+                          }}
+                          className={`w-full text-start px-3 py-1.5 rounded-[8px] text-[12.5px] font-[500] transition-colors ${
+                            childActive
+                              ? 'bg-[rgba(67,56,202,0.08)] dark:bg-[rgba(165,180,252,0.10)] text-[#4338ca] dark:text-[#a5b4fc]'
+                              : 'text-[#6c6760] dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230]'
+                          }`}
+                        >
+                          {child.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+
+          <div className="pt-2 border-t border-[#e6e9ef] dark:border-[#212a38] my-1" />
           <a
             href="/tracker"
             target="_blank"
             rel="noopener noreferrer"
-            title={sidebarCompact ? 'Customer Tracker' : undefined}
-            className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3'} rounded-lg text-sm font-medium transition-colors text-gray-300 hover:bg-gray-700`}
+            title={sidebarCompact ? t('nav.customerTracker') : undefined}
+            className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-3 py-2.5'} rounded-[10px] text-[13.5px] font-[600] transition-colors text-[#6c6760] dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230]`}
           >
-            <svg
-              className="w-5 h-5 flex-shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-              />
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
             </svg>
             {!sidebarCompact && (
               <span className="flex items-center gap-1.5">
-                Customer Tracker
-                <svg
-                  className="w-3 h-3 text-gray-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                  />
+                {t('nav.customerTracker')}
+                <svg className="w-3 h-3 text-[#a39e95] dark:text-[#646f7e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
               </span>
             )}
           </a>
 
-          {(currentUserRole === ROLES.ADMIN || currentUserRole === ROLES.SUPER_ADMIN) && (
-            <>
-              <div className="pt-2 border-t border-gray-700/60 my-1" />
-              <button
-                onClick={() => handleNavigate('/control-panel')}
-                title={sidebarCompact ? 'Control Panel' : undefined}
-                className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3'} rounded-lg text-sm font-medium transition-colors ${pathname === '/control-panel' ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
-              >
-                <svg
-                  className="w-5 h-5 flex-shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                </svg>
-                {!sidebarCompact && 'Control Panel'}
-              </button>
-            </>
-          )}
         </nav>
 
-        {/* User profile (bottom of sidebar) */}
-        <div className={`border-t border-gray-700 ${sidebarCompact ? 'p-2' : 'p-4'}`}>
-          <button
-            onClick={() => handleNavigate('/account')}
-            title={sidebarCompact ? 'Account Settings' : undefined}
-            className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-2' : 'gap-3 px-2 py-2'} rounded-lg hover:bg-gray-700 transition-colors text-left group`}
-          >
-            {currentUser?.user_metadata?.avatar_url ? (
-              <img
-                src={currentUser.user_metadata.avatar_url}
-                alt="avatar"
-                className="w-8 h-8 rounded-full object-cover ring-2 ring-indigo-500/30 flex-shrink-0"
-              />
-            ) : (
-              <div
-                className={`${sidebarCompact ? 'w-8 h-8' : 'w-8 h-8'} rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white font-semibold text-sm uppercase flex-shrink-0`}
-              >
-                {(currentUser?.user_metadata?.display_name || currentUser?.email || '?')[0]}
-              </div>
-            )}
-            {!sidebarCompact && (
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-gray-200 truncate">
-                  {currentUser?.user_metadata?.display_name || currentUser?.email}
-                </div>
-                <div className="text-xs text-gray-500 capitalize">{currentUserRole}</div>
-              </div>
-            )}
-          </button>
-        </div>
       </div>
 
       {/* UX-4: inert disables all keyboard/pointer interaction behind the open sidebar on mobile */}
       <div className="flex-1 flex flex-col min-h-0" {...(sidebarOpen ? { inert: '' } : {})}>
         {/* Mobile header */}
-        <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+        <div className="lg:hidden bg-white dark:bg-[#121823] border-b border-[#e6e9ef] dark:border-[#212a38] px-4 py-3 flex items-center justify-between">
           <button
             ref={hamburgerRef}
             onClick={() => setSidebarOpen(true)}
@@ -800,7 +980,7 @@ export default function App() {
               />
             </svg>
           </button>
-          <h2 className="text-lg font-semibold text-gray-900 capitalize">{mobileTitle}</h2>
+          <h2 className="text-[15px] font-[700] text-[#211f1b] dark:text-[#e8ebf0] capitalize">{mobileTitle}</h2>
           <div className="flex items-center gap-1.5">
             <NotificationBell
               notifications={notifications}
@@ -810,6 +990,22 @@ export default function App() {
               onMarkAllRead={markAllNotifsRead}
               mobile={true}
             />
+            {/* Dark mode toggle */}
+            <button
+              onClick={() => updateAppearance({ darkMode: !darkMode }, currentUser?.email)}
+              aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-600 dark:text-[#9aa4b2]"
+            >
+              {darkMode ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              )}
+            </button>
             <button
               onClick={() => handleNavigate('/account')}
               title="Account Settings"
@@ -822,20 +1018,43 @@ export default function App() {
         </div>
 
         {/* Desktop top bar — notifications + user menu */}
-        <div className="hidden lg:flex items-center justify-end gap-1 px-6 py-2 bg-white border-b border-gray-100 flex-shrink-0">
+        <div className="hidden lg:flex items-center justify-between gap-1 px-6 py-2 bg-white dark:bg-[#121823] border-b border-[#e6e9ef] dark:border-[#212a38] flex-shrink-0">
+          <CommandPalette
+            inputRef={cmdSearchRef}
+            onSelectTicket={handleCmdSelectTicket}
+            onSelectProduct={handleCmdSelectProduct}
+          />
+          <div className="flex items-center gap-1">
           <NotificationBell
             notifications={notifications}
             currentUserEmail={currentUser?.email}
-            sidebarCompact={true}
             onNavigateToTicket={handleNavigateToTicket}
             onMarkAllRead={markAllNotifsRead}
             mobile={true}
+            iconOnly={true}
           />
+          {/* Dark mode toggle */}
+          <button
+            onClick={() => updateAppearance({ darkMode: !darkMode }, currentUser?.email)}
+            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-[#6c6760] dark:text-[#9aa4b2] hover:bg-gray-100 dark:hover:bg-[#1a2230] transition-colors"
+          >
+            {darkMode ? (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+            )}
+          </button>
           {/* User dropdown */}
           <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setUserMenuOpen((o) => !o)}
-              className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+              className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
             >
               {currentUser?.user_metadata?.avatar_url ? (
                 <img
@@ -849,13 +1068,13 @@ export default function App() {
                 </div>
               )}
               <div className="text-left hidden xl:block">
-                <div className="text-sm font-medium text-gray-900 leading-none truncate max-w-[160px]">
+                <div className="text-[13px] font-[600] text-[#211f1b] dark:text-[#e8ebf0] leading-none truncate max-w-[160px]">
                   {currentUser?.user_metadata?.display_name || currentUser?.email}
                 </div>
-                <div className="text-xs text-gray-500 capitalize mt-0.5">{currentUserRole}</div>
+                <div className="text-[11px] text-[#6c6760] dark:text-[#9aa4b2] capitalize mt-0.5">{currentUserRole}</div>
               </div>
               <svg
-                className="w-4 h-4 text-gray-500 flex-shrink-0"
+                className="w-4 h-4 text-[#a39e95] dark:text-[#646f7e] flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -870,22 +1089,22 @@ export default function App() {
             </button>
 
             {userMenuOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100">
-                  <div className="text-sm font-semibold text-gray-900 truncate">
+              <div className="absolute right-0 top-full mt-1.5 w-52 bg-white dark:bg-[#121823] rounded-[14px] shadow-lg border border-[#e6e9ef] dark:border-[#212a38] z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-[#eef0f4] dark:border-[#1a2230]">
+                  <div className="text-[13px] font-[600] text-[#211f1b] dark:text-[#e8ebf0] truncate">
                     {currentUser?.user_metadata?.display_name || currentUser?.email}
                   </div>
-                  <div className="text-xs text-gray-500 capitalize mt-0.5">{currentUserRole}</div>
+                  <div className="text-[11px] text-[#6c6760] dark:text-[#9aa4b2] capitalize mt-0.5">{currentUserRole}</div>
                 </div>
                 <button
                   onClick={() => {
                     handleNavigate('/account')
                     setUserMenuOpen(false)
                   }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-[#211f1b] dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors text-left"
                 >
                   <svg
-                    className="w-4 h-4 text-gray-500 flex-shrink-0"
+                    className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] flex-shrink-0"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -899,13 +1118,13 @@ export default function App() {
                   </svg>
                   Account Settings
                 </button>
-                <div className="border-t border-gray-100" />
+                <div className="border-t border-[#eef0f4] dark:border-[#1a2230]" />
                 <button
                   onClick={() => {
                     handleLogout()
                     setUserMenuOpen(false)
                   }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-left"
                 >
                   <svg
                     className="w-4 h-4 flex-shrink-0"
@@ -925,7 +1144,11 @@ export default function App() {
               </div>
             )}
           </div>
+          </div>
         </div>
+
+        {/* ── Breadcrumb — only renders when there's a trail ───────────────── */}
+        <Breadcrumb />
 
         {/* ── Page content — React Router <Routes> ────────────────────────── */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8 main-scroll">

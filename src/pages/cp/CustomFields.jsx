@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { MigrationNotice } from './Announcements'
+import { captureException } from '../../lib/sentry'
 
 const FIELD_TYPES = ['text', 'number', 'date', 'select', 'textarea', 'checkbox']
 const APPLIES_TO = ['ticket', 'customer']
@@ -25,6 +27,7 @@ const TYPE_ICONS = {
 }
 
 export default function CustomFields({ currentUserEmail }) {
+  const { t } = useTranslation()
   const [fields, setFields] = useState([])
   const [loading, setLoading] = useState(true)
   const [missing, setMissing] = useState(false)
@@ -79,19 +82,19 @@ export default function CustomFields({ currentUserEmail }) {
   const handleSave = async (e) => {
     e.preventDefault()
     if (!form.field_label.trim()) {
-      toast.error('Label is required')
+      toast.error(t('cp.customFields.labelRequired'))
       return
     }
     if (!form.field_name.trim()) {
-      toast.error('Field name is required')
+      toast.error(t('cp.customFields.keyRequired'))
       return
     }
     if (!/^[a-z_][a-z0-9_]*$/.test(form.field_name)) {
-      toast.error('Field name: lowercase letters, numbers, underscores only')
+      toast.error(t('cp.customFields.keyInvalid'))
       return
     }
     if (form.field_type === 'select' && form.field_options.length === 0) {
-      toast.error('Add at least one option for select fields')
+      toast.error(t('cp.customFields.optionsRequired'))
       return
     }
     setSaving(true)
@@ -102,18 +105,19 @@ export default function CustomFields({ currentUserEmail }) {
       }
       if (editing) {
         await db.customFields.update(editing.id, payload)
-        toast.success('Field updated')
+        toast.success(t('cp.customFields.updated'))
       } else {
         await db.customFields.create({
           ...payload,
           created_by: currentUserEmail,
           created_date: new Date().toISOString(),
         })
-        toast.success('Custom field created')
+        toast.success(t('cp.customFields.created'))
       }
       setShowModal(false)
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     } finally {
       setSaving(false)
@@ -121,17 +125,13 @@ export default function CustomFields({ currentUserEmail }) {
   }
 
   const handleDelete = async (id) => {
-    if (
-      !confirm(
-        'Delete this custom field? Data stored in this field will not be deleted from existing records.'
-      )
-    )
-      return
+    if (!confirm(t('cp.customFields.deleteConfirm'))) return
     try {
       await db.customFields.delete(id)
-      toast.success('Deleted')
+      toast.success(t('cp.customFields.deleted'))
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     }
   }
@@ -141,6 +141,7 @@ export default function CustomFields({ currentUserEmail }) {
       await db.customFields.update(f.id, { is_active: !f.is_active })
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     }
   }
@@ -159,6 +160,16 @@ export default function CustomFields({ currentUserEmail }) {
     ? fields.filter((f) => f.applies_to === filterAppliesTo)
     : fields
 
+  const HEADERS = [
+    t('cp.customFields.fieldLabelCol'),
+    t('cp.customFields.fieldKeyCol'),
+    t('cp.customFields.typeCol'),
+    t('cp.customFields.appliesToCol'),
+    t('cp.customFields.requiredCol'),
+    t('cp.customFields.activeCol'),
+    t('cp.customFields.actionsCol'),
+  ]
+
   if (loading)
     return (
       <div className="flex justify-center py-16">
@@ -171,8 +182,8 @@ export default function CustomFields({ currentUserEmail }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Custom Fields</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Add extra fields to tickets and customers</p>
+          <h2 className="text-lg font-semibold text-gray-900">{t('cp.customFields.header')}</h2>
+          <p className="text-sm text-gray-500 mt-0.5">{t('cp.customFields.subtitle')}</p>
         </div>
         <button
           onClick={openCreate}
@@ -186,19 +197,19 @@ export default function CustomFields({ currentUserEmail }) {
               d="M12 6v6m0 0v6m0-6h6m-6 0H6"
             />
           </svg>
-          Add Field
+          {t('cp.customFields.addField')}
         </button>
       </div>
 
       <div className="flex items-center gap-3">
-        <span className="text-sm text-gray-600">Filter:</span>
+        <span className="text-sm text-gray-600">{t('cp.customFields.filterAll')}:</span>
         {['', 'ticket', 'customer'].map((v) => (
           <button
             key={v}
             onClick={() => setFilterAppliesTo(v)}
             className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${filterAppliesTo === v ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
           >
-            {v === '' ? 'All' : v === 'ticket' ? '🎫 Tickets' : '👤 Customers'}
+            {v === '' ? t('cp.customFields.filterAll') : v === 'ticket' ? t('cp.customFields.filterTickets') : t('cp.customFields.filterCustomers')}
           </button>
         ))}
       </div>
@@ -207,17 +218,9 @@ export default function CustomFields({ currentUserEmail }) {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              {[
-                'Field Label',
-                'Name (key)',
-                'Type',
-                'Applies To',
-                'Required',
-                'Active',
-                'Actions',
-              ].map((h) => (
+              {HEADERS.map((h, i) => (
                 <th
-                  key={h}
+                  key={i}
                   className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase"
                 >
                   {h}
@@ -229,7 +232,7 @@ export default function CustomFields({ currentUserEmail }) {
             {displayed.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
-                  No custom fields defined yet
+                  {t('cp.customFields.noFields')}
                 </td>
               </tr>
             )}
@@ -248,7 +251,7 @@ export default function CustomFields({ currentUserEmail }) {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
-                  {f.is_required ? '✓ Yes' : 'No'}
+                  {f.is_required ? t('cp.customFields.yesValue') : t('cp.customFields.noValue')}
                 </td>
                 <td className="px-4 py-3">
                   <button
@@ -296,7 +299,7 @@ export default function CustomFields({ currentUserEmail }) {
                             d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                           />
                         </svg>
-                        Edit
+                        {t('cp.edit')}
                       </button>
                       <button
                         onClick={() => {
@@ -318,7 +321,7 @@ export default function CustomFields({ currentUserEmail }) {
                             d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                           />
                         </svg>
-                        Delete
+                        {t('cp.delete')}
                       </button>
                     </div>
                   )}
@@ -335,7 +338,7 @@ export default function CustomFields({ currentUserEmail }) {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-8">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-bold text-gray-900">
-                {editing ? 'Edit Field' : 'New Custom Field'}
+                {editing ? t('cp.customFields.editModal') : t('cp.customFields.newModal')}
               </h3>
               <button
                 onClick={() => setShowModal(false)}
@@ -354,7 +357,7 @@ export default function CustomFields({ currentUserEmail }) {
             <form onSubmit={handleSave} className="px-6 py-5 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Label <span className="text-red-500">*</span>
+                  {t('cp.customFields.labelField')}
                 </label>
                 <input
                   value={form.field_label}
@@ -377,8 +380,8 @@ export default function CustomFields({ currentUserEmail }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Field key <span className="text-red-500">*</span>{' '}
-                  <span className="text-xs text-gray-500">(lowercase, no spaces)</span>
+                  {t('cp.customFields.keyField')}{' '}
+                  <span className="text-xs text-gray-500">{t('cp.customFields.keyHint')}</span>
                 </label>
                 <input
                   value={form.field_name}
@@ -391,31 +394,31 @@ export default function CustomFields({ currentUserEmail }) {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Type</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('cp.customFields.typeField')}</label>
                   <select
                     value={form.field_type}
                     onChange={(e) => setForm({ ...form, field_type: e.target.value })}
                     className={inp}
                   >
-                    {FIELD_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {TYPE_ICONS[t]} {t}
+                    {FIELD_TYPES.map((ft) => (
+                      <option key={ft} value={ft}>
+                        {TYPE_ICONS[ft]} {ft}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Applies to
+                    {t('cp.customFields.appliesToField')}
                   </label>
                   <select
                     value={form.applies_to}
                     onChange={(e) => setForm({ ...form, applies_to: e.target.value })}
                     className={inp}
                   >
-                    {APPLIES_TO.map((t) => (
-                      <option key={t} value={t}>
-                        {t === 'ticket' ? '🎫 Ticket' : '👤 Customer'}
+                    {APPLIES_TO.map((at) => (
+                      <option key={at} value={at}>
+                        {at === 'ticket' ? t('cp.customFields.appliesToTicket') : t('cp.customFields.appliesToCustomer')}
                       </option>
                     ))}
                   </select>
@@ -429,7 +432,7 @@ export default function CustomFields({ currentUserEmail }) {
                     onChange={(e) => setForm({ ...form, is_required: e.target.checked })}
                     className="w-4 h-4 text-indigo-600 rounded"
                   />
-                  <span className="text-sm font-medium text-gray-700">Required field</span>
+                  <span className="text-sm font-medium text-gray-700">{t('cp.customFields.requiredCheck')}</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -438,26 +441,26 @@ export default function CustomFields({ currentUserEmail }) {
                     onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
                     className="w-4 h-4 text-indigo-600 rounded"
                   />
-                  <span className="text-sm font-medium text-gray-700">Active</span>
+                  <span className="text-sm font-medium text-gray-700">{t('cp.customFields.activeCheck')}</span>
                 </label>
               </div>
               {form.field_type === 'select' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Options</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('cp.customFields.optionsLabel')}</label>
                   <div className="flex gap-2 mb-2">
                     <input
                       value={newOption}
                       onChange={(e) => setNewOption(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addOption())}
                       className={`${inp} flex-1`}
-                      placeholder="Add option..."
+                      placeholder={t('cp.customFields.addOptionPlaceholder')}
                     />
                     <button
                       type="button"
                       onClick={addOption}
                       className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm"
                     >
-                      Add
+                      {t('cp.customFields.addOption')}
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -485,14 +488,14 @@ export default function CustomFields({ currentUserEmail }) {
                   onClick={() => setShowModal(false)}
                   className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
-                  Cancel
+                  {t('cp.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
                   className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {saving ? 'Saving...' : editing ? 'Save Changes' : 'Create Field'}
+                  {saving ? t('cp.saving') : editing ? t('cp.customFields.saveChanges') : t('cp.customFields.createField')}
                 </button>
               </div>
             </form>

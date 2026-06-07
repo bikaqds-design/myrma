@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, db, storage } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
@@ -9,6 +10,7 @@ import { PageHeader } from '../../components/ui'
 import { useURLTab } from '../../hooks/useURLTab'
 import { ROLES } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
+import { productSchema, getFirstError } from '../../lib/schemas'
 import ProductsListTab from './ProductsListTab'
 import HierarchyTab from './HierarchyTab'
 import { AddProductModal, AddBrandModal, AddCategoryModal, BulkUploadModal } from './_modals'
@@ -19,6 +21,7 @@ export default function Products({
   currentUserPermissions,
   onNavigateToProduct,
 }) {
+  const { t } = useTranslation()
   const searchRef = useRef(null)
   const [activeTab, setActiveTab] = useURLTab('tab', 'products')
   const queryClient = useQueryClient()
@@ -289,7 +292,7 @@ export default function Products({
       handlePageChange(pageNum)
       setJumpToPage('')
     } else {
-      toast.error(`Page must be between 1 and ${totalPages}`)
+      toast.error(t('products.pageMustBeBetween', { total: totalPages }))
     }
   }
 
@@ -309,17 +312,17 @@ export default function Products({
 
   const handleBulkDelete = () => {
     if (selectedProducts.length === 0) {
-      toast.error('No products selected')
+      toast.error(t('products.noProductsSelected'))
       return
     }
     openConfirm(
-      'Delete Products',
+      t('products.deleteTitle'),
       `Delete ${selectedProducts.length} selected product${selectedProducts.length !== 1 ? 's' : ''}? This cannot be undone.`,
       async () => {
         closeConfirm()
         try {
           await db.products.bulkDelete(selectedProducts)
-          toast.success(`Deleted ${selectedProducts.length} products`)
+          toast.success(t('products.bulkDeleted', { count: selectedProducts.length }))
           db.auditLog
             .log(
               currentUserEmail,
@@ -331,7 +334,7 @@ export default function Products({
           queryClient.invalidateQueries({ queryKey: ['products-page'] })
         } catch (error) {
           captureException(error)
-          toast.error('Failed to delete products')
+          toast.error(t('products.failedDeleteProducts'))
         }
       }
     )
@@ -339,13 +342,13 @@ export default function Products({
 
   const handleBulkStatusChange = async (status) => {
     if (selectedProducts.length === 0) {
-      toast.error('No products selected')
+      toast.error(t('products.noProductsSelected'))
       return
     }
 
     try {
       await db.products.bulkUpdateStatus(selectedProducts, status)
-      toast.success(`Updated ${selectedProducts.length} products to ${status}`)
+      toast.success(t('products.bulkUpdatedStatus', { count: selectedProducts.length, status }))
       db.auditLog
         .log(
           currentUserEmail,
@@ -357,7 +360,7 @@ export default function Products({
       queryClient.invalidateQueries({ queryKey: ['products-page'] })
     } catch (error) {
       captureException(error)
-      toast.error('Failed to update products')
+      toast.error(t('products.failedUpdateProducts'))
     }
   }
 
@@ -396,7 +399,7 @@ export default function Products({
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
-    toast.success(`Exported ${filteredProducts.length} products`)
+    toast.success(t('products.exported', { count: filteredProducts.length }))
     db.auditLog
       .log(
         currentUserEmail,
@@ -455,7 +458,7 @@ export default function Products({
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
-    toast.success('Template downloaded')
+    toast.success(t('products.templateDownloaded'))
   }
 
   const parseCSVLine = (line) => {
@@ -488,7 +491,7 @@ export default function Products({
       const lines = text.split('\n').filter((line) => line.trim())
 
       if (lines.length < 2) {
-        toast.error('CSV file is empty or invalid')
+        toast.error(t('products.csvEmpty'))
         return
       }
 
@@ -497,7 +500,7 @@ export default function Products({
       const missingFields = requiredFields.filter((f) => !headers.includes(f))
 
       if (missingFields.length > 0) {
-        toast.error(`Missing required columns: ${missingFields.join(', ')}`)
+        toast.error(t('products.csvMissingColumns', { columns: missingFields.join(', ') }))
         return
       }
 
@@ -568,7 +571,7 @@ export default function Products({
       }
 
       if (productsToImport.length === 0) {
-        toast.error('No valid products to import')
+        toast.error(t('products.noValidProducts'))
         if (errors.length > 0) captureException(new Error('CSV import errors'), { errors })
         return
       }
@@ -604,7 +607,7 @@ export default function Products({
         .catch(() => {})
 
       if (errors.length > 0) {
-        toast.error(`${errors.length} rows had errors. Check console for details.`)
+        toast.error(t('products.importRowErrors', { count: errors.length }))
         captureException(new Error('CSV import errors'), { errors })
       }
 
@@ -612,7 +615,7 @@ export default function Products({
       queryClient.invalidateQueries({ queryKey: ['products-page'] })
     } catch (error) {
       captureException(error)
-      toast.error(`Failed to import: ${error.message}`)
+      toast.error(t('products.failedImport', { error: error.message }))
     }
   }
 
@@ -620,11 +623,11 @@ export default function Products({
     const file = e.target.files[0]
     if (file) {
       if (!file.type.startsWith('image/')) {
-        toast.error('Please select an image file')
+        toast.error(t('products.errorSelectImage'))
         return
       }
       if (file.size > 5 * 1024 * 1024) {
-        toast.error('Image must be less than 5MB')
+        toast.error(t('products.errorImageSize'))
         return
       }
       setImageFile(file)
@@ -638,11 +641,11 @@ export default function Products({
     const file = e.target.files[0]
     if (file) {
       if (!file.type.startsWith('image/')) {
-        toast.error('Please select an image file')
+        toast.error(t('products.errorSelectImage'))
         return
       }
       if (file.size > 2 * 1024 * 1024) {
-        toast.error('Logo must be less than 2MB')
+        toast.error(t('products.brandLogoTooLarge'))
         return
       }
       setLogoFile(file)
@@ -653,8 +656,12 @@ export default function Products({
   }
 
   const handleSaveProduct = async () => {
-    if (!productForm.sku || !productForm.product_name || !productForm.brand_id) {
-      toast.error('Please fill in all required fields')
+    const validation = productSchema.safeParse({
+      ...productForm,
+      warranty_months: productForm.warranty_months ? Number(productForm.warranty_months) : undefined,
+    })
+    if (!validation.success) {
+      toast.error(getFirstError(validation))
       return
     }
 
@@ -703,7 +710,7 @@ export default function Products({
             targetEmails: [],
           })
           .catch(() => {})
-        toast.success('Product updated successfully')
+        toast.success(t('products.successUpdated'))
         db.auditLog
           .log(
             currentUserEmail,
@@ -736,7 +743,7 @@ export default function Products({
             targetEmails: [],
           })
           .catch(() => {})
-        toast.success('Product added successfully')
+        toast.success(t('products.successAdded'))
         db.auditLog
           .log(
             currentUserEmail,
@@ -751,13 +758,13 @@ export default function Products({
       queryClient.invalidateQueries({ queryKey: ['products-page'] })
     } catch (error) {
       captureException(error)
-      toast.error(`Failed to save product: ${error.message}`)
+      toast.error(t('products.failedSave', { error: error.message }))
     }
   }
 
   const handleSaveBrand = async () => {
     if (!brandForm.brand_name) {
-      toast.error('Brand name is required')
+      toast.error(t('products.brandRequired'))
       return
     }
 
@@ -779,13 +786,13 @@ export default function Products({
 
       if (editingBrand) {
         await db.brands.update(editingBrand.id, brandData)
-        toast.success('Brand updated successfully')
+        toast.success(t('products.brandUpdated'))
         db.auditLog
           .log(currentUserEmail, 'brand_updated', `Updated brand ${brandData.brand_name}`)
           .catch(() => {})
       } else {
         await db.brands.create(brandData)
-        toast.success('Brand added successfully')
+        toast.success(t('products.brandAdded'))
         db.auditLog
           .log(currentUserEmail, 'brand_created', `Created brand ${brandData.brand_name}`)
           .catch(() => {})
@@ -796,13 +803,13 @@ export default function Products({
       queryClient.invalidateQueries({ queryKey: ['products-page'] })
     } catch (error) {
       captureException(error)
-      toast.error(`Failed to save brand: ${error.message}`)
+      toast.error(t('products.failedSaveBrand', { error: error.message }))
     }
   }
 
   const handleSaveCategory = async () => {
     if (!categoryForm.brand_id || !categoryForm.category_name) {
-      toast.error('Brand and category name are required')
+      toast.error(t('products.brandCategoryRequired'))
       return
     }
 
@@ -818,7 +825,7 @@ export default function Products({
 
       if (editingCategory) {
         await db.categories.update(editingCategory.id, categoryData)
-        toast.success('Category updated successfully')
+        toast.success(t('products.categoryUpdated'))
         db.auditLog
           .log(
             currentUserEmail,
@@ -828,7 +835,7 @@ export default function Products({
           .catch(() => {})
       } else {
         await db.categories.create(categoryData)
-        toast.success('Category added successfully')
+        toast.success(t('products.categoryAdded'))
         db.auditLog
           .log(
             currentUserEmail,
@@ -843,14 +850,14 @@ export default function Products({
       queryClient.invalidateQueries({ queryKey: ['products-page'] })
     } catch (error) {
       captureException(error)
-      toast.error(`Failed to save category: ${error.message}`)
+      toast.error(t('products.failedSaveCategory', { error: error.message }))
     }
   }
 
   const handleDeleteProduct = (product) => {
     openConfirm(
-      'Delete Product',
-      `Delete product "${product.product_name}"? This cannot be undone.`,
+      t('products.deleteTitle'),
+      t('products.deleteMsg', { name: product.product_name }),
       async () => {
         closeConfirm()
         try {
@@ -874,7 +881,7 @@ export default function Products({
               targetEmails: [],
             })
             .catch(() => {})
-          toast.success('Product deleted')
+          toast.success(t('products.successDeleted'))
           db.auditLog
             .log(
               currentUserEmail,
@@ -885,7 +892,7 @@ export default function Products({
           queryClient.invalidateQueries({ queryKey: ['products-page'] })
         } catch (error) {
           captureException(error)
-          toast.error('Failed to delete product')
+          toast.error(t('products.errorDeleteProduct'))
         }
       }
     )
@@ -899,7 +906,7 @@ export default function Products({
         closeConfirm()
         try {
           await db.brands.delete(brand.id)
-          toast.success('Brand deleted')
+          toast.success(t('products.brandDeleted'))
           db.auditLog
             .log(currentUserEmail, 'brand_deleted', `Deleted brand ${brand.brand_name}`)
             .catch(() => {})
@@ -907,7 +914,7 @@ export default function Products({
           queryClient.invalidateQueries({ queryKey: ['products-page'] })
         } catch (error) {
           captureException(error)
-          toast.error('Failed to delete brand')
+          toast.error(t('products.failedDeleteBrand'))
         }
       }
     )
@@ -921,14 +928,14 @@ export default function Products({
         closeConfirm()
         try {
           await db.categories.delete(category.id)
-          toast.success('Category deleted')
+          toast.success(t('products.categoryDeleted'))
           db.auditLog
             .log(currentUserEmail, 'category_deleted', `Deleted category ${category.category_name}`)
             .catch(() => {})
           queryClient.invalidateQueries({ queryKey: ['products-page'] })
         } catch (error) {
           captureException(error)
-          toast.error('Failed to delete category')
+          toast.error(t('products.failedDeleteCategory'))
         }
       }
     )
@@ -1054,10 +1061,10 @@ export default function Products({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Products" subtitle="Manage product catalog and hierarchy" />
+      <PageHeader title={t('products.title')} subtitle={t('products.subtitle')} />
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="border-b border-gray-200">
+      <div className="bg-white dark:bg-[#121823] rounded-xl shadow-sm border border-gray-200 dark:border-[#212a38]">
+        <div className="border-b border-gray-200 dark:border-[#212a38]">
           <nav className="flex gap-8 px-6">
             <button
               onClick={() => setActiveTab('products')}
@@ -1065,10 +1072,10 @@ export default function Products({
                 'py-4 border-b-2 font-medium transition-colors ' +
                 (activeTab === 'products'
                   ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700')
+                  : 'border-transparent text-gray-500 dark:text-[#9aa4b2] hover:text-gray-700 dark:text-[#e8ebf0]')
               }
             >
-              Products
+              {t('products.tabProducts')}
             </button>
             <button
               onClick={() => setActiveTab('hierarchy')}
@@ -1076,10 +1083,10 @@ export default function Products({
                 'py-4 border-b-2 font-medium transition-colors ' +
                 (activeTab === 'hierarchy'
                   ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700')
+                  : 'border-transparent text-gray-500 dark:text-[#9aa4b2] hover:text-gray-700 dark:text-[#e8ebf0]')
               }
             >
-              Product Hierarchy
+              {t('products.tabHierarchy')}
             </button>
           </nav>
         </div>

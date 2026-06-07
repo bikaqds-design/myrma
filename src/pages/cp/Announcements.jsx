@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { captureException } from '../../lib/sentry'
 
 const EMPTY_FORM = {
   title: '',
@@ -35,6 +37,7 @@ const TYPE_STYLES = {
 }
 
 export default function Announcements({ currentUserEmail }) {
+  const { t } = useTranslation()
   const [announcements, setAnnouncements] = useState([])
   const [loading, setLoading] = useState(true)
   const [missing, setMissing] = useState(false)
@@ -84,7 +87,7 @@ export default function Announcements({ currentUserEmail }) {
   const handleSave = async (e) => {
     e.preventDefault()
     if (!form.title.trim() || !form.message.trim()) {
-      toast.error('Title and message are required')
+      toast.error(t('cp.announcements.titleRequired'))
       return
     }
     setSaving(true)
@@ -97,7 +100,7 @@ export default function Announcements({ currentUserEmail }) {
       }
       if (editing) {
         await db.announcements.update(editing.id, payload)
-        toast.success('Announcement updated')
+        toast.success(t('cp.announcements.updated'))
         db.auditLog
           .log(currentUserEmail, 'announcement_updated', `Updated announcement "${form.title}"`)
           .catch(() => {})
@@ -107,7 +110,7 @@ export default function Announcements({ currentUserEmail }) {
           created_by: currentUserEmail,
           created_date: new Date().toISOString(),
         })
-        toast.success('Announcement created')
+        toast.success(t('cp.announcements.created'))
         db.auditLog
           .log(currentUserEmail, 'announcement_created', `Created announcement "${form.title}"`)
           .catch(() => {})
@@ -115,6 +118,7 @@ export default function Announcements({ currentUserEmail }) {
       setShowModal(false)
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     } finally {
       setSaving(false)
@@ -122,15 +126,16 @@ export default function Announcements({ currentUserEmail }) {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this announcement?')) return
+    if (!confirm(t('cp.announcements.deleteConfirm'))) return
     try {
       await db.announcements.delete(id)
-      toast.success('Deleted')
+      toast.success(t('cp.announcements.deleted'))
       db.auditLog
         .log(currentUserEmail, 'announcement_deleted', `Deleted announcement ${id}`)
         .catch(() => {})
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     }
   }
@@ -147,6 +152,7 @@ export default function Announcements({ currentUserEmail }) {
         .catch(() => {})
       load()
     } catch (err) {
+      captureException(err)
       toast.error(err.message)
     }
   }
@@ -154,6 +160,15 @@ export default function Announcements({ currentUserEmail }) {
   const fmt = (d) => (d ? new Date(d).toLocaleString() : '—')
   const inp =
     'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent'
+
+  const HEADERS = [
+    t('cp.announcements.titleCol'),
+    t('cp.announcements.typeCol'),
+    t('cp.announcements.activeCol'),
+    t('cp.announcements.startsCol'),
+    t('cp.announcements.endsCol'),
+    t('cp.announcements.actionsCol'),
+  ]
 
   if (loading)
     return (
@@ -168,9 +183,9 @@ export default function Announcements({ currentUserEmail }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Announcements</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t('cp.announcements.header')}</h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            Post banners visible to all logged-in users
+            {t('cp.announcements.subtitle')}
           </p>
         </div>
         <button
@@ -185,14 +200,14 @@ export default function Announcements({ currentUserEmail }) {
               d="M12 6v6m0 0v6m0-6h6m-6 0H6"
             />
           </svg>
-          New Announcement
+          {t('cp.announcements.newAnnouncement')}
         </button>
       </div>
 
       {/* Live preview of active announcements */}
       {announcements.filter((a) => a.is_active).length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Live Preview</p>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{t('cp.announcements.livePreview')}</p>
           {announcements
             .filter((a) => a.is_active)
             .map((a) => {
@@ -217,9 +232,9 @@ export default function Announcements({ currentUserEmail }) {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              {['Title', 'Type', 'Active', 'Starts', 'Ends', 'Actions'].map((h) => (
+              {HEADERS.map((h, i) => (
                 <th
-                  key={h}
+                  key={i}
                   className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase"
                 >
                   {h}
@@ -231,7 +246,7 @@ export default function Announcements({ currentUserEmail }) {
             {announcements.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
-                  No announcements yet
+                  {t('cp.announcements.noAnnouncements')}
                 </td>
               </tr>
             )}
@@ -296,7 +311,7 @@ export default function Announcements({ currentUserEmail }) {
                               d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                             />
                           </svg>
-                          Edit
+                          {t('cp.edit')}
                         </button>
                         <button
                           onClick={() => {
@@ -318,7 +333,7 @@ export default function Announcements({ currentUserEmail }) {
                               d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                             />
                           </svg>
-                          Delete
+                          {t('cp.delete')}
                         </button>
                       </div>
                     )}
@@ -336,7 +351,7 @@ export default function Announcements({ currentUserEmail }) {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-bold text-gray-900">
-                {editing ? 'Edit Announcement' : 'New Announcement'}
+                {editing ? t('cp.announcements.editModal') : t('cp.announcements.newModal')}
               </h3>
               <button
                 onClick={() => setShowModal(false)}
@@ -355,7 +370,7 @@ export default function Announcements({ currentUserEmail }) {
             <form onSubmit={handleSave} className="px-6 py-5 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Title <span className="text-red-500">*</span>
+                  {t('cp.announcements.titleLabel')}
                 </label>
                 <input
                   value={form.title}
@@ -367,7 +382,7 @@ export default function Announcements({ currentUserEmail }) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Message <span className="text-red-500">*</span>
+                  {t('cp.announcements.messageLabel')}
                 </label>
                 <textarea
                   value={form.message}
@@ -380,7 +395,7 @@ export default function Announcements({ currentUserEmail }) {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Type</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('cp.announcements.typeLabel')}</label>
                   <select
                     value={form.type}
                     onChange={(e) => setForm({ ...form, type: e.target.value })}
@@ -400,14 +415,14 @@ export default function Announcements({ currentUserEmail }) {
                       onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
                       className="w-4 h-4 text-indigo-600 rounded"
                     />
-                    <span className="text-sm font-medium text-gray-700">Active now</span>
+                    <span className="text-sm font-medium text-gray-700">{t('cp.announcements.activeNow')}</span>
                   </label>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Start date <span className="text-xs text-gray-500">(optional)</span>
+                    {t('cp.announcements.startDate')}
                   </label>
                   <input
                     type="datetime-local"
@@ -418,7 +433,7 @@ export default function Announcements({ currentUserEmail }) {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    End date <span className="text-xs text-gray-500">(optional)</span>
+                    {t('cp.announcements.endDate')}
                   </label>
                   <input
                     type="datetime-local"
@@ -434,14 +449,14 @@ export default function Announcements({ currentUserEmail }) {
                   onClick={() => setShowModal(false)}
                   className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
-                  Cancel
+                  {t('cp.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
                   className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {saving ? 'Saving...' : editing ? 'Save Changes' : 'Create'}
+                  {saving ? t('cp.saving') : editing ? t('cp.announcements.saveChanges') : t('cp.announcements.create')}
                 </button>
               </div>
             </form>
@@ -453,6 +468,7 @@ export default function Announcements({ currentUserEmail }) {
 }
 
 export function MigrationNotice({ feature, sql }) {
+  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
   const copy = () => {
     navigator.clipboard.writeText(sql)
@@ -464,10 +480,9 @@ export function MigrationNotice({ feature, sql }) {
       <div className="flex items-start gap-3">
         <span className="text-2xl">⚙️</span>
         <div>
-          <h3 className="font-semibold text-amber-900">{feature} — Database setup required</h3>
+          <h3 className="font-semibold text-amber-900">{t('cp.migration.dbSetupRequired', { feature })}</h3>
           <p className="text-sm text-amber-700 mt-1">
-            Run the following SQL in your <strong>Supabase SQL Editor</strong> to enable this
-            feature.
+            {t('cp.migration.runSql')}
           </p>
         </div>
       </div>
@@ -479,7 +494,7 @@ export function MigrationNotice({ feature, sql }) {
           onClick={copy}
           className="absolute top-2 right-2 px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded hover:bg-gray-600"
         >
-          {copied ? '✓ Copied' : 'Copy'}
+          {copied ? t('cp.copied') : t('cp.copy')}
         </button>
       </div>
     </div>

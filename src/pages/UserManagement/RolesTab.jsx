@@ -1,9 +1,47 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import Modal from '../../components/Modal'
 import { ROLES } from '../../lib/constants'
 import { ROLE_DEFAULT_PERMISSIONS } from '../../lib/permissions'
 import { RoleBadge } from './_shared'
 import { getDefaultPermissions, getRoleTemplates } from './_utils'
+
+// Permissions that the DB (RLS) cannot enforce for a given role — granting them shows
+// the UI button but the server will reject the write. Used to surface a warning.
+const RLS_CEILING = {
+  [ROLES.VIEWER]: {
+    products: ['create', 'edit_all', 'delete', 'import'],
+    customers: ['create', 'edit', 'delete', 'import'],
+    rma_tickets: ['create', 'edit_all', 'edit_assigned', 'delete', 'bulk_actions'],
+    inventory: ['create', 'edit', 'delete', 'transfer'],
+    invoices: ['create', 'edit', 'delete'],
+    parts: ['create', 'edit', 'delete', 'adjust'],
+    reports: ['export'],
+    calendar: ['create', 'edit', 'delete'],
+    time_tracking: ['create', 'edit', 'delete'],
+    user_management: ['view', 'create', 'edit', 'delete', 'manage_permissions'],
+  },
+  [ROLES.TECHNICIAN]: {
+    products: ['create', 'edit_all', 'delete', 'import'],
+    customers: ['create', 'edit', 'delete', 'import'],
+    invoices: ['create', 'edit', 'delete'],
+    user_management: ['view', 'create', 'edit', 'delete', 'manage_permissions'],
+  },
+}
+
+function getCrossTierPermissions(role, perms) {
+  const ceiling = RLS_CEILING[role]
+  if (!ceiling) return []
+  const violations = []
+  for (const [section, actions] of Object.entries(ceiling)) {
+    for (const action of actions) {
+      if (perms?.[section]?.[action] === true) {
+        violations.push(`${section}.${action}`)
+      }
+    }
+  }
+  return violations
+}
 
 // Merges stored permissions on top of the full defaults so all keys are always present
 function mergeWithDefaults(permissions) {
@@ -20,6 +58,7 @@ function mergeWithDefaults(permissions) {
 // at runtime (ROLE_DEFAULT_PERMISSIONS). admin / super_admin bypass all checks, so
 // they're shown as full access. Per-user overrides live on the Users tab → Edit Permissions.
 export function RoleTemplatesTab() {
+  const { t } = useTranslation()
   const roles = getRoleTemplates()
 
   // Source of truth = runtime defaults. admin/super_admin aren't in ROLE_DEFAULT_PERMISSIONS
@@ -36,11 +75,9 @@ export function RoleTemplatesTab() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <div className="text-sm text-blue-800">
-          <p className="font-medium">These are the built-in role defaults the app enforces.</p>
+          <p className="font-medium">{t('userManagement.roleReferenceTitle')}</p>
           <p className="mt-0.5 text-blue-700">
-            They're shown for reference and can't be edited here. To grant or restrict permissions
-            for an individual user, use <strong>Edit Permissions</strong> on the Users tab.
-            Admins and super admins always have full access.
+            {t('userManagement.roleReferenceDesc')}
           </p>
         </div>
       </div>
@@ -61,7 +98,7 @@ export function RoleTemplatesTab() {
             </div>
 
             {bypasses ? (
-              <p className="text-sm text-gray-600 italic">Full access — bypasses all permission checks.</p>
+              <p className="text-sm text-gray-600 italic">{t('userManagement.fullAccess')}</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 {Object.entries(perms).map(([module, modulePerms]) => {
@@ -75,7 +112,7 @@ export function RoleTemplatesTab() {
                       </h4>
                       <div className="flex flex-wrap gap-1.5">
                         {enabled.length === 0 ? (
-                          <span className="text-xs text-gray-500 italic">No access</span>
+                          <span className="text-xs text-gray-500 italic">{t('userManagement.noAccess')}</span>
                         ) : (
                           enabled.map((p) => (
                             <span
@@ -100,21 +137,22 @@ export function RoleTemplatesTab() {
 }
 
 export function CustomRolesTab({ customRoles, onCreateRole, onDeleteRole }) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-4">
-        <p className="text-gray-600">{customRoles.length} custom roles created</p>
+        <p className="text-gray-600">{customRoles.length} {t('userManagement.customRolesCount')}</p>
         <button
           onClick={onCreateRole}
           className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
         >
-          Create Custom Role
+          {t('userManagement.createCustomRole')}
         </button>
       </div>
 
       {customRoles.length === 0 ? (
         <div className="text-center py-12 text-gray-500">
-          No custom roles created yet. Create your first custom role!
+          {t('userManagement.noCustomRoles')}
         </div>
       ) : (
         <div className="space-y-4">
@@ -124,7 +162,7 @@ export function CustomRolesTab({ customRoles, onCreateRole, onDeleteRole }) {
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900">{role.role_name}</h3>
                   <p className="text-sm text-gray-600 mt-1">{role.role_description}</p>
-                  <p className="text-xs text-gray-500 mt-2">Created by {role.created_by}</p>
+                  <p className="text-xs text-gray-500 mt-2">{t('userManagement.customCreatedBy', { by: role.created_by })}</p>
                 </div>
                 <button
                   onClick={() => onDeleteRole(role.id)}
@@ -158,6 +196,7 @@ export function CreateRoleModal({
   onSubmit,
   onClose,
 }) {
+  const { t } = useTranslation()
   const togglePermission = (module, perm) => {
     const updated = { ...permissions }
     updated[module][perm] = !updated[module][perm]
@@ -168,37 +207,37 @@ export function CreateRoleModal({
     <Modal
       open={true}
       onClose={onClose}
-      title="Create Custom Role"
+      title={t('userManagement.createCustomRole')}
       className="max-w-4xl"
       hideHeader
     >
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Create Custom Role</h2>
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">{t('userManagement.createCustomRole')}</h2>
       <form onSubmit={onSubmit} className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Role Name</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('userManagement.roleNameLabel')}</label>
           <input
             type="text"
             value={roleName}
             onChange={(e) => onRoleNameChange(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600"
-            placeholder="e.g., Support Agent"
+            placeholder={t('userManagement.roleNamePlaceholder')}
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('userManagement.descriptionLabel')}</label>
           <textarea
             value={roleDescription}
             onChange={(e) => onRoleDescriptionChange(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600"
             rows="2"
-            placeholder="Brief description of this role"
+            placeholder={t('userManagement.roleDescPlaceholder')}
           />
         </div>
 
         <div>
-          <h3 className="font-semibold text-gray-900 mb-3">Permissions</h3>
+          <h3 className="font-semibold text-gray-900 mb-3">{t('userManagement.permissionsHeading')}</h3>
           <PermissionMatrix permissions={permissions} onToggle={togglePermission} />
         </div>
 
@@ -208,13 +247,13 @@ export function CreateRoleModal({
             onClick={onClose}
             className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="submit"
             className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
           >
-            Create Role
+            {t('userManagement.createRoleBtn')}
           </button>
         </div>
       </form>
@@ -223,6 +262,7 @@ export function CreateRoleModal({
 }
 
 export function PermissionsModal({ user, onSave, onClose }) {
+  const { t } = useTranslation()
   const [saving, setSaving] = useState(false)
 
   // Seed: use stored custom permissions if present, otherwise role template defaults.
@@ -233,6 +273,8 @@ export function PermissionsModal({ user, onSave, onClose }) {
     const base = hasStored ? stored : (ROLE_DEFAULT_PERMISSIONS[user.role] || getDefaultPermissions())
     return mergeWithDefaults(base)
   })
+
+  const crossTierViolations = getCrossTierPermissions(user.role, perms)
 
   const hasCustomPerms =
     user.permissions && typeof user.permissions === 'object' && Object.keys(user.permissions).length > 0
@@ -261,20 +303,20 @@ export function PermissionsModal({ user, onSave, onClose }) {
   }
 
   return (
-    <Modal open={true} onClose={onClose} title={`Edit Permissions: ${user.user_email}`} className="max-w-4xl" hideHeader>
+    <Modal open={true} onClose={onClose} title={t('userManagement.editPermissionsTitle', { email: user.user_email })} className="max-w-4xl" hideHeader>
       <div className="flex flex-col max-h-[85vh]">
         <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Edit Permissions</h2>
+            <h2 className="text-xl font-bold text-gray-900">{t('userManagement.permissionsModal')}</h2>
             <p className="text-sm text-gray-500 mt-0.5">{user.user_email}</p>
             <div className="flex items-center gap-2 mt-2">
               <RoleBadge role={user.role} />
               {hasCustomPerms ? (
                 <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">
-                  Custom overrides active
+                  {t('userManagement.customOverridesActive')}
                 </span>
               ) : (
-                <span className="text-xs text-gray-400">Showing role defaults</span>
+                <span className="text-xs text-gray-400">{t('userManagement.showingRoleDefaults')}</span>
               )}
             </div>
           </div>
@@ -285,6 +327,18 @@ export function PermissionsModal({ user, onSave, onClose }) {
           </button>
         </div>
 
+        {crossTierViolations.length > 0 && (
+          <div className="mx-6 mt-3 mb-1 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+            <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+            <span>
+              <strong>{t('userManagement.crossTierWarning')}</strong> — {t('userManagement.crossTierWarningDetail', { role: user.role })}{' '}
+              <span className="font-mono">{crossTierViolations.join(', ')}</span>
+            </span>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto px-6 py-4">
           <PermissionMatrix permissions={perms} onToggle={togglePermission} />
         </div>
@@ -294,21 +348,21 @@ export function PermissionsModal({ user, onSave, onClose }) {
             onClick={resetToRoleDefaults}
             className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-white transition-colors"
           >
-            Reset to Role Defaults
+            {t('userManagement.resetToRoleDefaults')}
           </button>
           <div className="flex gap-3">
             <button
               onClick={onClose}
               className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-white transition-colors"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={handleSave}
               disabled={saving}
               className="px-5 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
-              {saving ? 'Saving...' : 'Save Permissions'}
+              {saving ? t('common.saving') : t('userManagement.savePermissions')}
             </button>
           </div>
         </div>
@@ -318,19 +372,20 @@ export function PermissionsModal({ user, onSave, onClose }) {
 }
 
 export function PermissionMatrix({ permissions, onToggle }) {
+  const { t } = useTranslation()
   const modules = [
-    { key: 'products', label: 'Products' },
-    { key: 'customers', label: 'Customers' },
-    { key: 'rma_tickets', label: 'RMA Tickets' },
-    { key: 'inventory', label: 'Inventory' },
-    { key: 'invoices', label: 'Invoices' },
-    { key: 'parts', label: 'Parts Inventory' },
-    { key: 'time_tracking', label: 'Time Tracking' },
-    { key: 'calendar', label: 'Calendar' },
-    { key: 'reports', label: 'Reports' },
-    { key: 'dashboard', label: 'Dashboard' },
-    { key: 'user_management', label: 'User Management' },
-    { key: 'settings', label: 'Settings' },
+    { key: 'products', label: t('nav.products') },
+    { key: 'customers', label: t('nav.customers') },
+    { key: 'rma_tickets', label: t('nav.rmaTickets') },
+    { key: 'inventory', label: t('nav.inventory') },
+    { key: 'invoices', label: t('nav.invoices') },
+    { key: 'parts', label: t('nav.parts') },
+    { key: 'time_tracking', label: t('userManagement.moduleTimeTracking') },
+    { key: 'calendar', label: t('nav.calendar') },
+    { key: 'reports', label: t('nav.reports') },
+    { key: 'dashboard', label: t('nav.dashboard') },
+    { key: 'user_management', label: t('userManagement.moduleUserManagement') },
+    { key: 'settings', label: t('userManagement.moduleSettings') },
   ]
 
   return (
@@ -344,13 +399,13 @@ export function PermissionMatrix({ permissions, onToggle }) {
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-medium text-gray-900">{module.label}</h4>
               <span className="text-xs text-gray-400">
-                {enabledCount}/{entries.length} enabled
+                {t('userManagement.enabledCount', { count: enabledCount, total: entries.length })}
               </span>
             </div>
             {entries.length === 0 ? (
-              <p className="text-sm text-gray-400 italic">No permissions defined</p>
+              <p className="text-sm text-gray-400 italic">{t('userManagement.noPermsDefined')}</p>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                 {entries.map(([perm, enabled]) => (
                   <label key={perm} className="flex items-center gap-2 cursor-pointer select-none">
                     <input

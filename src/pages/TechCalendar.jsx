@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { Button, Spinner, PageHeader } from '../components/ui'
@@ -9,21 +11,19 @@ import { captureException } from '../lib/sentry'
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PRIORITY_CLS = {
-  Critical: 'bg-red-100 text-red-700 border border-red-200',
-  High: 'bg-orange-100 text-orange-700',
-  Medium: 'bg-yellow-100 text-yellow-700',
-  Low: 'bg-green-100 text-green-700',
+  Critical: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/30',
+  High:     'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
+  Medium:   'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
+  Low:      'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
 }
 
 const STATUS_CLS = {
-  New: 'bg-pink-100 text-pink-700',
-  'In Progress': 'bg-blue-100 text-blue-700',
-  'On Hold': 'bg-yellow-100 text-yellow-700',
-  Completed: 'bg-green-100 text-green-700',
-  Cancelled: 'bg-gray-100 text-gray-600',
+  New:          'bg-pink-100 dark:bg-pink-900/20 text-pink-700 dark:text-pink-400',
+  'In Progress':'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
+  'On Hold':    'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
+  Completed:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+  Cancelled:    'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
 }
-
-const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -64,32 +64,32 @@ function TicketCard({ ticket, isOverdue, onNavigateToTicket }) {
   return (
     <div
       onClick={() => onNavigateToTicket?.(ticket.id)}
-      className={`rounded-lg border bg-white p-2.5 cursor-pointer hover:shadow-md transition-shadow text-xs ${
+      className={`rounded-lg border bg-white dark:bg-[#121823] p-2.5 cursor-pointer hover:shadow-md transition-shadow text-xs ${
         isOverdue
-          ? 'border-l-4 border-l-red-500 border-t-gray-200 border-r-gray-200 border-b-gray-200'
-          : 'border-gray-200'
+          ? 'border-l-4 border-l-red-500 border-t-[#e6e9ef] border-r-[#e6e9ef] border-b-[#e6e9ef] dark:border-t-[#212a38] dark:border-r-[#212a38] dark:border-b-[#212a38]'
+          : 'border-[#e6e9ef] dark:border-[#212a38]'
       }`}
     >
-      <p className="font-semibold text-gray-800 truncate mb-1">{ticket.rma_number}</p>
-      <p className="text-gray-500 truncate mb-1.5">{ticket.customer_name || '—'}</p>
+      <p className="font-semibold text-gray-800 dark:text-[#e8ebf0] truncate mb-1">{ticket.rma_number}</p>
+      <p className="text-gray-500 dark:text-[#9aa4b2] truncate mb-1.5">{ticket.customer_name || '—'}</p>
       <div className="flex flex-wrap gap-1">
         {ticket.priority && (
           <span
-            className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${PRIORITY_CLS[ticket.priority] || 'bg-gray-100 text-gray-600'}`}
+            className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${PRIORITY_CLS[ticket.priority] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'}`}
           >
             {ticket.priority}
           </span>
         )}
         {ticket.ticket_status && (
           <span
-            className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_CLS[ticket.ticket_status] || 'bg-gray-100 text-gray-600'}`}
+            className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_CLS[ticket.ticket_status] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'}`}
           >
             {ticket.ticket_status}
           </span>
         )}
       </div>
       {ticket.assigned_technician && (
-        <p className="text-gray-500 mt-1 truncate">{ticket.assigned_technician}</p>
+        <p className="text-gray-500 dark:text-[#9aa4b2] mt-1 truncate">{ticket.assigned_technician}</p>
       )}
     </div>
   )
@@ -103,6 +103,7 @@ export default function TechCalendar({
   currentUserPermissions,
   onNavigateToTicket,
 }) {
+  const { t, i18n } = useTranslation()
   const { formatDate: _formatDate } = useAppearance()
 
   const _canDo = (s, a) =>
@@ -110,23 +111,20 @@ export default function TechCalendar({
 
   const isAdminOrManager = ['super_admin', 'admin', 'manager'].includes(currentUserRole)
 
-  const [tickets, setTickets] = useState([])
-  const [loading, setLoading] = useState(true)
   const [mondayDate, setMondayDate] = useState(() => getMonday(new Date()))
   const [selectedTech, setSelectedTech] = useState('')
 
   // ─── Load data ──────────────────────────────────────────────────────────────
+  const { data: tickets = [], isLoading: loading, isError, error, refetch } = useQuery({
+    queryKey: ['tech-calendar-tickets'],
+    queryFn: () => db.rmaTickets.list(),
+  })
   useEffect(() => {
-    setLoading(true)
-    db.rmaTickets
-      .list()
-      .then((data) => setTickets(data))
-      .catch((err) => {
-        captureException(err)
-        toast.error('Failed to load tickets')
-      })
-      .finally(() => setLoading(false))
-  }, [])
+    if (isError) {
+      captureException(error)
+      toast.error(t('calendar.errorLoadTickets'))
+    }
+  }, [isError, error])
 
   // ─── Derived data ────────────────────────────────────────────────────────────
   const technicians = useMemo(() => {
@@ -195,12 +193,21 @@ export default function TechCalendar({
     )
   }
 
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[320px] gap-3">
+        <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('calendar.errorLoadCalendar')}</p>
+        <Button variant="secondary" size="sm" onClick={() => refetch()}>{t('common.retry')}</Button>
+      </div>
+    )
+  }
+
   return (
-    <div className="p-6 max-w-full">
+    <div className="p-3 sm:p-6 max-w-full">
       {/* Header */}
       <PageHeader
-        title="Tech Calendar"
-        subtitle="Weekly view of tickets by technician and due date"
+        title={t('calendar.title')}
+        subtitle={t('calendar.subtitle')}
       />
 
       {/* Controls */}
@@ -209,11 +216,11 @@ export default function TechCalendar({
         <div className="flex items-center gap-2">
           <button
             onClick={goToPrev}
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+            className="p-2 rounded-lg border border-[#e6e9ef] dark:border-[#212a38] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
             aria-label="Previous week"
           >
             <svg
-              className="w-4 h-4 text-gray-600"
+              className="w-4 h-4 text-gray-600 dark:text-[#9aa4b2]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -226,16 +233,16 @@ export default function TechCalendar({
               />
             </svg>
           </button>
-          <span className="text-sm font-semibold text-gray-800 min-w-[160px] text-center">
+          <span className="text-sm font-semibold text-gray-800 dark:text-[#e8ebf0] min-w-[160px] text-center">
             {weekLabel}
           </span>
           <button
             onClick={goToNext}
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+            className="p-2 rounded-lg border border-[#e6e9ef] dark:border-[#212a38] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
             aria-label="Next week"
           >
             <svg
-              className="w-4 h-4 text-gray-600"
+              className="w-4 h-4 text-gray-600 dark:text-[#9aa4b2]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -244,20 +251,20 @@ export default function TechCalendar({
             </svg>
           </button>
           <Button variant="secondary" size="sm" onClick={goToToday}>
-            Today
+            {t('calendar.today')}
           </Button>
         </div>
 
         {/* Technician filter — admin/manager only */}
         {isAdminOrManager && (
           <div className="ml-auto flex items-center gap-2">
-            <label className="text-sm text-gray-500">Technician:</label>
+            <label className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('calendar.technician')}:</label>
             <select
               value={selectedTech}
               onChange={(e) => setSelectedTech(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="px-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-800 dark:text-[#e8ebf0] focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              <option value="">All Technicians</option>
+              <option value="">{t('calendar.allTechnicians')}</option>
               {technicians.map((t) => (
                 <option key={t} value={t}>
                   {t}
@@ -269,29 +276,30 @@ export default function TechCalendar({
       </div>
 
       {/* Calendar Grid */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
+      <div className="overflow-x-auto -mx-3 sm:mx-0">
+      <div className="min-w-[640px] bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] shadow-sm overflow-hidden mb-6">
         {/* Day header row */}
-        <div className="grid grid-cols-7 border-b border-gray-200">
+        <div className="grid grid-cols-7 border-b border-[#e6e9ef] dark:border-[#212a38]">
           {days.map((d, i) => {
             const isToday = sameDay(d, new Date())
             return (
               <div
                 key={i}
-                className={`px-3 py-3 text-center border-r last:border-r-0 border-gray-100 ${
-                  isToday ? 'bg-indigo-50' : 'bg-gray-50'
+                className={`px-3 py-3 text-center border-r last:border-r-0 border-[#e6e9ef] dark:border-[#212a38] ${
+                  isToday ? 'bg-indigo-50 dark:bg-[#1e1f3a]' : 'bg-[#f8f9fb] dark:bg-[#0f1520]'
                 }`}
               >
                 <p
-                  className={`text-xs font-semibold uppercase tracking-wide ${isToday ? 'text-indigo-600' : 'text-gray-500'}`}
+                  className={`text-xs font-semibold uppercase tracking-wide ${isToday ? 'text-indigo-600 dark:text-[#a5b4fc]' : 'text-gray-500 dark:text-[#9aa4b2]'}`}
                 >
-                  {DAY_NAMES[i]}
+                  {d.toLocaleDateString(i18n.language, { weekday: 'short' }).toUpperCase()}
                 </p>
                 <p
-                  className={`text-lg font-bold mt-0.5 ${isToday ? 'text-indigo-700' : 'text-gray-800'}`}
+                  className={`text-lg font-bold mt-0.5 ${isToday ? 'text-indigo-700 dark:text-[#a5b4fc]' : 'text-gray-800 dark:text-[#e8ebf0]'}`}
                 >
                   {d.getDate()}
                 </p>
-                <p className="text-[10px] text-gray-500">
+                <p className="text-[10px] text-gray-500 dark:text-[#9aa4b2]">
                   {d.toLocaleDateString('en-US', { month: 'short' })}
                 </p>
               </div>
@@ -308,12 +316,12 @@ export default function TechCalendar({
             return (
               <div
                 key={i}
-                className={`border-r last:border-r-0 border-gray-100 p-2 flex flex-col gap-2 ${
-                  isToday ? 'bg-indigo-50/30' : ''
+                className={`border-r last:border-r-0 border-[#e6e9ef] dark:border-[#212a38] p-2 flex flex-col gap-2 ${
+                  isToday ? 'bg-indigo-50/30 dark:bg-[#1e1f3a]/20' : ''
                 }`}
               >
                 {dayTickets.length === 0 && (
-                  <p className="text-[10px] text-gray-300 text-center mt-4">—</p>
+                  <p className="text-[10px] text-gray-300 dark:text-[#4a5568] text-center mt-4">—</p>
                 )}
                 {dayTickets.map((ticket) => {
                   const dueDate = ticket.due_date ? new Date(ticket.due_date) : null
@@ -337,12 +345,13 @@ export default function TechCalendar({
           })}
         </div>
       </div>
+      </div>
 
       {/* Unscheduled Panel */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+      <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] shadow-sm p-4">
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-[#e8ebf0] mb-3 flex items-center gap-2">
           <svg
-            className="w-4 h-4 text-gray-500"
+            className="w-4 h-4 text-gray-500 dark:text-[#9aa4b2]"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -354,17 +363,17 @@ export default function TechCalendar({
               d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
             />
           </svg>
-          Unscheduled Tickets
+          {t('calendar.unscheduledTickets')}
           {unscheduled.length > 0 && (
-            <span className="ml-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 text-xs font-medium">
+            <span className="ml-1 px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2] text-xs font-medium">
               {unscheduled.length}
             </span>
           )}
         </h3>
         {unscheduled.length === 0 ? (
           <EmptyState
-            title="No unscheduled tickets"
-            description="All active tickets have a due date assigned."
+            title={t('calendar.noUnscheduled')}
+            description={t('calendar.noUnscheduledDesc')}
             className="py-8"
           />
         ) : (

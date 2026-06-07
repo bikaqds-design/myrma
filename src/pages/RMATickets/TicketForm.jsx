@@ -1,12 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { useTranslation } from 'react-i18next'
+import { createPortal } from 'react-dom'
+const BarcodeScannerModule = lazy(() => import('../../components/BarcodeScanner'))
+const BarcodeScanner = (props) => (
+  <Suspense fallback={null}><BarcodeScannerModule {...props} /></Suspense>
+)
+const CAMERA_SUPPORTED = typeof window !== 'undefined' && 'BarcodeDetector' in window
 import { useQueryClient } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { db, storage } from '../../api/supabaseClient'
+import { db, storage, notifications } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { notificationEventBus } from '../../lib/events/NotificationEventBus.js'
 import Modal from '../../components/Modal'
 import { Button } from '../../components/ui'
 import { ROLES } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
+import { ticketSchema, getFirstError } from '../../lib/schemas'
 import {
   generateRmaNumber,
   DEFAULT_DUE,
@@ -15,6 +24,7 @@ import {
   fmtBytes,
   isImage,
 } from './_utils'
+import { ProductSearchInput } from './_shared'
 
 const inp =
   'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm bg-white placeholder-gray-400 transition-colors'
@@ -32,6 +42,7 @@ export function TicketForm({
   userRole,
   userPermissions,
 }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
 
   const canDo = (action) => {
@@ -44,6 +55,8 @@ export function TicketForm({
       const prods = editingTicket.products?.length ? editingTicket.products : [{ ...EMPTY_PRODUCT }]
       return {
         customer_name: editingTicket.customer_name || '',
+        customer_id: editingTicket.customer_id || '',
+        customer_email: editingTicket.customer_email || '',
         priority: editingTicket.priority || 'Medium',
         ticket_status: editingTicket.ticket_status || 'Open',
         assigned_technician: editingTicket.assigned_technician || '',
@@ -59,6 +72,8 @@ export function TicketForm({
     }
     return {
       customer_name: '',
+      customer_id: '',
+      customer_email: '',
       priority: 'Medium',
       ticket_status: 'Open',
       assigned_technician: userEmail || '',
@@ -78,6 +93,11 @@ export function TicketForm({
     editingTicket ? editingTicket.customer_name || '' : ''
   )
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
+  const [scanningProductIdx, setScanningProductIdx] = useState(null)
+
+  const EMPTY_RES = { type: '', replacement_product_name: '', replacement_serial: '', amount: '', currency: 'USD', reason: '', reference_number: '' }
+  const [resForm, setResForm] = useState(EMPTY_RES)
+  const [existingResolutionId, setExistingResolutionId] = useState(null)
   const [productSearches, setProductSearches] = useState(() => {
     if (editingTicket) {
       const prods = editingTicket.products?.length ? editingTicket.products : [{ ...EMPTY_PRODUCT }]
@@ -104,6 +124,25 @@ export function TicketForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userEmail])
+
+  // Load existing resolution when editing
+  useEffect(() => {
+    if (!editingTicket?.id) return
+    db.ticketResolutions.get(editingTicket.id).then((res) => {
+      if (res) {
+        setExistingResolutionId(res.id)
+        setResForm({
+          type: res.type,
+          replacement_product_name: res.replacement_product_name || '',
+          replacement_serial: res.replacement_serial || '',
+          amount: res.amount != null ? String(res.amount) : '',
+          currency: res.currency || 'USD',
+          reason: res.reason || '',
+          reference_number: res.reference_number || '',
+        })
+      }
+    }).catch(() => {})
+  }, [editingTicket?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const handler = (e) => {
@@ -164,10 +203,10 @@ export function TicketForm({
     try {
       if (att.path) await storage.deleteFile(att.path)
       setFormData({ ...formData, attachments: formData.attachments.filter((_, idx) => idx !== i) })
-      toast.success('Attachment removed')
+      toast.success(t('ticketForm.attachmentRemoved'))
     } catch (err) {
       captureException(err, { page: 'RMATickets', context: 'removeAttachment' })
-      toast.error('Failed to remove attachment')
+      toast.error(t('ticketForm.failedRemoveAttachment'))
     }
   }
 
@@ -175,7 +214,7 @@ export function TicketForm({
     const files = Array.from(e.target.files)
     const total = (formData.attachments?.length || 0) + pendingFiles.length + files.length
     if (total > 10) {
-      toast.error('Maximum 10 attachments per ticket')
+      toast.error(t('ticketForm.maxAttachments'))
       return
     }
     setPendingFiles((prev) => [...prev, ...files])
@@ -185,11 +224,17 @@ export function TicketForm({
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (editingTicket && !canDo('edit_all') && !canDo('edit_assigned')) {
-      toast.error('You do not have permission to edit tickets')
+      toast.error(t('ticketForm.noPermissionEdit'))
       return
     }
     if (!editingTicket && !canDo('create')) {
-      toast.error('You do not have permission to create tickets')
+      toast.error(t('ticketForm.noPermissionCreate'))
+      return
+    }
+
+    const validation = ticketSchema.safeParse(formData)
+    if (!validation.success) {
+      toast.error(getFirstError(validation))
       return
     }
 
@@ -204,7 +249,7 @@ export function TicketForm({
           newAttachments.push(uploaded)
         } catch (err) {
           captureException(err, { page: 'RMATickets', context: 'uploadAttachment' })
-          toast.error(`Failed to upload ${file.name}`)
+          toast.error(t('ticketForm.failedUploadFile', { name: file.name }))
         }
       }
 
@@ -220,8 +265,18 @@ export function TicketForm({
         } catch {}
       }
 
+      // Resolve customer email: formData first, then fall back to customers prop lookup
+      // (covers existing tickets that have customer_id but customer_email was never stored)
+      const resolvedCustomerEmail =
+        formData.customer_email ||
+        customers.find((c) => c.id === formData.customer_id)?.email ||
+        editingTicket?.customer_email ||
+        null
+
       const ticketData = {
         customer_name: formData.customer_name,
+        customer_id: formData.customer_id || null,
+        customer_email: resolvedCustomerEmail,
         priority: formData.priority,
         ticket_status: formData.ticket_status,
         assigned_technician: formData.assigned_technician,
@@ -242,8 +297,27 @@ export function TicketForm({
         updated_date: new Date().toISOString(),
       }
 
+      let newTicket = null
       if (editingTicket) {
         await db.rmaTickets.update(editingTicket.id, ticketData)
+        // Activity log — one entry per changed dimension
+        const logAct = (type, details) =>
+          db.ticketActivity.create({ ticket_id: editingTicket.id, action_type: type, details, user_email: userEmail, created_date: new Date().toISOString() }).catch(() => {})
+        if (ticketData.ticket_status !== editingTicket.ticket_status)
+          logAct('status_changed', `${editingTicket.ticket_status} → ${ticketData.ticket_status}`)
+        if (ticketData.priority !== editingTicket.priority)
+          logAct('priority_changed', `${editingTicket.priority} → ${ticketData.priority}`)
+        if (ticketData.assigned_technician !== editingTicket.assigned_technician)
+          logAct('technician_assigned', `Assigned to ${ticketData.assigned_technician || 'Unassigned'}`)
+        if (newAttachments.length > 0)
+          logAct('attachment_added', `Added ${newAttachments.length} file(s): ${newAttachments.map((a) => a.name).join(', ')}`)
+        if (
+          ticketData.ticket_status === editingTicket.ticket_status &&
+          ticketData.priority === editingTicket.priority &&
+          ticketData.assigned_technician === editingTicket.assigned_technician &&
+          newAttachments.length === 0
+        )
+          logAct('ticket_updated', 'Updated ticket details')
         db.userActivity
           .create(
             userEmail,
@@ -307,7 +381,7 @@ export function TicketForm({
             })
             .catch(() => {})
         }
-        toast.success('Ticket updated successfully!')
+        toast.success(t('ticketForm.ticketUpdated'))
         // Fire automation rules + webhook on update
         db.automationRules
           .evaluate('ticket_updated', { ...editingTicket, ...ticketData })
@@ -344,8 +418,67 @@ export function TicketForm({
             })
             .catch(() => {})
         }
+
+        // ── WhatsApp + email notification events ─────────────────────────
+        {
+          const updatedPayload = { ...editingTicket, ...ticketData, id: editingTicket.id }
+          const ts = new Date().toISOString()
+          const statusChanged = ticketData.ticket_status !== editingTicket.ticket_status
+          const assigneeChanged = ticketData.assigned_technician !== editingTicket.assigned_technician
+          const priorityChanged = ticketData.priority !== editingTicket.priority
+          const isClosed = ['Closed', 'Completed', 'Cancelled'].includes(ticketData.ticket_status)
+
+          if (assigneeChanged) {
+            notificationEventBus.emitAsync({ type: 'ticket.assigned', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })
+            if (ticketData.assigned_technician) {
+              notifications.sendEmail(ticketData.assigned_technician, 'ticket_assigned', {
+                recipient_name: ticketData.assigned_technician,
+                rma_number: editingTicket.rma_number,
+                customer_name: ticketData.customer_name,
+                priority: ticketData.priority,
+                due_date: ticketData.due_date || 'N/A',
+              }).catch((err) => console.error('[email] ticket_assigned:', err.message))
+            }
+          }
+          if (statusChanged && isClosed) {
+            notificationEventBus.emitAsync({ type: 'ticket.closed', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })
+          } else if (statusChanged) {
+            notificationEventBus.emitAsync({ type: 'ticket.updated', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })
+          }
+          // Email customer on any status change
+          if (statusChanged) {
+            if (!resolvedCustomerEmail) {
+              console.warn('[email] status change skipped — no customer email on ticket', editingTicket.id)
+            } else {
+              notifications.sendEmail(resolvedCustomerEmail, 'status_changed', {
+                recipient_name: ticketData.customer_name,
+                customer_name: ticketData.customer_name,
+                rma_number: editingTicket.rma_number,
+                old_status: editingTicket.ticket_status,
+                new_status: ticketData.ticket_status,
+                priority: ticketData.priority,
+                status: ticketData.ticket_status,
+                updated_by: userEmail,
+                update_time: new Date().toLocaleString(),
+              }).catch((err) => {
+                console.error('[email] status change failed:', err.message)
+                toast.error(t('ticketForm.emailNotifFailed', { error: err.message }), { duration: 6000 })
+              })
+            }
+          }
+          // Email customer on priority change
+          if (priorityChanged && resolvedCustomerEmail) {
+            notifications.sendEmail(resolvedCustomerEmail, 'priority_changed', {
+              recipient_name: ticketData.customer_name,
+              customer_name: ticketData.customer_name,
+              rma_number: editingTicket.rma_number,
+              old_priority: editingTicket.priority,
+              new_priority: ticketData.priority,
+            }).catch((err) => console.error('[email] priority_changed:', err.message))
+          }
+        }
       } else {
-        const newTicket = await db.rmaTickets.create({
+        newTicket = await db.rmaTickets.create({
           ...ticketData,
           created_by: userEmail,
           created_date: new Date().toISOString(),
@@ -388,6 +521,48 @@ export function TicketForm({
               status: ticketData.ticket_status,
             })
             .catch(() => {})
+          // WhatsApp notification — spread the saved DB row so all fields
+          // (incl. created_date) are present; ticketData alone lacks created_date
+          // which left {{created_date}} empty → Meta #131008 "required parameter missing".
+          notificationEventBus.emitAsync({
+            type: 'ticket.created',
+            timestamp: new Date().toISOString(),
+            ticketId: newTicket.id,
+            ticket: {
+              ...ticketData,
+              ...newTicket,
+              id: newTicket.id,
+              rma_number: newTicket.rma_number || rmaNumber,
+              created_date: newTicket.created_date || new Date().toISOString(),
+            },
+            triggeredBy: userEmail,
+          })
+          // Email assigned technician (if different from the creator)
+          if (ticketData.assigned_technician && ticketData.assigned_technician !== userEmail) {
+            notifications.sendEmail(ticketData.assigned_technician, 'ticket_assigned', {
+              recipient_name: ticketData.assigned_technician,
+              rma_number: newTicket.rma_number || rmaNumber,
+              customer_name: ticketData.customer_name,
+              priority: ticketData.priority,
+              due_date: ticketData.due_date || 'N/A',
+            }).catch((err) => console.error('[email] ticket_assigned (create):', err.message))
+          }
+          // Email notification to customer
+          if (resolvedCustomerEmail) {
+            const productDetails = (ticketData.products || [])
+              .filter((p) => p.product_name)
+              .map((p) => `${p.product_name}${p.serial_number ? ` (SN: ${p.serial_number})` : ''}`)
+              .join('\n') || 'N/A'
+            notifications.sendEmail(resolvedCustomerEmail, 'ticket_created', {
+              recipient_name: ticketData.customer_name,
+              customer_name: ticketData.customer_name,
+              rma_number: newTicket.rma_number || rmaNumber,
+              priority: ticketData.priority,
+              status: ticketData.ticket_status,
+              issue_description: ticketData.general_description || '',
+              product_details: productDetails,
+            }).catch((err) => console.error('[email] ticket created:', err.message))
+          }
         }
         db.userActivity
           .create(
@@ -396,7 +571,30 @@ export function TicketForm({
             `Created ticket ${rmaNumber} for ${ticketData.customer_name}`
           )
           .catch(() => {})
-        toast.success('Ticket created successfully!')
+        if (newTicket?.id)
+          db.ticketActivity.create({
+            ticket_id: newTicket.id,
+            action_type: 'ticket_created',
+            details: `Created for ${ticketData.customer_name} · ${ticketData.priority} priority · ${ticketData.ticket_status}`,
+            user_email: userEmail,
+            created_date: new Date().toISOString(),
+          }).catch(() => {})
+        toast.success(t('ticketForm.ticketCreated'))
+      }
+
+      // Save resolution if type is selected
+      const savedTicketId = editingTicket?.id || newTicket?.id
+      if (savedTicketId && resForm.type) {
+        db.ticketResolutions.upsert(savedTicketId, {
+          type: resForm.type,
+          replacement_product_name: resForm.replacement_product_name?.trim() || null,
+          replacement_serial: resForm.replacement_serial?.trim() || null,
+          amount: resForm.amount !== '' ? parseFloat(resForm.amount) : null,
+          currency: resForm.currency || 'USD',
+          reason: resForm.reason?.trim() || null,
+          reference_number: resForm.reference_number?.trim() || null,
+          created_by: userEmail,
+        }).catch(() => {})
       }
 
       queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
@@ -404,13 +602,14 @@ export function TicketForm({
       onSaved({ ...ticketData, id: editingTicket?.id })
     } catch (error) {
       captureException(error, { page: 'RMATickets', context: 'saveTicket' })
-      toast.error(`Failed to save ticket: ${error.message}`)
+      toast.error(t('ticketForm.failedSaveTicket', { error: error.message }))
     } finally {
       setUploading(false)
     }
   }
 
   return (
+    <>
     <Modal
       open={true}
       onClose={onClose}
@@ -424,11 +623,11 @@ export function TicketForm({
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
           <div>
             <h2 className="text-xl font-bold text-gray-900">
-              {editingTicket ? 'Edit RMA Ticket' : 'Create New RMA Ticket'}
+              {editingTicket ? t('ticketForm.editTitle') : t('ticketForm.createTitle')}
             </h2>
             <div className="flex items-center gap-3 mt-1">
               <p className="text-xs text-gray-500">
-                <span className="text-red-500">*</span> Required fields
+                <span className="text-red-500">*</span> {t('ticketForm.requiredFields')}
               </p>
               {!editingTicket && (
                 <span className="text-xs font-mono font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
@@ -463,7 +662,7 @@ export function TicketForm({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={lbl}>
-                  Customer Name <span className="text-red-500">*</span>
+                  {t('ticketForm.customerName')} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative customer-dropdown">
                   <input
@@ -475,7 +674,7 @@ export function TicketForm({
                       setShowCustomerDropdown(true)
                     }}
                     onFocus={() => setShowCustomerDropdown(true)}
-                    placeholder="Search customer..."
+                    placeholder={t('ticketForm.searchCustomer')}
                     className={inp}
                     required
                   />
@@ -513,7 +712,7 @@ export function TicketForm({
                                 onMouseDown={(e) => {
                                   e.preventDefault()
                                   setCustomerSearch(displayName)
-                                  setFormData({ ...formData, customer_name: displayName })
+                                  setFormData({ ...formData, customer_name: displayName, customer_id: c.id, customer_email: c.email || '' })
                                   setShowCustomerDropdown(false)
                                 }}
                                 className="w-full h-full px-4 text-left hover:bg-indigo-50 border-b border-gray-100 flex flex-col justify-center"
@@ -546,7 +745,7 @@ export function TicketForm({
               </div>
               <div>
                 <label className={lbl}>
-                  Priority <span className="text-red-500">*</span>
+                  {t('ticketForm.priority')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.priority}
@@ -564,7 +763,7 @@ export function TicketForm({
             {/* Row 2: Status + Assigned To + Due Date */}
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className={lbl}>Ticket Status</label>
+                <label className={lbl}>{t('ticketForm.ticketStatus')}</label>
                 <select
                   value={formData.ticket_status}
                   onChange={(e) => setFormData({ ...formData, ticket_status: e.target.value })}
@@ -580,7 +779,7 @@ export function TicketForm({
                 </select>
               </div>
               <div>
-                <label className={lbl}>Assigned To</label>
+                <label className={lbl}>{t('ticketForm.assignedTo')}</label>
                 {userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN ? (
                   <select
                     value={formData.assigned_technician}
@@ -603,8 +802,8 @@ export function TicketForm({
               </div>
               <div>
                 <label className={lbl}>
-                  Due Date{' '}
-                  <span className="text-xs text-gray-500 font-normal ml-1">auto +7 days</span>
+                  {t('ticketForm.dueDate')}{' '}
+                  <span className="text-xs text-gray-500 font-normal ml-1">{t('ticketForm.dueDateHint')}</span>
                 </label>
                 <input
                   type="date"
@@ -618,13 +817,13 @@ export function TicketForm({
             {/* Products */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-base font-semibold text-gray-900">Products</h3>
+                <h3 className="text-base font-semibold text-gray-900">{t('ticketForm.products')}</h3>
                 <button
                   type="button"
                   onClick={addProduct}
                   className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
                 >
-                  + Add Product
+                  + {t('ticketForm.addProduct')}
                 </button>
               </div>
               {formData.products.map((product, idx) => (
@@ -633,14 +832,14 @@ export function TicketForm({
                   className="border border-gray-200 rounded-xl p-4 mb-4 bg-gray-50"
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-800 text-sm">Product {idx + 1}</h4>
+                    <h4 className="font-medium text-gray-800 text-sm">{t('ticketForm.productLabel')} {idx + 1}</h4>
                     {formData.products.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeProduct(idx)}
                         className="text-red-500 hover:text-red-700 text-xs font-medium"
                       >
-                        Remove
+                        {t('ticketForm.remove')}
                       </button>
                     )}
                   </div>
@@ -648,7 +847,7 @@ export function TicketForm({
                     {/* Product name combobox */}
                     <div>
                       <label className={lbl}>
-                        Product Name <span className="text-red-500">*</span>
+                        {t('ticketForm.productName')} <span className="text-red-500">*</span>
                       </label>
                       <div className="relative product-dropdown">
                         <input
@@ -668,7 +867,7 @@ export function TicketForm({
                             d[idx] = true
                             setShowProductDropdowns(d)
                           }}
-                          placeholder="Search or type product..."
+                          placeholder={t('ticketForm.searchProduct')}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-sm bg-white"
                           required
                         />
@@ -706,18 +905,41 @@ export function TicketForm({
                     </div>
                     <div>
                       <label className={lbl}>
-                        Serial Number <span className="text-red-500">*</span>
+                        {t('ticketForm.serialNumber')} <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="text"
-                        value={product.serial_number}
-                        onChange={(e) => updateProduct(idx, 'serial_number', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm bg-white"
-                        required
-                      />
+                      <div className="relative">
+                        <input
+                          type="text"
+                          data-serial-idx={idx}
+                          value={product.serial_number}
+                          onChange={(e) => updateProduct(idx, 'serial_number', e.target.value)}
+                          className="w-full pl-3 pr-9 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm bg-white"
+                          required
+                        />
+                        <button
+                          type="button"
+                          title={CAMERA_SUPPORTED ? 'Scan with camera' : 'Click then scan with USB scanner'}
+                          onClick={() => {
+                            if (CAMERA_SUPPORTED) {
+                              setScanningProductIdx(idx)
+                            } else {
+                              document.querySelector(`[data-serial-idx="${idx}"]`)?.focus()
+                            }
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600 transition-colors">
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <rect x="2"  y="3" width="2" height="18" rx="0.5" />
+                            <rect x="6"  y="3" width="1" height="18" rx="0.5" />
+                            <rect x="9"  y="3" width="2" height="18" rx="0.5" />
+                            <rect x="13" y="3" width="1" height="18" rx="0.5" />
+                            <rect x="16" y="3" width="3" height="18" rx="0.5" />
+                            <rect x="21" y="3" width="1" height="18" rx="0.5" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                     <div>
-                      <label className={lbl}>Product Status</label>
+                      <label className={lbl}>{t('ticketForm.productStatus')}</label>
                       <select
                         value={product.product_status}
                         onChange={(e) => updateProduct(idx, 'product_status', e.target.value)}
@@ -732,7 +954,7 @@ export function TicketForm({
                       </select>
                     </div>
                     <div>
-                      <label className={lbl}>Warranty Status</label>
+                      <label className={lbl}>{t('ticketForm.warrantyStatus')}</label>
                       <select
                         value={product.warranty_status}
                         onChange={(e) => updateProduct(idx, 'warranty_status', e.target.value)}
@@ -746,7 +968,7 @@ export function TicketForm({
                   </div>
                   <div className="mt-3">
                     <label className={lbl}>
-                      Issue Description <span className="text-red-500">*</span>
+                      {t('ticketForm.issueDescription')} <span className="text-red-500">*</span>
                     </label>
                     <textarea
                       value={product.issue_description}
@@ -762,13 +984,13 @@ export function TicketForm({
 
             {/* General RMA Description */}
             <div>
-              <label className={lbl}>General RMA Description</label>
+              <label className={lbl}>{t('ticketForm.generalDescription')}</label>
               <textarea
                 value={formData.general_description}
                 onChange={(e) =>
                   setFormData({ ...formData, general_description: e.target.value })
                 }
-                placeholder="General description for the RMA ticket (optional)..."
+                placeholder={t('ticketForm.generalDescPlaceholder')}
                 className={inp}
                 rows={3}
               />
@@ -776,13 +998,13 @@ export function TicketForm({
 
             {/* Accessories Received */}
             <div>
-              <label className={lbl}>Accessories Received</label>
+              <label className={lbl}>{t('ticketForm.accessories')}</label>
               <textarea
                 value={formData.accessories_received}
                 onChange={(e) =>
                   setFormData({ ...formData, accessories_received: e.target.value })
                 }
-                placeholder="List any accessories received with the device..."
+                placeholder={t('ticketForm.accessoriesPlaceholder')}
                 className={inp}
                 rows={3}
               />
@@ -791,11 +1013,11 @@ export function TicketForm({
             {/* Shipping Information */}
             <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50/50">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Shipping Information
+                {t('ticketForm.shipping')}
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={lbl}>Carrier</label>
+                  <label className={lbl}>{t('ticketForm.carrier')}</label>
                   <select
                     value={formData.carrier}
                     onChange={(e) => setFormData((f) => ({ ...f, carrier: e.target.value }))}
@@ -809,7 +1031,7 @@ export function TicketForm({
                   </select>
                 </div>
                 <div>
-                  <label className={lbl}>Tracking Number</label>
+                  <label className={lbl}>{t('ticketForm.trackingNumber')}</label>
                   <input
                     type="text"
                     value={formData.tracking_number}
@@ -823,8 +1045,8 @@ export function TicketForm({
               </div>
               <div>
                 <label className={lbl}>
-                  Shipping Label URL{' '}
-                  <span className="text-gray-500 font-normal">(optional)</span>
+                  {t('ticketForm.shippingLabel')}{' '}
+                  <span className="text-gray-500 font-normal">({t('common.optional')})</span>
                 </label>
                 <input
                   type="url"
@@ -864,7 +1086,7 @@ export function TicketForm({
             {/* Attachments */}
             <div>
               <label className={lbl}>
-                Attachments
+                {t('ticketForm.attachments')}
                 <span className="text-xs text-gray-500 font-normal ml-2">
                   ({(formData.attachments?.length || 0) + pendingFiles.length}/10)
                 </span>
@@ -1024,6 +1246,97 @@ export function TicketForm({
                 </label>
               )}
             </div>
+
+          {/* ── Resolution ── */}
+          <div className="border-t border-gray-200 pt-5">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">{t('ticketForm.resolution')} <span className="text-gray-400 font-normal normal-case">({t('common.optional')})</span></h3>
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <label className={lbl}>{t('ticketForm.resolutionType')}</label>
+                <select
+                  value={resForm.type}
+                  onChange={(e) => setResForm(f => ({ ...f, type: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600"
+                >
+                  <option value="">— None —</option>
+                  <option value="replacement">Replacement</option>
+                  <option value="exchange">Exchange</option>
+                  <option value="credit_note">Credit Note</option>
+                  <option value="refund">Refund</option>
+                </select>
+              </div>
+
+              {(resForm.type === 'replacement' || resForm.type === 'exchange') && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={lbl}>{t('ticketForm.replacementProduct')}</label>
+                    <ProductSearchInput
+                      value={resForm.replacement_product_name}
+                      onChange={(v) => setResForm(f => ({ ...f, replacement_product_name: v }))}
+                      products={products}
+                      placeholder="Search or type product…"
+                      inputClassName="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600"
+                    />
+                  </div>
+                  <div>
+                    <label className={lbl}>{t('ticketForm.replacementSerial')}</label>
+                    <input
+                      value={resForm.replacement_serial}
+                      onChange={(e) => setResForm(f => ({ ...f, replacement_serial: e.target.value }))}
+                      placeholder="Serial number"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600 font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {(resForm.type === 'credit_note' || resForm.type === 'refund') && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={lbl}>{t('ticketForm.amount')}</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={resForm.currency}
+                        onChange={(e) => setResForm(f => ({ ...f, currency: e.target.value }))}
+                        className="w-20 px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600"
+                      >
+                        {['USD','EUR','GBP','AED','SAR','EGP'].map(c => <option key={c}>{c}</option>)}
+                      </select>
+                      <input
+                        type="number" min="0" step="0.01"
+                        value={resForm.amount}
+                        onChange={(e) => setResForm(f => ({ ...f, amount: e.target.value }))}
+                        placeholder="0.00"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={lbl}>{t('ticketForm.referenceNumber')}</label>
+                    <input
+                      value={resForm.reference_number}
+                      onChange={(e) => setResForm(f => ({ ...f, reference_number: e.target.value }))}
+                      placeholder="Invoice / credit note #"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {resForm.type && (
+                <div>
+                  <label className={lbl}>{t('ticketForm.reason')}</label>
+                  <textarea
+                    rows={2}
+                    value={resForm.reason}
+                    onChange={(e) => setResForm(f => ({ ...f, reason: e.target.value }))}
+                    placeholder="Optional notes"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600 resize-none"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
           </div>
 
           {/* Footer */}
@@ -1034,14 +1347,25 @@ export function TicketForm({
               className="flex-1 justify-center"
               onClick={onClose}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" loading={uploading} className="flex-1 justify-center">
-              {editingTicket ? 'Update Ticket' : 'Create Ticket'}
+              {editingTicket ? t('ticketForm.updateTicket') : t('ticketForm.createTicket')}
             </Button>
           </div>
         </form>
       </div>
     </Modal>
+    {scanningProductIdx !== null && CAMERA_SUPPORTED && createPortal(
+      <BarcodeScanner
+        onScan={(value) => {
+          updateProduct(scanningProductIdx, 'serial_number', value)
+          setScanningProductIdx(null)
+        }}
+        onClose={() => setScanningProductIdx(null)}
+      />,
+      document.body
+    )}
+    </>
   )
 }

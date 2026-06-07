@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import AttachmentsField from '../../components/AttachmentsField'
 import { Button } from '../../components/ui'
@@ -35,6 +36,7 @@ export function AddCustomerModal({
   onSave,
   onClose,
 }) {
+  const { t } = useTranslation()
   const isB2B = form.customer_type === 'B2B'
   const set = (key, val) => setForm((prev) => ({ ...prev, [key]: val }))
 
@@ -45,10 +47,10 @@ export function AddCustomerModal({
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
           <div>
             <h2 className="text-xl font-bold text-gray-900">
-              {editing ? 'Edit Customer' : 'Add New Customer'}
+              {editing ? t('customerModal.editTitle') : t('customerModal.addTitle')}
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              <span className="text-red-500">*</span> Required fields
+              <span className="text-red-500">*</span> {t('customerModal.requiredFields')}
             </p>
           </div>
           <button
@@ -69,61 +71,61 @@ export function AddCustomerModal({
         <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
           {/* Type + Status */}
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Customer Type" required>
+            <Field label={t('customerModal.customerType')} required>
               <select
                 value={form.customer_type}
                 onChange={(e) => set('customer_type', e.target.value)}
                 className={sel}
               >
-                <option value="B2B">B2B — Company</option>
-                <option value="B2C">B2C — Individual</option>
+                <option value="B2B">{t('customerModal.typeB2B')}</option>
+                <option value="B2C">{t('customerModal.typeB2C')}</option>
               </select>
             </Field>
-            <Field label="Status">
+            <Field label={t('customerModal.status')}>
               <select
                 value={form.customer_status}
                 onChange={(e) => set('customer_status', e.target.value)}
                 className={sel}
               >
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-                <option value="Suspended">Suspended</option>
-                <option value="VIP">VIP</option>
+                <option value="Active">{t('customerModal.statusActive')}</option>
+                <option value="Inactive">{t('customerModal.statusInactive')}</option>
+                <option value="Suspended">{t('customerModal.statusSuspended')}</option>
+                <option value="VIP">{t('customerModal.statusVIP')}</option>
               </select>
             </Field>
           </div>
 
           {/* Company Name — B2B only */}
           {isB2B && (
-            <Field label="Company Name" required>
+            <Field label={t('customerModal.companyName')} required>
               <input
                 type="text"
                 value={form.company_name}
                 onChange={(e) => set('company_name', e.target.value)}
                 className={inp}
-                placeholder="e.g. Maximum Hardware"
+                placeholder={t('customerModal.companyPlaceholder')}
               />
             </Field>
           )}
 
           {/* Contact Person + Account Manager */}
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Contact Person" required>
+            <Field label={t('customerModal.contactPerson')} required>
               <input
                 type="text"
                 value={form.contact_person}
                 onChange={(e) => set('contact_person', e.target.value)}
                 className={inp}
-                placeholder="Full name"
+                placeholder={t('customerModal.contactPlaceholder')}
               />
             </Field>
-            <Field label="Account Manager">
+            <Field label={t('customerModal.accountManager')}>
               <select
                 value={form.account_manager}
                 onChange={(e) => set('account_manager', e.target.value)}
                 className={sel}
               >
-                <option value="">— Select manager —</option>
+                <option value="">{t('customerModal.selectManager')}</option>
                 {usersList.map((u) => (
                   <option key={u.user_email} value={u.user_email}>
                     {u.user_email}
@@ -135,7 +137,7 @@ export function AddCustomerModal({
 
           {/* Mobile + Landline */}
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Mobile" required>
+            <Field label={t('customerModal.mobile')} required>
               <input
                 type="tel"
                 value={form.mobile}
@@ -144,7 +146,7 @@ export function AddCustomerModal({
                 placeholder="+20 XXX XXX XXXX"
               />
             </Field>
-            <Field label="Landline">
+            <Field label={t('customerModal.landline')}>
               <input
                 type="tel"
                 value={form.landline}
@@ -156,7 +158,7 @@ export function AddCustomerModal({
           </div>
 
           {/* Email */}
-          <Field label="Email">
+          <Field label={t('customerModal.email')}>
             <input
               type="email"
               value={form.email}
@@ -167,55 +169,55 @@ export function AddCustomerModal({
           </Field>
 
           {/* Address */}
-          <Field label="Address">
+          <Field label={t('customerModal.address')}>
             <textarea
               value={form.address}
               onChange={(e) => set('address', e.target.value)}
               rows={3}
               className={inp}
-              placeholder="Street, city, governorate..."
+              placeholder={t('customerModal.addressPlaceholder')}
             />
           </Field>
 
           {/* CR Number + Tax ID — B2B only */}
           {isB2B && (
             <div className="grid grid-cols-2 gap-4">
-              <Field label="CR Number">
+              <Field label={t('customerModal.crNumber')}>
                 <input
                   type="text"
                   value={form.cr_number}
                   onChange={(e) => set('cr_number', e.target.value)}
                   className={inp}
-                  placeholder="Commercial registration"
+                  placeholder={t('customerModal.crPlaceholder')}
                 />
               </Field>
-              <Field label="Tax ID">
+              <Field label={t('customerModal.taxId')}>
                 <input
                   type="text"
                   value={form.tax_id}
                   onChange={(e) => set('tax_id', e.target.value)}
                   className={inp}
-                  placeholder="Tax identification number"
+                  placeholder={t('customerModal.taxIdPlaceholder')}
                 />
               </Field>
             </div>
           )}
 
           {/* Notes */}
-          <Field label="Notes">
+          <Field label={t('customerModal.notes')}>
             <textarea
               value={form.notes}
               onChange={(e) => set('notes', e.target.value)}
               rows={3}
               className={inp}
-              placeholder="Internal notes..."
+              placeholder={t('customerModal.notesPlaceholder')}
             />
           </Field>
 
           {/* Attachments */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Attachments
+              {t('customerModal.attachments')}
             </label>
             <AttachmentsField
               savedAttachments={form.attachments || []}
@@ -229,10 +231,10 @@ export function AddCustomerModal({
         {/* Footer */}
         <div className="flex gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
           <Button variant="secondary" className="flex-1 justify-center" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button className="flex-1 justify-center" onClick={onSave}>
-            {editing ? 'Update Customer' : 'Create Customer'}
+            {editing ? t('customerModal.updateCustomer') : t('customerModal.createCustomer')}
           </Button>
         </div>
       </div>
@@ -243,6 +245,7 @@ export function AddCustomerModal({
 // ─── BULK UPLOAD CUSTOMERS MODAL ────────────────────────────────────────────
 
 export function BulkUploadCustomersModal({ onClose, onUpload, onDownloadTemplate }) {
+  const { t } = useTranslation()
   const [file, setFile] = useState(null)
   const [uploading, setUploading] = useState(false)
 
@@ -250,7 +253,7 @@ export function BulkUploadCustomersModal({ onClose, onUpload, onDownloadTemplate
     const selected = e.target.files[0]
     if (selected) {
       if (!selected.name.endsWith('.csv')) {
-        toast.error('Please select a CSV file')
+        toast.error(t('customers.selectCsvFile'))
         return
       }
       setFile(selected)
@@ -259,7 +262,7 @@ export function BulkUploadCustomersModal({ onClose, onUpload, onDownloadTemplate
 
   const handleUpload = async () => {
     if (!file) {
-      toast.error('Please select a file first')
+      toast.error(t('customers.selectFileFirst'))
       return
     }
     setUploading(true)
@@ -274,7 +277,7 @@ export function BulkUploadCustomersModal({ onClose, onUpload, onDownloadTemplate
     <div className="modal-overlay-bg fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overscroll-contain">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">Bulk Upload Customers</h2>
+          <h2 className="text-xl font-bold text-gray-900">{t('customerModal.bulkUploadTitle')}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-600">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -289,24 +292,15 @@ export function BulkUploadCustomersModal({ onClose, onUpload, onDownloadTemplate
 
         <div className="p-6 space-y-4">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="font-medium text-blue-900 mb-2">📋 Instructions:</h3>
+            <h3 className="font-medium text-blue-900 mb-2">📋 {t('customerModal.instructions')}</h3>
             <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-              <li>Download the CSV template first</li>
-              <li>Fill in your customer data following the template format</li>
-              <li>
-                Required fields: <strong>company_name</strong> (B2B) or{' '}
-                <strong>contact_person</strong> (B2C) — mobile is optional
-              </li>
-              <li>
-                <strong>company_name</strong> is required when customer_type is B2B
-              </li>
-              <li>
-                Valid customer_type values: <strong>B2B</strong>, <strong>B2C</strong>
-              </li>
-              <li>
-                Valid customer_status values: <strong>Active</strong>, <strong>Inactive</strong>
-              </li>
-              <li>Avoid commas inside the address field — use a dash instead</li>
+              <li>{t('customerModal.bulkInst1')}</li>
+              <li>{t('customerModal.bulkInst2')}</li>
+              <li>{t('customerModal.bulkInst3')}</li>
+              <li>{t('customerModal.bulkInst4')}</li>
+              <li>{t('customerModal.bulkInst5')}</li>
+              <li>{t('customerModal.bulkInst6')}</li>
+              <li>{t('customerModal.bulkInst7')}</li>
             </ul>
           </div>
 
@@ -322,11 +316,11 @@ export function BulkUploadCustomersModal({ onClose, onUpload, onDownloadTemplate
                 d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            Download CSV Template
+            {t('customerModal.downloadTemplate')}
           </button>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Upload CSV File</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('customerModal.uploadCSVLabel')}</label>
             <label className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-indigo-500 transition-colors block">
               {file ? (
                 <div className="space-y-2">
@@ -345,7 +339,7 @@ export function BulkUploadCustomersModal({ onClose, onUpload, onDownloadTemplate
                   </svg>
                   <p className="font-medium text-gray-900">{file.name}</p>
                   <p className="text-sm text-gray-500">{(file.size / 1024).toFixed(2)} KB</p>
-                  <p className="text-xs text-indigo-600">Click to change file</p>
+                  <p className="text-xs text-indigo-600">{t('customerModal.clickToChangeFile')}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -362,8 +356,8 @@ export function BulkUploadCustomersModal({ onClose, onUpload, onDownloadTemplate
                       d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
                     />
                   </svg>
-                  <p className="text-gray-600">Click to upload CSV file</p>
-                  <p className="text-sm text-gray-500">or drag and drop</p>
+                  <p className="text-gray-600">{t('customerModal.clickToUploadCSV')}</p>
+                  <p className="text-sm text-gray-500">{t('customerModal.dragAndDrop')}</p>
                 </div>
               )}
               <input type="file" accept=".csv" onChange={handleFileChange} className="hidden" />
@@ -372,14 +366,14 @@ export function BulkUploadCustomersModal({ onClose, onUpload, onDownloadTemplate
 
           {file && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
-              ⚠️ Each imported customer will get a unique CB-XXXXXXXX code generated automatically.
+              ⚠️ {t('customerModal.bulkUploadWarning')}
             </div>
           )}
         </div>
 
         <div className="flex gap-3 p-6 border-t border-gray-200">
           <Button variant="secondary" className="flex-1 justify-center" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             className="flex-1 justify-center"
@@ -397,7 +391,7 @@ export function BulkUploadCustomersModal({ onClose, onUpload, onDownloadTemplate
                 />
               </svg>
             )}
-            {uploading ? 'Uploading...' : 'Import Customers'}
+            {uploading ? t('common.loading') : t('customerModal.uploadBtn')}
           </Button>
         </div>
       </div>

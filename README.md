@@ -26,6 +26,7 @@ myRMA provides end-to-end lifecycle management for product returns, warranty cla
 | **Real-Time Notifications** | Live updates via Supabase Realtime, per-user preference controls |
 | **Dark Mode** | Full dark/light theme toggle, persisted per user |
 | **PWA / Offline** | Installable app with offline shell via Workbox service worker |
+| **WhatsApp Notifications** | Automated WhatsApp messages on ticket lifecycle events via Meta Cloud API |
 | **PDF Generation** | Ticket and invoice PDF export |
 | **Bulk CSV Import** | Mass upload for products and customers |
 | **Audit Log** | Full system audit trail visible in the Control Panel |
@@ -107,6 +108,10 @@ supabase/migrations/20260526_enable_rls.sql
 supabase/migrations/20260526_check_constraints.sql
 supabase/migrations/20260527_storage_bucket_policies.sql
 supabase/migrations/20260528_ticket_cascade_fk.sql
+supabase/migrations/20260529_repair_permissions.sql
+supabase/migrations/20260531_relax_ticket_status_constraint.sql
+supabase/migrations/20260602_whatsapp_notifications.sql
+supabase/migrations/20260603_user_preferences_rls.sql
 ```
 
 ### 4. Set up storage
@@ -119,12 +124,23 @@ Create a storage bucket named **`rma-attachments`** in your Supabase project. Th
 supabase functions deploy admin-reset-password
 supabase functions deploy public-track
 supabase functions deploy send-email
+supabase functions deploy send-whatsapp
+supabase functions deploy notification-worker
+supabase functions deploy whatsapp-webhook
 ```
 
-Set the required secrets:
-```bash
-supabase secrets set SERVICE_ROLE_KEY=your-service-role-key
+Set the required secrets in Supabase Dashboard → Edge Functions → Secrets:
 ```
+WHATSAPP_ACCESS_TOKEN         # permanent system-user token from Meta
+WHATSAPP_PHONE_NUMBER_ID      # phone number ID from WhatsApp Business API
+WHATSAPP_WEBHOOK_VERIFY_TOKEN # arbitrary string matching Meta webhook config
+```
+
+**WhatsApp setup gotchas (learned the hard way — see `CLAUDE.md` for full detail):**
+- Use a **permanent System User token**, not the temporary 24h token from Meta's API Setup page (it expires daily → Meta error 190).
+- `WHATSAPP_PHONE_NUMBER_ID` must be **all digits** (a letter `O` vs zero `0` → Meta error 100).
+- Templates must be **Utility** category, not Marketing — Marketing templates are delivery-throttled by Meta (error 131049). Keep bodies purely transactional.
+- Each template's variable count must equal its Meta `{{n}}` count; no positional param may be empty (error 131008 / 132000).
 
 ### 6. Start development
 
@@ -143,7 +159,7 @@ npm run dev
 npm run dev                    # Vite dev server (hot reload, port 5173)
 npm run build                  # Production build → dist/
 npm run preview                # Preview production build locally
-npm test                       # Vitest unit tests (74 tests, ~1s)
+npm test                       # Vitest unit tests (80 tests, ~1s)
 npm run test:watch             # Vitest in watch mode
 npm run test:coverage          # Coverage report (HTML + text)
 npm run lint                   # ESLint check
@@ -167,11 +183,11 @@ myrma-app/
 │   │   ├── branding.js                       # Company branding settings
 │   │   ├── email.js                          # Notification dispatch + send-email Edge Function
 │   │   ├── backup.js                         # Full data export/import
-│   │   └── db/
-│   │       ├── index.js                      # Aggregates all domain modules → `db` export
-│   │       ├── tickets.js                    # RMA ticket CRUD + public tracker lookup
-│   │       ├── customers.js                  # Customer CRUD
-│   │       ├── catalog.js                    # Product catalog CRUD
+│   │   └── db/                               # All TypeScript — export Row types
+│   │       ├── index.ts                      # Aggregates all domain modules → `db` export + re-exports all Row types
+│   │       ├── tickets.ts                    # RMA ticket CRUD + public tracker lookup
+│   │       ├── customers.ts                  # Customer CRUD
+│   │       ├── catalog.ts                    # Product catalog CRUD
 │   │       ├── inventory.js                  # Inventory CRUD
 │   │       ├── users.js                      # User role management
 │   │       ├── notifications.js              # Notification table ops
@@ -305,7 +321,7 @@ Roles are stored in the `user_roles` table. Default permission sets are defined 
 npm test
 ```
 
-74 unit tests across 3 suites in `src/lib/`:
+80 unit tests across 3 suites in `src/lib/`:
 
 | Suite | Coverage |
 |-------|---------|
@@ -322,7 +338,7 @@ Tests run in under 1 second via Vitest with jsdom environment.
 GitHub Actions runs automatically on every push and PR to `main`:
 
 ```
-1. npm test              → all 74 tests must pass
+1. npm test              → all 80 tests must pass
 2. npm run lint:ci       → zero ESLint warnings allowed
 3. npm run build         → production build must succeed
 ```

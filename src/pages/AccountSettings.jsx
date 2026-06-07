@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { auth, db, storage, notifications } from '../api/supabaseClient'
 import { captureException } from '../lib/sentry'
+import { resetPasswordSchema, getFirstError } from '../lib/schemas'
 import { safeStorage } from '../lib/safeStorage'
 import { WIDGET_CATALOG } from './Dashboard'
 import toast from 'react-hot-toast'
 import { Spinner, PageHeader, Button, Input } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
 import { ROLES } from '../lib/constants'
+import { useAppearance } from '../contexts/AppearanceContext'
 
 function EyeIcon({ visible }) {
   return visible ? (
@@ -160,15 +163,20 @@ const SYSTEM_NOTIF_CATEGORIES = [
 ]
 
 export default function AccountSettings({ currentUser, currentUserRole, onProfileUpdate }) {
+  const { t } = useTranslation()
   const isAdmin = currentUserRole === ROLES.ADMIN || currentUserRole === ROLES.SUPER_ADMIN
   const tabs = [
-    'Profile',
-    'Security',
-    'Notifications',
-    'Appearance',
-    ...(isAdmin ? ['Activity'] : []),
+    { key: 'Profile', label: t('accountSettings.tabProfile') },
+    { key: 'Security', label: t('accountSettings.tabSecurity') },
+    { key: 'Notifications', label: t('accountSettings.tabNotifications') },
+    { key: 'Appearance', label: t('accountSettings.tabAppearance') },
+    ...(isAdmin ? [{ key: 'Activity', label: t('accountSettings.tabActivity') }] : []),
   ]
   const [activeTab, setActiveTab] = useURLTab('tab', 'Profile')
+
+  // Appearance — display settings
+  const { darkMode, fontFamily, tableDensity, dateFormat, updateAppearance, language, setLanguage } = useAppearance()
+  const updateDisplay = (partial) => updateAppearance(partial, currentUser?.email)
 
   // Appearance — widget prefs
   const widgetStorageKey = `dashboard_widgets_${currentUser?.email}`
@@ -206,12 +214,26 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
   const [profileLoading, setProfileLoading] = useState(false)
   const fileInputRef = useRef(null)
 
-  // Security
+  // Security — password
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [passwordLoading, setPasswordLoading] = useState(false)
+
+  // Security — sessions
+  const [sessions, setSessions] = useState(null) // null = not loaded yet
+  const [currentSessionId, setCurrentSessionId] = useState(null)
+  const [sessionActivity, setSessionActivity] = useState([])
+  const [sessionsLoading, setSessionsLoading] = useState(false)
+
+  // Security — MFA
+  const [mfaStatus, setMfaStatus] = useState('loading') // 'loading' | 'disabled' | 'enabled'
+  const [mfaFactorId, setMfaFactorId] = useState(null)
+  const [mfaStep, setMfaStep] = useState('idle') // 'idle' | 'scan' | 'disabling'
+  const [mfaEnrollData, setMfaEnrollData] = useState(null) // { id, qrCode, secret }
+  const [mfaCode, setMfaCode] = useState('')
+  const [mfaLoading, setMfaLoading] = useState(false)
 
   // Email notification preferences (DB-backed)
   const [notifPrefs, setNotifPrefs] = useState(null)
@@ -279,6 +301,8 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
   useEffect(() => {
     if (activeTab === 'Notifications' && !notifPrefs) loadNotifPrefs()
     if (activeTab === 'Activity' && isAdmin && activity.length === 0) loadActivity()
+    if (activeTab === 'Security' && mfaStatus === 'loading') loadMfaStatus()
+    if (activeTab === 'Security' && sessions === null) loadSessions()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isAdmin, notifPrefs, activity.length])
 
@@ -288,7 +312,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
       setNotifPrefs(await notifications.getPreferences(currentUser.email))
     } catch (err) {
       captureException(err, { page: 'AccountSettings', context: 'loadNotifPrefs' })
-      toast.error('Failed to load preferences')
+      toast.error(t('accountSettings.failedLoadPrefs'))
     } finally {
       setNotifLoading(false)
     }
@@ -300,10 +324,87 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
       setActivity(await db.userActivity.list(currentUser.email))
     } catch (err) {
       captureException(err, { page: 'AccountSettings', context: 'loadActivity' })
-      toast.error('Failed to load activity')
+      toast.error(t('accountSettings.failedLoadActivity'))
     } finally {
       setActivityLoading(false)
     }
+  }
+
+  const loadSessions = async () => {
+    setSessionsLoading(true)
+    try {
+      const { sessions: list, currentSessionId: cid, activity } = await auth.sessions.list()
+      setSessions(list)
+      setCurrentSessionId(cid)
+      setSessionActivity(activity)
+    } catch (err) {
+      captureException(err, { page: 'AccountSettings', context: 'loadSessions' })
+      toast.error(t('accountSettings.failedLoadSessions', { error: err.message }))
+      setSessions([])
+    } finally {
+      setSessionsLoading(false)
+    }
+  }
+
+  const handleSignOutAll = async () => {
+    try {
+      await auth.signOutAll()
+      toast.success(t('accountSettings.signedOutAllSuccess'))
+      db.auditLog.log(currentUser?.email, 'user_signed_out_all_devices', `Signed out all devices for ${currentUser?.email}`).catch(() => {})
+    } catch (err) {
+      captureException(err, { page: 'AccountSettings', context: 'signOutAll' })
+      toast.error(err.message || t('accountSettings.failedSignOutAll'))
+    }
+  }
+
+  const loadMfaStatus = async () => {
+    try {
+      const { data } = await auth.mfa.listFactors()
+      const totp = data?.all?.find((f) => f.factor_type === 'totp' && f.status === 'verified')
+      if (totp) { setMfaStatus('enabled'); setMfaFactorId(totp.id) }
+      else setMfaStatus('disabled')
+    } catch { setMfaStatus('disabled') }
+  }
+
+  const handleMfaEnable = async () => {
+    setMfaLoading(true)
+    try {
+      const { data, error } = await auth.mfa.enroll()
+      if (error) throw error
+      setMfaEnrollData({ id: data.id, qrCode: data.totp.qr_code, secret: data.totp.secret })
+      setMfaStep('scan')
+      setMfaCode('')
+    } catch (err) { toast.error(err.message || t('accountSettings.failedStart2FA')) }
+    finally { setMfaLoading(false) }
+  }
+
+  const handleMfaConfirm = async () => {
+    if (mfaCode.length !== 6) return
+    setMfaLoading(true)
+    try {
+      const { error } = await auth.mfa.challengeAndVerify(mfaEnrollData.id, mfaCode)
+      if (error) throw error
+      setMfaStatus('enabled')
+      setMfaFactorId(mfaEnrollData.id)
+      setMfaStep('idle')
+      setMfaEnrollData(null)
+      setMfaCode('')
+      toast.success(t('accountSettings.twoFAEnabledSuccess'))
+    } catch (err) { toast.error(err.message || t('accountSettings.invalid2FACode')); setMfaCode('') }
+    finally { setMfaLoading(false) }
+  }
+
+  const handleMfaDisable = async () => {
+    setMfaLoading(true)
+    try {
+      const { error } = await auth.mfa.unenroll(mfaFactorId)
+      if (error) throw error
+      setMfaStatus('disabled')
+      setMfaFactorId(null)
+      setMfaStep('idle')
+      toast.success(t('accountSettings.twoFADisabledSuccess'))
+    } catch (err) { toast.error(err.message || t('accountSettings.failedDisable2FA')) }
+    finally { setMfaLoading(false) }
   }
 
   const handleAvatarChange = (e) => {
@@ -325,7 +426,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
       setAvatarPreview(null)
       setAvatarFile(null)
       onProfileUpdate(user)
-      toast.success('Profile updated!')
+      toast.success(t('accountSettings.profileUpdatedSuccess'))
       db.auditLog
         .log(
           currentUser?.email,
@@ -335,19 +436,16 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
         .catch(() => {})
     } catch (err) {
       captureException(err, { page: 'AccountSettings', context: 'updateProfile' })
-      toast.error(err.message || 'Failed to update profile')
+      toast.error(err.message || t('accountSettings.failedUpdateProfile'))
     } finally {
       setProfileLoading(false)
     }
   }
 
   const handlePasswordSave = async () => {
-    if (newPassword.length < 6) {
-      toast.error('Password must be at least 6 characters')
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      toast.error('Passwords do not match')
+    const validation = resetPasswordSchema.safeParse({ newPassword, confirmPassword })
+    if (!validation.success) {
+      toast.error(getFirstError(validation))
       return
     }
     setPasswordLoading(true)
@@ -355,7 +453,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
       await auth.updatePassword(newPassword)
       setNewPassword('')
       setConfirmPassword('')
-      toast.success('Password updated!')
+      toast.success(t('accountSettings.passwordUpdatedSuccess'))
       db.auditLog
         .log(
           currentUser?.email,
@@ -365,26 +463,9 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
         .catch(() => {})
     } catch (err) {
       captureException(err, { page: 'AccountSettings', context: 'updatePassword' })
-      toast.error(err.message || 'Failed to update password')
+      toast.error(err.message || t('accountSettings.failedUpdatePassword'))
     } finally {
       setPasswordLoading(false)
-    }
-  }
-
-  const handleSignOutAll = async () => {
-    try {
-      await auth.signOutAll()
-      toast.success('Signed out from all devices')
-      db.auditLog
-        .log(
-          currentUser?.email,
-          'user_signed_out_all_devices',
-          `Signed out all devices for ${currentUser?.email}`
-        )
-        .catch(() => {})
-    } catch (err) {
-      captureException(err, { page: 'AccountSettings', context: 'signOutAll' })
-      toast.error('Failed to sign out all devices')
     }
   }
 
@@ -392,7 +473,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
     setNotifSaving(true)
     try {
       await notifications.updatePreferences(currentUser.email, notifPrefs)
-      toast.success('Preferences saved!')
+      toast.success(t('accountSettings.preferencesSavedSuccess'))
       db.auditLog
         .log(
           currentUser?.email,
@@ -402,7 +483,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
         .catch(() => {})
     } catch (err) {
       captureException(err, { page: 'AccountSettings', context: 'saveNotifPrefs' })
-      toast.error('Failed to save preferences')
+      toast.error(t('accountSettings.failedSavePrefs'))
     } finally {
       setNotifSaving(false)
     }
@@ -421,25 +502,25 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
     <div className="max-w-2xl mx-auto">
       {/* Page header */}
       <PageHeader
-        title="Account Settings"
-        subtitle="Manage your profile, security, and notification preferences"
+        title={t('accountSettings.title')}
+        subtitle={t('accountSettings.subtitle')}
         className="mb-8"
       />
 
       {/* Tabs */}
       <div className="border-b border-gray-200 mb-8">
-        <nav className="-mb-px flex gap-6">
+        <nav className="-mb-px flex gap-4 sm:gap-6 overflow-x-auto">
           {tabs.map((tab) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
               className={`pb-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === tab
+                activeTab === tab.key
                   ? 'border-indigo-600 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </nav>
@@ -451,7 +532,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
           {/* Avatar card */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6">
             <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">
-              Profile Photo
+              {t('accountSettings.profilePhoto')}
             </h2>
             <div className="flex items-center gap-5">
               <div className="relative flex-shrink-0">
@@ -468,7 +549,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                 )}
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  aria-label="Change profile photo"
+                  aria-label={t('accountSettings.uploadPhoto')}
                   className="absolute -bottom-1 -right-1 w-7 h-7 bg-white border-2 border-gray-200 rounded-full flex items-center justify-center hover:bg-indigo-50 hover:border-indigo-300 shadow-sm transition-colors"
                 >
                   <svg
@@ -493,7 +574,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                 </button>
               </div>
               <div>
-                <Button onClick={() => fileInputRef.current?.click()}>Upload photo</Button>
+                <Button onClick={() => fileInputRef.current?.click()}>{t('accountSettings.uploadPhoto')}</Button>
                 {avatarPreview && (
                   <Button
                     variant="secondary"
@@ -503,10 +584,10 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                       setAvatarFile(null)
                     }}
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                 )}
-                <p className="text-xs text-gray-500 mt-2">JPG, PNG or GIF · Max 2MB</p>
+                <p className="text-xs text-gray-500 mt-2">{t('accountSettings.photoHint')}</p>
               </div>
               <input
                 ref={fileInputRef}
@@ -521,22 +602,22 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
           {/* Info card */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5">
             <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-              Personal Information
+              {t('accountSettings.personalInfo')}
             </h2>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Display Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('accountSettings.displayName')}</label>
               <Input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Your name"
+                placeholder={t('accountSettings.displayNamePlaceholder')}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Email Address
+                {t('accountSettings.emailAddress')}
               </label>
               <input
                 type="email"
@@ -544,11 +625,11 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                 disabled
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
               />
-              <p className="text-xs text-gray-500 mt-1">Email cannot be changed here</p>
+              <p className="text-xs text-gray-500 mt-1">{t('accountSettings.emailReadonly')}</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Role</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('accountSettings.role')}</label>
               <span
                 className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border capitalize ${roleColors[currentUserRole] || roleColors.technician}`}
               >
@@ -558,7 +639,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
 
             <div className="pt-1 border-t border-gray-100">
               <Button size="lg" loading={profileLoading} onClick={handleProfileSave}>
-                Save Changes
+                {t('accountSettings.saveChanges')}
               </Button>
             </div>
           </div>
@@ -571,15 +652,15 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
           <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5">
             <div>
               <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                Change Password
+                {t('accountSettings.changePassword')}
               </h2>
               <p className="text-sm text-gray-500 mt-1">
-                Choose a strong password — at least 6 characters
+                {t('accountSettings.changePasswordHint')}
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">New Password</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('accountSettings.newPassword')}</label>
               <div className="relative">
                 <Input
                   type={showNew ? 'text' : 'password'}
@@ -602,7 +683,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Confirm Password
+                {t('accountSettings.confirmPassword')}
               </label>
               <div className="relative">
                 <Input
@@ -623,7 +704,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                 </button>
               </div>
               {newPassword && confirmPassword && newPassword !== confirmPassword && (
-                <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                <p className="text-xs text-red-500 mt-1">{t('common.required')}</p>
               )}
             </div>
 
@@ -634,28 +715,174 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                 disabled={!newPassword || !confirmPassword}
                 onClick={handlePasswordSave}
               >
-                Update Password
+                {t('accountSettings.changePassword')}
               </Button>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
+          <div className="bg-white dark:bg-[#121823] rounded-2xl border border-gray-200 dark:border-[#212a38] p-6 space-y-4">
+            <div className="flex items-center justify-between gap-4">
               <div>
-                <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                  Sessions
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0] uppercase tracking-wide">
+                  {t('accountSettings.activeSessions')}
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  Sign out from all other devices immediately
+                <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-1">
+                  {t('accountSettings.activeSessionsDesc')}
                 </p>
               </div>
-              <button
-                onClick={handleSignOutAll}
-                className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-              >
-                Sign out all devices
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={loadSessions}
+                  disabled={sessionsLoading}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-[#e8ebf0] hover:bg-gray-100 dark:hover:bg-[#0f1520] transition-colors"
+                  aria-label="Refresh sessions"
+                >
+                  <svg className={`w-4 h-4 ${sessionsLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+                <button
+                  onClick={handleSignOutAll}
+                  className="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors whitespace-nowrap"
+                >
+                  {t('accountSettings.signOutAll')}
+                </button>
+              </div>
             </div>
+
+            {sessionsLoading && sessions === null && (
+              <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-[#9aa4b2] py-2">
+                <Spinner size="sm" /> {t('accountSettings.loadingSessions')}
+              </div>
+            )}
+
+            {sessions !== null && sessions.length > 0 && (
+              <div className="space-y-3">
+                {sessions.map((session) => {
+                  const startedAt = new Date(session.created_at)
+                  const expiresAt = session.not_after ? new Date(session.not_after) : null
+                  return (
+                    <div key={session.id} className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 dark:bg-[#0f1520] border border-gray-100 dark:border-[#212a38]">
+                      <div className="mt-1 w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-gray-800 dark:text-[#e8ebf0]">{t('accountSettings.currentSession')}</span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">{t('accountSettings.thisDevice')}</span>
+                          {session.factor_id && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">2FA</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-400 dark:text-[#9aa4b2] mt-0.5">
+                          {t('accountSettings.sessionStarted', { time: startedAt.toLocaleString() })}
+                          {expiresAt && t('accountSettings.sessionExpires', { time: expiresAt.toLocaleString() })}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {sessionActivity.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-gray-400 dark:text-[#9aa4b2] uppercase tracking-wide mb-2">{t('accountSettings.recentLoginActivity')}</p>
+                <div className="divide-y divide-gray-100 dark:divide-[#212a38]">
+                  {sessionActivity.map((a) => (
+                    <div key={a.id} className="flex items-center justify-between py-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-1.5 h-1.5 rounded-full ${a.action === 'login' ? 'bg-green-500' : 'bg-gray-300 dark:bg-[#4a5568]'}`} />
+                        <span className="text-xs text-gray-600 dark:text-[#9aa4b2] capitalize">{a.action}</span>
+                      </div>
+                      <span className="text-xs text-gray-400 dark:text-[#4a5568]">{new Date(a.created_at).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Two-Factor Authentication */}
+          <div className="bg-white dark:bg-[#121823] rounded-2xl border border-gray-200 dark:border-[#212a38] p-6 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0] uppercase tracking-wide">
+                  {t('accountSettings.twoFactor')}
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-1">
+                  {mfaStatus === 'enabled' ? t('accountSettings.twoFactorEnabled') : t('accountSettings.twoFactorDisabled')}
+                </p>
+              </div>
+              {mfaStatus === 'enabled' && (
+                <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                  {t('accountSettings.mfaStatusActive')}
+                </span>
+              )}
+            </div>
+
+            {mfaStatus === 'loading' && (
+              <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-[#9aa4b2]">
+                <Spinner size="sm" /> {t('common.loading')}…
+              </div>
+            )}
+
+            {mfaStatus === 'disabled' && mfaStep === 'idle' && (
+              <Button onClick={handleMfaEnable} loading={mfaLoading} variant="secondary">
+                {t('accountSettings.enable2FA')}
+              </Button>
+            )}
+
+            {mfaStep === 'scan' && mfaEnrollData && (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600 dark:text-[#9aa4b2]">
+                  {t('accountSettings.twoFactorHint')}
+                </p>
+                <div className="flex flex-col sm:flex-row gap-6 items-start">
+                  <img
+                    src={mfaEnrollData.qrCode}
+                    alt="2FA QR code"
+                    className="w-40 h-40 border border-gray-200 dark:border-[#212a38] rounded-lg bg-white p-2"
+                  />
+                  <div className="space-y-3 flex-1">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 dark:text-[#9aa4b2] mb-1">{t('accountSettings.manualEntryKey')}</p>
+                      <code className="text-xs font-mono bg-gray-100 dark:bg-[#0f1520] text-gray-700 dark:text-[#e8ebf0] px-2 py-1.5 rounded break-all block">
+                        {mfaEnrollData.secret}
+                      </code>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-[#e8ebf0] mb-1.5">
+                        {t('accountSettings.verificationCode')}
+                      </label>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={6}
+                        value={mfaCode}
+                        onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+                        placeholder="000000"
+                        className="font-mono tracking-widest text-center max-w-[160px]"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={handleMfaConfirm} loading={mfaLoading} disabled={mfaCode.length !== 6}>
+                        {t('accountSettings.verify2FA')}
+                      </Button>
+                      <Button variant="secondary" onClick={() => { setMfaStep('idle'); setMfaEnrollData(null); setMfaCode('') }}>
+                        {t('accountSettings.cancel2FA')}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {mfaStatus === 'enabled' && mfaStep === 'idle' && (
+              <Button variant="danger" onClick={handleMfaDisable} loading={mfaLoading}>
+                {t('accountSettings.disable2FA')}
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -667,9 +894,9 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
           <div className="bg-white rounded-2xl border border-gray-200 p-6">
             <div className="mb-6">
               <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                Email Notifications
+                {t('accountSettings.emailNotifications')}
               </h2>
-              <p className="text-sm text-gray-500 mt-1">Choose which events send you an email</p>
+              <p className="text-sm text-gray-500 mt-1">{t('accountSettings.emailNotifsDesc')}</p>
             </div>
 
             {notifLoading ? (
@@ -679,11 +906,11 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
             ) : notifPrefs ? (
               <>
                 <div className="divide-y divide-gray-100">
-                  {NOTIF_ITEMS.map(({ key, label, desc }) => (
+                  {NOTIF_ITEMS.map(({ key }) => (
                     <div key={key} className="flex items-center justify-between py-3.5">
                       <div>
-                        <p className="text-sm font-medium text-gray-800">{label}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                        <p className="text-sm font-medium text-gray-800">{t(`accountSettings.notifItems.${key}.label`, { defaultValue: key })}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{t(`accountSettings.notifItems.${key}.desc`, { defaultValue: '' })}</p>
                       </div>
                       <Toggle
                         checked={!!notifPrefs[key]}
@@ -694,7 +921,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                 </div>
                 <div className="pt-5 border-t border-gray-100 mt-2">
                   <Button size="lg" loading={notifSaving} onClick={handleNotifSave}>
-                    Save Preferences
+                    {t('accountSettings.savePreferences')}
                   </Button>
                 </div>
               </>
@@ -706,18 +933,18 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
             <div className="flex items-start justify-between mb-6">
               <div>
                 <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                  System Notifications
+                  {t('accountSettings.systemNotifications')}
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">
-                  Control which in-app alerts appear in your notification bell
+                  {t('accountSettings.systemNotifsDesc')}
                 </p>
               </div>
               <div className="flex gap-2 flex-shrink-0">
                 <Button variant="secondary" size="sm" onClick={() => setSysAll(false)}>
-                  Hide all
+                  {t('accountSettings.disableAll')}
                 </Button>
                 <Button size="sm" onClick={() => setSysAll(true)}>
-                  Show all
+                  {t('accountSettings.enableAll')}
                 </Button>
               </div>
             </div>
@@ -726,17 +953,17 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
               {SYSTEM_NOTIF_CATEGORIES.map(({ cat, items }) => (
                 <div key={cat}>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                    {cat}
+                    {t(`accountSettings.sysNotifCats.${cat}`, { defaultValue: cat })}
                   </p>
                   <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-100">
-                    {items.map(({ key, label, desc }) => (
+                    {items.map(({ key }) => (
                       <div
                         key={key}
                         className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 transition-colors"
                       >
                         <div>
-                          <p className="text-sm font-medium text-gray-800">{label}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                          <p className="text-sm font-medium text-gray-800">{t(`accountSettings.sysNotifItems.${key}.label`, { defaultValue: key })}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{t(`accountSettings.sysNotifItems.${key}.desc`, { defaultValue: '' })}</p>
                         </div>
                         <Toggle
                           checked={sysNotifPrefs[key] !== false}
@@ -748,7 +975,6 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                 </div>
               ))}
             </div>
-            <p className="text-xs text-gray-500 mt-4">Changes are saved automatically</p>
           </div>
         </div>
       )}
@@ -756,22 +982,134 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
       {/* ── APPEARANCE TAB ── */}
       {activeTab === 'Appearance' && (
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          {/* ── Language ── */}
+          <div className="bg-white dark:bg-[#121823] rounded-2xl border border-gray-200 dark:border-[#212a38] p-6">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0] uppercase tracking-wide mb-4">
+              {t('appearance.language')}
+            </h2>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-[#e8ebf0]">{t('appearance.language')}</p>
+                <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">
+                  {t('appearance.languageSubtitle')}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                {[
+                  { value: 'en', label: 'English', flag: '🇺🇸' },
+                  { value: 'ar', label: 'العربية', flag: '🇸🇦' },
+                ].map((lang) => (
+                  <button
+                    key={lang.value}
+                    type="button"
+                    onClick={() => setLanguage(lang.value)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all ${language === lang.value ? 'border-indigo-600 bg-indigo-50 dark:bg-[rgba(99,102,241,0.12)] text-indigo-700 dark:text-[#a5b4fc]' : 'border-gray-200 dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] hover:border-gray-300 dark:hover:border-[#2d3a4e]'}`}
+                  >
+                    <span>{lang.flag}</span>
+                    <span>{lang.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Display Settings ── */}
+          <div className="bg-white dark:bg-[#121823] rounded-2xl border border-gray-200 dark:border-[#212a38] p-6">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0] uppercase tracking-wide mb-4">
+              {t('accountSettings.tabAppearance')}
+            </h2>
+
+            {/* Dark Mode */}
+            <div className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-[#212a38]">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-[#e8ebf0]">{t('appearance.darkMode')}</p>
+                <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">{t('appearance.darkModeSubtitle')}</p>
+              </div>
+              <Toggle checked={darkMode} onChange={(v) => updateDisplay({ darkMode: v })} />
+            </div>
+
+            {/* Font Family */}
+            <div className="py-3 border-b border-gray-100 dark:border-[#212a38]">
+              <p className="text-sm font-medium text-gray-900 dark:text-[#e8ebf0] mb-1">{t('appearance.font')}</p>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-3">{t('appearance.fontSubtitle')}</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: 'hanken', label: 'Hanken Grotesk' },
+                  { value: 'inter', label: 'Inter' },
+                  { value: 'roboto', label: 'Roboto' },
+                  { value: 'opensans', label: 'Open Sans' },
+                  { value: 'poppins', label: 'Poppins' },
+                  { value: 'system', label: 'System' },
+                ].map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    onClick={() => updateDisplay({ fontFamily: f.value })}
+                    className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${fontFamily === f.value ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] hover:border-gray-300'}`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Table Density */}
+            <div className="py-3 border-b border-gray-100 dark:border-[#212a38]">
+              <p className="text-sm font-medium text-gray-900 dark:text-[#e8ebf0] mb-1">{t('appearance.tableDensity')}</p>
+              <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-3">{t('appearance.tableDensitySubtitle')}</p>
+              <div className="flex gap-2">
+                {[
+                  { id: 'spacious', label: 'Spacious' },
+                  { id: 'comfortable', label: 'Comfortable' },
+                  { id: 'compact', label: 'Compact' },
+                ].map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => updateDisplay({ tableDensity: d.id })}
+                    className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${tableDensity === d.id ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] hover:border-gray-300'}`}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Date Format */}
+            <div className="pt-3">
+              <p className="text-sm font-medium text-gray-900 dark:text-[#e8ebf0] mb-1">{t('appearance.dateFormat')}</p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD', 'DD-MM-YYYY'].map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => updateDisplay({ dateFormat: f })}
+                    className={`px-3 py-1.5 rounded-lg border text-sm font-mono transition-all ${dateFormat === f ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] hover:border-gray-300'}`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Dashboard Widgets ── */}
+          <div className="bg-white dark:bg-[#121823] rounded-2xl border border-gray-200 dark:border-[#212a38] p-6">
             <div className="flex items-center justify-between mb-1">
               <div>
-                <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                  Dashboard Widgets
+                <h2 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0] uppercase tracking-wide">
+                  {t('accountSettings.dashboardWidgets')}
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">
-                  Choose which widgets appear on your dashboard
+                  {t('accountSettings.dashboardWidgetsHint')}
                 </p>
               </div>
               <div className="flex gap-2">
                 <Button variant="secondary" size="sm" onClick={disableAllWidgets}>
-                  Hide all
+                  {t('accountSettings.disableAllWidgets')}
                 </Button>
                 <Button size="sm" onClick={enableAllWidgets}>
-                  Show all
+                  {t('accountSettings.enableAllWidgets')}
                 </Button>
               </div>
             </div>
@@ -789,7 +1127,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                         <span
                           className={`text-xs px-1.5 py-0.5 rounded font-medium ${w.size === 'full' ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-100 text-gray-500'}`}
                         >
-                          {w.size === 'full' ? 'Full width' : 'Half width'}
+                          {w.size === 'full' ? t('accountSettings.widgetFullWidth') : t('accountSettings.widgetHalfWidth')}
                         </span>
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5">{w.desc}</p>
@@ -804,8 +1142,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
             </div>
 
             <p className="text-xs text-gray-500 mt-4 text-center">
-              {widgetPrefs.length} of {WIDGET_CATALOG.length} widgets enabled · Changes apply
-              instantly
+              {t('accountSettings.widgetsEnabledSummary', { count: widgetPrefs.length, total: WIDGET_CATALOG.length })}
             </p>
           </div>
         </div>
@@ -816,9 +1153,8 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
           <div className="mb-6">
             <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-              Activity Log
+              {t('accountSettings.recentActivity')}
             </h2>
-            <p className="text-sm text-gray-500 mt-1">Your 50 most recent account actions</p>
           </div>
 
           {activityLoading ? (
@@ -842,7 +1178,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                   />
                 </svg>
               </div>
-              <p className="text-sm text-gray-500">No activity recorded yet</p>
+              <p className="text-sm text-gray-500">{t('accountSettings.noActivity')}</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
