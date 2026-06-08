@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev            # start dev server (Vite, port 5173)
 npm run build          # production build
 npm run preview        # preview production build
-npm test               # Vitest unit tests (80 tests, 3 suites) — run before every push
+npm test               # Vitest unit tests (80 tests, 3 suites, ~3.5s) — run before every push
 npm run test:watch     # Vitest in watch mode
 npm run test:coverage  # test with coverage report
 npm run lint           # ESLint (0 errors target)
@@ -161,7 +161,7 @@ const [activeTab, setActiveTab] = useURLTab('tab', 'products')
 The app supports **Arabic** and **English** with full RTL layout via `react-i18next`.
 
 **Files:**
-- `src/i18n.js` — i18next config (language detection, `en` default)
+- `src/lib/i18n.js` — i18next config (language detection, `en` default)
 - `src/locales/en.json` — English strings (~500+ keys)
 - `src/locales/ar.json` — Arabic strings (same key structure)
 
@@ -219,7 +219,7 @@ In `Dashboard.jsx`, these tokens are computed at render time via `tokens(darkMod
 Provider-agnostic notification layer that fires on ticket lifecycle events. Ticket saves emit events via `notificationEventBus.emitAsync()` → handlers in `src/lib/events/ticketEventHandlers.ts` check settings → INSERT into `notification_queue` → invoke `notification-worker` for fast delivery with queue persistence for retry.
 
 **Library (`src/lib/`):**
-- `messaging/types.ts` — `IMessagingProvider`, `NotificationEvent`, `EventType`, `DeliveryStatus`
+- `messaging/types.ts` — `IMessagingProvider`, `NotificationEvent`, `EventType`, `DeliveryStatus`, `QueueJob`, `QueueJobPayload`, `NotificationSettings`
 - `messaging/TemplateEngine.ts` — `{{key}}` substitution + `{{#key}}…{{/key}}` conditionals; `toWhatsAppParams()` builds positional Meta API params
 - `messaging/MessagingService.ts` — `messagingService` singleton; `registerProvider()`, `send()`, `sendBatch()`
 - `messaging/providers/WhatsAppProvider.ts` — calls `send-whatsapp` Edge Function; never calls Meta API directly
@@ -333,7 +333,3 @@ All UI primitives come from `src/components/ui.jsx`. Never re-implement buttons,
 GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR to `main`:  
 **test → lint:ci → build** — all three must pass. Node 20, `npm ci --legacy-peer-deps`.
 
-<!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
-<!-- SPECKIT END -->

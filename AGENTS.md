@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev            # start dev server (Vite, port 5173)
 npm run build          # production build
 npm run preview        # preview production build
-npm test               # Vitest unit tests (80 tests, 3 suites) — run before every push
+npm test               # Vitest unit tests (80 tests, 3 suites, ~3.5s) — run before every push
 npm run test:watch     # Vitest in watch mode
 npm run test:coverage  # test with coverage report
 npm run lint           # ESLint (0 errors target)
@@ -100,15 +100,15 @@ Domain modules in `src/api/db/`:
 
 | Module | Covers |
 |--------|--------|
-| `tickets.js` | RMA ticket CRUD + `rmaTracker` public lookup (via Edge Function) |
-| `customers.js` | Customer CRUD |
-| `catalog.js` | Product/catalog CRUD |
-| `inventory.js` | Inventory CRUD |
-| `users.js` | User role management |
-| `notifications.js` | Notification table ops |
-| `system.js` | System config (`rma_config` table) |
-| `audit.js` | Audit log reads |
-| `whatsappNotifications.js` | WhatsApp templates, notification logs, settings, queue |
+| `tickets.ts` | RMA ticket CRUD + `rmaTracker` public lookup (via Edge Function) |
+| `customers.ts` | Customer CRUD |
+| `catalog.ts` | Product/catalog CRUD |
+| `inventory.ts` | Inventory CRUD |
+| `users.ts` | User role management |
+| `notifications.ts` | Notification table ops |
+| `system.ts` | System config (`rma_config` table) |
+| `audit.ts` | Audit log reads |
+| `whatsappNotifications.ts` | WhatsApp templates, notification logs, settings, queue |
 
 Many optional tables (e.g. `announcements`, `custom_field_definitions`, `inventory_units`, `warehouses`) may not exist in every deployment. All `db.*` helpers that target these tables guard with `error.code === '42P01'` (table not found) and return `{ missing: true, data: [] }` instead of throwing.
 
@@ -153,6 +153,44 @@ const [activeTab, setActiveTab] = useURLTab('tab', 'products')
 **Font:** Primary font is **Hanken Grotesk** (Google Fonts, weights 400–800). Loaded via `index.html` preconnect + stylesheet, and dynamically by `AppearanceContext` when selected. `tailwind.config.js` sets `fontFamily.sans: ['Hanken Grotesk', 'system-ui', 'sans-serif']`. `FONT_STACKS` and `GOOGLE_FONTS` in `AppearanceContext.jsx` include `hanken` as a selectable option.
 
 **Dark mode:** `AppearanceContext` toggles the `dark` class on `<html>` (`darkMode: 'class'` Tailwind strategy). Use `dark:` Tailwind prefix classes with Direction B design tokens — see the Design tokens section below.
+
+### Internationalisation (i18n) / RTL
+
+The app supports **Arabic** and **English** with full RTL layout via `react-i18next`.
+
+**Files:**
+- `src/lib/i18n.js` — i18next config (language detection, `en` default)
+- `src/locales/en.json` — English strings (~500+ keys)
+- `src/locales/ar.json` — Arabic strings (same key structure)
+
+**Usage in components:**
+```jsx
+import { useTranslation } from 'react-i18next'
+const { t, i18n } = useTranslation()
+// simple key
+t('tickets.createTicket')
+// interpolation
+t('tickets.pageMustBeBetween', { total: totalPages })
+```
+
+**Language toggle:** `AppearanceContext` exposes `language` / `setLanguage`. Changing language sets `i18n.changeLanguage(lang)` and toggles `dir="rtl"` on `<html>` (applied via `AppearanceContext` — same mechanism as dark mode).
+
+**Module-level functions** cannot use React hooks. Two patterns:
+
+| Situation | Pattern |
+|-----------|---------|
+| Function called from one component that already has `t` | Pass `t` as parameter: `exportPDF(invoice, t)` |
+| Utility called from many places | Import singleton: `import i18next from 'i18next'` then `i18next.t('key')` |
+
+**RTL portals:** Elements rendered via `createPortal` do NOT inherit `dir="rtl"` from `<html>` automatically. Always add an explicit `dir` attribute:
+```jsx
+const isRtl = i18n.language === 'ar'
+<div dir={isRtl ? 'rtl' : 'ltr'} ...>
+```
+
+**RTL floating panel positioning:** When a button moves in RTL (e.g. notification bell shifts to the left side of the header), anchor the panel to match — use `getBoundingClientRect().left` + clamp logic instead of a fixed `right: 8`. See `NotificationBell.jsx` for the reference implementation.
+
+**LAW: Every new page, component, modal, or function must use `t()` for all user-visible strings at build time.** Translation is part of the definition of done — never leave hardcoded English strings in new code.
 
 ### Design tokens (Direction B "Command")
 
@@ -205,7 +243,7 @@ All Edge Functions validate the caller's JWT before performing privileged operat
 Provider-agnostic notification layer that fires on ticket lifecycle events.
 
 **Library layer** (`src/lib/`):
-- `messaging/types.ts` — `IMessagingProvider`, `NotificationEvent`, `EventType`, `DeliveryStatus`, `QueueJob`
+- `messaging/types.ts` — `IMessagingProvider`, `NotificationEvent`, `EventType`, `DeliveryStatus`, `QueueJob`, `QueueJobPayload`, `NotificationSettings`
 - `messaging/TemplateEngine.ts` — `render(template, variables)` with `{{key}}` substitution + `{{#key}}…{{/key}}` conditionals; `resolveVariables(defs, payload)` dot-path resolution; `toWhatsAppParams(variables)` builds positional Meta API params
 - `messaging/MessagingService.ts` — `messagingService` singleton; `registerProvider()`, `send()`, `sendBatch()` with bounded concurrency
 - `messaging/providers/WhatsAppProvider.ts` — browser-side adapter; calls `send-whatsapp` Edge Function via `supabase.functions.invoke()`; never calls Meta API directly
@@ -296,7 +334,3 @@ All UI primitives come from `src/components/ui.jsx`. Never re-implement buttons,
 GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR to `main`:  
 **test → lint:ci → build** — all three must pass. Node 20, `npm ci --legacy-peer-deps`.
 
-<!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
-<!-- SPECKIT END -->
