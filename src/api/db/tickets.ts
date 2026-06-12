@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { captureException } from '../../lib/sentry.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -140,20 +141,16 @@ export const ticketActivity = {
 
 export const ticketComments = {
   async list(ticketId: string): Promise<{ missing: boolean; data: TicketCommentRow[] }> {
-    try {
-      const { data, error } = await supabase
-        .from('ticket_comments')
-        .select('*')
-        .eq('ticket_id', ticketId)
-        .order('created_date', { ascending: true })
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
-    } catch {
-      return { missing: true, data: [] }
+    const { data, error } = await supabase
+      .from('ticket_comments')
+      .select('*')
+      .eq('ticket_id', ticketId)
+      .order('created_date', { ascending: true })
+    if (error) {
+      if (error.code === '42P01') return { missing: true, data: [] }
+      throw error
     }
+    return { missing: false, data: data || [] }
   },
   async create(
     ticketId: string,
@@ -204,7 +201,8 @@ export const rmaTracker = {
       if (error) return null
       if (data?.error) return null
       return data?.ticket || null
-    } catch {
+    } catch (err) {
+      captureException(err, { context: 'rmaTracker.getTicketByRmaNumber' })
       return null
     }
   },
@@ -215,7 +213,8 @@ export const rmaTracker = {
       })
       if (error || data?.error) return []
       return data?.comments || []
-    } catch {
+    } catch (err) {
+      captureException(err, { context: 'rmaTracker.getPublicComments' })
       return []
     }
   },
@@ -244,23 +243,22 @@ export const rmaTracker = {
 export const serialHistory = {
   async getBySerial(serialNumber: string): Promise<Partial<RMATicketRow>[]> {
     if (!serialNumber?.trim()) return []
-    try {
-      const { data, error } = await supabase
-        .from('rma_tickets')
-        .select(
-          'id, rma_number, customer_name, ticket_status, priority, assigned_technician, created_date, due_date, products'
-        )
-        .order('created_date', { ascending: false })
-      if (error) return []
-      return (data || []).filter((t) =>
-        (t.products || []).some(
-          (p: TicketProductItem) =>
-            p.serial_number?.toLowerCase() === serialNumber.trim().toLowerCase()
-        )
+    const { data, error } = await supabase
+      .from('rma_tickets')
+      .select(
+        'id, rma_number, customer_name, ticket_status, priority, assigned_technician, created_date, due_date, products'
       )
-    } catch {
+      .order('created_date', { ascending: false })
+    if (error) {
+      captureException(error, { context: 'serialHistory.getBySerial' })
       return []
     }
+    return (data || []).filter((t) =>
+      (t.products || []).some(
+        (p: TicketProductItem) =>
+          p.serial_number?.toLowerCase() === serialNumber.trim().toLowerCase()
+      )
+    )
   },
 }
 
@@ -283,18 +281,14 @@ export interface TicketResolutionRow {
 
 export const ticketResolutions = {
   async get(ticketId: string): Promise<TicketResolutionRow | null> {
-    try {
-      const { data, error } = await supabase
-        .from('ticket_resolutions')
-        .select('*')
-        .eq('ticket_id', ticketId)
-        .maybeSingle()
-      if (error?.code === '42P01') return null
-      if (error) throw error
-      return data
-    } catch {
-      return null
-    }
+    const { data, error } = await supabase
+      .from('ticket_resolutions')
+      .select('*')
+      .eq('ticket_id', ticketId)
+      .maybeSingle()
+    if (error?.code === '42P01') return null
+    if (error) throw error
+    return data
   },
 
   async upsert(ticketId: string, payload: Omit<TicketResolutionRow, 'id' | 'ticket_id' | 'created_at' | 'updated_at'>): Promise<TicketResolutionRow> {

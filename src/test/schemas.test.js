@@ -179,7 +179,7 @@ describe('ticketSchema', () => {
   })
 
   it('accepts all valid ticket_status values', () => {
-    const statuses = ['Open', 'In Progress', 'Pending', 'On Hold', 'Closed', 'Cancelled']
+    const statuses = ['Open', 'In Progress', 'Pending', 'On Hold', 'Completed', 'Closed', 'Cancelled']
     for (const s of statuses) {
       expect(ticketSchema.safeParse({ ...valid, ticket_status: s }).success).toBe(true)
     }

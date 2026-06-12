@@ -1,5 +1,6 @@
 import { supabase } from '../client.js'
 import { auditInsert } from './audit.js'
+import { captureException } from '../../lib/sentry.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -35,20 +36,16 @@ export interface UserPreferencesRow {
 
 export const userRoles = {
   async getUserRole(email: string): Promise<UserRoleRow | null> {
-    try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('*')
-        .eq('user_email', email)
-        .single()
-      if (error) {
-        if (error.code === 'PGRST116') return null
-        throw error
-      }
-      return data
-    } catch {
-      return null
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('*')
+      .eq('user_email', email)
+      .single()
+    if (error) {
+      if (error.code === 'PGRST116') return null // no row found
+      throw error
     }
+    return data
   },
   async listAllRoles(): Promise<UserRoleRow[]> {
     const { data, error } = await supabase
@@ -128,16 +125,15 @@ export const userRoles = {
     if (error) throw error
   },
   async getCustomRoles(): Promise<unknown[]> {
-    try {
-      const { data, error } = await supabase
-        .from('custom_roles')
-        .select('*')
-        .order('created_date', { ascending: false })
-      if (error) throw error
-      return data || []
-    } catch {
-      return []
+    const { data, error } = await supabase
+      .from('custom_roles')
+      .select('*')
+      .order('created_date', { ascending: false })
+    if (error) {
+      if (error.code === '42P01') return [] // optional table not yet migrated
+      throw error
     }
+    return data || []
   },
   async createCustomRole(
     roleName: string,
@@ -162,18 +158,17 @@ export const userRoles = {
 
 export const userActivity = {
   async list(email: string): Promise<UserActivityRow[]> {
-    try {
-      const { data, error } = await supabase
-        .from('user_activity_log')
-        .select('*')
-        .eq('user_email', email)
-        .order('created_date', { ascending: false })
-        .limit(50)
-      if (error) throw error
-      return data || []
-    } catch {
-      return []
+    const { data, error } = await supabase
+      .from('user_activity_log')
+      .select('*')
+      .eq('user_email', email)
+      .order('created_date', { ascending: false })
+      .limit(50)
+    if (error) {
+      if (error.code === '42P01') return [] // optional table not yet migrated
+      throw error
     }
+    return data || []
   },
   async create(email: string, actionType: string, actionDetails: string): Promise<void> {
     // H-9: use resilient auditInsert (retry + queue) instead of bare insert

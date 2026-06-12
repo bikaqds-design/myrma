@@ -46,11 +46,12 @@ describe('ROLES', () => {
 // ── TICKET_STATUS ─────────────────────────────────────────────────────────────
 
 describe('TICKET_STATUS', () => {
-  it('defines the six canonical statuses', () => {
+  it('defines all seven canonical statuses', () => {
     expect(TICKET_STATUS.OPEN).toBe('Open')
     expect(TICKET_STATUS.IN_PROGRESS).toBe('In Progress')
     expect(TICKET_STATUS.PENDING).toBe('Pending')
     expect(TICKET_STATUS.ON_HOLD).toBe('On Hold')
+    expect(TICKET_STATUS.COMPLETED).toBe('Completed')
     expect(TICKET_STATUS.CLOSED).toBe('Closed')
     expect(TICKET_STATUS.CANCELLED).toBe('Cancelled')
   })
@@ -69,7 +70,8 @@ describe('TICKET_STATUS', () => {
     }
   })
 
-  it('Closed and Cancelled are resolved', () => {
+  it('Closed, Cancelled, and Completed are resolved', () => {
+    expect(TICKET_STATUS_RESOLVED).toContain(TICKET_STATUS.COMPLETED)
     expect(TICKET_STATUS_RESOLVED).toContain(TICKET_STATUS.CLOSED)
     expect(TICKET_STATUS_RESOLVED).toContain(TICKET_STATUS.CANCELLED)
   })
@@ -130,9 +132,9 @@ describe('STORAGE_KEY', () => {
     expect(STORAGE_KEY.NOTIF_PREFS('user@test.com')).toBe('notif_system_prefs_user@test.com')
   })
 
-  it('APPEARANCE and AUDIT_QUEUE are strings', () => {
-    expect(typeof STORAGE_KEY.APPEARANCE).toBe('string')
-    expect(typeof STORAGE_KEY.AUDIT_QUEUE).toBe('string')
+  it('APPEARANCE and AUDIT_QUEUE have expected storage key values', () => {
+    expect(STORAGE_KEY.APPEARANCE).toBe('mrma_appearance')
+    expect(STORAGE_KEY.AUDIT_QUEUE).toBe('mrma_audit_queue')
   })
 })
 
