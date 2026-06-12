@@ -1,18 +1,22 @@
 # Code Review: myRMA 2.0 — `src/` (full codebase pass)
-**Date:** 2026-06-08
+**Date:** 2026-06-12 *(re-audit — previous pass 2026-06-08)*
 **Skill:** clean-code-guard (review mode)
-**Scope:** Full `src/` directory
+**Scope:** Full `src/` directory · all 2026-06-08 findings re-verified · new code since then reviewed (P2-4 activity timeline, `useURLTab` rewrite, Reports tab fix)
 
 ---
 
 # Test Guard Report: myRMA 2.0 — `src/test/`
-**Date:** 2026-06-08
+**Date:** 2026-06-12 *(re-audit — previous pass 2026-06-08)*
 **Skill:** test-guard (review mode)
-**Runner:** Vitest 4.1.7 · **Environment:** jsdom · **Result:** 80/80 passing ✅ *(pre-fix count was 107 due to Vitest worktree duplication — resolved by adding `include: ['src/test/**/*.test.{js,ts}']` to vite.config.js)*
+**Runner:** Vitest 4.1.7 · **Environment:** jsdom · **Result:** 80/80 passing ✅ · 3 files · 3.46s
 
 ## Summary
 
 The existing tests are clean, well-scoped, and free of mocks — the three test files cover pure functions with real inputs and real assertions. No Rule 1, 2, or 8 violations (the "must fix" category). The issues that exist are in Rules 3, 4, 5, and 7 — bloat and weak test names that make failures harder to diagnose. The `resolvePermissions` regression suite is excellent and should be treated as sacred (Rule 6). Notable gap: `TemplateEngine.ts` and `generateRmaNumber()` have complex logic and zero test coverage.
+
+### Re-audit status (2026-06-12)
+
+All three test files are unchanged since 2026-05-31 (verified by file timestamps), so **every finding below remains open** — none of the Rule 3/4/5/7 fixes or coverage gaps have been addressed. No new test files have been added since the last pass, despite new logic shipping in the meantime (P2-4 activity timeline, `useURLTab` rewrite). The suite still passes 80/80 with zero mock usage and the `resolvePermissions` regression guard intact. One coverage-gap update: `useURLTab` was rewritten onto React Router's `useSearchParams` — its delete-param-on-empty-value behavior is now testable with `renderHook` + `MemoryRouter` and worth a small suite (added to the gap table below).
 
 ---
 
@@ -123,6 +127,7 @@ test.each([
 | `generateRmaNumber()` (`_utils.js`) | Date-based + max-serial collision logic; `Math.max(...todaySerials)` path has edge cases |
 | `auditInsert()` (`audit.ts`) | Retry-after-600ms + localStorage queue logic — needs `vi.useFakeTimers()` to test deterministically |
 | `getStatusColor()` / `getPriorityColor()` (`_utils.js`) | The fallback for unknown status is worth a test |
+| `useURLTab` (`hooks/useURLTab.js`) | *(added 2026-06-12)* Rewritten onto `useSearchParams`; the empty/null → param-delete branch and `pushHistory` replace-vs-push behavior are pure contract, testable via `renderHook` inside `MemoryRouter` |
 
 ---
 
@@ -145,7 +150,73 @@ test.each([
 
 ## Summary
 
-The codebase is well-structured overall — clean TypeScript types, a good Zod schema layer, and solid design in the messaging, permissions, and audit subsystems. The main quality debt lives in one place: `TicketForm.jsx`'s `handleSubmit` function, which has grown into a ~385-line, 25+ branch god-method that violates every complexity limit. Several DB helper functions also have overly broad catch-all handlers that silently swallow errors. These two issues together represent the highest risk to correctness and maintainability. **Needs work before the next major feature.**
+The codebase is well-structured overall — clean TypeScript types, a good Zod schema layer, and solid design in the messaging, permissions, and audit subsystems. The main quality debt is unchanged since the 2026-06-08 pass: **all 4 Critical and all 7 Important findings from that pass remain open** — none have been fixed. `handleSubmit` in `TicketForm.jsx` is still a ~385-line god-method (now lines 224–609). The new code shipped since then (P2-4 unified activity timeline, `useURLTab` rewrite) is mostly good quality, but the timeline introduces two new Important findings: a ~100-line IIFE render block and an i18n violation that stores/renders English-only activity strings. **Needs work before the next major feature.**
+
+### Status of 2026-06-08 findings (re-verified 2026-06-12)
+
+| Finding | Status | Current location |
+|---------|--------|------------------|
+| C-1 `handleSubmit` god-function | 🔴 Open | `TicketForm.jsx:224–609` |
+| C-2 `ticketComments.create()` 8 params | 🔴 Open | `tickets.ts:158–167` |
+| C-3 Catch-all handlers swallow errors | 🔴 Open | `tickets.ts`, `users.ts` (all 8 occurrences unchanged) |
+| C-4 `serialHistory.getBySerial()` full-table fetch | 🔴 Open | `tickets.ts:248–264` |
+| I-1 Step-number comments | 🔴 Open | `ticketEventHandlers.ts:46–152` (now 7 numbered steps) |
+| I-2 `sendBatch` fragile index invariant | 🔴 Open | `MessagingService.ts:57` |
+| I-3 `{ missing }` sentinel leak | 🔴 Open | `tickets.ts:142`, `users.ts:204–224` |
+| I-4 Silent `.catch(() => {})` | 🔴 Open | `TicketForm.jsx` (~15 sites) + **spread to new code**: `TicketDrawer.jsx` `logActivity` |
+| I-5 `toWhatsAppParams` dead code | 🔴 Open | `TemplateEngine.ts:95` — grep confirms zero callers |
+| I-6 `validateConfig()` unused | 🔴 Open | `WhatsAppProvider.ts:28` + interface decl `types.ts:89` — zero callers |
+| I-7 Three near-identical notification blocks | 🔴 Open | `TicketForm.jsx:332–383` |
+| Nits (`fmt`, `inp`/`lbl`, `logAct`) | 🔴 Open | `_utils.js:58`, `TicketForm.jsx:29–31`, `TicketForm.jsx:304` |
+
+Full evidence and suggested fixes for the above are in the 2026-06-08 sections below (unchanged and still accurate). New findings from this pass follow.
+
+---
+
+## New Critical Findings (2026-06-12)
+
+None. The new code since 2026-06-08 introduces no correctness or data-loss issues.
+
+---
+
+## New Important Findings (2026-06-12)
+
+### N-1. Activity timeline is a ~100-line IIFE inside JSX — `TicketDrawer.jsx:958–1059`
+**Evidence:** `{(() => { const entries = […]; const ACTIVITY_CFG = {…}; const typeIcon = …; const typeLabel = …; return (<div>…</div>) })()}` — the entire timeline (data merge, config map, two render helpers, and markup) lives in an immediately-invoked closure inside the drawer's JSX. `ACTIVITY_CFG`, `typeIcon`, and `typeLabel` are re-created on every drawer render, and `TicketDrawer.jsx` has grown to 1 505 lines.
+**Principle violated:** Functions stay small / one thing (imperative 2); long function mixing concerns (AI failure mode 8).
+**Suggested fix:** Extract an `ActivityTimeline({ comments, timeEntries, activityLog })` component (new file in `src/pages/RMATickets/` per the existing folder convention). Move `ACTIVITY_CFG` to module scope — it is a pure constant. The entries merge belongs in a `useMemo`.
+
+---
+
+### N-2. Activity timeline renders English-only strings to all locales — `TicketDrawer.jsx:1013, 1068` + `logActivity` call sites
+**Evidence (two related violations of the project i18n LAW):**
+1. `TicketDrawer.jsx:1068` — `{ticketComments.length} comment{ticketComments.length !== 1 ? 's' : ''}` — hardcoded English pluralization, not `t()`. Arabic users see "3 comments".
+2. The new `logActivity()` helper writes freeform English into `ticket_activity.details` (`'Deleted a comment'`, `` `Resolution: ${resForm.type}` ``, `` `Logged ${h}h ${m}m — ${notes}` ``), and `typeLabel` (line 1013) renders `entry.details` raw. The same applies to `TicketForm.jsx`'s `logAct` strings. Once written, these strings are frozen in the writer's language forever.
+**Principle violated:** CLAUDE.md LAW — "Every new page, component, modal, or function must use `t()` for all user-visible strings at build time."
+**Suggested fix:** For (1), use `t('ticketDrawer.commentCount', { count: ticketComments.length })` — i18next handles plural rules per locale (Arabic has 6 plural forms). For (2), the durable fix is structural: store machine-readable `action_type` + a small params object (e.g. `{ hours, minutes }`, `{ resolution_type }`) and translate at render time via `t(\`activity.${entry.action_type}\`, params)`. Storing pre-rendered prose in the DB makes per-locale rendering impossible.
+
+---
+
+### N-3. `logActivity` duplicates `logAct` — third copy of the activity-insert shape — `TicketDrawer.jsx:148–153` vs `TicketForm.jsx:304–305`
+**Evidence:** Both helpers build the same `{ ticket_id, action_type, details, user_email, created_date }` insert with the same silent `.catch(() => {})`. `TicketForm` also inlines the same shape once more at line 575.
+**Principle violated:** DRY — knowledge duplication (imperative 11); also extends I-4 (silent catch) into new code.
+**Suggested fix:** Add `db.ticketActivity.log(ticketId, actionType, details, userEmail)` in `tickets.ts` that owns the timestamp and the error policy (at minimum `captureException` before swallowing), then use it from both components.
+
+---
+
+## New Nits (2026-06-12)
+
+- **Dead `title` prop** — `TicketForm.jsx:616`. `title={editingTicket ? 'Edit RMA Ticket' : 'Create New RMA Ticket'}` is hardcoded English, but the same `Modal` call passes `hideHeader`, so the title never renders. Delete the prop (or translate it if `hideHeader` is ever removed).
+- **`entry.id ?? i` list key** — `TicketDrawer.jsx:1032`. Falling back to array index is safe only because entries are re-sorted on every render anyway; fine for now, worth a stable key if the timeline ever gets inline editing.
+
+---
+
+## What's Improved Since 2026-06-08
+
+1. **`useURLTab` rewrite** (`useURLTab.js`) — replaced manual `window.history` + `popstate` listener (31 lines) with React Router's `useSearchParams` (18 lines). Fewer moving parts, back/forward now handled by the router, and the `pushHistory` flag has a real caller (`ControlPanel.jsx:439`). Textbook simplification.
+2. **`Reports.jsx` tab state** now uses `useURLTab` instead of bare `useState` — deep links work, consistent with every other page.
+3. **`ACTIVITY_CFG` map** replaces the old `actionType?.includes('creat')` string-sniffing heuristic for timeline icon colors — explicit lookup with a sensible default. (Just move it to module scope per N-1.)
+4. **`logActivity` optimistic UI** — appending the returned entry to local state so the timeline updates without a refetch is the right pattern.
 
 ---
 
@@ -328,8 +399,11 @@ settled.forEach((r, idx) => {
 | 7 | I-7: Extract `createTicketNotification` helper | `TicketForm.jsx:332` | Low |
 | 8 | I-1: Extract helpers in `ticketEventHandlers.ts` | `ticketEventHandlers.ts:46` | Medium |
 | 9 | I-3: Remove `{ missing }` sentinel | `tickets.ts`, `users.ts` | Medium |
-| 10 | I-5/I-6: Delete dead code (`toWhatsAppParams`, `validateConfig`) | `TemplateEngine.ts`, `WhatsAppProvider.ts` | Low |
-| 11 | Nits | Various | Low |
+| 10 | N-2: Fix timeline i18n (plural + stored-English details) | `TicketDrawer.jsx:1013,1068` | Medium |
+| 11 | N-1: Extract `ActivityTimeline` component | `TicketDrawer.jsx:958` | Medium |
+| 12 | N-3: Shared `db.ticketActivity.log()` helper | `tickets.ts`, both components | Low |
+| 13 | I-5/I-6: Delete dead code (`toWhatsAppParams`, `validateConfig`) | `TemplateEngine.ts`, `WhatsAppProvider.ts` | Low |
+| 14 | Nits | Various | Low |
 
 ---
 
