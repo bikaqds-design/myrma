@@ -48,13 +48,14 @@ export class MessagingService {
     for (let i = 0; i < batch.length; i += concurrency) {
       const slice = batch.slice(i, i + concurrency)
       const settled = await Promise.allSettled(slice.map((o) => this.send(o)))
-      for (const r of settled) {
+      for (let j = 0; j < settled.length; j++) {
+        const r = settled[j]
         if (r.status === 'fulfilled') {
           results.push(r.value)
         } else {
           results.push({
             success: false,
-            provider: slice[results.length % slice.length]?.provider ?? 'whatsapp',
+            provider: slice[j]?.provider ?? 'whatsapp',
             status: 'failed',
             error: r.reason instanceof Error ? r.reason.message : String(r.reason),
           })

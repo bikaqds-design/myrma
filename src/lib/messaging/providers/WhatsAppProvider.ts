@@ -25,10 +25,6 @@ export class WhatsAppProvider implements IMessagingProvider {
     return this.enabled && !!this.phoneNumberId
   }
 
-  validateConfig(): boolean {
-    return !!this.phoneNumberId
-  }
-
   async send(options: SendMessageOptions): Promise<MessageResult> {
     if (!this.isEnabled()) {
       return {

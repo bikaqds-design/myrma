@@ -86,7 +86,6 @@ export interface MessageResult {
 export interface IMessagingProvider {
   readonly provider: NotificationProvider
   send(options: SendMessageOptions): Promise<MessageResult>
-  validateConfig(): boolean
   isEnabled(): boolean
 }
 
