@@ -1084,7 +1084,10 @@
     "ticketCreated": "تم إنشاء التذكرة بنجاح!",
     "failedSaveTicket": "فشل حفظ التذكرة: {{error}}",
     "emailNotifFailed": "فشل إشعار البريد الإلكتروني: {{error}}",
-    "customerNameRequired": "اسم العميل مطلوب"
+    "customerNameRequired": "اسم العميل مطلوب",
+    "viewTable": "جدول",
+    "viewKanban": "كانبان",
+    "kanbanNoTickets": "لا توجد تذاكر"
   },
   "ticketDrawer": {
     "title": "تفاصيل التذكرة",

@@ -49,11 +49,17 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 - **TS-03** — `test.each` for status/priority/role loops ✅
 - **UX-04** — Customer name blur validation ✅
 
-### Next (Phase 5 candidates)
+### Shipped (Phase 5)
 
-- **UX-03** — Sidebar navigation grouping
-- **UX-05** — Ticket kanban/pipeline view
-- **CQ-05** — Extract numbered-step blocks in `ticketEventHandlers.ts`
+- **CQ-05** — Extract step helpers from `ticketEventHandlers.ts` ✅
+- **UX-05** — Ticket kanban view ✅
+- **UX-03** — Sidebar grouping (Dropped by user request)
+
+### Next (Phase 6 candidates)
+
+- **CQ-07** — Remove `{ missing: boolean }` sentinel from API return types
+- **CQ-15** — Nits bundle: rename helpers, delete dead prop + comments
+- **UX-06** — Keyboard shortcuts + `?` menu
 
 ### Later (backlog)
 - **FT-01** — Customer return initiation portal (highest-impact remaining feature gap)
@@ -82,7 +88,7 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 | CQ-12 | Extract `ActivityTimeline` component from ~100-line IIFE | P1 | Medium | Shipped | GUARD → N-1 | `TicketDrawer.jsx:958–1059` → `ActivityTimeline.jsx` |
 | CQ-13 | Fix activity timeline i18n (plural count + stored-English details in DB) | P1 | Medium | Shipped | GUARD → N-2 | `TicketDrawer.jsx:1013,1068` + logActivity call sites |
 | CQ-14 | Add shared `db.ticketActivity.log()` helper (3 copies of insert shape) | P1 | Low | Shipped | GUARD → N-3 | `tickets.ts`, `TicketDrawer.jsx`, `TicketForm.jsx` |
-| CQ-05 | Extract numbered-step blocks in `ticketEventHandlers.ts` into named helpers | P2 | Medium | Open | GUARD → I-1 | `ticketEventHandlers.ts:46–152` |
+| CQ-05 | Extract numbered-step blocks in `ticketEventHandlers.ts` into named helpers | P2 | Medium | Shipped | GUARD → I-1 | `ticketEventHandlers.ts:46–152` |
 | CQ-07 | Remove `{ missing: boolean }` sentinel from API return types | P2 | Medium | Open | GUARD → I-3 | `tickets.ts:142`, `users.ts:194` |
 | CQ-15 | Nits bundle: rename `fmt`→`formatDate`, `inp`/`lbl`→`inputClass`/`labelClass`, `logAct`→`logActivityChange`; delete `title` dead prop; delete paraphrasing comments | P3 | Low | Open | GUARD → Nits | `_utils.js:58`, `TicketForm.jsx:29–31,258,268,303,616` |
 
@@ -173,9 +179,9 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 |----|-------|----------|--------|--------|--------|-------|
 | UX-01 | Mobile-first ticket view (tap targets, swipe actions, camera attachment) | P0 | Hard | Open | COMP §4 Mobile | Not mobile-first; technicians work at benches |
 | UX-02 | Role-aware dashboard widgets (technician vs. manager views) | P1 | Medium | Shipped | COMP §4 Dashboard | "My Open Tickets" panel for technician/viewer roles |
-| UX-03 | Sidebar navigation grouping (Service, Customers, Operations, Admin sections) | P1 | Medium | Open | COMP §4 Sidebar | 14+ flat items; discovery slow for new users |
+| UX-03 | Sidebar navigation grouping (Service, Customers, Operations, Admin sections) | P1 | Medium | Dropped | COMP §4 Sidebar | 14+ flat items; discovery slow for new users |
 | UX-04 | Form validation on blur (real-time field errors before submit) | P1 | Low | Shipped | COMP §4 Forms | Zod wired but errors appear only post-submit |
-| UX-05 | Ticket status workflow view (kanban or stage-pipeline, block illegal transitions) | P1 | Medium | Open | COMP §4 Status | No visual transition diagram |
+| UX-05 | Ticket status workflow view (kanban or stage-pipeline, block illegal transitions) | P1 | Medium | Shipped | COMP §4 Status | No visual transition diagram |
 | UX-06 | Keyboard shortcuts + `?` shortcut menu (`N`=new ticket, `Esc`=close, `Cmd+K`) | P2 | Easy | Open | COMP §4 Keyboard | Power user gap |
 | UX-07 | WCAG AA accessibility audit + fix critical violations | P2 | Medium | Open | COMP §4 Accessibility | axe-core runs in dev; no production audit done |
 | UX-08 | Table pagination controls ("Showing X–Y of Z" + server-side above 500 rows) | P2 | Low | Open | COMP §4 Pagination | 5,000-row client cap with no visible controls |

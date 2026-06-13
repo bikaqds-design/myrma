@@ -14,6 +14,7 @@ import { ROLES, TICKET_STATUS_RESOLVED, TICKET_STATUS_LIST, PRIORITY_LIST } from
 import { captureException } from '../../lib/sentry'
 import { SortableHeader } from './_shared'
 import { getStatusColor, getPriorityColor, fmt } from './_utils'
+import { KanbanView } from './_kanban'
 import { TicketForm } from './TicketForm'
 import { TicketDrawer } from './TicketDrawer'
 
@@ -99,6 +100,10 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     setConfirmDialog({ open: true, title, message, onConfirm })
   const closeConfirm = () => setConfirmDialog((d) => ({ ...d, open: false }))
 
+  const [viewMode, setViewMode] = useState(
+    () => safeStorage.get('rmaTicketsViewMode', 'table')
+  )
+
   const [selectedTickets, setSelectedTickets] = useState([])
   const [bulkTicketStatus, setBulkTicketStatus] = useState('')
   const [bulkProductStatus, setBulkProductStatus] = useState('')
@@ -117,6 +122,9 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     filterAssigned,
     filterCustomer,
   ])
+  useEffect(() => {
+    safeStorage.set('rmaTicketsViewMode', viewMode)
+  }, [viewMode])
   useEffect(() => {
     safeStorage.set('rmaTicketsPerPage', itemsPerPage)
   }, [itemsPerPage])
@@ -213,7 +221,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         }
       }
       db.auditLog.log(userEmail, `ticket_${field}_changed`, `${ticket.rma_number}: ${oldValue} → ${newValue}`).catch(() => {})
-      db.ticketActivity.create({ ticket_id: ticket.id, action_type: field === 'ticket_status' ? 'status_changed' : 'priority_changed', details: `${oldValue} → ${newValue}`, user_email: userEmail, created_date: new Date().toISOString() }).catch(() => {})
+      db.ticketActivity.log(ticket.id, field === 'ticket_status' ? 'status_changed' : 'priority_changed', `${oldValue} → ${newValue}`, userEmail)
       toast.success(t('tickets.fieldUpdated', { field: field === 'ticket_status' ? t('common.status') : t('common.priority') }))
     } catch {
       // Rollback
@@ -461,7 +469,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       await Promise.all(
         selectedTickets.map((id) => {
           const prev = tickets.find((t) => t.id === id)
-          db.ticketActivity.create({ ticket_id: id, action_type: 'status_changed', details: `${prev?.ticket_status || '?'} → ${bulkTicketStatus} (bulk)`, user_email: userEmail, created_date: new Date().toISOString() }).catch(() => {})
+          db.ticketActivity.log(id, 'status_changed', `${prev?.ticket_status || '?'} → ${bulkTicketStatus} (bulk)`, userEmail)
           return db.rmaTickets.update(id, {
             ticket_status: bulkTicketStatus,
             updated_by: userEmail,
@@ -950,6 +958,31 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           </button>
         </div>
         <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden text-sm">
+            <button
+              onClick={() => setViewMode('table')}
+              aria-pressed={viewMode === 'table'}
+              title={t('tickets.viewTable')}
+              className={`px-3 py-2 flex items-center gap-1.5 transition-colors ${viewMode === 'table' ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              <span className="hidden sm:inline">{t('tickets.viewTable')}</span>
+            </button>
+            <button
+              onClick={() => setViewMode('kanban')}
+              aria-pressed={viewMode === 'kanban'}
+              title={t('tickets.viewKanban')}
+              className={`px-3 py-2 flex items-center gap-1.5 transition-colors ${viewMode === 'kanban' ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+              </svg>
+              <span className="hidden sm:inline">{t('tickets.viewKanban')}</span>
+            </button>
+          </div>
           {canDo('export') && (
             <Button variant="secondary" onClick={handleExport}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1149,7 +1182,13 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         </div>
       )}
 
-      {/* Pagination top bar */}
+      {/* Kanban view */}
+      {viewMode === 'kanban' && (
+        <KanbanView tickets={filteredTickets} onViewDetails={handleViewDetails} />
+      )}
+
+      {/* Table view: pagination bar + table + footer */}
+      {viewMode === 'table' && (<>
       <div className="flex items-center justify-between text-sm text-gray-600">
         <div>
           {t('tickets.showingRange', { from: filteredTickets.length === 0 ? 0 : startIndex + 1, to: endIndex, total: filteredTickets.length })}
@@ -1608,6 +1647,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           </div>
         </div>
       )}
+      </>)}
 
       {/* ─── CREATE / EDIT MODAL ─── */}
       {showModal && (
@@ -1634,7 +1674,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       {/* ─── DETAILS MODAL ─── */}
       {showDetailsModal && selectedTicket && (
         <TicketDrawer
-          ticket={selectedTicket}
+          ticket={tickets.find((t) => t.id === selectedTicket.id) || selectedTicket}
           onClose={() => {
             handleCloseDetails()
             setSelectedTicket(null)

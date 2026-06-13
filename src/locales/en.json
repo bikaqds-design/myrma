@@ -1084,7 +1084,10 @@
     "ticketCreated": "Ticket created successfully!",
     "failedSaveTicket": "Failed to save ticket: {{error}}",
     "emailNotifFailed": "Email notification failed: {{error}}",
-    "customerNameRequired": "Customer name is required"
+    "customerNameRequired": "Customer name is required",
+    "viewTable": "Table",
+    "viewKanban": "Kanban",
+    "kanbanNoTickets": "No tickets"
   },
   "ticketDrawer": {
     "title": "Ticket Details",
