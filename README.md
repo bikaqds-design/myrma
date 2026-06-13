@@ -191,7 +191,8 @@ myrma-app/
 │   │       ├── users.ts                      # User role management
 │   │       ├── notifications.ts              # Notification table ops
 │   │       ├── system.ts                     # System config (rma_config table)
-│   │       └── audit.ts                      # Audit log reads
+│   │       ├── audit.ts                      # Audit log reads
+│   │       └── whatsappNotifications.ts      # WhatsApp templates, notification logs, settings, queue
 │   ├── components/
 │   │   ├── ui.jsx                            # Shared component library (Button, Input, Modal, Badge…)
 │   │   ├── ErrorBoundary.jsx                 # App-level error boundary → Sentry
@@ -230,7 +231,10 @@ myrma-app/
 │   ├── functions/                            # Supabase Edge Functions
 │   │   ├── admin-reset-password/             # Password reset + user creation (create-if-missing)
 │   │   ├── public-track/                     # Rate-limited public RMA lookup
-│   │   └── send-email/                       # Email dispatch
+│   │   ├── send-email/                       # Email dispatch
+│   │   ├── send-whatsapp/                    # WhatsApp message dispatch via Meta Cloud API
+│   │   ├── notification-worker/              # Queue processor with exponential-backoff retry
+│   │   └── whatsapp-webhook/                 # Meta delivery-status callbacks
 │   └── migrations/                           # Database migrations (run in date order)
 ├── .github/
 │   └── workflows/
@@ -249,7 +253,7 @@ myrma-app/
 Page Component
   → import { db, auth, storage } from '../api/supabaseClient.js'
   → db.rmaTickets.list() / db.customers.get(id) / etc.
-  → src/api/db/<domain>.js
+  → src/api/db/<domain>.ts
   → supabase client (src/api/client.js)
   → Supabase PostgreSQL (RLS enforced)
 ```

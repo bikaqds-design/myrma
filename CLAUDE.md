@@ -331,11 +331,6 @@ All UI primitives come from `src/components/ui.jsx`. Never re-implement buttons,
 ### CI/CD
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR to `main`:  
-**test → lint:ci → build** — all three must pass. Node 20, `npm ci --legacy-peer-deps`.
-
-<!-- SPECKIT START -->
-Active plan: `specs/001-quality-fixes-plan/plan.md` — unified improvement plan document
-(merges `GUARD_SKILL_TEST_REPORT.md` + `COMPETITIVE_ANALYSIS.md` into `IMPROVEMENT_PLAN.md`).
-<!-- SPECKIT END -->
+**test → lint:ci → build** — all three must pass. Node 20, `npm ci` (`--legacy-peer-deps` is set in `.npmrc`).
 
 

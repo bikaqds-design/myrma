@@ -1,6 +1,6 @@
 # myRMA — Improvement Plan
 
-**Last updated:** 2026-06-12
+**Last updated:** 2026-06-13
 **Sources:**
 - `GUARD_SKILL_TEST_REPORT.md` — clean-code-guard + test-guard + docs-guard audit (2026-06-12 re-audit)
 - `COMPETITIVE_ANALYSIS.md` — feature-gap + UX audit (2026-06-06)
@@ -26,25 +26,30 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 
 ## Now / Next / Later
 
-### Now (this sprint)
-- **CQ-01** — Break up `handleSubmit` god-function (385 lines, cyclomatic ≥25)
-- **CQ-03** — Narrow catch-all error handlers (8 occurrences swallowing DB errors silently)
-- **TS-01** — Fix COMPLETED status missing from constants test suite (silent correctness gap)
-- **DOC-05** — Add `vitest include` filter to fix test doubling from worktree
-- **DOC-03** — Fix i18n file path in CLAUDE.md
+### Shipped (Phase 1 + Phase 2)
+- **CQ-01** — Break up `handleSubmit` god-function ✅
+- **CQ-03** — Narrow catch-all error handlers ✅
+- **CQ-08** — Wire `captureException` into fire-and-forget catches ✅
+- **CQ-12** — Extract `ActivityTimeline` component ✅
+- **CQ-14** — Add `db.ticketActivity.log()` shared helper ✅
+- **TS-01** — Fix COMPLETED status in constants test ✅
+- **DOC-03** — Fix i18n file path in CLAUDE.md ✅
+- **DOC-05** — Add `vitest include` filter + `pool: 'forks'` ✅
+- **UX-02** — Role-aware dashboard widgets ✅
 
-### Next (following sprint)
-- **CQ-08** — Wire `captureException` into fire-and-forget catches (production observability)
-- **CQ-12** — Extract `ActivityTimeline` component from IIFE (TicketDrawer 1 505 lines)
-- **CQ-14** — Add `db.ticketActivity.log()` shared helper (3 copies of same insert shape)
-- **UX-02** — Role-aware dashboard widgets (P2-5 feature, explained but not yet built)
-- **FT-06** — SMS notifications via Twilio (reuses existing notification_queue pattern)
+### Next (Phase 3 candidates)
+- **CQ-02** — Refactor `ticketComments.create()` 8 positional args → DTO
+- **CQ-04** — Fix `serialHistory.getBySerial()` full-table fetch
+- **CQ-09 + CQ-10** — Delete two dead code items
+- **CQ-11** — Extract `createTicketNotification` helper
+- **UX-04** — Form validation on blur
 
 ### Later (backlog)
 - **FT-01** — Customer return initiation portal (highest-impact remaining feature gap)
 - **FT-02** — Payment processing / POS (blocks closing the repair loop)
 - **FT-03** — Public REST API + developer docs (required for B2B sales)
 - **FT-04** — Native mobile app (technician workflow gap vs. RepairDesk)
+- **FT-06** — SMS notifications via Twilio (reuses existing notification_queue pattern)
 
 ---
 
@@ -54,18 +59,18 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 
 | ID | Title | Priority | Effort | Status | Source | Where |
 |----|-------|----------|--------|--------|--------|-------|
-| CQ-01 | Break up `handleSubmit` god-function (385 lines, cyclomatic ≥25) | P0 | High | Open | GUARD → C-1 | `TicketForm.jsx:224–609` |
+| CQ-01 | Break up `handleSubmit` god-function (385 lines, cyclomatic ≥25) | P0 | High | Shipped | GUARD → C-1 | `TicketForm.jsx:224–609` |
 | CQ-02 | Refactor `ticketComments.create()` from 8 positional params to DTO | P0 | Low | Open | GUARD → C-2 | `tickets.ts:158–167` |
-| CQ-03 | Narrow catch-all handlers to specific error codes (8 occurrences) | P0 | Medium | Open | GUARD → C-3 | `tickets.ts`, `users.ts` |
+| CQ-03 | Narrow catch-all handlers to specific error codes (8 occurrences) | P0 | Medium | Shipped | GUARD → C-3 | `tickets.ts`, `users.ts` |
 | CQ-04 | Fix `serialHistory.getBySerial()` full-table client-side fetch | P0 | Medium | Open | GUARD → C-4 | `tickets.ts:249–264` |
 | CQ-06 | Fix `sendBatch` fragile index invariant | P1 | Low | Open | GUARD → I-2 | `MessagingService.ts:57` |
-| CQ-08 | Replace silent `.catch(() => {})` with `captureException` | P1 | Low | Open | GUARD → I-4 | `TicketForm.jsx` (~15 sites), `TicketDrawer.jsx` |
+| CQ-08 | Replace silent `.catch(() => {})` with `captureException` | P1 | Low | Shipped | GUARD → I-4 | `TicketForm.jsx` (~15 sites), `TicketDrawer.jsx` |
 | CQ-09 | Delete `toWhatsAppParams` dead code | P1 | Low | Open | GUARD → I-5 | `TemplateEngine.ts:95` |
 | CQ-10 | Delete `validateConfig()` unused method | P1 | Low | Open | GUARD → I-6 | `WhatsAppProvider.ts:28` |
 | CQ-11 | Extract `createTicketNotification` helper (3 identical notification blocks) | P1 | Low | Open | GUARD → I-7 | `TicketForm.jsx:332–383` |
-| CQ-12 | Extract `ActivityTimeline` component from ~100-line IIFE | P1 | Medium | Open | GUARD → N-1 | `TicketDrawer.jsx:958–1059` |
+| CQ-12 | Extract `ActivityTimeline` component from ~100-line IIFE | P1 | Medium | Shipped | GUARD → N-1 | `TicketDrawer.jsx:958–1059` → `ActivityTimeline.jsx` |
 | CQ-13 | Fix activity timeline i18n (plural count + stored-English details in DB) | P1 | Medium | Open | GUARD → N-2 | `TicketDrawer.jsx:1013,1068` + logActivity call sites |
-| CQ-14 | Add shared `db.ticketActivity.log()` helper (3 copies of insert shape) | P1 | Low | Open | GUARD → N-3 | `tickets.ts`, `TicketDrawer.jsx`, `TicketForm.jsx` |
+| CQ-14 | Add shared `db.ticketActivity.log()` helper (3 copies of insert shape) | P1 | Low | Shipped | GUARD → N-3 | `tickets.ts`, `TicketDrawer.jsx`, `TicketForm.jsx` |
 | CQ-05 | Extract numbered-step blocks in `ticketEventHandlers.ts` into named helpers | P2 | Medium | Open | GUARD → I-1 | `ticketEventHandlers.ts:46–152` |
 | CQ-07 | Remove `{ missing: boolean }` sentinel from API return types | P2 | Medium | Open | GUARD → I-3 | `tickets.ts:142`, `users.ts:194` |
 | CQ-15 | Nits bundle: rename `fmt`→`formatDate`, `inp`/`lbl`→`inputClass`/`labelClass`, `logAct`→`logActivityChange`; delete `title` dead prop; delete paraphrasing comments | P3 | Low | Open | GUARD → Nits | `_utils.js:58`, `TicketForm.jsx:29–31,258,268,303,616` |
@@ -78,7 +83,7 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 
 | ID | Title | Priority | Effort | Status | Source | Where |
 |----|-------|----------|--------|--------|--------|-------|
-| TS-01 | Fix `COMPLETED` status missing from constants test (7th status not covered) | P0 | Low | Open | GUARD → constants.test.js analysis | `constants.test.js` — `defines the six canonical statuses` |
+| TS-01 | Fix `COMPLETED` status missing from constants test (7th status not covered) | P0 | Low | Shipped | GUARD → constants.test.js analysis | `constants.test.js` — `defines the six canonical statuses` |
 | TS-02 | Delete `typeof STORAGE_KEY.APPEARANCE === 'string'` type-system test | P1 | Low | Open | GUARD → Rule 7+4 | `constants.test.js` |
 | TS-03 | Convert `for` loops in schemas tests to `test.each` | P1 | Low | Open | GUARD → Rule 3 | `schemas.test.js` — ticket_status, priority, roles loops |
 | TS-04 | Merge `null`/`undefined` permission tests into one `test.each` | P2 | Low | Open | GUARD → Rule 3 | `permissions.test.js` |
@@ -99,22 +104,22 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 
 | ID | Title | Priority | Effort | Status | Source | Where |
 |----|-------|----------|--------|--------|--------|-------|
-| DOC-01 | Fix `.js` → `.ts` extensions in AGENTS.md module table | P0 | Low | Open | GUARD → docs-guard Rule 1 | `AGENTS.md:103–111` (9 entries) |
-| DOC-02 | Fix `.js` → `.ts` extensions in README.md project tree | P0 | Low | Open | GUARD → docs-guard Rule 1 | `README.md:193–196` |
-| DOC-03 | Fix i18n path: `src/i18n.js` → `src/lib/i18n.js` in CLAUDE.md | P0 | Low | Open | GUARD → docs-guard Rule 1 | `CLAUDE.md:164` |
-| DOC-04 | Resolve design token contradiction: sync DESIGN.md hex values to CLAUDE.md | P0 | Low | Open | GUARD → docs-guard Rule 1 | `DESIGN.md` vs `CLAUDE.md` (5 token pairs differ) |
-| DOC-05 | Add `include` filter to Vitest config to fix test doubling from worktree | P0 | Low | Open | GUARD → docs-guard Rule 3 | `vite.config.js` test config + update counts in README/CLAUDE/AGENTS |
-| DOC-11 | Fix CONSTITUTION.md §13.1 Directory Map (.js→.ts; products.js→catalog.ts; add missing modules) | P0 | Low | Open | GUARD → docs-guard Rule 1+3 | `CONSTITUTION.md:~1178–1185` |
-| DOC-12 | Fix CONSTITUTION.md §12.1 Naming table (.js→.ts in extension column and examples) | P0 | Low | Open | GUARD → docs-guard Rule 1 | `CONSTITUTION.md:~1082` |
-| DOC-06 | Remove CI badge placeholder or replace with real repo URL | P1 | Low | Open | GUARD → docs-guard Rule 5 | `README.md:5` |
-| DOC-07 | Remove redundant `--legacy-peer-deps` flag (already in .npmrc) | P1 | Low | Open | GUARD → docs-guard Rule 7 | `README.md:78` |
-| DOC-08 | Add i18n/RTL section to AGENTS.md (entirely missing) | P1 | Medium | Open | GUARD → docs-guard Rule 8 | `AGENTS.md` |
-| DOC-09 | Remove SPECKIT stubs from CLAUDE.md and AGENTS.md (last 4 lines each) | P1 | Low | Open | GUARD → docs-guard Rule 10 | `CLAUDE.md`, `AGENTS.md` (last 4 lines) |
+| DOC-01 | Fix `.js` → `.ts` extensions in AGENTS.md module table | P0 | Low | Dropped | GUARD → docs-guard Rule 1 | Pre-existing correct — TypeScript conversion (2026-06-03) already fixed all 9 entries |
+| DOC-02 | Fix `.js` → `.ts` in README.md data flow + add missing `whatsappNotifications.ts` + 3 Edge Functions to tree | P0 | Low | Shipped | GUARD → docs-guard Rule 1 | `README.md:253,194,233` |
+| DOC-03 | Fix i18n path: `src/i18n.js` → `src/lib/i18n.js` in CLAUDE.md | P0 | Low | Shipped | GUARD → docs-guard Rule 1 | `CLAUDE.md:164` |
+| DOC-04 | Resolve design token contradiction: sync DESIGN.md hex values to CLAUDE.md | P0 | Low | Dropped | GUARD → docs-guard Rule 1 | Pre-existing correct — token tables match exactly |
+| DOC-05 | Add `include` filter to Vitest config to fix test doubling from worktree | P0 | Low | Shipped | GUARD → docs-guard Rule 3 | `vite.config.js` test config + update counts in README/CLAUDE/AGENTS |
+| DOC-11 | Fix CONSTITUTION.md §13.1 Directory Map — add 3 missing Edge Functions | P0 | Low | Shipped | GUARD → docs-guard Rule 1+3 | `CONSTITUTION.md:~1246–1250` |
+| DOC-12 | Fix CONSTITUTION.md §12.1 Naming table (.js→.ts in extension column) | P0 | Low | Dropped | GUARD → docs-guard Rule 1 | Pre-existing correct — table already shows `.ts` for all TypeScript modules |
+| DOC-06 | Remove CI badge placeholder or replace with real repo URL | P1 | Low | Dropped | GUARD → docs-guard Rule 5 | Pre-existing correct — no badge placeholder in README |
+| DOC-07 | Remove redundant `--legacy-peer-deps` flag (already in .npmrc) | P1 | Low | Shipped | GUARD → docs-guard Rule 7 | `CLAUDE.md:334`, `AGENTS.md:335` updated; README install cmd was already clean |
+| DOC-08 | Add i18n/RTL section to AGENTS.md (entirely missing) | P1 | Medium | Dropped | GUARD → docs-guard Rule 8 | Pre-existing correct — full i18n/RTL section already present at AGENTS.md:157–193 |
+| DOC-09 | Remove SPECKIT stubs from CLAUDE.md | P1 | Low | Shipped | GUARD → docs-guard Rule 10 | `CLAUDE.md:336–339` removed; AGENTS.md had no stub |
 | DOC-10 | Verify and sync `QueueJob` export in AGENTS.md vs CLAUDE.md | P2 | Low | Open | GUARD → docs-guard Worth noting | `AGENTS.md:208`, `CLAUDE.md:222` |
-| DOC-13 | Fix AUDIT_LOG.md i18n path in 2026-06-05 entry | P0 | Low | Open | GUARD → docs-guard Rule 1 | `AUDIT_LOG.md:1310` |
-| DOC-14 | Add 3 missing Edge Functions to CONSTITUTION.md §7.4 | P1 | Low | Open | GUARD → docs-guard Rule 1 | `CONSTITUTION.md:~753–763` |
-| DOC-15 | Fix CONSTITUTION.md §16.3 CI test count: 74 → 80 | P1 | Low | Open | GUARD → docs-guard Rule 1 | `CONSTITUTION.md:~1454` |
-| DOC-16 | Mark MFA / replacement / i18n as Shipped in COMPETITIVE_ANALYSIS.md §3 | P1 | Low | Open | GUARD → docs-guard Rule 3 | `COMPETITIVE_ANALYSIS.md` §3 |
+| DOC-13 | Fix AUDIT_LOG.md i18n path in 2026-06-05 entry | P0 | Low | Dropped | GUARD → docs-guard Rule 1 | Pre-existing correct — `src/lib/i18n.js` already correct at AUDIT_LOG.md:1310 |
+| DOC-14 | Add 3 missing Edge Functions to CONSTITUTION.md §7.4 | P1 | Low | Dropped | GUARD → docs-guard Rule 1 | Pre-existing correct — §7.4 already lists all 6 functions + ai-assist |
+| DOC-15 | Fix CONSTITUTION.md §16.3 CI test count: 74 → 80 | P1 | Low | Dropped | GUARD → docs-guard Rule 1 | Pre-existing correct — §16.3 already reads `80 unit tests` |
+| DOC-16 | Mark MFA / replacement / i18n as Shipped in COMPETITIVE_ANALYSIS.md §3 | P1 | Low | Dropped | GUARD → docs-guard Rule 3 | Pre-existing correct — all three already marked ✅ Shipped in §3 |
 | DOC-17 | Add note in AUDIT_LOG.md C-1 entry: `poolOptions` refined to `fileParallelism: false` | P2 | Low | Open | GUARD → docs-guard Rule 3 | `AUDIT_LOG.md:~601` |
 | DOC-18 | Update GUARD_SKILL_TEST_REPORT.md header: `107/107` → `80/80` with note | P2 | Low | Open | GUARD → docs-guard Worth noting | `GUARD_SKILL_TEST_REPORT.md:11` |
 
@@ -156,7 +161,7 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 | ID | Title | Priority | Effort | Status | Source | Notes |
 |----|-------|----------|--------|--------|--------|-------|
 | UX-01 | Mobile-first ticket view (tap targets, swipe actions, camera attachment) | P0 | Hard | Open | COMP §4 Mobile | Not mobile-first; technicians work at benches |
-| UX-02 | Role-aware dashboard widgets (technician vs. manager views) | P1 | Medium | Open | COMP §4 Dashboard | P2-5 — explained, not yet confirmed/built |
+| UX-02 | Role-aware dashboard widgets (technician vs. manager views) | P1 | Medium | Shipped | COMP §4 Dashboard | "My Open Tickets" panel for technician/viewer roles |
 | UX-03 | Sidebar navigation grouping (Service, Customers, Operations, Admin sections) | P1 | Medium | Open | COMP §4 Sidebar | 14+ flat items; discovery slow for new users |
 | UX-04 | Form validation on blur (real-time field errors before submit) | P1 | Low | Open | COMP §4 Forms | Zod wired but errors appear only post-submit |
 | UX-05 | Ticket status workflow view (kanban or stage-pipeline, block illegal transitions) | P1 | Medium | Open | COMP §4 Status | No visual transition diagram |
@@ -194,3 +199,5 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 | Date | Change |
 |------|--------|
 | 2026-06-12 | Initial population — 75 items across CQ (15), TS (12), DOC (18), FT (10 open + 10 shipped), UX (10 open + 6 shipped), Horizon (6) |
+| 2026-06-13 | Phase 1 shipped: CQ-01, CQ-03, TS-01, DOC-03, DOC-05. Phase 2 shipped: CQ-08, CQ-12, CQ-14, UX-02. Updated Now/Next/Later section. |
+| 2026-06-13 | Group 1 doc fixes: DOC-02, DOC-07, DOC-09, DOC-11 shipped. DOC-01/04/06/08/12/13/14/15/16 dropped (pre-existing correct from 2026-06-03 TypeScript conversion). |

@@ -1246,7 +1246,10 @@ d:\myrma-app\
 │   ├── functions\              # Supabase Edge Functions
 │   │   ├── admin-reset-password\
 │   │   ├── public-track\
-│   │   └── send-email\
+│   │   ├── send-email\
+│   │   ├── send-whatsapp\
+│   │   ├── notification-worker\
+│   │   └── whatsapp-webhook\
 │   └── migrations\             # Database migrations (YYYYMMDD_description.sql)
 ├── .github\
 │   └── workflows\
