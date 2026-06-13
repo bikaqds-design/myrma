@@ -45,12 +45,15 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 - **DOC-03** — Fix i18n file path in CLAUDE.md ✅
 - **DOC-05** — Add `vitest include` filter + `pool: 'forks'` ✅
 - **UX-02** — Role-aware dashboard widgets ✅
+- **TS-02** — Delete `typeof` type-system assertion ✅
+- **TS-03** — `test.each` for status/priority/role loops ✅
+- **UX-04** — Customer name blur validation ✅
 
-### Next (Phase 4 candidates)
+### Next (Phase 5 candidates)
 
-- **TS-02** — Delete `typeof STORAGE_KEY.APPEARANCE` type-system test
-- **TS-03** — Convert `for` loops in schemas tests to `test.each`
-- **UX-04** — Form validation on blur
+- **UX-03** — Sidebar navigation grouping
+- **UX-05** — Ticket kanban/pipeline view
+- **CQ-05** — Extract numbered-step blocks in `ticketEventHandlers.ts`
 
 ### Later (backlog)
 - **FT-01** — Customer return initiation portal (highest-impact remaining feature gap)
@@ -92,8 +95,8 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 | ID | Title | Priority | Effort | Status | Source | Where |
 |----|-------|----------|--------|--------|--------|-------|
 | TS-01 | Fix `COMPLETED` status missing from constants test (7th status not covered) | P0 | Low | Shipped | GUARD → constants.test.js analysis | `constants.test.js` — `defines the six canonical statuses` |
-| TS-02 | Delete `typeof STORAGE_KEY.APPEARANCE === 'string'` type-system test | P1 | Low | Open | GUARD → Rule 7+4 | `constants.test.js` |
-| TS-03 | Convert `for` loops in schemas tests to `test.each` | P1 | Low | Open | GUARD → Rule 3 | `schemas.test.js` — ticket_status, priority, roles loops |
+| TS-02 | Delete `typeof STORAGE_KEY.APPEARANCE === 'string'` type-system test | P1 | Low | Shipped | GUARD → Rule 7+4 | `constants.test.js` |
+| TS-03 | Convert `for` loops in schemas tests to `test.each` | P1 | Low | Shipped | GUARD → Rule 3 | `schemas.test.js` — ticket_status, priority, roles loops |
 | TS-04 | Merge `null`/`undefined` permission tests into one `test.each` | P2 | Low | Open | GUARD → Rule 3 | `permissions.test.js` |
 | TS-05 | Consolidate 5 `canDo with default permissions` blocks into `test.each` | P2 | Low | Open | GUARD → Rule 3 | `permissions.test.js:161–180` |
 | TS-06 | Convert multi-assert `it()` blocks in constants tests to `test.each` | P2 | Low | Open | GUARD → Rule 3 | `constants.test.js` — ROLES, PRIORITY, INVENTORY_STATUS, etc. |
@@ -171,7 +174,7 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 | UX-01 | Mobile-first ticket view (tap targets, swipe actions, camera attachment) | P0 | Hard | Open | COMP §4 Mobile | Not mobile-first; technicians work at benches |
 | UX-02 | Role-aware dashboard widgets (technician vs. manager views) | P1 | Medium | Shipped | COMP §4 Dashboard | "My Open Tickets" panel for technician/viewer roles |
 | UX-03 | Sidebar navigation grouping (Service, Customers, Operations, Admin sections) | P1 | Medium | Open | COMP §4 Sidebar | 14+ flat items; discovery slow for new users |
-| UX-04 | Form validation on blur (real-time field errors before submit) | P1 | Low | Open | COMP §4 Forms | Zod wired but errors appear only post-submit |
+| UX-04 | Form validation on blur (real-time field errors before submit) | P1 | Low | Shipped | COMP §4 Forms | Zod wired but errors appear only post-submit |
 | UX-05 | Ticket status workflow view (kanban or stage-pipeline, block illegal transitions) | P1 | Medium | Open | COMP §4 Status | No visual transition diagram |
 | UX-06 | Keyboard shortcuts + `?` shortcut menu (`N`=new ticket, `Esc`=close, `Cmd+K`) | P2 | Easy | Open | COMP §4 Keyboard | Power user gap |
 | UX-07 | WCAG AA accessibility audit + fix critical violations | P2 | Medium | Open | COMP §4 Accessibility | axe-core runs in dev; no production audit done |
