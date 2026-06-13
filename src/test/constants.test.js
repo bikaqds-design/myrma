@@ -128,7 +128,6 @@ describe('BATCH_STATUS', () => {
 
 describe('STORAGE_KEY', () => {
   it('NOTIF_PREFS is a function that accepts an email', () => {
-    expect(typeof STORAGE_KEY.NOTIF_PREFS).toBe('function')
     expect(STORAGE_KEY.NOTIF_PREFS('user@test.com')).toBe('notif_system_prefs_user@test.com')
   })
 

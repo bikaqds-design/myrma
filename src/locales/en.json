@@ -154,7 +154,9 @@
     "priorityDistribution": "Priority Distribution",
     "last7Days": "Last 7 days",
     "last30Days": "Last 30 days",
-    "ticketsLabel": "Tickets"
+    "ticketsLabel": "Tickets",
+    "myOpenTickets": "My Open Tickets",
+    "dueSoon": "Due Soon"
   },
   "tickets": {
     "title": "RMA Tickets",
@@ -1081,7 +1083,8 @@
     "ticketUpdated": "Ticket updated successfully!",
     "ticketCreated": "Ticket created successfully!",
     "failedSaveTicket": "Failed to save ticket: {{error}}",
-    "emailNotifFailed": "Email notification failed: {{error}}"
+    "emailNotifFailed": "Email notification failed: {{error}}",
+    "customerNameRequired": "Customer name is required"
   },
   "ticketDrawer": {
     "title": "Ticket Details",

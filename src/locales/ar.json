@@ -154,7 +154,9 @@
     "priorityDistribution": "توزيع الأولوية",
     "last7Days": "آخر 7 أيام",
     "last30Days": "آخر 30 يومًا",
-    "ticketsLabel": "تذاكر"
+    "ticketsLabel": "تذاكر",
+    "myOpenTickets": "تذاكري المفتوحة",
+    "dueSoon": "تستحق قريباً"
   },
   "tickets": {
     "title": "تذاكر الإرجاع",
@@ -1081,7 +1083,8 @@
     "ticketUpdated": "تم تحديث التذكرة بنجاح!",
     "ticketCreated": "تم إنشاء التذكرة بنجاح!",
     "failedSaveTicket": "فشل حفظ التذكرة: {{error}}",
-    "emailNotifFailed": "فشل إشعار البريد الإلكتروني: {{error}}"
+    "emailNotifFailed": "فشل إشعار البريد الإلكتروني: {{error}}",
+    "customerNameRequired": "اسم العميل مطلوب"
   },
   "ticketDrawer": {
     "title": "تفاصيل التذكرة",

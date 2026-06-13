@@ -370,6 +370,7 @@ export function TicketForm({
   })
 
   const [uploading, setUploading] = useState(false)
+  const [customerNameError, setCustomerNameError] = useState('')
   const [customerSearch, setCustomerSearch] = useState(
     editingTicket ? editingTicket.customer_name || '' : ''
   )
@@ -681,12 +682,19 @@ export function TicketForm({
                       setCustomerSearch(e.target.value)
                       setFormData({ ...formData, customer_name: e.target.value })
                       setShowCustomerDropdown(true)
+                      if (e.target.value.trim()) setCustomerNameError('')
+                    }}
+                    onBlur={() => {
+                      if (!formData.customer_name.trim()) setCustomerNameError(t('ticketForm.customerNameRequired'))
                     }}
                     onFocus={() => setShowCustomerDropdown(true)}
                     placeholder={t('ticketForm.searchCustomer')}
                     className={inp}
                     required
                   />
+                  {customerNameError && (
+                    <p className="mt-1 text-xs text-red-500">{customerNameError}</p>
+                  )}
                   {showCustomerDropdown && filteredCustomersList.length > 0 && (
                     /* P-2: virtualised list — only visible rows rendered in DOM */
                     <div
