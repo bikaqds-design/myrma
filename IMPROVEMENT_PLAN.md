@@ -26,22 +26,30 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 
 ## Now / Next / Later
 
-### Shipped (Phase 1 + Phase 2)
+### Shipped (Phase 1 + Phase 2 + Phase 3)
+
 - **CQ-01** — Break up `handleSubmit` god-function ✅
+- **CQ-02** — `ticketComments.create()` DTO ✅
 - **CQ-03** — Narrow catch-all error handlers ✅
+- **CQ-04** — `serialHistory.getBySerial()` → server-side RPC ✅
+- **CQ-06** — Fix `sendBatch` index invariant ✅
 - **CQ-08** — Wire `captureException` into fire-and-forget catches ✅
+- **CQ-09** — Delete `toWhatsAppParams` dead code ✅
+- **CQ-10** — Delete `validateConfig()` unused method ✅
+- **CQ-11** — Extract `sendTicketAssignedEmail` helper ✅
 - **CQ-12** — Extract `ActivityTimeline` component ✅
+- **CQ-13** — Activity timeline i18n pipe format ✅
 - **CQ-14** — Add `db.ticketActivity.log()` shared helper ✅
 - **TS-01** — Fix COMPLETED status in constants test ✅
+- **DOC-02, DOC-07, DOC-09, DOC-11** — Docs fixes ✅
 - **DOC-03** — Fix i18n file path in CLAUDE.md ✅
 - **DOC-05** — Add `vitest include` filter + `pool: 'forks'` ✅
 - **UX-02** — Role-aware dashboard widgets ✅
 
-### Next (Phase 3 candidates)
-- **CQ-02** — Refactor `ticketComments.create()` 8 positional args → DTO
-- **CQ-04** — Fix `serialHistory.getBySerial()` full-table fetch
-- **CQ-09 + CQ-10** — Delete two dead code items
-- **CQ-11** — Extract `createTicketNotification` helper
+### Next (Phase 4 candidates)
+
+- **TS-02** — Delete `typeof STORAGE_KEY.APPEARANCE` type-system test
+- **TS-03** — Convert `for` loops in schemas tests to `test.each`
 - **UX-04** — Form validation on blur
 
 ### Later (backlog)
@@ -60,16 +68,16 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 | ID | Title | Priority | Effort | Status | Source | Where |
 |----|-------|----------|--------|--------|--------|-------|
 | CQ-01 | Break up `handleSubmit` god-function (385 lines, cyclomatic ≥25) | P0 | High | Shipped | GUARD → C-1 | `TicketForm.jsx:224–609` |
-| CQ-02 | Refactor `ticketComments.create()` from 8 positional params to DTO | P0 | Low | Open | GUARD → C-2 | `tickets.ts:158–167` |
+| CQ-02 | Refactor `ticketComments.create()` from 8 positional params to DTO | P0 | Low | Shipped | GUARD → C-2 | `tickets.ts:158–167` |
 | CQ-03 | Narrow catch-all handlers to specific error codes (8 occurrences) | P0 | Medium | Shipped | GUARD → C-3 | `tickets.ts`, `users.ts` |
-| CQ-04 | Fix `serialHistory.getBySerial()` full-table client-side fetch | P0 | Medium | Open | GUARD → C-4 | `tickets.ts:249–264` |
-| CQ-06 | Fix `sendBatch` fragile index invariant | P1 | Low | Open | GUARD → I-2 | `MessagingService.ts:57` |
+| CQ-04 | Fix `serialHistory.getBySerial()` full-table client-side fetch | P0 | Medium | Shipped | GUARD → C-4 | `tickets.ts:249–264` |
+| CQ-06 | Fix `sendBatch` fragile index invariant | P1 | Low | Shipped | GUARD → I-2 | `MessagingService.ts:57` |
 | CQ-08 | Replace silent `.catch(() => {})` with `captureException` | P1 | Low | Shipped | GUARD → I-4 | `TicketForm.jsx` (~15 sites), `TicketDrawer.jsx` |
-| CQ-09 | Delete `toWhatsAppParams` dead code | P1 | Low | Open | GUARD → I-5 | `TemplateEngine.ts:95` |
-| CQ-10 | Delete `validateConfig()` unused method | P1 | Low | Open | GUARD → I-6 | `WhatsAppProvider.ts:28` |
-| CQ-11 | Extract `createTicketNotification` helper (3 identical notification blocks) | P1 | Low | Open | GUARD → I-7 | `TicketForm.jsx:332–383` |
+| CQ-09 | Delete `toWhatsAppParams` dead code | P1 | Low | Shipped | GUARD → I-5 | `TemplateEngine.ts:95` |
+| CQ-10 | Delete `validateConfig()` unused method | P1 | Low | Shipped | GUARD → I-6 | `WhatsAppProvider.ts:28` |
+| CQ-11 | Extract `createTicketNotification` helper (3 identical notification blocks) | P1 | Low | Shipped | GUARD → I-7 | `TicketForm.jsx:332–383` |
 | CQ-12 | Extract `ActivityTimeline` component from ~100-line IIFE | P1 | Medium | Shipped | GUARD → N-1 | `TicketDrawer.jsx:958–1059` → `ActivityTimeline.jsx` |
-| CQ-13 | Fix activity timeline i18n (plural count + stored-English details in DB) | P1 | Medium | Open | GUARD → N-2 | `TicketDrawer.jsx:1013,1068` + logActivity call sites |
+| CQ-13 | Fix activity timeline i18n (plural count + stored-English details in DB) | P1 | Medium | Shipped | GUARD → N-2 | `TicketDrawer.jsx:1013,1068` + logActivity call sites |
 | CQ-14 | Add shared `db.ticketActivity.log()` helper (3 copies of insert shape) | P1 | Low | Shipped | GUARD → N-3 | `tickets.ts`, `TicketDrawer.jsx`, `TicketForm.jsx` |
 | CQ-05 | Extract numbered-step blocks in `ticketEventHandlers.ts` into named helpers | P2 | Medium | Open | GUARD → I-1 | `ticketEventHandlers.ts:46–152` |
 | CQ-07 | Remove `{ missing: boolean }` sentinel from API return types | P2 | Medium | Open | GUARD → I-3 | `tickets.ts:142`, `users.ts:194` |
