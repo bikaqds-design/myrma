@@ -26,9 +26,9 @@ import {
 } from './_utils'
 import { ProductSearchInput } from './_shared'
 
-const inp =
+const inputClass =
   'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm bg-white placeholder-gray-400 transition-colors'
-const lbl = 'block text-sm font-medium text-gray-700 mb-1.5'
+const labelClass = 'block text-sm font-medium text-gray-700 mb-1.5'
 
 // ── Ticket save helpers ────────────────────────────────────────────────────────
 
@@ -623,7 +623,6 @@ export function TicketForm({
     <Modal
       open={true}
       onClose={onClose}
-      title={editingTicket ? 'Edit RMA Ticket' : 'Create New RMA Ticket'}
       className="max-w-4xl"
       noPadding
       hideHeader
@@ -671,7 +670,7 @@ export function TicketForm({
             {/* Row 1: Customer + Priority */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={lbl}>
+                <label className={labelClass}>
                   {t('ticketForm.customerName')} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative customer-dropdown">
@@ -689,7 +688,7 @@ export function TicketForm({
                     }}
                     onFocus={() => setShowCustomerDropdown(true)}
                     placeholder={t('ticketForm.searchCustomer')}
-                    className={inp}
+                    className={inputClass}
                     required
                   />
                   {customerNameError && (
@@ -761,13 +760,13 @@ export function TicketForm({
                 </div>
               </div>
               <div>
-                <label className={lbl}>
+                <label className={labelClass}>
                   {t('ticketForm.priority')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.priority}
                   onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  className={inp}
+                  className={inputClass}
                 >
                   <option value="Low">Low</option>
                   <option value="Medium">Medium</option>
@@ -780,11 +779,11 @@ export function TicketForm({
             {/* Row 2: Status + Assigned To + Due Date */}
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className={lbl}>{t('ticketForm.ticketStatus')}</label>
+                <label className={labelClass}>{t('ticketForm.ticketStatus')}</label>
                 <select
                   value={formData.ticket_status}
                   onChange={(e) => setFormData({ ...formData, ticket_status: e.target.value })}
-                  className={inp}
+                  className={inputClass}
                 >
                   <option value="Open">Open</option>
                   <option value="In Progress">In Progress</option>
@@ -796,14 +795,14 @@ export function TicketForm({
                 </select>
               </div>
               <div>
-                <label className={lbl}>{t('ticketForm.assignedTo')}</label>
+                <label className={labelClass}>{t('ticketForm.assignedTo')}</label>
                 {userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN ? (
                   <select
                     value={formData.assigned_technician}
                     onChange={(e) =>
                       setFormData({ ...formData, assigned_technician: e.target.value })
                     }
-                    className={inp}
+                    className={inputClass}
                   >
                     {users.map((u) => (
                       <option key={u.user_email} value={u.user_email}>
@@ -818,7 +817,7 @@ export function TicketForm({
                 )}
               </div>
               <div>
-                <label className={lbl}>
+                <label className={labelClass}>
                   {t('ticketForm.dueDate')}{' '}
                   <span className="text-xs text-gray-500 font-normal ml-1">{t('ticketForm.dueDateHint')}</span>
                 </label>
@@ -826,7 +825,7 @@ export function TicketForm({
                   type="date"
                   value={formData.due_date}
                   onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                  className={inp}
+                  className={inputClass}
                 />
               </div>
             </div>
@@ -863,7 +862,7 @@ export function TicketForm({
                   <div className="grid grid-cols-2 gap-3">
                     {/* Product name combobox */}
                     <div>
-                      <label className={lbl}>
+                      <label className={labelClass}>
                         {t('ticketForm.productName')} <span className="text-red-500">*</span>
                       </label>
                       <div className="relative product-dropdown">
@@ -921,7 +920,7 @@ export function TicketForm({
                       </div>
                     </div>
                     <div>
-                      <label className={lbl}>
+                      <label className={labelClass}>
                         {t('ticketForm.serialNumber')} <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
@@ -956,7 +955,7 @@ export function TicketForm({
                       </div>
                     </div>
                     <div>
-                      <label className={lbl}>{t('ticketForm.productStatus')}</label>
+                      <label className={labelClass}>{t('ticketForm.productStatus')}</label>
                       <select
                         value={product.product_status}
                         onChange={(e) => updateProduct(idx, 'product_status', e.target.value)}
@@ -971,7 +970,7 @@ export function TicketForm({
                       </select>
                     </div>
                     <div>
-                      <label className={lbl}>{t('ticketForm.warrantyStatus')}</label>
+                      <label className={labelClass}>{t('ticketForm.warrantyStatus')}</label>
                       <select
                         value={product.warranty_status}
                         onChange={(e) => updateProduct(idx, 'warranty_status', e.target.value)}
@@ -984,7 +983,7 @@ export function TicketForm({
                     </div>
                   </div>
                   <div className="mt-3">
-                    <label className={lbl}>
+                    <label className={labelClass}>
                       {t('ticketForm.issueDescription')} <span className="text-red-500">*</span>
                     </label>
                     <textarea
@@ -1001,28 +1000,28 @@ export function TicketForm({
 
             {/* General RMA Description */}
             <div>
-              <label className={lbl}>{t('ticketForm.generalDescription')}</label>
+              <label className={labelClass}>{t('ticketForm.generalDescription')}</label>
               <textarea
                 value={formData.general_description}
                 onChange={(e) =>
                   setFormData({ ...formData, general_description: e.target.value })
                 }
                 placeholder={t('ticketForm.generalDescPlaceholder')}
-                className={inp}
+                className={inputClass}
                 rows={3}
               />
             </div>
 
             {/* Accessories Received */}
             <div>
-              <label className={lbl}>{t('ticketForm.accessories')}</label>
+              <label className={labelClass}>{t('ticketForm.accessories')}</label>
               <textarea
                 value={formData.accessories_received}
                 onChange={(e) =>
                   setFormData({ ...formData, accessories_received: e.target.value })
                 }
                 placeholder={t('ticketForm.accessoriesPlaceholder')}
-                className={inp}
+                className={inputClass}
                 rows={3}
               />
             </div>
@@ -1034,7 +1033,7 @@ export function TicketForm({
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={lbl}>{t('ticketForm.carrier')}</label>
+                  <label className={labelClass}>{t('ticketForm.carrier')}</label>
                   <select
                     value={formData.carrier}
                     onChange={(e) => setFormData((f) => ({ ...f, carrier: e.target.value }))}
@@ -1048,20 +1047,20 @@ export function TicketForm({
                   </select>
                 </div>
                 <div>
-                  <label className={lbl}>{t('ticketForm.trackingNumber')}</label>
+                  <label className={labelClass}>{t('ticketForm.trackingNumber')}</label>
                   <input
                     type="text"
                     value={formData.tracking_number}
                     onChange={(e) =>
                       setFormData((f) => ({ ...f, tracking_number: e.target.value }))
                     }
-                    className={inp}
+                    className={inputClass}
                     placeholder="e.g. 1Z999AA10123456784"
                   />
                 </div>
               </div>
               <div>
-                <label className={lbl}>
+                <label className={labelClass}>
                   {t('ticketForm.shippingLabel')}{' '}
                   <span className="text-gray-500 font-normal">({t('common.optional')})</span>
                 </label>
@@ -1071,7 +1070,7 @@ export function TicketForm({
                   onChange={(e) =>
                     setFormData((f) => ({ ...f, shipping_label_url: e.target.value }))
                   }
-                  className={inp}
+                  className={inputClass}
                   placeholder="https://..."
                 />
               </div>
@@ -1102,7 +1101,7 @@ export function TicketForm({
 
             {/* Attachments */}
             <div>
-              <label className={lbl}>
+              <label className={labelClass}>
                 {t('ticketForm.attachments')}
                 <span className="text-xs text-gray-500 font-normal ml-2">
                   ({(formData.attachments?.length || 0) + pendingFiles.length}/10)
@@ -1269,7 +1268,7 @@ export function TicketForm({
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">{t('ticketForm.resolution')} <span className="text-gray-400 font-normal normal-case">({t('common.optional')})</span></h3>
             <div className="grid grid-cols-1 gap-3">
               <div>
-                <label className={lbl}>{t('ticketForm.resolutionType')}</label>
+                <label className={labelClass}>{t('ticketForm.resolutionType')}</label>
                 <select
                   value={resForm.type}
                   onChange={(e) => setResForm(f => ({ ...f, type: e.target.value }))}
@@ -1286,7 +1285,7 @@ export function TicketForm({
               {(resForm.type === 'replacement' || resForm.type === 'exchange') && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className={lbl}>{t('ticketForm.replacementProduct')}</label>
+                    <label className={labelClass}>{t('ticketForm.replacementProduct')}</label>
                     <ProductSearchInput
                       value={resForm.replacement_product_name}
                       onChange={(v) => setResForm(f => ({ ...f, replacement_product_name: v }))}
@@ -1296,7 +1295,7 @@ export function TicketForm({
                     />
                   </div>
                   <div>
-                    <label className={lbl}>{t('ticketForm.replacementSerial')}</label>
+                    <label className={labelClass}>{t('ticketForm.replacementSerial')}</label>
                     <input
                       value={resForm.replacement_serial}
                       onChange={(e) => setResForm(f => ({ ...f, replacement_serial: e.target.value }))}
@@ -1310,7 +1309,7 @@ export function TicketForm({
               {(resForm.type === 'credit_note' || resForm.type === 'refund') && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className={lbl}>{t('ticketForm.amount')}</label>
+                    <label className={labelClass}>{t('ticketForm.amount')}</label>
                     <div className="flex gap-2">
                       <select
                         value={resForm.currency}
@@ -1329,7 +1328,7 @@ export function TicketForm({
                     </div>
                   </div>
                   <div>
-                    <label className={lbl}>{t('ticketForm.referenceNumber')}</label>
+                    <label className={labelClass}>{t('ticketForm.referenceNumber')}</label>
                     <input
                       value={resForm.reference_number}
                       onChange={(e) => setResForm(f => ({ ...f, reference_number: e.target.value }))}
@@ -1342,7 +1341,7 @@ export function TicketForm({
 
               {resForm.type && (
                 <div>
-                  <label className={lbl}>{t('ticketForm.reason')}</label>
+                  <label className={labelClass}>{t('ticketForm.reason')}</label>
                   <textarea
                     rows={2}
                     value={resForm.reason}

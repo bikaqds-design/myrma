@@ -55,7 +55,7 @@ export const getPriorityColor = (p) =>
     Critical: 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400',
   })[p] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]'
 
-export const fmt = (d) => (d ? new Date(d).toLocaleDateString() : 'N/A')
+export const formatDate = (d) => (d ? new Date(d).toLocaleDateString() : 'N/A')
 
 export const fmtDateTime = (d) => {
   if (!d) return 'N/A'

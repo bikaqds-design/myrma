@@ -12,8 +12,8 @@ import AIAssist from '../../components/AIAssist'
 import EmptyState from '../../components/EmptyState'
 import { ROLES, TICKET_STATUS_RESOLVED, TICKET_STATUS_LIST, PRIORITY_LIST } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
-import { SortableHeader } from './_shared'
-import { getStatusColor, getPriorityColor, fmt } from './_utils'
+import { SortableHeader, ShortcutsHelp } from './_shared'
+import { getStatusColor, getPriorityColor, formatDate } from './_utils'
 import { KanbanView } from './_kanban'
 import { TicketForm } from './TicketForm'
 import { TicketDrawer } from './TicketDrawer'
@@ -103,6 +103,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const [viewMode, setViewMode] = useState(
     () => safeStorage.get('rmaTicketsViewMode', 'table')
   )
+  const [showShortcuts, setShowShortcuts] = useState(false)
 
   const [selectedTickets, setSelectedTickets] = useState([])
   const [bulkTicketStatus, setBulkTicketStatus] = useState('')
@@ -151,10 +152,15 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable
       if (e.key === 'Escape') {
         setShowModal(false)
+        setShowShortcuts(false)
         handleCloseDetails()
         return
       }
       if (typing) return
+      if (e.key === '?') {
+        e.preventDefault()
+        setShowShortcuts((v) => !v)
+      }
       if (e.key === 'n' || e.key === 'N') {
         e.preventDefault()
         handleAddNew()
@@ -858,7 +864,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   // eslint-disable-next-line no-unused-vars
   const SLABadge = ({ dueDate, status }) => {
     if (!dueDate || ['Completed', 'Cancelled'].includes(status))
-      return <span className="text-gray-500 text-xs">{dueDate ? fmt(dueDate) : '—'}</span>
+      return <span className="text-gray-500 text-xs">{dueDate ? formatDate(dueDate) : '—'}</span>
     const days = Math.ceil((new Date(dueDate) - Date.now()) / 86400000)
     if (days < 0)
       return (
@@ -884,7 +890,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           {t('tickets.daysLeft', { days })}
         </span>
       )
-    return <span className="text-xs text-gray-500">{fmt(dueDate)}</span>
+    return <span className="text-xs text-gray-500">{formatDate(dueDate)}</span>
   }
 
   if (loading) return <PageSkeleton cols={9} />
@@ -958,6 +964,15 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           </button>
         </div>
         <div className="flex items-center gap-2">
+          {/* Shortcut help button */}
+          <button
+            onClick={() => setShowShortcuts(true)}
+            title={t('shortcuts.title')}
+            className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors text-sm font-medium"
+            aria-label={t('shortcuts.title')}
+          >
+            ?
+          </button>
           {/* View toggle */}
           <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden text-sm">
             <button
@@ -1463,7 +1478,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 <td className="px-4 py-3 text-sm text-gray-600">
                   {t.assigned_technician || t('common.unassigned')}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600">{fmt(t.created_date)}</td>
+                <td className="px-4 py-3 text-sm text-gray-600">{formatDate(t.created_date)}</td>
                 <td className="px-4 py-3 relative action-menu">
                   <button
                     onClick={(e) => {
@@ -1700,6 +1715,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         onConfirm={confirmDialog.onConfirm}
         onCancel={closeConfirm}
       />
+
+      {showShortcuts && <ShortcutsHelp onClose={() => setShowShortcuts(false)} />}
     </div>
   )
 }

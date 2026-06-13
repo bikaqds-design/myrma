@@ -72,6 +72,13 @@
     "clearAll": "مسح الكل",
     "saving": "جارٍ الحفظ..."
   },
+  "shortcuts": {
+    "title": "اختصارات لوحة المفاتيح",
+    "newTicket": "تذكرة جديدة",
+    "focusSearch": "التركيز على البحث",
+    "showHelp": "عرض هذه المساعدة",
+    "closePanel": "إغلاق اللوحة / النافذة"
+  },
   "statusValues": {
     "Open": "مفتوح",
     "In Progress": "قيد التنفيذ",

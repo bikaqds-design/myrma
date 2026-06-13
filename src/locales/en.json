@@ -72,6 +72,13 @@
     "clearAll": "Clear all",
     "saving": "Saving..."
   },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "newTicket": "New ticket",
+    "focusSearch": "Focus search",
+    "showHelp": "Show this help",
+    "closePanel": "Close panel / modal"
+  },
   "statusValues": {
     "Open": "Open",
     "In Progress": "In Progress",

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { TICKET_STATUS_LIST } from '../../lib/constants'
-import { getStatusColor, getPriorityColor, fmt } from './_utils'
+import { getStatusColor, getPriorityColor, formatDate } from './_utils'
 
 function KanbanCard({ ticket, onViewDetails }) {
   return (
@@ -26,7 +26,7 @@ function KanbanCard({ ticket, onViewDetails }) {
       )}
       {ticket.due_date && (
         <p className="text-[10px] text-[#a09d99] dark:text-[#4a5568] mt-1">
-          {fmt(ticket.due_date)}
+          {formatDate(ticket.due_date)}
         </p>
       )}
     </button>
