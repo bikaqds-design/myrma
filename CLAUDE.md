@@ -309,6 +309,7 @@ Current migrations:
 - `20260531_relax_ticket_status_constraint.sql`
 - `20260602_whatsapp_notifications.sql`
 - `20260603_user_preferences_rls.sql`
+- `20260613_search_by_serial.sql`
 
 ### RLS SQL helper functions
 
@@ -332,5 +333,3 @@ All UI primitives come from `src/components/ui.jsx`. Never re-implement buttons,
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR to `main`:  
 **test → lint:ci → build** — all three must pass. Node 20, `npm ci` (`--legacy-peer-deps` is set in `.npmrc`).
-
-

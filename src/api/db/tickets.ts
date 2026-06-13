@@ -135,6 +135,17 @@ export const ticketActivity = {
     if (error) throw error
     return data?.[0]
   },
+  async log(ticketId: string, actionType: string, details: string | null, userEmail: string | null): Promise<TicketActivityRow | undefined> {
+    const { data, error } = await supabase
+      .from('ticket_activity')
+      .insert([{ ticket_id: ticketId, action_type: actionType, details, user_email: userEmail, created_date: new Date().toISOString() }])
+      .select()
+    if (error) {
+      captureException(error, { context: 'ticketActivity.log', ticketId, actionType })
+      return undefined
+    }
+    return data?.[0]
+  },
 }
 
 // ── Ticket Comments ───────────────────────────────────────────────────────────
@@ -152,16 +163,26 @@ export const ticketComments = {
     }
     return { missing: false, data: data || [] }
   },
-  async create(
-    ticketId: string,
-    commentText: string,
-    authorEmail: string,
-    authorName: string,
-    isInternal = false,
-    parentCommentId: string | null = null,
-    attachments: unknown[] = [],
-    isCustomerComment = false
-  ): Promise<TicketCommentRow | undefined> {
+  async create(dto: {
+    ticketId: string
+    commentText: string
+    authorEmail: string
+    authorName?: string
+    isInternal?: boolean
+    parentCommentId?: string | null
+    attachments?: unknown[]
+    isCustomerComment?: boolean
+  }): Promise<TicketCommentRow | undefined> {
+    const {
+      ticketId,
+      commentText,
+      authorEmail,
+      authorName,
+      isInternal = false,
+      parentCommentId = null,
+      attachments = [],
+      isCustomerComment = false,
+    } = dto
     const { data, error } = await supabase
       .from('ticket_comments')
       .insert([
@@ -244,21 +265,12 @@ export const serialHistory = {
   async getBySerial(serialNumber: string): Promise<Partial<RMATicketRow>[]> {
     if (!serialNumber?.trim()) return []
     const { data, error } = await supabase
-      .from('rma_tickets')
-      .select(
-        'id, rma_number, customer_name, ticket_status, priority, assigned_technician, created_date, due_date, products'
-      )
-      .order('created_date', { ascending: false })
+      .rpc('rma_search_by_serial', { serial: serialNumber.trim() })
     if (error) {
       captureException(error, { context: 'serialHistory.getBySerial' })
       return []
     }
-    return (data || []).filter((t) =>
-      (t.products || []).some(
-        (p: TicketProductItem) =>
-          p.serial_number?.toLowerCase() === serialNumber.trim().toLowerCase()
-      )
-    )
+    return data || []
   },
 }
 
