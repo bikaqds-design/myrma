@@ -205,6 +205,9 @@
     "fieldUpdated": "{{field}} updated",
     "failedUpdate": "Failed to update",
     "exportedSuccess": "Exported!",
+    "viewTable": "Table",
+    "viewKanban": "Kanban",
+    "kanbanNoTickets": "No tickets",
     "overdueDays": "Overdue {{days}}d",
     "dueToday": "Due today",
     "daysLeft": "{{days}}d left",
@@ -1084,10 +1087,7 @@
     "ticketCreated": "Ticket created successfully!",
     "failedSaveTicket": "Failed to save ticket: {{error}}",
     "emailNotifFailed": "Email notification failed: {{error}}",
-    "customerNameRequired": "Customer name is required",
-    "viewTable": "Table",
-    "viewKanban": "Kanban",
-    "kanbanNoTickets": "No tickets"
+    "customerNameRequired": "Customer name is required"
   },
   "ticketDrawer": {
     "title": "Ticket Details",

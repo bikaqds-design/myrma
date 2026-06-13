@@ -42,14 +42,14 @@ export function KanbanView({ tickets, onViewDetails }) {
   }))
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: '400px' }}>
+    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))`, minHeight: '400px' }}>
       {columns.map(({ status, tickets: colTickets }) => (
-        <div key={status} className="flex-none w-60 flex flex-col">
+        <div key={status} className="flex flex-col min-w-0">
           <div className="flex items-center justify-between px-1 py-2 mb-2">
-            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getStatusColor(status)}`}>
+            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full truncate ${getStatusColor(status)}`}>
               {t(`statusValues.${status}`, status)}
             </span>
-            <span className="text-xs text-[#9aa4b2] font-medium tabular-nums">{colTickets.length}</span>
+            <span className="text-xs text-[#9aa4b2] font-medium tabular-nums ms-1 flex-shrink-0">{colTickets.length}</span>
           </div>
           <div className="flex-1 space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 340px)' }}>
             {colTickets.length === 0 ? (

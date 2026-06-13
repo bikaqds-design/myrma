@@ -205,6 +205,9 @@
     "fieldUpdated": "تم تحديث {{field}}",
     "failedUpdate": "فشل التحديث",
     "exportedSuccess": "تم التصدير!",
+    "viewTable": "جدول",
+    "viewKanban": "كانبان",
+    "kanbanNoTickets": "لا توجد تذاكر",
     "overdueDays": "متأخر {{days}} يوم",
     "dueToday": "موعد اليوم",
     "daysLeft": "{{days}} يوم متبقٍ",
@@ -1084,10 +1087,7 @@
     "ticketCreated": "تم إنشاء التذكرة بنجاح!",
     "failedSaveTicket": "فشل حفظ التذكرة: {{error}}",
     "emailNotifFailed": "فشل إشعار البريد الإلكتروني: {{error}}",
-    "customerNameRequired": "اسم العميل مطلوب",
-    "viewTable": "جدول",
-    "viewKanban": "كانبان",
-    "kanbanNoTickets": "لا توجد تذاكر"
+    "customerNameRequired": "اسم العميل مطلوب"
   },
   "ticketDrawer": {
     "title": "تفاصيل التذكرة",
