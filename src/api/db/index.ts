@@ -1,5 +1,6 @@
 // Assembles the full `db` object from domain modules.
 // Import `db` from here (or from supabaseClient.js which re-exports it).
+export type { TableResult, PagedResult, CountedResult, PrefsResult, SetPrefsResult } from './types.js'
 export { auditFlushQueue } from './audit.js'
 
 import { userRoles, userActivity, userPreferences } from './users.js'

@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import type { TableResult } from './types.js'
 import { captureException } from '../../lib/sentry.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -151,7 +152,7 @@ export const ticketActivity = {
 // ── Ticket Comments ───────────────────────────────────────────────────────────
 
 export const ticketComments = {
-  async list(ticketId: string): Promise<{ missing: boolean; data: TicketCommentRow[] }> {
+  async list(ticketId: string): Promise<TableResult<TicketCommentRow[]>> {
     const { data, error } = await supabase
       .from('ticket_comments')
       .select('*')

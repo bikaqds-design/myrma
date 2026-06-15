@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import type { PrefsResult, SetPrefsResult } from './types.js'
 import { auditInsert } from './audit.js'
 import { captureException } from '../../lib/sentry.js'
 
@@ -186,7 +187,7 @@ export const userActivity = {
 export const userPreferences = {
   // Schema: user_preferences(id, user_email text PK, prefs jsonb, updated_at timestamptz)
   // Missing table → returns { missing: true } so the app falls back to localStorage.
-  async get(email: string): Promise<{ missing: boolean; prefs?: Record<string, unknown> | null }> {
+  async get(email: string): Promise<PrefsResult> {
     try {
       const { data, error } = await supabase
         .from('user_preferences')
@@ -203,7 +204,7 @@ export const userPreferences = {
   async set(
     email: string,
     prefs: Record<string, unknown>
-  ): Promise<{ missing: boolean; error?: unknown }> {
+  ): Promise<SetPrefsResult> {
     try {
       const { error } = await supabase
         .from('user_preferences')

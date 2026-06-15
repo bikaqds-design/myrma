@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import type { TableResult } from './types.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -142,7 +143,7 @@ export const inventory = {
     return data || []
   },
 
-  async listUnits(): Promise<{ missing: boolean; data: InventoryUnitRow[] }> {
+  async listUnits(): Promise<TableResult<InventoryUnitRow[]>> {
     try {
       const { data, error } = await supabase
         .from('inventory_units')
@@ -173,7 +174,7 @@ export const inventory = {
     return data || []
   },
 
-  async listBatches(): Promise<{ missing: boolean; data: ManufacturerBatchRow[] }> {
+  async listBatches(): Promise<TableResult<ManufacturerBatchRow[]>> {
     try {
       const { data, error } = await supabase
         .from('manufacturer_batches')
@@ -271,7 +272,7 @@ export const inventory = {
 // ── Warehouses ────────────────────────────────────────────────────────────────
 
 export const warehouses = {
-  async list(): Promise<{ missing: boolean; data: WarehouseRow[] }> {
+  async list(): Promise<TableResult<WarehouseRow[]>> {
     try {
       const { data, error } = await supabase.from('warehouses').select('*').order('name', { ascending: true })
       if (error) {
@@ -302,7 +303,7 @@ export const warehouses = {
 // ── Parts ─────────────────────────────────────────────────────────────────────
 
 export const parts = {
-  async list(): Promise<{ missing: boolean; data: PartRow[] }> {
+  async list(): Promise<TableResult<PartRow[]>> {
     try {
       const { data, error } = await supabase.from('parts').select('*').order('part_name', { ascending: true })
       if (error) {
@@ -351,7 +352,7 @@ export const parts = {
 // ── Ticket Parts ──────────────────────────────────────────────────────────────
 
 export const ticketParts = {
-  async list(ticketId: string): Promise<{ missing: boolean; data: TicketPartRow[] }> {
+  async list(ticketId: string): Promise<TableResult<TicketPartRow[]>> {
     try {
       const { data, error } = await supabase
         .from('ticket_parts')
@@ -393,7 +394,7 @@ export const ticketParts = {
 // ── Time Tracking ─────────────────────────────────────────────────────────────
 
 export const timeEntries = {
-  async list(ticketId: string): Promise<{ missing: boolean; data: TimeEntryRow[] }> {
+  async list(ticketId: string): Promise<TableResult<TimeEntryRow[]>> {
     try {
       const { data, error } = await supabase
         .from('time_entries')
@@ -409,7 +410,7 @@ export const timeEntries = {
       return { missing: true, data: [] }
     }
   },
-  async listAll(): Promise<{ missing: boolean; data: unknown[] }> {
+  async listAll(): Promise<TableResult<unknown[]>> {
     try {
       const { data, error } = await supabase
         .from('time_entries')
@@ -459,7 +460,7 @@ export const timeEntries = {
 // ── Invoices / Quotes ─────────────────────────────────────────────────────────
 
 export const invoices = {
-  async list(): Promise<{ missing: boolean; data: InvoiceRow[] }> {
+  async list(): Promise<TableResult<InvoiceRow[]>> {
     try {
       const { data, error } = await supabase
         .from('invoices')

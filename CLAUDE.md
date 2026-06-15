@@ -112,7 +112,7 @@ Domain modules in `src/api/db/` (all TypeScript — export Row types):
 
 Import Row types from `src/api/db/index.ts` — all are re-exported there for convenience.
 
-Many optional tables (e.g. `announcements`, `custom_field_definitions`, `inventory_units`, `warehouses`) may not exist in every deployment. All `db.*` helpers that target these tables guard with `error.code === '42P01'` (table not found) and return `{ missing: true, data: [] }` instead of throwing.
+Many optional tables (e.g. `announcements`, `custom_field_definitions`, `inventory_units`, `warehouses`) may not exist in every deployment. All `db.*` helpers that target these tables guard with `error.code === '42P01'` (table not found) and return `{ missing: true, data: [] }` instead of throwing. The return type for these helpers is the shared `TableResult<T>` alias (or `PagedResult<T>` / `CountedResult<T>` for paged results) — all exported from `src/api/db/index.ts`. Never inline `{ missing: boolean; data: T[] }` in new helper signatures; import and use these shared types.
 
 **List caps:** `db.customers.list()`, `db.rmaTickets.list()`, and `db.products.list()` cap at **5 000 rows** (raised from 500). These pages filter/sort client-side so all rows must be in memory. If any dataset exceeds 5 000, switch that page to server-side pagination using the existing `listPaged()` method. Do not lower the cap; it is intentional headroom.
 

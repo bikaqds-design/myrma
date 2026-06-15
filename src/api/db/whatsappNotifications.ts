@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import type { TableResult, PagedResult, CountedResult } from './types.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -103,7 +104,7 @@ interface ExportOptions {
 // ── Templates ─────────────────────────────────────────────────────────────────
 
 export const whatsappTemplates = {
-  async list(): Promise<{ missing: boolean; data: WhatsAppTemplateRow[] }> {
+  async list(): Promise<TableResult<WhatsAppTemplateRow[]>> {
     const { data, error } = await supabase
       .from('whatsapp_templates')
       .select('*')
@@ -169,7 +170,7 @@ export const whatsappTemplates = {
 export const notificationLogs = {
   async list({
     page = 0, pageSize = 50, provider, status, ticketId, dateFrom, dateTo, search,
-  }: LogListOptions = {}): Promise<{ missing: boolean; data: NotificationLogRow[]; count: number; page: number; pageSize: number; totalPages: number }> {
+  }: LogListOptions = {}): Promise<PagedResult<NotificationLogRow>> {
     let query = supabase
       .from('notification_logs')
       .select('*, whatsapp_templates(display_name)', { count: 'exact' })
@@ -256,7 +257,7 @@ export const notificationLogs = {
 // ── Notification Settings ─────────────────────────────────────────────────────
 
 export const notificationSettings = {
-  async getAll(): Promise<{ missing: boolean; data: Record<string, unknown> }> {
+  async getAll(): Promise<TableResult<Record<string, unknown>>> {
     const { data, error } = await supabase
       .from('notification_settings')
       .select('setting_key, setting_value')
@@ -309,7 +310,7 @@ export const notificationSettings = {
 // ── Notification Queue ────────────────────────────────────────────────────────
 
 export const notificationQueue = {
-  async list({ status, jobType, page = 0, pageSize = 50 }: QueueListOptions = {}): Promise<{ missing: boolean; data: NotificationQueueRow[]; count: number }> {
+  async list({ status, jobType, page = 0, pageSize = 50 }: QueueListOptions = {}): Promise<CountedResult<NotificationQueueRow>> {
     let query = supabase
       .from('notification_queue')
       .select('*', { count: 'exact' })
