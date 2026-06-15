@@ -240,10 +240,11 @@ export function Divider({ className = '' }) {
 }
 
 // ─── ICON BUTTON ──────────────────────────────────────────────────────────────
-export function IconButton({ children, className = '', title, ...props }) {
+export function IconButton({ children, className = '', title, 'aria-label': ariaLabel, ...props }) {
   return (
     <button
       title={title}
+      aria-label={ariaLabel ?? title}
       className={`inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
       {...props}
     >
@@ -266,9 +267,16 @@ export function ModalOverlay({ children, onClose }) {
   )
 }
 
-export function ModalCard({ children, className = '' }) {
+export function ModalCard({ children, className = '', 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, ...props }) {
   return (
-    <div className={`bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-auto ${className}`}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
+      className={`bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-auto ${className}`}
+      {...props}
+    >
       {children}
     </div>
   )

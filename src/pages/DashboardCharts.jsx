@@ -16,7 +16,15 @@ export default function DashboardCharts({ on, nav, weeklyTrend, monthlyTrend, ch
   return (
     <>
       {on('weekly_trend') && (
-        <div className="col-span-12 lg:col-span-6" style={{ ...cardStyle, cursor: 'pointer' }} onClick={nav('/rma-tickets')}>
+        <div
+          className="col-span-12 lg:col-span-6"
+          style={{ ...cardStyle, cursor: 'pointer' }}
+          role="button"
+          tabIndex={0}
+          aria-label={t('dashboard.weeklyTrend')}
+          onClick={nav('/rma-tickets')}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); nav('/rma-tickets')(e) } }}
+        >
           <h3 style={headStyle}>
             {t('dashboard.weeklyTrend')}
             <span style={{ fontSize: 11.5, fontWeight: 600, color: tk?.textFaint || '#a39e95' }}>{t('dashboard.last7Days')}</span>
@@ -41,7 +49,15 @@ export default function DashboardCharts({ on, nav, weeklyTrend, monthlyTrend, ch
       )}
 
       {on('monthly_trend') && (
-        <div className="col-span-12 lg:col-span-6" style={{ ...cardStyle, cursor: 'pointer' }} onClick={nav('/rma-tickets')}>
+        <div
+          className="col-span-12 lg:col-span-6"
+          style={{ ...cardStyle, cursor: 'pointer' }}
+          role="button"
+          tabIndex={0}
+          aria-label={t('dashboard.monthlyTrend')}
+          onClick={nav('/rma-tickets')}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); nav('/rma-tickets')(e) } }}
+        >
           <h3 style={headStyle}>
             {t('dashboard.monthlyTrend')}
             <span style={{ fontSize: 11.5, fontWeight: 600, color: tk?.textFaint || '#a39e95' }}>{t('dashboard.last30Days')}</span>

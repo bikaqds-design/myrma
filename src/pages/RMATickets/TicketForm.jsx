@@ -811,7 +811,7 @@ export function TicketForm({
                     ))}
                   </select>
                 ) : (
-                  <div className={`${inp} bg-gray-50 text-gray-600 cursor-not-allowed`}>
+                  <div className={`${inputClass} bg-gray-50 text-gray-600 cursor-not-allowed`}>
                     {formData.assigned_technician || userEmail || '—'}
                   </div>
                 )}

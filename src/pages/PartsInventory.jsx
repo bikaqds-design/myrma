@@ -174,14 +174,14 @@ function PartModal({ part, onSave, onClose, saving }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-[#121823] rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-hidden="true" onClick={onClose} />
+      <div role="dialog" aria-modal="true" aria-labelledby="parts-modal-title" className="relative bg-white dark:bg-[#121823] rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-[#212a38]">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-[#e8ebf0]">
+          <h2 id="parts-modal-title" className="text-base font-semibold text-gray-900 dark:text-[#e8ebf0]">
             {part ? t('parts.editPart') : t('parts.addPart')}
           </h2>
-          <button onClick={onClose} className="text-gray-500 dark:text-[#9aa4b2] hover:text-gray-600 dark:text-[#9aa4b2] transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button onClick={onClose} aria-label={t('common.close')} className="text-gray-500 dark:text-[#9aa4b2] hover:text-gray-600 dark:text-[#9aa4b2] transition-colors">
+            <svg className="w-5 h-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
