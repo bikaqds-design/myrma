@@ -59,12 +59,16 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 
 - **CQ-15** — Rename `fmt`/`inp`/`lbl`, delete dead `title` prop ✅
 - **UX-06** — Keyboard shortcuts + `?` help panel ✅
-- **CQ-07** — Missing sentinel (Deferred — touches 15+ call sites across 5 files)
 
-### Next (Phase 7 candidates)
+### Shipped (Phase 7)
 
-- **CQ-07** — Remove `{ missing: boolean }` sentinel (full sweep — inventory.ts, system.ts, whatsappNotifications.ts + all consumers)
-- **UX-07** — WCAG AA accessibility audit + fix critical violations
+- **CQ-07** — Centralize `TableResult<T>` / `PagedResult<T>` / `CountedResult<T>` in `src/api/db/types.ts`; update all 13 helper signatures ✅
+- **UX-07** — WCAG AA static audit: `role="dialog"` + `aria-modal` on `ModalCard`; `IconButton` aria-label fallback; DashboardCharts keyboard nav; PartsInventory modal landmarks ✅
+
+### Next (Phase 8 candidates)
+
+- **UX-08** — Table pagination controls ("Showing X–Y of Z" + server-side above 500 rows)
+- **UX-09** — Direction B token sweep — finish remaining pages (Invoices, PartsInventory)
 - **FT-06** — SMS notifications via Twilio (reuses existing notification_queue pattern)
 
 ### Later (backlog)
@@ -94,7 +98,7 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 | CQ-13 | Fix activity timeline i18n (plural count + stored-English details in DB) | P1 | Medium | Shipped | GUARD → N-2 | `TicketDrawer.jsx:1013,1068` + logActivity call sites |
 | CQ-14 | Add shared `db.ticketActivity.log()` helper (3 copies of insert shape) | P1 | Low | Shipped | GUARD → N-3 | `tickets.ts`, `TicketDrawer.jsx`, `TicketForm.jsx` |
 | CQ-05 | Extract numbered-step blocks in `ticketEventHandlers.ts` into named helpers | P2 | Medium | Shipped | GUARD → I-1 | `ticketEventHandlers.ts:46–152` |
-| CQ-07 | Remove `{ missing: boolean }` sentinel from API return types | P2 | Medium | Open | GUARD → I-3 | `tickets.ts:142`, `users.ts:194` |
+| CQ-07 | Remove `{ missing: boolean }` sentinel from API return types | P2 | Medium | Shipped | GUARD → I-3 | `src/api/db/types.ts` (new), 6 db files |
 | CQ-15 | Nits bundle: rename `fmt`→`formatDate`, `inp`/`lbl`→`inputClass`/`labelClass`, `logAct`→`logActivityChange`; delete `title` dead prop; delete paraphrasing comments | P3 | Low | Shipped | GUARD → Nits | `_utils.js:58`, `TicketForm.jsx:29–31,258,268,303,616` |
 
 ---
@@ -188,7 +192,7 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 | UX-04 | Form validation on blur (real-time field errors before submit) | P1 | Low | Shipped | COMP §4 Forms | Zod wired but errors appear only post-submit |
 | UX-05 | Ticket status workflow view (kanban or stage-pipeline, block illegal transitions) | P1 | Medium | Shipped | COMP §4 Status | No visual transition diagram |
 | UX-06 | Keyboard shortcuts + `?` shortcut menu (`N`=new ticket, `Esc`=close, `Cmd+K`) | P2 | Easy | Shipped | COMP §4 Keyboard | Power user gap |
-| UX-07 | WCAG AA accessibility audit + fix critical violations | P2 | Medium | Open | COMP §4 Accessibility | axe-core runs in dev; no production audit done |
+| UX-07 | WCAG AA accessibility audit + fix critical violations | P2 | Medium | Shipped | COMP §4 Accessibility | `ui.jsx`, `DashboardCharts.jsx`, `PartsInventory.jsx` |
 | UX-08 | Table pagination controls ("Showing X–Y of Z" + server-side above 500 rows) | P2 | Low | Open | COMP §4 Pagination | 5,000-row client cap with no visible controls |
 | UX-09 | Direction B token sweep — finish remaining pages (Invoices, PartsInventory) | P2 | Low | Open | COMP §4 Consistency | Some pages still use old Tailwind grays |
 | UX-10 | Notification center improvements (mark-all-read, grouping by type, history page) | P3 | Low | Open | COMP §4 Notifications | Polish item |
