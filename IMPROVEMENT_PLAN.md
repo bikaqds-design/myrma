@@ -82,7 +82,7 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 
 ### Shipped (Phase 11)
 
-- **FT-09** — Permission preview ("view as user") — UI/canDo() gating only, no real session swap; banner + audit log ✅
+- **FT-09** — Permission preview ("view as user") — UI/canDo() gating only, no real session swap; banner + audit log ✅ — _2026-06-17 follow-up: fixed Control Panel staying on the real role during preview (now correctly redirects per the previewed role); wired the "Invite User" button to `canDo('user_management', 'create_users')` instead of a hardcoded super_admin-only check_
 - **UX-10** — Notification center mark-all-read button + category grouping (history page descoped) ✅
 - **FT-10** — Knowledge Base / FAQ — `kb_articles` migration, admin CRUD, public `/kb` route linked from `/tracker` ✅
 
@@ -193,7 +193,7 @@ _None queued — see Later for postponed items._
 | FT-06 | SMS notifications via Twilio | P1 | Easy | Open | COMP §3/§5 #10 | Reuses notification_queue + send-whatsapp pattern; universal channel — _Postponed 2026-06-17_ |
 | FT-07 | Warranty validation engine (rule-based auto-flag) | P2 | Medium | Open | COMP §3/§5 #20 | Removes manual warranty status entry — _Postponed 2026-06-17_ |
 | FT-08 | Parts supplier integration | P2 | Hard | Open | COMP §3 | RepairDesk differentiator; context-switch elimination — _Postponed 2026-06-17_ |
-| FT-09 | Admin impersonation (view-as-user for support) | P2 | Easy | Shipped | COMP §3 | Scoped to permission-preview only (no real session swap) — see `App.jsx` PreviewBanner, `UsersTab.jsx` |
+| FT-09 | Admin impersonation (view-as-user for support) | P2 | Easy | Shipped | COMP §3 | Scoped to permission-preview only (no real session swap) — see `App.jsx` PreviewBanner, `UsersTab.jsx`. Bug found via real testing 2026-06-17: Control Panel stayed on the real role during preview, letting "Invite User" still work — fixed by routing the route guard through `effectiveUserRole`; also wired Invite User to `canDo('user_management','create_users')` |
 | FT-10 | Knowledge base / FAQ tied to public tracker portal | P2 | Easy | Shipped | COMP §3 | `kb_articles` migration, `db/kb.ts`, `cp/KnowledgeBase.jsx`, public `/kb` route |
 | FT-S1 | MFA / TOTP | — | — | Shipped | COMP §3/§5 #2 | Supabase TOTP on login + Account Settings |
 | FT-S2 | Session management UI (active sessions + force-logout) | — | — | Shipped | COMP §3/§5 #3 | Account Settings |

@@ -141,6 +141,8 @@ Roles: `super_admin`, `admin`, `manager`, `technician`, `viewer`.
 
 Use the `canDo` pattern when gating UI actions — import `canDo` from `src/lib/permissions` and call `canDo(currentUserRole, currentUserPermissions, 'section', 'action')`.
 
+**Permission preview ("view as user"):** Admin/super_admin can preview the app as another user's role+permissions from User Management's per-user action menu (cannot target admin/super_admin or yourself). `App.jsx` holds `previewUser` state; `effectiveUserRole`/`effectiveUserPermissions` are derived (`previewUser ? previewUser.role/.permissions : currentUserRole/.currentUserPermissions`) and passed to every route **including Control Panel** — Control Panel correctly redirects away when previewing a role that can't access it, same as a real login would. This is a **UI/`canDo()` gating preview only** — it does not swap the real Supabase session, so RLS-scoped data (e.g. that previewed user's own notifications) is unaffected. `AccountSettings` is the one route kept on the real role (it's "my own account," not a permission-gated module). The persistent `PreviewBanner` renders above `<Routes>` in the app shell, so "Exit preview" is always reachable regardless of which page the previewed role redirects to.
+
 ### URL tab state
 
 `src/hooks/useURLTab.js` — a lightweight hook that syncs a tab or sub-section selection with a URL query parameter. Used throughout page components so deep-links and browser back/forward work within a page:
