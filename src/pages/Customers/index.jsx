@@ -1371,6 +1371,13 @@ export default function Customers({
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-200 dark:border-[#212a38]">
+              <div className="text-sm text-gray-600 dark:text-[#9aa4b2]">
+                {t('common.showingRange', {
+                  start: startIndex + 1,
+                  end: Math.min(startIndex + itemsPerPage, filteredCustomers.length),
+                  total: filteredCustomers.length,
+                })}
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}

@@ -69,6 +69,7 @@
     "itemsPerPage": "Items per page",
     "jumpToPage": "Jump to page",
     "go": "Go",
+    "showingRange": "Showing {{start}}–{{end}} of {{total}}",
     "clearAll": "Clear all",
     "saving": "Saving..."
   },

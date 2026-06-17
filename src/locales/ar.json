@@ -69,6 +69,7 @@
     "itemsPerPage": "عناصر في الصفحة",
     "jumpToPage": "الانتقال إلى الصفحة",
     "go": "انتقال",
+    "showingRange": "عرض {{start}}–{{end}} من {{total}}",
     "clearAll": "مسح الكل",
     "saving": "جارٍ الحفظ..."
   },
