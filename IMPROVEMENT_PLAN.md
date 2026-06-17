@@ -91,9 +91,18 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 
 - **UX-01** — Mobile-first Kanban: scroll-snap columns (CSS-only responsive) + swipe-to-advance quick action + bumped table touch target. Camera attachment capture turned out to already work (unrestricted file input). ✅
 
-### Next (Phase 13 candidates)
+### Shipped (Phase 13 — Audit Sprint A)
 
-_None queued — see Later for postponed items._
+- **CI-01** — `lint:ci` was failing (the exact command CI runs): added missing `requestAnimationFrame`/`cancelAnimationFrame` eslint globals, fixed all 11 pre-existing warnings individually (no blanket suppression) — `npm run lint:ci` now exits 0 ✅
+- **SEC-01** — Removed the stray `VITE_SUPABASE_SERVICE_KEY` from local `.env` (unused, gitignored, but a `VITE_`-prefix footgun). **Key rotation in the Supabase dashboard still needed from the user.** ✅ (partial — manual step pending)
+- **SEC-02a** — `PartsInventory.jsx`: removed hardcoded `\|\| currentUserRole === ROLES.MANAGER/TECHNICIAN` bypasses on canAdd/canEdit/canAdjust/canDelete; added missing `adjust_stock` permission key to Manager/Technician defaults in `ROLE_DEFAULT_PERMISSIONS` to preserve current behavior while making it properly overridable ✅
+- **SEC-02b** — `Invoices.jsx`: replaced hardcoded `isManager`/`isViewer` booleans with a real `canDo()` helper (the file already had a dead, never-called `_canDo` someone had started); also fixed 2 more instances of the same bypass pattern found while in the file (`isAdmin && onDelete` hiding delete for non-admins with a granted delete permission; Actions-menu visibility not accounting for delete-only access) ✅
+
+### Next (Phase 14 candidates — Audit Sprint B)
+
+- **SEC-03** — `WATestCenter.jsx` bypasses the data-access barrel (L-1 violation)
+- **CQ-16** — Systemic hardcoded-role-vs-canDo() audit across 12 remaining files
+- **CQ-17** — Prettier formatting drift on 103 files
 
 ### Later (backlog)
 
