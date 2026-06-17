@@ -86,7 +86,11 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 - **UX-10** — Notification center mark-all-read button + category grouping (history page descoped) ✅
 - **FT-10** — Knowledge Base / FAQ — `kb_articles` migration, admin CRUD, public `/kb` route linked from `/tracker` ✅
 
-### Next (Phase 12 candidates)
+### Shipped (Phase 12)
+
+- **UX-01** — Mobile-first Kanban: scroll-snap columns (CSS-only responsive) + swipe-to-advance quick action + bumped table touch target. Camera attachment capture turned out to already work (unrestricted file input). ✅
+
+### Next (Phase 13 candidates)
 
 _None queued — see Later for postponed items._
 
@@ -100,7 +104,6 @@ _None queued — see Later for postponed items._
 - **FT-03** — Public REST API + developer docs (required for B2B sales) — _Postponed 2026-06-17_
 - **FT-04** — Native mobile app (technician workflow gap vs. RepairDesk) — _Postponed 2026-06-17_
 - **FT-05** — Full customer self-service portal (ticket history, comments, quote approval) — _Postponed 2026-06-17_
-- **UX-01** — Mobile-first ticket view (tap targets, swipe actions, camera attachment) — _Postponed 2026-06-17_
 
 ---
 
@@ -211,7 +214,7 @@ _None queued — see Later for postponed items._
 
 | ID | Title | Priority | Effort | Status | Source | Notes |
 |----|-------|----------|--------|--------|--------|-------|
-| UX-01 | Mobile-first ticket view (tap targets, swipe actions, camera attachment) | P0 | Hard | Open | COMP §4 Mobile | Not mobile-first; technicians work at benches — _Postponed 2026-06-17_ |
+| UX-01 | Mobile-first ticket view (tap targets, swipe actions, camera attachment) | P0 | Hard | Shipped | COMP §4 Mobile | Kanban scroll-snap + swipe-to-advance shipped (`_kanban.jsx`); table action-button touch target bumped; camera attachment was already working (unrestricted file input already surfaces camera on iOS/Android) — no change needed |
 | UX-02 | Role-aware dashboard widgets (technician vs. manager views) | P1 | Medium | Shipped | COMP §4 Dashboard | "My Open Tickets" panel for technician/viewer roles |
 | UX-03 | Sidebar navigation grouping (Service, Customers, Operations, Admin sections) | P1 | Medium | Dropped | COMP §4 Sidebar | 14+ flat items; discovery slow for new users |
 | UX-04 | Form validation on blur (real-time field errors before submit) | P1 | Low | Shipped | COMP §4 Forms | Zod wired but errors appear only post-submit |
