@@ -1,6 +1,6 @@
 # myRMA — Improvement Plan
 
-**Last updated:** 2026-06-13
+**Last updated:** 2026-06-17
 **Sources:**
 - `GUARD_SKILL_TEST_REPORT.md` — clean-code-guard + test-guard + docs-guard audit (2026-06-12 re-audit)
 - `COMPETITIVE_ANALYSIS.md` — feature-gap + UX audit (2026-06-06)
@@ -72,9 +72,11 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 
 ### Next (Phase 9 candidates)
 
-- **FT-06** — SMS notifications via Twilio (reuses existing notification_queue pattern)
+_None queued — see Later for postponed items._
 
 ### Later (backlog)
+
+- **FT-06** — SMS notifications via Twilio (reuses existing notification_queue pattern) — _Postponed 2026-06-17_
 - **FT-01** — Customer return initiation portal (highest-impact remaining feature gap)
 - **FT-02** — Payment processing / POS (blocks closing the repair loop)
 - **FT-03** — Public REST API + developer docs (required for B2B sales)
