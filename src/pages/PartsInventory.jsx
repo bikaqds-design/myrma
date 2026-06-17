@@ -100,7 +100,7 @@ function SortBtn({ label, sortKey, activeSortKey, activeSortDir, onSort }) {
         )
       ) : (
         <svg
-          className="w-3 h-3 text-gray-300 ml-0.5"
+          className="w-3 h-3 text-gray-300 dark:text-[#4a5568] ml-0.5"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -511,8 +511,8 @@ export default function PartsInventory({
     return (
       <div className="space-y-6">
         <div className="space-y-2">
-          <div className="h-8 w-40 animate-pulse bg-gray-200 rounded-lg" />
-          <div className="h-4 w-64 animate-pulse bg-gray-200 rounded-lg" />
+          <div className="h-8 w-40 animate-pulse bg-gray-200 dark:bg-[#1a2230] rounded-lg" />
+          <div className="h-4 w-64 animate-pulse bg-gray-200 dark:bg-[#1a2230] rounded-lg" />
         </div>
         <div className="h-64 animate-pulse bg-gray-100 dark:bg-[#1a2230] rounded-xl" />
       </div>

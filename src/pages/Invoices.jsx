@@ -357,7 +357,7 @@ function InvoicePanel({
                       className="flex-1 px-2 py-1.5 border border-gray-200 dark:border-[#212a38] rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400"
                     />
                     {form.lineItems.length > 1 && (
-                      <button onClick={() => removeLine(idx)} className="text-gray-300 hover:text-red-500 flex-shrink-0">
+                      <button onClick={() => removeLine(idx)} className="text-gray-300 dark:text-[#4a5568] hover:text-red-500 flex-shrink-0">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -367,7 +367,7 @@ function InvoicePanel({
                   {/* Qty | Unit $ | Line total */}
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div>
-                      <label className="block text-gray-400 mb-1">{t('invoices.labelQty')}</label>
+                      <label className="block text-gray-400 dark:text-[#9aa4b2] mb-1">{t('invoices.labelQty')}</label>
                       <input
                         type="number" min="0" value={li.qty}
                         onChange={(e) => updateLine(idx, 'qty', e.target.value)}
@@ -375,7 +375,7 @@ function InvoicePanel({
                       />
                     </div>
                     <div>
-                      <label className="block text-gray-400 mb-1">{t('invoices.labelUnitPrice')}</label>
+                      <label className="block text-gray-400 dark:text-[#9aa4b2] mb-1">{t('invoices.labelUnitPrice')}</label>
                       <input
                         type="number" min="0" step="0.01" value={li.unitPrice}
                         onChange={(e) => updateLine(idx, 'unitPrice', e.target.value)}
@@ -383,7 +383,7 @@ function InvoicePanel({
                       />
                     </div>
                     <div>
-                      <label className="block text-gray-400 mb-1">{t('invoices.labelLineTotal')}</label>
+                      <label className="block text-gray-400 dark:text-[#9aa4b2] mb-1">{t('invoices.labelLineTotal')}</label>
                       <div className="px-2 py-1.5 bg-gray-50 dark:bg-[#0f1520] rounded text-sm text-right font-medium text-gray-700 dark:text-[#e8ebf0]">
                         ${fmt((parseFloat(li.qty) || 0) * (parseFloat(li.unitPrice) || 0))}
                       </div>
@@ -934,7 +934,7 @@ function InvoiceCard({ inv, isAdmin, isManager, formatDate, onEdit, onExportPDF,
       </div>
 
       {/* Customer */}
-      <p className="text-sm font-medium text-gray-800 truncate">{inv.customer_name || '—'}</p>
+      <p className="text-sm font-medium text-gray-800 dark:text-[#e8ebf0] truncate">{inv.customer_name || '—'}</p>
       {inv.customer_email && <p className="text-xs text-gray-500 dark:text-[#9aa4b2] truncate">{inv.customer_email}</p>}
 
       {/* Meta row */}
@@ -1031,7 +1031,7 @@ function InvoiceRow({
         </span>
       </td>
       <td className="px-4 py-3">
-        <p className="font-medium text-gray-800 truncate max-w-[160px]">
+        <p className="font-medium text-gray-800 dark:text-[#e8ebf0] truncate max-w-[160px]">
           {inv.customer_name || '—'}
         </p>
         {inv.customer_email && (
@@ -1046,7 +1046,7 @@ function InvoiceRow({
           {inv.status ? inv.status.charAt(0).toUpperCase() + inv.status.slice(1) : 'Draft'}
         </span>
       </td>
-      <td className="px-4 py-3 text-right font-semibold text-gray-800">${fmt(inv.total)}</td>
+      <td className="px-4 py-3 text-right font-semibold text-gray-800 dark:text-[#e8ebf0]">${fmt(inv.total)}</td>
       <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs">
         {inv.due_date ? formatDate(inv.due_date) : '—'}
       </td>
