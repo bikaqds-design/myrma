@@ -1312,9 +1312,9 @@ export default function App() {
               <Route
                 path="/control-panel"
                 element={
-                  currentUserRole === ROLES.ADMIN || currentUserRole === ROLES.SUPER_ADMIN ? (
+                  effectiveUserRole === ROLES.ADMIN || effectiveUserRole === ROLES.SUPER_ADMIN ? (
                     <ControlPanel
-                      currentUserRole={currentUserRole}
+                      currentUserRole={effectiveUserRole}
                       currentUserEmail={currentUser?.email}
                       onStartPreview={startPreview}
                     />
