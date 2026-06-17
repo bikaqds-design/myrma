@@ -3,7 +3,7 @@
  *
  * Covers: canDo() helper, ROLE_DEFAULT_PERMISSIONS structure
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, test } from 'vitest'
 import { canDo, resolvePermissions, ROLE_DEFAULT_PERMISSIONS } from '../lib/permissions'
 import { ROLES } from '../lib/constants'
 
@@ -48,12 +48,11 @@ describe('canDo — permission object lookup', () => {
     expect(canDo(ROLES.VIEWER, perms, 'products', 'import')).toBe(false)
   })
 
-  it('returns false when permissions is null', () => {
-    expect(canDo(ROLES.MANAGER, null, 'rma_tickets', 'view_all')).toBe(false)
-  })
-
-  it('returns false when permissions is undefined', () => {
-    expect(canDo(ROLES.MANAGER, undefined, 'rma_tickets', 'view_all')).toBe(false)
+  test.each([
+    ['null', null],
+    ['undefined', undefined],
+  ])('returns false when permissions is %s', (_label, perms) => {
+    expect(canDo(ROLES.MANAGER, perms, 'rma_tickets', 'view_all')).toBe(false)
   })
 })
 
@@ -154,27 +153,13 @@ describe('ROLE_DEFAULT_PERMISSIONS', () => {
 // ── canDo with ROLE_DEFAULT_PERMISSIONS ──────────────────────────────────────
 
 describe('canDo with default permissions', () => {
-  const managerPerms = ROLE_DEFAULT_PERMISSIONS[ROLES.MANAGER]
-  const techPerms = ROLE_DEFAULT_PERMISSIONS[ROLES.TECHNICIAN]
-  const viewerPerms = ROLE_DEFAULT_PERMISSIONS[ROLES.VIEWER]
-
-  it('manager can create tickets', () => {
-    expect(canDo(ROLES.MANAGER, managerPerms, 'rma_tickets', 'create')).toBe(true)
-  })
-
-  it('technician cannot create tickets', () => {
-    expect(canDo(ROLES.TECHNICIAN, techPerms, 'rma_tickets', 'create')).toBe(false)
-  })
-
-  it('viewer cannot create tickets', () => {
-    expect(canDo(ROLES.VIEWER, viewerPerms, 'rma_tickets', 'create')).toBe(false)
-  })
-
-  it('manager can export products', () => {
-    expect(canDo(ROLES.MANAGER, managerPerms, 'products', 'export')).toBe(true)
-  })
-
-  it('viewer cannot export products', () => {
-    expect(canDo(ROLES.VIEWER, viewerPerms, 'products', 'export')).toBe(false)
+  test.each([
+    [ROLES.MANAGER, 'rma_tickets', 'create', true],
+    [ROLES.TECHNICIAN, 'rma_tickets', 'create', false],
+    [ROLES.VIEWER, 'rma_tickets', 'create', false],
+    [ROLES.MANAGER, 'products', 'export', true],
+    [ROLES.VIEWER, 'products', 'export', false],
+  ])('%s canDo %s.%s → %s', (role, section, action, expected) => {
+    expect(canDo(role, ROLE_DEFAULT_PERMISSIONS[role], section, action)).toBe(expected)
   })
 })
