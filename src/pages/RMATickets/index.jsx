@@ -1199,7 +1199,14 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
       {/* Kanban view */}
       {viewMode === 'kanban' && (
-        <KanbanView tickets={filteredTickets} onViewDetails={handleViewDetails} />
+        <KanbanView
+          tickets={filteredTickets}
+          onViewDetails={handleViewDetails}
+          onQuickStatusChange={(ticket, newStatus) => handleInlineUpdate(ticket, 'ticket_status', newStatus)}
+          canQuickEdit={(ticket) =>
+            canDo('edit_all') || (canDo('edit_assigned') && ticket.assigned_technician === userEmail)
+          }
+        />
       )}
 
       {/* Table view: pagination bar + table + footer */}
@@ -1488,7 +1495,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                     aria-label={`Actions for ticket ${t.rma_number}`}
                     aria-expanded={openMenuId === t.id}
                     aria-haspopup="menu"
-                    className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                    className="p-2.5 sm:p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
                   >
                     <svg className="w-4 h-4" aria-hidden="true" fill="currentColor" viewBox="0 0 24 24">
                       <circle cx="12" cy="5" r="1.5" />

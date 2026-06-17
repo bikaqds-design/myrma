@@ -216,6 +216,7 @@
     "viewTable": "جدول",
     "viewKanban": "كانبان",
     "kanbanNoTickets": "لا توجد تذاكر",
+    "markAs": "تحديد كـ {{status}}",
     "overdueDays": "متأخر {{days}} يوم",
     "dueToday": "موعد اليوم",
     "daysLeft": "{{days}} يوم متبقٍ",

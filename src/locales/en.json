@@ -216,6 +216,7 @@
     "viewTable": "Table",
     "viewKanban": "Kanban",
     "kanbanNoTickets": "No tickets",
+    "markAs": "Mark as {{status}}",
     "overdueDays": "Overdue {{days}}d",
     "dueToday": "Due today",
     "daysLeft": "{{days}}d left",
