@@ -347,10 +347,10 @@ export default function PartsInventory({
     if (currentUserRole === ROLES.SUPER_ADMIN || currentUserRole === ROLES.ADMIN) return true
     return currentUserPermissions?.parts?.[action] === true
   }
-  const canAdd = canDo('create') || currentUserRole === ROLES.MANAGER
-  const canEdit = canDo('edit') || currentUserRole === ROLES.MANAGER
-  const canDelete = currentUserRole === ROLES.SUPER_ADMIN || currentUserRole === ROLES.ADMIN
-  const canAdjust = canAdd || currentUserRole === ROLES.TECHNICIAN || canDo('adjust_stock')
+  const canAdd = canDo('create')
+  const canEdit = canDo('edit')
+  const canDelete = canDo('delete')
+  const canAdjust = canAdd || canDo('adjust_stock')
   const canExport = canAdd || canDo('export')
 
   const queryClient = useQueryClient()

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import i18next from 'i18next'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { MigrationNotice } from './Announcements'
@@ -30,11 +31,7 @@ export default function RMAConfig({ currentUserEmail }) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   const [users, setUsers] = useState([])
 
-  useEffect(() => {
-    load()
-  }, [])
-
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const [cfgResult, usersData] = await Promise.all([
@@ -53,11 +50,15 @@ export default function RMAConfig({ currentUserEmail }) {
       if (byKey.default_settings) setSettings(byKey.default_settings)
     } catch (err) {
       captureException(err)
-      toast.error(t('cp.rmaConfig.loadFailed'))
+      toast.error(i18next.t('cp.rmaConfig.loadFailed'))
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   const save = async () => {
     setSaving(true)

@@ -379,7 +379,6 @@ export function TicketForm({
 
   const EMPTY_RES = { type: '', replacement_product_name: '', replacement_serial: '', amount: '', currency: 'USD', reason: '', reference_number: '' }
   const [resForm, setResForm] = useState(EMPTY_RES)
-  const [existingResolutionId, setExistingResolutionId] = useState(null)
   const [productSearches, setProductSearches] = useState(() => {
     if (editingTicket) {
       const prods = editingTicket.products?.length ? editingTicket.products : [{ ...EMPTY_PRODUCT }]
@@ -412,7 +411,6 @@ export function TicketForm({
     if (!editingTicket?.id) return
     db.ticketResolutions.get(editingTicket.id).then((res) => {
       if (res) {
-        setExistingResolutionId(res.id)
         setResForm({
           type: res.type,
           replacement_product_name: res.replacement_product_name || '',
@@ -424,7 +422,7 @@ export function TicketForm({
         })
       }
     }).catch(() => {})
-  }, [editingTicket?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [editingTicket?.id])
 
   useEffect(() => {
     const handler = (e) => {

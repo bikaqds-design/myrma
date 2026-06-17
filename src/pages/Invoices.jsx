@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import i18next from 'i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -528,13 +529,12 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
   const { t } = useTranslation()
   const { formatDate } = useAppearance()
 
-  const _canDo = (s, a) =>
-    [ROLES.SUPER_ADMIN, ROLES.ADMIN].includes(currentUserRole) || currentUserPermissions?.[s]?.[a]
-
   const isAdmin = [ROLES.SUPER_ADMIN, ROLES.ADMIN].includes(currentUserRole)
-  const isManager = currentUserRole === ROLES.MANAGER || isAdmin
+  const canDo = (action) => isAdmin || currentUserPermissions?.invoices?.[action] === true
+  const canCreateInvoice = canDo('create')
+  const canEditInvoice = canDo('edit')
+  const canDeleteInvoice = canDo('delete')
   const isTech = currentUserRole === ROLES.TECHNICIAN
-  const isViewer = currentUserRole === ROLES.VIEWER
 
   const queryClient = useQueryClient()
   const { data: invoicesData, isLoading: loading, isError: invoicesError } = useQuery({
@@ -554,7 +554,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
   const tickets = useMemo(() => ticketsData ?? [], [ticketsData])
 
   useEffect(() => {
-    if (invoicesError) toast.error(t('invoices.errorLoadFailed'))
+    if (invoicesError) toast.error(i18next.t('invoices.errorLoadFailed'))
   }, [invoicesError])
   const [activeTab, setActiveTab] = useState('All')
   const [panelOpen, setPanelOpen] = useState(false)
@@ -750,7 +750,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
         subtitle={t('invoices.subtitle')}
         className="mb-6"
       >
-        {!isViewer && !tableMissing && (
+        {canCreateInvoice && !tableMissing && (
           <Button onClick={openCreate}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -801,7 +801,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
                 ? t('invoices.emptyTableDesc')
                 : t('invoices.emptyDesc')
             }
-            action={!isViewer && !tableMissing ? openCreate : undefined}
+            action={canCreateInvoice && !tableMissing ? openCreate : undefined}
             actionLabel={t('invoices.newInvoiceQuote')}
           />
         </div>
@@ -813,8 +813,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
               <InvoiceCard
                 key={inv.id}
                 inv={inv}
-                isAdmin={isAdmin}
-                isManager={isManager}
+                canEdit={canEditInvoice}
                 formatDate={formatDate}
                 onEdit={() => openEdit(inv)}
                 onExportPDF={() => exportPDF(inv, t)}
@@ -827,7 +826,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
                 onVoid={() =>
                   openConfirm(t('invoices.confirmVoidTitle'), t('invoices.confirmVoidMsg', { number: inv.invoice_number }), () => { closeConfirm(); updateStatus(inv, 'void') })
                 }
-                onDelete={isAdmin ? () => handleDelete(inv) : undefined}
+                onDelete={canDeleteInvoice ? () => handleDelete(inv) : undefined}
               />
             ))}
           </div>
@@ -854,9 +853,8 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
                     <InvoiceRow
                       key={inv.id}
                       inv={inv}
-                      isAdmin={isAdmin}
-                      isManager={isManager}
-                      isTech={isTech}
+                      canEdit={canEditInvoice}
+                      canDelete={canDeleteInvoice}
                       formatDate={formatDate}
                       onEdit={() => openEdit(inv)}
                       onExportPDF={() => exportPDF(inv, t)}
@@ -869,7 +867,7 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
                       onVoid={() =>
                         openConfirm(t('invoices.confirmVoidTitle'), t('invoices.confirmVoidMsg', { number: inv.invoice_number }), () => { closeConfirm(); updateStatus(inv, 'void') })
                       }
-                      onDelete={isAdmin ? () => handleDelete(inv) : undefined}
+                      onDelete={canDeleteInvoice ? () => handleDelete(inv) : undefined}
                     />
                   ))}
                 </tbody>
@@ -909,11 +907,10 @@ export default function Invoices({ currentUserRole, currentUserEmail, currentUse
 
 // ─── Invoice Card (mobile) ────────────────────────────────────────────────────
 
-function InvoiceCard({ inv, isAdmin, isManager, formatDate, onEdit, onExportPDF, onMarkSent, onMarkPaid, onVoid, onDelete }) {
+function InvoiceCard({ inv, canEdit, formatDate, onEdit, onExportPDF, onMarkSent, onMarkPaid, onVoid, onDelete }) {
   const { t } = useTranslation()
   const [menuOpen, setMenuOpen] = useState(false)
-  const canChangeStatus = isManager
-  const canEdit = isManager
+  const canChangeStatus = canEdit
 
   return (
     <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-4 shadow-sm">
@@ -956,7 +953,7 @@ function InvoiceCard({ inv, isAdmin, isManager, formatDate, onEdit, onExportPDF,
           PDF
         </button>
 
-        {(canEdit || canChangeStatus || isAdmin) && (
+        {(canEdit || onDelete) && (
           <div className="relative flex-1">
             <button
               onClick={() => setMenuOpen((o) => !o)}
@@ -983,7 +980,7 @@ function InvoiceCard({ inv, isAdmin, isManager, formatDate, onEdit, onExportPDF,
                   {canChangeStatus && inv.status !== 'void' && inv.status !== 'paid' && (
                     <button onClick={() => { setMenuOpen(false); onVoid() }} className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600">{t('invoices.void')}</button>
                   )}
-                  {isAdmin && onDelete && (
+                  {onDelete && (
                     <button onClick={() => { setMenuOpen(false); onDelete() }} className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 border-t border-gray-100 dark:border-[#212a38]">{t('common.delete')}</button>
                   )}
                 </div>
@@ -1000,9 +997,8 @@ function InvoiceCard({ inv, isAdmin, isManager, formatDate, onEdit, onExportPDF,
 
 function InvoiceRow({
   inv,
-  isAdmin,
-  isManager,
-  isTech: _isTech,
+  canEdit,
+  canDelete,
   formatDate,
   onEdit,
   onExportPDF,
@@ -1014,9 +1010,7 @@ function InvoiceRow({
   const { t } = useTranslation()
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const canChangeStatus = isManager
-  const canEdit = isManager
-  const canDelete = isAdmin
+  const canChangeStatus = canEdit
 
   return (
     <tr className="hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] transition-colors">
