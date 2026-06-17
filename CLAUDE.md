@@ -58,11 +58,12 @@ All top-level pages are lazy-loaded via the `lazyWithReload()` wrapper in `App.j
 | `/parts` | `PartsInventory` | required |
 | `/reports` | `Reports` | required |
 | `/tracker` | `RMATracker` | **none (public)** |
+| `/kb` | `KnowledgeBasePublic` | **none (public)** |
 | `*` | `NotFoundPage` | — |
 
 Props passed to every authenticated page component: `currentUserRole`, `currentUserEmail`, `currentUserPermissions`.
 
-`/tracker` is the only unauthenticated route — detected via `pathname === '/tracker'` before the auth check renders.
+`/tracker` and `/kb` are the only unauthenticated routes — each detected via a `pathname === '/...'` check before the auth check renders.
 
 **Exception:** `window.history.pushState` is used ONLY inside `RMATickets/index.jsx` to sync `?ticket=<id>` (open ticket modal URL) without triggering a full route transition. This is intentional in-page state, not top-level navigation.
 
@@ -310,6 +311,7 @@ Current migrations:
 - `20260602_whatsapp_notifications.sql`
 - `20260603_user_preferences_rls.sql`
 - `20260613_search_by_serial.sql`
+- `20260617_kb_articles.sql`
 
 ### RLS SQL helper functions
 

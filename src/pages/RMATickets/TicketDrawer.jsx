@@ -12,7 +12,7 @@ import { captureException } from '../../lib/sentry'
 import {
   getStatusColor,
   getPriorityColor,
-  fmt,
+  formatDate,
   fmtDateTime,
   fmtBytes,
   isImage,
@@ -360,7 +360,7 @@ export function TicketDrawer({
                   label: t('ticketDrawer.assignedTo'),
                   value: ticket.assigned_technician || t('ticketDrawer.unassigned'),
                 },
-                { label: t('ticketDrawer.dueDate'), value: fmt(ticket.due_date) },
+                { label: t('ticketDrawer.dueDate'), value: formatDate(ticket.due_date) },
                 { label: t('ticketDrawer.created'), value: fmtDateTime(ticket.created_date) },
                 { label: t('ticketDrawer.createdBy'), value: ticket.created_by || '—' },
               ].map(({ label, value }) => (

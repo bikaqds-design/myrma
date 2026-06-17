@@ -24,6 +24,7 @@ import {
   notificationSettings,
   notificationQueue,
 } from './whatsappNotifications.js'
+import { kbArticles } from './kb.js'
 
 export const db = {
   // Users & roles
@@ -74,6 +75,9 @@ export const db = {
   notificationLogs,
   notificationSettings,
   notificationQueue,
+
+  // Knowledge base
+  kbArticles,
 }
 
 // Re-export all Row types for page components to import
@@ -92,3 +96,4 @@ export type {
   WhatsAppTemplateRow, TemplateVariable, NotificationLogRow,
   NotificationSettingRow, NotificationQueueRow,
 } from './whatsappNotifications.js'
+export type { KBArticleRow } from './kb.js'
