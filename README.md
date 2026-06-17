@@ -239,7 +239,7 @@ myrma-app/
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                            # CI: test → lint:ci → build
-├── AUDIT_LOG.md                              # Engineering audit history + scorecard
+├── docs/archive/AUDIT_LOG.md                 # Engineering audit history + scorecard
 ├── CLAUDE.md                                 # AI agent instructions
 ├── CONSTITUTION.md                           # Engineering constitution (rules + standards)
 └── vite.config.js                            # Vite + PWA configuration
@@ -419,7 +419,8 @@ security(storage): restrict anonymous upload MIME types
 |------|---------|
 | [`CLAUDE.md`](CLAUDE.md) | AI agent instructions — architecture patterns, gotchas, and rules |
 | [`CONSTITUTION.md`](CONSTITUTION.md) | Engineering constitution — 18 sections of laws, standards, and enforcement |
-| [`AUDIT_LOG.md`](AUDIT_LOG.md) | Full engineering audit history — all findings, fixes, and project scorecard |
+| [`docs/archive/AUDIT_LOG.md`](docs/archive/AUDIT_LOG.md) | Full engineering audit history — all findings, fixes, and project scorecard |
+| [`docs/archive/`](docs/archive/) | Historical/dated reports: old test snapshots, the GUARD-skill audit, competitive analysis, past system audits |
 
 ---
 

@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 > **Full engineering rules are in [`CONSTITUTION.md`](CONSTITUTION.md).**  
-> **Audit history and scorecard are in [`AUDIT_LOG.md`](AUDIT_LOG.md).**
+> **Audit history and scorecard are in [`docs/archive/AUDIT_LOG.md`](docs/archive/AUDIT_LOG.md).**
 
 ## Commands
 

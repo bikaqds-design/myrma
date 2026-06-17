@@ -1255,7 +1255,9 @@ d:\myrma-app\
 │   └── workflows\
 │       └── ci.yml              # CI: test → lint:ci → build
 ├── .specify\                   # Speckit planning artifacts
-├── AUDIT_LOG.md                # Engineering audit history and scorecard
+├── docs\
+│   └── archive\                # Historical audit reports, superseded test snapshots
+│       └── AUDIT_LOG.md        # Engineering audit history and scorecard
 ├── CLAUDE.md                   # AI agent instructions (checked into repo)
 ├── CONSTITUTION.md             # This file
 ├── vite.config.js              # Vite + PWA configuration
@@ -1276,7 +1278,7 @@ d:\myrma-app\
 | New Edge Function | `supabase/functions/new-function/index.ts` |
 | New migration | `supabase/migrations/YYYYMMDD_description.sql` |
 
-**LAW: Do not create files in the root directory** unless they are project-level configs (vite.config.js, tailwind.config.js, etc.) or documentation (CONSTITUTION.md, AUDIT_LOG.md, CLAUDE.md).
+**LAW: Do not create files in the root directory** unless they are project-level configs (vite.config.js, tailwind.config.js, etc.) or actively-maintained documentation (CONSTITUTION.md, CLAUDE.md, AGENTS.md, DESIGN.md, IMPROVEMENT_PLAN.md, README.md). One-time or historical reports (audit logs, dated test snapshots) go in `docs/archive/` instead.
 
 ### 13.3 Import Order (Enforced by ESLint)
 
@@ -1528,7 +1530,7 @@ This section is for Claude Code, GitHub Copilot, and any other AI coding assista
 Priority order for authoritative information:
 1. This `CONSTITUTION.md`
 2. `CLAUDE.md` (project-level instructions)
-3. `AUDIT_LOG.md` (what was changed and why)
+3. `docs/archive/AUDIT_LOG.md` (what was changed and why)
 4. The actual source code files
 5. READMEs and docs (may be outdated)
 
@@ -1650,7 +1652,7 @@ const isRtl = i18n.language === 'ar'
 
 ### 17.10 Documenting Changes
 
-**MUST: When making changes that affect the audit record, update `AUDIT_LOG.md`** changelog section with:
+**MUST: When making changes that affect the audit record, update `docs/archive/AUDIT_LOG.md`** changelog section with:
 - Date (YYYY-MM-DD)
 - Change summary
 - ID if it corresponds to an existing finding
@@ -1745,7 +1747,7 @@ Before approving any PR, verify:
 - [ ] No deleted or weakened security features
 - [ ] New constants added to `src/lib/constants.ts`
 - [ ] `CLAUDE.md` updated if architectural patterns changed
-- [ ] `AUDIT_LOG.md` changelog updated if relevant to audit findings
+- [ ] `docs/archive/AUDIT_LOG.md` changelog updated if relevant to audit findings
 
 ### 18.4 Living Document
 
@@ -1756,7 +1758,7 @@ This constitution is a living document. When:
 
 **MUST: Constitution changes are reviewed by the project lead** and committed as `docs(constitution): <description>`.
 
-**MUST: All constitution changes are documented in the `AUDIT_LOG.md` changelog.**
+**MUST: All constitution changes are documented in the `docs/archive/AUDIT_LOG.md` changelog.**
 
 ---
 

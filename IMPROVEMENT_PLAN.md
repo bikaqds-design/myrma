@@ -2,8 +2,9 @@
 
 **Last updated:** 2026-06-17
 **Sources:**
-- `GUARD_SKILL_TEST_REPORT.md` — clean-code-guard + test-guard + docs-guard audit (2026-06-12 re-audit)
-- `COMPETITIVE_ANALYSIS.md` — feature-gap + UX audit (2026-06-06)
+- `docs/archive/GUARD_SKILL_TEST_REPORT.md` — clean-code-guard + test-guard + docs-guard audit (2026-06-12 re-audit)
+- `docs/archive/COMPETITIVE_ANALYSIS.md` — feature-gap + UX audit (2026-06-06)
+- `SYSTEM_AUDIT_REPORT_20260617.md` (in `docs/archive/`) + `FIX_PLAN_20260617.md` — full system audit (2026-06-17)
 
 **Rule:** Update Status in this file as items ship. Evidence, fix details, and competitor rationale stay in the source documents.
 
@@ -77,8 +78,8 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 ### Shipped (Phase 10)
 
 - **DOC-10** — Verified `QueueJob` export already in sync between AGENTS.md/CLAUDE.md (no edit needed) ✅
-- **DOC-17** — Added 2026-06-17 note to AUDIT_LOG.md C-1 documenting the later `pool: 'forks'` addition ✅
-- **DOC-18** — Refreshed GUARD_SKILL_TEST_REPORT.md header from stale `80/80` to `173/173` with a snapshot-date caveat ✅
+- **DOC-17** — Added 2026-06-17 note to docs/archive/AUDIT_LOG.md C-1 documenting the later `pool: 'forks'` addition ✅
+- **DOC-18** — Refreshed docs/archive/GUARD_SKILL_TEST_REPORT.md header from stale `80/80` to `173/173` with a snapshot-date caveat ✅
 
 ### Shipped (Phase 11)
 
@@ -109,7 +110,7 @@ _None queued — see Later for postponed items._
 
 ## Track CQ — Code Quality
 
-> Source: `GUARD_SKILL_TEST_REPORT.md` → clean-code-guard sections C-1..C-4, I-1..I-7, N-1..N-3, Nits
+> Source: `docs/archive/GUARD_SKILL_TEST_REPORT.md` → clean-code-guard sections C-1..C-4, I-1..I-7, N-1..N-3, Nits
 
 | ID | Title | Priority | Effort | Status | Source | Where |
 |----|-------|----------|--------|--------|--------|-------|
@@ -133,7 +134,7 @@ _None queued — see Later for postponed items._
 
 ## Track TS — Tests
 
-> Source: `GUARD_SKILL_TEST_REPORT.md` → test-guard section
+> Source: `docs/archive/GUARD_SKILL_TEST_REPORT.md` → test-guard section
 
 | ID | Title | Priority | Effort | Status | Source | Where |
 |----|-------|----------|--------|--------|--------|-------|
@@ -154,7 +155,7 @@ _None queued — see Later for postponed items._
 
 ## Track DOC — Documentation
 
-> Source: `GUARD_SKILL_TEST_REPORT.md` → docs-guard sections (README/CLAUDE/AGENTS/DESIGN pass + CONSTITUTION/AUDIT_LOG pass)
+> Source: `docs/archive/GUARD_SKILL_TEST_REPORT.md` → docs-guard sections (README/CLAUDE/AGENTS/DESIGN pass + CONSTITUTION/AUDIT_LOG pass)
 
 | ID | Title | Priority | Effort | Status | Source | Where |
 |----|-------|----------|--------|--------|--------|-------|
@@ -170,18 +171,18 @@ _None queued — see Later for postponed items._
 | DOC-08 | Add i18n/RTL section to AGENTS.md (entirely missing) | P1 | Medium | Dropped | GUARD → docs-guard Rule 8 | Pre-existing correct — full i18n/RTL section already present at AGENTS.md:157–193 |
 | DOC-09 | Remove SPECKIT stubs from CLAUDE.md | P1 | Low | Shipped | GUARD → docs-guard Rule 10 | `CLAUDE.md:336–339` removed; AGENTS.md had no stub |
 | DOC-10 | Verify and sync `QueueJob` export in AGENTS.md vs CLAUDE.md | P2 | Low | Shipped | GUARD → docs-guard Worth noting | Verified 2026-06-17 — both files already list identical `messaging/types.ts` export line; no edit needed |
-| DOC-13 | Fix AUDIT_LOG.md i18n path in 2026-06-05 entry | P0 | Low | Dropped | GUARD → docs-guard Rule 1 | Pre-existing correct — `src/lib/i18n.js` already correct at AUDIT_LOG.md:1310 |
+| DOC-13 | Fix docs/archive/AUDIT_LOG.md i18n path in 2026-06-05 entry | P0 | Low | Dropped | GUARD → docs-guard Rule 1 | Pre-existing correct — `src/lib/i18n.js` already correct at docs/archive/AUDIT_LOG.md:1310 |
 | DOC-14 | Add 3 missing Edge Functions to CONSTITUTION.md §7.4 | P1 | Low | Dropped | GUARD → docs-guard Rule 1 | Pre-existing correct — §7.4 already lists all 6 functions + ai-assist |
 | DOC-15 | Fix CONSTITUTION.md §16.3 CI test count: 74 → 80 | P1 | Low | Dropped | GUARD → docs-guard Rule 1 | Pre-existing correct — §16.3 already reads `80 unit tests` |
-| DOC-16 | Mark MFA / replacement / i18n as Shipped in COMPETITIVE_ANALYSIS.md §3 | P1 | Low | Dropped | GUARD → docs-guard Rule 3 | Pre-existing correct — all three already marked ✅ Shipped in §3 |
-| DOC-17 | Add note in AUDIT_LOG.md C-1 entry: `poolOptions` refined to `fileParallelism: false` | P2 | Low | Shipped | GUARD → docs-guard Rule 3 | `AUDIT_LOG.md:601` — added 2026-06-17 note on `pool: 'forks'` addition + confirmed-intermittent race |
-| DOC-18 | Update GUARD_SKILL_TEST_REPORT.md header: `107/107` → `80/80` with note | P2 | Low | Shipped | GUARD → docs-guard Worth noting | `GUARD_SKILL_TEST_REPORT.md:11` — refreshed to `173/173`, 7 files, with a snapshot-date caveat |
+| DOC-16 | Mark MFA / replacement / i18n as Shipped in docs/archive/COMPETITIVE_ANALYSIS.md §3 | P1 | Low | Dropped | GUARD → docs-guard Rule 3 | Pre-existing correct — all three already marked ✅ Shipped in §3 |
+| DOC-17 | Add note in docs/archive/AUDIT_LOG.md C-1 entry: `poolOptions` refined to `fileParallelism: false` | P2 | Low | Shipped | GUARD → docs-guard Rule 3 | `docs/archive/AUDIT_LOG.md:601` — added 2026-06-17 note on `pool: 'forks'` addition + confirmed-intermittent race |
+| DOC-18 | Update docs/archive/GUARD_SKILL_TEST_REPORT.md header: `107/107` → `80/80` with note | P2 | Low | Shipped | GUARD → docs-guard Worth noting | `docs/archive/GUARD_SKILL_TEST_REPORT.md:11` — refreshed to `173/173`, 7 files, with a snapshot-date caveat |
 
 ---
 
 ## Track FT — Features
 
-> Source: `COMPETITIVE_ANALYSIS.md` §3 Missing Features Report + §5 Product Roadmap
+> Source: `docs/archive/COMPETITIVE_ANALYSIS.md` §3 Missing Features Report + §5 Product Roadmap
 
 | ID | Title | Priority | Effort | Status | Source | Notes |
 |----|-------|----------|--------|--------|--------|-------|
@@ -210,7 +211,7 @@ _None queued — see Later for postponed items._
 
 ## Track UX — UX Improvements
 
-> Source: `COMPETITIVE_ANALYSIS.md` §4 UX Audit
+> Source: `docs/archive/COMPETITIVE_ANALYSIS.md` §4 UX Audit
 
 | ID | Title | Priority | Effort | Status | Source | Notes |
 |----|-------|----------|--------|--------|--------|-------|
