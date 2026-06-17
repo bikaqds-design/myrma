@@ -17,7 +17,7 @@ import { RoleTemplatesTab, CustomRolesTab, CreateRoleModal, PermissionsModal } f
 // not loaded by getUserRole, not enforced by canDo). Hidden until fully supported (UM-3).
 const ENABLE_CUSTOM_ROLES = false
 
-export default function UserManagement({ currentUserRole, currentUserEmail }) {
+export default function UserManagement({ currentUserRole, currentUserEmail, onPreviewUser }) {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useURLTab('umtab', 'users')
   const queryClient = useQueryClient()
@@ -572,6 +572,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail }) {
               onUserControl={handleOpenUserControl}
               onViewActivity={handleViewActivity}
               onResetPassword={handleOpenPasswordReset}
+              onPreview={onPreviewUser}
               openMenuId={openMenuId}
               setOpenMenuId={setOpenMenuId}
             />

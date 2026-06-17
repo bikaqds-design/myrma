@@ -19,6 +19,26 @@ import OnboardingWizard from './components/OnboardingWizard'
 import { Spinner } from './components/ui'
 import { captureException } from './lib/sentry'
 
+function PreviewBanner({ previewUser, onExit }) {
+  const { t } = useTranslation()
+  if (!previewUser) return null
+  return (
+    <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between gap-3 px-4 py-2 bg-amber-500 text-white text-sm">
+      <span>
+        {t('preview.banner', { email: previewUser.email, role: previewUser.role })}
+        {' — '}
+        <span className="opacity-90">{t('preview.dataDisclaimer')}</span>
+      </span>
+      <button
+        onClick={onExit}
+        className="flex-shrink-0 px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 font-medium transition-colors"
+      >
+        {t('preview.exit')}
+      </button>
+    </div>
+  )
+}
+
 function AnnouncementBanner() {
   const [items, setItems] = useState([])
   const [dismissed, setDismissed] = useState([])
@@ -62,6 +82,7 @@ function AnnouncementBanner() {
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
 import RMATracker from './pages/RMATracker'
+import KnowledgeBasePublic from './pages/KnowledgeBasePublic'
 
 // When Vite redeploys, content-hashed chunk filenames change. A user who still
 // has the old index.html cached will try to fetch old chunk URLs that no longer
@@ -227,6 +248,13 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null)
   const [currentUserRole, setCurrentUserRole] = useState(null)
   const [currentUserPermissions, setCurrentUserPermissions] = useState(null)
+  // FT-09: permission preview — lets an admin temporarily see the app as another
+  // user's role+permissions would render it. Does NOT swap the real Supabase
+  // session, so RLS-scoped data (e.g. that user's own notifications) is unaffected —
+  // this is a UI/canDo() gating preview only, never real impersonation.
+  const [previewUser, setPreviewUser] = useState(null) // { email, role, permissions } | null
+  const effectiveUserRole = previewUser ? previewUser.role : currentUserRole
+  const effectiveUserPermissions = previewUser ? previewUser.permissions : currentUserPermissions
   const [loading, setLoading] = useState(true)
   const [mfaPending, setMfaPending] = useState(null) // { user, factorId } — waiting for TOTP code
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -325,6 +353,34 @@ export default function App() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const startPreview = (user) => {
+    setPreviewUser({
+      email: user.user_email,
+      role: user.role,
+      permissions: resolvePermissions(user.role, user.permissions),
+    })
+    db.auditLog
+      .log(
+        currentUser?.email,
+        'permission_preview_started',
+        `Started permission preview as ${user.user_email} (${user.role})`
+      )
+      .catch(() => {})
+  }
+
+  const stopPreview = () => {
+    if (previewUser) {
+      db.auditLog
+        .log(
+          currentUser?.email,
+          'permission_preview_stopped',
+          `Stopped permission preview as ${previewUser.email}`
+        )
+        .catch(() => {})
+    }
+    setPreviewUser(null)
   }
 
   // Load notifications once and maintain a single real-time subscription
@@ -733,6 +789,15 @@ export default function App() {
     )
   }
 
+  if (pathname === '/kb') {
+    return (
+      <>
+        <KnowledgeBasePublic />
+        <Toaster position="top-right" toastOptions={toastOptions} />
+      </>
+    )
+  }
+
   if (resetPasswordMode) {
     return (
       <>
@@ -777,6 +842,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#f4f6f9] dark:bg-[#0b0f17] flex">
       <AnnouncementBanner />
+      <PreviewBanner previewUser={previewUser} onExit={stopPreview} />
       <Toaster position="top-right" />
       {showOnboarding && (
         <OnboardingWizard
@@ -1157,7 +1223,7 @@ export default function App() {
               <Route
                 path="/"
                 element={
-                  <Dashboard currentUserEmail={currentUser?.email} onNavigate={handleNavigate} />
+                  <Dashboard currentUserEmail={currentUser?.email} currentUserRole={effectiveUserRole} onNavigate={handleNavigate} />
                 }
               />
               <Route path="/dashboard" element={<Navigate to="/" replace />} />
@@ -1166,9 +1232,9 @@ export default function App() {
                 path="/products"
                 element={
                   <Products
-                    currentUserRole={currentUserRole}
+                    currentUserRole={effectiveUserRole}
                     currentUserEmail={currentUser?.email}
-                    currentUserPermissions={currentUserPermissions}
+                    currentUserPermissions={effectiveUserPermissions}
                     onNavigateToProduct={(id) => navigate(`/products/${id}`)}
                   />
                 }
@@ -1177,9 +1243,9 @@ export default function App() {
                 path="/products/:id"
                 element={
                   <ProductDetailsRoute
-                    currentUserRole={currentUserRole}
+                    currentUserRole={effectiveUserRole}
                     currentUserEmail={currentUser?.email}
-                    currentUserPermissions={currentUserPermissions}
+                    currentUserPermissions={effectiveUserPermissions}
                     onNavigateToTicket={handleNavigateToTicket}
                   />
                 }
@@ -1189,9 +1255,9 @@ export default function App() {
                 path="/customers"
                 element={
                   <Customers
-                    currentUserRole={currentUserRole}
+                    currentUserRole={effectiveUserRole}
                     currentUserEmail={currentUser?.email}
-                    currentUserPermissions={currentUserPermissions}
+                    currentUserPermissions={effectiveUserPermissions}
                     onNavigateToCustomer={(id) => navigate(`/customers/${id}`)}
                   />
                 }
@@ -1200,9 +1266,9 @@ export default function App() {
                 path="/customers/:id"
                 element={
                   <CustomerDetailsRoute
-                    currentUserRole={currentUserRole}
+                    currentUserRole={effectiveUserRole}
                     currentUserEmail={currentUser?.email}
-                    currentUserPermissions={currentUserPermissions}
+                    currentUserPermissions={effectiveUserPermissions}
                     onNavigateToTicket={handleNavigateToTicket}
                   />
                 }
@@ -1212,9 +1278,9 @@ export default function App() {
                 path="/rma-tickets"
                 element={
                   <RMATickets
-                    userRole={currentUserRole}
+                    userRole={effectiveUserRole}
                     userEmail={currentUser?.email}
-                    userPermissions={currentUserPermissions}
+                    userPermissions={effectiveUserPermissions}
                     initialTicketId={selectedTicketId}
                   />
                 }
@@ -1224,9 +1290,9 @@ export default function App() {
                 path="/inventory"
                 element={
                   <Inventory
-                    userRole={currentUserRole}
+                    userRole={effectiveUserRole}
                     userEmail={currentUser?.email}
-                    userPermissions={currentUserPermissions}
+                    userPermissions={effectiveUserPermissions}
                     onNavigateToTicket={handleNavigateToTicket}
                   />
                 }
@@ -1250,6 +1316,7 @@ export default function App() {
                     <ControlPanel
                       currentUserRole={currentUserRole}
                       currentUserEmail={currentUser?.email}
+                      onStartPreview={startPreview}
                     />
                   ) : (
                     <Navigate to="/" replace />
@@ -1261,9 +1328,9 @@ export default function App() {
                 path="/calendar"
                 element={
                   <TechCalendar
-                    userRole={currentUserRole}
+                    userRole={effectiveUserRole}
                     userEmail={currentUser?.email}
-                    userPermissions={currentUserPermissions}
+                    userPermissions={effectiveUserPermissions}
                     onNavigateToTicket={handleNavigateToTicket}
                   />
                 }
@@ -1273,9 +1340,9 @@ export default function App() {
                 path="/invoices"
                 element={
                   <Invoices
-                    userRole={currentUserRole}
+                    userRole={effectiveUserRole}
                     userEmail={currentUser?.email}
-                    userPermissions={currentUserPermissions}
+                    userPermissions={effectiveUserPermissions}
                   />
                 }
               />
@@ -1284,9 +1351,9 @@ export default function App() {
                 path="/parts"
                 element={
                   <PartsInventory
-                    userRole={currentUserRole}
+                    userRole={effectiveUserRole}
                     userEmail={currentUser?.email}
-                    userPermissions={currentUserPermissions}
+                    userPermissions={effectiveUserPermissions}
                   />
                 }
               />
@@ -1295,9 +1362,9 @@ export default function App() {
                 path="/reports"
                 element={
                   <Reports
-                    userRole={currentUserRole}
+                    userRole={effectiveUserRole}
                     userEmail={currentUser?.email}
-                    userPermissions={currentUserPermissions}
+                    userPermissions={effectiveUserPermissions}
                   />
                 }
               />

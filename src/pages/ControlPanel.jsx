@@ -11,6 +11,7 @@ import UserManagement from './UserManagement'
 import BrandingSettings from './BrandingSettings'
 import BackupRestore from './BackupRestore'
 import Announcements from './cp/Announcements'
+import KnowledgeBase from './cp/KnowledgeBase'
 import AuditLog from './cp/AuditLog'
 import RMAConfig from './cp/RMAConfig'
 import DataCleanup from './cp/DataCleanup'
@@ -126,6 +127,23 @@ const GROUPS = [
               strokeLinejoin="round"
               strokeWidth={2}
               d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"
+            />
+          </svg>
+        ),
+      },
+      {
+        id: 'kb',
+        label: 'Knowledge Base',
+        labelKey: 'cp.kbLabel',
+        desc: 'FAQ articles shown on the public tracker page',
+        descKey: 'cp.kbDesc',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s4.832.477 6 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
             />
           </svg>
         ),
@@ -434,7 +452,7 @@ const COLOR_MAP = {
   },
 }
 
-export default function ControlPanel({ currentUserRole, currentUserEmail }) {
+export default function ControlPanel({ currentUserRole, currentUserEmail, onStartPreview }) {
   const { t } = useTranslation()
   const [section, setSection] = useURLTab('section', null, true)
 
@@ -505,7 +523,11 @@ export default function ControlPanel({ currentUserRole, currentUserEmail }) {
 
       {/* Feature content */}
       {section === 'users' && (
-        <UserManagement currentUserRole={currentUserRole} currentUserEmail={currentUserEmail} />
+        <UserManagement
+          currentUserRole={currentUserRole}
+          currentUserEmail={currentUserEmail}
+          onPreviewUser={onStartPreview}
+        />
       )}
       {section === 'appearance' && (
         <BrandingSettings
@@ -529,6 +551,7 @@ export default function ControlPanel({ currentUserRole, currentUserEmail }) {
         <BackupRestore currentUserRole={currentUserRole} currentUserEmail={currentUserEmail} />
       )}
       {section === 'announcements' && <Announcements currentUserEmail={currentUserEmail} />}
+      {section === 'kb' && <KnowledgeBase currentUserEmail={currentUserEmail} />}
       {section === 'broadcast' && <SendAlert currentUserEmail={currentUserEmail} />}
       {section === 'audit' && <AuditLog />}
       {section === 'rmaconfig' && <RMAConfig currentUserEmail={currentUserEmail} />}

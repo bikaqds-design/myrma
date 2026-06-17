@@ -1248,6 +1248,7 @@
     "custom": "Custom",
     "roleDefault": "Role Default",
     "controls": "Controls",
+    "previewAsUser": "Preview as this user",
     "resetPassword": "Reset Password",
     "viewActivity": "View Activity",
     "lastLogin": "Last login",
@@ -1513,6 +1514,8 @@
     "userMgmtDesc": "Manage accounts, roles and permissions",
     "announcementsLabel": "Announcements",
     "announcementsDesc": "Post system-wide banners visible to all users",
+    "kbLabel": "Knowledge Base",
+    "kbDesc": "FAQ articles shown on the public tracker page",
     "sendAlertLabel": "Send Alert",
     "sendAlertDesc": "Send instant in-app notifications to users or groups",
     "appearanceLabel": "Appearance",
@@ -1663,6 +1666,30 @@
       "deleteConfirm": "Delete this announcement?",
       "deleted": "Deleted",
       "titleRequired": "Title and message are required"
+    },
+
+    "kb": {
+      "header": "Knowledge Base",
+      "subtitle": "FAQ articles shown to customers on the public tracker page",
+      "newArticle": "New Article",
+      "noArticles": "No articles yet",
+      "titleCol": "Title",
+      "categoryCol": "Category",
+      "publishedCol": "Published",
+      "actionsCol": "Actions",
+      "editModal": "Edit Article",
+      "newModal": "New Article",
+      "titleLabel": "Title *",
+      "bodyLabel": "Answer *",
+      "categoryLabel": "Category",
+      "publishNow": "Published",
+      "saveChanges": "Save Changes",
+      "create": "Create",
+      "updated": "Article updated",
+      "created": "Article created",
+      "deleteConfirm": "Delete this article?",
+      "deleted": "Deleted",
+      "titleBodyRequired": "Title and answer are required"
     },
 
     "migration": {
@@ -2023,6 +2050,13 @@
     "noNotificationsYet": "No notifications yet",
     "noNotificationsHint": "You'll see activity here as it happens",
     "totalUnread": "{{total}} total · {{unread}} unread",
+    "markAllRead": "Mark all read",
+    "categoryTickets": "Tickets",
+    "categoryCustomers": "Customers",
+    "categoryProducts": "Products",
+    "categoryUsers": "Users",
+    "categorySystem": "System",
+    "categoryOther": "Other",
     "viewTicket": "View →",
     "justNow": "just now",
     "minsAgo_one": "{{count}}m ago",
@@ -2114,5 +2148,19 @@
     "step2": "Select your backup JSON file",
     "step3": "Wait for the restore process to complete",
     "step4": "Refresh the page to see restored data"
+  },
+  "preview": {
+    "banner": "Previewing as {{email}} ({{role}})",
+    "dataDisclaimer": "data still loads as you",
+    "exit": "Exit preview"
+  },
+  "kb": {
+    "needHelpLink": "Need help? Browse FAQs →",
+    "headerSubtitle": "Help Center",
+    "title": "Frequently Asked Questions",
+    "subtitle": "Find quick answers to common questions about your repair",
+    "searchPlaceholder": "Search for a topic...",
+    "noResults": "No articles match your search",
+    "backToTracker": "← Back to Service Tracker"
   }
 }
