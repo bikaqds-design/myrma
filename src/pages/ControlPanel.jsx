@@ -452,7 +452,7 @@ const COLOR_MAP = {
   },
 }
 
-export default function ControlPanel({ currentUserRole, currentUserEmail, onStartPreview }) {
+export default function ControlPanel({ currentUserRole, currentUserEmail, currentUserPermissions, onStartPreview }) {
   const { t } = useTranslation()
   const [section, setSection] = useURLTab('section', null, true)
 
@@ -526,6 +526,7 @@ export default function ControlPanel({ currentUserRole, currentUserEmail, onStar
         <UserManagement
           currentUserRole={currentUserRole}
           currentUserEmail={currentUserEmail}
+          currentUserPermissions={currentUserPermissions}
           onPreviewUser={onStartPreview}
         />
       )}

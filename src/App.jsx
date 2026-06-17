@@ -1316,6 +1316,7 @@ export default function App() {
                     <ControlPanel
                       currentUserRole={effectiveUserRole}
                       currentUserEmail={currentUser?.email}
+                      currentUserPermissions={effectiveUserPermissions}
                       onStartPreview={startPreview}
                     />
                   ) : (

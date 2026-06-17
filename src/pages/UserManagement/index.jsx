@@ -7,6 +7,7 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import { Spinner } from '../../components/ui'
 import { useURLTab } from '../../hooks/useURLTab'
 import { ROLES } from '../../lib/constants'
+import { canDo } from '../../lib/permissions'
 import { captureException } from '../../lib/sentry'
 import { addUserSchema, getFirstError } from '../../lib/schemas'
 import { validatePasswordStrength, getDefaultPermissions } from './_utils'
@@ -17,7 +18,7 @@ import { RoleTemplatesTab, CustomRolesTab, CreateRoleModal, PermissionsModal } f
 // not loaded by getUserRole, not enforced by canDo). Hidden until fully supported (UM-3).
 const ENABLE_CUSTOM_ROLES = false
 
-export default function UserManagement({ currentUserRole, currentUserEmail, onPreviewUser }) {
+export default function UserManagement({ currentUserRole, currentUserEmail, currentUserPermissions, onPreviewUser }) {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useURLTab('umtab', 'users')
   const queryClient = useQueryClient()
@@ -507,7 +508,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail, onPr
           <h1 className="text-2xl font-bold text-gray-900">{t('userManagement.title')}</h1>
           <p className="text-sm text-gray-500 mt-0.5">{t('userManagement.subtitle')}</p>
         </div>
-        {currentUserRole === ROLES.SUPER_ADMIN && (
+        {canDo(currentUserRole, currentUserPermissions, 'user_management', 'create_users') && (
           <button
             onClick={() => setShowAddUserModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium transition-colors"
