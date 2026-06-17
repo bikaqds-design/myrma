@@ -187,7 +187,7 @@ _None queued — see Later for postponed items._
 | FT-03 | Public REST API + developer documentation | P0 | Medium | Open | COMP §3/§5 #16 | Blocks all B2B integration; no enterprise sales without it — _Postponed 2026-06-17_ |
 | FT-04 | Native mobile app (React Native / Expo) | P0 | Hard | Open | COMP §3/§5 #17 | Technician workflow gap vs. RepairDesk; target iOS first — _Postponed 2026-06-17_ |
 | FT-05 | Full customer self-service portal (ticket history, comments, quote approval) | P1 | Medium | Open | COMP §3/§5 #8 | Reduces inbound tickets 30–40% — _Postponed 2026-06-17_ |
-| FT-06 | SMS notifications via Twilio | P1 | Easy | Open | COMP §3/§5 #10 | Reuses notification_queue + send-whatsapp pattern; universal channel |
+| FT-06 | SMS notifications via Twilio | P1 | Easy | Open | COMP §3/§5 #10 | Reuses notification_queue + send-whatsapp pattern; universal channel — _Postponed 2026-06-17_ |
 | FT-07 | Warranty validation engine (rule-based auto-flag) | P2 | Medium | Open | COMP §3/§5 #20 | Removes manual warranty status entry — _Postponed 2026-06-17_ |
 | FT-08 | Parts supplier integration | P2 | Hard | Open | COMP §3 | RepairDesk differentiator; context-switch elimination — _Postponed 2026-06-17_ |
 | FT-09 | Admin impersonation (view-as-user for support) | P2 | Easy | Shipped | COMP §3 | Scoped to permission-preview only (no real session swap) — see `App.jsx` PreviewBanner, `UsersTab.jsx` |
