@@ -93,6 +93,8 @@ _None queued — see Later for postponed items._
 - **FT-04** — Native mobile app (technician workflow gap vs. RepairDesk) — _Postponed 2026-06-17_
 - **FT-05** — Full customer self-service portal (ticket history, comments, quote approval) — _Postponed 2026-06-17_
 - **UX-01** — Mobile-first ticket view (tap targets, swipe actions, camera attachment) — _Postponed 2026-06-17_
+- **FT-07** — Warranty validation engine (rule-based auto-flag) — _Postponed 2026-06-17_
+- **FT-08** — Parts supplier integration — _Postponed 2026-06-17_
 
 ---
 
@@ -180,8 +182,8 @@ _None queued — see Later for postponed items._
 | FT-04 | Native mobile app (React Native / Expo) | P0 | Hard | Open | COMP §3/§5 #17 | Technician workflow gap vs. RepairDesk; target iOS first — _Postponed 2026-06-17_ |
 | FT-05 | Full customer self-service portal (ticket history, comments, quote approval) | P1 | Medium | Open | COMP §3/§5 #8 | Reduces inbound tickets 30–40% — _Postponed 2026-06-17_ |
 | FT-06 | SMS notifications via Twilio | P1 | Easy | Open | COMP §3/§5 #10 | Reuses notification_queue + send-whatsapp pattern; universal channel |
-| FT-07 | Warranty validation engine (rule-based auto-flag) | P2 | Medium | Open | COMP §3/§5 #20 | Removes manual warranty status entry |
-| FT-08 | Parts supplier integration | P2 | Hard | Open | COMP §3 | RepairDesk differentiator; context-switch elimination |
+| FT-07 | Warranty validation engine (rule-based auto-flag) | P2 | Medium | Open | COMP §3/§5 #20 | Removes manual warranty status entry — _Postponed 2026-06-17_ |
+| FT-08 | Parts supplier integration | P2 | Hard | Open | COMP §3 | RepairDesk differentiator; context-switch elimination — _Postponed 2026-06-17_ |
 | FT-09 | Admin impersonation (view-as-user for support) | P2 | Easy | Open | COMP §3 | Standard in Freshdesk, Zendesk, Salesforce |
 | FT-10 | Knowledge base / FAQ tied to public tracker portal | P2 | Easy | Open | COMP §3 | Deflects repeat "what's my status?" calls |
 | FT-S1 | MFA / TOTP | — | — | Shipped | COMP §3/§5 #2 | Supabase TOTP on login + Account Settings |
