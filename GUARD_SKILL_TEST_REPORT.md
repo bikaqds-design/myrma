@@ -8,7 +8,7 @@
 # Test Guard Report: myRMA 2.0 — `src/test/`
 **Date:** 2026-06-12 *(re-audit — previous pass 2026-06-08)*
 **Skill:** test-guard (review mode)
-**Runner:** Vitest 4.1.7 · **Environment:** jsdom · **Result:** 80/80 passing ✅ · 3 files · 3.46s
+**Runner:** Vitest 4.1.7 · **Environment:** jsdom · **Result:** 173/173 passing ✅ · 7 files (as of 2026-06-17 — count grows over time; run `npm test` for the current figure rather than trusting this snapshot)
 
 ## Summary
 
