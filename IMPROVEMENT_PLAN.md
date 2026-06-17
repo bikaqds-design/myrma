@@ -80,21 +80,27 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 - **DOC-17** — Added 2026-06-17 note to AUDIT_LOG.md C-1 documenting the later `pool: 'forks'` addition ✅
 - **DOC-18** — Refreshed GUARD_SKILL_TEST_REPORT.md header from stale `80/80` to `173/173` with a snapshot-date caveat ✅
 
-### Next (Phase 11 candidates)
+### Shipped (Phase 11)
+
+- **FT-09** — Permission preview ("view as user") — UI/canDo() gating only, no real session swap; banner + audit log ✅
+- **UX-10** — Notification center mark-all-read button + category grouping (history page descoped) ✅
+- **FT-10** — Knowledge Base / FAQ — `kb_articles` migration, admin CRUD, public `/kb` route linked from `/tracker` ✅
+
+### Next (Phase 12 candidates)
 
 _None queued — see Later for postponed items._
 
 ### Later (backlog)
 
 - **FT-06** — SMS notifications via Twilio (reuses existing notification_queue pattern) — _Postponed 2026-06-17_
+- **FT-07** — Warranty validation engine (rule-based auto-flag) — _Postponed 2026-06-17_
+- **FT-08** — Parts supplier integration — _Postponed 2026-06-17_
 - **FT-01** — Customer return initiation portal (highest-impact remaining feature gap) — _Postponed 2026-06-17_
 - **FT-02** — Payment processing / POS (blocks closing the repair loop) — _Postponed 2026-06-17_
 - **FT-03** — Public REST API + developer docs (required for B2B sales) — _Postponed 2026-06-17_
 - **FT-04** — Native mobile app (technician workflow gap vs. RepairDesk) — _Postponed 2026-06-17_
 - **FT-05** — Full customer self-service portal (ticket history, comments, quote approval) — _Postponed 2026-06-17_
 - **UX-01** — Mobile-first ticket view (tap targets, swipe actions, camera attachment) — _Postponed 2026-06-17_
-- **FT-07** — Warranty validation engine (rule-based auto-flag) — _Postponed 2026-06-17_
-- **FT-08** — Parts supplier integration — _Postponed 2026-06-17_
 
 ---
 
@@ -184,8 +190,8 @@ _None queued — see Later for postponed items._
 | FT-06 | SMS notifications via Twilio | P1 | Easy | Open | COMP §3/§5 #10 | Reuses notification_queue + send-whatsapp pattern; universal channel |
 | FT-07 | Warranty validation engine (rule-based auto-flag) | P2 | Medium | Open | COMP §3/§5 #20 | Removes manual warranty status entry — _Postponed 2026-06-17_ |
 | FT-08 | Parts supplier integration | P2 | Hard | Open | COMP §3 | RepairDesk differentiator; context-switch elimination — _Postponed 2026-06-17_ |
-| FT-09 | Admin impersonation (view-as-user for support) | P2 | Easy | Open | COMP §3 | Standard in Freshdesk, Zendesk, Salesforce |
-| FT-10 | Knowledge base / FAQ tied to public tracker portal | P2 | Easy | Open | COMP §3 | Deflects repeat "what's my status?" calls |
+| FT-09 | Admin impersonation (view-as-user for support) | P2 | Easy | Shipped | COMP §3 | Scoped to permission-preview only (no real session swap) — see `App.jsx` PreviewBanner, `UsersTab.jsx` |
+| FT-10 | Knowledge base / FAQ tied to public tracker portal | P2 | Easy | Shipped | COMP §3 | `kb_articles` migration, `db/kb.ts`, `cp/KnowledgeBase.jsx`, public `/kb` route |
 | FT-S1 | MFA / TOTP | — | — | Shipped | COMP §3/§5 #2 | Supabase TOTP on login + Account Settings |
 | FT-S2 | Session management UI (active sessions + force-logout) | — | — | Shipped | COMP §3/§5 #3 | Account Settings |
 | FT-S3 | Replacement / exchange RMA workflow | — | — | Shipped | COMP §3/§5 #12 | Exchange + credit note outcome |
@@ -214,7 +220,7 @@ _None queued — see Later for postponed items._
 | UX-07 | WCAG AA accessibility audit + fix critical violations | P2 | Medium | Shipped | COMP §4 Accessibility | `ui.jsx`, `DashboardCharts.jsx`, `PartsInventory.jsx` |
 | UX-08 | Table pagination controls ("Showing X–Y of Z" + server-side above 500 rows) | P2 | Low | Shipped | COMP §4 Pagination | `RMATickets/index.jsx`, `Customers/index.jsx`, `Products/ProductsListTab.jsx` |
 | UX-09 | Direction B token sweep — finish remaining pages (Invoices, PartsInventory) | P2 | Low | Shipped | COMP §4 Consistency | `Invoices.jsx`, `PartsInventory.jsx` |
-| UX-10 | Notification center improvements (mark-all-read, grouping by type, history page) | P3 | Low | Open | COMP §4 Notifications | Polish item |
+| UX-10 | Notification center improvements (mark-all-read, grouping by type, history page) | P3 | Low | Shipped | COMP §4 Notifications | `NotificationBell.jsx` — mark-all-read button + category grouping shipped; history page descoped (see Group 10 notes) |
 | UX-S1 | Skeleton loaders (replace full-page spinner) | — | — | Shipped | COMP §4 Loading | P2-3 — `Skeleton.jsx` |
 | UX-S2 | Breadcrumb navigation | — | — | Shipped | COMP §4 Breadcrumb | P2-2 — `Breadcrumb.jsx` |
 | UX-S3 | Unified comment / activity timeline | — | — | Shipped | COMP §4 Timeline | P2-4 — `TicketDrawer.jsx` unified tab |
