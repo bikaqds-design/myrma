@@ -70,7 +70,11 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 - **UX-08** — "Showing X–Y of Z" pagination summary on RMA Tickets, Customers, Products ✅
 - **UX-09** — Fixed 8 dark-mode gray classes with no `dark:` counterpart in Invoices/PartsInventory ✅
 
-### Next (Phase 9 candidates)
+### Shipped (Phase 9)
+
+- **TS-04 through TS-12** — Full test-quality cleanup: consolidated repetitive blocks into `test.each` (TS-04–07) and closed 5 coverage gaps with 4 new test files — TemplateEngine, generateRmaNumber/color fallbacks, auditInsert retry logic, useURLTab hook (TS-08–12). Test count: 93 → 173. ✅
+
+### Next (Phase 10 candidates)
 
 _None queued — see Later for postponed items._
 
@@ -117,15 +121,15 @@ _None queued — see Later for postponed items._
 | TS-01 | Fix `COMPLETED` status missing from constants test (7th status not covered) | P0 | Low | Shipped | GUARD → constants.test.js analysis | `constants.test.js` — `defines the six canonical statuses` |
 | TS-02 | Delete `typeof STORAGE_KEY.APPEARANCE === 'string'` type-system test | P1 | Low | Shipped | GUARD → Rule 7+4 | `constants.test.js` |
 | TS-03 | Convert `for` loops in schemas tests to `test.each` | P1 | Low | Shipped | GUARD → Rule 3 | `schemas.test.js` — ticket_status, priority, roles loops |
-| TS-04 | Merge `null`/`undefined` permission tests into one `test.each` | P2 | Low | Open | GUARD → Rule 3 | `permissions.test.js` |
-| TS-05 | Consolidate 5 `canDo with default permissions` blocks into `test.each` | P2 | Low | Open | GUARD → Rule 3 | `permissions.test.js:161–180` |
-| TS-06 | Convert multi-assert `it()` blocks in constants tests to `test.each` | P2 | Low | Open | GUARD → Rule 3 | `constants.test.js` — ROLES, PRIORITY, INVENTORY_STATUS, etc. |
-| TS-07 | Rename 4 test names to describe scenario not structure | P3 | Low | Open | GUARD → Rule 5 | `constants.test.js` |
-| TS-08 | Add `TemplateEngine` unit tests (conditional block rendering, substitution) | P2 | Medium | Open | GUARD → Coverage gaps | New file in `src/test/` |
-| TS-09 | Add `generateRmaNumber()` tests (collision logic, serial padding) | P2 | Low | Open | GUARD → Coverage gaps | New file in `src/test/` |
-| TS-10 | Add `auditInsert()` retry tests using `vi.useFakeTimers()` | P2 | Medium | Open | GUARD → Coverage gaps | New file in `src/test/` |
-| TS-11 | Add `getStatusColor()`/`getPriorityColor()` fallback tests | P3 | Low | Open | GUARD → Coverage gaps | New file or `constants.test.js` |
-| TS-12 | Add `useURLTab` hook tests (empty→delete-param, pushHistory replace-vs-push) | P2 | Low | Open | GUARD → Coverage gaps (added 2026-06-12) | New file — `renderHook` + `MemoryRouter` |
+| TS-04 | Merge `null`/`undefined` permission tests into one `test.each` | P2 | Low | Shipped | GUARD → Rule 3 | `permissions.test.js` |
+| TS-05 | Consolidate 5 `canDo with default permissions` blocks into `test.each` | P2 | Low | Shipped | GUARD → Rule 3 | `permissions.test.js:161–180` |
+| TS-06 | Convert multi-assert `it()` blocks in constants tests to `test.each` | P2 | Low | Shipped | GUARD → Rule 3 | `constants.test.js` — ROLES, PRIORITY, INVENTORY_STATUS, etc. |
+| TS-07 | Rename 4 test names to describe scenario not structure | P3 | Low | Shipped | GUARD → Rule 5 | `constants.test.js` — 4 "stays in sync with X" renames |
+| TS-08 | Add `TemplateEngine` unit tests (conditional block rendering, substitution) | P2 | Medium | Shipped | GUARD → Coverage gaps | `src/test/TemplateEngine.test.js` (new, 23 tests) |
+| TS-09 | Add `generateRmaNumber()` tests (collision logic, serial padding) | P2 | Low | Shipped | GUARD → Coverage gaps | `src/test/_utils.test.js` (new) |
+| TS-10 | Add `auditInsert()` retry tests using `vi.useFakeTimers()` | P2 | Medium | Shipped | GUARD → Coverage gaps | `src/test/audit.test.js` (new) |
+| TS-11 | Add `getStatusColor()`/`getPriorityColor()` fallback tests | P3 | Low | Shipped | GUARD → Coverage gaps | `src/test/_utils.test.js` (new) |
+| TS-12 | Add `useURLTab` hook tests (empty→delete-param, pushHistory replace-vs-push) | P2 | Low | Shipped | GUARD → Coverage gaps (added 2026-06-12) | `src/test/useURLTab.test.js` (new) |
 
 ---
 
