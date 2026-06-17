@@ -65,10 +65,13 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 - **CQ-07** — Centralize `TableResult<T>` / `PagedResult<T>` / `CountedResult<T>` in `src/api/db/types.ts`; update all 13 helper signatures ✅
 - **UX-07** — WCAG AA static audit: `role="dialog"` + `aria-modal` on `ModalCard`; `IconButton` aria-label fallback; DashboardCharts keyboard nav; PartsInventory modal landmarks ✅
 
-### Next (Phase 8 candidates)
+### Shipped (Phase 8)
 
-- **UX-08** — Table pagination controls ("Showing X–Y of Z" + server-side above 500 rows)
-- **UX-09** — Direction B token sweep — finish remaining pages (Invoices, PartsInventory)
+- **UX-08** — "Showing X–Y of Z" pagination summary on RMA Tickets, Customers, Products ✅
+- **UX-09** — Fixed 8 dark-mode gray classes with no `dark:` counterpart in Invoices/PartsInventory ✅
+
+### Next (Phase 9 candidates)
+
 - **FT-06** — SMS notifications via Twilio (reuses existing notification_queue pattern)
 
 ### Later (backlog)
@@ -193,8 +196,8 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 | UX-05 | Ticket status workflow view (kanban or stage-pipeline, block illegal transitions) | P1 | Medium | Shipped | COMP §4 Status | No visual transition diagram |
 | UX-06 | Keyboard shortcuts + `?` shortcut menu (`N`=new ticket, `Esc`=close, `Cmd+K`) | P2 | Easy | Shipped | COMP §4 Keyboard | Power user gap |
 | UX-07 | WCAG AA accessibility audit + fix critical violations | P2 | Medium | Shipped | COMP §4 Accessibility | `ui.jsx`, `DashboardCharts.jsx`, `PartsInventory.jsx` |
-| UX-08 | Table pagination controls ("Showing X–Y of Z" + server-side above 500 rows) | P2 | Low | Open | COMP §4 Pagination | 5,000-row client cap with no visible controls |
-| UX-09 | Direction B token sweep — finish remaining pages (Invoices, PartsInventory) | P2 | Low | Open | COMP §4 Consistency | Some pages still use old Tailwind grays |
+| UX-08 | Table pagination controls ("Showing X–Y of Z" + server-side above 500 rows) | P2 | Low | Shipped | COMP §4 Pagination | `RMATickets/index.jsx`, `Customers/index.jsx`, `Products/ProductsListTab.jsx` |
+| UX-09 | Direction B token sweep — finish remaining pages (Invoices, PartsInventory) | P2 | Low | Shipped | COMP §4 Consistency | `Invoices.jsx`, `PartsInventory.jsx` |
 | UX-10 | Notification center improvements (mark-all-read, grouping by type, history page) | P3 | Low | Open | COMP §4 Notifications | Polish item |
 | UX-S1 | Skeleton loaders (replace full-page spinner) | — | — | Shipped | COMP §4 Loading | P2-3 — `Skeleton.jsx` |
 | UX-S2 | Breadcrumb navigation | — | — | Shipped | COMP §4 Breadcrumb | P2-2 — `Breadcrumb.jsx` |
