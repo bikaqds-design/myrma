@@ -74,17 +74,25 @@ Tables are sorted by priority (P0 first), then ID. Status changes append a Chang
 
 - **TS-04 through TS-12** — Full test-quality cleanup: consolidated repetitive blocks into `test.each` (TS-04–07) and closed 5 coverage gaps with 4 new test files — TemplateEngine, generateRmaNumber/color fallbacks, auditInsert retry logic, useURLTab hook (TS-08–12). Test count: 93 → 173. ✅
 
-### Next (Phase 10 candidates)
+### Shipped (Phase 10)
+
+- **DOC-10** — Verified `QueueJob` export already in sync between AGENTS.md/CLAUDE.md (no edit needed) ✅
+- **DOC-17** — Added 2026-06-17 note to AUDIT_LOG.md C-1 documenting the later `pool: 'forks'` addition ✅
+- **DOC-18** — Refreshed GUARD_SKILL_TEST_REPORT.md header from stale `80/80` to `173/173` with a snapshot-date caveat ✅
+
+### Next (Phase 11 candidates)
 
 _None queued — see Later for postponed items._
 
 ### Later (backlog)
 
 - **FT-06** — SMS notifications via Twilio (reuses existing notification_queue pattern) — _Postponed 2026-06-17_
-- **FT-01** — Customer return initiation portal (highest-impact remaining feature gap)
-- **FT-02** — Payment processing / POS (blocks closing the repair loop)
-- **FT-03** — Public REST API + developer docs (required for B2B sales)
-- **FT-04** — Native mobile app (technician workflow gap vs. RepairDesk)
+- **FT-01** — Customer return initiation portal (highest-impact remaining feature gap) — _Postponed 2026-06-17_
+- **FT-02** — Payment processing / POS (blocks closing the repair loop) — _Postponed 2026-06-17_
+- **FT-03** — Public REST API + developer docs (required for B2B sales) — _Postponed 2026-06-17_
+- **FT-04** — Native mobile app (technician workflow gap vs. RepairDesk) — _Postponed 2026-06-17_
+- **FT-05** — Full customer self-service portal (ticket history, comments, quote approval) — _Postponed 2026-06-17_
+- **UX-01** — Mobile-first ticket view (tap targets, swipe actions, camera attachment) — _Postponed 2026-06-17_
 
 ---
 
@@ -150,13 +158,13 @@ _None queued — see Later for postponed items._
 | DOC-07 | Remove redundant `--legacy-peer-deps` flag (already in .npmrc) | P1 | Low | Shipped | GUARD → docs-guard Rule 7 | `CLAUDE.md:334`, `AGENTS.md:335` updated; README install cmd was already clean |
 | DOC-08 | Add i18n/RTL section to AGENTS.md (entirely missing) | P1 | Medium | Dropped | GUARD → docs-guard Rule 8 | Pre-existing correct — full i18n/RTL section already present at AGENTS.md:157–193 |
 | DOC-09 | Remove SPECKIT stubs from CLAUDE.md | P1 | Low | Shipped | GUARD → docs-guard Rule 10 | `CLAUDE.md:336–339` removed; AGENTS.md had no stub |
-| DOC-10 | Verify and sync `QueueJob` export in AGENTS.md vs CLAUDE.md | P2 | Low | Open | GUARD → docs-guard Worth noting | `AGENTS.md:208`, `CLAUDE.md:222` |
+| DOC-10 | Verify and sync `QueueJob` export in AGENTS.md vs CLAUDE.md | P2 | Low | Shipped | GUARD → docs-guard Worth noting | Verified 2026-06-17 — both files already list identical `messaging/types.ts` export line; no edit needed |
 | DOC-13 | Fix AUDIT_LOG.md i18n path in 2026-06-05 entry | P0 | Low | Dropped | GUARD → docs-guard Rule 1 | Pre-existing correct — `src/lib/i18n.js` already correct at AUDIT_LOG.md:1310 |
 | DOC-14 | Add 3 missing Edge Functions to CONSTITUTION.md §7.4 | P1 | Low | Dropped | GUARD → docs-guard Rule 1 | Pre-existing correct — §7.4 already lists all 6 functions + ai-assist |
 | DOC-15 | Fix CONSTITUTION.md §16.3 CI test count: 74 → 80 | P1 | Low | Dropped | GUARD → docs-guard Rule 1 | Pre-existing correct — §16.3 already reads `80 unit tests` |
 | DOC-16 | Mark MFA / replacement / i18n as Shipped in COMPETITIVE_ANALYSIS.md §3 | P1 | Low | Dropped | GUARD → docs-guard Rule 3 | Pre-existing correct — all three already marked ✅ Shipped in §3 |
-| DOC-17 | Add note in AUDIT_LOG.md C-1 entry: `poolOptions` refined to `fileParallelism: false` | P2 | Low | Open | GUARD → docs-guard Rule 3 | `AUDIT_LOG.md:~601` |
-| DOC-18 | Update GUARD_SKILL_TEST_REPORT.md header: `107/107` → `80/80` with note | P2 | Low | Open | GUARD → docs-guard Worth noting | `GUARD_SKILL_TEST_REPORT.md:11` |
+| DOC-17 | Add note in AUDIT_LOG.md C-1 entry: `poolOptions` refined to `fileParallelism: false` | P2 | Low | Shipped | GUARD → docs-guard Rule 3 | `AUDIT_LOG.md:601` — added 2026-06-17 note on `pool: 'forks'` addition + confirmed-intermittent race |
+| DOC-18 | Update GUARD_SKILL_TEST_REPORT.md header: `107/107` → `80/80` with note | P2 | Low | Shipped | GUARD → docs-guard Worth noting | `GUARD_SKILL_TEST_REPORT.md:11` — refreshed to `173/173`, 7 files, with a snapshot-date caveat |
 
 ---
 
@@ -166,11 +174,11 @@ _None queued — see Later for postponed items._
 
 | ID | Title | Priority | Effort | Status | Source | Notes |
 |----|-------|----------|--------|--------|--------|-------|
-| FT-01 | Customer return initiation portal (customers submit own RMAs, no login) | P0 | Medium | Open | COMP §3/§5 #15 | Highest-impact remaining gap; blocks scaling intake |
-| FT-02 | Payment processing / POS (Stripe invoice payment links + in-app collection) | P0 | Med-Hard | Open | COMP §3/§5 #9 | Required to close the repair loop; drives churn without it |
-| FT-03 | Public REST API + developer documentation | P0 | Medium | Open | COMP §3/§5 #16 | Blocks all B2B integration; no enterprise sales without it |
-| FT-04 | Native mobile app (React Native / Expo) | P0 | Hard | Open | COMP §3/§5 #17 | Technician workflow gap vs. RepairDesk; target iOS first |
-| FT-05 | Full customer self-service portal (ticket history, comments, quote approval) | P1 | Medium | Open | COMP §3/§5 #8 | Reduces inbound tickets 30–40% |
+| FT-01 | Customer return initiation portal (customers submit own RMAs, no login) | P0 | Medium | Open | COMP §3/§5 #15 | Highest-impact remaining gap; blocks scaling intake — _Postponed 2026-06-17_ |
+| FT-02 | Payment processing / POS (Stripe invoice payment links + in-app collection) | P0 | Med-Hard | Open | COMP §3/§5 #9 | Required to close the repair loop; drives churn without it — _Postponed 2026-06-17_ |
+| FT-03 | Public REST API + developer documentation | P0 | Medium | Open | COMP §3/§5 #16 | Blocks all B2B integration; no enterprise sales without it — _Postponed 2026-06-17_ |
+| FT-04 | Native mobile app (React Native / Expo) | P0 | Hard | Open | COMP §3/§5 #17 | Technician workflow gap vs. RepairDesk; target iOS first — _Postponed 2026-06-17_ |
+| FT-05 | Full customer self-service portal (ticket history, comments, quote approval) | P1 | Medium | Open | COMP §3/§5 #8 | Reduces inbound tickets 30–40% — _Postponed 2026-06-17_ |
 | FT-06 | SMS notifications via Twilio | P1 | Easy | Open | COMP §3/§5 #10 | Reuses notification_queue + send-whatsapp pattern; universal channel |
 | FT-07 | Warranty validation engine (rule-based auto-flag) | P2 | Medium | Open | COMP §3/§5 #20 | Removes manual warranty status entry |
 | FT-08 | Parts supplier integration | P2 | Hard | Open | COMP §3 | RepairDesk differentiator; context-switch elimination |
@@ -195,7 +203,7 @@ _None queued — see Later for postponed items._
 
 | ID | Title | Priority | Effort | Status | Source | Notes |
 |----|-------|----------|--------|--------|--------|-------|
-| UX-01 | Mobile-first ticket view (tap targets, swipe actions, camera attachment) | P0 | Hard | Open | COMP §4 Mobile | Not mobile-first; technicians work at benches |
+| UX-01 | Mobile-first ticket view (tap targets, swipe actions, camera attachment) | P0 | Hard | Open | COMP §4 Mobile | Not mobile-first; technicians work at benches — _Postponed 2026-06-17_ |
 | UX-02 | Role-aware dashboard widgets (technician vs. manager views) | P1 | Medium | Shipped | COMP §4 Dashboard | "My Open Tickets" panel for technician/viewer roles |
 | UX-03 | Sidebar navigation grouping (Service, Customers, Operations, Admin sections) | P1 | Medium | Dropped | COMP §4 Sidebar | 14+ flat items; discovery slow for new users |
 | UX-04 | Form validation on blur (real-time field errors before submit) | P1 | Low | Shipped | COMP §4 Forms | Zod wired but errors appear only post-submit |
