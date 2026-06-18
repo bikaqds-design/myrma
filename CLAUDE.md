@@ -5,6 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 > **Full engineering rules are in [`CONSTITUTION.md`](CONSTITUTION.md).**  
 > **Audit history and scorecard are in [`docs/archive/AUDIT_LOG.md`](docs/archive/AUDIT_LOG.md).**
 
+<!-- SPECKIT START -->
+**Active SpecKit plan:** [`specs/002-crm-upgrade/plan.md`](specs/002-crm-upgrade/plan.md) — CRM Upgrade Phase 1 / Sprint 1 (Foundation). See also `specs/002-crm-upgrade/spec.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`. Source study: [`CRM_UPGRADE_STUDY.md`](CRM_UPGRADE_STUDY.md).
+<!-- SPECKIT END -->
+
 ## Commands
 
 ```bash
