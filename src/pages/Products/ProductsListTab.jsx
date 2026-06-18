@@ -588,6 +588,13 @@ export default function ProductsListTab({
       {/* Pagination Bottom */}
       {totalPages > 1 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-200">
+          <div className="text-sm text-gray-600">
+            {t('common.showingRange', {
+              start: startIndex + 1,
+              end: Math.min(endIndex, totalProducts),
+              total: totalProducts,
+            })}
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => handlePageChange(currentPage - 1)}

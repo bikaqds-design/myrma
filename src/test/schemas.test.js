@@ -4,7 +4,7 @@
  * Covers: loginSchema, forgotPasswordSchema, customerSchema,
  *         ticketSchema, getFirstError, getFieldErrors
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, test } from 'vitest'
 import {
   loginSchema,
   forgotPasswordSchema,
@@ -178,18 +178,19 @@ describe('ticketSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('accepts all valid ticket_status values', () => {
-    const statuses = ['Open', 'In Progress', 'Pending', 'On Hold', 'Closed', 'Cancelled']
-    for (const s of statuses) {
+  test.each(['Open', 'In Progress', 'Pending', 'On Hold', 'Completed', 'Closed', 'Cancelled'])(
+    'accepts ticket_status "%s"',
+    (s) => {
       expect(ticketSchema.safeParse({ ...valid, ticket_status: s }).success).toBe(true)
     }
-  })
+  )
 
-  it('accepts all valid priority values', () => {
-    for (const p of ['Critical', 'High', 'Medium', 'Low']) {
+  test.each(['Critical', 'High', 'Medium', 'Low'])(
+    'accepts priority "%s"',
+    (p) => {
       expect(ticketSchema.safeParse({ ...valid, priority: p }).success).toBe(true)
     }
-  })
+  )
 })
 
 // ── productSchema ──────────────────────────────────────────────────────────────
@@ -239,11 +240,12 @@ describe('addUserSchema', () => {
     expect(addUserSchema.safeParse({ email: 'user@co.com', role: 'guest' }).success).toBe(false)
   })
 
-  it('accepts all valid roles', () => {
-    for (const role of ['super_admin', 'admin', 'manager', 'technician', 'viewer']) {
+  test.each(['super_admin', 'admin', 'manager', 'technician', 'viewer'])(
+    'accepts role "%s"',
+    (role) => {
       expect(addUserSchema.safeParse({ email: 'x@x.com', role }).success).toBe(true)
     }
-  })
+  )
 })
 
 // ── helpers ───────────────────────────────────────────────────────────────────

@@ -3,7 +3,11 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 > **Full engineering rules are in [`CONSTITUTION.md`](CONSTITUTION.md).**  
-> **Audit history and scorecard are in [`AUDIT_LOG.md`](AUDIT_LOG.md).**
+> **Audit history and scorecard are in [`docs/archive/AUDIT_LOG.md`](docs/archive/AUDIT_LOG.md).**
+
+<!-- SPECKIT START -->
+**Active SpecKit plan:** [`specs/002-crm-upgrade/plan.md`](specs/002-crm-upgrade/plan.md) — CRM Upgrade Phase 1 / Sprint 1 (Foundation). See also `specs/002-crm-upgrade/spec.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`. Source study: [`CRM_UPGRADE_STUDY.md`](CRM_UPGRADE_STUDY.md).
+<!-- SPECKIT END -->
 
 ## Commands
 
@@ -11,7 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev            # start dev server (Vite, port 5173)
 npm run build          # production build
 npm run preview        # preview production build
-npm test               # Vitest unit tests (80 tests, 3 suites) — run before every push
+npm test               # Vitest unit tests (80 tests, 3 suites, ~3.5s) — run before every push
 npm run test:watch     # Vitest in watch mode
 npm run test:coverage  # test with coverage report
 npm run lint           # ESLint (0 errors target)
@@ -58,11 +62,12 @@ All top-level pages are lazy-loaded via the `lazyWithReload()` wrapper in `App.j
 | `/parts` | `PartsInventory` | required |
 | `/reports` | `Reports` | required |
 | `/tracker` | `RMATracker` | **none (public)** |
+| `/kb` | `KnowledgeBasePublic` | **none (public)** |
 | `*` | `NotFoundPage` | — |
 
 Props passed to every authenticated page component: `currentUserRole`, `currentUserEmail`, `currentUserPermissions`.
 
-`/tracker` is the only unauthenticated route — detected via `pathname === '/tracker'` before the auth check renders.
+`/tracker` and `/kb` are the only unauthenticated routes — each detected via a `pathname === '/...'` check before the auth check renders.
 
 **Exception:** `window.history.pushState` is used ONLY inside `RMATickets/index.jsx` to sync `?ticket=<id>` (open ticket modal URL) without triggering a full route transition. This is intentional in-page state, not top-level navigation.
 
@@ -112,7 +117,7 @@ Domain modules in `src/api/db/` (all TypeScript — export Row types):
 
 Import Row types from `src/api/db/index.ts` — all are re-exported there for convenience.
 
-Many optional tables (e.g. `announcements`, `custom_field_definitions`, `inventory_units`, `warehouses`) may not exist in every deployment. All `db.*` helpers that target these tables guard with `error.code === '42P01'` (table not found) and return `{ missing: true, data: [] }` instead of throwing.
+Many optional tables (e.g. `announcements`, `custom_field_definitions`, `inventory_units`, `warehouses`) may not exist in every deployment. All `db.*` helpers that target these tables guard with `error.code === '42P01'` (table not found) and return `{ missing: true, data: [] }` instead of throwing. The return type for these helpers is the shared `TableResult<T>` alias (or `PagedResult<T>` / `CountedResult<T>` for paged results) — all exported from `src/api/db/index.ts`. Never inline `{ missing: boolean; data: T[] }` in new helper signatures; import and use these shared types.
 
 **List caps:** `db.customers.list()`, `db.rmaTickets.list()`, and `db.products.list()` cap at **5 000 rows** (raised from 500). These pages filter/sort client-side so all rows must be in memory. If any dataset exceeds 5 000, switch that page to server-side pagination using the existing `listPaged()` method. Do not lower the cap; it is intentional headroom.
 
@@ -140,6 +145,8 @@ Roles: `super_admin`, `admin`, `manager`, `technician`, `viewer`.
 
 Use the `canDo` pattern when gating UI actions — import `canDo` from `src/lib/permissions` and call `canDo(currentUserRole, currentUserPermissions, 'section', 'action')`.
 
+**Permission preview ("view as user"):** Admin/super_admin can preview the app as another user's role+permissions from User Management's per-user action menu (cannot target admin/super_admin or yourself). `App.jsx` holds `previewUser` state; `effectiveUserRole`/`effectiveUserPermissions` are derived (`previewUser ? previewUser.role/.permissions : currentUserRole/.currentUserPermissions`) and passed to every route **including Control Panel** — Control Panel correctly redirects away when previewing a role that can't access it, same as a real login would. This is a **UI/`canDo()` gating preview only** — it does not swap the real Supabase session, so RLS-scoped data (e.g. that previewed user's own notifications) is unaffected. `AccountSettings` is the one route kept on the real role (it's "my own account," not a permission-gated module). The persistent `PreviewBanner` renders above `<Routes>` in the app shell, so "Exit preview" is always reachable regardless of which page the previewed role redirects to.
+
 ### URL tab state
 
 `src/hooks/useURLTab.js` — a lightweight hook that syncs a tab or sub-section selection with a URL query parameter. Used throughout page components so deep-links and browser back/forward work within a page:
@@ -161,7 +168,7 @@ const [activeTab, setActiveTab] = useURLTab('tab', 'products')
 The app supports **Arabic** and **English** with full RTL layout via `react-i18next`.
 
 **Files:**
-- `src/i18n.js` — i18next config (language detection, `en` default)
+- `src/lib/i18n.js` — i18next config (language detection, `en` default)
 - `src/locales/en.json` — English strings (~500+ keys)
 - `src/locales/ar.json` — Arabic strings (same key structure)
 
@@ -219,7 +226,7 @@ In `Dashboard.jsx`, these tokens are computed at render time via `tokens(darkMod
 Provider-agnostic notification layer that fires on ticket lifecycle events. Ticket saves emit events via `notificationEventBus.emitAsync()` → handlers in `src/lib/events/ticketEventHandlers.ts` check settings → INSERT into `notification_queue` → invoke `notification-worker` for fast delivery with queue persistence for retry.
 
 **Library (`src/lib/`):**
-- `messaging/types.ts` — `IMessagingProvider`, `NotificationEvent`, `EventType`, `DeliveryStatus`
+- `messaging/types.ts` — `IMessagingProvider`, `NotificationEvent`, `EventType`, `DeliveryStatus`, `QueueJob`, `QueueJobPayload`, `NotificationSettings`
 - `messaging/TemplateEngine.ts` — `{{key}}` substitution + `{{#key}}…{{/key}}` conditionals; `toWhatsAppParams()` builds positional Meta API params
 - `messaging/MessagingService.ts` — `messagingService` singleton; `registerProvider()`, `send()`, `sendBatch()`
 - `messaging/providers/WhatsAppProvider.ts` — calls `send-whatsapp` Edge Function; never calls Meta API directly
@@ -309,6 +316,8 @@ Current migrations:
 - `20260531_relax_ticket_status_constraint.sql`
 - `20260602_whatsapp_notifications.sql`
 - `20260603_user_preferences_rls.sql`
+- `20260613_search_by_serial.sql`
+- `20260617_kb_articles.sql`
 
 ### RLS SQL helper functions
 
@@ -331,9 +340,4 @@ All UI primitives come from `src/components/ui.jsx`. Never re-implement buttons,
 ### CI/CD
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR to `main`:  
-**test → lint:ci → build** — all three must pass. Node 20, `npm ci --legacy-peer-deps`.
-
-<!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
-<!-- SPECKIT END -->
+**test → lint:ci → build** — all three must pass. Node 20, `npm ci` (`--legacy-peer-deps` is set in `.npmrc`).

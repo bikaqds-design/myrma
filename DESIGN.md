@@ -14,22 +14,22 @@ colors:
   # Light mode (default)
   page-light:        "#f4f6f9"
   surface-light:     "#ffffff"
-  surface-inset:     "#f7f8fb"
+  surface-inset:     "#f8f9fb"
   border-light:      "#e6e9ef"
-  border-soft-light: "#eef0f4"
+  border-soft-light: "#f0f2f6"
   text-light:        "#211f1b"
   text-muted-light:  "#6c6760"
-  text-faint-light:  "#a39e95"
+  text-faint-light:  "#a09d99"
 
   # Dark mode (class="dark" on <html>)
   page-dark:        "#0b0f17"
   surface-dark:     "#121823"
-  surface-inset-dark: "#0e131c"
+  surface-inset-dark: "#0f1520"
   border-dark:      "#212a38"
   border-soft-dark: "#1a2230"
   text-dark:        "#e8ebf0"
   text-muted-dark:  "#9aa4b2"
-  text-faint-dark:  "#646f7e"
+  text-faint-dark:  "#4a5568"
 
   # Accent — indigo
   accent-light:  "#4338ca"   # indigo-700
@@ -151,7 +151,7 @@ in 1–2 clicks.
 
 ## Colors
 Use the page background (`#f4f6f9` / `#0b0f17` dark) as the canvas. Cards are
-pure white / `#121823` dark. Surface-inset (`#f7f8fb` / `#0e131c` dark) is for
+pure white / `#121823` dark. Surface-inset (`#f8f9fb` / `#0f1520` dark) is for
 nested tiles inside cards (inventory grid, technician columns). Never use
 shadows — borders do the separation work.
 

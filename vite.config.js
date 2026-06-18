@@ -82,6 +82,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.js'],
+    // Scope to project tests only — without this Vitest also picks up copies
+    // inside .claude/worktrees/*, doubling every test in the output.
+    include: ['src/test/**/*.test.{js,ts}'],
     // Vitest 4.1.7 has a parallel-pool race that surfaces as
     // "Cannot read properties of undefined (reading 'config')" on suite import.
     // Disable file-level parallelism to serialise suites and avoid the race.

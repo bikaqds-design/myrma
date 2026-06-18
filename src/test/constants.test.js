@@ -5,7 +5,7 @@
  * derived lists are consistent with their source objects, and helper
  * functions return the right types.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, test } from 'vitest'
 import {
   ROLES,
   ROLE_LIST,
@@ -28,15 +28,17 @@ import {
 // ── ROLES ──────────────────────────────────────────────────────────────────────
 
 describe('ROLES', () => {
-  it('defines all five roles', () => {
-    expect(ROLES.SUPER_ADMIN).toBe('super_admin')
-    expect(ROLES.ADMIN).toBe('admin')
-    expect(ROLES.MANAGER).toBe('manager')
-    expect(ROLES.TECHNICIAN).toBe('technician')
-    expect(ROLES.VIEWER).toBe('viewer')
+  test.each([
+    ['SUPER_ADMIN', 'super_admin'],
+    ['ADMIN', 'admin'],
+    ['MANAGER', 'manager'],
+    ['TECHNICIAN', 'technician'],
+    ['VIEWER', 'viewer'],
+  ])('ROLES.%s === %s', (key, value) => {
+    expect(ROLES[key]).toBe(value)
   })
 
-  it('ROLE_LIST contains all five roles', () => {
+  it('ROLE_LIST stays in sync with ROLES', () => {
     expect(ROLE_LIST).toHaveLength(5)
     expect(ROLE_LIST).toContain(ROLES.SUPER_ADMIN)
     expect(ROLE_LIST).toContain(ROLES.VIEWER)
@@ -46,16 +48,19 @@ describe('ROLES', () => {
 // ── TICKET_STATUS ─────────────────────────────────────────────────────────────
 
 describe('TICKET_STATUS', () => {
-  it('defines the six canonical statuses', () => {
-    expect(TICKET_STATUS.OPEN).toBe('Open')
-    expect(TICKET_STATUS.IN_PROGRESS).toBe('In Progress')
-    expect(TICKET_STATUS.PENDING).toBe('Pending')
-    expect(TICKET_STATUS.ON_HOLD).toBe('On Hold')
-    expect(TICKET_STATUS.CLOSED).toBe('Closed')
-    expect(TICKET_STATUS.CANCELLED).toBe('Cancelled')
+  test.each([
+    ['OPEN', 'Open'],
+    ['IN_PROGRESS', 'In Progress'],
+    ['PENDING', 'Pending'],
+    ['ON_HOLD', 'On Hold'],
+    ['COMPLETED', 'Completed'],
+    ['CLOSED', 'Closed'],
+    ['CANCELLED', 'Cancelled'],
+  ])('TICKET_STATUS.%s === %s', (key, value) => {
+    expect(TICKET_STATUS[key]).toBe(value)
   })
 
-  it('TICKET_STATUS_LIST contains all seven statuses', () => {
+  it('TICKET_STATUS_LIST stays in sync with TICKET_STATUS', () => {
     expect(TICKET_STATUS_LIST).toHaveLength(7)
     for (const v of Object.values(TICKET_STATUS)) {
       expect(TICKET_STATUS_LIST).toContain(v)
@@ -69,7 +74,8 @@ describe('TICKET_STATUS', () => {
     }
   })
 
-  it('Closed and Cancelled are resolved', () => {
+  it('Closed, Cancelled, and Completed are resolved', () => {
+    expect(TICKET_STATUS_RESOLVED).toContain(TICKET_STATUS.COMPLETED)
     expect(TICKET_STATUS_RESOLVED).toContain(TICKET_STATUS.CLOSED)
     expect(TICKET_STATUS_RESOLVED).toContain(TICKET_STATUS.CANCELLED)
   })
@@ -78,14 +84,16 @@ describe('TICKET_STATUS', () => {
 // ── PRIORITY ──────────────────────────────────────────────────────────────────
 
 describe('PRIORITY', () => {
-  it('defines four priorities', () => {
-    expect(PRIORITY.CRITICAL).toBe('Critical')
-    expect(PRIORITY.HIGH).toBe('High')
-    expect(PRIORITY.MEDIUM).toBe('Medium')
-    expect(PRIORITY.LOW).toBe('Low')
+  test.each([
+    ['CRITICAL', 'Critical'],
+    ['HIGH', 'High'],
+    ['MEDIUM', 'Medium'],
+    ['LOW', 'Low'],
+  ])('PRIORITY.%s === %s', (key, value) => {
+    expect(PRIORITY[key]).toBe(value)
   })
 
-  it('PRIORITY_LIST has all four', () => {
+  it('PRIORITY_LIST stays in sync with PRIORITY', () => {
     expect(PRIORITY_LIST).toHaveLength(4)
     for (const v of Object.values(PRIORITY)) {
       expect(PRIORITY_LIST).toContain(v)
@@ -106,19 +114,23 @@ describe('PRIORITY', () => {
 // ── INVENTORY_STATUS / BATCH_STATUS ──────────────────────────────────────────
 
 describe('INVENTORY_STATUS', () => {
-  it('defines expected values', () => {
-    expect(INVENTORY_STATUS.ACTIVE_RMA).toBe('active_rma')
-    expect(INVENTORY_STATUS.COMPANY_STOCK).toBe('company_stock')
-    expect(INVENTORY_STATUS.SENT_TO_MANUFACTURER).toBe('sent_to_manufacturer')
-    expect(INVENTORY_STATUS.CLOSED).toBe('closed')
+  test.each([
+    ['ACTIVE_RMA', 'active_rma'],
+    ['COMPANY_STOCK', 'company_stock'],
+    ['SENT_TO_MANUFACTURER', 'sent_to_manufacturer'],
+    ['CLOSED', 'closed'],
+  ])('INVENTORY_STATUS.%s === %s', (key, value) => {
+    expect(INVENTORY_STATUS[key]).toBe(value)
   })
 })
 
 describe('BATCH_STATUS', () => {
-  it('defines draft/sent/resolved', () => {
-    expect(BATCH_STATUS.DRAFT).toBe('draft')
-    expect(BATCH_STATUS.SENT).toBe('sent')
-    expect(BATCH_STATUS.RESOLVED).toBe('resolved')
+  test.each([
+    ['DRAFT', 'draft'],
+    ['SENT', 'sent'],
+    ['RESOLVED', 'resolved'],
+  ])('BATCH_STATUS.%s === %s', (key, value) => {
+    expect(BATCH_STATUS[key]).toBe(value)
   })
 })
 
@@ -126,20 +138,19 @@ describe('BATCH_STATUS', () => {
 
 describe('STORAGE_KEY', () => {
   it('NOTIF_PREFS is a function that accepts an email', () => {
-    expect(typeof STORAGE_KEY.NOTIF_PREFS).toBe('function')
     expect(STORAGE_KEY.NOTIF_PREFS('user@test.com')).toBe('notif_system_prefs_user@test.com')
   })
 
-  it('APPEARANCE and AUDIT_QUEUE are strings', () => {
-    expect(typeof STORAGE_KEY.APPEARANCE).toBe('string')
-    expect(typeof STORAGE_KEY.AUDIT_QUEUE).toBe('string')
+  it('APPEARANCE and AUDIT_QUEUE have expected storage key values', () => {
+    expect(STORAGE_KEY.APPEARANCE).toBe('mrma_appearance')
+    expect(STORAGE_KEY.AUDIT_QUEUE).toBe('mrma_audit_queue')
   })
 })
 
 // ── WARRANTY_STATUS ───────────────────────────────────────────────────────────
 
 describe('WARRANTY_STATUS', () => {
-  it('WARRANTY_STATUS_LIST matches all values', () => {
+  it('WARRANTY_STATUS_LIST stays in sync with WARRANTY_STATUS', () => {
     for (const v of Object.values(WARRANTY_STATUS)) {
       expect(WARRANTY_STATUS_LIST).toContain(v)
     }
@@ -149,20 +160,24 @@ describe('WARRANTY_STATUS', () => {
 // ── AUTOMATION_ACTION ─────────────────────────────────────────────────────────
 
 describe('AUTOMATION_ACTION', () => {
-  it('defines expected action types', () => {
-    expect(AUTOMATION_ACTION.CHANGE_STATUS).toBe('change_status')
-    expect(AUTOMATION_ACTION.CHANGE_PRIORITY).toBe('change_priority')
-    expect(AUTOMATION_ACTION.ASSIGN_TECHNICIAN).toBe('assign_technician')
-    expect(AUTOMATION_ACTION.CREATE_NOTIFICATION).toBe('create_notification')
+  test.each([
+    ['CHANGE_STATUS', 'change_status'],
+    ['CHANGE_PRIORITY', 'change_priority'],
+    ['ASSIGN_TECHNICIAN', 'assign_technician'],
+    ['CREATE_NOTIFICATION', 'create_notification'],
+  ])('AUTOMATION_ACTION.%s === %s', (key, value) => {
+    expect(AUTOMATION_ACTION[key]).toBe(value)
   })
 })
 
 // ── CONFIG_KEY ────────────────────────────────────────────────────────────────
 
 describe('CONFIG_KEY', () => {
-  it('defines expected keys', () => {
-    expect(CONFIG_KEY.SLA_CONFIG).toBe('sla_config')
-    expect(CONFIG_KEY.AUTOMATION_RULES).toBe('automation_rules')
-    expect(CONFIG_KEY.APPEARANCE).toBe('appearance_settings')
+  test.each([
+    ['SLA_CONFIG', 'sla_config'],
+    ['AUTOMATION_RULES', 'automation_rules'],
+    ['APPEARANCE', 'appearance_settings'],
+  ])('CONFIG_KEY.%s === %s', (key, value) => {
+    expect(CONFIG_KEY[key]).toBe(value)
   })
 })

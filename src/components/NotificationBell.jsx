@@ -33,6 +33,47 @@ const TYPE_META = {
   custom_alert: { icon: '🔔', color: 'bg-amber-100 text-amber-700' },
 }
 
+// UX-10: group the panel list by category — mirrors the comment groupings above.
+const TYPE_CATEGORY = {
+  ticket_created: 'tickets',
+  ticket_updated: 'tickets',
+  ticket_deleted: 'tickets',
+  ticket_assigned: 'tickets',
+  ticket_status_changed: 'tickets',
+  ticket_overdue: 'tickets',
+  due_date_warning: 'tickets',
+  comment_added: 'tickets',
+  customer_created: 'customers',
+  customer_updated: 'customers',
+  customer_deleted: 'customers',
+  product_created: 'products',
+  product_updated: 'products',
+  product_deleted: 'products',
+  inventory_low: 'products',
+  user_created: 'users',
+  user_role_changed: 'users',
+  user_suspended: 'users',
+  user_locked: 'users',
+  user_activated: 'users',
+  user_deleted: 'users',
+  system_announcement: 'system',
+  custom_alert: 'system',
+}
+const CATEGORY_ORDER = ['tickets', 'customers', 'products', 'users', 'system', 'other']
+
+/** Groups notifications by category, preserving each item's original (already-sorted) order. */
+function groupByCategory(notifications) {
+  const buckets = new Map()
+  for (const n of notifications) {
+    const category = TYPE_CATEGORY[n.type] || 'other'
+    if (!buckets.has(category)) buckets.set(category, [])
+    buckets.get(category).push(n)
+  }
+  return CATEGORY_ORDER.map((category) => [category, buckets.get(category) || []]).filter(
+    ([, items]) => items.length > 0
+  )
+}
+
 function timeAgo(dateStr, t, lang = 'en') {
   const diff = Date.now() - new Date(dateStr).getTime()
   const m = Math.floor(diff / 60000)
@@ -70,6 +111,15 @@ export default function NotificationBell({
   )
   const isRead = (n) => readSets.get(n.id)?.has(normalizedEmail) || false
   const unread = notifications.filter((n) => !isRead(n)).length
+  const grouped = useMemo(() => groupByCategory(notifications), [notifications])
+  const CATEGORY_LABEL_KEYS = {
+    tickets: 'notifications.categoryTickets',
+    customers: 'notifications.categoryCustomers',
+    products: 'notifications.categoryProducts',
+    users: 'notifications.categoryUsers',
+    system: 'notifications.categorySystem',
+    other: 'notifications.categoryOther',
+  }
 
   // The text label + trailing count badge only belong in the full sidebar mode.
   // In icon-only (top bar) and compact-sidebar modes we show just the bell with
@@ -194,19 +244,30 @@ export default function NotificationBell({
                 </p>
               )}
             </div>
-            <button
-              onClick={() => setOpen(false)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 dark:text-[#9aa4b2] hover:text-gray-600 dark:hover:text-[#e8ebf0] hover:bg-gray-100 dark:hover:bg-[#1a2230] transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {unread > 0 && (
+                <button
+                  onClick={() => onMarkAllRead?.()}
+                  className="px-2 py-1 rounded-lg text-xs font-medium text-indigo-600 dark:text-[#a5b4fc] hover:bg-indigo-50 dark:hover:bg-[#1a2230] transition-colors"
+                >
+                  {t('notifications.markAllRead')}
+                </button>
+              )}
+              <button
+                onClick={() => setOpen(false)}
+                aria-label={t('common.close')}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 dark:text-[#9aa4b2] hover:text-gray-600 dark:hover:text-[#e8ebf0] hover:bg-gray-100 dark:hover:bg-[#1a2230] transition-colors"
+              >
+                <svg className="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* List */}
@@ -232,54 +293,61 @@ export default function NotificationBell({
                 <p className="text-xs text-gray-500 dark:text-[#4a5568] mt-1">{t('notifications.noNotificationsHint')}</p>
               </div>
             ) : (
-              notifications.map((n) => {
-                const isUnread = !isRead(n)
-                const meta = TYPE_META[n.type] || { icon: '🔔', color: 'bg-gray-100 text-gray-700' }
-                const clickable = n.entity_type === 'ticket' && n.entity_id
-                return (
-                  <div
-                    key={n.id}
-                    onClick={() => handleClickNotif(n)}
-                    className={`flex gap-3 px-4 py-3 border-b border-gray-50 dark:border-[#1a2230] last:border-0 transition-colors ${clickable ? 'cursor-pointer hover:bg-indigo-50 dark:hover:bg-[#1a2230]' : ''} ${isUnread ? 'bg-blue-50/40 dark:bg-blue-900/10' : ''}`}
-                  >
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm ${meta.color}`}
-                    >
-                      {meta.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <p
-                          className={`text-sm leading-snug ${isUnread ? 'font-semibold text-gray-900 dark:text-[#e8ebf0]' : 'font-medium text-gray-700 dark:text-[#9aa4b2]'}`}
+              grouped.map(([category, items]) => (
+                <div key={category}>
+                  <p className="sticky top-0 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-[#4a5568] bg-gray-50/90 dark:bg-[#0f1520]/90 backdrop-blur-sm">
+                    {t(CATEGORY_LABEL_KEYS[category])}
+                  </p>
+                  {items.map((n) => {
+                    const isUnread = !isRead(n)
+                    const meta = TYPE_META[n.type] || { icon: '🔔', color: 'bg-gray-100 text-gray-700' }
+                    const clickable = n.entity_type === 'ticket' && n.entity_id
+                    return (
+                      <div
+                        key={n.id}
+                        onClick={() => handleClickNotif(n)}
+                        className={`flex gap-3 px-4 py-3 border-b border-gray-50 dark:border-[#1a2230] last:border-0 transition-colors ${clickable ? 'cursor-pointer hover:bg-indigo-50 dark:hover:bg-[#1a2230]' : ''} ${isUnread ? 'bg-blue-50/40 dark:bg-blue-900/10' : ''}`}
+                      >
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm ${meta.color}`}
                         >
-                          {n.title}
-                        </p>
-                        {isUnread && (
-                          <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />
-                        )}
+                          {meta.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <p
+                              className={`text-sm leading-snug ${isUnread ? 'font-semibold text-gray-900 dark:text-[#e8ebf0]' : 'font-medium text-gray-700 dark:text-[#9aa4b2]'}`}
+                            >
+                              {n.title}
+                            </p>
+                            {isUnread && (
+                              <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5 line-clamp-2">{n.message}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-gray-500 dark:text-[#4a5568]">{timeAgo(n.created_date, t, i18n.language)}</span>
+                            {n.entity_ref && (
+                              <>
+                                <span className="text-gray-300 dark:text-[#212a38]">·</span>
+                                <span className="text-xs font-mono text-indigo-600 dark:text-[#a5b4fc]">
+                                  {n.entity_ref}
+                                </span>
+                              </>
+                            )}
+                            {clickable && (
+                              <>
+                                <span className="text-gray-300 dark:text-[#212a38]">·</span>
+                                <span className="text-xs text-indigo-500 dark:text-[#a5b4fc]">{t('notifications.viewTicket')}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5 line-clamp-2">{n.message}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-gray-500 dark:text-[#4a5568]">{timeAgo(n.created_date, t, i18n.language)}</span>
-                        {n.entity_ref && (
-                          <>
-                            <span className="text-gray-300 dark:text-[#212a38]">·</span>
-                            <span className="text-xs font-mono text-indigo-600 dark:text-[#a5b4fc]">
-                              {n.entity_ref}
-                            </span>
-                          </>
-                        )}
-                        {clickable && (
-                          <>
-                            <span className="text-gray-300 dark:text-[#212a38]">·</span>
-                            <span className="text-xs text-indigo-500 dark:text-[#a5b4fc]">{t('notifications.viewTicket')}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })
+                    )
+                  })}
+                </div>
+              ))
             )}
           </div>
         </div>,

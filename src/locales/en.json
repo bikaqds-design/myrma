@@ -69,8 +69,16 @@
     "itemsPerPage": "Items per page",
     "jumpToPage": "Jump to page",
     "go": "Go",
+    "showingRange": "Showing {{start}}–{{end}} of {{total}}",
     "clearAll": "Clear all",
     "saving": "Saving..."
+  },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "newTicket": "New ticket",
+    "focusSearch": "Focus search",
+    "showHelp": "Show this help",
+    "closePanel": "Close panel / modal"
   },
   "statusValues": {
     "Open": "Open",
@@ -154,7 +162,9 @@
     "priorityDistribution": "Priority Distribution",
     "last7Days": "Last 7 days",
     "last30Days": "Last 30 days",
-    "ticketsLabel": "Tickets"
+    "ticketsLabel": "Tickets",
+    "myOpenTickets": "My Open Tickets",
+    "dueSoon": "Due Soon"
   },
   "tickets": {
     "title": "RMA Tickets",
@@ -203,6 +213,10 @@
     "fieldUpdated": "{{field}} updated",
     "failedUpdate": "Failed to update",
     "exportedSuccess": "Exported!",
+    "viewTable": "Table",
+    "viewKanban": "Kanban",
+    "kanbanNoTickets": "No tickets",
+    "markAs": "Mark as {{status}}",
     "overdueDays": "Overdue {{days}}d",
     "dueToday": "Due today",
     "daysLeft": "{{days}}d left",
@@ -1081,7 +1095,8 @@
     "ticketUpdated": "Ticket updated successfully!",
     "ticketCreated": "Ticket created successfully!",
     "failedSaveTicket": "Failed to save ticket: {{error}}",
-    "emailNotifFailed": "Email notification failed: {{error}}"
+    "emailNotifFailed": "Email notification failed: {{error}}",
+    "customerNameRequired": "Customer name is required"
   },
   "ticketDrawer": {
     "title": "Ticket Details",
@@ -1234,6 +1249,7 @@
     "custom": "Custom",
     "roleDefault": "Role Default",
     "controls": "Controls",
+    "previewAsUser": "Preview as this user",
     "resetPassword": "Reset Password",
     "viewActivity": "View Activity",
     "lastLogin": "Last login",
@@ -1499,6 +1515,8 @@
     "userMgmtDesc": "Manage accounts, roles and permissions",
     "announcementsLabel": "Announcements",
     "announcementsDesc": "Post system-wide banners visible to all users",
+    "kbLabel": "Knowledge Base",
+    "kbDesc": "FAQ articles shown on the public tracker page",
     "sendAlertLabel": "Send Alert",
     "sendAlertDesc": "Send instant in-app notifications to users or groups",
     "appearanceLabel": "Appearance",
@@ -1649,6 +1667,30 @@
       "deleteConfirm": "Delete this announcement?",
       "deleted": "Deleted",
       "titleRequired": "Title and message are required"
+    },
+
+    "kb": {
+      "header": "Knowledge Base",
+      "subtitle": "FAQ articles shown to customers on the public tracker page",
+      "newArticle": "New Article",
+      "noArticles": "No articles yet",
+      "titleCol": "Title",
+      "categoryCol": "Category",
+      "publishedCol": "Published",
+      "actionsCol": "Actions",
+      "editModal": "Edit Article",
+      "newModal": "New Article",
+      "titleLabel": "Title *",
+      "bodyLabel": "Answer *",
+      "categoryLabel": "Category",
+      "publishNow": "Published",
+      "saveChanges": "Save Changes",
+      "create": "Create",
+      "updated": "Article updated",
+      "created": "Article created",
+      "deleteConfirm": "Delete this article?",
+      "deleted": "Deleted",
+      "titleBodyRequired": "Title and answer are required"
     },
 
     "migration": {
@@ -2009,6 +2051,13 @@
     "noNotificationsYet": "No notifications yet",
     "noNotificationsHint": "You'll see activity here as it happens",
     "totalUnread": "{{total}} total · {{unread}} unread",
+    "markAllRead": "Mark all read",
+    "categoryTickets": "Tickets",
+    "categoryCustomers": "Customers",
+    "categoryProducts": "Products",
+    "categoryUsers": "Users",
+    "categorySystem": "System",
+    "categoryOther": "Other",
     "viewTicket": "View →",
     "justNow": "just now",
     "minsAgo_one": "{{count}}m ago",
@@ -2100,5 +2149,19 @@
     "step2": "Select your backup JSON file",
     "step3": "Wait for the restore process to complete",
     "step4": "Refresh the page to see restored data"
+  },
+  "preview": {
+    "banner": "Previewing as {{email}} ({{role}})",
+    "dataDisclaimer": "data still loads as you",
+    "exit": "Exit preview"
+  },
+  "kb": {
+    "needHelpLink": "Need help? Browse FAQs →",
+    "headerSubtitle": "Help Center",
+    "title": "Frequently Asked Questions",
+    "subtitle": "Find quick answers to common questions about your repair",
+    "searchPlaceholder": "Search for a topic...",
+    "noResults": "No articles match your search",
+    "backToTracker": "← Back to Service Tracker"
   }
 }

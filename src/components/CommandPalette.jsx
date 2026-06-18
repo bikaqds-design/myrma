@@ -56,7 +56,7 @@ export default function CommandPalette({ onSelectTicket, onSelectProduct, inputR
 
       // Build products OR including any matching brand IDs
       const brandIds = (brandsRes.data || []).map((b) => b.id)
-      let orParts = [`product_name.ilike.%${safe}%`, `sku.ilike.%${safe}%`]
+      const orParts = [`product_name.ilike.%${safe}%`, `sku.ilike.%${safe}%`]
       if (brandIds.length) orParts.push(`brand_id.in.(${brandIds.join(',')})`)
 
       const productsRes = await supabase

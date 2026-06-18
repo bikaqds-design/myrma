@@ -1,6 +1,6 @@
 # myRMA Engineering Constitution
 
-> **Version:** 2.0 — May 2026  
+> **Version:** 2.1 — Amended 2026-06-08 (AI Assist + Skeleton/Breadcrumb components + secrets table)  
 > **Authority:** This document is the single source of truth for all engineering decisions in myRMA.  
 > **Scope:** All contributors, developers, and AI coding agents working on this codebase.  
 > **Enforcement:** Rules marked **LAW** are non-negotiable. Rules marked **MUST** require justification to override. Rules marked **SHOULD** are strong defaults.
@@ -237,10 +237,25 @@ The library exports:
 | `IconButton` | — | Icon-only actions |
 | `ModalOverlay` | — | Modal backdrop |
 | `ModalCard` | — | Modal container |
+| `StatusPill` | `status`, optional `className` | Colored dot + label pill by status string |
+
+**Skeleton loaders** live in `src/components/Skeleton.jsx` (separate file from `ui.jsx`):
+
+| Export | Props | Use Case |
+|--------|-------|---------|
+| `TableSkeleton` | `rows`, `cols` | Animate-pulse rows inside a `<tbody>` |
+| `StatCardSkeleton` | `count` | Grid of KPI card skeletons |
+| `CardSkeleton` | `lines` | Generic card content skeleton |
+| `PageSkeleton` | `cols` | Full-page skeleton (header + stat cards + table) |
+| `RouteSkeleton` | — | Route-level fallback (used in Suspense boundaries) |
+
+**Breadcrumb** lives in `src/components/Breadcrumb.jsx`. Used on detail pages (`ProductDetails`, `CustomerDetails`) and Control Panel sub-pages to show the back path. It is i18n-aware and RTL-safe.
 
 ```jsx
 // ✅ CORRECT
 import { Button, Spinner, Badge, ModalOverlay, ModalCard } from '../components/ui.jsx'
+import { TableSkeleton, PageSkeleton, RouteSkeleton } from '../components/Skeleton.jsx'
+import Breadcrumb from '../components/Breadcrumb.jsx'
 
 // ❌ FORBIDDEN
 <button className="bg-indigo-600 text-white px-4 py-2 rounded">Submit</button>
@@ -485,7 +500,7 @@ myRMA is used by warehouse operations, technicians, and managers — not casual 
 | Operation | Loading UI |
 |-----------|-----------|
 | Page load | Full-page `<Spinner size="xl">` centered |
-| Table data | Spinner above table OR skeleton rows |
+| Table data | `<TableSkeleton>` from `Skeleton.jsx` (preferred) OR spinner above table |
 | Form submit | Spinner inside submit button, button disabled |
 | Inline action | Spinner replaces action icon |
 | Background sync | No UI required unless > 2 seconds |
@@ -686,12 +701,14 @@ src/api/storage.js            ← file upload/download
 src/api/branding.js           ← company branding settings
 src/api/email.js              ← notification dispatch + Edge Function call
 src/api/backup.js             ← full data export/import
+src/api/ai.js                 ← AI Assist (NVIDIA NIM Llama 3.3 70B via ai-assist Edge Function)
 ```
 
 ```js
 // ✅ CORRECT — in a page component
-import { db, auth, storage } from '../api/supabaseClient.js'
+import { db, auth, storage, ai } from '../api/supabaseClient.js'
 const { data } = await db.rmaTickets.list({ status: 'open' })
+const result = await ai.assist('ticket', ticketData)
 
 // ❌ FORBIDDEN — in a page component
 import { supabase } from '../api/client.js'
@@ -753,6 +770,10 @@ Current functions:
 - `admin-reset-password` — Password reset AND new user creation (create-if-missing logic)
 - `public-track` — Rate-limited public RMA tracker lookup
 - `send-email` — Email dispatch
+- `send-whatsapp` — WhatsApp message dispatch via Meta Cloud API
+- `notification-worker` — Drains `notification_queue` table, retries failed sends
+- `whatsapp-webhook` — Receives Meta delivery/read status callbacks
+- `ai-assist` — AI analysis via NVIDIA NIM (Llama 3.3 70B); accepts `context_type` (`ticket`, `customer`, `dashboard`) + `data`; returns `{ summary, suggestion }` JSON; requires `NVIDIA_API_KEY` Supabase secret
 
 **MUST: Edge Functions validate the caller's JWT** before performing privileged operations:
 
@@ -867,6 +888,15 @@ if (currentUserRole === 'admin') {
 **LAW: The service role key (`service_role`) is ONLY used in Edge Functions running server-side.** Never expose it to the browser.
 
 **MUST: The `VITE_SUPABASE_ANON_KEY` (browser-safe public key) is the only key shipped to the client.** The anon key is rate-limited and RLS-restricted by design.
+
+Required Supabase Edge Function secrets (set via `supabase secrets set`):
+
+| Secret | Used by | Notes |
+|--------|---------|-------|
+| `NVIDIA_API_KEY` | `ai-assist` | NVIDIA NIM API key for Llama 3.3 70B |
+| `WHATSAPP_ACCESS_TOKEN` | `send-whatsapp` | Permanent System User token (not the 24h API-Setup token) |
+| `WHATSAPP_PHONE_NUMBER_ID` | `send-whatsapp` | All digits — a letter O instead of zero causes Meta error 100 |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | `whatsapp-webhook` | Verification handshake token |
 
 ### 8.4 Input Validation
 
@@ -1079,7 +1109,7 @@ xl:   1280px — desktop
 | React page component | PascalCase `.jsx` or `PascalCase/index.jsx` folder | `RMATickets/index.jsx`, `Dashboard.jsx` |
 | React sub-component | PascalCase `.jsx` | `TicketRow.jsx` |
 | Shared UI component | PascalCase `.jsx` in `components/` | `ui.jsx`, `ErrorBoundary.jsx` |
-| API domain module | camelCase `.js` in `api/db/` | `tickets.js`, `customers.js` |
+| API domain module | camelCase `.ts` in `api/db/` | `tickets.ts`, `catalog.ts` |
 | Hook | camelCase `.js` in `hooks/` | `useURLTab.js` |
 | Context | PascalCase `Context.jsx` | `AppearanceContext.jsx` |
 | TypeScript lib module | camelCase `.ts` in `lib/` | `constants.ts`, `permissions.ts` |
@@ -1175,14 +1205,16 @@ d:\myrma-app\
 │   │   ├── email.js            # Notification dispatch
 │   │   ├── backup.js           # Data export/import
 │   │   └── db\
-│   │       ├── index.js        # Aggregates all domain modules into `db` export
-│   │       ├── tickets.js      # RMA ticket CRUD + rmaTracker public lookup
-│   │       ├── customers.js    # Customer CRUD
-│   │       ├── products.js     # Product CRUD
-│   │       ├── inventory.js    # Inventory CRUD
-│   │       ├── users.js        # User role management
-│   │       ├── notifications.js # Notification table ops
-│   │       └── ...             # (15 domain files total)
+│   │       ├── index.ts        # Aggregates all domain modules into `db` export
+│   │       ├── tickets.ts      # RMA ticket CRUD + rmaTracker public lookup
+│   │       ├── customers.ts    # Customer CRUD
+│   │       ├── catalog.ts      # Product CRUD
+│   │       ├── inventory.ts    # Inventory CRUD
+│   │       ├── users.ts        # User role management
+│   │       ├── notifications.ts # Notification table ops
+│   │       ├── system.ts       # System config ops
+│   │       ├── audit.ts        # Audit log ops
+│   │       └── whatsappNotifications.ts # WhatsApp notification ops
 │   ├── components\
 │   │   ├── ui.jsx              # Shared component library (Button, Input, Modal, etc.)
 │   │   ├── ErrorBoundary.jsx   # App-level error boundary
@@ -1214,13 +1246,18 @@ d:\myrma-app\
 │   ├── functions\              # Supabase Edge Functions
 │   │   ├── admin-reset-password\
 │   │   ├── public-track\
-│   │   └── send-email\
+│   │   ├── send-email\
+│   │   ├── send-whatsapp\
+│   │   ├── notification-worker\
+│   │   └── whatsapp-webhook\
 │   └── migrations\             # Database migrations (YYYYMMDD_description.sql)
 ├── .github\
 │   └── workflows\
 │       └── ci.yml              # CI: test → lint:ci → build
 ├── .specify\                   # Speckit planning artifacts
-├── AUDIT_LOG.md                # Engineering audit history and scorecard
+├── docs\
+│   └── archive\                # Historical audit reports, superseded test snapshots
+│       └── AUDIT_LOG.md        # Engineering audit history and scorecard
 ├── CLAUDE.md                   # AI agent instructions (checked into repo)
 ├── CONSTITUTION.md             # This file
 ├── vite.config.js              # Vite + PWA configuration
@@ -1241,7 +1278,7 @@ d:\myrma-app\
 | New Edge Function | `supabase/functions/new-function/index.ts` |
 | New migration | `supabase/migrations/YYYYMMDD_description.sql` |
 
-**LAW: Do not create files in the root directory** unless they are project-level configs (vite.config.js, tailwind.config.js, etc.) or documentation (CONSTITUTION.md, AUDIT_LOG.md, CLAUDE.md).
+**LAW: Do not create files in the root directory** unless they are project-level configs (vite.config.js, tailwind.config.js, etc.) or actively-maintained documentation (CONSTITUTION.md, CLAUDE.md, AGENTS.md, DESIGN.md, IMPROVEMENT_PLAN.md, README.md). One-time or historical reports (audit logs, dated test snapshots) go in `docs/archive/` instead.
 
 ### 13.3 Import Order (Enforced by ESLint)
 
@@ -1451,7 +1488,7 @@ security(storage): add anon upload size and MIME type restrictions
 GitHub Actions runs on every push and PR to `main`:
 
 ```
-1. npm test          — Vitest (74 unit tests, must all pass)
+1. npm test          — Vitest (80 unit tests, must all pass)
 2. npm run lint:ci   — ESLint (zero errors gate)
 3. npm run build     — Vite production build (must succeed)
 ```
@@ -1493,7 +1530,7 @@ This section is for Claude Code, GitHub Copilot, and any other AI coding assista
 Priority order for authoritative information:
 1. This `CONSTITUTION.md`
 2. `CLAUDE.md` (project-level instructions)
-3. `AUDIT_LOG.md` (what was changed and why)
+3. `docs/archive/AUDIT_LOG.md` (what was changed and why)
 4. The actual source code files
 5. READMEs and docs (may be outdated)
 
@@ -1527,6 +1564,9 @@ Before generating any UI element, ask: _Does `ui.jsx` already export this?_
 - URL tab sync → `useURLTab()` in `src/hooks/useURLTab.js`
 - Sentry capture → `captureException()` (via ErrorBoundary)
 - Theme access → `useAppearance()` from `AppearanceContext.jsx`
+- Skeleton loaders → `TableSkeleton`, `PageSkeleton`, etc. from `src/components/Skeleton.jsx`
+- Breadcrumb navigation → `Breadcrumb` from `src/components/Breadcrumb.jsx`
+- AI Assist → `ai.assist()` from `src/api/ai.js` (via `ai-assist` Edge Function)
 - All magic strings → `src/lib/constants.ts`
 
 ### 17.5 Never Remove Safety Features
@@ -1612,7 +1652,7 @@ const isRtl = i18n.language === 'ar'
 
 ### 17.10 Documenting Changes
 
-**MUST: When making changes that affect the audit record, update `AUDIT_LOG.md`** changelog section with:
+**MUST: When making changes that affect the audit record, update `docs/archive/AUDIT_LOG.md`** changelog section with:
 - Date (YYYY-MM-DD)
 - Change summary
 - ID if it corresponds to an existing finding
@@ -1707,7 +1747,7 @@ Before approving any PR, verify:
 - [ ] No deleted or weakened security features
 - [ ] New constants added to `src/lib/constants.ts`
 - [ ] `CLAUDE.md` updated if architectural patterns changed
-- [ ] `AUDIT_LOG.md` changelog updated if relevant to audit findings
+- [ ] `docs/archive/AUDIT_LOG.md` changelog updated if relevant to audit findings
 
 ### 18.4 Living Document
 
@@ -1718,9 +1758,9 @@ This constitution is a living document. When:
 
 **MUST: Constitution changes are reviewed by the project lead** and committed as `docs(constitution): <description>`.
 
-**MUST: All constitution changes are documented in the `AUDIT_LOG.md` changelog.**
+**MUST: All constitution changes are documented in the `docs/archive/AUDIT_LOG.md` changelog.**
 
 ---
 
-*myRMA Engineering Constitution v2.0 — Established May 2026*  
+*myRMA Engineering Constitution v2.1 — Established May 2026 · Amended 2026-06-08*  
 *"Build it right, keep it right, document why it's right."*

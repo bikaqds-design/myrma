@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import type { TableResult } from './types.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -74,7 +75,7 @@ export const notifications = {
   async listForUser(
     _email: string,
     _role: string
-  ): Promise<{ missing: boolean; data: NotificationRow[] }> {
+  ): Promise<TableResult<NotificationRow[]>> {
     try {
       // RLS policy user_read_targeted already filters by target_roles/target_emails server-side.
       const { data, error } = await supabase

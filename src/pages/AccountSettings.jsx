@@ -223,7 +223,8 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
 
   // Security — sessions
   const [sessions, setSessions] = useState(null) // null = not loaded yet
-  const [currentSessionId, setCurrentSessionId] = useState(null)
+  // Tracked for a future "this device" badge in the session list — not yet rendered (UX-xx candidate)
+  const [_currentSessionId, setCurrentSessionId] = useState(null)
   const [sessionActivity, setSessionActivity] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
 

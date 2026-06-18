@@ -69,8 +69,16 @@
     "itemsPerPage": "عناصر في الصفحة",
     "jumpToPage": "الانتقال إلى الصفحة",
     "go": "انتقال",
+    "showingRange": "عرض {{start}}–{{end}} من {{total}}",
     "clearAll": "مسح الكل",
     "saving": "جارٍ الحفظ..."
+  },
+  "shortcuts": {
+    "title": "اختصارات لوحة المفاتيح",
+    "newTicket": "تذكرة جديدة",
+    "focusSearch": "التركيز على البحث",
+    "showHelp": "عرض هذه المساعدة",
+    "closePanel": "إغلاق اللوحة / النافذة"
   },
   "statusValues": {
     "Open": "مفتوح",
@@ -154,7 +162,9 @@
     "priorityDistribution": "توزيع الأولوية",
     "last7Days": "آخر 7 أيام",
     "last30Days": "آخر 30 يومًا",
-    "ticketsLabel": "تذاكر"
+    "ticketsLabel": "تذاكر",
+    "myOpenTickets": "تذاكري المفتوحة",
+    "dueSoon": "تستحق قريباً"
   },
   "tickets": {
     "title": "تذاكر الإرجاع",
@@ -203,6 +213,10 @@
     "fieldUpdated": "تم تحديث {{field}}",
     "failedUpdate": "فشل التحديث",
     "exportedSuccess": "تم التصدير!",
+    "viewTable": "جدول",
+    "viewKanban": "كانبان",
+    "kanbanNoTickets": "لا توجد تذاكر",
+    "markAs": "تحديد كـ {{status}}",
     "overdueDays": "متأخر {{days}} يوم",
     "dueToday": "موعد اليوم",
     "daysLeft": "{{days}} يوم متبقٍ",
@@ -1081,7 +1095,8 @@
     "ticketUpdated": "تم تحديث التذكرة بنجاح!",
     "ticketCreated": "تم إنشاء التذكرة بنجاح!",
     "failedSaveTicket": "فشل حفظ التذكرة: {{error}}",
-    "emailNotifFailed": "فشل إشعار البريد الإلكتروني: {{error}}"
+    "emailNotifFailed": "فشل إشعار البريد الإلكتروني: {{error}}",
+    "customerNameRequired": "اسم العميل مطلوب"
   },
   "ticketDrawer": {
     "title": "تفاصيل التذكرة",
@@ -1234,6 +1249,7 @@
     "custom": "مخصص",
     "roleDefault": "افتراضي الدور",
     "controls": "التحكم",
+    "previewAsUser": "معاينة كهذا المستخدم",
     "resetPassword": "إعادة تعيين كلمة المرور",
     "viewActivity": "عرض النشاط",
     "lastLogin": "آخر تسجيل دخول",
@@ -1499,6 +1515,8 @@
     "userMgmtDesc": "إدارة الحسابات والأدوار والصلاحيات",
     "announcementsLabel": "الإعلانات",
     "announcementsDesc": "نشر إشعارات على مستوى النظام لجميع المستخدمين",
+    "kbLabel": "قاعدة المعرفة",
+    "kbDesc": "مقالات الأسئلة الشائعة المعروضة في صفحة التتبع العامة",
     "sendAlertLabel": "إرسال تنبيه",
     "sendAlertDesc": "إرسال إشعارات فورية داخل التطبيق للمستخدمين أو المجموعات",
     "appearanceLabel": "المظهر",
@@ -1649,6 +1667,30 @@
       "deleteConfirm": "حذف هذا الإعلان؟",
       "deleted": "تم الحذف",
       "titleRequired": "العنوان والرسالة مطلوبان"
+    },
+
+    "kb": {
+      "header": "قاعدة المعرفة",
+      "subtitle": "مقالات الأسئلة الشائعة المعروضة للعملاء في صفحة التتبع العامة",
+      "newArticle": "مقالة جديدة",
+      "noArticles": "لا توجد مقالات بعد",
+      "titleCol": "العنوان",
+      "categoryCol": "الفئة",
+      "publishedCol": "منشور",
+      "actionsCol": "الإجراءات",
+      "editModal": "تعديل المقالة",
+      "newModal": "مقالة جديدة",
+      "titleLabel": "العنوان *",
+      "bodyLabel": "الإجابة *",
+      "categoryLabel": "الفئة",
+      "publishNow": "منشور",
+      "saveChanges": "حفظ التغييرات",
+      "create": "إنشاء",
+      "updated": "تم تحديث المقالة",
+      "created": "تم إنشاء المقالة",
+      "deleteConfirm": "حذف هذه المقالة؟",
+      "deleted": "تم الحذف",
+      "titleBodyRequired": "العنوان والإجابة مطلوبان"
     },
 
     "migration": {
@@ -2009,6 +2051,13 @@
     "noNotificationsYet": "لا توجد إشعارات بعد",
     "noNotificationsHint": "ستظهر هنا الأنشطة فور حدوثها",
     "totalUnread": "{{total}} إجمالي · {{unread}} غير مقروء",
+    "markAllRead": "تحديد الكل كمقروء",
+    "categoryTickets": "التذاكر",
+    "categoryCustomers": "العملاء",
+    "categoryProducts": "المنتجات",
+    "categoryUsers": "المستخدمون",
+    "categorySystem": "النظام",
+    "categoryOther": "أخرى",
     "viewTicket": "عرض →",
     "justNow": "الآن",
     "minsAgo_one": "منذ دقيقة",
@@ -2100,5 +2149,19 @@
     "step2": "اختر ملف JSON الخاص بالنسخ الاحتياطي",
     "step3": "انتظر حتى اكتمال عملية الاستعادة",
     "step4": "أعد تحميل الصفحة لرؤية البيانات المُستعادة"
+  },
+  "preview": {
+    "banner": "معاينة كـ {{email}} ({{role}})",
+    "dataDisclaimer": "البيانات لا تزال تُحمَّل كحسابك",
+    "exit": "إنهاء المعاينة"
+  },
+  "kb": {
+    "needHelpLink": "هل تحتاج إلى مساعدة؟ تصفح الأسئلة الشائعة ←",
+    "headerSubtitle": "مركز المساعدة",
+    "title": "الأسئلة الشائعة",
+    "subtitle": "اعثر على إجابات سريعة للأسئلة الشائعة حول إصلاحك",
+    "searchPlaceholder": "ابحث عن موضوع...",
+    "noResults": "لا توجد مقالات تطابق بحثك",
+    "backToTracker": "← العودة إلى متتبع الخدمة"
   }
 }

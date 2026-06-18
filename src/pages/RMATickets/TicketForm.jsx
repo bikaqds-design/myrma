@@ -26,9 +26,290 @@ import {
 } from './_utils'
 import { ProductSearchInput } from './_shared'
 
-const inp =
+const inputClass =
   'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm bg-white placeholder-gray-400 transition-colors'
-const lbl = 'block text-sm font-medium text-gray-700 mb-1.5'
+const labelClass = 'block text-sm font-medium text-gray-700 mb-1.5'
+
+// ── Ticket save helpers ────────────────────────────────────────────────────────
+
+function sendTicketAssignedEmail(email, rmaNumber, customerName, priority, dueDate) {
+  notifications
+    .sendEmail(email, 'ticket_assigned', {
+      recipient_name: email,
+      rma_number: rmaNumber,
+      customer_name: customerName,
+      priority,
+      due_date: dueDate || 'N/A',
+    })
+    .catch((err) => console.error('[email] ticket_assigned:', err.message))
+}
+
+async function uploadPendingAttachments(pendingFiles, rmaNumber, t) {
+  const uploaded = []
+  for (const file of pendingFiles) {
+    try {
+      const result = await storage.uploadFile(file, rmaNumber)
+      uploaded.push(result)
+    } catch (err) {
+      captureException(err, { page: 'RMATickets', context: 'uploadAttachment' })
+      toast.error(t('ticketForm.failedUploadFile', { name: file.name }))
+    }
+  }
+  return uploaded
+}
+
+async function logTicketChanges(ticketId, rmaNumber, prevTicket, newData, newAttachments, userEmail) {
+  const pending = []
+  const log = (type, details) =>
+    pending.push(db.ticketActivity.log(ticketId, type, details, userEmail))
+  let specific = false
+
+  if (newData.ticket_status !== prevTicket.ticket_status) {
+    log('status_changed', `${prevTicket.ticket_status}|${newData.ticket_status}`)
+    specific = true
+  }
+  if (newData.priority !== prevTicket.priority) {
+    log('priority_changed', `${prevTicket.priority}|${newData.priority}`)
+    specific = true
+  }
+  if (newData.assigned_technician !== prevTicket.assigned_technician) {
+    log('technician_assigned', `Assigned to ${newData.assigned_technician || 'Unassigned'}`)
+    specific = true
+  }
+  if (newData.due_date !== prevTicket.due_date) {
+    const label = newData.due_date
+      ? new Date(newData.due_date).toLocaleDateString()
+      : 'cleared'
+    log('ticket_updated', `Due date → ${label}`)
+    specific = true
+  }
+  if (newAttachments.length > 0) {
+    log('attachment_added', `Added ${newAttachments.length} file(s): ${newAttachments.map((a) => a.name).join(', ')}`)
+    specific = true
+  }
+
+  const prevProds = prevTicket.products || []
+  const newProds = newData.products || []
+  newProds.forEach((newP, i) => {
+    const prevP = prevProds[i]
+    if (!prevP) return
+    const name = newP.product_name || prevP.product_name || `Item ${i + 1}`
+    if (newP.product_status !== prevP.product_status) {
+      log('product_status_changed', `${name}: ${prevP.product_status || '—'} → ${newP.product_status || '—'}`)
+      specific = true
+    }
+    if (newP.warranty_status !== prevP.warranty_status) {
+      log('product_updated', `${name}: warranty ${prevP.warranty_status || '—'} → ${newP.warranty_status || '—'}`)
+      specific = true
+    }
+  })
+
+  if (!specific)
+    log('ticket_updated', 'Updated ticket details')
+
+  await Promise.allSettled(pending)
+  db.userActivity
+    .create(userEmail, 'ticket_updated', `Updated ticket ${rmaNumber || ticketId}`)
+    .catch(() => {})
+}
+
+function dispatchUpdateNotifications(editingTicket, newData, userEmail) {
+  const { id: ticketId, rma_number: rmaNumber } = editingTicket
+  const techEmails =
+    newData.assigned_technician && newData.assigned_technician !== userEmail
+      ? [newData.assigned_technician]
+      : []
+  db.notifications
+    .create({
+      type: 'ticket_updated',
+      title: 'Ticket Updated',
+      message: `Ticket ${rmaNumber} for ${newData.customer_name} was updated by ${userEmail}`,
+      entityType: 'ticket',
+      entityId: ticketId,
+      entityRef: rmaNumber,
+      createdBy: userEmail,
+      targetRoles: ['admin', 'super_admin'],
+      targetEmails: techEmails,
+    })
+    .catch(() => {})
+  if (newData.assigned_technician && newData.assigned_technician !== editingTicket.assigned_technician) {
+    db.notifications
+      .create({
+        type: 'ticket_assigned',
+        title: 'Ticket Assigned',
+        message: `Ticket ${rmaNumber} was assigned to ${newData.assigned_technician}`,
+        entityType: 'ticket',
+        entityId: ticketId,
+        entityRef: rmaNumber,
+        createdBy: userEmail,
+        targetRoles: ['admin', 'super_admin'],
+        targetEmails: [newData.assigned_technician],
+      })
+      .catch(() => {})
+  }
+  if (newData.ticket_status !== editingTicket.ticket_status) {
+    const assigneeEmails =
+      editingTicket.assigned_technician && editingTicket.assigned_technician !== userEmail
+        ? [editingTicket.assigned_technician]
+        : []
+    db.notifications
+      .create({
+        type: 'ticket_status_changed',
+        title: 'Ticket Status Changed',
+        message: `Ticket ${rmaNumber} moved from "${editingTicket.ticket_status}" to "${newData.ticket_status}"`,
+        entityType: 'ticket',
+        entityId: ticketId,
+        entityRef: rmaNumber,
+        createdBy: userEmail,
+        targetRoles: ['admin', 'super_admin'],
+        targetEmails: assigneeEmails,
+      })
+      .catch(() => {})
+  }
+  db.automationRules.evaluate('ticket_updated', { ...editingTicket, ...newData }).catch((err) => captureException(err, { context: 'automationRules:ticket_updated' }))
+  db.webhooks.dispatch('ticket_updated', { id: ticketId, rma_number: rmaNumber, ...newData }).catch((err) => captureException(err, { context: 'webhooks:ticket_updated' }))
+  if (newData.ticket_status !== editingTicket.ticket_status) {
+    db.automationRules.evaluate('ticket_status_changed', { ...editingTicket, ...newData }).catch((err) => captureException(err, { context: 'automationRules:ticket_status_changed' }))
+    db.webhooks
+      .dispatch('ticket_status_changed', {
+        id: ticketId,
+        rma_number: rmaNumber,
+        old_status: editingTicket.ticket_status,
+        new_status: newData.ticket_status,
+      })
+      .catch((err) => captureException(err, { context: 'webhooks:ticket_status_changed' }))
+  }
+  if (newData.assigned_technician !== editingTicket.assigned_technician) {
+    db.automationRules.evaluate('ticket_assigned', { ...editingTicket, ...newData }).catch((err) => captureException(err, { context: 'automationRules:ticket_assigned' }))
+    db.webhooks
+      .dispatch('ticket_assigned', { id: ticketId, rma_number: rmaNumber, technician: newData.assigned_technician })
+      .catch((err) => captureException(err, { context: 'webhooks:ticket_assigned' }))
+  }
+}
+
+function fireUpdateEmails(editingTicket, newData, resolvedCustomerEmail, userEmail, t) {
+  const updatedPayload = { ...editingTicket, ...newData, id: editingTicket.id }
+  const ts = new Date().toISOString()
+  const statusChanged = newData.ticket_status !== editingTicket.ticket_status
+  const assigneeChanged = newData.assigned_technician !== editingTicket.assigned_technician
+  const priorityChanged = newData.priority !== editingTicket.priority
+  const isClosed = ['Closed', 'Completed', 'Cancelled'].includes(newData.ticket_status)
+  if (assigneeChanged) {
+    notificationEventBus.emitAsync({ type: 'ticket.assigned', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })
+    if (newData.assigned_technician) {
+      sendTicketAssignedEmail(
+        newData.assigned_technician,
+        editingTicket.rma_number,
+        newData.customer_name,
+        newData.priority,
+        newData.due_date
+      )
+    }
+  }
+  if (statusChanged && isClosed) {
+    notificationEventBus.emitAsync({ type: 'ticket.closed', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })
+  } else if (statusChanged) {
+    notificationEventBus.emitAsync({ type: 'ticket.updated', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })
+  }
+  if (statusChanged) {
+    if (!resolvedCustomerEmail) {
+      console.warn('[email] status change skipped — no customer email on ticket', editingTicket.id)
+    } else {
+      notifications.sendEmail(resolvedCustomerEmail, 'status_changed', {
+        recipient_name: newData.customer_name,
+        customer_name: newData.customer_name,
+        rma_number: editingTicket.rma_number,
+        old_status: editingTicket.ticket_status,
+        new_status: newData.ticket_status,
+        priority: newData.priority,
+        status: newData.ticket_status,
+        updated_by: userEmail,
+        update_time: new Date().toLocaleString(),
+      }).catch((err) => {
+        console.error('[email] status change failed:', err.message)
+        toast.error(t('ticketForm.emailNotifFailed', { error: err.message }), { duration: 6000 })
+      })
+    }
+  }
+  if (priorityChanged && resolvedCustomerEmail) {
+    notifications.sendEmail(resolvedCustomerEmail, 'priority_changed', {
+      recipient_name: newData.customer_name,
+      customer_name: newData.customer_name,
+      rma_number: editingTicket.rma_number,
+      old_priority: editingTicket.priority,
+      new_priority: newData.priority,
+    }).catch((err) => console.error('[email] priority_changed:', err.message))
+  }
+}
+
+function dispatchCreateSideEffects(newTicket, ticketData, rmaNumber, userEmail, resolvedCustomerEmail) {
+  if (!newTicket?.id) return
+  db.inventory
+    .createUnitsFromTicket(newTicket.id, newTicket.rma_number || rmaNumber, ticketData.products)
+    .catch((err) => captureException(err, { page: 'RMATickets', context: 'createInventoryUnit' }))
+  const techEmails =
+    ticketData.assigned_technician && ticketData.assigned_technician !== userEmail
+      ? [ticketData.assigned_technician]
+      : []
+  db.notifications
+    .create({
+      type: 'ticket_created',
+      title: 'New RMA Ticket',
+      message: `Ticket ${rmaNumber} created for ${ticketData.customer_name}`,
+      entityType: 'ticket',
+      entityId: newTicket.id,
+      entityRef: rmaNumber,
+      createdBy: userEmail,
+      targetRoles: ['admin', 'super_admin'],
+      targetEmails: techEmails,
+    })
+    .catch(() => {})
+  db.automationRules.evaluate('ticket_created', newTicket).catch((err) => captureException(err, { context: 'automationRules:ticket_created' }))
+  db.webhooks
+    .dispatch('ticket_created', {
+      id: newTicket.id,
+      rma_number: rmaNumber,
+      customer_name: ticketData.customer_name,
+      priority: ticketData.priority,
+      status: ticketData.ticket_status,
+    })
+    .catch((err) => captureException(err, { context: 'webhooks:ticket_created' }))
+  // WhatsApp notification — spread the saved DB row so all fields
+  // (incl. created_date) are present; ticketData alone lacks created_date
+  // which left {{created_date}} empty → Meta #131008 "required parameter missing".
+  notificationEventBus.emitAsync({
+    type: 'ticket.created',
+    timestamp: new Date().toISOString(),
+    ticketId: newTicket.id,
+    ticket: { ...ticketData, ...newTicket, id: newTicket.id, rma_number: newTicket.rma_number || rmaNumber, created_date: newTicket.created_date || new Date().toISOString() },
+    triggeredBy: userEmail,
+  })
+  if (ticketData.assigned_technician && ticketData.assigned_technician !== userEmail) {
+    sendTicketAssignedEmail(
+      ticketData.assigned_technician,
+      newTicket.rma_number || rmaNumber,
+      ticketData.customer_name,
+      ticketData.priority,
+      ticketData.due_date
+    )
+  }
+  if (resolvedCustomerEmail) {
+    const productDetails =
+      (ticketData.products || [])
+        .filter((p) => p.product_name)
+        .map((p) => `${p.product_name}${p.serial_number ? ` (SN: ${p.serial_number})` : ''}`)
+        .join('\n') || 'N/A'
+    notifications.sendEmail(resolvedCustomerEmail, 'ticket_created', {
+      recipient_name: ticketData.customer_name,
+      customer_name: ticketData.customer_name,
+      rma_number: newTicket.rma_number || rmaNumber,
+      priority: ticketData.priority,
+      status: ticketData.ticket_status,
+      issue_description: ticketData.general_description || '',
+      product_details: productDetails,
+    }).catch((err) => console.error('[email] ticket created:', err.message))
+  }
+}
 
 export function TicketForm({
   editingTicket,
@@ -89,6 +370,7 @@ export function TicketForm({
   })
 
   const [uploading, setUploading] = useState(false)
+  const [customerNameError, setCustomerNameError] = useState('')
   const [customerSearch, setCustomerSearch] = useState(
     editingTicket ? editingTicket.customer_name || '' : ''
   )
@@ -97,7 +379,6 @@ export function TicketForm({
 
   const EMPTY_RES = { type: '', replacement_product_name: '', replacement_serial: '', amount: '', currency: 'USD', reason: '', reference_number: '' }
   const [resForm, setResForm] = useState(EMPTY_RES)
-  const [existingResolutionId, setExistingResolutionId] = useState(null)
   const [productSearches, setProductSearches] = useState(() => {
     if (editingTicket) {
       const prods = editingTicket.products?.length ? editingTicket.products : [{ ...EMPTY_PRODUCT }]
@@ -130,7 +411,6 @@ export function TicketForm({
     if (!editingTicket?.id) return
     db.ticketResolutions.get(editingTicket.id).then((res) => {
       if (res) {
-        setExistingResolutionId(res.id)
         setResForm({
           type: res.type,
           replacement_product_name: res.replacement_product_name || '',
@@ -142,7 +422,7 @@ export function TicketForm({
         })
       }
     }).catch(() => {})
-  }, [editingTicket?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [editingTicket?.id])
 
   useEffect(() => {
     const handler = (e) => {
@@ -241,18 +521,7 @@ export function TicketForm({
     setUploading(true)
     try {
       const rmaNumber = editingTicket ? editingTicket.rma_number : generateRmaNumber(tickets)
-
-      const newAttachments = []
-      for (const file of pendingFiles) {
-        try {
-          const uploaded = await storage.uploadFile(file, rmaNumber)
-          newAttachments.push(uploaded)
-        } catch (err) {
-          captureException(err, { page: 'RMATickets', context: 'uploadAttachment' })
-          toast.error(t('ticketForm.failedUploadFile', { name: file.name }))
-        }
-      }
-
+      const newAttachments = await uploadPendingAttachments(pendingFiles, rmaNumber, t)
       const allAttachments = [...(formData.attachments || []), ...newAttachments]
 
       // Auto-set due date from SLA policy when creating a new ticket
@@ -288,7 +557,6 @@ export function TicketForm({
           ...p,
           status_date: p.status_date || new Date().toISOString(),
         })),
-        // Shipping
         carrier: formData.carrier || null,
         tracking_number: formData.tracking_number || null,
         shipping_label_url: formData.shipping_label_url || null,
@@ -300,301 +568,41 @@ export function TicketForm({
       let newTicket = null
       if (editingTicket) {
         await db.rmaTickets.update(editingTicket.id, ticketData)
-        // Activity log — one entry per changed dimension
-        const logAct = (type, details) =>
-          db.ticketActivity.create({ ticket_id: editingTicket.id, action_type: type, details, user_email: userEmail, created_date: new Date().toISOString() }).catch(() => {})
-        if (ticketData.ticket_status !== editingTicket.ticket_status)
-          logAct('status_changed', `${editingTicket.ticket_status} → ${ticketData.ticket_status}`)
-        if (ticketData.priority !== editingTicket.priority)
-          logAct('priority_changed', `${editingTicket.priority} → ${ticketData.priority}`)
-        if (ticketData.assigned_technician !== editingTicket.assigned_technician)
-          logAct('technician_assigned', `Assigned to ${ticketData.assigned_technician || 'Unassigned'}`)
-        if (newAttachments.length > 0)
-          logAct('attachment_added', `Added ${newAttachments.length} file(s): ${newAttachments.map((a) => a.name).join(', ')}`)
-        if (
-          ticketData.ticket_status === editingTicket.ticket_status &&
-          ticketData.priority === editingTicket.priority &&
-          ticketData.assigned_technician === editingTicket.assigned_technician &&
-          newAttachments.length === 0
-        )
-          logAct('ticket_updated', 'Updated ticket details')
-        db.userActivity
-          .create(
-            userEmail,
-            'ticket_updated',
-            `Updated ticket ${editingTicket.rma_number || editingTicket.id}`
-          )
-          .catch(() => {})
-        const techEmails =
-          ticketData.assigned_technician && ticketData.assigned_technician !== userEmail
-            ? [ticketData.assigned_technician]
-            : []
-        db.notifications
-          .create({
-            type: 'ticket_updated',
-            title: 'Ticket Updated',
-            message: `Ticket ${editingTicket.rma_number} for ${ticketData.customer_name} was updated by ${userEmail}`,
-            entityType: 'ticket',
-            entityId: editingTicket.id,
-            entityRef: editingTicket.rma_number,
-            createdBy: userEmail,
-            targetRoles: ['admin', 'super_admin'],
-            targetEmails: techEmails,
-          })
-          .catch(() => {})
-        // Specific: technician assignment changed
-        if (
-          ticketData.assigned_technician &&
-          ticketData.assigned_technician !== editingTicket.assigned_technician
-        ) {
-          db.notifications
-            .create({
-              type: 'ticket_assigned',
-              title: 'Ticket Assigned',
-              message: `Ticket ${editingTicket.rma_number} was assigned to ${ticketData.assigned_technician}`,
-              entityType: 'ticket',
-              entityId: editingTicket.id,
-              entityRef: editingTicket.rma_number,
-              createdBy: userEmail,
-              targetRoles: ['admin', 'super_admin'],
-              targetEmails: [ticketData.assigned_technician],
-            })
-            .catch(() => {})
-        }
-        // Specific: status changed
-        if (ticketData.ticket_status !== editingTicket.ticket_status) {
-          const assigneeEmails =
-            editingTicket.assigned_technician && editingTicket.assigned_technician !== userEmail
-              ? [editingTicket.assigned_technician]
-              : []
-          db.notifications
-            .create({
-              type: 'ticket_status_changed',
-              title: 'Ticket Status Changed',
-              message: `Ticket ${editingTicket.rma_number} moved from "${editingTicket.ticket_status}" to "${ticketData.ticket_status}"`,
-              entityType: 'ticket',
-              entityId: editingTicket.id,
-              entityRef: editingTicket.rma_number,
-              createdBy: userEmail,
-              targetRoles: ['admin', 'super_admin'],
-              targetEmails: assigneeEmails,
-            })
-            .catch(() => {})
-        }
+        await logTicketChanges(editingTicket.id, editingTicket.rma_number, editingTicket, ticketData, newAttachments, userEmail)
+        dispatchUpdateNotifications(editingTicket, ticketData, userEmail)
+        fireUpdateEmails(editingTicket, ticketData, resolvedCustomerEmail, userEmail, t)
         toast.success(t('ticketForm.ticketUpdated'))
-        // Fire automation rules + webhook on update
-        db.automationRules
-          .evaluate('ticket_updated', { ...editingTicket, ...ticketData })
-          .catch(() => {})
-        db.webhooks
-          .dispatch('ticket_updated', {
-            id: editingTicket.id,
-            rma_number: editingTicket.rma_number,
-            ...ticketData,
-          })
-          .catch(() => {})
-        if (ticketData.ticket_status !== editingTicket.ticket_status) {
-          db.automationRules
-            .evaluate('ticket_status_changed', { ...editingTicket, ...ticketData })
-            .catch(() => {})
-          db.webhooks
-            .dispatch('ticket_status_changed', {
-              id: editingTicket.id,
-              rma_number: editingTicket.rma_number,
-              old_status: editingTicket.ticket_status,
-              new_status: ticketData.ticket_status,
-            })
-            .catch(() => {})
-        }
-        if (ticketData.assigned_technician !== editingTicket.assigned_technician) {
-          db.automationRules
-            .evaluate('ticket_assigned', { ...editingTicket, ...ticketData })
-            .catch(() => {})
-          db.webhooks
-            .dispatch('ticket_assigned', {
-              id: editingTicket.id,
-              rma_number: editingTicket.rma_number,
-              technician: ticketData.assigned_technician,
-            })
-            .catch(() => {})
-        }
-
-        // ── WhatsApp + email notification events ─────────────────────────
-        {
-          const updatedPayload = { ...editingTicket, ...ticketData, id: editingTicket.id }
-          const ts = new Date().toISOString()
-          const statusChanged = ticketData.ticket_status !== editingTicket.ticket_status
-          const assigneeChanged = ticketData.assigned_technician !== editingTicket.assigned_technician
-          const priorityChanged = ticketData.priority !== editingTicket.priority
-          const isClosed = ['Closed', 'Completed', 'Cancelled'].includes(ticketData.ticket_status)
-
-          if (assigneeChanged) {
-            notificationEventBus.emitAsync({ type: 'ticket.assigned', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })
-            if (ticketData.assigned_technician) {
-              notifications.sendEmail(ticketData.assigned_technician, 'ticket_assigned', {
-                recipient_name: ticketData.assigned_technician,
-                rma_number: editingTicket.rma_number,
-                customer_name: ticketData.customer_name,
-                priority: ticketData.priority,
-                due_date: ticketData.due_date || 'N/A',
-              }).catch((err) => console.error('[email] ticket_assigned:', err.message))
-            }
-          }
-          if (statusChanged && isClosed) {
-            notificationEventBus.emitAsync({ type: 'ticket.closed', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })
-          } else if (statusChanged) {
-            notificationEventBus.emitAsync({ type: 'ticket.updated', timestamp: ts, ticketId: editingTicket.id, ticket: updatedPayload, triggeredBy: userEmail })
-          }
-          // Email customer on any status change
-          if (statusChanged) {
-            if (!resolvedCustomerEmail) {
-              console.warn('[email] status change skipped — no customer email on ticket', editingTicket.id)
-            } else {
-              notifications.sendEmail(resolvedCustomerEmail, 'status_changed', {
-                recipient_name: ticketData.customer_name,
-                customer_name: ticketData.customer_name,
-                rma_number: editingTicket.rma_number,
-                old_status: editingTicket.ticket_status,
-                new_status: ticketData.ticket_status,
-                priority: ticketData.priority,
-                status: ticketData.ticket_status,
-                updated_by: userEmail,
-                update_time: new Date().toLocaleString(),
-              }).catch((err) => {
-                console.error('[email] status change failed:', err.message)
-                toast.error(t('ticketForm.emailNotifFailed', { error: err.message }), { duration: 6000 })
-              })
-            }
-          }
-          // Email customer on priority change
-          if (priorityChanged && resolvedCustomerEmail) {
-            notifications.sendEmail(resolvedCustomerEmail, 'priority_changed', {
-              recipient_name: ticketData.customer_name,
-              customer_name: ticketData.customer_name,
-              rma_number: editingTicket.rma_number,
-              old_priority: editingTicket.priority,
-              new_priority: ticketData.priority,
-            }).catch((err) => console.error('[email] priority_changed:', err.message))
-          }
-        }
       } else {
         newTicket = await db.rmaTickets.create({
           ...ticketData,
           created_by: userEmail,
           created_date: new Date().toISOString(),
         })
-        if (newTicket?.id) {
-          db.inventory
-            .createUnitsFromTicket(
-              newTicket.id,
-              newTicket.rma_number || rmaNumber,
-              ticketData.products
-            )
-            .catch((err) => {
-              captureException(err, { page: 'RMATickets', context: 'createInventoryUnit' })
-            })
-          const techEmails =
-            ticketData.assigned_technician && ticketData.assigned_technician !== userEmail
-              ? [ticketData.assigned_technician]
-              : []
-          db.notifications
-            .create({
-              type: 'ticket_created',
-              title: 'New RMA Ticket',
-              message: `Ticket ${rmaNumber} created for ${ticketData.customer_name}`,
-              entityType: 'ticket',
-              entityId: newTicket.id,
-              entityRef: rmaNumber,
-              createdBy: userEmail,
-              targetRoles: ['admin', 'super_admin'],
-              targetEmails: techEmails,
-            })
-            .catch(() => {})
-          // Fire automation rules + webhook on create
-          db.automationRules.evaluate('ticket_created', newTicket).catch(() => {})
-          db.webhooks
-            .dispatch('ticket_created', {
-              id: newTicket.id,
-              rma_number: rmaNumber,
-              customer_name: ticketData.customer_name,
-              priority: ticketData.priority,
-              status: ticketData.ticket_status,
-            })
-            .catch(() => {})
-          // WhatsApp notification — spread the saved DB row so all fields
-          // (incl. created_date) are present; ticketData alone lacks created_date
-          // which left {{created_date}} empty → Meta #131008 "required parameter missing".
-          notificationEventBus.emitAsync({
-            type: 'ticket.created',
-            timestamp: new Date().toISOString(),
-            ticketId: newTicket.id,
-            ticket: {
-              ...ticketData,
-              ...newTicket,
-              id: newTicket.id,
-              rma_number: newTicket.rma_number || rmaNumber,
-              created_date: newTicket.created_date || new Date().toISOString(),
-            },
-            triggeredBy: userEmail,
-          })
-          // Email assigned technician (if different from the creator)
-          if (ticketData.assigned_technician && ticketData.assigned_technician !== userEmail) {
-            notifications.sendEmail(ticketData.assigned_technician, 'ticket_assigned', {
-              recipient_name: ticketData.assigned_technician,
-              rma_number: newTicket.rma_number || rmaNumber,
-              customer_name: ticketData.customer_name,
-              priority: ticketData.priority,
-              due_date: ticketData.due_date || 'N/A',
-            }).catch((err) => console.error('[email] ticket_assigned (create):', err.message))
-          }
-          // Email notification to customer
-          if (resolvedCustomerEmail) {
-            const productDetails = (ticketData.products || [])
-              .filter((p) => p.product_name)
-              .map((p) => `${p.product_name}${p.serial_number ? ` (SN: ${p.serial_number})` : ''}`)
-              .join('\n') || 'N/A'
-            notifications.sendEmail(resolvedCustomerEmail, 'ticket_created', {
-              recipient_name: ticketData.customer_name,
-              customer_name: ticketData.customer_name,
-              rma_number: newTicket.rma_number || rmaNumber,
-              priority: ticketData.priority,
-              status: ticketData.ticket_status,
-              issue_description: ticketData.general_description || '',
-              product_details: productDetails,
-            }).catch((err) => console.error('[email] ticket created:', err.message))
-          }
-        }
+        dispatchCreateSideEffects(newTicket, ticketData, rmaNumber, userEmail, resolvedCustomerEmail)
         db.userActivity
-          .create(
-            userEmail,
-            'ticket_created',
-            `Created ticket ${rmaNumber} for ${ticketData.customer_name}`
-          )
+          .create(userEmail, 'ticket_created', `Created ticket ${rmaNumber} for ${ticketData.customer_name}`)
           .catch(() => {})
         if (newTicket?.id)
-          db.ticketActivity.create({
-            ticket_id: newTicket.id,
-            action_type: 'ticket_created',
-            details: `Created for ${ticketData.customer_name} · ${ticketData.priority} priority · ${ticketData.ticket_status}`,
-            user_email: userEmail,
-            created_date: new Date().toISOString(),
-          }).catch(() => {})
+          db.ticketActivity.log(newTicket.id, 'ticket_created', `Created for ${ticketData.customer_name} · ${ticketData.priority} priority · ${ticketData.ticket_status}`, userEmail)
         toast.success(t('ticketForm.ticketCreated'))
       }
 
       // Save resolution if type is selected
       const savedTicketId = editingTicket?.id || newTicket?.id
       if (savedTicketId && resForm.type) {
-        db.ticketResolutions.upsert(savedTicketId, {
-          type: resForm.type,
-          replacement_product_name: resForm.replacement_product_name?.trim() || null,
-          replacement_serial: resForm.replacement_serial?.trim() || null,
-          amount: resForm.amount !== '' ? parseFloat(resForm.amount) : null,
-          currency: resForm.currency || 'USD',
-          reason: resForm.reason?.trim() || null,
-          reference_number: resForm.reference_number?.trim() || null,
-          created_by: userEmail,
-        }).catch(() => {})
+        db.ticketResolutions
+          .upsert(savedTicketId, {
+            type: resForm.type,
+            replacement_product_name: resForm.replacement_product_name?.trim() || null,
+            replacement_serial: resForm.replacement_serial?.trim() || null,
+            amount: resForm.amount !== '' ? parseFloat(resForm.amount) : null,
+            currency: resForm.currency || 'USD',
+            reason: resForm.reason?.trim() || null,
+            reference_number: resForm.reference_number?.trim() || null,
+            created_by: userEmail,
+          })
+          .catch(() => {})
+        db.ticketActivity.log(savedTicketId, 'resolution_saved', `Resolution: ${resForm.type}`, userEmail)
       }
 
       queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
@@ -613,7 +621,6 @@ export function TicketForm({
     <Modal
       open={true}
       onClose={onClose}
-      title={editingTicket ? 'Edit RMA Ticket' : 'Create New RMA Ticket'}
       className="max-w-4xl"
       noPadding
       hideHeader
@@ -661,7 +668,7 @@ export function TicketForm({
             {/* Row 1: Customer + Priority */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={lbl}>
+                <label className={labelClass}>
                   {t('ticketForm.customerName')} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative customer-dropdown">
@@ -672,12 +679,19 @@ export function TicketForm({
                       setCustomerSearch(e.target.value)
                       setFormData({ ...formData, customer_name: e.target.value })
                       setShowCustomerDropdown(true)
+                      if (e.target.value.trim()) setCustomerNameError('')
+                    }}
+                    onBlur={() => {
+                      if (!formData.customer_name.trim()) setCustomerNameError(t('ticketForm.customerNameRequired'))
                     }}
                     onFocus={() => setShowCustomerDropdown(true)}
                     placeholder={t('ticketForm.searchCustomer')}
-                    className={inp}
+                    className={inputClass}
                     required
                   />
+                  {customerNameError && (
+                    <p className="mt-1 text-xs text-red-500">{customerNameError}</p>
+                  )}
                   {showCustomerDropdown && filteredCustomersList.length > 0 && (
                     /* P-2: virtualised list — only visible rows rendered in DOM */
                     <div
@@ -744,13 +758,13 @@ export function TicketForm({
                 </div>
               </div>
               <div>
-                <label className={lbl}>
+                <label className={labelClass}>
                   {t('ticketForm.priority')} <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.priority}
                   onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  className={inp}
+                  className={inputClass}
                 >
                   <option value="Low">Low</option>
                   <option value="Medium">Medium</option>
@@ -763,11 +777,11 @@ export function TicketForm({
             {/* Row 2: Status + Assigned To + Due Date */}
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className={lbl}>{t('ticketForm.ticketStatus')}</label>
+                <label className={labelClass}>{t('ticketForm.ticketStatus')}</label>
                 <select
                   value={formData.ticket_status}
                   onChange={(e) => setFormData({ ...formData, ticket_status: e.target.value })}
-                  className={inp}
+                  className={inputClass}
                 >
                   <option value="Open">Open</option>
                   <option value="In Progress">In Progress</option>
@@ -779,14 +793,14 @@ export function TicketForm({
                 </select>
               </div>
               <div>
-                <label className={lbl}>{t('ticketForm.assignedTo')}</label>
+                <label className={labelClass}>{t('ticketForm.assignedTo')}</label>
                 {userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN ? (
                   <select
                     value={formData.assigned_technician}
                     onChange={(e) =>
                       setFormData({ ...formData, assigned_technician: e.target.value })
                     }
-                    className={inp}
+                    className={inputClass}
                   >
                     {users.map((u) => (
                       <option key={u.user_email} value={u.user_email}>
@@ -795,13 +809,13 @@ export function TicketForm({
                     ))}
                   </select>
                 ) : (
-                  <div className={`${inp} bg-gray-50 text-gray-600 cursor-not-allowed`}>
+                  <div className={`${inputClass} bg-gray-50 text-gray-600 cursor-not-allowed`}>
                     {formData.assigned_technician || userEmail || '—'}
                   </div>
                 )}
               </div>
               <div>
-                <label className={lbl}>
+                <label className={labelClass}>
                   {t('ticketForm.dueDate')}{' '}
                   <span className="text-xs text-gray-500 font-normal ml-1">{t('ticketForm.dueDateHint')}</span>
                 </label>
@@ -809,7 +823,7 @@ export function TicketForm({
                   type="date"
                   value={formData.due_date}
                   onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                  className={inp}
+                  className={inputClass}
                 />
               </div>
             </div>
@@ -846,7 +860,7 @@ export function TicketForm({
                   <div className="grid grid-cols-2 gap-3">
                     {/* Product name combobox */}
                     <div>
-                      <label className={lbl}>
+                      <label className={labelClass}>
                         {t('ticketForm.productName')} <span className="text-red-500">*</span>
                       </label>
                       <div className="relative product-dropdown">
@@ -904,7 +918,7 @@ export function TicketForm({
                       </div>
                     </div>
                     <div>
-                      <label className={lbl}>
+                      <label className={labelClass}>
                         {t('ticketForm.serialNumber')} <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
@@ -939,7 +953,7 @@ export function TicketForm({
                       </div>
                     </div>
                     <div>
-                      <label className={lbl}>{t('ticketForm.productStatus')}</label>
+                      <label className={labelClass}>{t('ticketForm.productStatus')}</label>
                       <select
                         value={product.product_status}
                         onChange={(e) => updateProduct(idx, 'product_status', e.target.value)}
@@ -954,7 +968,7 @@ export function TicketForm({
                       </select>
                     </div>
                     <div>
-                      <label className={lbl}>{t('ticketForm.warrantyStatus')}</label>
+                      <label className={labelClass}>{t('ticketForm.warrantyStatus')}</label>
                       <select
                         value={product.warranty_status}
                         onChange={(e) => updateProduct(idx, 'warranty_status', e.target.value)}
@@ -967,7 +981,7 @@ export function TicketForm({
                     </div>
                   </div>
                   <div className="mt-3">
-                    <label className={lbl}>
+                    <label className={labelClass}>
                       {t('ticketForm.issueDescription')} <span className="text-red-500">*</span>
                     </label>
                     <textarea
@@ -984,28 +998,28 @@ export function TicketForm({
 
             {/* General RMA Description */}
             <div>
-              <label className={lbl}>{t('ticketForm.generalDescription')}</label>
+              <label className={labelClass}>{t('ticketForm.generalDescription')}</label>
               <textarea
                 value={formData.general_description}
                 onChange={(e) =>
                   setFormData({ ...formData, general_description: e.target.value })
                 }
                 placeholder={t('ticketForm.generalDescPlaceholder')}
-                className={inp}
+                className={inputClass}
                 rows={3}
               />
             </div>
 
             {/* Accessories Received */}
             <div>
-              <label className={lbl}>{t('ticketForm.accessories')}</label>
+              <label className={labelClass}>{t('ticketForm.accessories')}</label>
               <textarea
                 value={formData.accessories_received}
                 onChange={(e) =>
                   setFormData({ ...formData, accessories_received: e.target.value })
                 }
                 placeholder={t('ticketForm.accessoriesPlaceholder')}
-                className={inp}
+                className={inputClass}
                 rows={3}
               />
             </div>
@@ -1017,7 +1031,7 @@ export function TicketForm({
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={lbl}>{t('ticketForm.carrier')}</label>
+                  <label className={labelClass}>{t('ticketForm.carrier')}</label>
                   <select
                     value={formData.carrier}
                     onChange={(e) => setFormData((f) => ({ ...f, carrier: e.target.value }))}
@@ -1031,20 +1045,20 @@ export function TicketForm({
                   </select>
                 </div>
                 <div>
-                  <label className={lbl}>{t('ticketForm.trackingNumber')}</label>
+                  <label className={labelClass}>{t('ticketForm.trackingNumber')}</label>
                   <input
                     type="text"
                     value={formData.tracking_number}
                     onChange={(e) =>
                       setFormData((f) => ({ ...f, tracking_number: e.target.value }))
                     }
-                    className={inp}
+                    className={inputClass}
                     placeholder="e.g. 1Z999AA10123456784"
                   />
                 </div>
               </div>
               <div>
-                <label className={lbl}>
+                <label className={labelClass}>
                   {t('ticketForm.shippingLabel')}{' '}
                   <span className="text-gray-500 font-normal">({t('common.optional')})</span>
                 </label>
@@ -1054,7 +1068,7 @@ export function TicketForm({
                   onChange={(e) =>
                     setFormData((f) => ({ ...f, shipping_label_url: e.target.value }))
                   }
-                  className={inp}
+                  className={inputClass}
                   placeholder="https://..."
                 />
               </div>
@@ -1085,7 +1099,7 @@ export function TicketForm({
 
             {/* Attachments */}
             <div>
-              <label className={lbl}>
+              <label className={labelClass}>
                 {t('ticketForm.attachments')}
                 <span className="text-xs text-gray-500 font-normal ml-2">
                   ({(formData.attachments?.length || 0) + pendingFiles.length}/10)
@@ -1252,7 +1266,7 @@ export function TicketForm({
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">{t('ticketForm.resolution')} <span className="text-gray-400 font-normal normal-case">({t('common.optional')})</span></h3>
             <div className="grid grid-cols-1 gap-3">
               <div>
-                <label className={lbl}>{t('ticketForm.resolutionType')}</label>
+                <label className={labelClass}>{t('ticketForm.resolutionType')}</label>
                 <select
                   value={resForm.type}
                   onChange={(e) => setResForm(f => ({ ...f, type: e.target.value }))}
@@ -1269,7 +1283,7 @@ export function TicketForm({
               {(resForm.type === 'replacement' || resForm.type === 'exchange') && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className={lbl}>{t('ticketForm.replacementProduct')}</label>
+                    <label className={labelClass}>{t('ticketForm.replacementProduct')}</label>
                     <ProductSearchInput
                       value={resForm.replacement_product_name}
                       onChange={(v) => setResForm(f => ({ ...f, replacement_product_name: v }))}
@@ -1279,7 +1293,7 @@ export function TicketForm({
                     />
                   </div>
                   <div>
-                    <label className={lbl}>{t('ticketForm.replacementSerial')}</label>
+                    <label className={labelClass}>{t('ticketForm.replacementSerial')}</label>
                     <input
                       value={resForm.replacement_serial}
                       onChange={(e) => setResForm(f => ({ ...f, replacement_serial: e.target.value }))}
@@ -1293,7 +1307,7 @@ export function TicketForm({
               {(resForm.type === 'credit_note' || resForm.type === 'refund') && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className={lbl}>{t('ticketForm.amount')}</label>
+                    <label className={labelClass}>{t('ticketForm.amount')}</label>
                     <div className="flex gap-2">
                       <select
                         value={resForm.currency}
@@ -1312,7 +1326,7 @@ export function TicketForm({
                     </div>
                   </div>
                   <div>
-                    <label className={lbl}>{t('ticketForm.referenceNumber')}</label>
+                    <label className={labelClass}>{t('ticketForm.referenceNumber')}</label>
                     <input
                       value={resForm.reference_number}
                       onChange={(e) => setResForm(f => ({ ...f, reference_number: e.target.value }))}
@@ -1325,7 +1339,7 @@ export function TicketForm({
 
               {resForm.type && (
                 <div>
-                  <label className={lbl}>{t('ticketForm.reason')}</label>
+                  <label className={labelClass}>{t('ticketForm.reason')}</label>
                   <textarea
                     rows={2}
                     value={resForm.reason}

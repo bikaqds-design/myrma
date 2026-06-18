@@ -14,6 +14,7 @@ export function UsersTab({
   onUserControl,
   onViewActivity,
   onResetPassword,
+  onPreview,
   openMenuId,
   setOpenMenuId,
 }) {
@@ -27,6 +28,10 @@ export function UsersTab({
   const hasCustomPerms = (u) =>
     !!u.permissions && typeof u.permissions === 'object' && Object.keys(u.permissions).length > 0
   const roleOptions = ASSIGNABLE_ROLES.filter((r) => !r.superAdminOnly || isSuperAdmin)
+  // FT-09: only non-admin targets can be previewed — previewing an admin/super_admin
+  // would let the acting admin grant themselves elevated UI access, defeating the point.
+  const canPreview = (u) =>
+    u.user_email !== currentUserEmail && u.role !== ROLES.ADMIN && u.role !== ROLES.SUPER_ADMIN
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
@@ -208,6 +213,36 @@ export function UsersTab({
                       </svg>
                       {t('accountSettings.recentActivity')}
                     </button>
+                    {canPreview(user) && (
+                      <button
+                        onClick={() => {
+                          onPreview(user)
+                          setOpenMenuId(null)
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
+                      >
+                        <svg
+                          className="w-4 h-4 text-gray-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
+                        </svg>
+                        {t('userManagement.previewAsUser')}
+                      </button>
+                    )}
                   </div>
                 )}
               </td>

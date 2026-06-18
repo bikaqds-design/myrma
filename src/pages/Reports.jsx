@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import i18next from 'i18next'
 import { useURLTab } from '../hooks/useURLTab'
 import { useQuery } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
@@ -1059,7 +1060,7 @@ export default function Reports({
   useEffect(() => {
     if (isError) {
       captureException(error, { page: 'Reports', context: 'loadData' })
-      toast.error(t('reports.errorLoad'))
+      toast.error(i18next.t('reports.errorLoad'))
     }
   }, [isError, error])
 

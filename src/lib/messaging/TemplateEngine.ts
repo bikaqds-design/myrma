@@ -91,8 +91,4 @@ export class TemplateEngine {
     return out
   }
 
-  /** Build the numbered parameter array WhatsApp Cloud API expects. */
-  static toWhatsAppParams(variables: Record<string, string>): Array<{ type: 'text'; text: string }> {
-    return Object.values(variables).map((v) => ({ type: 'text' as const, text: v ?? '' }))
-  }
 }

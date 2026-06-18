@@ -2,8 +2,6 @@
 
 > A full-stack, enterprise-grade **Return Merchandise Authorization (RMA)** management platform built for warehouse operations, technical teams, and customer service staff.
 
-[![CI](https://github.com/your-org/myrma-app/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/myrma-app/actions/workflows/ci.yml)
-
 ---
 
 ## Overview
@@ -75,7 +73,8 @@ myRMA provides end-to-end lifecycle management for product returns, warranty cla
 ```bash
 git clone https://github.com/your-org/myrma-app.git
 cd myrma-app
-npm install --legacy-peer-deps
+npm install
+# (legacy-peer-deps is set in .npmrc — no flag needed)
 ```
 
 ### 2. Configure environment
@@ -159,7 +158,7 @@ npm run dev
 npm run dev                    # Vite dev server (hot reload, port 5173)
 npm run build                  # Production build → dist/
 npm run preview                # Preview production build locally
-npm test                       # Vitest unit tests (80 tests, ~1s)
+npm test                       # Vitest unit tests (80 tests, ~3.5s)
 npm run test:watch             # Vitest in watch mode
 npm run test:coverage          # Coverage report (HTML + text)
 npm run lint                   # ESLint check
@@ -188,11 +187,12 @@ myrma-app/
 │   │       ├── tickets.ts                    # RMA ticket CRUD + public tracker lookup
 │   │       ├── customers.ts                  # Customer CRUD
 │   │       ├── catalog.ts                    # Product catalog CRUD
-│   │       ├── inventory.js                  # Inventory CRUD
-│   │       ├── users.js                      # User role management
-│   │       ├── notifications.js              # Notification table ops
-│   │       ├── system.js                     # System config (rma_config table)
-│   │       └── audit.js                      # Audit log reads
+│   │       ├── inventory.ts                  # Inventory CRUD
+│   │       ├── users.ts                      # User role management
+│   │       ├── notifications.ts              # Notification table ops
+│   │       ├── system.ts                     # System config (rma_config table)
+│   │       ├── audit.ts                      # Audit log reads
+│   │       └── whatsappNotifications.ts      # WhatsApp templates, notification logs, settings, queue
 │   ├── components/
 │   │   ├── ui.jsx                            # Shared component library (Button, Input, Modal, Badge…)
 │   │   ├── ErrorBoundary.jsx                 # App-level error boundary → Sentry
@@ -231,12 +231,15 @@ myrma-app/
 │   ├── functions/                            # Supabase Edge Functions
 │   │   ├── admin-reset-password/             # Password reset + user creation (create-if-missing)
 │   │   ├── public-track/                     # Rate-limited public RMA lookup
-│   │   └── send-email/                       # Email dispatch
+│   │   ├── send-email/                       # Email dispatch
+│   │   ├── send-whatsapp/                    # WhatsApp message dispatch via Meta Cloud API
+│   │   ├── notification-worker/              # Queue processor with exponential-backoff retry
+│   │   └── whatsapp-webhook/                 # Meta delivery-status callbacks
 │   └── migrations/                           # Database migrations (run in date order)
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                            # CI: test → lint:ci → build
-├── AUDIT_LOG.md                              # Engineering audit history + scorecard
+├── docs/archive/AUDIT_LOG.md                 # Engineering audit history + scorecard
 ├── CLAUDE.md                                 # AI agent instructions
 ├── CONSTITUTION.md                           # Engineering constitution (rules + standards)
 └── vite.config.js                            # Vite + PWA configuration
@@ -250,7 +253,7 @@ myrma-app/
 Page Component
   → import { db, auth, storage } from '../api/supabaseClient.js'
   → db.rmaTickets.list() / db.customers.get(id) / etc.
-  → src/api/db/<domain>.js
+  → src/api/db/<domain>.ts
   → supabase client (src/api/client.js)
   → Supabase PostgreSQL (RLS enforced)
 ```
@@ -329,7 +332,7 @@ npm test
 | `permissions.test.js` | `canDo()` across all role/permission combinations |
 | `schemas.test.js` | Zod schemas with valid + invalid inputs |
 
-Tests run in under 1 second via Vitest with jsdom environment.
+Tests run in under 5 seconds via Vitest with jsdom environment (serialised — `fileParallelism: false`).
 
 ---
 
@@ -338,7 +341,7 @@ Tests run in under 1 second via Vitest with jsdom environment.
 GitHub Actions runs automatically on every push and PR to `main`:
 
 ```
-1. npm test              → all 80 tests must pass
+1. npm test              → 80 tests must pass
 2. npm run lint:ci       → zero ESLint warnings allowed
 3. npm run build         → production build must succeed
 ```
@@ -416,7 +419,8 @@ security(storage): restrict anonymous upload MIME types
 |------|---------|
 | [`CLAUDE.md`](CLAUDE.md) | AI agent instructions — architecture patterns, gotchas, and rules |
 | [`CONSTITUTION.md`](CONSTITUTION.md) | Engineering constitution — 18 sections of laws, standards, and enforcement |
-| [`AUDIT_LOG.md`](AUDIT_LOG.md) | Full engineering audit history — all findings, fixes, and project scorecard |
+| [`docs/archive/AUDIT_LOG.md`](docs/archive/AUDIT_LOG.md) | Full engineering audit history — all findings, fixes, and project scorecard |
+| [`docs/archive/`](docs/archive/) | Historical/dated reports: old test snapshots, the GUARD-skill audit, competitive analysis, past system audits |
 
 ---
 

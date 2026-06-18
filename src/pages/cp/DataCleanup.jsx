@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import i18next from 'i18next'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../../lib/sentry'
@@ -14,23 +15,23 @@ export default function DataCleanup() {
   const [cancelledDays, setCancelledDays] = useState(30)
   const [preview, setPreview] = useState(null)
 
-  useEffect(() => {
-    load()
-  }, [])
-
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [t, c] = await Promise.all([db.rmaTickets.list(), db.customers.list()])
-      setTickets(t)
-      setCustomers(c)
+      const [tickets, customers] = await Promise.all([db.rmaTickets.list(), db.customers.list()])
+      setTickets(tickets)
+      setCustomers(customers)
     } catch (err) {
       captureException(err)
-      toast.error(t('cp.dataCleanup.loadFailed'))
+      toast.error(i18next.t('cp.dataCleanup.loadFailed'))
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   const cutoff = (days) => {
     const d = new Date()

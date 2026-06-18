@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { db, storage, branding as brandingAPI } from '../api/supabaseClient'
 import { safeStorage } from '../lib/safeStorage'
 
@@ -106,6 +107,7 @@ function fileSize(bytes) {
 }
 
 export default function RMATracker() {
+  const { t } = useTranslation()
   const [branding, setBranding] = useState(null)
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
@@ -307,6 +309,9 @@ export default function RMATracker() {
           <p className="text-gray-500">
             Enter your RMA number to check the current status and communicate with our team.
           </p>
+          <a href="/kb" className="inline-block text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+            {t('kb.needHelpLink')}
+          </a>
         </div>
 
         <form

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import i18next from 'i18next'
 import { useQuery } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -20,7 +21,7 @@ export default function AuditLog() {
   useEffect(() => {
     if (isError) {
       captureException(error)
-      toast.error(t('cp.auditLog.loadFailed'))
+      toast.error(i18next.t('cp.auditLog.loadFailed'))
     }
   }, [isError, error])
 

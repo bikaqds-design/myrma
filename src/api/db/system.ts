@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import type { TableResult } from './types.js'
 import { auditInsert, auditFlushQueue } from './audit.js'
 import { PRIORITY, CONFIG_KEY, AUTOMATION_ACTION } from '../../lib/constants.js'
 
@@ -83,7 +84,7 @@ export interface AutomationRule {
 // ── Announcements ─────────────────────────────────────────────────────────────
 
 export const announcements = {
-  async list(): Promise<{ missing: boolean; data: AnnouncementRow[] }> {
+  async list(): Promise<TableResult<AnnouncementRow[]>> {
     try {
       const { data, error } = await supabase
         .from('announcements')
@@ -142,7 +143,7 @@ export const announcements = {
 // ── RMA Config ────────────────────────────────────────────────────────────────
 
 export const rmaConfig = {
-  async getAll(): Promise<{ missing: boolean; data: RmaConfigRow[] }> {
+  async getAll(): Promise<TableResult<RmaConfigRow[]>> {
     try {
       const { data, error } = await supabase.from('rma_config').select('*')
       if (error) {
@@ -175,7 +176,7 @@ export const rmaConfig = {
 // ── Custom Fields ─────────────────────────────────────────────────────────────
 
 export const customFields = {
-  async list(): Promise<{ missing: boolean; data: CustomFieldRow[] }> {
+  async list(): Promise<TableResult<CustomFieldRow[]>> {
     try {
       const { data, error } = await supabase
         .from('custom_field_definitions')
@@ -213,7 +214,7 @@ export const customFields = {
 // ── Webhooks ──────────────────────────────────────────────────────────────────
 
 export const webhooks = {
-  async list(): Promise<{ missing: boolean; data: WebhookRow[] }> {
+  async list(): Promise<TableResult<WebhookRow[]>> {
     try {
       const { data, error } = await supabase
         .from('webhooks')
