@@ -85,6 +85,15 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
     parts: { view: true, create: true, edit: true, delete: false, adjust_stock: true },
     calendar: { view: true },
     reports: { view: true, export: true },
+    // RLS: manager_or_above() sees/edits all leads/deals/activities/contacts
+    // (matching contacts_update + leads/deals/activities's composite policies).
+    // pipelines write is admin-only at the RLS layer (Step 3 migration) — manager
+    // is read-only here, same as every other manager section never getting delete.
+    leads: { view: true, create: true, edit: true, delete: false },
+    deals: { view: true, create: true, edit: true, delete: false },
+    activities: { view: true, create: true, edit: true, delete: false },
+    contacts: { view: true, create: true, edit: true, delete: false },
+    pipelines: { view: true },
   },
   [ROLES.TECHNICIAN]: {
     products: {
@@ -241,6 +250,36 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
     parts: { view: true, create: false, edit: false, delete: false },
     calendar: { view: true },
     reports: { view: false, export: false },
+  },
+  // sales_rep: CRM-focused role, RLS-scoped to "own" rows on leads/deals/
+  // activities (see 20260621/22/23_crm_*.sql), read-only on customers except
+  // their own assigned accounts (sales_rep_update_assigned policy), and no
+  // access to RMA-internal sections (rma_tickets/inventory/parts) — those
+  // sections are omitted entirely rather than set to false everywhere,
+  // since canDo() already returns false for a missing section.
+  [ROLES.SALES_REP]: {
+    leads: { view: true, create: true, edit: true, delete: false },
+    deals: { view: true, create: true, edit: true, delete: false },
+    activities: { view: true, create: true, edit: true, delete: false },
+    // contacts RLS is manager_insert/manager_update only — sales_rep is
+    // read-only here, matching the actual DB grant (Step 2 migration).
+    contacts: { view: true, create: false, edit: false, delete: false },
+    // pipelines write is admin-only at the RLS layer (Step 3 migration).
+    pipelines: { view: true },
+    customers: {
+      view: true,
+      create: false,
+      edit: true,
+      delete: false,
+      export: false,
+      import: false,
+      view_history: true,
+    },
+    // invoices INSERT requires manager_or_above() at the RLS layer (existing,
+    // unchanged by this CRM migration set) — create stays false here so the
+    // UI never offers an action that would fail at the RLS layer. Revisit if
+    // sales_rep invoice creation is wanted later (needs its own RLS change).
+    invoices: { view: true, create: false, edit: false, delete: false },
   },
 }
 

@@ -1,0 +1,96 @@
+import { supabase } from '../client.js'
+
+// ── Row types ─────────────────────────────────────────────────────────────────
+
+export interface LeadRow {
+  id: string
+  full_name: string
+  company_name: string | null
+  phone: string | null
+  email: string | null
+  source: string
+  status: string
+  assigned_rep: string | null
+  notes: string | null
+  converted_at: string | null
+  converted_customer_id: string | null
+  converted_deal_id: string | null
+  created_at: string
+  created_by: string | null
+  updated_at: string | null
+}
+
+// ── Leads ─────────────────────────────────────────────────────────────────────
+// Once converted_at is set, a lead is immutable except for notes — convert()
+// is the only path that sets the converted_* fields. See data-model.md.
+
+export const leads = {
+  async list(filters?: { status?: string; assignedRep?: string }): Promise<LeadRow[]> {
+    let query = supabase.from('leads').select('*').order('created_at', { ascending: false })
+    if (filters?.status) query = query.eq('status', filters.status)
+    if (filters?.assignedRep) query = query.eq('assigned_rep', filters.assignedRep)
+    const { data, error } = await query
+    if (error) throw error
+    return data || []
+  },
+  async get(id: string): Promise<LeadRow> {
+    const { data, error } = await supabase.from('leads').select('*').eq('id', id).single()
+    if (error) throw error
+    return data
+  },
+  async create(
+    lead: Omit<
+      LeadRow,
+      'id' | 'created_at' | 'converted_at' | 'converted_customer_id' | 'converted_deal_id'
+    >
+  ): Promise<LeadRow> {
+    const { data, error } = await supabase.from('leads').insert([lead]).select()
+    if (error) throw error
+    return data[0]
+  },
+  async update(id: string, lead: Partial<LeadRow>): Promise<LeadRow> {
+    const { data: existing, error: fetchError } = await supabase
+      .from('leads')
+      .select('converted_at')
+      .eq('id', id)
+      .single()
+    if (fetchError) throw fetchError
+    if (existing.converted_at) {
+      const touchesOtherFields = Object.keys(lead).some((key) => key !== 'notes')
+      if (touchesOtherFields) {
+        throw new Error('Converted leads are immutable except for notes')
+      }
+    }
+    const { data, error } = await supabase.from('leads').update(lead).eq('id', id).select()
+    if (error) throw error
+    return data[0]
+  },
+  /**
+   * Atomic conversion — calls the crm_convert_lead SECURITY DEFINER RPC
+   * (supabase/migrations/20260626_crm_leads_convert_rpc.sql). See research.md
+   * §1 for why this must be one DB transaction, not a client-side sequence.
+   */
+  async convert(
+    leadId: string,
+    dealInput: { title: string; pipelineId: string; value?: number },
+    existingCustomerId?: string
+  ): Promise<{ customer: { id: string }; deal: { id: string } }> {
+    const { data, error } = await supabase.rpc('crm_convert_lead', {
+      p_lead_id: leadId,
+      p_deal_title: dealInput.title,
+      p_pipeline_id: dealInput.pipelineId,
+      p_deal_value: dealInput.value ?? null,
+      p_existing_customer_id: existingCustomerId ?? null,
+    })
+    if (error) {
+      if (error.code === 'PGRST202')
+        throw new Error(
+          'crm_convert_lead RPC not found. Run supabase/migrations/20260626_crm_leads_convert_rpc.sql first.'
+        )
+      throw error
+    }
+    const row = data?.[0]
+    if (!row) throw new Error('Lead conversion did not return a result')
+    return { customer: { id: row.customer_id }, deal: { id: row.deal_id } }
+  },
+}

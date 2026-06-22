@@ -1,6 +1,6 @@
 # CRM Upgrade — Master Build Plan
 
-**Status**: Sprint 1 planned (SpecKit artifacts complete), not yet built. **Branch**: `002-crm-upgrade`. **Scope**: Full Phase 1 — all 5 sprints, transforming myRMA into a CRM-capable system per `CRM_UPGRADE_STUDY.md`.
+**Status**: Sprint 1 (Foundation) code-complete — all 9 migrations, constants, schemas, permissions, and 5 API modules built and passing `test`/`lint`/`build`. Manual QA (live `sales_rep` session, API smoke test, page regression check) still needed before Sprint 1 is fully done — see Step 14. Sprints 2–5 not started. **Branch**: `002-crm-upgrade`. **Scope**: Full Phase 1 — all 5 sprints, transforming myRMA into a CRM-capable system per `CRM_UPGRADE_STUDY.md`.
 
 **This is the single file to follow sprint-by-sprint.** Check items off as you go. Full technical detail (data model, API contracts, validation steps) lives in `specs/002-crm-upgrade/` — link out from here rather than duplicating, except where a build step needs to be self-contained enough to execute without cross-referencing.
 
@@ -27,116 +27,129 @@ These decisions are made and must not be revisited mid-build — changing them a
 
 **Goal**: Database, API modules, permissions, constants. Nothing user-facing yet.
 
-### Step 1 — Prerequisite migration (must run first)
+### Step 1 — Prerequisite migration (must run first) ✅ Applied & verified 2026-06-22
 
 **File**: `supabase/migrations/20260618_crm_add_sales_rep_role.sql`
 
-- [ ] `ALTER TABLE user_roles DROP CONSTRAINT chk_user_role` + re-add including `'sales_rep'`
-- [ ] `CREATE OR REPLACE FUNCTION public.rma_is_staff()` — add `'sales_rep'` to the role list
-- [ ] Do **NOT** add `sales_rep` to `public.rma_is_manager_or_above()` (would over-grant manager-tier write access schema-wide)
-- [ ] Add new policy `sales_rep_update_assigned` on `customers`: `FOR UPDATE TO authenticated USING (public.rma_user_role() = 'sales_rep' AND assigned_rep = auth.uid())`
+- [x] `ALTER TABLE user_roles DROP CONSTRAINT chk_user_role` + re-add including `'sales_rep'`
+- [x] `CREATE OR REPLACE FUNCTION public.rma_is_staff()` — add `'sales_rep'` to the role list
+- [x] Do **NOT** add `sales_rep` to `public.rma_is_manager_or_above()` (would over-grant manager-tier write access schema-wide)
+- [ ] ~~Add new policy `sales_rep_update_assigned` on `customers` here~~ — **moved to Step 7**: the policy references `customers.assigned_rep`, which doesn't exist until that migration adds the column. Postgres validates policy column references at `CREATE POLICY` time, so defining it here would fail outright.
 
-### Step 2 — Contacts table
+### Step 2 — Contacts table ✅ Applied & verified 2026-06-22
 
 **File**: `supabase/migrations/20260619_crm_contacts.sql`
-- [ ] `CREATE TABLE IF NOT EXISTS contacts` (see `specs/002-crm-upgrade/data-model.md` for full columns)
-- [ ] RLS: staff read, manager+/admin write, anon blocked
+- [x] `CREATE TABLE IF NOT EXISTS contacts` (see `specs/002-crm-upgrade/data-model.md` for full columns)
+- [x] RLS: staff read, manager+/admin write (sales_rep is read-only on contacts in Sprint 1 — confirmed with user, can be revisited if Sprint 2/3 needs rep-created contacts)
 
-### Step 3 — Pipelines table + seed data
+### Step 3 — Pipelines table + seed data ✅ Applied & verified 2026-06-22
 
 **File**: `supabase/migrations/20260620_crm_pipelines.sql`
-- [ ] `CREATE TABLE IF NOT EXISTS pipelines`
-- [ ] Seed **B2B Dealer**: New Lead (10%) → Contacted (20%) → Needs Assessment (40%) → Quote Sent (60%) → Negotiation (75%) → Won/Lost
-- [ ] Seed **B2C Retail**: New Inquiry (10%) → Contacted (30%) → Quote Sent (60%) → Won/Lost
-- [ ] RLS: staff read, admin write
+- [x] `CREATE TABLE IF NOT EXISTS pipelines`
+- [x] Seed **B2B Dealer**: New Lead (10%) → Contacted (20%) → Needs Assessment (40%) → Quote Sent (60%) → Negotiation (75%) → Won (100%)/Lost (0%) — 7 stages, names not yet confirmed with QDS sales team (see Architecture Lock)
+- [x] Seed **B2C Retail**: New Inquiry (10%) → Contacted (30%) → Quote Sent (60%) → Won (100%)/Lost (0%) — 5 stages
+- [x] RLS: staff read, admin write
 
-### Step 4 — Leads table
+### Step 4 — Leads table ✅ Applied & verified 2026-06-22
 
 **File**: `supabase/migrations/20260621_crm_leads.sql`
-- [ ] `CREATE TABLE IF NOT EXISTS leads`, indexes on `assigned_rep`, `status`, `source`, `created_at`
-- [ ] RLS: reps see own (`assigned_rep = auth.uid()`), manager+ see all
+- [x] `CREATE TABLE IF NOT EXISTS leads`, indexes on `assigned_rep`, `status`, `source`, `created_at`
+- [x] `chk_lead_source`/`chk_lead_status` CHECK constraints (DB-level enum enforcement, matching `chk_ticket_status` pattern)
+- [x] RLS: reps see own (`assigned_rep = auth.uid()`), manager+ see all — composite policy since sales_rep isn't in `rma_is_manager_or_above()`. Unassigned leads are manager+-only (confirmed with user — no self-claim pool in Sprint 1).
+- [x] `converted_deal_id` created as plain `uuid` (no FK yet — `deals` doesn't exist until Step 5; FK added there)
 
-### Step 5 — Deals table
+### Step 5 — Deals table ✅ Applied & verified 2026-06-22
 
 **File**: `supabase/migrations/20260622_crm_deals.sql`
-- [ ] `CREATE TABLE IF NOT EXISTS deals`, indexes on `customer_id`, `assigned_rep`, `status`, `expected_close_date`
-- [ ] RLS: reps see own, manager+ see all
+- [x] `CREATE TABLE IF NOT EXISTS deals`, indexes on `customer_id`, `assigned_rep`, `status`, `expected_close_date`
+- [x] `chk_deal_status`/`chk_deal_probability` CHECK constraints
+- [x] RLS: reps see own, manager+ see all (same composite pattern as leads)
+- [x] Closed the loop from Step 4: added `fk_leads_converted_deal` FK now that `deals` exists
 
-### Step 6 — Activities table
+### Step 6 — Activities table ✅ Applied & verified 2026-06-22
 
 **File**: `supabase/migrations/20260623_crm_activities.sql`
-- [ ] `CREATE TABLE IF NOT EXISTS activities`, indexes on `related_id`, `assigned_rep`, `due_date`, `completed_at`
-- [ ] RLS: reps see own, manager+ see all
+- [x] `CREATE TABLE IF NOT EXISTS activities`, indexes on `related_id`, `assigned_rep`, `due_date`, `completed_at`
+- [x] `chk_activity_related_type`/`chk_activity_type` CHECK constraints
+- [x] RLS: reps see own, manager+ see all (same composite pattern as leads/deals)
 
-### Step 7 — Extend customers table
+### Step 7 — Extend customers table ✅ Applied & verified 2026-06-22
 
 **File**: `supabase/migrations/20260624_crm_customers_extend.sql`
-- [ ] `ADD COLUMN IF NOT EXISTS lifecycle_stage text DEFAULT 'customer'`
-- [ ] `ADD COLUMN IF NOT EXISTS lead_source text`
-- [ ] `ADD COLUMN IF NOT EXISTS assigned_rep uuid REFERENCES auth.users(id)`
-- [ ] `ADD COLUMN IF NOT EXISTS last_activity_at timestamptz`
-- [ ] **Do not touch `account_manager`** — stays separate (see Architecture Lock)
+- [x] `ADD COLUMN IF NOT EXISTS lifecycle_stage text DEFAULT 'customer'` + `chk_customer_lifecycle_stage` CHECK constraint
+- [x] `ADD COLUMN IF NOT EXISTS lead_source text`
+- [x] `ADD COLUMN IF NOT EXISTS assigned_rep uuid REFERENCES auth.users(id)`
+- [x] `ADD COLUMN IF NOT EXISTS last_activity_at timestamptz`
+- [x] **Do not touch `account_manager`** — stays separate (see Architecture Lock)
+- [x] Added policy `sales_rep_update_assigned` on `customers` (moved here from Step 1, deferred until `assigned_rep` existed)
+- [x] `last_activity_at` kept correct via a trigger on `activities` INSERT (`crm_update_customer_last_activity()`), not an app-layer update — resolves the customer via `related_type` (direct for `customer`, FK lookup for `contact`/`deal`, `converted_customer_id` for `lead`)
 
-### Step 8 — Notification events
+### Step 8 — Notification events ✅ Applied & verified 2026-06-22
 
 **File**: `supabase/migrations/20260625_crm_notification_events.sql`
-- [ ] Seed `whatsapp_templates` event types: `crm_lead_assigned`, `crm_deal_won`, `crm_followup_due`, `crm_deal_overdue`
+- [x] Seed `whatsapp_templates` event types: `crm_lead_assigned`, `crm_deal_won`, `crm_followup_due`, `crm_deal_overdue` — all `status = 'pending_approval'` (placeholder bodies, not yet Meta-registered; create + approve in Meta Business Manager before Sprint 4 goes live, then update `template_name`)
 
-### Step 9 — Constants
+### Step 9 — Constants ✅ Applied & verified 2026-06-22
 
 **File**: `src/lib/constants.ts`
-- [ ] `LEAD_STATUS` (new, contacted, qualified, converted, disqualified)
-- [ ] `LEAD_SOURCE` (walk-in, phone, referral, exhibition, website, whatsapp)
-- [ ] `DEAL_STATUS` (open, won, lost)
-- [ ] `ACTIVITY_TYPE` (call, meeting, whatsapp, email, note, task)
-- [ ] `CRM_PIPELINE_IDS` (if needed for default-pipeline lookups)
+- [x] `LEAD_STATUS` (new, contacted, qualified, converted, disqualified)
+- [x] `LEAD_SOURCE` (walk-in, phone, referral, exhibition, website, whatsapp)
+- [x] `DEAL_STATUS` (open, won, lost)
+- [x] `ACTIVITY_TYPE` (call, meeting, whatsapp, email, note, task)
+- [x] `LIFECYCLE_STAGE` (lead, prospect, customer, churned) — not in the original list, added because it corresponds to Step 7's `chk_customer_lifecycle_stage` constraint
+- [x] ~~`CRM_PIPELINE_IDS`~~ — skipped: pipeline `id`s are generated UUIDs from the seed migration, nothing static to hardcode; code looks them up via `pipelines.list()`/`.get()`
+- [x] Added `ROLES.SALES_REP` + `ROLE_LIST` entry — gap in the original plan: Step 11 needs `ROLES.SALES_REP` to exist, and nothing else added it
+- [x] 30 new test cases in `src/test/constants.test.js`, full suite: 203/203 passing, lint clean
 
-### Step 10 — Zod schemas
+### Step 10 — Zod schemas ✅ Applied & verified 2026-06-22
 
 **File**: `src/lib/schemas.ts`
-- [ ] `contactSchema`, `leadSchema`, `dealSchema`, `activitySchema`
-- [ ] Add test cases to `src/test/schemas.test.js`
+- [x] `contactSchema`, `leadSchema`, `dealSchema`, `activitySchema`
+- [x] `dealSchema` uses `.superRefine()` to require `lost_reason` when `status === 'lost'` (matches `customerSchema`'s B2B `company_name` pattern)
+- [x] `leadSchema` deliberately does NOT hard-reject missing phone+email — data-model.md specifies that as a soft UI warning, not a blocked submit
+- [x] Stage-membership validation (is this stage id valid for this deal's pipeline?) is NOT in the schema — requires a DB lookup, lives in `deals.create()`/`moveStage()` at the API layer instead (Step 12)
+- [x] 43 new test cases in `src/test/schemas.test.js`, full suite: 246/246 passing, lint clean
 
-### Step 11 — Permissions
+### Step 11 — Permissions ✅ Applied & verified 2026-06-22
 
 **File**: `src/lib/permissions.ts`
-- [ ] Add `sales_rep` to `ROLE_DEFAULT_PERMISSIONS`:
-  - `leads.*`, `deals.*`, `activities.*` → read, create, edit (own)
-  - `customers.*` → read, edit (no delete)
-  - `invoices.*` → read (own), create
-  - `products.*` → read only
-  - `rma_tickets.*`, `inventory.*`, `parts.*`, `control_panel.*` → none
-- [ ] Add `sales_rep` test cases to `src/test/permissions.test.js`
+- [x] Add `sales_rep` to `ROLE_DEFAULT_PERMISSIONS`: `leads`/`deals`/`activities` (view/create/edit, no delete — RLS already scopes to "own" rows), `contacts`/`pipelines` (view only — RLS write is manager+/admin only), `customers` (view + edit, no create/delete — matches `sales_rep_update_assigned` RLS policy), `invoices` (view only — **not** create, see below)
+- [x] **Deviated from the study's matrix on one point**: study said sales_rep gets `invoices: read (own), create`, but `invoices` RLS (existing, untouched by this migration set) restricts INSERT to `manager_or_above()`. Shipping `invoices.create: false` so the UI never offers an action that fails at the RLS layer — flagged as a backlog item if sales_rep invoice creation is wanted later (needs its own RLS migration)
+- [x] Also added full CRM sections to `MANAGER`'s existing defaults (gap in the original plan — without this, `canDo('manager', ..., 'leads', 'view')` would return `false` despite manager's RLS already granting full access, same UI/RLS-mismatch bug class fixed in `PartsInventory.jsx`/`Invoices.jsx` earlier this project). `pipelines` is view-only even for manager (admin-only write at the RLS layer). `TECHNICIAN`/`VIEWER` get no CRM sections — zero RLS access either way.
+- [x] 26 new test cases in `src/test/permissions.test.js`, full suite: 272/272 passing, lint clean
 
 ### Step 12 — API domain modules
 
+- [x] **Prerequisite, not in the original plan**: `supabase/migrations/20260626_crm_leads_convert_rpc.sql` — `crm_convert_lead()` SECURITY DEFINER function backing `leads.convert()`. Unlike the existing `delete_customer_cascade` precedent (granted to `anon, authenticated` with no internal auth check), this function replicates the `leads_update` RLS authorization logic inside the function body and is granted to `authenticated` only — applied & verified 2026-06-22.
+
 Build in this order (each builds on the prior ones already existing):
-1. [ ] `src/api/db/contacts.ts` — `ContactRow`, `contacts.list/create/update/delete`
-2. [ ] `src/api/db/pipelines.ts` — `PipelineRow`, `PipelineStage`, `pipelines.list/get/update`
-3. [ ] `src/api/db/deals.ts` — `DealRow`, `DealProductLine`, `deals.list/get/create/update/moveStage/markWon/markLost`
-4. [ ] `src/api/db/activities.ts` — `ActivityRow`, `activities.list/create/complete/listOverdue`
-5. [ ] `src/api/db/leads.ts` — `LeadRow`, `leads.list/get/create/update/convert`
+1. [x] `src/api/db/contacts.ts` — `ContactRow`, `contacts.list/create/update/delete` (single-primary-contact invariant enforced via a shared `clearExistingPrimary()` helper)
+2. [x] `src/api/db/pipelines.ts` — `PipelineRow`, `PipelineStage`, `pipelines.list/get/update` (`update()` validates exactly-one-`is_won`/exactly-one-`is_lost`/unique-stage-ids before persisting)
+3. [x] `src/api/db/deals.ts` — `DealRow`, `DealProductLine`, `deals.list/get/create/update/moveStage/markWon/markLost`
+4. [x] `src/api/db/activities.ts` — `ActivityRow`, `activities.list/create/complete/listOverdue` (`create()` verifies the polymorphic `related_id` actually exists before insert)
+5. [x] `src/api/db/leads.ts` — `LeadRow`, `leads.list/get/create/update/convert` (`update()` rejects any field but `notes` once `converted_at` is set; `convert()` calls the `crm_convert_lead` RPC)
 
 Exact signatures: `specs/002-crm-upgrade/contracts/api-modules.md`. Full field/state-transition detail: `specs/002-crm-upgrade/data-model.md`.
 
 **Non-negotiable implementation rules**:
-- `leads.convert()` MUST be a single `SECURITY DEFINER` Postgres function via `supabase.rpc()` — never a client-side sequence of inserts (partial failure must be structurally impossible)
-- `deals.moveStage()` MUST validate the target stage exists in the pipeline's `stages` array before writing — throw on invalid, never write silently
-- `deals.product_lines` and `pipelines.stages` MUST be JSONB **arrays**, never objects (Postgres JSONB does not preserve object key order — this exact bug already happened once with WhatsApp template params)
+- [x] `leads.convert()` MUST be a single `SECURITY DEFINER` Postgres function via `supabase.rpc()` — never a client-side sequence of inserts (partial failure must be structurally impossible)
+- [x] `deals.moveStage()` MUST validate the target stage exists in the pipeline's `stages` array before writing — throw on invalid, never write silently. **Extended beyond the plan**: the same validation also runs in `deals.create()` and in `deals.update()` whenever it carries a `stage` field — not just `moveStage()` — since research.md's whole concern was a stale client writing a ghost stage through *any* path, not just one named method.
+- [x] `deals.product_lines` and `pipelines.stages` MUST be JSONB **arrays**, never objects (Postgres JSONB does not preserve object key order — this exact bug already happened once with WhatsApp template params)
 
-### Step 13 — Wire into the barrel export
+### Step 13 — Wire into the barrel export ✅ Applied & verified 2026-06-22
 
 **File**: `src/api/db/index.ts`
-- [ ] Export `contacts`, `pipelines`, `leads`, `deals`, `activities` and their Row types
+- [x] Export `contacts`, `pipelines`, `leads`, `deals`, `activities` and their Row types
+- [x] `npm test` 272/272, `npm run lint:ci` clean, `npm run build` succeeded (bundle +6KB, as expected for 5 new modules) — this is the step that actually exercises the 5 new files through Vite's compiler, since nothing imported them before this
 
 ### Step 14 — Validate Sprint 1
 
-Run `specs/002-crm-upgrade/quickstart.md`:
-- [ ] All 8 migrations apply cleanly and idempotently
-- [ ] `sales_rep` test session reads `customers`/CRM tables, blocked from `rma_tickets`/`inventory`/`parts`
-- [ ] Each API module exercised directly (create lead, list pipelines, create deal, invalid `moveStage()` throws)
-- [ ] `leads.convert()` exercised end-to-end — exactly one customer + one deal created, lead becomes immutable
-- [ ] `npm test`, `npm run lint:ci`, `npm run build` all pass; manual smoke test on `RMATickets`, `Customers`, `Products`, `Inventory`, `UserManagement`
+- [x] All 9 migrations apply cleanly (8 from the original plan + the `crm_convert_lead` RPC migration, applied & verified as each was written)
+- [x] `npm test` (272/272), `npm run lint:ci` (clean), `npm run build` (succeeds) — re-run together as a final pass, 2026-06-22
+- [ ] **Needs a live session — not done yet**: `sales_rep` test session reads `customers`/CRM tables, blocked from `rma_tickets`/`inventory`/`parts`
+- [ ] **Needs a live session — not done yet**: each API module exercised directly (create lead, list pipelines, create deal, invalid `moveStage()` throws)
+- [ ] **Needs a live session — not done yet**: `leads.convert()` exercised end-to-end — exactly one customer + one deal created, lead becomes immutable
+- [ ] **Needs manual click-through — not done yet**: smoke test `RMATickets`, `Customers`, `Products`, `Inventory`, `UserManagement` for regressions
 
 ---
 

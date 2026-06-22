@@ -163,3 +163,60 @@ describe('canDo with default permissions', () => {
     expect(canDo(role, ROLE_DEFAULT_PERMISSIONS[role], section, action)).toBe(expected)
   })
 })
+
+// ── sales_rep CRM permissions ─────────────────────────────────────────────────
+
+describe('ROLE_DEFAULT_PERMISSIONS — sales_rep', () => {
+  it('is defined', () => {
+    expect(ROLE_DEFAULT_PERMISSIONS[ROLES.SALES_REP]).toBeDefined()
+  })
+
+  it('has no access to RMA-internal sections (omitted entirely, not set to false)', () => {
+    const salesRep = ROLE_DEFAULT_PERMISSIONS[ROLES.SALES_REP]
+    expect(salesRep.rma_tickets).toBeUndefined()
+    expect(salesRep.inventory).toBeUndefined()
+    expect(salesRep.parts).toBeUndefined()
+    expect(salesRep.user_management).toBeUndefined()
+    expect(salesRep.settings).toBeUndefined()
+  })
+
+  test.each([
+    ['leads', 'view', true],
+    ['leads', 'create', true],
+    ['leads', 'edit', true],
+    ['leads', 'delete', false],
+    ['deals', 'create', true],
+    ['deals', 'delete', false],
+    ['activities', 'create', true],
+    ['contacts', 'view', true],
+    ['contacts', 'create', false],
+    ['pipelines', 'view', true],
+    ['customers', 'view', true],
+    ['customers', 'create', false],
+    ['customers', 'edit', true],
+    ['customers', 'delete', false],
+    ['invoices', 'view', true],
+    ['invoices', 'create', false],
+  ])('sales_rep canDo %s.%s → %s', (section, action, expected) => {
+    expect(canDo(ROLES.SALES_REP, ROLE_DEFAULT_PERMISSIONS[ROLES.SALES_REP], section, action)).toBe(
+      expected
+    )
+  })
+})
+
+describe('ROLE_DEFAULT_PERMISSIONS — manager CRM access', () => {
+  test.each([
+    ['leads', 'view', true],
+    ['leads', 'create', true],
+    ['deals', 'edit', true],
+    ['activities', 'create', true],
+    ['contacts', 'create', true],
+    ['contacts', 'delete', false],
+    ['pipelines', 'view', true],
+    ['pipelines', 'edit', false],
+  ])('manager canDo %s.%s → %s', (section, action, expected) => {
+    expect(canDo(ROLES.MANAGER, ROLE_DEFAULT_PERMISSIONS[ROLES.MANAGER], section, action)).toBe(
+      expected
+    )
+  })
+})

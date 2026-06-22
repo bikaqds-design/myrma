@@ -23,6 +23,16 @@ import {
   STORAGE_KEY,
   WARRANTY_STATUS,
   WARRANTY_STATUS_LIST,
+  LEAD_STATUS,
+  LEAD_STATUS_LIST,
+  LEAD_SOURCE,
+  LEAD_SOURCE_LIST,
+  DEAL_STATUS,
+  DEAL_STATUS_LIST,
+  ACTIVITY_TYPE,
+  ACTIVITY_TYPE_LIST,
+  LIFECYCLE_STAGE,
+  LIFECYCLE_STAGE_LIST,
 } from '../lib/constants'
 
 // ── ROLES ──────────────────────────────────────────────────────────────────────
@@ -34,14 +44,16 @@ describe('ROLES', () => {
     ['MANAGER', 'manager'],
     ['TECHNICIAN', 'technician'],
     ['VIEWER', 'viewer'],
+    ['SALES_REP', 'sales_rep'],
   ])('ROLES.%s === %s', (key, value) => {
     expect(ROLES[key]).toBe(value)
   })
 
   it('ROLE_LIST stays in sync with ROLES', () => {
-    expect(ROLE_LIST).toHaveLength(5)
+    expect(ROLE_LIST).toHaveLength(6)
     expect(ROLE_LIST).toContain(ROLES.SUPER_ADMIN)
     expect(ROLE_LIST).toContain(ROLES.VIEWER)
+    expect(ROLE_LIST).toContain(ROLES.SALES_REP)
   })
 })
 
@@ -131,6 +143,102 @@ describe('BATCH_STATUS', () => {
     ['RESOLVED', 'resolved'],
   ])('BATCH_STATUS.%s === %s', (key, value) => {
     expect(BATCH_STATUS[key]).toBe(value)
+  })
+})
+
+// ── CRM constants ─────────────────────────────────────────────────────────────
+
+describe('LEAD_STATUS', () => {
+  test.each([
+    ['NEW', 'new'],
+    ['CONTACTED', 'contacted'],
+    ['QUALIFIED', 'qualified'],
+    ['CONVERTED', 'converted'],
+    ['DISQUALIFIED', 'disqualified'],
+  ])('LEAD_STATUS.%s === %s', (key, value) => {
+    expect(LEAD_STATUS[key]).toBe(value)
+  })
+
+  it('LEAD_STATUS_LIST stays in sync with LEAD_STATUS', () => {
+    expect(LEAD_STATUS_LIST).toHaveLength(5)
+    for (const v of Object.values(LEAD_STATUS)) {
+      expect(LEAD_STATUS_LIST).toContain(v)
+    }
+  })
+})
+
+describe('LEAD_SOURCE', () => {
+  test.each([
+    ['WALK_IN', 'walk-in'],
+    ['PHONE', 'phone'],
+    ['REFERRAL', 'referral'],
+    ['EXHIBITION', 'exhibition'],
+    ['WEBSITE', 'website'],
+    ['WHATSAPP', 'whatsapp'],
+  ])('LEAD_SOURCE.%s === %s', (key, value) => {
+    expect(LEAD_SOURCE[key]).toBe(value)
+  })
+
+  it('LEAD_SOURCE_LIST stays in sync with LEAD_SOURCE', () => {
+    expect(LEAD_SOURCE_LIST).toHaveLength(6)
+    for (const v of Object.values(LEAD_SOURCE)) {
+      expect(LEAD_SOURCE_LIST).toContain(v)
+    }
+  })
+})
+
+describe('DEAL_STATUS', () => {
+  test.each([
+    ['OPEN', 'open'],
+    ['WON', 'won'],
+    ['LOST', 'lost'],
+  ])('DEAL_STATUS.%s === %s', (key, value) => {
+    expect(DEAL_STATUS[key]).toBe(value)
+  })
+
+  it('DEAL_STATUS_LIST stays in sync with DEAL_STATUS', () => {
+    expect(DEAL_STATUS_LIST).toHaveLength(3)
+    for (const v of Object.values(DEAL_STATUS)) {
+      expect(DEAL_STATUS_LIST).toContain(v)
+    }
+  })
+})
+
+describe('ACTIVITY_TYPE', () => {
+  test.each([
+    ['CALL', 'call'],
+    ['MEETING', 'meeting'],
+    ['WHATSAPP', 'whatsapp'],
+    ['EMAIL', 'email'],
+    ['NOTE', 'note'],
+    ['TASK', 'task'],
+  ])('ACTIVITY_TYPE.%s === %s', (key, value) => {
+    expect(ACTIVITY_TYPE[key]).toBe(value)
+  })
+
+  it('ACTIVITY_TYPE_LIST stays in sync with ACTIVITY_TYPE', () => {
+    expect(ACTIVITY_TYPE_LIST).toHaveLength(6)
+    for (const v of Object.values(ACTIVITY_TYPE)) {
+      expect(ACTIVITY_TYPE_LIST).toContain(v)
+    }
+  })
+})
+
+describe('LIFECYCLE_STAGE', () => {
+  test.each([
+    ['LEAD', 'lead'],
+    ['PROSPECT', 'prospect'],
+    ['CUSTOMER', 'customer'],
+    ['CHURNED', 'churned'],
+  ])('LIFECYCLE_STAGE.%s === %s', (key, value) => {
+    expect(LIFECYCLE_STAGE[key]).toBe(value)
+  })
+
+  it('LIFECYCLE_STAGE_LIST stays in sync with LIFECYCLE_STAGE', () => {
+    expect(LIFECYCLE_STAGE_LIST).toHaveLength(4)
+    for (const v of Object.values(LIFECYCLE_STAGE)) {
+      expect(LIFECYCLE_STAGE_LIST).toContain(v)
+    }
   })
 })
 

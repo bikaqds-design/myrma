@@ -13,9 +13,16 @@ import {
   ticketSchema,
   productSchema,
   addUserSchema,
+  contactSchema,
+  leadSchema,
+  dealSchema,
+  activitySchema,
   getFirstError,
   getFieldErrors,
 } from '../lib/schemas'
+
+const UUID_A = '00000000-0000-0000-0000-000000000001'
+const UUID_B = '00000000-0000-0000-0000-000000000002'
 
 // ── loginSchema ──────────────────────────────────────────────────────────────
 
@@ -244,6 +251,162 @@ describe('addUserSchema', () => {
     'accepts role "%s"',
     (role) => {
       expect(addUserSchema.safeParse({ email: 'x@x.com', role }).success).toBe(true)
+    }
+  )
+})
+
+// ── contactSchema ────────────────────────────────────────────────────────────
+
+describe('contactSchema', () => {
+  const valid = { customer_id: UUID_A, full_name: 'Jane Doe' }
+
+  it('accepts a valid contact', () => {
+    expect(contactSchema.safeParse(valid).success).toBe(true)
+  })
+
+  it('rejects missing full_name', () => {
+    expect(contactSchema.safeParse({ ...valid, full_name: '' }).success).toBe(false)
+  })
+
+  it('rejects non-uuid customer_id', () => {
+    expect(contactSchema.safeParse({ ...valid, customer_id: 'not-a-uuid' }).success).toBe(false)
+  })
+
+  it('rejects invalid email format when provided', () => {
+    expect(contactSchema.safeParse({ ...valid, email: 'nope' }).success).toBe(false)
+  })
+
+  it('accepts empty-string email (optional)', () => {
+    expect(contactSchema.safeParse({ ...valid, email: '' }).success).toBe(true)
+  })
+})
+
+// ── leadSchema ───────────────────────────────────────────────────────────────
+
+describe('leadSchema', () => {
+  const valid = { full_name: 'Convert Me', source: 'phone' }
+
+  it('accepts a valid lead', () => {
+    expect(leadSchema.safeParse(valid).success).toBe(true)
+  })
+
+  it('rejects missing full_name', () => {
+    expect(leadSchema.safeParse({ ...valid, full_name: '' }).success).toBe(false)
+  })
+
+  it('rejects invalid source', () => {
+    expect(leadSchema.safeParse({ ...valid, source: 'carrier-pigeon' }).success).toBe(false)
+  })
+
+  it('rejects invalid status', () => {
+    expect(leadSchema.safeParse({ ...valid, status: 'ghosted' }).success).toBe(false)
+  })
+
+  it('accepts a lead with neither phone nor email (soft validation only)', () => {
+    expect(leadSchema.safeParse(valid).success).toBe(true)
+  })
+
+  test.each(['walk-in', 'phone', 'referral', 'exhibition', 'website', 'whatsapp'])(
+    'accepts source "%s"',
+    (source) => {
+      expect(leadSchema.safeParse({ ...valid, source }).success).toBe(true)
+    }
+  )
+
+  test.each(['new', 'contacted', 'qualified', 'converted', 'disqualified'])(
+    'accepts status "%s"',
+    (status) => {
+      expect(leadSchema.safeParse({ ...valid, status }).success).toBe(true)
+    }
+  )
+})
+
+// ── dealSchema ───────────────────────────────────────────────────────────────
+
+describe('dealSchema', () => {
+  const valid = {
+    title: 'New Deal',
+    customer_id: UUID_A,
+    pipeline_id: UUID_B,
+    stage: 'new_lead',
+  }
+
+  it('accepts a valid open deal', () => {
+    expect(dealSchema.safeParse(valid).success).toBe(true)
+  })
+
+  it('rejects missing title', () => {
+    expect(dealSchema.safeParse({ ...valid, title: '' }).success).toBe(false)
+  })
+
+  it('rejects missing stage', () => {
+    expect(dealSchema.safeParse({ ...valid, stage: '' }).success).toBe(false)
+  })
+
+  it('rejects non-uuid pipeline_id', () => {
+    expect(dealSchema.safeParse({ ...valid, pipeline_id: 'nope' }).success).toBe(false)
+  })
+
+  it('rejects status "lost" with no lost_reason', () => {
+    const result = dealSchema.safeParse({ ...valid, status: 'lost' })
+    expect(result.success).toBe(false)
+    const msg = getFirstError(result)
+    expect(msg).toMatch(/reason.*required/i)
+  })
+
+  it('accepts status "lost" with a lost_reason', () => {
+    expect(
+      dealSchema.safeParse({ ...valid, status: 'lost', lost_reason: 'Went with a competitor' })
+        .success
+    ).toBe(true)
+  })
+
+  it('accepts status "won" with no lost_reason', () => {
+    expect(dealSchema.safeParse({ ...valid, status: 'won' }).success).toBe(true)
+  })
+
+  it('rejects probability out of 0-100 range', () => {
+    expect(dealSchema.safeParse({ ...valid, probability: 150 }).success).toBe(false)
+  })
+})
+
+// ── activitySchema ───────────────────────────────────────────────────────────
+
+describe('activitySchema', () => {
+  const valid = {
+    related_type: 'deal',
+    related_id: UUID_A,
+    type: 'call',
+    title: 'Follow-up call',
+  }
+
+  it('accepts a valid activity', () => {
+    expect(activitySchema.safeParse(valid).success).toBe(true)
+  })
+
+  it('rejects missing title', () => {
+    expect(activitySchema.safeParse({ ...valid, title: '' }).success).toBe(false)
+  })
+
+  it('rejects invalid related_type', () => {
+    expect(activitySchema.safeParse({ ...valid, related_type: 'ticket' }).success).toBe(false)
+  })
+
+  it('rejects invalid type', () => {
+    expect(activitySchema.safeParse({ ...valid, type: 'carrier-pigeon' }).success).toBe(false)
+  })
+
+  test.each(['lead', 'deal', 'customer', 'contact'])(
+    'accepts related_type "%s"',
+    (related_type) => {
+      expect(activitySchema.safeParse({ ...valid, related_type }).success).toBe(true)
+    }
+  )
+
+  test.each(['call', 'meeting', 'whatsapp', 'email', 'note', 'task'])(
+    'accepts type "%s"',
+    (type) => {
+      expect(activitySchema.safeParse({ ...valid, type }).success).toBe(true)
     }
   )
 })

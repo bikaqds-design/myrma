@@ -15,7 +15,23 @@
  *   }
  */
 import { z } from 'zod'
-import { ROLES, ROLE_LIST, TICKET_STATUS_LIST, PRIORITY_LIST, type Role, type TicketStatus, type Priority } from './constants.js'
+import {
+  ROLES,
+  ROLE_LIST,
+  TICKET_STATUS_LIST,
+  PRIORITY_LIST,
+  LEAD_STATUS_LIST,
+  LEAD_SOURCE_LIST,
+  DEAL_STATUS_LIST,
+  ACTIVITY_TYPE_LIST,
+  type Role,
+  type TicketStatus,
+  type Priority,
+  type LeadStatus,
+  type LeadSource,
+  type DealStatus,
+  type ActivityType,
+} from './constants.js'
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -200,6 +216,87 @@ export const batchUpdateSchema = z.object({
   notes: z.string().max(2000).optional().nullable(),
 })
 
+// ── CRM: contacts ─────────────────────────────────────────────────────────────
+
+export const contactSchema = z.object({
+  customer_id: z.string().uuid('Select a customer'),
+  full_name: z.string().min(1, 'Full name is required').max(200),
+  title: z.string().max(200).optional().nullable(),
+  phone: z.string().max(50).optional().nullable(),
+  email: z.union([z.string().email('Enter a valid email'), z.literal(''), z.null()]).optional(),
+  is_primary: z.boolean().optional(),
+  notes: z.string().max(2000).optional().nullable(),
+})
+
+// ── CRM: leads ────────────────────────────────────────────────────────────────
+// "At least one of phone/email present" is a soft warning in data-model.md
+// (walk-in leads occasionally lack both initially), not a hard reject — so
+// it's intentionally not enforced here as a .superRefine(). Surface it as a
+// UI warning instead, not a blocked submit.
+
+export const leadSchema = z.object({
+  full_name: z.string().min(1, 'Full name is required').max(200),
+  company_name: z.string().max(200).optional().nullable(),
+  phone: z.string().max(50).optional().nullable(),
+  email: z.union([z.string().email('Enter a valid email'), z.literal(''), z.null()]).optional(),
+  source: z.enum(LEAD_SOURCE_LIST as [LeadSource, ...LeadSource[]]),
+  status: z.enum(LEAD_STATUS_LIST as [LeadStatus, ...LeadStatus[]]).optional(),
+  assigned_rep: z.string().uuid().optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
+})
+
+// ── CRM: deals ────────────────────────────────────────────────────────────────
+// stage membership (does this stage id actually exist in the deal's
+// pipeline.stages array?) can't be checked here — it requires a DB lookup of
+// the referenced pipeline. That check lives in deals.create()/moveStage() at
+// the API layer (FR-011, see research.md §4). This schema only validates
+// stage is a non-empty string.
+
+const dealProductLineSchema = z.object({
+  product_id: z.string().uuid(),
+  product_name: z.string().min(1).max(300),
+  qty: z.number().int().min(1),
+  unit_price: z.number().min(0),
+})
+
+export const dealSchema = z
+  .object({
+    title: z.string().min(1, 'Title is required').max(300),
+    customer_id: z.string().uuid('Select a customer'),
+    contact_id: z.string().uuid().optional().nullable(),
+    pipeline_id: z.string().uuid('Select a pipeline'),
+    stage: z.string().min(1, 'Stage is required'),
+    value: z.number().min(0).optional().nullable(),
+    probability: z.number().int().min(0).max(100).optional(),
+    expected_close_date: z.string().optional().nullable(),
+    assigned_rep: z.string().uuid().optional().nullable(),
+    product_lines: z.array(dealProductLineSchema).optional(),
+    status: z.enum(DEAL_STATUS_LIST as [DealStatus, ...DealStatus[]]).optional(),
+    lost_reason: z.string().max(500).optional().nullable(),
+    notes: z.string().max(2000).optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.status === 'lost' && !data.lost_reason?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'A reason is required when marking a deal as lost',
+        path: ['lost_reason'],
+      })
+    }
+  })
+
+// ── CRM: activities ───────────────────────────────────────────────────────────
+
+export const activitySchema = z.object({
+  related_type: z.enum(['lead', 'deal', 'customer', 'contact']),
+  related_id: z.string().uuid('Select a record'),
+  type: z.enum(ACTIVITY_TYPE_LIST as [ActivityType, ...ActivityType[]]),
+  title: z.string().min(1, 'Title is required').max(300),
+  due_date: z.string().optional().nullable(),
+  assigned_rep: z.string().uuid().optional().nullable(),
+  outcome_notes: z.string().max(2000).optional().nullable(),
+})
+
 // ── Derived types ─────────────────────────────────────────────────────────────
 
 export type LoginFormData = z.infer<typeof loginSchema>
@@ -213,6 +310,10 @@ export type PartFormData = z.infer<typeof partSchema>
 export type InvoiceFormData = z.infer<typeof invoiceSchema>
 export type InventoryUnitFormData = z.infer<typeof inventoryUnitSchema>
 export type WarehouseFormData = z.infer<typeof warehouseSchema>
+export type ContactFormData = z.infer<typeof contactSchema>
+export type LeadFormData = z.infer<typeof leadSchema>
+export type DealFormData = z.infer<typeof dealSchema>
+export type ActivityFormData = z.infer<typeof activitySchema>
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
