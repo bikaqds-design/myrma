@@ -64,6 +64,12 @@ const ROLE_META = [
     icon: '👁️',
     description: 'Read-only access to all data',
   },
+  {
+    key: ROLES.SALES_REP,
+    name: 'Sales Rep',
+    icon: '🤝',
+    description: 'CRM-focused: leads, deals, and activities scoped to their own records; no RMA-internal access',
+  },
 ]
 
 export function getRoleTemplates() {

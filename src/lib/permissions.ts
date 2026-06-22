@@ -258,6 +258,11 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
   // sections are omitted entirely rather than set to false everywhere,
   // since canDo() already returns false for a missing section.
   [ROLES.SALES_REP]: {
+    // Gap found during nav-visibility audit: the original matrix called for
+    // "products.* -> read only" but this was missing from the initial Sprint 1
+    // implementation. Without it, a sales_rep can't even reference the product
+    // catalog when building a deal's product_lines.
+    products: { view: true, create: false, edit: false, delete: false, export: false, import: false },
     leads: { view: true, create: true, edit: true, delete: false },
     deals: { view: true, create: true, edit: true, delete: false },
     activities: { view: true, create: true, edit: true, delete: false },

@@ -181,6 +181,8 @@ describe('ROLE_DEFAULT_PERMISSIONS — sales_rep', () => {
   })
 
   test.each([
+    ['products', 'view', true],
+    ['products', 'create', false],
     ['leads', 'view', true],
     ['leads', 'create', true],
     ['leads', 'edit', true],
