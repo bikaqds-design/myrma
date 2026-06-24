@@ -5,7 +5,7 @@ import AIAssist from '../components/AIAssist'
 import { safeStorage } from '../lib/safeStorage'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { Spinner } from '../components/ui'
-import { TICKET_STATUS, TICKET_STATUS_LIST, TICKET_STATUS_RESOLVED } from '../lib/constants'
+import { TICKET_STATUS, TICKET_STATUS_LIST, TICKET_STATUS_RESOLVED, ROLES } from '../lib/constants'
 import { useTranslation } from 'react-i18next'
 
 const DashboardCharts = lazy(() => import('./DashboardCharts'))
@@ -192,7 +192,7 @@ function DonutWithLegend({ segments, tk }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function Dashboard({ currentUserEmail, onNavigate }) {
+export default function Dashboard({ currentUserEmail, currentUserRole, onNavigate }) {
   const { dashboardWidgets, darkMode } = useAppearance()
   const { t } = useTranslation()
   const tk = tokens(darkMode)
@@ -386,6 +386,18 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
     [tickets]
   )
 
+  const myOpenTickets = useMemo(() => {
+    if (currentUserRole !== ROLES.TECHNICIAN && currentUserRole !== ROLES.VIEWER) return []
+    return tickets
+      .filter((t) => t.assigned_technician === currentUserEmail && !TICKET_STATUS_RESOLVED.includes(t.ticket_status))
+      .sort((a, b) => {
+        if (a.due_date && b.due_date) return new Date(a.due_date) - new Date(b.due_date)
+        if (a.due_date) return -1
+        if (b.due_date) return 1
+        return new Date(b.created_date || 0) - new Date(a.created_date || 0)
+      })
+  }, [tickets, currentUserEmail, currentUserRole])
+
   const daysBetween = (a) => Math.ceil((new Date() - new Date(a)) / 86400000)
   const openActive = (statusCounts[TICKET_STATUS.OPEN] || 0) + (statusCounts[TICKET_STATUS.IN_PROGRESS] || 0) +
     (statusCounts[TICKET_STATUS.PENDING] || 0) + (statusCounts[TICKET_STATUS.ON_HOLD] || 0)
@@ -444,6 +456,41 @@ export default function Dashboard({ currentUserEmail, onNavigate }) {
         <div style={{ background: tk.surface, border: `2px dashed ${tk.border}`, borderRadius: 14, padding: '56px 0', textAlign: 'center' }}>
           <p style={{ color: tk.textMuted, fontWeight: 600, margin: 0 }}>{t('dashboard.noWidgets')}</p>
           <p style={{ color: tk.textFaint, fontSize: 13, marginTop: 4 }}>{t('dashboard.noWidgetsHint')}</p>
+        </div>
+      )}
+
+      {/* ── My Open Tickets (technician / viewer only) ── */}
+      {myOpenTickets.length > 0 && (
+        <div className="mb-4"
+          style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18 }}>
+          <CardHead title={t('dashboard.myOpenTickets')} action={`${myOpenTickets.length} ${t('common.open')}`} tk={tk} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {myOpenTickets.slice(0, 6).map((ticket) => {
+              const isDue = ticket.due_date && new Date(ticket.due_date) < new Date()
+              const dueInDays = ticket.due_date
+                ? Math.ceil((new Date(ticket.due_date) - new Date()) / 86400000)
+                : null
+              return (
+                <div key={ticket.id}
+                  onClick={() => onNavigate?.(`/rma-tickets?ticket=${ticket.id}`)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
+                    borderRadius: 10, background: tk.surfaceInset, cursor: 'pointer',
+                    border: `1px solid ${tk.borderSoft}`,
+                  }}>
+                  <StatusPill status={ticket.ticket_status} />
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: tk.text, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {ticket.rma_number} · {ticket.customer_name}
+                  </span>
+                  {dueInDays !== null && (
+                    <span style={{ fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap', color: isDue ? tk.bad : dueInDays <= 2 ? tk.warn : tk.textMuted }}>
+                      {isDue ? t('dashboard.overdue') : `${t('dashboard.dueSoon')} ${dueInDays}d`}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 

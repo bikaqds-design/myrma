@@ -25,6 +25,11 @@ import {
   notificationQueue,
 } from './whatsappNotifications.js'
 import { kbArticles } from './kb.js'
+import { contacts } from './contacts.js'
+import { pipelines } from './pipelines.js'
+import { leads } from './leads.js'
+import { deals } from './deals.js'
+import { activities } from './activities.js'
 
 export const db = {
   // Users & roles
@@ -78,6 +83,13 @@ export const db = {
 
   // Knowledge base
   kbArticles,
+
+  // CRM
+  contacts,
+  pipelines,
+  leads,
+  deals,
+  activities,
 }
 
 // Re-export all Row types for page components to import
@@ -97,3 +109,8 @@ export type {
   NotificationSettingRow, NotificationQueueRow,
 } from './whatsappNotifications.js'
 export type { KBArticleRow } from './kb.js'
+export type { ContactRow } from './contacts.js'
+export type { PipelineRow, PipelineStage } from './pipelines.js'
+export type { LeadRow } from './leads.js'
+export type { DealRow, DealProductLine } from './deals.js'
+export type { ActivityRow, ActivityAttachment, ActivityCreateInput } from './activities.js'

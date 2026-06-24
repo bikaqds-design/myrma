@@ -15,7 +15,7 @@ Source of truth for field-level detail: CRM_UPGRADE_STUDY.md §6.2 (verified aga
 | is_primary | boolean | default `false` |
 | notes | text | nullable |
 | created_at | timestamptz | default `now()` |
-| created_by | uuid | FK → `auth.users` |
+| created_by | text | creator's email, nullable — **changed from `uuid FK -> auth.users` during Sprint 2**: same fix as `assigned_rep`, see `20260629_crm_created_by_use_email.sql` |
 
 **Relationships**: many contacts → one customer (account). A `deals.contact_id` may reference one of an account's contacts as the deal's primary point of contact.
 
@@ -54,16 +54,16 @@ Source of truth for field-level detail: CRM_UPGRADE_STUDY.md §6.2 (verified aga
 | email | text | nullable |
 | source | text | NOT NULL — `LEAD_SOURCE` enum |
 | status | text | NOT NULL, default `'new'` — `LEAD_STATUS` enum |
-| assigned_rep | uuid | FK → `auth.users`, nullable (unassigned leads exist before triage) |
+| assigned_rep | text | rep's email, nullable (unassigned leads exist before triage) — **changed from `uuid FK -> auth.users` during Sprint 2**: the client can't resolve another user's `auth.users.id` (protected schema, not queryable via PostgREST); switched to email to match the existing `rma_tickets.assigned_technician` convention, see `20260628_crm_assigned_rep_use_email.sql` |
 | notes | text | nullable |
 | converted_at | timestamptz | nullable |
 | converted_customer_id | uuid | FK → `customers.id`, nullable |
 | converted_deal_id | uuid | FK → `deals.id`, nullable |
 | created_at | timestamptz | default `now()` |
-| created_by | uuid | FK → `auth.users` |
+| created_by | text | creator's email, nullable — see `contacts.created_by` above for why this is text, not a uuid FK |
 | updated_at | timestamptz | nullable |
 
-**State transitions** (`LEAD_STATUS`): `new → contacted → qualified → (converted, terminal)` or `→ disqualified (terminal)` at any point from `new`/`contacted`/`qualified`. Once `converted_at` is set, the lead is immutable except for `notes` — `leads.convert()` is the only path that sets `converted_*` fields, and the API module should reject further status changes on an already-converted lead.
+**State transitions** (`LEAD_STATUS`): `new → contacted → qualified → (converted, terminal)` or `→ disqualified (terminal)` at any point from `new`/`contacted`/`qualified`. `nurturing` and `inactive` (added Sprint 2, see `20260701_crm_leads_add_statuses.sql`) are non-terminal side states reachable from any non-terminal status — `nurturing` for leads still being actively worked but not buying-ready, `inactive` for leads gone cold; both remain reactivatable back to any non-terminal status, matching current CRM best practice (5–7 action-oriented statuses) rather than a strict linear funnel. Once `converted_at` is set, the lead is immutable except for `notes` — `leads.convert()` is the only path that sets `converted_*` fields, and the API module should reject further status changes on an already-converted lead.
 
 **Relationships**: A converted lead points to exactly one customer (new or matched-existing) and exactly one deal. A lead before conversion has neither.
 
@@ -86,7 +86,7 @@ Source of truth for field-level detail: CRM_UPGRADE_STUDY.md §6.2 (verified aga
 | value | numeric(12,2) | nullable |
 | probability | integer | default `0`, range 0–100 |
 | expected_close_date | date | nullable |
-| assigned_rep | uuid | FK → `auth.users`, nullable |
+| assigned_rep | text | rep's email, nullable — see `leads.assigned_rep` above for why this is text, not a uuid FK |
 | product_lines | jsonb | NOT NULL default `'[]'` — **array** of `{product_id, product_name, qty, unit_price}` |
 | status | text | NOT NULL, default `'open'` — `DEAL_STATUS` enum: open / won / lost |
 | lost_reason | text | nullable — **required** (application-layer check) when `status = 'lost'` |
@@ -94,7 +94,7 @@ Source of truth for field-level detail: CRM_UPGRADE_STUDY.md §6.2 (verified aga
 | lost_at | timestamptz | nullable |
 | notes | text | nullable |
 | created_at | timestamptz | default `now()` |
-| created_by | uuid | FK → `auth.users` |
+| created_by | text | creator's email, nullable — see `contacts.created_by` above for why this is text, not a uuid FK |
 | updated_at | timestamptz | nullable |
 
 **State transitions** (`DEAL_STATUS`): `open → won` (terminal, sets `won_at`) or `open → lost` (terminal, sets `lost_at`, requires `lost_reason`). A won/lost deal's `stage` should land on whichever pipeline stage has `is_won`/`is_lost: true`. No transition out of `won`/`lost` in Sprint 1 (re-opening a closed deal is an explicit non-goal — not in the study's Phase 1 scope).
@@ -117,10 +117,10 @@ Source of truth for field-level detail: CRM_UPGRADE_STUDY.md §6.2 (verified aga
 | title | text | NOT NULL |
 | due_date | timestamptz | nullable |
 | completed_at | timestamptz | nullable — `NULL` = pending/overdue |
-| assigned_rep | uuid | FK → `auth.users`, nullable |
+| assigned_rep | text | rep's email, nullable — see `leads.assigned_rep` above for why this is text, not a uuid FK |
 | outcome_notes | text | nullable |
 | created_at | timestamptz | default `now()` |
-| created_by | uuid | FK → `auth.users` |
+| created_by | text | creator's email, nullable — see `contacts.created_by` above for why this is text, not a uuid FK |
 
 **Derived state**: "Overdue" = `due_date < now() AND completed_at IS NULL` — computed at query time (`activities.listOverdue()`), not a stored column, to avoid a stale-flag bug (a denormalized `is_overdue` boolean would need a cron job to stay correct; a computed query does not).
 
@@ -138,7 +138,7 @@ New columns added via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`:
 |---|---|---|---|
 | lifecycle_stage | text | `'customer'` | Enum: lead / prospect / customer / churned |
 | lead_source | text | `NULL` | How this account was acquired |
-| assigned_rep | uuid (FK → auth.users) | `NULL` | CRM deal-owner — **separate from** `account_manager` |
+| assigned_rep | text | `NULL` | CRM deal-owner's email — **separate from** `account_manager`; see `leads.assigned_rep` above for why this is text, not a uuid FK |
 | last_activity_at | timestamptz | `NULL` | Denormalized — updated by trigger when any `activities` row referencing this customer (or a deal/lead/contact belonging to it) is created |
 
 **Explicitly unchanged**: `account_manager` (existing free-text column) — not merged, not deprecated. See research.md and the spec's Assumptions for why.

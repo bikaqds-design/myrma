@@ -5,7 +5,7 @@ import { Toaster, toast } from 'react-hot-toast'
 import { useQueryClient } from '@tanstack/react-query'
 import { auth, db, branding as brandingAPI, supabase } from './api/supabaseClient'
 import { useAppearance } from './contexts/AppearanceContext'
-import { resolvePermissions } from './lib/permissions'
+import { resolvePermissions, canDo } from './lib/permissions'
 import { ROLES } from './lib/constants'
 import { safeStorage } from './lib/safeStorage'
 import { registerTicketEventHandlers } from './lib/events/ticketEventHandlers'
@@ -115,6 +115,10 @@ const TechCalendar = lazyWithReload(() => import('./pages/TechCalendar'))
 const Invoices = lazyWithReload(() => import('./pages/Invoices'))
 const PartsInventory = lazyWithReload(() => import('./pages/PartsInventory'))
 const Reports = lazyWithReload(() => import('./pages/Reports'))
+const Leads = lazyWithReload(() => import('./pages/Leads'))
+const LeadDetails = lazyWithReload(() => import('./pages/Leads/LeadDetails'))
+const Pipeline = lazyWithReload(() => import('./pages/Pipeline'))
+const DealDetails = lazyWithReload(() => import('./pages/Pipeline/DealDetail'))
 const NotFoundPage = lazyWithReload(() => import('./pages/NotFoundPage'))
 import CommandPalette from './components/CommandPalette'
 
@@ -157,6 +161,34 @@ function CustomerDetailsRoute({
       currentUserPermissions={currentUserPermissions}
       onBack={() => navigate('/customers')}
       onNavigateToTicket={onNavigateToTicket}
+    />
+  )
+}
+
+function LeadDetailsRoute({ currentUserRole, currentUserEmail, currentUserPermissions }) {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  return (
+    <LeadDetails
+      leadId={id}
+      currentUserRole={currentUserRole}
+      currentUserEmail={currentUserEmail}
+      currentUserPermissions={currentUserPermissions}
+      onBack={() => navigate('/leads')}
+    />
+  )
+}
+
+function DealDetailsRoute({ currentUserRole, currentUserEmail, currentUserPermissions }) {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  return (
+    <DealDetails
+      dealId={id}
+      currentUserRole={currentUserRole}
+      currentUserEmail={currentUserEmail}
+      currentUserPermissions={currentUserPermissions}
+      onBack={() => navigate('/pipeline')}
     />
   )
 }
@@ -625,17 +657,21 @@ export default function App() {
   // ── Active state derived from URL ─────────────────────────────────────────
   const isProductsActive = pathname === '/products' || pathname.startsWith('/products/')
   const isCustomersActive = pathname === '/customers' || pathname.startsWith('/customers/')
+  // Uses effectiveUserRole (not currentUserRole) so sidebar visibility respects
+  // permission preview — these gate what's rendered, not what's authenticated.
   const isAdminOrManagerRole =
-    currentUserRole === ROLES.ADMIN ||
-    currentUserRole === ROLES.SUPER_ADMIN ||
-    currentUserRole === ROLES.MANAGER
+    effectiveUserRole === ROLES.ADMIN ||
+    effectiveUserRole === ROLES.SUPER_ADMIN ||
+    effectiveUserRole === ROLES.MANAGER
 
-  const navItems = [
+  const rawNavItems = [
     {
       path: '/',
       label: t('nav.dashboard'),
       active: pathname === '/' || pathname === '/dashboard',
       icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+      // No requiredPermission — Dashboard is the universal home route, shown
+      // to every authenticated role regardless of section-level permissions.
     },
     {
       path: '/products',
@@ -643,6 +679,7 @@ export default function App() {
       active: isProductsActive,
       icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
       tabParam: 'tab',
+      requiredPermission: ['products', 'view'],
       children: [
         { tabId: 'products', label: t('products.tabProducts') },
         { tabId: 'hierarchy', label: t('products.tabHierarchy') },
@@ -653,12 +690,28 @@ export default function App() {
       label: t('nav.customers'),
       active: isCustomersActive,
       icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',
+      requiredPermission: ['customers', 'view'],
+    },
+    {
+      path: '/leads',
+      label: t('nav.leads'),
+      active: pathname === '/leads',
+      icon: 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z',
+      requiredPermission: ['leads', 'view'],
+    },
+    {
+      path: '/pipeline',
+      label: t('nav.pipeline'),
+      active: pathname === '/pipeline',
+      icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14',
+      requiredPermission: ['deals', 'view'],
     },
     {
       path: '/rma-tickets',
       label: t('nav.rmaTickets'),
       active: pathname === '/rma-tickets',
       icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z',
+      requiredPermission: ['rma_tickets', 'view_all'],
     },
     {
       path: '/inventory',
@@ -666,6 +719,7 @@ export default function App() {
       active: pathname === '/inventory',
       icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
       tabParam: 'tab',
+      requiredPermission: ['inventory', 'view'],
       children: [
         { tabId: 'overview', label: t('inventory.overview') },
         { tabId: 'by-product', label: t('inventory.allUnits') },
@@ -682,18 +736,21 @@ export default function App() {
       label: t('nav.calendar'),
       active: pathname === '/calendar',
       icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+      requiredPermission: ['calendar', 'view'],
     },
     {
       path: '/invoices',
       label: t('nav.invoices'),
       active: pathname === '/invoices',
       icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+      requiredPermission: ['invoices', 'view'],
     },
     {
       path: '/parts',
       label: t('nav.parts'),
       active: pathname === '/parts',
       icon: 'M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z',
+      requiredPermission: ['parts', 'view'],
     },
     {
       path: '/reports',
@@ -701,6 +758,7 @@ export default function App() {
       active: pathname === '/reports',
       icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
       tabParam: 'tab',
+      requiredPermission: ['reports', 'view'],
       children: [
         { tabId: 'tickets', label: t('reports.tabTickets') },
         ...(isAdminOrManagerRole
@@ -712,7 +770,7 @@ export default function App() {
           : []),
       ],
     },
-    ...(currentUserRole === ROLES.ADMIN || currentUserRole === ROLES.SUPER_ADMIN
+    ...(effectiveUserRole === ROLES.ADMIN || effectiveUserRole === ROLES.SUPER_ADMIN
       ? [
           {
             path: '/control-panel',
@@ -758,15 +816,29 @@ export default function App() {
       : []),
   ]
 
+  // Hide any nav item the current role has zero access to, rather than
+  // showing a link that leads to an empty/blocked page. control-panel is
+  // already gated above (only spread into the array for admin/super_admin),
+  // so it has no requiredPermission and passes through unfiltered.
+  const navItems = rawNavItems.filter(
+    (item) =>
+      !item.requiredPermission ||
+      canDo(effectiveUserRole, effectiveUserPermissions, ...item.requiredPermission)
+  )
+
   // ── Derive page title for mobile header ───────────────────────────────────
   const mobileTitle = (() => {
     if (pathname.startsWith('/products/')) return 'Product Details'
     if (pathname.startsWith('/customers/')) return 'Customer Details'
+    if (pathname.startsWith('/leads/')) return 'Lead Details'
+    if (pathname.startsWith('/pipeline/')) return 'Deal Details'
     const MAP = {
       '/': 'Dashboard',
       '/dashboard': 'Dashboard',
       '/products': 'Products',
       '/customers': 'Customers',
+      '/leads': 'Leads',
+      '/pipeline': 'Pipeline',
       '/rma-tickets': 'RMA Tickets',
       '/inventory': 'Inventory',
       '/account': 'Account Settings',
@@ -1028,7 +1100,12 @@ export default function App() {
       </div>
 
       {/* UX-4: inert disables all keyboard/pointer interaction behind the open sidebar on mobile */}
-      <div className="flex-1 flex flex-col min-h-0" {...(sidebarOpen ? { inert: '' } : {})}>
+      {/* min-w-0 is required here: a flex item's implicit min-width is "auto" (its content
+          width), so without it a wide page (e.g. the Pipeline Kanban board) forces this whole
+          column wider than the viewport instead of scrolling internally — dragging the sidebar
+          along with it. min-w-0 lets this column shrink to the available space so only the
+          page's own overflow-x-auto containers scroll, not the app shell. */}
+      <div className="flex-1 flex flex-col min-h-0 min-w-0" {...(sidebarOpen ? { inert: '' } : {})}>
         {/* Mobile header */}
         <div className="lg:hidden bg-white dark:bg-[#121823] border-b border-[#e6e9ef] dark:border-[#212a38] px-4 py-3 flex items-center justify-between">
           <button
@@ -1270,6 +1347,50 @@ export default function App() {
                     currentUserEmail={currentUser?.email}
                     currentUserPermissions={effectiveUserPermissions}
                     onNavigateToTicket={handleNavigateToTicket}
+                  />
+                }
+              />
+
+              <Route
+                path="/leads"
+                element={
+                  <Leads
+                    currentUserRole={effectiveUserRole}
+                    currentUserEmail={currentUser?.email}
+                    currentUserPermissions={effectiveUserPermissions}
+                  />
+                }
+              />
+
+              <Route
+                path="/leads/:id"
+                element={
+                  <LeadDetailsRoute
+                    currentUserRole={effectiveUserRole}
+                    currentUserEmail={currentUser?.email}
+                    currentUserPermissions={effectiveUserPermissions}
+                  />
+                }
+              />
+
+              <Route
+                path="/pipeline"
+                element={
+                  <Pipeline
+                    currentUserRole={effectiveUserRole}
+                    currentUserEmail={currentUser?.email}
+                    currentUserPermissions={effectiveUserPermissions}
+                  />
+                }
+              />
+
+              <Route
+                path="/pipeline/:id"
+                element={
+                  <DealDetailsRoute
+                    currentUserRole={effectiveUserRole}
+                    currentUserEmail={currentUser?.email}
+                    currentUserPermissions={effectiveUserPermissions}
                   />
                 }
               />

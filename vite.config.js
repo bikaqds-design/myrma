@@ -85,9 +85,9 @@ export default defineConfig({
     // Scope to project tests only — without this Vitest also picks up copies
     // inside .claude/worktrees/*, doubling every test in the output.
     include: ['src/test/**/*.test.{js,ts}'],
-    // Vitest 4.1.7 has a parallel-pool race that surfaces as
-    // "Cannot read properties of undefined (reading 'config')" on suite import.
-    // Disable file-level parallelism to serialise suites and avoid the race.
+    // Vitest 4.1.7 + Node 24 worker_threads pool has a race on suite init.
+    // forks pool sidesteps it; fileParallelism:false also kept for safety.
+    pool: 'forks',
     fileParallelism: false,
     coverage: {
       provider: 'v8',

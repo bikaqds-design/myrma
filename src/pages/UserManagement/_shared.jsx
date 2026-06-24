@@ -10,6 +10,7 @@ export const ASSIGNABLE_ROLES = [
   { value: 'manager', label: '👔 Manager' },
   { value: 'technician', label: '🔧 Technician' },
   { value: 'viewer', label: '👁️ Viewer' },
+  { value: 'sales_rep', label: '🤝 Sales Rep' },
 ]
 
 export function StatusBadge({ status }) {
@@ -46,6 +47,7 @@ export function RoleBadge({ role }) {
     manager:     'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400',
     technician:  'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400',
     viewer:      'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]',
+    sales_rep:   'bg-teal-100 dark:bg-teal-900/20 text-teal-800 dark:text-teal-400',
   }
 
   const labels = {
@@ -54,6 +56,7 @@ export function RoleBadge({ role }) {
     manager: '👔 Manager',
     technician: '🔧 Technician',
     viewer: '👁️ Viewer',
+    sales_rep: '🤝 Sales Rep',
   }
 
   return (
