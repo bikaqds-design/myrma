@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { activities } from './activities.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -64,6 +65,29 @@ export const leads = {
     const { data, error } = await supabase.from('leads').update(lead).eq('id', id).select()
     if (error) throw error
     return data[0]
+  },
+  /**
+   * updateStatus — change a lead's status and auto-log the transition to the
+   * activities feed (Odoo-style field tracking). Used by the inline status
+   * dropdown and the detail-page stepper. The status-immutability rule on
+   * converted leads is enforced by update() above. The audit log is non-fatal:
+   * a failed log never blocks the status change.
+   */
+  async updateStatus(id: string, newStatus: string, actorEmail: string | null): Promise<LeadRow> {
+    const { data: current, error: fetchError } = await supabase
+      .from('leads')
+      .select('status')
+      .eq('id', id)
+      .single()
+    if (fetchError) throw fetchError
+    if (current.status === newStatus) return this.get(id)
+    const updated = await this.update(id, { status: newStatus })
+    try {
+      await activities.logSystem('lead', id, `status_changed|${current.status}|${newStatus}`, actorEmail)
+    } catch {
+      /* non-fatal — status change already persisted */
+    }
+    return updated
   },
   /**
    * Atomic conversion — calls the crm_convert_lead SECURITY DEFINER RPC

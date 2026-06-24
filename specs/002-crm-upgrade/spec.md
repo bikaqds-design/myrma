@@ -24,7 +24,7 @@ An admin can assign the `sales_rep` role to a user. That user can authenticate, 
 
 1. **Given** the `chk_user_role` constraint has been updated, **When** a row is inserted into `user_roles` with `role = 'sales_rep'`, **Then** the insert succeeds (previously: constraint violation).
 2. **Given** `rma_is_staff()` has been updated to include `sales_rep`, **When** a sales_rep-authenticated session queries `customers`, **Then** rows are returned (previously: zero rows due to RLS, regardless of `ROLE_DEFAULT_PERMISSIONS`).
-3. **Given** the new scoped `customers` update policy exists, **When** a sales_rep updates a `customers` row where `assigned_rep = auth.uid()`, **Then** the update succeeds; **When** they attempt to update a `customers` row assigned to a different rep, **Then** the update is rejected by RLS.
+3. **Given** the new scoped `customers` update policy exists, **When** a sales_rep updates a `customers` row where `assigned_rep = rma_current_user_email()`, **Then** the update succeeds; **When** they attempt to update a `customers` row assigned to a different rep, **Then** the update is rejected by RLS.
 4. **Given** a sales_rep session, **When** it queries `rma_tickets`, `inventory`, or `parts`, **Then** zero rows are returned (RLS exclusion, not an error).
 
 ---
@@ -42,7 +42,7 @@ A developer can import `db.leads`, `db.deals`, `db.activities`, `db.pipelines`, 
 1. **Given** the `leads` table exists, **When** `db.leads.create({...})` is called, **Then** a row is persisted and the returned object matches the `LeadRow` type.
 2. **Given** a deal exists in stage "New Lead", **When** `db.deals.moveStage(dealId, 'Quote Sent')` is called, **Then** the stage updates AND the move is validated against the deal's `pipeline_id`'s `stages` array — an invalid stage name is rejected, not silently written.
 3. **Given** an activity with `due_date` in the past and `completed_at IS NULL`, **When** `db.activities.listOverdue()` is called, **Then** that activity is included in the result.
-4. **Given** a sales_rep session, **When** `db.deals.list()` is called, **Then** only deals where `assigned_rep = auth.uid()` are returned; **given** a manager+ session, **When** the same call is made, **Then** all deals are returned.
+4. **Given** a sales_rep session, **When** `db.deals.list()` is called, **Then** only deals where `assigned_rep = rma_current_user_email()` are returned; **given** a manager+ session, **When** the same call is made, **Then** all deals are returned.
 5. **Given** `src/api/db/index.ts`, **When** inspected, **Then** it exports `LeadRow`, `DealRow`, `ActivityRow`, `PipelineRow`, `ContactRow` alongside all existing Row type exports, with zero duplication of the `TableResult<T>` pattern already centralized there.
 
 ---
@@ -68,7 +68,7 @@ A developer (via API, no UI yet) can call a conversion function that takes a `le
 ### Edge Cases
 
 - What happens when an admin tries to assign `sales_rep` to a user who already has a different role? → Existing `db.userRoles.updateRole()` already clears stale permission overrides on role change (PERM-2 fix) — confirm this still applies correctly for the new role.
-- What happens when a sales_rep's `assigned_rep` is null on a `customers` row (legacy data predating this feature)? → The scoped update policy (`assigned_rep = auth.uid()`) correctly denies edit access; this is expected, not a bug — legacy unassigned accounts need a manager to assign a rep first.
+- What happens when a sales_rep's `assigned_rep` is null on a `customers` row (legacy data predating this feature)? → The scoped update policy (`assigned_rep = rma_current_user_email()`) correctly denies edit access; this is expected, not a bug — legacy unassigned accounts need a manager to assign a rep first.
 - How does the system handle a `deals.moveStage()` call targeting a stage name that doesn't exist in the deal's pipeline's `stages` JSONB array? → Must reject with a clear error, not silently write an invalid stage string (which would break Kanban rendering in Sprint 3).
 - How does the system handle JSONB key-order for `deals.product_lines` and `pipelines.stages`? → Per CONSTITUTION.md §7.5a (and the WhatsApp params scramble bug this exact rule was written to prevent), both **must** be stored as arrays, never objects with positional/ordered semantics relying on key order.
 - What happens to a `sales_rep`'s existing session permissions if the prerequisite migration (`20260618_crm_add_sales_rep_role.sql`) has not yet been applied but the role was somehow already set? → Out of scope for Sprint 1 — the migration is a hard precondition documented in the study; this scenario should not occur if the merge order in the study's Risk Register is followed.
@@ -81,7 +81,7 @@ A developer (via API, no UI yet) can call a conversion function that takes a `le
 - **FR-001**: System MUST allow the `user_roles.role` column to accept the value `'sales_rep'` (update `chk_user_role` CHECK constraint).
 - **FR-002**: System MUST update `public.rma_is_staff()` to return `true` for `sales_rep`, so sales reps can read tables gated by that function (including `customers`).
 - **FR-003**: System MUST NOT add `sales_rep` to `public.rma_is_manager_or_above()` — sales_rep is deliberately not manager-tier, to avoid loosening that check's meaning across the rest of the app.
-- **FR-004**: System MUST add a new RLS policy scoping `customers` UPDATE to `sales_rep` sessions where `assigned_rep = auth.uid()` — distinct from the existing `manager_update` policy.
+- **FR-004**: System MUST add a new RLS policy scoping `customers` UPDATE to `sales_rep` sessions where `assigned_rep = rma_current_user_email()` — distinct from the existing `manager_update` policy.
 - **FR-005**: System MUST create the `contacts` table (customer_id FK, full_name, title, phone, email, is_primary, notes) with RLS: staff read, admin/manager write, anon blocked.
 - **FR-006**: System MUST create the `pipelines` table (name, stages JSONB array, is_active) seeded with the two default pipelines (B2B Dealer — 6 stages; B2C Retail — 5 stages) defined in CRM_UPGRADE_STUDY.md §6.2.
 - **FR-007**: System MUST create the `leads` table (full_name, company_name, phone, email, source, status, assigned_rep, converted_at, converted_customer_id, converted_deal_id) with RLS: reps see own, manager+ see all.

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 > **Audit history and scorecard are in [`docs/archive/AUDIT_LOG.md`](docs/archive/AUDIT_LOG.md).**
 
 <!-- SPECKIT START -->
-**Active SpecKit plan:** [`specs/002-crm-upgrade/plan.md`](specs/002-crm-upgrade/plan.md) — CRM Upgrade Phase 1 / Sprint 1 (Foundation). See also `specs/002-crm-upgrade/spec.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`. Source study: [`CRM_UPGRADE_STUDY.md`](CRM_UPGRADE_STUDY.md).
+**Active build plan:** [`MASTER_UPGRADE_PLAN.md`](MASTER_UPGRADE_PLAN.md) — the single sprint-by-sprint tracker for both the CRM upgrade (Track A) and system-wide module upgrades benchmarked against Odoo (Track B). Supersedes the former `CRM_UPGRADE_PLAN.md` and `SYSTEM_UPGRADE_PLAN.md`, both archived to `docs/archive/`. Formal SpecKit artifacts for Track A Sprint 1 live in `specs/002-crm-upgrade/` (`plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`). Source study: [`docs/archive/CRM_UPGRADE_STUDY.md`](docs/archive/CRM_UPGRADE_STUDY.md).
 <!-- SPECKIT END -->
 
 ## Commands
@@ -318,6 +318,27 @@ Current migrations:
 - `20260603_user_preferences_rls.sql`
 - `20260613_search_by_serial.sql`
 - `20260617_kb_articles.sql`
+
+CRM upgrade (Track A — `specs/002-crm-upgrade/`), applied in order:
+- `20260618_crm_add_sales_rep_role.sql` — adds the `sales_rep` role (prerequisite, sequenced first)
+- `20260619_crm_contacts.sql`
+- `20260620_crm_pipelines.sql`
+- `20260621_crm_leads.sql`
+- `20260622_crm_deals.sql`
+- `20260623_crm_activities.sql`
+- `20260624_crm_customers_extend.sql`
+- `20260625_crm_notification_events.sql`
+- `20260626_crm_leads_convert_rpc.sql` — `convert_lead_to_deal` RPC
+- `20260627_crm_fix_duplicate_user_roles_check.sql`
+- `20260628_crm_assigned_rep_use_email.sql` — `assigned_rep` is `text`/email, not a uuid FK
+- `20260629_crm_created_by_use_email.sql` — `created_by` is `text`/email, not a uuid FK
+- `20260630_crm_convert_lead_customer_code.sql` — RPC sets `customer_code` (was NOT NULL violation)
+- `20260701_crm_leads_add_statuses.sql` — adds `active`/`inactive` lead statuses
+- `20260702_crm_activities_chatter.sql` — chatter columns (`attachments`, system `log` type)
+- `20260703_crm_activities_replies.sql` — `parent_id` for comment replies
+- `20260704_crm_pipeline_rename_new_lead_stage.sql` — renames B2B "New Lead" stage label to "New Deal" (data UPDATE only)
+
+**The "who" convention for CRM tables:** `assigned_rep` and `created_by` are `text` columns holding the user's **email**, NOT `uuid REFERENCES auth.users`. This was a repeated source of "Invalid uuid" bugs — Zod schemas must validate these as email/string, never `.uuid()`.
 
 ### RLS SQL helper functions
 

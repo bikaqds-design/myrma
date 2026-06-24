@@ -103,4 +103,17 @@ export const storage = {
     } = supabase.storage.from('rma-attachments').getPublicUrl(fileName)
     return { name: file.name, url: publicUrl, path: fileName, size: file.size, type: file.type }
   },
+  // relatedType: 'lead' | 'deal' — used by the shared ActivityChatter component
+  async uploadActivityAttachment(file, relatedType, relatedId) {
+    file = await resizeImage(file) // P-3
+    validateAttachment(file)
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${relatedType}s/${relatedId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+    const { error } = await supabase.storage.from('rma-attachments').upload(fileName, file)
+    if (error) throw error
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('rma-attachments').getPublicUrl(fileName)
+    return { name: file.name, url: publicUrl, path: fileName, size: file.size, type: file.type }
+  },
 }

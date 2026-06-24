@@ -241,7 +241,7 @@ export const leadSchema = z.object({
   email: z.union([z.string().email('Enter a valid email'), z.literal(''), z.null()]).optional(),
   source: z.enum(LEAD_SOURCE_LIST as [LeadSource, ...LeadSource[]]),
   status: z.enum(LEAD_STATUS_LIST as [LeadStatus, ...LeadStatus[]]).optional(),
-  assigned_rep: z.string().uuid().optional().nullable(),
+  assigned_rep: z.union([z.string().email(), z.literal('')]).optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
 })
 
@@ -269,7 +269,7 @@ export const dealSchema = z
     value: z.number().min(0).optional().nullable(),
     probability: z.number().int().min(0).max(100).optional(),
     expected_close_date: z.string().optional().nullable(),
-    assigned_rep: z.string().uuid().optional().nullable(),
+    assigned_rep: z.union([z.string().email(), z.literal('')]).optional().nullable(),
     product_lines: z.array(dealProductLineSchema).optional(),
     status: z.enum(DEAL_STATUS_LIST as [DealStatus, ...DealStatus[]]).optional(),
     lost_reason: z.string().max(500).optional().nullable(),
@@ -293,7 +293,7 @@ export const activitySchema = z.object({
   type: z.enum(ACTIVITY_TYPE_LIST as [ActivityType, ...ActivityType[]]),
   title: z.string().min(1, 'Title is required').max(300),
   due_date: z.string().optional().nullable(),
-  assigned_rep: z.string().uuid().optional().nullable(),
+  assigned_rep: z.union([z.string().email(), z.literal('')]).optional().nullable(),
   outcome_notes: z.string().max(2000).optional().nullable(),
 })
 

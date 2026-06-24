@@ -41,7 +41,7 @@ SELECT * FROM customers LIMIT 1;
 SELECT * FROM rma_tickets LIMIT 1;
 -- Expected: zero rows (RLS correctly excludes sales_rep)
 
-UPDATE customers SET notes = 'test' WHERE assigned_rep = auth.uid() LIMIT 1;
+UPDATE customers SET notes = 'test' WHERE assigned_rep = (SELECT email FROM auth.users WHERE id = auth.uid()) LIMIT 1;
 -- Expected: succeeds if this rep has an assigned account, no-op otherwise (RLS scoping)
 ```
 

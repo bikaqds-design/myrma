@@ -115,6 +115,10 @@ const TechCalendar = lazyWithReload(() => import('./pages/TechCalendar'))
 const Invoices = lazyWithReload(() => import('./pages/Invoices'))
 const PartsInventory = lazyWithReload(() => import('./pages/PartsInventory'))
 const Reports = lazyWithReload(() => import('./pages/Reports'))
+const Leads = lazyWithReload(() => import('./pages/Leads'))
+const LeadDetails = lazyWithReload(() => import('./pages/Leads/LeadDetails'))
+const Pipeline = lazyWithReload(() => import('./pages/Pipeline'))
+const DealDetails = lazyWithReload(() => import('./pages/Pipeline/DealDetail'))
 const NotFoundPage = lazyWithReload(() => import('./pages/NotFoundPage'))
 import CommandPalette from './components/CommandPalette'
 
@@ -157,6 +161,34 @@ function CustomerDetailsRoute({
       currentUserPermissions={currentUserPermissions}
       onBack={() => navigate('/customers')}
       onNavigateToTicket={onNavigateToTicket}
+    />
+  )
+}
+
+function LeadDetailsRoute({ currentUserRole, currentUserEmail, currentUserPermissions }) {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  return (
+    <LeadDetails
+      leadId={id}
+      currentUserRole={currentUserRole}
+      currentUserEmail={currentUserEmail}
+      currentUserPermissions={currentUserPermissions}
+      onBack={() => navigate('/leads')}
+    />
+  )
+}
+
+function DealDetailsRoute({ currentUserRole, currentUserEmail, currentUserPermissions }) {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  return (
+    <DealDetails
+      dealId={id}
+      currentUserRole={currentUserRole}
+      currentUserEmail={currentUserEmail}
+      currentUserPermissions={currentUserPermissions}
+      onBack={() => navigate('/pipeline')}
     />
   )
 }
@@ -661,6 +693,20 @@ export default function App() {
       requiredPermission: ['customers', 'view'],
     },
     {
+      path: '/leads',
+      label: t('nav.leads'),
+      active: pathname === '/leads',
+      icon: 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z',
+      requiredPermission: ['leads', 'view'],
+    },
+    {
+      path: '/pipeline',
+      label: t('nav.pipeline'),
+      active: pathname === '/pipeline',
+      icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14',
+      requiredPermission: ['deals', 'view'],
+    },
+    {
       path: '/rma-tickets',
       label: t('nav.rmaTickets'),
       active: pathname === '/rma-tickets',
@@ -784,11 +830,15 @@ export default function App() {
   const mobileTitle = (() => {
     if (pathname.startsWith('/products/')) return 'Product Details'
     if (pathname.startsWith('/customers/')) return 'Customer Details'
+    if (pathname.startsWith('/leads/')) return 'Lead Details'
+    if (pathname.startsWith('/pipeline/')) return 'Deal Details'
     const MAP = {
       '/': 'Dashboard',
       '/dashboard': 'Dashboard',
       '/products': 'Products',
       '/customers': 'Customers',
+      '/leads': 'Leads',
+      '/pipeline': 'Pipeline',
       '/rma-tickets': 'RMA Tickets',
       '/inventory': 'Inventory',
       '/account': 'Account Settings',
@@ -1050,7 +1100,12 @@ export default function App() {
       </div>
 
       {/* UX-4: inert disables all keyboard/pointer interaction behind the open sidebar on mobile */}
-      <div className="flex-1 flex flex-col min-h-0" {...(sidebarOpen ? { inert: '' } : {})}>
+      {/* min-w-0 is required here: a flex item's implicit min-width is "auto" (its content
+          width), so without it a wide page (e.g. the Pipeline Kanban board) forces this whole
+          column wider than the viewport instead of scrolling internally — dragging the sidebar
+          along with it. min-w-0 lets this column shrink to the available space so only the
+          page's own overflow-x-auto containers scroll, not the app shell. */}
+      <div className="flex-1 flex flex-col min-h-0 min-w-0" {...(sidebarOpen ? { inert: '' } : {})}>
         {/* Mobile header */}
         <div className="lg:hidden bg-white dark:bg-[#121823] border-b border-[#e6e9ef] dark:border-[#212a38] px-4 py-3 flex items-center justify-between">
           <button
@@ -1292,6 +1347,50 @@ export default function App() {
                     currentUserEmail={currentUser?.email}
                     currentUserPermissions={effectiveUserPermissions}
                     onNavigateToTicket={handleNavigateToTicket}
+                  />
+                }
+              />
+
+              <Route
+                path="/leads"
+                element={
+                  <Leads
+                    currentUserRole={effectiveUserRole}
+                    currentUserEmail={currentUser?.email}
+                    currentUserPermissions={effectiveUserPermissions}
+                  />
+                }
+              />
+
+              <Route
+                path="/leads/:id"
+                element={
+                  <LeadDetailsRoute
+                    currentUserRole={effectiveUserRole}
+                    currentUserEmail={currentUser?.email}
+                    currentUserPermissions={effectiveUserPermissions}
+                  />
+                }
+              />
+
+              <Route
+                path="/pipeline"
+                element={
+                  <Pipeline
+                    currentUserRole={effectiveUserRole}
+                    currentUserEmail={currentUser?.email}
+                    currentUserPermissions={effectiveUserPermissions}
+                  />
+                }
+              />
+
+              <Route
+                path="/pipeline/:id"
+                element={
+                  <DealDetailsRoute
+                    currentUserRole={effectiveUserRole}
+                    currentUserEmail={currentUser?.email}
+                    currentUserPermissions={effectiveUserPermissions}
                   />
                 }
               />

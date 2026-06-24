@@ -153,6 +153,8 @@ describe('LEAD_STATUS', () => {
     ['NEW', 'new'],
     ['CONTACTED', 'contacted'],
     ['QUALIFIED', 'qualified'],
+    ['NURTURING', 'nurturing'],
+    ['INACTIVE', 'inactive'],
     ['CONVERTED', 'converted'],
     ['DISQUALIFIED', 'disqualified'],
   ])('LEAD_STATUS.%s === %s', (key, value) => {
@@ -160,7 +162,7 @@ describe('LEAD_STATUS', () => {
   })
 
   it('LEAD_STATUS_LIST stays in sync with LEAD_STATUS', () => {
-    expect(LEAD_STATUS_LIST).toHaveLength(5)
+    expect(LEAD_STATUS_LIST).toHaveLength(7)
     for (const v of Object.values(LEAD_STATUS)) {
       expect(LEAD_STATUS_LIST).toContain(v)
     }
@@ -212,12 +214,13 @@ describe('ACTIVITY_TYPE', () => {
     ['EMAIL', 'email'],
     ['NOTE', 'note'],
     ['TASK', 'task'],
+    ['LOG', 'log'],
   ])('ACTIVITY_TYPE.%s === %s', (key, value) => {
     expect(ACTIVITY_TYPE[key]).toBe(value)
   })
 
   it('ACTIVITY_TYPE_LIST stays in sync with ACTIVITY_TYPE', () => {
-    expect(ACTIVITY_TYPE_LIST).toHaveLength(6)
+    expect(ACTIVITY_TYPE_LIST).toHaveLength(7)
     for (const v of Object.values(ACTIVITY_TYPE)) {
       expect(ACTIVITY_TYPE_LIST).toContain(v)
     }

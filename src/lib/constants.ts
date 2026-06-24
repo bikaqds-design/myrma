@@ -208,6 +208,8 @@ export const LEAD_STATUS = {
   NEW: 'new',
   CONTACTED: 'contacted',
   QUALIFIED: 'qualified',
+  NURTURING: 'nurturing',
+  INACTIVE: 'inactive',
   CONVERTED: 'converted',
   DISQUALIFIED: 'disqualified',
 } as const
@@ -218,6 +220,8 @@ export const LEAD_STATUS_LIST: LeadStatus[] = [
   LEAD_STATUS.NEW,
   LEAD_STATUS.CONTACTED,
   LEAD_STATUS.QUALIFIED,
+  LEAD_STATUS.NURTURING,
+  LEAD_STATUS.INACTIVE,
   LEAD_STATUS.CONVERTED,
   LEAD_STATUS.DISQUALIFIED,
 ]
@@ -258,6 +262,13 @@ export const DEAL_STATUS_LIST: DealStatus[] = [
   DEAL_STATUS.LOST,
 ]
 
+// A deal untouched (no stage change) for this many days is flagged "rotting"
+// on the Pipeline Kanban card. Global constant for v1 — Odoo makes this a
+// per-stage admin setting, but with two simple pipelines and no usage data
+// yet on whether reps even want it tunable, a single sensible default avoids
+// building a config UI for a threshold nobody has asked to change.
+export const DEAL_ROTTING_THRESHOLD_DAYS = 7
+
 // ── CRM: activity types ──────────────────────────────────────────────────────
 export const ACTIVITY_TYPE = {
   CALL: 'call',
@@ -266,6 +277,7 @@ export const ACTIVITY_TYPE = {
   EMAIL: 'email',
   NOTE: 'note',
   TASK: 'task',
+  LOG: 'log',
 } as const
 
 export type ActivityType = (typeof ACTIVITY_TYPE)[keyof typeof ACTIVITY_TYPE]
@@ -276,6 +288,16 @@ export const ACTIVITY_TYPE_LIST: ActivityType[] = [
   ACTIVITY_TYPE.WHATSAPP,
   ACTIVITY_TYPE.EMAIL,
   ACTIVITY_TYPE.NOTE,
+  ACTIVITY_TYPE.TASK,
+  ACTIVITY_TYPE.LOG,
+]
+
+// User-schedulable activity types (excludes 'log', which is system-generated only)
+export const ACTIVITY_TYPE_SCHEDULABLE: ActivityType[] = [
+  ACTIVITY_TYPE.CALL,
+  ACTIVITY_TYPE.MEETING,
+  ACTIVITY_TYPE.WHATSAPP,
+  ACTIVITY_TYPE.EMAIL,
   ACTIVITY_TYPE.TASK,
 ]
 
