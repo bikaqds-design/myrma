@@ -25,6 +25,10 @@ export type EventType =
   | 'delivery.scheduled'
   | 'warranty.approved'
   | 'user.created'
+  | 'crm.lead_assigned'
+  | 'crm.deal_won'
+  | 'crm.followup_due'
+  | 'crm.deal_overdue'
   | 'custom'
 
 // ── Template ──────────────────────────────────────────────────────────────

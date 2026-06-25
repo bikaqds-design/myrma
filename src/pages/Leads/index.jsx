@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { db, supabase } from '../../api/supabaseClient'
 import { PageSkeleton } from '../../components/Skeleton'
-import { PageHeader, Button } from '../../components/ui'
+import { PageHeader } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { leadSchema, getFirstError } from '../../lib/schemas'
@@ -14,8 +14,11 @@ import { LEAD_STATUS_LIST, LEAD_SOURCE_LIST } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
 import { safeStorage } from '../../lib/safeStorage'
 import { EMPTY_FORM, EMPTY_CONVERT_FORM } from './_constants'
-import { CreateLeadModal, ConvertLeadModal } from './_modals'
+import { CreateLeadModal, ConvertLeadModal, BulkUploadLeadsModal } from './_modals'
 import { SortableHeader } from './_shared'
+import * as XLSX from 'xlsx'
+import { useURLTab } from '../../hooks/useURLTab'
+import LeadsKanbanView from './LeadsKanbanView'
 
 const STATUS_BADGE = {
   new:          'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
@@ -34,6 +37,74 @@ const SOURCE_BADGE = {
   exhibition:  'bg-lime-100 dark:bg-lime-900/20 text-lime-700 dark:text-lime-400',
   website:     'bg-sky-100 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400',
   whatsapp:    'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400',
+}
+
+function KanbanIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
+      <rect x="1" y="1" width="4" height="14" rx="1" />
+      <rect x="6" y="1" width="4" height="10" rx="1" />
+      <rect x="11" y="1" width="4" height="12" rx="1" />
+    </svg>
+  )
+}
+function ListIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
+      <path d="M2 4h12v1.5H2V4zm0 3.5h12V9H2V7.5zm0 3.5h12v1.5H2V11z" />
+    </svg>
+  )
+}
+const LEADS_VIEWS = [
+  { key: 'list', Icon: ListIcon },
+  { key: 'kanban', Icon: KanbanIcon },
+]
+
+function exportLeadsXlsx(leads, t, label = 'leads') {
+  if (!leads.length) {
+    toast(t('leads.exportEmpty'))
+    return
+  }
+  const headers = [
+    t('leadModal.fullName'),
+    t('leadModal.companyName'),
+    t('leadModal.phone'),
+    t('common.email'),
+    t('leads.colSource'),
+    t('common.status'),
+    t('leads.colAssignedRep'),
+    t('common.createdAt'),
+    t('leads.createdBy'),
+    t('common.notes'),
+  ]
+  const rows = leads.map((l) => [
+    l.full_name || '',
+    l.company_name || '',
+    l.phone || '',
+    l.email || '',
+    l.source || '',
+    l.status || '',
+    l.assigned_rep || '',
+    l.created_at ? new Date(l.created_at).toLocaleDateString() : '',
+    l.created_by || '',
+    l.notes || '',
+  ])
+  const aoa = [headers, ...rows]
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  headers.forEach((_, ci) => {
+    const addr = XLSX.utils.encode_cell({ r: 0, c: ci })
+    if (ws[addr]) ws[addr].s = { font: { bold: true } }
+  })
+  ws['!autofilter'] = { ref: `A1:${XLSX.utils.encode_col(headers.length - 1)}1` }
+  ws['!cols'] = [
+    { wch: 28 }, { wch: 28 }, { wch: 16 }, { wch: 28 },
+    { wch: 14 }, { wch: 14 }, { wch: 28 }, { wch: 14 },
+    { wch: 28 }, { wch: 40 },
+  ]
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Leads')
+  XLSX.writeFile(wb, `${label}-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  toast.success(t('leads.exportSuccess', { count: rows.length }))
 }
 
 function parseCSVLine(line) {
@@ -60,6 +131,64 @@ function parseCSVLine(line) {
   return result
 }
 
+// ─── Multi-select filter dropdown ────────────────────────────────────────────
+function MultiCheckFilter({ label, selected, onChange, options }) {
+  const [open, setOpen] = React.useState(false)
+  const ref = React.useRef(null)
+
+  React.useEffect(() => {
+    const handler = (e) => { if (!ref.current?.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const toggle = (value) => {
+    const next = new Set(selected)
+    if (next.has(value)) next.delete(value)
+    else next.add(value)
+    onChange(next)
+  }
+
+  const active = selected.size > 0
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm transition-colors ${
+          active
+            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-400 text-indigo-700 dark:text-indigo-300'
+            : 'border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#121823] text-[#6c6760] dark:text-[#9aa4b2]'
+        }`}
+      >
+        <span>{active ? `${label.replace(/^All /, '')} (${selected.size})` : label}</span>
+        <svg className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 min-w-[170px] bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-xl shadow-lg py-1.5">
+          {options.map(({ value, label: optLabel }) => (
+            <label
+              key={value}
+              className="flex items-center gap-2.5 px-3 py-2 hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] cursor-pointer text-sm text-[#211f1b] dark:text-[#e8ebf0]"
+            >
+              <input
+                type="checkbox"
+                checked={selected.has(value)}
+                onChange={() => toggle(value)}
+                className="rounded border-gray-300 dark:border-[#212a38] text-indigo-600 focus:ring-indigo-500"
+              />
+              {optLabel}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Leads({ currentUserRole, currentUserEmail, currentUserPermissions }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -81,24 +210,34 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
     queryFn: () => db.userRoles.listAllRoles(),
     staleTime: 5 * 60_000,
   })
-  const salesReps = usersList.filter((u) => u.role === 'sales_rep' || u.role === 'manager')
+  const salesReps = usersList.filter((u) =>
+    u.role === 'sales_rep' || u.role === 'manager' || u.role === 'admin' || u.role === 'super_admin'
+  )
 
   const [sortConfig, setSortConfig] = useState(() =>
     safeStorage.get('leadsSortConfig', { key: 'created_at', direction: 'desc' })
   )
   const [searchQuery, setSearchQuery] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
-  const [filterSource, setFilterSource] = useState('')
+  const [filterStatuses, setFilterStatuses] = useState(new Set())
+  const [filterSources, setFilterSources] = useState(new Set())
+  const [filterReps, setFilterReps] = useState(new Set())
+  const [showFilters, setShowFilters] = useState(false)
   const [openMenuId, setOpenMenuId] = useState(null)
   const [menuAnchor, setMenuAnchor] = useState(null)
   const [statusMenu, setStatusMenu] = useState({ id: null, anchor: null })
   const [sourceMenu, setSourceMenu] = useState({ id: null, anchor: null })
   const [showAddLead, setShowAddLead] = useState(false)
+  const [showBulkUpload, setShowBulkUpload] = useState(false)
+  const [showAddLeadDropdown, setShowAddLeadDropdown] = useState(false)
+  const [showExportDropdown, setShowExportDropdown] = useState(false)
   const [editingLead, setEditingLead] = useState(null)
   const [leadForm, setLeadForm] = useState(EMPTY_FORM)
   const [convertingLead, setConvertingLead] = useState(null)
   const [convertForm, setConvertForm] = useState(EMPTY_CONVERT_FORM)
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null })
+  const [activeView, setActiveView] = useURLTab('view', 'list')
+  const [selectedLeads, setSelectedLeads] = useState(new Set())
+  const [pendingLeadCode, setPendingLeadCode] = useState('')
 
   const openConfirm = (title, message, onConfirm) => setConfirmDialog({ open: true, title, message, onConfirm })
   const closeConfirm = () => setConfirmDialog((d) => ({ ...d, open: false }))
@@ -117,6 +256,8 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
       if (!e.target.closest('.action-menu')) setOpenMenuId(null)
       if (!e.target.closest('.status-menu')) setStatusMenu({ id: null, anchor: null })
       if (!e.target.closest('.source-menu')) setSourceMenu({ id: null, anchor: null })
+      if (!e.target.closest('.add-lead-dropdown')) setShowAddLeadDropdown(false)
+      if (!e.target.closest('.export-dropdown')) setShowExportDropdown(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -243,15 +384,17 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
 
   const filteredLeads = leads
     .filter((l) => {
-      if (filterStatus && l.status !== filterStatus) return false
-      if (filterSource && l.source !== filterSource) return false
+      if (filterStatuses.size > 0 && !filterStatuses.has(l.status)) return false
+      if (filterSources.size > 0 && !filterSources.has(l.source)) return false
+      if (filterReps.size > 0 && !filterReps.has(l.assigned_rep)) return false
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase()
         return (
           l.full_name?.toLowerCase().includes(q) ||
           l.company_name?.toLowerCase().includes(q) ||
           l.email?.toLowerCase().includes(q) ||
-          l.phone?.toLowerCase().includes(q)
+          l.phone?.toLowerCase().includes(q) ||
+          l.lead_code?.toLowerCase().includes(q)
         )
       }
       return true
@@ -282,9 +425,12 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
     }))
   }
 
+  const generateLeadCode = () => `LD-${Math.floor(10000000 + Math.random() * 90000000)}`
+
   const resetForm = () => {
     setLeadForm(EMPTY_FORM)
     setEditingLead(null)
+    setPendingLeadCode(generateLeadCode())
   }
 
   const handleSaveLead = async () => {
@@ -315,7 +461,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
         toast.success(t('leads.leadUpdated'))
         db.auditLog.log(currentUserEmail, 'lead_updated', `Updated lead ${payload.full_name}`).catch(() => {})
       } else {
-        await db.leads.create({ ...payload, created_by: currentUserEmail })
+        await db.leads.create({ ...payload, lead_code: pendingLeadCode, created_by: currentUserEmail })
         toast.success(t('leads.leadCreated'))
         db.auditLog.log(currentUserEmail, 'lead_created', `Created lead ${payload.full_name}`).catch(() => {})
       }
@@ -357,8 +503,17 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   }
 
   const handleOpenConvert = (lead) => {
+    const pid = pipelines[0]?.id ?? ''
+    const firstStage = pipelines[0]?.stages
+      ? [...pipelines[0].stages].sort((a, b) => a.order - b.order).find((s) => !s.is_won && !s.is_lost)
+      : null
     setConvertingLead(lead)
-    setConvertForm({ ...EMPTY_CONVERT_FORM, title: `${lead.full_name} — Deal` })
+    setConvertForm({
+      ...EMPTY_CONVERT_FORM,
+      title: `${lead.full_name} — Deal`,
+      pipeline_id: pid,
+      stage_id: firstStage?.id ?? '',
+    })
   }
 
   const handleConvert = async () => {
@@ -372,6 +527,10 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
         pipelineId: convertForm.pipeline_id,
         value: convertForm.value ? Number(convertForm.value) : undefined,
       })
+      // If user chose a non-default stage, move the deal after creation
+      if (convertForm.stage_id) {
+        db.deals.moveStage(result.deal.id, convertForm.stage_id).catch(() => {})
+      }
       toast.success(t('leads.leadConverted'))
       db.auditLog
         .log(currentUserEmail, 'lead_converted', `Converted lead ${convertingLead.full_name} to deal ${result.deal.id}`)
@@ -383,10 +542,50 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
     }
   }
 
+  const nonConvertedSelected = () =>
+    [...selectedLeads].filter((id) => leads.find((l) => l.id === id)?.status !== 'converted')
+
+  const handleBulkDelete = async () => {
+    const ids = nonConvertedSelected()
+    if (!window.confirm(t('leads.bulkDeleteConfirm', { count: ids.length }))) return
+    try {
+      await db.leads.bulkDelete(ids)
+      toast.success(t('leads.bulkDeleted', { count: ids.length }))
+      setSelectedLeads(new Set())
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  const handleBulkStatusChange = async (status) => {
+    const ids = nonConvertedSelected()
+    try {
+      await db.leads.bulkUpdate(ids, { status })
+      toast.success(t('leads.bulkStatusChanged', { count: ids.length }))
+      setSelectedLeads(new Set())
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  const handleBulkSourceChange = async (source) => {
+    const ids = nonConvertedSelected()
+    try {
+      await db.leads.bulkUpdate(ids, { source })
+      toast.success(t('leads.bulkSourceChanged', { count: ids.length }))
+      setSelectedLeads(new Set())
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
   const handleDownloadTemplate = () => {
     const csv = [
-      ['full_name', 'company_name', 'phone', 'email', 'source', 'notes'].join(','),
-      ['Ahmed Saeed', 'Maximum Hardware', '01000121589', 'ahmed@maximum.com', 'phone', ''].join(','),
+      ['full_name', 'company_name', 'phone', 'email', 'source', 'status', 'notes'].join(','),
+      ['Ahmed Saeed', 'Maximum Hardware', '01000121589', 'ahmed@maximum.com', 'phone', 'new', ''].join(','),
     ].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -414,6 +613,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
         return
       }
       const validSources = new Set(['walk-in', 'phone', 'referral', 'exhibition', 'website', 'whatsapp'])
+      const validStatuses = new Set(['new', 'contacted', 'qualified', 'nurturing', 'inactive', 'disqualified'])
       const toImport = []
       const errors = []
       for (let i = 1; i < lines.length; i++) {
@@ -427,13 +627,15 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
           continue
         }
         const source = validSources.has(row.source) ? row.source : 'website'
+        const status = validStatuses.has(row.status) ? row.status : 'new'
         toImport.push({
+          lead_code: `LD-${Math.floor(10000000 + Math.random() * 90000000)}`,
           full_name: row.full_name,
           company_name: row.company_name || null,
           phone: row.phone || null,
           email: row.email || null,
           source,
-          status: 'new',
+          status,
           notes: row.notes || null,
           created_by: currentUserEmail,
         })
@@ -452,94 +654,303 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
         toast.error(t('leads.importRowErrors', { count: errors.length }))
         captureException(new Error('Lead CSV import errors'), { errors })
       }
-      setShowAddLead(false)
+      setShowBulkUpload(false)
       queryClient.invalidateQueries({ queryKey: ['leads'] })
     } catch (error) {
       toast.error(t('leads.failedImport', { error: error.message }))
     }
   }
 
+  const handleKanbanStatusChange = async (leadId, newStatus) => {
+    const lead = leads.find((l) => l.id === leadId)
+    if (!lead) return
+    try {
+      await db.leads.updateStatus(lead.id, newStatus, currentUserEmail)
+      toast.success(t('leads.statusUpdated'))
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
+    } catch (error) {
+      toast.error(t('leads.failedSave', { error: error.message }))
+    }
+  }
+
   if (loading) return <PageSkeleton cols={6} />
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader title={t('leads.title')} subtitle={t('leads.subtitle')}>
-        {canDo('create') && (
-          <>
-            <input
-              type="file"
-              accept=".csv"
-              id="leads-csv-input"
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files?.[0]) handleBulkUpload(e.target.files[0])
-                e.target.value = ''
-              }}
-            />
-            <Button variant="secondary" onClick={handleDownloadTemplate}>
-              {t('leads.downloadTemplate')}
-            </Button>
-            <Button variant="secondary" onClick={() => document.getElementById('leads-csv-input').click()}>
-              {t('leads.importCSV')}
-            </Button>
-            <Button
-              onClick={() => {
-                resetForm()
-                setShowAddLead(true)
-              }}
+        {/* View switcher */}
+        <div className="flex gap-1 bg-[#f4f6f9] dark:bg-[#0f1520] rounded-lg p-1">
+          {LEADS_VIEWS.map(({ key, Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveView(key)}
+              title={t(`leads.view_${key}`)}
+              className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors ${
+                activeView === key
+                  ? 'bg-white dark:bg-[#121823] text-[#4338ca] dark:text-[#a5b4fc] shadow-sm'
+                  : 'text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]'
+              }`}
             >
+              <Icon />
+            </button>
+          ))}
+        </div>
+        {leads.length > 0 && (
+          <div className="relative export-dropdown">
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowExportDropdown(!showExportDropdown) }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#e6e9ef] dark:border-[#212a38] text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] transition-colors"
+            >
+              <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              {t('leads.export')}
+              <svg className={`w-3.5 h-3.5 transition-transform ${showExportDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showExportDropdown && (
+              <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] z-20 py-1.5">
+                {/* Export All */}
+                <button
+                  onClick={() => { exportLeadsXlsx(leads, t, 'leads-all'); setShowExportDropdown(false) }}
+                  className="w-full px-4 py-2.5 text-left hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3"
+                >
+                  <svg className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <div>
+                    <div className="text-sm font-medium text-[#211f1b] dark:text-[#e8ebf0]">{t('leads.exportAll')}</div>
+                    <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('leads.exportAllDesc', { count: leads.length })}</div>
+                  </div>
+                </button>
+                {/* Export Filtered — only when filters/search are active */}
+                {filteredLeads.length !== leads.length && (
+                  <button
+                    onClick={() => { exportLeadsXlsx(filteredLeads, t, 'leads-filtered'); setShowExportDropdown(false) }}
+                    className="w-full px-4 py-2.5 text-left hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3 border-t border-[#f0f2f6] dark:border-[#1a2230]"
+                  >
+                    <svg className="w-4 h-4 text-indigo-500 dark:text-[#a5b4fc] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+                    </svg>
+                    <div>
+                      <div className="text-sm font-medium text-[#211f1b] dark:text-[#e8ebf0]">{t('leads.exportFiltered')}</div>
+                      <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('leads.exportFilteredDesc', { count: filteredLeads.length })}</div>
+                    </div>
+                  </button>
+                )}
+                {/* Export Selected — only when rows are checked */}
+                {selectedLeads.size > 0 && (
+                  <button
+                    onClick={() => {
+                      const selectedData = leads.filter((l) => selectedLeads.has(l.id))
+                      exportLeadsXlsx(selectedData, t, 'leads-selected')
+                      setShowExportDropdown(false)
+                    }}
+                    className="w-full px-4 py-2.5 text-left hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3 border-t border-[#f0f2f6] dark:border-[#1a2230]"
+                  >
+                    <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <div>
+                      <div className="text-sm font-medium text-[#211f1b] dark:text-[#e8ebf0]">{t('leads.exportSelected')}</div>
+                      <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('leads.exportSelectedDesc', { count: selectedLeads.size })}</div>
+                    </div>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {canDo('create') && (
+          <div className="relative add-lead-dropdown">
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowAddLeadDropdown(!showAddLeadDropdown) }}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2 text-sm font-medium"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
               {t('leads.addLead')}
-            </Button>
-          </>
+              <svg className={`w-4 h-4 transition-transform ${showAddLeadDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showAddLeadDropdown && (
+              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#121823] rounded-lg shadow-lg border border-gray-200 dark:border-[#212a38] z-20">
+                <button
+                  onClick={() => { resetForm(); setShowAddLead(true); setShowAddLeadDropdown(false); }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[#1a2230] flex items-center gap-3 border-b border-gray-100 dark:border-[#212a38]"
+                >
+                  <svg className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  <div>
+                    <div className="font-medium text-gray-900 dark:text-[#e8ebf0]">{t('leadModal.addSingle')}</div>
+                    <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('leadModal.addSingleDesc')}</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setShowBulkUpload(true); setShowAddLeadDropdown(false) }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-3 rounded-b-lg"
+                >
+                  <svg className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <div>
+                    <div className="font-medium text-gray-900 dark:text-[#e8ebf0]">{t('leadModal.bulkImport')}</div>
+                    <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('leadModal.bulkImportDesc')}</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </PageHeader>
 
+      {/* Search + filter — shared across both views */}
       <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] shadow-sm">
-        <div className="p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
-            <div className="relative flex-1 max-w-md">
-              <input
-                ref={searchRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t('leads.searchPlaceholder')}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-[#212a38] dark:bg-[#0f1520] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-              />
-              <svg className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+        <div className="px-5 py-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="relative flex-1 max-w-md">
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t('leads.searchPlaceholder')}
+                  className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
+                />
+                <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                aria-expanded={showFilters}
+                aria-controls="leads-filters-panel"
+                className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${
+                  showFilters || filterStatuses.size || filterSources.size || filterReps.size
+                    ? 'border-indigo-500 text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-400 dark:text-indigo-300'
+                    : 'border-[#e6e9ef] dark:border-[#212a38] text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520]'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+                </svg>
+                {t('common.filters')}
+                {(filterStatuses.size + filterSources.size + filterReps.size) > 0 && (
+                  <span className="w-4 h-4 bg-indigo-600 text-white text-xs rounded-full flex items-center justify-center">
+                    {filterStatuses.size + filterSources.size + filterReps.size}
+                  </span>
+                )}
+              </button>
             </div>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-[#212a38] dark:bg-[#0f1520] dark:text-[#e8ebf0] rounded-lg text-sm"
-            >
-              <option value="">{t('leads.allStatuses')}</option>
-              {LEAD_STATUS_LIST.map((s) => (
-                <option key={s} value={s}>
-                  {t(`leadStatus.${s}`)}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filterSource}
-              onChange={(e) => setFilterSource(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-[#212a38] dark:bg-[#0f1520] dark:text-[#e8ebf0] rounded-lg text-sm"
-            >
-              <option value="">{t('leads.allSources')}</option>
-              {['walk-in', 'phone', 'referral', 'exhibition', 'website', 'whatsapp'].map((s) => (
-                <option key={s} value={s}>
-                  {t(`leadSource.${s.replace('-', '_')}`)}
-                </option>
-              ))}
-            </select>
+            {showFilters && (
+              <div id="leads-filters-panel" className="p-4 bg-[#f8f9fb] dark:bg-[#0f1520] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
+                <div className="flex flex-wrap gap-3">
+                  <MultiCheckFilter
+                    label={t('leads.allStatuses')}
+                    selected={filterStatuses}
+                    onChange={setFilterStatuses}
+                    options={LEAD_STATUS_LIST.map((s) => ({ value: s, label: t(`leadStatus.${s}`) }))}
+                  />
+                  <MultiCheckFilter
+                    label={t('leads.allSources')}
+                    selected={filterSources}
+                    onChange={setFilterSources}
+                    options={['walk-in','phone','referral','exhibition','website','whatsapp'].map((s) => ({ value: s, label: t(`leadSource.${s.replace('-','_')}`) }))}
+                  />
+                  <MultiCheckFilter
+                    label={t('leads.allReps')}
+                    selected={filterReps}
+                    onChange={setFilterReps}
+                    options={salesReps.map((r) => ({ value: r.user_email, label: r.user_email }))}
+                  />
+                  {(filterStatuses.size || filterSources.size || filterReps.size) ? (
+                    <button
+                      onClick={() => { setFilterStatuses(new Set()); setFilterSources(new Set()); setFilterReps(new Set()) }}
+                      className="text-sm text-red-500 dark:text-red-400 hover:underline self-center"
+                    >
+                      {t('common.clear')}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            )}
           </div>
+        </div>
+      </div>
 
+      {/* Bulk action bar */}
+      {selectedLeads.size > 0 && (
+        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-[#4338ca]/20 dark:border-[#a5b4fc]/20 rounded-[14px] px-4 py-2.5 flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-medium text-[#4338ca] dark:text-[#a5b4fc]">
+            {selectedLeads.size} {t('common.selected')}
+          </span>
+          <div className="w-px h-5 bg-[#4338ca]/20 dark:bg-[#a5b4fc]/20" />
+          <select
+            defaultValue=""
+            onChange={(e) => { if (e.target.value) { handleBulkStatusChange(e.target.value); e.target.value = '' } }}
+            className="text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg px-2 py-1.5 bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
+          >
+            <option value="">{t('leads.bulkChangeStatus')}</option>
+            {['new','contacted','qualified','nurturing','inactive','disqualified'].map((s) => (
+              <option key={s} value={s}>{t(`leadStatus.${s}`)}</option>
+            ))}
+          </select>
+          <select
+            defaultValue=""
+            onChange={(e) => { if (e.target.value) { handleBulkSourceChange(e.target.value); e.target.value = '' } }}
+            className="text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg px-2 py-1.5 bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
+          >
+            <option value="">{t('leads.bulkChangeSource')}</option>
+            {['walk-in','phone','referral','exhibition','website','whatsapp'].map((s) => (
+              <option key={s} value={s}>{t(`leadSource.${s.replace('-','_')}`)}</option>
+            ))}
+          </select>
+          {canDo('delete') && (
+            <button
+              onClick={handleBulkDelete}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors border border-red-200 dark:border-red-800"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              {t('common.delete')}
+            </button>
+          )}
+          <button
+            onClick={() => setSelectedLeads(new Set())}
+            className="ml-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
+          >
+            {t('common.clear')}
+          </button>
+        </div>
+      )}
+
+      {/* List view */}
+      {activeView === 'list' && (
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-[#0f1520] border-y border-gray-200 dark:border-[#212a38]">
                 <tr>
+                  <th className="pl-4 pr-2 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 dark:border-[#212a38] text-indigo-600 focus:ring-indigo-500"
+                      checked={filteredLeads.filter((l) => l.status !== 'converted').length > 0 && filteredLeads.filter((l) => l.status !== 'converted').every((l) => selectedLeads.has(l.id))}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedLeads(new Set(filteredLeads.filter((l) => l.status !== 'converted').map((l) => l.id)))
+                        else setSelectedLeads(new Set())
+                      }}
+                      aria-label={t('common.selectAll')}
+                    />
+                  </th>
+                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase w-10">#</th>
+                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase w-32">{t('common.code')}</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">
                     <SortableHeader label={t('leads.colName')} sortKey="full_name" sortConfig={sortConfig} onSort={handleSort} />
                   </th>
@@ -553,13 +964,16 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">
                     <SortableHeader label={t('leads.colAssignedRep')} sortKey="assigned_rep" sortConfig={sortConfig} onSort={handleSort} />
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">
+                    <SortableHeader label={t('common.createdAt')} sortKey="created_at" sortConfig={sortConfig} onSort={handleSort} />
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-[#212a38]">
                 {filteredLeads.length === 0 ? (
                   <tr>
-                    <td colSpan="6">
+                    <td colSpan="10">
                       <EmptyState
                         title={t('leads.noLeadsFound')}
                         description={leads.length > 0 ? t('leads.adjustFilters') : t('leads.noLeadsHint')}
@@ -569,15 +983,36 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                     </td>
                   </tr>
                 ) : (
-                  filteredLeads.map((l) => (
-                    <tr key={l.id} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors">
-                      <td className="px-4 py-3">
+                  filteredLeads.map((l, idx) => (
+                    <tr key={l.id} className={`hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors ${selectedLeads.has(l.id) ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}`}>
+                      <td className="pl-4 pr-2 py-3">
+                        <input
+                          type="checkbox"
+                          disabled={l.status === 'converted'}
+                          className="rounded border-gray-300 dark:border-[#212a38] text-indigo-600 focus:ring-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                          checked={selectedLeads.has(l.id)}
+                          onChange={(e) => {
+                            const next = new Set(selectedLeads)
+                            if (e.target.checked) next.add(l.id)
+                            else next.delete(l.id)
+                            setSelectedLeads(next)
+                          }}
+                          aria-label={t('common.selectRow', { name: l.full_name })}
+                        />
+                      </td>
+                      <td className="px-2 py-3 text-xs text-gray-400 dark:text-[#4a5568] font-mono">{idx + 1}</td>
+                      <td className="px-2 py-3">
                         <button
                           onClick={() => navigate(`/leads/${l.id}`)}
-                          className="font-medium text-indigo-600 dark:text-[#a5b4fc] hover:underline text-sm text-left"
+                          className="text-xs font-mono font-semibold text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
                         >
-                          {l.company_name || l.full_name}
+                          {l.lead_code || '—'}
                         </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-[#211f1b] dark:text-[#e8ebf0] text-sm">
+                          {l.company_name || l.full_name}
+                        </div>
                         {l.company_name && <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">{l.full_name}</div>}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600 dark:text-[#9aa4b2]">
@@ -622,6 +1057,9 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600 dark:text-[#9aa4b2]">{l.assigned_rep || '—'}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500 dark:text-[#9aa4b2] whitespace-nowrap">
+                        {l.created_at ? new Date(l.created_at).toLocaleDateString() : '—'}
+                      </td>
                       <td className="px-4 py-3 relative action-menu">
                         <button
                           onClick={(e) => handleToggleMenu(e, l.id)}
@@ -697,13 +1135,23 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
             </table>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Kanban view */}
+      {activeView === 'kanban' && (
+        <LeadsKanbanView
+          leads={filteredLeads}
+          onStatusChange={handleKanbanStatusChange}
+          canEdit={canDo('edit')}
+        />
+      )}
 
       {showAddLead && (
         <CreateLeadModal
           form={leadForm}
           setForm={setLeadForm}
           editing={editingLead}
+          leadCode={editingLead ? editingLead.lead_code : pendingLeadCode}
           salesReps={salesReps}
           onSave={handleSaveLead}
           onClose={() => {
@@ -713,10 +1161,22 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
         />
       )}
 
+      {showBulkUpload && (
+        <BulkUploadLeadsModal
+          onClose={() => setShowBulkUpload(false)}
+          onUpload={handleBulkUpload}
+          onDownloadTemplate={handleDownloadTemplate}
+        />
+      )}
+
       {convertingLead && (
         <ConvertLeadModal
           lead={convertingLead}
-          pipelines={pipelines}
+          stages={
+            pipelines[0]?.stages
+              ? [...pipelines[0].stages].sort((a, b) => a.order - b.order).filter((s) => !s.is_won && !s.is_lost)
+              : []
+          }
           form={convertForm}
           setForm={setConvertForm}
           onConvert={handleConvert}

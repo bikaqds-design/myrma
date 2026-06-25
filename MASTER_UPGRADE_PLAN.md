@@ -296,6 +296,188 @@ Found while starting to build the Leads page: `assigned_rep` on `leads`/`deals`/
 - [x] All strings in `en.json` + `ar.json`
 - [ ] Mobile/PWA check: drag performance on touch — **not yet tested, needs a real device/touch test**; fall back to tap-to-move-stage dropdown only if it proves poor (see Risk Register)
 
+**Post-build refinements — Round 2 (2026-07-08)** — `npm test` 277/277, lint clean, build succeeds:
+
+1. **Four additional Pipeline views** — Odoo-parity analytics suite added via URL-persisted view switcher (`?view=kanban|list|graph|pivot|activity`), no route change needed:
+   - **List view** (`PipelineListView.jsx`) — sortable table (Title/Customer/Stage/Value/Rep/Close Date), status filter chips, footer totals
+   - **Graph view** (`PipelineGraphView.jsx`) — Recharts engine; bar/line/pie chart type toggle; measure (count | revenue) and group-by (stage | salesperson | status | month) selectors; summary stat cards
+   - **Pivot view** (`PipelinePivotView.jsx`) — 2D pivot table; row dim, col dim, measure selectors (count | sum | avg); row/col/grand totals with accent color
+   - **Activity view** (`PipelineActivityView.jsx`) — deals × activity-type matrix; cells color-coded overdue/today/planned; column progress bar; SVG icons per type
+   - View switcher toolbar added to `Pipeline/index.jsx` PageHeader
+
+2. **XLSX Export** — added to Pipeline PageHeader; flat table with Excel AutoFilter on every column header (no stage-group headers, no subtotals, no grand total); sorted by stage order; 14 columns (Stage / Title / Company / Value / Status / Probability / Rep / Close Date / Rotting / Won-Lost Date / Lost Reason / Created At / Created By / Notes)
+
+3. **Kanban column header fix** — title + deal count on line 1, total column value on line 2 (previously both on one cramped line)
+
+4. **"New Deal" → "New Deals"** label fix — `20260707_crm_rename_new_deal_stage_plural.sql` (data UPDATE on `pipelines.stages` JSONB; stage `id` `new_lead` unchanged; idempotent)
+
+5. **Seed data** — `20260706_seed_test_users_and_deals.sql`: 10 test users across all roles (inserted into `user_roles` only, no auth accounts), 31 deals spread across all stages, Feb–Jul 2026, varied reps/values/statuses — used to populate the Graph/Pivot/Activity views with realistic data
+
+6. **Deal Detail page — 6 Odoo-parity UX improvements** (all in `DealDetail.jsx`):
+   - **Color-coded stage pills** — distinct color per stage position (blue → indigo → violet → amber → orange); active stage gets a ring; wraps if > 5 stages
+   - **Won/Lost inline** — ✓ Mark Won and ✗ Mark Lost moved from the top-right button cluster into the stage row itself (same line), separated by a `|` divider; only Edit and Reopen remain top-right
+   - **Probability** — shown as a color-coded pill in the header (green ≥75 / amber ≥50 / orange ≥25 / gray <25) and as a progress bar in the Deal Info sidebar; editable via a range slider (0–100, step 5) in the Edit Deal modal; `probability` added to `EMPTY_DEAL_FORM` in `_constants.js`
+   - **Value prominent + conditional edit** — value displayed as a large bold number in the header; a pencil icon next to it opens an inline input (Enter/Esc to confirm/cancel) — **only shown when `product_lines` is empty**; when product lines exist, value is read-only with a "(Calculated from product lines)" note; the Edit Deal modal disables the value field the same way (`hasProductLines` prop)
+   - **Expected Close Date in header** — shown inline with the value and probability in the header info row (calendar icon + "Closes: date"); still present in the Deal Info sidebar as well
+   - **Single unified tab row** — the right panel previously had two nested tab bars (outer "Activity | Product Lines", inner "Log Note | Schedule Activity"). Collapsed into **one flat row**: Log Note | Schedule Activity | Product Lines. `ActivityChatter` now accepts optional `controlledTab`/`onControlledTabChange` props; when provided it suppresses its own tab bar and is driven externally by DealDetail. Product Lines tab shows the full editor with column headers (Product / Qty / Unit Price / Subtotal) and a bold total row; saving product lines now also auto-syncs `deals.value` to the computed sum.
+
+7. **Activity controls inline** (`ActivityChatter.jsx`) — planned activity cards changed from stacked right-side buttons to a horizontal inline row below the title: **✓ Mark Done · ✏ Edit · ✕ Cancel**. "Edit" = reschedule (date picker inline below). "Cancel" = hard-deletes the activity row via new `db.activities.delete(id)` method added to `src/api/db/activities.ts`.
+
+8. **Data consistency migration** — `20260708_crm_sync_deal_values.sql`: back-fills `deals.value` from `SUM(qty × unit_price)` for all deals with non-empty `product_lines` (old `saveLines()` path never wrote back to `value`); also enforces `probability = 100` for won deals and `probability = 0` for lost deals. **User must run in Supabase SQL Editor.**
+
+**Post-build refinements — Round 3 (2026-07-09)** — `npm test` 277/277, lint clean, build ✓:
+
+1. **Full inline editing on Deal Detail** — all editable fields now use the modern "click-to-edit" hover pattern (dashed indigo underline + background tint on hover; click the value to open an input in-place). No pencil icons. Fields covered:
+   - **Title** — click `h1` → text input (Enter saves, Esc cancels)
+   - **Customer** — click name → searchable type-ahead dropdown (top-10 live filter from `customers` list; click-outside closes; saves `customer_id`)
+   - **Value** — click value → number input (existing pencil replaced by click pattern; disabled when product lines exist)
+   - **Expected Close Date** — click date row → date picker input; shows "Set close date" when null so the field is always a click target
+   - **Probability** — click colored pill → number input 0–100 (ring glow hover on the pill suits its shape better than underline)
+   - **Assigned Rep** (sidebar) — click name → `<select>` dropdown; widened role filter to include `admin`/`super_admin` (was `sales_rep|manager` only — caused blank dropdown for admin accounts); field uses `user_email` (not `email`) from `UserRoleRow`
+   - All edit states: save button + Esc/Enter shortcut; `canEditDeal` guard prevents any click on read-only roles; `title` tooltip "Click to edit"
+
+2. **Tab bar redesign** on Deal Detail:
+   - "Log Note" renamed → **"Deal Log"** (new i18n key `activityChatter.addComment`)
+   - New 4th tab **"Deal Notes"** (`pipeline.dealNotesTab`) — full-width `<textarea>` pre-populated from `deal.notes`, with an explicit Save button; saves to `deals.notes`; persists between tab switches via `useEffect` sync from the query cache
+   - Tab order: **Deal Log | Schedule Activity | Product Lines | Deal Notes**
+   - **Deal Log tab**: note composer removed (moved to right-side Comment Panel); ActivityChatter renders in read-only history mode (`hideNoteComposer` prop)
+   - **Schedule Activity tab**: history feed removed (`hideHistory` prop); shows only the schedule form + planned activities list
+
+3. **Deal Comment Panel** — new persistent right-side column (`src/pages/Pipeline/DealCommentPanel.jsx`):
+   - Always visible; does not require switching tabs
+   - Colored avatar initials (deterministic hash of email → one of 8 accent colors — same across sessions)
+   - Threaded comment bubbles (bubble style, rounded-tl-sm on author side)
+   - Timestamps, file attachment links, "Reply" inline (Enter to send, Esc to cancel)
+   - Composer at bottom: `<textarea>` (500-char limit, char counter), attachment button (reuses `storage.uploadActivityAttachment`), Send button + Ctrl+Enter shortcut
+   - **Synced with Deal Log**: both read the same TanStack Query key `['activities', 'deal', dealId]`; posting in the panel immediately appears in the Deal Log (no extra code — shared cache)
+   - Realtime: Supabase channel `deal_comments_panel_${dealId}` → `invalidateQueries` on any `activities` INSERT/UPDATE/DELETE
+   - Auto-scrolls to bottom on new comment arrival (only if comments grew, not on initial load)
+
+4. **`ActivityChatter.jsx` extended** with two new props:
+   - `hideNoteComposer` — suppresses the note textarea when the note composer has moved to an external panel (schedule activity form still shows when on the activity tab)
+   - `hideHistory` — suppresses the history feed section (used for Schedule Activity tab to show planned-only view)
+
+5. **Deal Detail layout**:
+   - **Full-width page** — `max-w-5xl` cap removed; page now fills the content area
+   - **4-column grid**: Deal Info (25%) | Tabs (50%) | Comment Panel (25%) — `lg:grid-cols-4`, `items-start`
+   - **Edit button removed** — inline editing makes the modal-based "Edit Deal" button redundant; "Reopen Deal" stays (it's a distinct workflow action, not an edit)
+
+6. **New i18n keys** (both `en.json` + `ar.json`):
+   - `activityChatter.addComment` → "Deal Log" / "سجل الصفقة"
+   - `pipeline.dealNotesTab` → "Deal Notes" / "ملاحظات الصفقة"
+   - `pipeline.dealNotesPlaceholder` → "Add notes about this deal..." / "أضف ملاحظات حول هذه الصفقة..."
+   - `pipeline.searchCustomer` → "Search customer..." / "ابحث عن عميل..."
+   - `pipeline.setCloseDate` → "Set close date" / "تحديد تاريخ الإغلاق"
+   - `pipeline.clickToEdit` → "Click to edit" / "انقر للتعديل"
+   - `pipeline.commentsPanel` → "Comments" / "التعليقات"
+   - `pipeline.noComments` → "No comments yet. Be the first to comment." / "لا توجد تعليقات بعد. كن أول من يعلق."
+   - `pipeline.commentPlaceholder` → "Write a comment... (Ctrl+Enter to send)" / "اكتب تعليقاً... (Ctrl+Enter للإرسال)"
+
+**Post-build refinements — Round 4 (2026-07-09)** — `npm test` 277/277, lint clean, build ✓:
+
+1. **Lead & deal reference codes** — auto-generated reference codes added to identify records at a glance:
+   - **Leads**: `LD-XXXXXXXX` (8 random digits) stored in `leads.lead_code`. Generated client-side at create-time; displayed as a clickable code cell in the list (replaces name as the click target to navigate to detail page). `20260709_crm_lead_deal_codes.sql` adds the column and backfills existing rows.
+   - **Deals**: `QT-XXXXXXXX` stored in `deals.deal_code`. Initially seeded as `DL-` in `20260709`, then renamed to `QT-` (Quotation) by `20260710_crm_deal_code_rename.sql` to reflect the deal-as-quotation lifecycle. `crm_convert_lead` RPC updated in `20260711_crm_convert_rpc_deal_code.sql` to generate the QT- code atomically on conversion (no longer patched client-side after the fact).
+   - Codes displayed in the Leads list (clickable), Pipeline list (clickable), Deal Detail header, and Lead Detail header. Pipeline search extended to support `deal_code` matching.
+
+2. **Pipeline list view overhaul** (`PipelineListView.jsx`):
+   - **Status column removed** — stage IS the status indicator; won/lost stages render green/red on the StagePin badge; a separate status column was redundant.
+   - **StagePin inline dropdown** — per-row badge that opens a stage-change menu on click. Color-coded by stage position using an 8-color palette (`OPEN_STAGE_COLORS`). Won = green, Lost = red. Uses `.stage-pin-root` CSS class for safe click-outside detection (mousedown fires before click — the containment check prevents the dropdown from closing before the option click lands).
+   - **Multi-select bulk actions** — checkbox column + select-all header. Bulk stage-change via `deals.bulkMoveStage()`; bulk delete (admin-only) via `deals.bulkDelete()`. `selectedDeals` state lifted to `Pipeline/index.jsx` so the export dropdown can also read it.
+   - **Export dropdown** — replaces single export button with 3-option dropdown: Export All, Export Filtered (only when a filter is active), Export Selected (only when rows are checked).
+   - **Status filter removed** from filter panel and graph/pivot views — status (open/won/lost) is now implicit in stage color, not a separate dimension.
+
+3. **Leads page export dropdown** — same 3-option pattern (Export All / Export Filtered / Export Selected) added to the Leads page header, replacing the single export button.
+
+4. **Kanban improvements** — Leads kanban card clickable-code (LD- code displayed on card, clicking navigates to detail); deal codes displayed on Pipeline kanban cards.
+
+---
+
+## System-wide Rule — Bulk Action Bar (2026-07-09)
+
+**Rule**: When rows can be multi-selected for bulk operations, the bulk action bar MUST appear as a standalone card **below** the search/filter card and **above** the table — never inside `<PageHeader>` or the toolbar row. All existing pages unified to this pattern.
+
+**Canonical container** (use exactly — `Pipeline/PipelineListView.jsx` is the reference):
+
+```text
+bg-indigo-50 dark:bg-indigo-900/20 border border-[#4338ca]/20 dark:border-[#a5b4fc]/20 rounded-[14px] px-4 py-2.5 flex items-center gap-3 flex-wrap
+```
+
+**Count label**: `text-sm font-medium text-[#4338ca] dark:text-[#a5b4fc]` — format: `{N} {t('common.selected')}`
+
+**Divider**: `w-px h-5 bg-[#4338ca]/20 dark:bg-[#a5b4fc]/20`
+
+**Action selects**: `text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg px-2 py-1.5 bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent`
+
+**Apply button**: `px-3 py-1.5 bg-[#4338ca] dark:bg-[#a5b4fc] text-white dark:text-[#0b0f17] rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-40 transition-opacity`
+
+**Delete button** (soft red, NOT solid): `flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors border border-red-200 dark:border-red-800`
+
+**Clear button**: `ml-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]`
+
+**Pages unified (2026-07-09)**: Pipeline (reference), Leads, Customers, Products, RMA Tickets.
+
+---
+
+## System-wide Rule — Filter Button Pattern (2026-07-08)
+
+**Rule**: Every page that has a search bar must also have a standardised **Filters** button (funnel icon + label + active-count badge) that reveals a collapsible filter panel. This is a permanent engineering law enforced from this date forward — new pages must ship with it, and existing pages without it were retroactively updated today.
+
+**Canonical Filters button classes** (use exactly — no `indigo-*` named classes):
+
+- **Inactive**: `flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors border-[#e6e9ef] dark:border-[#212a38] text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520]`
+- **Active** (panel open OR filters applied): `border-[#4338ca] dark:border-[#a5b4fc] text-[#4338ca] dark:text-[#a5b4fc] bg-indigo-50 dark:bg-indigo-900/20`
+- **Badge**: `w-4 h-4 bg-[#4338ca] dark:bg-[#a5b4fc] text-white dark:text-[#0b0f17] text-xs rounded-full flex items-center justify-center`
+- **Filter icon**: `w-4 h-4` (never `w-5 h-5`)
+- **Filter panel**: `p-4 bg-[#f8f9fb] dark:bg-[#0f1520] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]`
+- **Panel selects**: `px-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent`
+
+**Pages updated today** (`npm test` 277/277, lint 0 errors, build ✓):
+
+| Page | Filter state moved/added |
+|---|---|
+| `cp/AuditLog.jsx` | Moved User, Action Type, Date From, Date To behind Filters toggle |
+| `cp/WALogs.jsx` | Moved Provider, Status, Date From, Date To behind Filters toggle; search stays always-visible |
+| `Leads/index.jsx` | Moved Status, Source behind Filters toggle |
+| `Pipeline/PipelineListView.jsx` | Added Stage + Assigned Rep filters; status chips remain always-visible |
+| `PartsInventory.jsx` | Added Supplier filter; Low Stock chip remains always-visible |
+| `Products/ProductsListTab.jsx` + `Products/index.jsx` | Added Brand, Category, Status filters; state in index.jsx, UI in ProductsListTab |
+
+**New i18n keys** (added to `en.json` + `ar.json`):
+- `products.allBrands`, `products.allCategories`, `products.allStatuses`
+- `parts.allSuppliers`
+- `pipeline.allStages`, `pipeline.allReps`
+
+---
+
+## System-wide Design Unification Sprint (2026-07-09)
+
+**Goal**: Make every page's search bar, Filters button, export button, and page header visually identical. Applied retroactively to all existing pages — new pages must ship already unified.
+
+**Changes applied** (`npm test` 277/277, lint 0 errors, build ✓):
+
+1. **AI Assist button hidden** — `<AIAssist>` JSX and imports removed from Dashboard, Reports, Inventory, CustomerDetails, RMATickets. Component file kept for future re-enabling.
+
+2. **Export button canonicalized** — `RMATickets/index.jsx` export button replaced with the canonical outline style (green download icon, design-token border/hover).
+
+3. **Search bar unified across all pages** — all `border-gray-300`, `ring-indigo-500/600`, light-only inputs updated to the canonical class (see Filter Button Rule above for `inp` class string). Pages fixed: `PartsInventory`, `Inventory/ByProductTab`, `Inventory/WarehousesTab`, `cp/AuditLog`, `cp/WALogs`.
+
+4. **Filters button active state unified** — eliminated all `border-indigo-500 / text-indigo-600 / dark:border-indigo-400 / dark:text-indigo-300` references. Updated to design-token classes (see rule above). Pages fixed: Products, Customers, RMATickets, PartsInventory, Inventory/ByProductTab, AuditLog.
+
+5. **Filter icon size unified** — all `w-5 h-5` filter funnel icons → `w-4 h-4`. Pages fixed: PartsInventory, Inventory/ByProductTab, AuditLog.
+
+6. **Filter badge unified** — all `bg-indigo-600` badge backgrounds → `bg-[#4338ca] dark:bg-[#a5b4fc] text-white dark:text-[#0b0f17]`. Pages fixed: PartsInventory, Inventory/ByProductTab, Products, AuditLog.
+
+7. **Filter panel background unified** — `bg-gray-50` → `bg-[#f8f9fb] dark:bg-[#0f1520]` with design-token border. Pages fixed: Inventory/ByProductTab.
+
+8. **Pipeline search/filter added** — Pipeline/index.jsx gained a persistent search bar + stage/rep/status filter panel; `filteredDeals` useMemo passed to all 5 views (kanban, list, graph, pivot, activity). PipelineListView's duplicate filter UI removed.
+
+9. **`Button secondary` variant updated** in `src/components/ui.jsx` — now uses design tokens system-wide instead of gray palette.
+
+**New i18n keys** (added to `en.json` + `ar.json`):
+
+- `pipeline.allStatuses`, `pipeline.searchPlaceholder`, `pipeline.filteredCount`
+
 ---
 
 ## Sprint 4 — Activities & Follow-Ups
@@ -556,9 +738,17 @@ Surfaced while verifying current-state ground truth — not comparisons to Odoo,
 | File | Sprint |
 |---|---|
 | `supabase/migrations/20260618_*` through `20260703_*` (full chain, see Sprints 1-2.5 above) | 1–2.5 |
+| `supabase/migrations/20260704_crm_pipeline_rename_new_lead_stage.sql` | 3 |
+| `supabase/migrations/20260706_seed_test_users_and_deals.sql` | 3 |
+| `supabase/migrations/20260707_crm_rename_new_deal_stage_plural.sql` | 3 |
+| `supabase/migrations/20260708_crm_sync_deal_values.sql` | 3 |
 | `src/api/db/leads.ts`, `deals.ts`, `activities.ts`, `pipelines.ts`, `contacts.ts` | 1 |
 | `src/pages/Leads/index.jsx`, `LeadDetails.jsx`, `LeadChatter.jsx`, `_modals.jsx`, `_constants.js` | 2, 2.5 |
 | `src/pages/Pipeline/index.jsx`, `Pipeline/DealDetail.jsx` | 3 |
+| `src/pages/Pipeline/PipelineListView.jsx` | 3 |
+| `src/pages/Pipeline/PipelineGraphView.jsx` | 3 |
+| `src/pages/Pipeline/PipelinePivotView.jsx` | 3 |
+| `src/pages/Pipeline/PipelineActivityView.jsx` | 3 |
 | `src/pages/Activities/index.jsx` | 4 |
 | `src/lib/events/crmEventHandlers.ts` | 4 |
 
@@ -566,10 +756,17 @@ Surfaced while verifying current-state ground truth — not comparisons to Odoo,
 | File | Change | Sprint |
 |---|---|---|
 | `src/api/db/index.ts` | Export new Row types + modules | 1 |
+| `src/api/db/activities.ts` | Added `delete(id)` method; `listForRelated()` bulk query | 3 |
+| `src/api/db/deals.ts` | `moveStage()`, `markWon()`, `markLost()`, `reopen()` with auto-log | 3 |
 | `src/lib/constants.ts` | `LEAD_STATUS`, `LEAD_SOURCE`, `DEAL_STATUS`, `ACTIVITY_TYPE` (+`LOG`), `LIFECYCLE_STAGE` | 1, 2.5 |
 | `src/lib/schemas.ts` | New Zod schemas | 1, 2 (assigned_rep fix) |
 | `src/lib/permissions.ts` | `sales_rep` in `ROLE_DEFAULT_PERMISSIONS` | 1 |
 | `src/App.jsx` | Routes `/leads`, `/leads/:id`, `/pipeline`, `/pipeline/:id`, `/activities` | 2, 2.5, 3–4 |
+| `src/components/ActivityChatter.jsx` | `controlledTab`/`onControlledTabChange` props (external tab control); inline Mark Done/Edit/Cancel activity controls; `handleCancelActivity` via `db.activities.delete()` | 3 |
+| `src/pages/Pipeline/index.jsx` | View switcher (kanban/list/graph/pivot/activity); XLSX export (flat + AutoFilter); Kanban column header layout fix | 3 |
+| `src/pages/Pipeline/DealDetail.jsx` | Color-coded stages; Won/Lost inline; probability header + sidebar + slider; prominent value + inline edit; Expected Close Date in header; unified single tab row (Log Note / Schedule Activity / Product Lines); product lines tab with column headers + auto-sync value | 3 |
+| `src/pages/Pipeline/_modals.jsx` | Probability slider; value field locked when `hasProductLines` | 3 |
+| `src/pages/Pipeline/_constants.js` | `probability: 0` added to `EMPTY_DEAL_FORM` | 3 |
 | `src/pages/Dashboard.jsx` | Sales KPI widgets, pipeline chart, leaderboard | 4–5 |
 | `src/pages/CustomerDetails.jsx` | Contacts tab, Deals tab (Track A) + Invoices tab (Track B) | 5 |
 | `src/pages/Reports.jsx` | CRM reports section | 5 |

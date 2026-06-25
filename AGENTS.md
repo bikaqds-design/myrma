@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev            # start dev server (Vite, port 5173)
 npm run build          # production build
 npm run preview        # preview production build
-npm test               # Vitest unit tests (80 tests, 3 suites, ~3.5s) — run before every push
+npm test               # Vitest unit tests (277 tests, 7 suites) — run before every push
 npm run test:watch     # Vitest in watch mode
 npm run test:coverage  # test with coverage report
 npm run lint           # ESLint (0 errors target)
@@ -57,12 +57,17 @@ All top-level pages are lazy-loaded via the `lazyWithReload()` wrapper in `App.j
 | `/invoices` | `Invoices` | required |
 | `/parts` | `PartsInventory` | required |
 | `/reports` | `Reports` | required |
+| `/leads` | `Leads` | required (`leads.view`) |
+| `/leads/:id` | `LeadDetailsRoute` → `LeadDetails` | required (`leads.view`) |
+| `/pipeline` | `Pipeline` | required (`deals.view`) |
+| `/pipeline/:id` | `PipelineDealRoute` → `DealDetail` | required (`deals.view`) |
 | `/tracker` | `RMATracker` | **none (public)** |
+| `/kb` | `KnowledgeBasePublic` | **none (public)** |
 | `*` | `NotFoundPage` | — |
 
 Props passed to every authenticated page component: `currentUserRole`, `currentUserEmail`, `currentUserPermissions`.
 
-`/tracker` is the only unauthenticated route — detected via `pathname === '/tracker'` before the auth check renders.
+`/tracker` and `/kb` are the only unauthenticated routes — each detected via a `pathname === '/...'` check before the auth check renders.
 
 **Exception:** `window.history.pushState` is used ONLY inside `RMATickets/index.jsx` to sync `?ticket=<id>` (open ticket modal URL) without triggering a full route transition. This is intentional in-page state, not top-level navigation.
 
@@ -109,6 +114,11 @@ Domain modules in `src/api/db/`:
 | `system.ts` | System config (`rma_config` table) |
 | `audit.ts` | Audit log reads |
 | `whatsappNotifications.ts` | WhatsApp templates, notification logs, settings, queue |
+| `leads.ts` | Lead CRUD + `convert()` atomic RPC (CRM) |
+| `deals.ts` | Deal CRUD + `moveStage()`, `markWon()`, `markLost()`, `reopen()`, `bulkDelete()`, `bulkMoveStage()` with auto-log (CRM Sprint 3) |
+| `activities.ts` | Activity/chatter CRUD + `listForRelated()` bulk query + `delete()` (CRM) |
+| `pipelines.ts` | Pipeline + stage CRUD (CRM) |
+| `contacts.ts` | Contact CRUD (CRM) |
 
 Many optional tables (e.g. `announcements`, `custom_field_definitions`, `inventory_units`, `warehouses`) may not exist in every deployment. All `db.*` helpers that target these tables guard with `error.code === '42P01'` (table not found) and return `{ missing: true, data: [] }` instead of throwing.
 
@@ -280,8 +290,14 @@ Five large pages are organized as folders. `React.lazy(() => import('./pages/X')
 | `src/pages/Products/` | `index.jsx`, `ProductsListTab.jsx`, `HierarchyTab.jsx`, `_modals.jsx` |
 | `src/pages/UserManagement/` | `index.jsx`, `UsersTab.jsx`, `RolesTab.jsx`, `_shared.jsx`, `_utils.js` — "Role Templates" tab is now a read-only **"Role Reference"** (displays runtime `ROLE_DEFAULT_PERMISSIONS`). "Custom Roles" tab is hidden behind `ENABLE_CUSTOM_ROLES = false` flag (not yet wired end-to-end). |
 | `src/pages/Customers/` | `index.jsx`, `_modals.jsx`, `_constants.js` |
+| `src/pages/Leads/` | `index.jsx` (list + filters), `LeadDetails.jsx` (detail page), `_modals.jsx` (Create/Convert), `_constants.js`, `_shared.jsx` (SortableHeader) |
+| `src/pages/Pipeline/` | `index.jsx` (view switcher, kanban, XLSX export, search/filters, multi-select stage/rep filters, export dropdown, lifted `selectedDeals` state), `DealDetail.jsx` (inline editing, product lines, stages), `DealCommentPanel.jsx` (right-side comment panel), `PipelineListView.jsx` (sortable table, stage pin dropdown, bulk select/delete/move, indigo bulk bar), `PipelineGraphView.jsx`, `PipelinePivotView.jsx`, `PipelineActivityView.jsx`, `_modals.jsx`, `_constants.js`, `_shared.jsx` |
 
 The remaining pages (`Dashboard`, `Reports`, `Invoices`, `PartsInventory`, `ControlPanel`, `AccountSettings`, etc.) are still single files.
+
+**Shared CRM component:** `src/components/ActivityChatter.jsx` — generalized chatter panel (note/schedule/reply/reschedule/reopen/attachments) used by both `LeadDetails.jsx` and `DealDetail.jsx`. Do not re-implement this per-page.
+
+**AI Assist:** `src/components/AIAssist.jsx` exists but is hidden — all `<AIAssist>` usage has been removed from page files. The `ai-assist` Edge Function and `ai.assist()` helper still exist.
 
 ### Accessibility
 
@@ -310,6 +326,35 @@ Current migrations:
 - `20260531_relax_ticket_status_constraint.sql`
 - `20260602_whatsapp_notifications.sql`
 - `20260603_user_preferences_rls.sql`
+- `20260613_search_by_serial.sql`
+- `20260617_kb_articles.sql`
+
+CRM upgrade (Track A), applied in order:
+
+- `20260618_crm_add_sales_rep_role.sql` — adds `sales_rep` role
+- `20260619_crm_contacts.sql`
+- `20260620_crm_pipelines.sql`
+- `20260621_crm_leads.sql`
+- `20260622_crm_deals.sql`
+- `20260623_crm_activities.sql`
+- `20260624_crm_customers_extend.sql`
+- `20260625_crm_notification_events.sql`
+- `20260626_crm_leads_convert_rpc.sql` — `convert_lead_to_deal` RPC
+- `20260627_crm_fix_duplicate_user_roles_check.sql`
+- `20260628_crm_assigned_rep_use_email.sql` — `assigned_rep` is `text`/email, not uuid FK
+- `20260629_crm_created_by_use_email.sql` — `created_by` is `text`/email, not uuid FK
+- `20260630_crm_convert_lead_customer_code.sql`
+- `20260701_crm_leads_add_statuses.sql` — adds `active`/`inactive` lead statuses
+- `20260702_crm_activities_chatter.sql` — `attachments jsonb`, `log` activity type
+- `20260703_crm_activities_replies.sql` — `parent_id` for threaded replies
+- `20260704_crm_pipeline_rename_new_lead_stage.sql`
+- `20260705_crm_remove_b2c_pipeline.sql`
+- `20260706_seed_test_users_and_deals.sql`
+- `20260707_crm_rename_new_deal_stage_plural.sql`
+- `20260708_crm_sync_deal_values.sql` — back-fills `deals.value` from product lines; enforces probability 100/0 for won/lost
+- `20260709_crm_lead_deal_codes.sql` — adds `lead_code` (LD- prefix) and `deal_code` (DL- prefix) columns; backfills existing rows
+- `20260710_crm_deal_code_rename.sql` — renames backfilled deal codes from DL- to QT- (Quotation lifecycle)
+- `20260711_crm_convert_rpc_deal_code.sql` — updates `crm_convert_lead` RPC to generate QT- `deal_code` atomically on conversion
 
 ### RLS SQL helper functions
 

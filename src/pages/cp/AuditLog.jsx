@@ -13,6 +13,7 @@ export default function AuditLog() {
   const [filterAction, setFilterAction] = useState('')
   const [filterFrom, setFilterFrom] = useState('')
   const [filterTo, setFilterTo] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
 
   const { data: logs = [], isLoading: loading, isError, error } = useQuery({
     queryKey: ['audit-log'],
@@ -73,9 +74,9 @@ export default function AuditLog() {
     setFilterFrom('')
     setFilterTo('')
   }
-  const hasFilters = search || filterUser || filterAction || filterFrom || filterTo
+  const activeFilterCount = [filterUser, filterAction, filterFrom, filterTo].filter(Boolean).length
   const inp =
-    'px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent'
+    'px-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent'
 
   const HEADERS = [
     t('cp.auditLog.dateTime'),
@@ -102,7 +103,7 @@ export default function AuditLog() {
         </div>
         <button
           onClick={handleExport}
-          className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#e6e9ef] dark:border-[#212a38] text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -116,69 +117,72 @@ export default function AuditLog() {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
+      {/* Toolbar */}
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-48">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('cp.auditLog.searchPlaceholder')}
-            className={`w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent`}
+            className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
           />
           <svg
-            className="w-4 h-4 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2"
+            className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
-        <select value={filterUser} onChange={(e) => setFilterUser(e.target.value)} className={inp}>
-          <option value="">{t('cp.auditLog.allUsers')}</option>
-          {uniqueUsers.map((u) => (
-            <option key={u} value={u}>
-              {u}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filterAction}
-          onChange={(e) => setFilterAction(e.target.value)}
-          className={inp}
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          aria-expanded={showFilters}
+          aria-controls="audit-filters-panel"
+          className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${
+            showFilters || activeFilterCount > 0
+              ? 'border-[#4338ca] text-[#4338ca] bg-indigo-50 dark:bg-indigo-900/20 dark:border-[#a5b4fc] dark:text-[#a5b4fc]'
+              : 'border-[#e6e9ef] dark:border-[#212a38] text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520]'
+          }`}
         >
-          <option value="">{t('cp.auditLog.allActions')}</option>
-          {uniqueActions.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </select>
-        <input
-          type="date"
-          value={filterFrom}
-          onChange={(e) => setFilterFrom(e.target.value)}
-          className={inp}
-          title={t('cp.auditLog.fromDate')}
-        />
-        <input
-          type="date"
-          value={filterTo}
-          onChange={(e) => setFilterTo(e.target.value)}
-          className={inp}
-          title={t('cp.auditLog.toDate')}
-        />
-        {hasFilters && (
-          <button onClick={clearFilters} className="text-sm text-red-600 hover:underline">
-            {t('cp.auditLog.clear')}
-          </button>
-        )}
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+          </svg>
+          {t('common.filters')}
+          {activeFilterCount > 0 && (
+            <span className="w-4 h-4 bg-[#4338ca] dark:bg-[#a5b4fc] text-white dark:text-[#0b0f17] text-xs rounded-full flex items-center justify-center">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
       </div>
+
+      {/* Filter panel */}
+      {showFilters && (
+        <div id="audit-filters-panel" className="p-4 bg-[#f8f9fb] dark:bg-[#0f1520] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <select value={filterUser} onChange={(e) => setFilterUser(e.target.value)} className={inp}>
+              <option value="">{t('cp.auditLog.allUsers')}</option>
+              {uniqueUsers.map((u) => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+            <select value={filterAction} onChange={(e) => setFilterAction(e.target.value)} className={inp}>
+              <option value="">{t('cp.auditLog.allActions')}</option>
+              {uniqueActions.map((a) => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+            <input type="date" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} className={inp} title={t('cp.auditLog.fromDate')} />
+            <input type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} className={inp} title={t('cp.auditLog.toDate')} />
+          </div>
+          {activeFilterCount > 0 && (
+            <button onClick={clearFilters} className="mt-3 text-sm text-red-500 dark:text-red-400 hover:underline">
+              {t('common.clear')}
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="text-xs text-gray-500">
         {t('cp.auditLog.showingOf', { filtered: filtered.length, total: logs.length })}

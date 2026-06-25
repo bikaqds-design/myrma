@@ -144,6 +144,10 @@ export const activities = {
     if (error) throw error
     return data[0]
   },
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('activities').delete().eq('id', id)
+    if (error) throw error
+  },
   // RLS already scopes results to what the caller can see (manager+ sees
   // all, sales_rep sees only their own assigned_rep rows).
   async listOverdue(): Promise<ActivityRow[]> {
@@ -152,6 +156,19 @@ export const activities = {
       .select('*')
       .lt('due_date', new Date().toISOString())
       .is('completed_at', null)
+      .order('due_date', { ascending: true })
+    if (error) throw error
+    return data || []
+  },
+  // All open (non-completed, non-log) scheduled activities across all related
+  // types. Used by the Activities page and for overdue-count badge derivation.
+  async listAllPlanned(): Promise<ActivityRow[]> {
+    const { data, error } = await supabase
+      .from('activities')
+      .select('*')
+      .is('completed_at', null)
+      .neq('type', 'log')
+      .not('due_date', 'is', null)
       .order('due_date', { ascending: true })
     if (error) throw error
     return data || []

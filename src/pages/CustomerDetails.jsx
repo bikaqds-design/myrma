@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, storage, branding as brandingAPI } from '../api/supabaseClient'
-import AIAssist from '../components/AIAssist'
 import QRCode from 'qrcode'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -472,31 +471,6 @@ export default function CustomerDetails({
           </div>
         ))}
       </div>
-
-      {/* AI Assist */}
-      <AIAssist
-        contextType="customer"
-        data={{
-          contact_person: customer.contact_person,
-          company_name: customer.company_name,
-          customer_type: customer.customer_type,
-          email: customer.email,
-          created_date: customer.created_date,
-          ticket_count: tickets.length,
-          open_ticket_count: tickets.filter((t) =>
-            t.ticket_status === TICKET_STATUS.OPEN ||
-            t.ticket_status === TICKET_STATUS.IN_PROGRESS ||
-            t.ticket_status === TICKET_STATUS.ON_HOLD
-          ).length,
-          resolved_count: tickets.filter((t) =>
-            t.ticket_status === TICKET_STATUS.COMPLETED ||
-            t.ticket_status === TICKET_STATUS.CLOSED
-          ).length,
-          last_ticket_date: tickets.length > 0
-            ? tickets.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]?.created_date
-            : null,
-        }}
-      />
 
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">

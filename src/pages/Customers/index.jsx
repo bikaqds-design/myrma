@@ -772,7 +772,7 @@ export default function Customers({
     if (sortConfig.key !== col)
       return (
         <svg
-          className="w-3.5 h-3.5 text-gray-300 ml-1"
+          className="w-3.5 h-3.5 text-[#e6e9ef] dark:text-[#212a38] ml-1"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -787,7 +787,7 @@ export default function Customers({
       )
     return sortConfig.direction === 'asc' ? (
       <svg
-        className="w-3.5 h-3.5 text-indigo-600 ml-1"
+        className="w-3.5 h-3.5 text-[#4338ca] dark:text-[#a5b4fc] ml-1"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -796,7 +796,7 @@ export default function Customers({
       </svg>
     ) : (
       <svg
-        className="w-3.5 h-3.5 text-indigo-600 ml-1"
+        className="w-3.5 h-3.5 text-[#4338ca] dark:text-[#a5b4fc] ml-1"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -878,10 +878,10 @@ export default function Customers({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t('customers.searchPlaceholder')}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                  className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
                 />
                 <svg
-                  className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2"
+                  className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -898,7 +898,7 @@ export default function Customers({
                 onClick={() => setShowFilters(!showFilters)}
                 aria-expanded={showFilters}
                 aria-controls="customer-filters-panel"
-                className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || filterStatus || filterType || filterCompany ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 dark:border-[#212a38] text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520]'}`}
+                className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || filterStatus || filterType || filterCompany ? 'border-[#4338ca] text-[#4338ca] bg-indigo-50 dark:bg-indigo-900/20 dark:border-[#a5b4fc] dark:text-[#a5b4fc]' : 'border-[#e6e9ef] dark:border-[#212a38] text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520]'}`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -918,45 +918,12 @@ export default function Customers({
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              {selectedCustomers.length > 0 && canDo('delete') && (
-                <>
-                  <button
-                    onClick={handleBulkDelete}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
-                    {t('common.delete')} ({selectedCustomers.length})
-                  </button>
-                  <select
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        handleBulkStatusChange(e.target.value)
-                        e.target.value = ''
-                      }
-                    }}
-                    defaultValue=""
-                    className="px-4 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
-                  >
-                    <option value="">{t('customers.changeStatus')}</option>
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                    <option value="Suspended">Suspended</option>
-                  </select>
-                </>
-              )}
               {canDo('export') && (
                 <button
                   onClick={handleExportCSV}
-                  className="px-4 py-2 border border-gray-300 dark:border-[#212a38] text-gray-700 dark:text-[#e8ebf0] rounded-lg hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-2 text-sm"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#e6e9ef] dark:border-[#212a38] text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] transition-colors"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1121,6 +1088,43 @@ export default function Customers({
               <span>
                 {t('customers.capWarning', { shown: customers.length, total: customersTotalCount })}
               </span>
+            </div>
+          )}
+
+          {/* Bulk action bar */}
+          {selectedCustomers.length > 0 && (
+            <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-[#4338ca]/20 dark:border-[#a5b4fc]/20 rounded-[14px] px-4 py-2.5 flex items-center gap-3 flex-wrap">
+              <span className="text-sm font-medium text-[#4338ca] dark:text-[#a5b4fc]">
+                {selectedCustomers.length} {t('common.selected')}
+              </span>
+              <div className="w-px h-5 bg-[#4338ca]/20 dark:bg-[#a5b4fc]/20" />
+              <select
+                onChange={(e) => { if (e.target.value) { handleBulkStatusChange(e.target.value); e.target.value = '' } }}
+                defaultValue=""
+                className="text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg px-2 py-1.5 bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
+              >
+                <option value="">{t('customers.changeStatus')}</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+                <option value="Suspended">Suspended</option>
+              </select>
+              {canDo('delete') && (
+                <button
+                  onClick={handleBulkDelete}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors border border-red-200 dark:border-red-800"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  {t('common.delete')}
+                </button>
+              )}
+              <button
+                onClick={() => setSelectedCustomers([])}
+                className="ml-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
+              >
+                {t('common.clear')}
+              </button>
             </div>
           )}
 
@@ -1382,7 +1386,7 @@ export default function Customers({
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {t('common.previous')}
                 </button>
@@ -1390,7 +1394,7 @@ export default function Customers({
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-2 border border-gray-300 dark:border-[#212a38] rounded text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {t('common.next')}
                 </button>

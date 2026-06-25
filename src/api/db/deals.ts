@@ -13,6 +13,7 @@ export interface DealProductLine {
 
 export interface DealRow {
   id: string
+  deal_code: string | null
   title: string
   customer_id: string
   contact_id: string | null
@@ -177,6 +178,50 @@ export const deals = {
       .select()
     if (error) throw error
     activities.logSystem('deal', id, `lost|${reason}`, actorEmail).catch(() => {})
+    return data[0]
+  },
+  async bulkDelete(ids: string[]): Promise<void> {
+    if (!ids.length) return
+    const { error } = await supabase.from('deals').delete().in('id', ids)
+    if (error) throw error
+  },
+  async bulkMoveStage(ids: string[], stageId: string): Promise<void> {
+    if (!ids.length) return
+    const { error } = await supabase
+      .from('deals')
+      .update({ stage: stageId, updated_at: new Date().toISOString() })
+      .in('id', ids)
+    if (error) throw error
+  },
+  async reopen(id: string, stageId: string, actorEmail: string | null = null): Promise<DealRow> {
+    const { data: current, error: fetchError } = await supabase
+      .from('deals')
+      .select('pipeline_id, status')
+      .eq('id', id)
+      .single()
+    if (fetchError) throw fetchError
+    const stages = await getPipelineStages(current.pipeline_id)
+    const targetStage = stages.find((s) => s.id === stageId)
+    if (!targetStage) throw new Error(`Stage "${stageId}" is not valid for this pipeline`)
+    if (targetStage.is_won || targetStage.is_lost) {
+      throw new Error('Cannot reopen a deal directly into a terminal stage')
+    }
+    const { data, error } = await supabase
+      .from('deals')
+      .update({
+        status: 'open',
+        stage: stageId,
+        won_at: null,
+        lost_at: null,
+        lost_reason: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+    if (error) throw error
+    activities
+      .logSystem('deal', id, `reopened|${current.status}|${stageName(stages, stageId)}`, actorEmail)
+      .catch(() => {})
     return data[0]
   },
 }

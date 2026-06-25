@@ -6,6 +6,7 @@ export const EMPTY_DEAL_FORM = {
   pipeline_id: '',
   stage: '',
   value: '',
+  probability: 0,
   expected_close_date: '',
   assigned_rep: '',
   notes: '',

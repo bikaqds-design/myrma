@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, supabase } from '../api/supabaseClient'
-import AIAssist from '../components/AIAssist'
 import { safeStorage } from '../lib/safeStorage'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { Spinner } from '../components/ui'
@@ -24,6 +23,7 @@ export const WIDGET_CATALOG = [
   { id: 'priority_distribution',  label: 'Priority Distribution',      desc: 'Donut chart of ticket priorities',              size: 'half' },
   { id: 'technician_performance', label: 'Technician Performance',     desc: 'Top 5 technicians by close rate',               size: 'full' },
   { id: 'top_issues',             label: 'Top Issues',                 desc: 'Ranked list of most common product issues',     size: 'full' },
+  { id: 'overdue_followups',      label: 'Overdue Follow-Ups',         desc: 'CRM activities past their due date',            size: 'half' },
 ]
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -219,7 +219,6 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
     queryFn: () => db.inventory.getStats().catch(() => null),
     staleTime: 2 * 60_000,
   })
-
   useEffect(() => {
     const channel = supabase
       .channel('dashboard-rt')
@@ -249,6 +248,13 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
 
   const on = (id) => enabledWidgets.includes(id)
   const nav = (page) => () => onNavigate?.(page)
+
+  const { data: overdueFollowups = [] } = useQuery({
+    queryKey: ['activities', 'overdue-count'],
+    queryFn: () => db.activities.listOverdue(),
+    staleTime: 60_000,
+    enabled: on('overdue_followups'),
+  })
 
   const rangedTickets = useMemo(() => {
     if (range === 'All') return tickets
@@ -449,8 +455,6 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
           ))}
         </div>
       </div>
-
-      <AIAssist contextType="dashboard" data={dashboardAIData} className="mb-5" />
 
       {!hasWidgets && (
         <div style={{ background: tk.surface, border: `2px dashed ${tk.border}`, borderRadius: 14, padding: '56px 0', textAlign: 'center' }}>
@@ -699,6 +703,39 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
                   </div>
                 )
               })}
+          </div>
+        )}
+
+        {/* ── Section: CRM ── */}
+        {on('overdue_followups') && (
+          <SectionLabel tk={tk}>{t('dashboard.crmSection')}</SectionLabel>
+        )}
+
+        {on('overdue_followups') && (
+          <div
+            className="col-span-12 sm:col-span-6 lg:col-span-3"
+            onClick={nav('/activities?tab=overdue')}
+            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
+          >
+            <CardHead title={t('dashboard.overdueFollowups')} action={String(overdueFollowups.length)} tk={tk} />
+            {overdueFollowups.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <svg className="mx-auto mb-2" width="32" height="32" fill="none" stroke={tk.good} strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p style={{ color: tk.good, fontSize: 13, fontWeight: 600, margin: 0 }}>{t('dashboard.allClear')}</p>
+              </div>
+            ) : overdueFollowups.slice(0, 8).map((a, i) => (
+              <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderTop: i ? `1px solid ${tk.borderSoft}` : 'none' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: tk.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.title}</div>
+                  <div style={{ fontSize: 11.5, color: tk.textMuted }}>{a.assigned_rep ?? '—'}</div>
+                </div>
+                <span style={{ flexShrink: 0, marginLeft: 8, padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, color: tk.bad, background: tk.bad + '1a' }}>
+                  {Math.ceil((new Date() - new Date(a.due_date)) / 86400000)}d
+                </span>
+              </div>
+            ))}
           </div>
         )}
 

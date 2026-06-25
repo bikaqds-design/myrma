@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -8,19 +8,19 @@ import { PageSkeleton } from '../../components/Skeleton'
 import { Button } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
 import ConfirmDialog from '../../components/ConfirmDialog'
-import { leadSchema, getFirstError } from '../../lib/schemas'
-import { LEAD_STATUS_LIST } from '../../lib/constants'
-import { EMPTY_FORM, EMPTY_CONVERT_FORM } from './_constants'
-import { CreateLeadModal, ConvertLeadModal } from './_modals'
 import { ActivityChatter } from '../../components/ActivityChatter'
+import { CommentPanel } from '../../components/CommentPanel'
+import { LEAD_STATUS_LIST } from '../../lib/constants'
+import { EMPTY_CONVERT_FORM } from './_constants'
+import { ConvertLeadModal } from './_modals'
 
 const STATUS_BADGE = {
-  new: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
-  contacted: 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
-  qualified: 'bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400',
-  nurturing: 'bg-teal-100 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400',
-  inactive: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
-  converted: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+  new:          'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
+  contacted:    'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
+  qualified:    'bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400',
+  nurturing:    'bg-teal-100 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400',
+  inactive:     'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
+  converted:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
   disqualified: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
 }
 
@@ -35,20 +35,20 @@ const SOURCE_BADGE = {
 
 const DEAL_STATUS_BADGE = {
   open: 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-[#a5b4fc]',
-  won: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+  won:  'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
   lost: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
 }
 
 const CARD = 'bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-[18px]'
 
-function Detail({ label, value }) {
-  return (
-    <div>
-      <div className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase">{label}</div>
-      <div className="text-sm text-gray-900 dark:text-[#e8ebf0] mt-0.5">{value || '—'}</div>
-    </div>
-  )
-}
+const TAB_CLS = (active) =>
+  `px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+    active
+      ? 'border-indigo-600 dark:border-[#a5b4fc] text-indigo-600 dark:text-[#a5b4fc]'
+      : 'border-transparent text-gray-500 dark:text-[#9aa4b2] hover:text-gray-700 dark:hover:text-[#e8ebf0]'
+  }`
+
+const LEAD_SOURCES = ['walk-in', 'phone', 'referral', 'exhibition', 'website', 'whatsapp']
 
 export default function LeadDetails({ leadId, currentUserRole, currentUserEmail, currentUserPermissions, onBack }) {
   const { t } = useTranslation()
@@ -70,37 +70,126 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
     queryFn: () => db.userRoles.listAllRoles(),
     staleTime: 5 * 60_000,
   })
-  const salesReps = usersList.filter((u) => u.role === 'sales_rep' || u.role === 'manager')
+  const salesReps = usersList.filter((u) =>
+    u.role === 'sales_rep' || u.role === 'manager' || u.role === 'admin' || u.role === 'super_admin'
+  )
 
-  // Surface the linked deal directly on the lead — only fetched once the
-  // lead has actually been converted (converted_deal_id set).
   const { data: linkedDeal } = useQuery({
     queryKey: ['deal', lead?.converted_deal_id],
     queryFn: () => db.deals.get(lead.converted_deal_id),
     enabled: !!lead?.converted_deal_id,
   })
   const linkedDealPipeline = pipelines.find((p) => p.id === linkedDeal?.pipeline_id)
-  const linkedDealStageName = linkedDealPipeline?.stages.find((s) => s.id === linkedDeal?.stage)?.name ?? linkedDeal?.stage
-
-  const [showEdit, setShowEdit] = useState(false)
-  const [leadForm, setLeadForm] = useState(EMPTY_FORM)
-  const [showConvert, setShowConvert] = useState(false)
-  const [convertForm, setConvertForm] = useState(EMPTY_CONVERT_FORM)
-  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null })
+  const linkedDealStageName =
+    linkedDealPipeline?.stages.find((s) => s.id === linkedDeal?.stage)?.name ?? linkedDeal?.stage
 
   const canDo = (action) => {
     if (currentUserRole === 'super_admin' || currentUserRole === 'admin') return true
     return currentUserPermissions?.leads?.[action] === true
   }
 
+  const isConverted = lead?.status === 'converted'
+  const canEdit = canDo('edit') && !isConverted
+
+  const EDITABLE = canEdit
+    ? 'cursor-pointer rounded px-1 -mx-1 border-b-2 border-dashed border-transparent hover:border-indigo-300 dark:hover:border-[#a5b4fc] hover:bg-indigo-50/60 dark:hover:bg-indigo-900/10 transition-all'
+    : ''
+
+  // Inline edit state
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const [editingCompany, setEditingCompany] = useState(false)
+  const [companyInput, setCompanyInput] = useState('')
+  const [editingPhone, setEditingPhone] = useState(false)
+  const [phoneInput, setPhoneInput] = useState('')
+  const [editingEmail, setEditingEmail] = useState(false)
+  const [emailInput, setEmailInput] = useState('')
+  const [editingSource, setEditingSource] = useState(false)
+  const [sourceInput, setSourceInput] = useState('')
+  const [editingRep, setEditingRep] = useState(false)
+  const [repInput, setRepInput] = useState('')
+  const [notesInput, setNotesInput] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
+  const [tab, setTab] = useState('note')
+
+  const [showConvert, setShowConvert] = useState(false)
+  const [convertForm, setConvertForm] = useState(EMPTY_CONVERT_FORM)
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null })
+
+  useEffect(() => {
+    setNotesInput(lead?.notes ?? '')
+  }, [lead?.notes])
+
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['lead', leadId] })
     queryClient.invalidateQueries({ queryKey: ['leads'] })
+    queryClient.invalidateQueries({ queryKey: ['activities', 'lead', leadId] })
+  }
+
+  const FIELD_KEY_MAP = {
+    full_name:     'leadModal.fullName',
+    company_name:  'leadModal.companyName',
+    phone:         'leadModal.phone',
+    email:         'common.email',
+    source:        'leads.colSource',
+    assigned_rep:  'leads.colAssignedRep',
+  }
+
+  const saveField = async (field, value) => {
+    try {
+      await db.leads.update(leadId, { [field]: value })
+      toast.success(t('leads.leadUpdated'))
+      const fieldKey = FIELD_KEY_MAP[field]
+      if (fieldKey) {
+        db.activities
+          .logSystem('lead', leadId, `field_updated|${fieldKey}|${value || '—'}`, currentUserEmail)
+          .catch(() => {})
+      }
+      refresh()
+    } catch (error) {
+      toast.error(t('leads.failedSave', { error: error.message }))
+    }
+  }
+
+  const handleSaveName = () => {
+    if (!nameInput.trim()) return
+    saveField('full_name', nameInput.trim())
+    setEditingName(false)
+  }
+  const handleSaveCompany = () => {
+    saveField('company_name', companyInput.trim() || null)
+    setEditingCompany(false)
+  }
+  const handleSavePhone = () => {
+    saveField('phone', phoneInput.trim() || null)
+    setEditingPhone(false)
+  }
+  const handleSaveEmail = () => {
+    saveField('email', emailInput.trim() || null)
+    setEditingEmail(false)
+  }
+  const handleSaveSource = () => {
+    saveField('source', sourceInput)
+    setEditingSource(false)
+  }
+  const handleSaveRep = () => {
+    saveField('assigned_rep', repInput || null)
+    setEditingRep(false)
+  }
+  const handleSaveNotes = async () => {
+    setSavingNotes(true)
+    try {
+      await db.leads.update(leadId, { notes: notesInput || null })
+      toast.success(t('leads.leadUpdated'))
+      refresh()
+    } catch (error) {
+      toast.error(t('leads.failedSave', { error: error.message }))
+    } finally {
+      setSavingNotes(false)
+    }
   }
 
   const inlineStatusList = LEAD_STATUS_LIST.filter((s) => s !== 'converted')
-  const isConverted = lead?.status === 'converted'
-  const canEdit = canDo('edit') && !isConverted
 
   const handleStatusChange = async (newStatus) => {
     if (!lead || lead.status === newStatus) return
@@ -109,54 +198,6 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
       toast.success(t('leads.statusUpdated'))
       db.auditLog.log(currentUserEmail, 'lead_status_changed', `Lead ${lead.full_name}: ${lead.status} → ${newStatus}`).catch(() => {})
       refresh()
-      queryClient.invalidateQueries({ queryKey: ['activities', 'lead', leadId] })
-    } catch (error) {
-      toast.error(t('leads.failedSave', { error: error.message }))
-    }
-  }
-
-  const handleOpenEdit = () => {
-    setLeadForm({
-      full_name: lead.full_name || '',
-      company_name: lead.company_name || '',
-      phone: lead.phone || '',
-      email: lead.email || '',
-      source: lead.source || 'walk-in',
-      status: lead.status || 'new',
-      assigned_rep: lead.assigned_rep || '',
-      notes: lead.notes || '',
-    })
-    setShowEdit(true)
-  }
-
-  const handleSaveLead = async () => {
-    const validation = leadSchema.safeParse(leadForm)
-    if (!validation.success) {
-      toast.error(getFirstError(validation))
-      return
-    }
-    const statusChanged = lead.status !== leadForm.status
-    const payload = {
-      full_name: leadForm.full_name,
-      company_name: leadForm.company_name || null,
-      phone: leadForm.phone || null,
-      email: leadForm.email || null,
-      source: leadForm.source,
-      status: leadForm.status,
-      assigned_rep: leadForm.assigned_rep || null,
-      notes: leadForm.notes || null,
-    }
-    try {
-      await db.leads.update(lead.id, payload)
-      if (statusChanged) {
-        db.activities
-          .logSystem('lead', lead.id, `status_changed|${lead.status}|${leadForm.status}`, currentUserEmail)
-          .catch(() => {})
-      }
-      toast.success(t('leads.leadUpdated'))
-      setShowEdit(false)
-      refresh()
-      queryClient.invalidateQueries({ queryKey: ['activities', 'lead', leadId] })
     } catch (error) {
       toast.error(t('leads.failedSave', { error: error.message }))
     }
@@ -182,7 +223,6 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
       toast.success(t('leads.leadConverted'))
       setShowConvert(false)
       refresh()
-      queryClient.invalidateQueries({ queryKey: ['activities', 'lead', leadId] })
     } catch (error) {
       toast.error(t('leads.failedConvert', { error: error.message }))
     }
@@ -192,7 +232,7 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
     setConfirmDialog({
       open: true,
       title: t('leads.deleteLeadTitle'),
-      message: t('leads.deleteLeadConfirm', { name: lead.full_name }),
+      message: t('leads.deleteLeadConfirm', { name: lead?.full_name }),
       onConfirm: async () => {
         setConfirmDialog((d) => ({ ...d, open: false }))
         await handleStatusChange('disqualified')
@@ -210,18 +250,13 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
+    <div className="w-full px-4 py-6">
       {/* Back + actions */}
       <div className="flex items-center justify-between mb-4">
         <button onClick={onBack} className="text-sm text-gray-500 dark:text-[#9aa4b2] hover:text-indigo-600 flex items-center gap-1">
           ← {t('common.back')}
         </button>
         <div className="flex items-center gap-2">
-          {canEdit && (
-            <Button variant="secondary" size="sm" onClick={handleOpenEdit}>
-              {t('common.edit')}
-            </Button>
-          )}
           {!isConverted && lead.status !== 'disqualified' && canDo('edit') && (
             <Button variant="secondary" size="sm" onClick={handleDisqualify}>
               {t('leads.disqualify')}
@@ -235,21 +270,75 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
         </div>
       </div>
 
-      {/* Header */}
+      {/* Header card */}
       <div className={`${CARD} mb-4`}>
         <div className="flex items-start justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-[#e8ebf0]">{lead.company_name || lead.full_name}</h1>
-            {lead.company_name && (
+          <div className="flex-1 min-w-0">
+            {/* Header edits company_name when it exists, full_name otherwise */}
+            {lead.company_name ? (
+              editingCompany ? (
+                <div className="flex items-center gap-2 mb-1">
+                  <input
+                    type="text"
+                    value={companyInput}
+                    onChange={(e) => setCompanyInput(e.target.value)}
+                    autoFocus
+                    className="text-2xl font-bold border-b-2 border-indigo-500 bg-transparent text-gray-900 dark:text-[#e8ebf0] focus:outline-none flex-1 min-w-0"
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveCompany(); if (e.key === 'Escape') setEditingCompany(false) }}
+                  />
+                  <button onClick={handleSaveCompany} className="text-sm text-indigo-600 dark:text-[#a5b4fc] font-medium hover:underline whitespace-nowrap">{t('common.save')}</button>
+                  <button onClick={() => setEditingCompany(false)} className="text-sm text-gray-400 hover:underline">×</button>
+                </div>
+              ) : (
+                <h1
+                  className={`text-2xl font-bold text-gray-900 dark:text-[#e8ebf0] ${EDITABLE}`}
+                  onClick={canEdit ? () => { setCompanyInput(lead.company_name || ''); setEditingCompany(true) } : undefined}
+                  title={canEdit ? t('pipeline.clickToEdit') : undefined}
+                >
+                  {lead.company_name}
+                </h1>
+              )
+            ) : (
+              editingName ? (
+                <div className="flex items-center gap-2 mb-1">
+                  <input
+                    type="text"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    autoFocus
+                    className="text-2xl font-bold border-b-2 border-indigo-500 bg-transparent text-gray-900 dark:text-[#e8ebf0] focus:outline-none flex-1 min-w-0"
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false) }}
+                  />
+                  <button onClick={handleSaveName} className="text-sm text-indigo-600 dark:text-[#a5b4fc] font-medium hover:underline whitespace-nowrap">{t('common.save')}</button>
+                  <button onClick={() => setEditingName(false)} className="text-sm text-gray-400 hover:underline">×</button>
+                </div>
+              ) : (
+                <h1
+                  className={`text-2xl font-bold text-gray-900 dark:text-[#e8ebf0] ${EDITABLE}`}
+                  onClick={canEdit ? () => { setNameInput(lead.full_name || ''); setEditingName(true) } : undefined}
+                  title={canEdit ? t('pipeline.clickToEdit') : undefined}
+                >
+                  {lead.full_name}
+                </h1>
+              )
+            )}
+            {lead.company_name && !editingCompany && (
               <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-0.5">{t('leadModal.fullName')}: {lead.full_name}</p>
             )}
+            {lead.lead_code && (
+              <span className="inline-block mt-1 text-xs font-mono font-semibold text-[#4338ca] dark:text-[#a5b4fc] bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 rounded">
+                {lead.lead_code}
+              </span>
+            )}
           </div>
-          {isConverted ? (
-            <span className={`px-3 py-1 text-sm rounded-full font-medium ${STATUS_BADGE.converted}`}>{t('leadStatus.converted')}</span>
-          ) : null}
+          {isConverted && (
+            <span className={`px-3 py-1 text-sm rounded-full font-medium ${STATUS_BADGE.converted}`}>
+              {t('leadStatus.converted')}
+            </span>
+          )}
         </div>
 
-        {/* Status stepper — click to change status directly */}
+        {/* Status stepper */}
         <div className="flex flex-wrap gap-2 mt-4">
           {isConverted ? (
             <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('leads.lockedConverted')}</span>
@@ -275,34 +364,182 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
         </div>
       </div>
 
-      {/* Details grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-1 space-y-4">
-          <div className={`${CARD} space-y-4`}>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{t('leads.colContact')}</h3>
-            <Detail label={t('leadModal.phone')} value={lead.phone} />
-            <Detail label={t('common.email')} value={lead.email} />
-            <div>
-              <div className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase">{t('leads.colSource')}</div>
-              <span className={`inline-block mt-0.5 px-2 py-0.5 text-xs rounded-full font-medium ${SOURCE_BADGE[lead.source] || SOURCE_BADGE['walk-in']}`}>
-                {t(`leadSource.${lead.source?.replace('-', '_')}`)}
+      {/* 4-column grid: Lead Info (25%) | Tabs (50%) | Comments (25%) */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
+
+        {/* Left: Lead Info */}
+        <div className={`${CARD} lg:col-span-1 space-y-4`}>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{t('leads.leadInfo')}</h3>
+
+          {/* Full Name */}
+          <div>
+            <div className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('leadModal.fullName')}</div>
+            {editingName ? null : (
+              <span
+                className={`text-sm text-gray-900 dark:text-[#e8ebf0] mt-0.5 inline-block ${EDITABLE}`}
+                onClick={canEdit ? () => { setNameInput(lead.full_name || ''); setEditingName(true) } : undefined}
+                title={canEdit ? t('pipeline.clickToEdit') : undefined}
+              >
+                {lead.full_name || '—'}
               </span>
-            </div>
-            <Detail label={t('leads.colAssignedRep')} value={lead.assigned_rep} />
-            <Detail label={t('common.createdAt')} value={lead.created_at ? new Date(lead.created_at).toLocaleString() : null} />
-            <Detail label={t('common.createdBy')} value={lead.created_by} />
-            {lead.notes && (
-              <div>
-                <div className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase">{t('common.notes')}</div>
-                <p className="text-sm text-gray-900 dark:text-[#e8ebf0] mt-0.5 whitespace-pre-wrap">{lead.notes}</p>
-              </div>
             )}
           </div>
 
+          {/* Company Name */}
+          <div>
+            <div className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('leadModal.companyName')}</div>
+            {editingCompany ? (
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  type="text"
+                  value={companyInput}
+                  onChange={(e) => setCompanyInput(e.target.value)}
+                  autoFocus
+                  className="flex-1 text-sm border border-indigo-500 dark:border-indigo-400 rounded px-2 py-1 dark:bg-[#0f1520] dark:text-[#e8ebf0] focus:outline-none min-w-0"
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveCompany(); if (e.key === 'Escape') setEditingCompany(false) }}
+                />
+                <button onClick={handleSaveCompany} className="text-xs text-indigo-600 dark:text-[#a5b4fc] font-medium hover:underline whitespace-nowrap">{t('common.save')}</button>
+                <button onClick={() => setEditingCompany(false)} className="text-xs text-gray-400 hover:underline">×</button>
+              </div>
+            ) : (
+              <span
+                className={`text-sm text-gray-900 dark:text-[#e8ebf0] mt-0.5 inline-block ${EDITABLE}`}
+                onClick={canEdit ? () => { setCompanyInput(lead.company_name || ''); setEditingCompany(true) } : undefined}
+                title={canEdit ? t('pipeline.clickToEdit') : undefined}
+              >
+                {lead.company_name || '—'}
+              </span>
+            )}
+          </div>
+
+          {/* Phone */}
+          <div>
+            <div className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('leadModal.phone')}</div>
+            {editingPhone ? (
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  type="tel"
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                  autoFocus
+                  className="flex-1 text-sm border border-indigo-500 dark:border-indigo-400 rounded px-2 py-1 dark:bg-[#0f1520] dark:text-[#e8ebf0] focus:outline-none min-w-0"
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSavePhone(); if (e.key === 'Escape') setEditingPhone(false) }}
+                />
+                <button onClick={handleSavePhone} className="text-xs text-indigo-600 dark:text-[#a5b4fc] font-medium hover:underline whitespace-nowrap">{t('common.save')}</button>
+                <button onClick={() => setEditingPhone(false)} className="text-xs text-gray-400 hover:underline">×</button>
+              </div>
+            ) : (
+              <span
+                className={`text-sm text-gray-900 dark:text-[#e8ebf0] mt-0.5 inline-block ${EDITABLE}`}
+                onClick={canEdit ? () => { setPhoneInput(lead.phone || ''); setEditingPhone(true) } : undefined}
+                title={canEdit ? t('pipeline.clickToEdit') : undefined}
+              >
+                {lead.phone || '—'}
+              </span>
+            )}
+          </div>
+
+          {/* Email */}
+          <div>
+            <div className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('common.email')}</div>
+            {editingEmail ? (
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  type="email"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  autoFocus
+                  className="flex-1 text-sm border border-indigo-500 dark:border-indigo-400 rounded px-2 py-1 dark:bg-[#0f1520] dark:text-[#e8ebf0] focus:outline-none min-w-0"
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEmail(); if (e.key === 'Escape') setEditingEmail(false) }}
+                />
+                <button onClick={handleSaveEmail} className="text-xs text-indigo-600 dark:text-[#a5b4fc] font-medium hover:underline whitespace-nowrap">{t('common.save')}</button>
+                <button onClick={() => setEditingEmail(false)} className="text-xs text-gray-400 hover:underline">×</button>
+              </div>
+            ) : (
+              <span
+                className={`text-sm text-gray-900 dark:text-[#e8ebf0] mt-0.5 inline-block ${EDITABLE}`}
+                onClick={canEdit ? () => { setEmailInput(lead.email || ''); setEditingEmail(true) } : undefined}
+                title={canEdit ? t('pipeline.clickToEdit') : undefined}
+              >
+                {lead.email || '—'}
+              </span>
+            )}
+          </div>
+
+          {/* Source — pill with ring glow on hover */}
+          <div>
+            <div className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('leads.colSource')}</div>
+            {editingSource ? (
+              <div className="flex items-center gap-2 mt-1">
+                <select
+                  value={sourceInput}
+                  onChange={(e) => setSourceInput(e.target.value)}
+                  autoFocus
+                  className="text-sm border border-indigo-500 dark:border-indigo-400 rounded px-2 py-1 dark:bg-[#0f1520] dark:text-[#e8ebf0] focus:outline-none flex-1 min-w-0"
+                >
+                  {LEAD_SOURCES.map((s) => (
+                    <option key={s} value={s}>{t(`leadSource.${s.replace('-', '_')}`)}</option>
+                  ))}
+                </select>
+                <button onClick={handleSaveSource} className="text-xs text-indigo-600 dark:text-[#a5b4fc] font-medium hover:underline whitespace-nowrap">{t('common.save')}</button>
+                <button onClick={() => setEditingSource(false)} className="text-xs text-gray-400 hover:underline">×</button>
+              </div>
+            ) : (
+              <span
+                className={`inline-block mt-0.5 px-2 py-0.5 text-xs rounded-full font-medium ${SOURCE_BADGE[lead.source] || SOURCE_BADGE['walk-in']} ${canEdit ? 'cursor-pointer hover:ring-2 hover:ring-indigo-300 dark:hover:ring-[#a5b4fc] hover:ring-offset-1 dark:hover:ring-offset-[#121823] transition-all' : ''}`}
+                onClick={canEdit ? () => { setSourceInput(lead.source || 'walk-in'); setEditingSource(true) } : undefined}
+                title={canEdit ? t('pipeline.clickToEdit') : undefined}
+              >
+                {t(`leadSource.${lead.source?.replace('-', '_')}`)}
+              </span>
+            )}
+          </div>
+
+          {/* Assigned Rep */}
+          <div>
+            <div className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('leads.colAssignedRep')}</div>
+            {editingRep ? (
+              <div className="flex items-center gap-2 mt-1">
+                <select
+                  value={repInput}
+                  onChange={(e) => setRepInput(e.target.value)}
+                  className="text-sm border border-indigo-500 dark:border-indigo-400 rounded px-2 py-1 dark:bg-[#0f1520] dark:text-[#e8ebf0] focus:outline-none flex-1 min-w-0"
+                >
+                  <option value="">{t('common.unassigned')}</option>
+                  {salesReps.map((r) => (
+                    <option key={r.user_email} value={r.user_email}>{r.user_email}</option>
+                  ))}
+                </select>
+                <button onClick={handleSaveRep} className="text-xs text-indigo-600 dark:text-[#a5b4fc] font-medium hover:underline whitespace-nowrap">{t('common.save')}</button>
+                <button onClick={() => setEditingRep(false)} className="text-xs text-gray-400 hover:underline">×</button>
+              </div>
+            ) : (
+              <span
+                className={`text-sm text-gray-900 dark:text-[#e8ebf0] mt-0.5 inline-block ${EDITABLE}`}
+                onClick={canEdit ? () => { setRepInput(lead.assigned_rep || ''); setEditingRep(true) } : undefined}
+                title={canEdit ? t('pipeline.clickToEdit') : undefined}
+              >
+                {lead.assigned_rep || '—'}
+              </span>
+            )}
+          </div>
+
+          <div>
+            <div className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('common.createdAt')}</div>
+            <div className="text-sm text-gray-900 dark:text-[#e8ebf0] mt-0.5">
+              {lead.created_at ? new Date(lead.created_at).toLocaleString() : '—'}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('common.createdBy')}</div>
+            <div className="text-sm text-gray-900 dark:text-[#e8ebf0] mt-0.5">{lead.created_by || '—'}</div>
+          </div>
+
+          {/* Linked deal */}
           {linkedDeal && (
-            <div className={CARD}>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{t('leads.linkedDeal')}</h3>
+            <div className="pt-3 border-t border-[#e6e9ef] dark:border-[#212a38]">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('leads.linkedDeal')}</span>
                 <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${DEAL_STATUS_BADGE[linkedDeal.status] || DEAL_STATUS_BADGE.open}`}>
                   {t(`pipeline.${linkedDeal.status}`)}
                 </span>
@@ -312,36 +549,71 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
                 {linkedDealStageName}
                 {linkedDeal.value != null && ` · ${Number(linkedDeal.value).toLocaleString()} ${t('pipeline.currency')}`}
               </p>
-              <Button variant="secondary" size="sm" className="mt-3" onClick={() => navigate(`/pipeline/${linkedDeal.id}`)}>
+              <Button variant="secondary" size="sm" className="mt-3 w-full" onClick={() => navigate(`/pipeline/${linkedDeal.id}`)}>
                 {t('leads.viewDeal')}
               </Button>
             </div>
           )}
         </div>
 
-        {/* Chatter */}
-        <div className={`${CARD} lg:col-span-2`}>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0] mb-3">{t('leads.comments')}</h3>
-          <ActivityChatter
+        {/* Center: tab bar */}
+        <div className={`${CARD} lg:col-span-2 !p-0 overflow-hidden`}>
+          <div className="flex border-b border-[#e6e9ef] dark:border-[#212a38] px-2 overflow-x-auto">
+            <button onClick={() => setTab('note')} className={TAB_CLS(tab === 'note')}>
+              {t('leads.leadLog')}
+            </button>
+            <button onClick={() => setTab('activity')} className={TAB_CLS(tab === 'activity')}>
+              {t('activityChatter.scheduleActivity')}
+            </button>
+            <button onClick={() => setTab('lead_notes')} className={TAB_CLS(tab === 'lead_notes')}>
+              {t('leads.leadNotesTab')}
+            </button>
+          </div>
+
+          <div className="p-[18px]">
+            {(tab === 'note' || tab === 'activity') && (
+              <ActivityChatter
+                relatedType="lead"
+                relatedId={lead.id}
+                currentUserEmail={currentUserEmail}
+                salesReps={salesReps}
+                canEdit={canDo('edit') || canDo('create')}
+                controlledTab={tab}
+                onControlledTabChange={setTab}
+                hideNoteComposer
+                hideHistory={tab === 'activity'}
+              />
+            )}
+
+            {tab === 'lead_notes' && (
+              <div className="space-y-3">
+                <textarea
+                  value={notesInput}
+                  onChange={(e) => setNotesInput(e.target.value)}
+                  placeholder={t('leads.leadNotesPlaceholder')}
+                  rows={10}
+                  className="w-full px-3 py-2.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-xl text-sm bg-[#f8f9fb] dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
+                />
+                <div className="flex justify-end">
+                  <Button size="sm" onClick={handleSaveNotes} loading={savingNotes} disabled={!canEdit}>
+                    {t('common.save')}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Comment Panel */}
+        <div className="lg:col-span-1 h-full">
+          <CommentPanel
             relatedType="lead"
             relatedId={lead.id}
             currentUserEmail={currentUserEmail}
-            salesReps={salesReps}
             canEdit={canDo('edit') || canDo('create')}
           />
         </div>
       </div>
-
-      {showEdit && (
-        <CreateLeadModal
-          form={leadForm}
-          setForm={setLeadForm}
-          editing={lead}
-          salesReps={salesReps}
-          onSave={handleSaveLead}
-          onClose={() => setShowEdit(false)}
-        />
-      )}
 
       {showConvert && (
         <ConvertLeadModal

@@ -31,11 +31,15 @@ function renderLogTitle(title, t) {
   if (kind === 'converted') return t('activityChatter.logConverted')
   if (kind === 'won') return t('activityChatter.logWon')
   if (kind === 'lost') return t('activityChatter.logLost', { reason: a })
+  if (kind === 'reopened') return t('activityChatter.logReopened', { from: a, to: b })
   if (kind === 'assigned') {
     return t('activityChatter.logAssigned', {
       from: a || t('leadModal.unassigned'),
       to: b || t('leadModal.unassigned'),
     })
+  }
+  if (kind === 'field_updated') {
+    return t('activityChatter.logFieldUpdated', { field: t(a), value: b || '—' })
   }
   return title
 }
@@ -49,12 +53,14 @@ function isOverdue(activity) {
   return !activity.completed_at && activity.due_date && new Date(activity.due_date) < new Date()
 }
 
-export function ActivityChatter({ relatedType, relatedId, currentUserEmail, salesReps, canEdit }) {
+export function ActivityChatter({ relatedType, relatedId, currentUserEmail, salesReps, canEdit, controlledTab, onControlledTabChange, hideNoteComposer, hideHistory }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const fileInputRef = useRef(null)
 
-  const [tab, setTab] = useState('note')
+  const [internalTab, setInternalTab] = useState('note')
+  const tab = controlledTab ?? internalTab
+  const setTab = onControlledTabChange ?? setInternalTab
   const [noteText, setNoteText] = useState('')
   const [files, setFiles] = useState([])
   const [uploading, setUploading] = useState(false)
@@ -198,6 +204,16 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
     }
   }
 
+  const handleCancelActivity = async (activity) => {
+    try {
+      await db.activities.delete(activity.id)
+      toast.success(t('activityChatter.activityCancelled'))
+      queryClient.invalidateQueries({ queryKey })
+    } catch (error) {
+      toast.error(t('activityChatter.failedComment', { error: error.message }))
+    }
+  }
+
   const startReschedule = (activity) => {
     setReschedulingId(activity.id)
     setRescheduleDue(activity.due_date ? activity.due_date.slice(0, 16) : '')
@@ -243,23 +259,25 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
 
   return (
     <div>
-      {/* Composer */}
-      {canEdit && (
+      {/* Composer — hidden on note tab when composer lives in the right panel */}
+      {canEdit && !(hideNoteComposer && tab === 'note') && (
         <div className="border border-gray-200 dark:border-[#212a38] rounded-xl overflow-hidden mb-5">
-          <div className="flex border-b border-gray-200 dark:border-[#212a38]">
-            <button
-              onClick={() => setTab('note')}
-              className={`px-4 py-2 text-sm font-medium ${tab === 'note' ? 'text-indigo-600 dark:text-[#a5b4fc] border-b-2 border-indigo-600 dark:border-[#a5b4fc]' : 'text-gray-500 dark:text-[#9aa4b2]'}`}
-            >
-              {t('activityChatter.logNote')}
-            </button>
-            <button
-              onClick={() => setTab('activity')}
-              className={`px-4 py-2 text-sm font-medium ${tab === 'activity' ? 'text-indigo-600 dark:text-[#a5b4fc] border-b-2 border-indigo-600 dark:border-[#a5b4fc]' : 'text-gray-500 dark:text-[#9aa4b2]'}`}
-            >
-              {t('activityChatter.scheduleActivity')}
-            </button>
-          </div>
+          {!controlledTab && (
+            <div className="flex border-b border-gray-200 dark:border-[#212a38]">
+              <button
+                onClick={() => setTab('note')}
+                className={`px-4 py-2 text-sm font-medium ${tab === 'note' ? 'text-indigo-600 dark:text-[#a5b4fc] border-b-2 border-indigo-600 dark:border-[#a5b4fc]' : 'text-gray-500 dark:text-[#9aa4b2]'}`}
+              >
+                {t('activityChatter.logNote')}
+              </button>
+              <button
+                onClick={() => setTab('activity')}
+                className={`px-4 py-2 text-sm font-medium ${tab === 'activity' ? 'text-indigo-600 dark:text-[#a5b4fc] border-b-2 border-indigo-600 dark:border-[#a5b4fc]' : 'text-gray-500 dark:text-[#9aa4b2]'}`}
+              >
+                {t('activityChatter.scheduleActivity')}
+              </button>
+            </div>
+          )}
 
           <div className="p-3">
             {tab === 'note' ? (
@@ -350,41 +368,46 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                 {planned.map((a) => (
                   <li
                     key={a.id}
-                    className={`flex items-start gap-3 p-3 rounded-lg border ${isOverdue(a) ? 'border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-900/10' : 'border-gray-200 dark:border-[#212a38] bg-gray-50 dark:bg-[#0f1520]'}`}
+                    className={`p-3 rounded-lg border ${isOverdue(a) ? 'border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-900/10' : 'border-gray-200 dark:border-[#212a38] bg-gray-50 dark:bg-[#0f1520]'}`}
                   >
-                    <span className="text-lg leading-none">{TYPE_ICON[a.type] || '•'}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-900 dark:text-[#e8ebf0]">{a.title}</p>
-                      <p className={`text-xs mt-0.5 ${isOverdue(a) ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-[#9aa4b2]'}`}>
-                        {t(`activityType.${a.type}`)}
-                        {a.due_date && ` · ${fmtTime(a.due_date)}`}
-                        {isOverdue(a) && ` · ${t('activityChatter.overdue')}`}
-                        {a.assigned_rep && ` · ${a.assigned_rep}`}
-                      </p>
-                      {reschedulingId === a.id && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <Input
-                            type="datetime-local"
-                            value={rescheduleDue}
-                            onChange={(e) => setRescheduleDue(e.target.value)}
-                            className="text-xs py-1"
-                          />
-                          <Button size="sm" onClick={() => handleSaveReschedule(a)} disabled={!rescheduleDue}>
-                            {t('common.save')}
-                          </Button>
-                          <button onClick={() => setReschedulingId(null)} className="text-xs text-gray-500 dark:text-[#9aa4b2] hover:underline">
-                            {t('common.cancel')}
-                          </button>
-                        </div>
-                      )}
+                    <div className="flex items-start gap-3">
+                      <span className="text-lg leading-none">{TYPE_ICON[a.type] || '•'}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-900 dark:text-[#e8ebf0]">{a.title}</p>
+                        <p className={`text-xs mt-0.5 ${isOverdue(a) ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-[#9aa4b2]'}`}>
+                          {t(`activityType.${a.type}`)}
+                          {a.due_date && ` · ${fmtTime(a.due_date)}`}
+                          {isOverdue(a) && ` · ${t('activityChatter.overdue')}`}
+                          {a.assigned_rep && ` · ${a.assigned_rep}`}
+                        </p>
+                      </div>
                     </div>
+                    {reschedulingId === a.id && (
+                      <div className="flex items-center gap-2 mt-2 ml-8">
+                        <Input
+                          type="datetime-local"
+                          value={rescheduleDue}
+                          onChange={(e) => setRescheduleDue(e.target.value)}
+                          className="text-xs py-1"
+                        />
+                        <Button size="sm" onClick={() => handleSaveReschedule(a)} disabled={!rescheduleDue}>
+                          {t('common.save')}
+                        </Button>
+                        <button onClick={() => setReschedulingId(null)} className="text-xs text-gray-500 dark:text-[#9aa4b2] hover:underline">
+                          {t('common.cancel')}
+                        </button>
+                      </div>
+                    )}
                     {canEdit && reschedulingId !== a.id && (
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <button onClick={() => handleMarkDone(a)} className="text-xs text-indigo-600 dark:text-[#a5b4fc] hover:underline">
-                          {t('activityChatter.markDone')}
+                      <div className="flex items-center gap-4 mt-2 ml-8">
+                        <button onClick={() => handleMarkDone(a)} className="text-xs font-medium text-indigo-600 dark:text-[#a5b4fc] hover:underline">
+                          ✓ {t('activityChatter.markDone')}
                         </button>
                         <button onClick={() => startReschedule(a)} className="text-xs text-gray-500 dark:text-[#9aa4b2] hover:underline">
-                          {t('activityChatter.reschedule')}
+                          ✏ {t('common.edit')}
+                        </button>
+                        <button onClick={() => handleCancelActivity(a)} className="text-xs text-red-500 dark:text-red-400 hover:underline">
+                          ✕ {t('activityChatter.cancelActivity')}
                         </button>
                       </div>
                     )}
@@ -394,94 +417,98 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
             </div>
           )}
 
-          {/* History feed */}
-          <h4 className="text-xs font-semibold uppercase text-gray-500 dark:text-[#9aa4b2] mb-2">{t('activityChatter.history')}</h4>
-          {history.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('activityChatter.noComments')}</p>
-          ) : (
-            <ul className="space-y-3">
-              {history.map((a) => {
-                const isCompletedActivity = a.completed_at && a.type !== 'note' && a.type !== 'log'
-                const replies = repliesOf(a.id)
-                return (
-                  <li key={a.id} className="flex items-start gap-3">
-                    <span className="text-base leading-none mt-0.5">{TYPE_ICON[a.type] || '•'}</span>
-                    <div className="flex-1 min-w-0">
-                      {a.type === 'log' ? (
-                        <p className="text-sm italic text-gray-500 dark:text-[#9aa4b2]">{renderLogTitle(a.title, t)}</p>
-                      ) : (
-                        <p className="text-sm text-gray-800 dark:text-[#e8ebf0] whitespace-pre-wrap">{a.title}</p>
-                      )}
-                      {a.outcome_notes && (
-                        <p className="text-xs text-gray-600 dark:text-[#9aa4b2] mt-1 whitespace-pre-wrap">{a.outcome_notes}</p>
-                      )}
-                      {Array.isArray(a.attachments) && a.attachments.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {a.attachments.map((f) => (
-                            <a
-                              key={f.path}
-                              href={f.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-[#0f1520] rounded-lg text-xs text-indigo-600 dark:text-[#a5b4fc] hover:underline"
-                            >
-                              📎 {f.name}
-                            </a>
-                          ))}
-                        </div>
-                      )}
-                      <div className="text-xs text-gray-400 dark:text-[#4a5568] mt-1 flex items-center gap-2 flex-wrap">
-                        <span>
-                          {a.created_by || '—'} · {fmtTime(a.created_at)}
-                          {isCompletedActivity && ` · ✓ ${t('activityChatter.completed')}`}
-                        </span>
-                        {a.type !== 'log' && canEdit && (
-                          <button
-                            onClick={() => setReplyingTo(replyingTo === a.id ? null : a.id)}
-                            className="text-indigo-600 dark:text-[#a5b4fc] hover:underline"
-                          >
-                            {t('activityChatter.reply')}
-                          </button>
-                        )}
-                        {isCompletedActivity && canEdit && (
-                          <button onClick={() => handleReopen(a)} className="text-indigo-600 dark:text-[#a5b4fc] hover:underline">
-                            {t('activityChatter.reopen')}
-                          </button>
-                        )}
-                      </div>
+          {/* History feed — hidden when hideHistory=true (Schedule Activity tab) */}
+          {!hideHistory && (
+            <>
+              <h4 className="text-xs font-semibold uppercase text-gray-500 dark:text-[#9aa4b2] mb-2">{t('activityChatter.history')}</h4>
+              {history.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('activityChatter.noComments')}</p>
+              ) : (
+                <ul className="space-y-3">
+                  {history.map((a) => {
+                    const isCompletedActivity = a.completed_at && a.type !== 'note' && a.type !== 'log'
+                    const replies = repliesOf(a.id)
+                    return (
+                      <li key={a.id} className="flex items-start gap-3">
+                        <span className="text-base leading-none mt-0.5">{TYPE_ICON[a.type] || '•'}</span>
+                        <div className="flex-1 min-w-0">
+                          {a.type === 'log' ? (
+                            <p className="text-sm italic text-gray-500 dark:text-[#9aa4b2]">{renderLogTitle(a.title, t)}</p>
+                          ) : (
+                            <p className="text-sm text-gray-800 dark:text-[#e8ebf0] whitespace-pre-wrap">{a.title}</p>
+                          )}
+                          {a.outcome_notes && (
+                            <p className="text-xs text-gray-600 dark:text-[#9aa4b2] mt-1 whitespace-pre-wrap">{a.outcome_notes}</p>
+                          )}
+                          {Array.isArray(a.attachments) && a.attachments.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {a.attachments.map((f) => (
+                                <a
+                                  key={f.path}
+                                  href={f.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-[#0f1520] rounded-lg text-xs text-indigo-600 dark:text-[#a5b4fc] hover:underline"
+                                >
+                                  📎 {f.name}
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                          <div className="text-xs text-gray-400 dark:text-[#4a5568] mt-1 flex items-center gap-2 flex-wrap">
+                            <span>
+                              {a.created_by || '—'} · {fmtTime(a.created_at)}
+                              {isCompletedActivity && ` · ✓ ${t('activityChatter.completed')}`}
+                            </span>
+                            {a.type !== 'log' && canEdit && (
+                              <button
+                                onClick={() => setReplyingTo(replyingTo === a.id ? null : a.id)}
+                                className="text-indigo-600 dark:text-[#a5b4fc] hover:underline"
+                              >
+                                {t('activityChatter.reply')}
+                              </button>
+                            )}
+                            {isCompletedActivity && canEdit && (
+                              <button onClick={() => handleReopen(a)} className="text-indigo-600 dark:text-[#a5b4fc] hover:underline">
+                                {t('activityChatter.reopen')}
+                              </button>
+                            )}
+                          </div>
 
-                      {/* Replies thread */}
-                      {replies.length > 0 && (
-                        <ul className="mt-2 space-y-2 border-l-2 border-gray-200 dark:border-[#212a38] pl-3">
-                          {replies.map((r) => (
-                            <li key={r.id}>
-                              <p className="text-sm text-gray-800 dark:text-[#e8ebf0] whitespace-pre-wrap">{r.title}</p>
-                              <div className="text-xs text-gray-400 dark:text-[#4a5568] mt-0.5">
-                                {r.created_by || '—'} · {fmtTime(r.created_at)}
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                          {/* Replies thread */}
+                          {replies.length > 0 && (
+                            <ul className="mt-2 space-y-2 border-l-2 border-gray-200 dark:border-[#212a38] pl-3">
+                              {replies.map((r) => (
+                                <li key={r.id}>
+                                  <p className="text-sm text-gray-800 dark:text-[#e8ebf0] whitespace-pre-wrap">{r.title}</p>
+                                  <div className="text-xs text-gray-400 dark:text-[#4a5568] mt-0.5">
+                                    {r.created_by || '—'} · {fmtTime(r.created_at)}
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
 
-                      {replyingTo === a.id && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <Input
-                            value={replyText}
-                            onChange={(e) => setReplyText(e.target.value.slice(0, NOTE_MAX_LENGTH))}
-                            placeholder={t('activityChatter.replyPlaceholder')}
-                            className="text-sm"
-                          />
-                          <Button size="sm" onClick={() => handlePostReply(a)} loading={submitting} disabled={!replyText.trim()}>
-                            {t('activityChatter.reply')}
-                          </Button>
+                          {replyingTo === a.id && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <Input
+                                value={replyText}
+                                onChange={(e) => setReplyText(e.target.value.slice(0, NOTE_MAX_LENGTH))}
+                                placeholder={t('activityChatter.replyPlaceholder')}
+                                className="text-sm"
+                              />
+                              <Button size="sm" onClick={() => handlePostReply(a)} loading={submitting} disabled={!replyText.trim()}>
+                                {t('activityChatter.reply')}
+                              </Button>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </>
           )}
         </>
       )}

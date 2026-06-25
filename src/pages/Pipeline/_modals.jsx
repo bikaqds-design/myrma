@@ -107,18 +107,24 @@ function CustomerSearchField({ customers, value, label, onSelect }) {
 
 // ─── CREATE DEAL MODAL ──────────────────────────────────────────────────────
 
-export function CreateDealModal({ form, setForm, customers, pipelines, salesReps, editing, onSave, onClose }) {
+export function CreateDealModal({ form, setForm, dealCode, customers, pipeline, salesReps, editing, hasProductLines, onSave, onClose }) {
   const { t } = useTranslation()
   const set = (key, val) => setForm((prev) => ({ ...prev, [key]: val }))
 
-  const selectedPipeline = pipelines.find((p) => p.id === form.pipeline_id)
-  const stages = selectedPipeline ? [...selectedPipeline.stages].sort((a, b) => a.order - b.order) : []
+  const stages = pipeline ? [...pipeline.stages].sort((a, b) => a.order - b.order).filter((s) => !s.is_won && !s.is_lost) : []
 
   return (
     <ModalOverlay onClose={onClose}>
       <ModalCard aria-label={editing ? t('pipeline.editDeal') : t('pipeline.createDeal')} className={`${CARD} max-w-lg my-8`}>
         <div className={`flex items-center justify-between px-6 py-5 ${HEADER}`}>
-          <h2 className={`text-xl font-bold ${TITLE}`}>{editing ? t('pipeline.editDeal') : t('pipeline.createDeal')}</h2>
+          <div>
+            <h2 className={`text-xl font-bold ${TITLE}`}>{editing ? t('pipeline.editDeal') : t('pipeline.createDeal')}</h2>
+            {!editing && dealCode && (
+              <span className="text-xs font-mono font-semibold text-[#4338ca] dark:text-[#a5b4fc] bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 rounded mt-1 inline-block">
+                {dealCode}
+              </span>
+            )}
+          </div>
           <button onClick={onClose} className={CLOSE_BTN} aria-label={t('common.close')}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -148,45 +154,47 @@ export function CreateDealModal({ form, setForm, customers, pipelines, salesReps
           </Field>
 
           {!editing && (
-            <div className="grid grid-cols-2 gap-4">
-              <Field label={t('leadModal.pipeline')} required>
-                <Select
-                  value={form.pipeline_id}
-                  onChange={(e) => {
-                    const pl = pipelines.find((p) => p.id === e.target.value)
-                    const firstStage = pl ? [...pl.stages].sort((a, b) => a.order - b.order)[0] : null
-                    set('pipeline_id', e.target.value)
-                    set('stage', firstStage ? firstStage.id : '')
-                  }}
-                >
-                  <option value="">{t('leadModal.selectPipeline')}</option>
-                  {pipelines.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label={t('common.status')} required>
-                <Select value={form.stage} onChange={(e) => set('stage', e.target.value)} disabled={!selectedPipeline}>
-                  {stages.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            </div>
+            <Field label={t('pipeline.stage')} required>
+              <Select value={form.stage} onChange={(e) => set('stage', e.target.value)}>
+                {stages.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
           )}
 
           <div className="grid grid-cols-2 gap-4">
             <Field label={t('leadModal.dealValue')}>
-              <Input type="number" min="0" value={form.value} onChange={(e) => set('value', e.target.value)} placeholder="0" />
+              {hasProductLines ? (
+                <div>
+                  <Input type="number" value={form.value} disabled className="opacity-50 cursor-not-allowed" />
+                  <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-1">{t('pipeline.valueLocked')}</p>
+                </div>
+              ) : (
+                <Input type="number" min="0" value={form.value} onChange={(e) => set('value', e.target.value)} placeholder="0" />
+              )}
             </Field>
             <Field label={t('pipeline.expectedCloseDate')}>
               <Input type="date" value={form.expected_close_date} onChange={(e) => set('expected_close_date', e.target.value)} />
             </Field>
           </div>
+
+          <Field label={`${t('pipeline.probability')} — ${form.probability ?? 0}%`}>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={form.probability ?? 0}
+              onChange={(e) => set('probability', Number(e.target.value))}
+              className="w-full accent-indigo-600 dark:accent-[#a5b4fc] h-2 cursor-pointer"
+            />
+            <div className="flex justify-between text-xs text-gray-400 dark:text-[#4a5568] mt-0.5">
+              <span>0%</span><span>50%</span><span>100%</span>
+            </div>
+          </Field>
 
           <Field label={t('leadModal.assignRep')}>
             <Select value={form.assigned_rep} onChange={(e) => set('assigned_rep', e.target.value)}>
@@ -209,6 +217,55 @@ export function CreateDealModal({ form, setForm, customers, pipelines, salesReps
             {t('common.cancel')}
           </Button>
           <Button onClick={onSave}>{editing ? t('common.saveChanges') : t('pipeline.createDeal')}</Button>
+        </div>
+      </ModalCard>
+    </ModalOverlay>
+  )
+}
+
+// ─── REOPEN DEAL MODAL ──────────────────────────────────────────────────────
+
+export function ReopenDealModal({ deal, stages, onConfirm, onClose }) {
+  const { t } = useTranslation()
+  const [stageId, setStageId] = useState('')
+
+  const openStages = stages.filter((s) => !s.is_won && !s.is_lost)
+
+  return (
+    <ModalOverlay onClose={onClose}>
+      <ModalCard aria-label={t('pipeline.reopenDeal')} className={`${CARD} max-w-md my-8`}>
+        <div className={`flex items-center justify-between px-6 py-5 ${HEADER}`}>
+          <div>
+            <h2 className={`text-xl font-bold ${TITLE}`}>{t('pipeline.reopenDeal')}</h2>
+            <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2] mt-0.5">{deal?.title}</p>
+          </div>
+          <button onClick={onClose} className={CLOSE_BTN} aria-label={t('common.close')}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="px-6 py-5">
+          <Field label={t('pipeline.reopenSelectStage')} required>
+            <Select value={stageId} onChange={(e) => setStageId(e.target.value)}>
+              <option value="">{t('pipeline.reopenStagePlaceholder')}</option>
+              {openStages.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 ${HEADER} border-t`}>
+          <Button variant="secondary" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={() => onConfirm(stageId)} disabled={!stageId}>
+            {t('pipeline.reopenDeal')}
+          </Button>
         </div>
       </ModalCard>
     </ModalOverlay>

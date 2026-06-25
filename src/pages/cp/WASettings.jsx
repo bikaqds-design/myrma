@@ -14,6 +14,11 @@ const EVENT_LABELS = {
   'warranty.approved':   'Warranty Approved',
   'replacement.approved':'Replacement Approved',
   'delivery.scheduled':  'Delivery Scheduled',
+  // CRM events
+  'crm.lead_assigned':   'CRM — Lead Assigned to Rep',
+  'crm.deal_won':        'CRM — Deal Marked Won',
+  'crm.followup_due':    'CRM — Follow-Up Due (morning digest)',
+  'crm.deal_overdue':    'CRM — Deal Overdue',
 }
 
 const DEFAULT_SETTINGS = {
@@ -25,6 +30,8 @@ const DEFAULT_SETTINGS = {
     'ticket.created': true, 'ticket.updated': true, 'ticket.closed': true,
     'ticket.assigned': true, 'payment.received': true, 'warranty.approved': true,
     'replacement.approved': false, 'delivery.scheduled': false,
+    'crm.lead_assigned': true, 'crm.deal_won': true,
+    'crm.followup_due': false, 'crm.deal_overdue': false,
   },
   retry_config: { max_retries: 3, retry_delay_seconds: 300, backoff_multiplier: 2 },
   rate_limit: { messages_per_minute: 60, messages_per_day: 1000 },

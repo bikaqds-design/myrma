@@ -8,7 +8,6 @@ import QRCode from 'qrcode'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { PageSkeleton } from '../../components/Skeleton'
 import { Button, PageHeader } from '../../components/ui'
-import AIAssist from '../../components/AIAssist'
 import EmptyState from '../../components/EmptyState'
 import { ROLES, TICKET_STATUS_RESOLVED, TICKET_STATUS_LIST, PRIORITY_LIST } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
@@ -900,21 +899,6 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       {/* Header */}
       <PageHeader title={t('tickets.title')} subtitle={t('tickets.subtitle')} />
 
-      <AIAssist
-        contextType="dashboard"
-        data={{
-          range: 'All time',
-          open: tickets.filter((t) => t.ticket_status === 'Open').length,
-          in_progress: tickets.filter((t) => t.ticket_status === 'In Progress').length,
-          pending: tickets.filter((t) => t.ticket_status === 'Pending').length,
-          overdue: tickets.filter((t) => t.due_date && !TICKET_STATUS_RESOLVED.includes(t.ticket_status) && new Date(t.due_date) < new Date()).length,
-          resolved: tickets.filter((t) => TICKET_STATUS_RESOLVED.includes(t.ticket_status)).length,
-          total: tickets.length,
-          sla_percent: tickets.length ? Math.round((tickets.filter((t) => !t.due_date || TICKET_STATUS_RESOLVED.includes(t.ticket_status) || new Date(t.due_date) >= new Date()).length / tickets.length) * 100) : 100,
-          resolution_rate: tickets.length ? Math.round((tickets.filter((t) => TICKET_STATUS_RESOLVED.includes(t.ticket_status)).length / tickets.length) * 100) : 0,
-        }}
-      />
-
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-1 max-w-2xl">
@@ -925,10 +909,10 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder={t('tickets.searchPlaceholder')}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+              className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
             />
             <svg
-              className="w-5 h-5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2"
+              className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -945,7 +929,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             onClick={() => setShowFilters(!showFilters)}
             aria-expanded={showFilters}
             aria-controls="ticket-filters-panel"
-            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || filterStatus || filterOverdue || filterPriority || filterAssigned || filterCustomer ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || filterStatus || filterOverdue || filterPriority || filterAssigned || filterCustomer ? 'border-[#4338ca] text-[#4338ca] bg-indigo-50 dark:bg-indigo-900/20 dark:border-[#a5b4fc] dark:text-[#a5b4fc]' : 'border-[#e6e9ef] dark:border-[#212a38] text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520]'}`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -968,48 +952,46 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           <button
             onClick={() => setShowShortcuts(true)}
             title={t('shortcuts.title')}
-            className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors text-sm font-medium"
+            className="w-8 h-8 flex items-center justify-center border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] hover:text-[#211f1b] dark:hover:text-[#e8ebf0] transition-colors text-sm font-medium"
             aria-label={t('shortcuts.title')}
           >
             ?
           </button>
           {/* View toggle */}
-          <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden text-sm">
+          <div className="flex gap-1 bg-[#f4f6f9] dark:bg-[#0f1520] rounded-lg p-1">
             <button
               onClick={() => setViewMode('table')}
               aria-pressed={viewMode === 'table'}
               title={t('tickets.viewTable')}
-              className={`px-3 py-2 flex items-center gap-1.5 transition-colors ${viewMode === 'table' ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
+              className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors ${viewMode === 'table' ? 'bg-white dark:bg-[#121823] text-[#4338ca] dark:text-[#a5b4fc] shadow-sm' : 'text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]'}`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
+                <path d="M2 4h12v1.5H2V4zm0 3.5h12V9H2V7.5zm0 3.5h12v1.5H2V11z" />
               </svg>
-              <span className="hidden sm:inline">{t('tickets.viewTable')}</span>
             </button>
             <button
               onClick={() => setViewMode('kanban')}
               aria-pressed={viewMode === 'kanban'}
               title={t('tickets.viewKanban')}
-              className={`px-3 py-2 flex items-center gap-1.5 transition-colors ${viewMode === 'kanban' ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
+              className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors ${viewMode === 'kanban' ? 'bg-white dark:bg-[#121823] text-[#4338ca] dark:text-[#a5b4fc] shadow-sm' : 'text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]'}`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+              <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
+                <rect x="1" y="1" width="4" height="14" rx="1" />
+                <rect x="6" y="1" width="4" height="10" rx="1" />
+                <rect x="11" y="1" width="4" height="12" rx="1" />
               </svg>
-              <span className="hidden sm:inline">{t('tickets.viewKanban')}</span>
             </button>
           </div>
           {canDo('export') && (
-            <Button variant="secondary" onClick={handleExport}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#e6e9ef] dark:border-[#212a38] text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] transition-colors"
+            >
+              <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               {t('common.export')}
-            </Button>
+            </button>
           )}
           {canDo('create') && (
             <Button onClick={handleAddNew}>
@@ -1235,20 +1217,11 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
       {/* Bulk action bar */}
       {selectedTickets.length > 0 && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl flex-wrap">
-          <div className="flex items-center gap-2 text-sm font-medium text-indigo-700">
-            <span className="w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
-              {selectedTickets.length}
-            </span>
-            {t('tickets.selected')}
-          </div>
-          <button
-            onClick={() => setSelectedTickets([])}
-            className="text-xs text-indigo-500 hover:text-indigo-700 underline"
-          >
-            {t('tickets.deselect')}
-          </button>
-          <div className="h-5 w-px bg-indigo-200 hidden sm:block" />
+        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-[#4338ca]/20 dark:border-[#a5b4fc]/20 rounded-[14px] px-4 py-2.5 flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-medium text-[#4338ca] dark:text-[#a5b4fc]">
+            {selectedTickets.length} {t('common.selected')}
+          </span>
+          <div className="w-px h-5 bg-[#4338ca]/20 dark:bg-[#a5b4fc]/20" />
 
           {/* Change ticket status */}
           {(canDo('edit_all') || canDo('change_status')) && (
@@ -1256,7 +1229,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               <select
                 value={bulkTicketStatus}
                 onChange={(e) => setBulkTicketStatus(e.target.value)}
-                className="px-2.5 py-1.5 border border-indigo-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg px-2 py-1.5 bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
               >
                 <option value="">{t('tickets.ticketStatusPlaceholder')}</option>
                 <option>New</option>
@@ -1268,7 +1241,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               <button
                 onClick={handleBulkTicketStatus}
                 disabled={!bulkTicketStatus || bulkProcessing}
-                className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+                className="px-3 py-1.5 bg-[#4338ca] dark:bg-[#a5b4fc] text-white dark:text-[#0b0f17] rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
               >
                 {t('common.apply')}
               </button>
@@ -1281,7 +1254,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               <select
                 value={bulkProductStatus}
                 onChange={(e) => setBulkProductStatus(e.target.value)}
-                className="px-2.5 py-1.5 border border-indigo-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg px-2 py-1.5 bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
               >
                 <option value="">{t('tickets.productStatusPlaceholder')}</option>
                 <option>Received</option>
@@ -1294,7 +1267,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               <button
                 onClick={handleBulkProductStatus}
                 disabled={!bulkProductStatus || bulkProcessing}
-                className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+                className="px-3 py-1.5 bg-[#4338ca] dark:bg-[#a5b4fc] text-white dark:text-[#0b0f17] rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-40 transition-opacity"
               >
                 {t('common.apply')}
               </button>
@@ -1303,34 +1276,28 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
 
           {/* Delete */}
           {canDo('delete') && (
-            <>
-              <div className="h-5 w-px bg-indigo-200 hidden sm:block" />
-              <button
-                onClick={handleBulkDelete}
-                disabled={bulkProcessing}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 disabled:opacity-40 transition-colors"
-              >
-                {bulkProcessing ? (
-                  <div className="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full" />
-                ) : (
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                )}
-                {t('tickets.deleteSelected')}
-              </button>
-            </>
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkProcessing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm hover:bg-red-100 dark:hover:bg-red-900/30 disabled:opacity-40 transition-colors border border-red-200 dark:border-red-800"
+            >
+              {bulkProcessing ? (
+                <div className="animate-spin w-3 h-3 border-2 border-red-500 border-t-transparent rounded-full" />
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              )}
+              {t('tickets.deleteSelected')}
+            </button>
           )}
+
+          <button
+            onClick={() => setSelectedTickets([])}
+            className="ml-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
+          >
+            {t('common.clear')}
+          </button>
         </div>
       )}
 
@@ -1495,7 +1462,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                     aria-label={`Actions for ticket ${t.rma_number}`}
                     aria-expanded={openMenuId === t.id}
                     aria-haspopup="menu"
-                    className="p-2.5 sm:p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                    className="p-2.5 sm:p-1.5 rounded-lg text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0] hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230] transition-colors"
                   >
                     <svg className="w-4 h-4" aria-hidden="true" fill="currentColor" viewBox="0 0 24 24">
                       <circle cx="12" cy="5" r="1.5" />
@@ -1504,16 +1471,16 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                     </svg>
                   </button>
                   {openMenuId === t.id && (
-                    <div className="absolute right-0 top-9 z-30 w-44 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
+                    <div className="absolute right-0 top-9 z-30 w-44 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-gray-200 dark:border-[#212a38] py-1 overflow-hidden">
                       <button
                         onClick={() => {
                           handleViewDetails(t)
                           setOpenMenuId(null)
                         }}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
+                        className="w-full px-4 py-2 text-left text-sm text-[#211f1b] dark:text-[#e8ebf0] hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230] flex items-center gap-2.5"
                       >
                         <svg
-                          className="w-4 h-4 text-gray-500"
+                          className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2]"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -1539,10 +1506,10 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                             handleEdit(t)
                             setOpenMenuId(null)
                           }}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
+                          className="w-full px-4 py-2 text-left text-sm text-[#211f1b] dark:text-[#e8ebf0] hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230] flex items-center gap-2.5"
                         >
                           <svg
-                            className="w-4 h-4 text-gray-500"
+                            className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2]"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -1562,10 +1529,10 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                           handleExportPDF(t)
                           setOpenMenuId(null)
                         }}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
+                        className="w-full px-4 py-2 text-left text-sm text-[#211f1b] dark:text-[#e8ebf0] hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230] flex items-center gap-2.5"
                       >
                         <svg
-                          className="w-4 h-4 text-gray-500"
+                          className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2]"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -1585,7 +1552,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                             handleDelete(t.id)
                             setOpenMenuId(null)
                           }}
-                          className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2.5"
+                          className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2.5"
                         >
                           <svg
                             className="w-4 h-4"
@@ -1642,7 +1609,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             <button
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="px-3 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {t('common.previous')}
             </button>
@@ -1650,7 +1617,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             <button
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="px-3 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {t('common.next')}
             </button>

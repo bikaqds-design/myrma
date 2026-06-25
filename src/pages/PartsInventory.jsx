@@ -317,13 +317,9 @@ function PartModal({ part, onSave, onClose, saving }) {
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-[#e8ebf0] border border-gray-200 dark:border-[#212a38] rounded-xl hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] transition-colors"
-            >
+            <Button type="button" variant="secondary" onClick={onClose}>
               {t('common.cancel')}
-            </button>
+            </Button>
             <Button type="submit" loading={saving}>
               {part ? t('customerDetails.saveChanges') : t('parts.addPart')}
             </Button>
@@ -365,6 +361,8 @@ export default function PartsInventory({
   const [sortKey, setSortKey] = useState('part_name')
   const [sortDir, setSortDir] = useState('asc')
   const [showLowOnly, setShowLowOnly] = useState(false)
+  const [filterSupplier, setFilterSupplier] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editingPart, setEditingPart] = useState(null)
   const [adjusting, setAdjusting] = useState({})
@@ -388,10 +386,12 @@ export default function PartsInventory({
   }
 
   const lowStockParts = useMemo(() => parts.filter((p) => p.quantity <= p.reorder_level), [parts])
+  const uniqueSuppliers = useMemo(() => [...new Set(parts.map((p) => p.supplier).filter(Boolean))].sort(), [parts])
 
   const filtered = useMemo(() => {
     let list = [...parts]
     if (showLowOnly) list = list.filter((p) => p.quantity <= p.reorder_level)
+    if (filterSupplier) list = list.filter((p) => p.supplier === filterSupplier)
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(
@@ -411,7 +411,7 @@ export default function PartsInventory({
       if (av > bv) return sortDir === 'asc' ? 1 : -1
       return 0
     })
-  }, [parts, search, showLowOnly, sortKey, sortDir])
+  }, [parts, search, showLowOnly, filterSupplier, sortKey, sortDir])
 
   const saveMutation = useMutation({
     mutationFn: (data) =>
@@ -641,50 +641,84 @@ export default function PartsInventory({
       )}
 
       {/* Toolbar */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-0 max-w-sm">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('parts.searchPlaceholder')}
-            className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-          />
-          <svg
-            className="w-4 h-4 text-gray-500 dark:text-[#9aa4b2] absolute left-2.5 top-1/2 -translate-y-1/2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-0 max-w-sm">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('parts.searchPlaceholder')}
+              className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
+            />
+            <svg
+              className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <button
+            onClick={() => setShowLowOnly((v) => !v)}
+            className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${showLowOnly ? 'bg-amber-50 border-amber-400 text-amber-700 dark:bg-amber-900/20 dark:border-amber-500 dark:text-amber-400' : 'border-gray-200 dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520]'}`}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {t('parts.lowStock')}
+            {!showLowOnly && lowStockParts.length > 0 && (
+              <span className="w-4 h-4 bg-amber-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
+                {lowStockParts.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            aria-expanded={showFilters}
+            aria-controls="parts-filters-panel"
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${
+              showFilters || filterSupplier
+                ? 'border-[#4338ca] text-[#4338ca] bg-indigo-50 dark:bg-indigo-900/20 dark:border-[#a5b4fc] dark:text-[#a5b4fc]'
+                : 'border-[#e6e9ef] dark:border-[#212a38] text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520]'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+            </svg>
+            {t('common.filters')}
+            {filterSupplier && (
+              <span className="w-4 h-4 bg-[#4338ca] dark:bg-[#a5b4fc] text-white dark:text-[#0b0f17] text-xs rounded-full flex items-center justify-center">1</span>
+            )}
+          </button>
+          <span className="text-sm text-gray-500 dark:text-[#9aa4b2] ml-auto">
+            {t('parts.partsCount', { count: filtered.length })}
+          </span>
         </div>
-        <button
-          onClick={() => setShowLowOnly((v) => !v)}
-          className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm transition-colors ${showLowOnly ? 'bg-amber-50 border-amber-400 text-amber-700' : 'border-gray-200 dark:border-[#212a38] text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520]'}`}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          {showLowOnly ? t('parts.lowStock') : t('parts.lowStock')}
-          {!showLowOnly && lowStockParts.length > 0 && (
-            <span className="w-4 h-4 bg-amber-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
-              {lowStockParts.length}
-            </span>
-          )}
-        </button>
-        <span className="text-sm text-gray-500 dark:text-[#9aa4b2] ml-auto">
-          {t('parts.partsCount', { count: filtered.length })}
-        </span>
+        {showFilters && (
+          <div id="parts-filters-panel" className="p-4 bg-[#f8f9fb] dark:bg-[#0f1520] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
+            <div className="flex flex-wrap gap-3">
+              <select
+                value={filterSupplier}
+                onChange={(e) => setFilterSupplier(e.target.value)}
+                className="px-3 py-2 text-sm border border-gray-300 dark:border-[#212a38] rounded-lg bg-white dark:bg-[#121823] text-gray-800 dark:text-[#e8ebf0] focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="">{t('parts.allSuppliers')}</option>
+                {uniqueSuppliers.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              {filterSupplier && (
+                <button
+                  onClick={() => setFilterSupplier('')}
+                  className="text-sm text-red-500 dark:text-red-400 hover:underline"
+                >
+                  {t('common.clear')}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Table */}

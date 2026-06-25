@@ -12,7 +12,8 @@
     "parts": "قطع الغيار",
     "reports": "التقارير",
     "customerTracker": "تتبع العميل",
-    "controlPanel": "لوحة الإدارة"
+    "controlPanel": "لوحة الإدارة",
+    "activities": "الأنشطة"
   },
   "common": {
     "save": "حفظ",
@@ -77,7 +78,9 @@
     "go": "انتقال",
     "showingRange": "عرض {{start}}–{{end}} من {{total}}",
     "clearAll": "مسح الكل",
-    "saving": "جارٍ الحفظ..."
+    "saving": "جارٍ الحفظ...",
+    "unknown": "غير معروف",
+    "noDate": "لا يوجد تاريخ"
   },
   "shortcuts": {
     "title": "اختصارات لوحة المفاتيح",
@@ -170,7 +173,11 @@
     "last30Days": "آخر 30 يومًا",
     "ticketsLabel": "تذاكر",
     "myOpenTickets": "تذاكري المفتوحة",
-    "dueSoon": "تستحق قريباً"
+    "dueSoon": "تستحق قريباً",
+    "overdueFollowups": "متابعات متأخرة",
+    "overdueFollowupsDesc": "أنشطة CRM تجاوزت موعدها",
+    "viewActivities": "عرض الأنشطة",
+    "crmSection": "إدارة العملاء"
   },
   "tickets": {
     "title": "تذاكر الإرجاع",
@@ -189,6 +196,8 @@
     "deleteSelected": "حذف المحدد",
     "clearFilters": "مسح الكل",
     "selected": "محدد",
+    "selectAll": "تحديد الكل",
+    "selectRow": "تحديد {{name}}",
     "deselect": "إلغاء",
     "ticketStatusPlaceholder": "حالة التذكرة…",
     "productStatusPlaceholder": "حالة المنتج…",
@@ -341,7 +350,35 @@
     "sourceUpdated": "تم تحديث المصدر",
     "lockedConverted": "هذا العميل المحتمل محوَّل ومقفل (للقراءة فقط).",
     "linkedDeal": "الصفقة المرتبطة",
-    "viewDeal": "عرض الصفقة"
+    "viewDeal": "عرض الصفقة",
+    "leadLog": "سجل العميل المحتمل",
+    "leadNotesTab": "ملاحظات العميل",
+    "leadNotesPlaceholder": "أضف ملاحظات حول هذا العميل المحتمل...",
+    "leadInfo": "معلومات العميل المحتمل",
+    "allReps": "جميع المندوبين",
+    "export": "تصدير",
+    "exportTooltip": "تصدير العملاء المحتملين إلى Excel",
+    "exportEmpty": "لا يوجد عملاء محتملون للتصدير",
+    "exportSuccess": "تم تصدير {{count}} عميل محتمل",
+    "exportAll": "تصدير الكل",
+    "exportAllDesc": "جميع {{count}} عميل محتمل",
+    "exportFiltered": "تصدير المُصفَّى",
+    "exportFilteredDesc": "{{count}} عميل محتمل وفق الفلاتر الحالية",
+    "exportSelected": "تصدير المحدد",
+    "exportSelectedDesc": "{{count}} عميل محتمل محدد",
+    "bulkDeleteConfirm": "حذف {{count}} عميل/عملاء محتملين نهائياً؟ لا يمكن التراجع عن هذا.",
+    "bulkDeleted": "تم حذف {{count}} عميل/عملاء محتملين",
+    "bulkStatusChanged": "تم تحديث الحالة لـ {{count}} عميل/عملاء محتملين",
+    "bulkSourceChanged": "تم تحديث المصدر لـ {{count}} عميل/عملاء محتملين",
+    "bulkChangeStatus": "تغيير الحالة",
+    "bulkChangeSource": "تغيير المصدر",
+    "view_list": "عرض القائمة",
+    "view_kanban": "عرض كانبان",
+    "dropHere": "أسقط هنا لتغيير الحالة",
+    "createdBy": "أنشئ بواسطة",
+    "addLeadDesc": "أدخل عميلاً محتملاً جديداً يدوياً",
+    "downloadTemplateDesc": "تحميل نموذج استيراد CSV",
+    "importCSVDesc": "رفع العملاء المحتملين بشكل جماعي من ملف CSV"
   },
   "activityType": {
     "call": "اتصال",
@@ -354,6 +391,7 @@
   },
   "activityChatter": {
     "logNote": "تسجيل ملاحظة",
+    "addComment": "سجل الصفقة",
     "scheduleActivity": "جدولة نشاط",
     "planned": "المخطط",
     "history": "السجل",
@@ -373,11 +411,15 @@
     "logConverted": "تم تحويل العميل المحتمل إلى صفقة",
     "logWon": "تم تحديد الصفقة كرابحة",
     "logLost": "تم تحديد الصفقة كخاسرة — {{reason}}",
+    "logReopened": "تمت إعادة فتح الصفقة من حالة {{from}} — انتقلت إلى {{to}}",
     "logAssigned": "أُعيد الإسناد من {{from}} إلى {{to}}",
     "reschedule": "إعادة الجدولة",
     "activityRescheduled": "تمت إعادة جدولة النشاط",
+    "cancelActivity": "إلغاء",
+    "activityCancelled": "تم إلغاء النشاط",
     "reopen": "إعادة فتح",
     "activityReopened": "تمت إعادة فتح النشاط",
+    "logFieldUpdated": "تم تحديث {{field}}: {{value}}",
     "reply": "رد",
     "replyPlaceholder": "اكتب ردًا...",
     "commentPlaceholder": "أضف ملاحظة متابعة للفريق...",
@@ -416,14 +458,123 @@
     "dealClosed": "هذه الصفقة مغلقة (للقراءة فقط)",
     "dealInfo": "معلومات الصفقة",
     "productLines": "بنود المنتجات",
+    "productLinesTab": "بنود المنتجات",
+    "dealNotesTab": "ملاحظات الصفقة",
+    "dealNotesPlaceholder": "أضف ملاحظات حول هذه الصفقة...",
+    "searchCustomer": "ابحث عن عميل...",
+    "setCloseDate": "تحديد تاريخ الإغلاق",
+    "clickToEdit": "انقر للتعديل",
+    "commentsPanel": "التعليقات",
+    "noComments": "لا توجد تعليقات بعد. كن أول من يعلق.",
+    "commentPlaceholder": "اكتب تعليقاً... (Ctrl+Enter للإرسال)",
     "noProductLines": "لم تتم إضافة بنود منتجات بعد.",
     "lineProductPlaceholder": "اسم المنتج",
+    "lineProduct": "المنتج",
+    "lineQty": "الكمية",
+    "lineUnitPrice": "سعر الوحدة",
+    "lineSubtotal": "الإجمالي الجزئي",
     "addLine": "إضافة بند",
     "activity": "النشاط",
+    "probability": "الاحتمالية",
+    "valueLocked": "القيمة محسوبة من بنود المنتجات",
+    "editValue": "تعديل القيمة",
+    "closeDate": "إغلاق",
     "rotting": "لا يوجد نشاط منذ فترة — قد تكون هذه الصفقة راكدة",
     "currency": "ج.م",
+    "stage": "المرحلة",
     "noStages": "لا توجد مراحل لهذا المسار",
-    "noStagesHint": "اطلب من المسؤول إعداد مراحل هذا المسار."
+    "noStagesHint": "اطلب من المسؤول إعداد مراحل هذا المسار.",
+    "reopenDeal": "إعادة فتح الصفقة",
+    "reopenSelectStage": "الرجوع إلى مرحلة",
+    "reopenStagePlaceholder": "اختر مرحلة...",
+    "dealReopened": "تمت إعادة فتح الصفقة بنجاح",
+    "unassigned": "غير معين",
+    "view_kanban": "كانبان",
+    "view_list": "قائمة",
+    "view_graph": "رسم بياني",
+    "view_pivot": "جدول محوري",
+    "view_activity": "النشاط",
+    "filter_all": "الكل",
+    "filter_active": "نشط",
+    "filter_won": "مكتسبة",
+    "filter_lost": "خسارة",
+    "listSearch": "البحث في الصفقات...",
+    "listDeals": "صفقة",
+    "listValue": "القيمة",
+    "listRep": "المندوب",
+    "listStatus": "الحالة",
+    "listEmpty": "لا توجد صفقات",
+    "listTotal": "المجموع",
+    "graphMeasures": "المقاييس",
+    "graphMeasureCount": "العدد",
+    "graphMeasureRevenue": "الإيرادات",
+    "graphGroupBy": "تجميع حسب",
+    "graphGroup_stage": "المرحلة",
+    "graphGroup_salesperson": "المندوب",
+    "graphGroup_status": "الحالة",
+    "graphGroup_month": "شهر الإنشاء",
+    "graphBy": "حسب",
+    "statTotalDeals": "إجمالي الصفقات",
+    "statTotalRevenue": "إجمالي الإيرادات",
+    "statWonDeals": "الصفقات المكتسبة",
+    "statWonRevenue": "إيرادات المكتسبة",
+    "pivotRows": "الصفوف",
+    "pivotCols": "الأعمدة",
+    "pivotMeasure": "المقياس",
+    "pivotTotal": "الإجمالي",
+    "pivotDim_stage": "المرحلة",
+    "pivotDim_salesperson": "المندوب",
+    "pivotDim_status": "الحالة",
+    "pivotDim_created_month": "شهر الإنشاء",
+    "pivotDim_close_month": "شهر الإغلاق المتوقع",
+    "pivotMeasure_count": "العدد",
+    "pivotMeasure_sum_revenue": "مجموع الإيرادات",
+    "pivotMeasure_avg_revenue": "متوسط الإيرادات",
+    "pivotHint": "القيم تعرض {{measure}} لكل تقاطع مجموعة.",
+    "activityDeal": "الصفقة",
+    "actType_call": "مكالمة",
+    "actType_email": "بريد إلكتروني",
+    "actType_meeting": "اجتماع",
+    "actType_whatsapp": "واتساب",
+    "actType_task": "مهمة",
+    "actOverdue": "متأخر",
+    "actToday": "مستحق اليوم",
+    "actPlanned": "مجدول",
+    "export": "تصدير",
+    "exportTooltip": "تصدير جميع الصفقات إلى Excel",
+    "exportEmpty": "لا توجد صفقات للتصدير",
+    "exportSuccess": "تم تصدير {{count}} صفقة إلى Excel",
+    "exportAll": "تصدير الكل",
+    "exportAllDesc": "جميع {{count}} صفقة",
+    "exportFiltered": "تصدير المُصفَّى",
+    "exportFilteredDesc": "{{count}} صفقة وفق الفلاتر الحالية",
+    "exportSelected": "تصدير المحدد",
+    "exportSelectedDesc": "{{count}} صفقة محددة",
+    "bulkDeleteConfirm": "حذف {{count}} صفقة/صفقات نهائياً؟ لا يمكن التراجع عن هذا.",
+    "bulkDeleted": "تم حذف {{count}} صفقة/صفقات",
+    "bulkChangeStage": "تغيير المرحلة",
+    "bulkStageChanged": "تم تحديث المرحلة لـ {{count}} صفقة/صفقات",
+    "exportColStage": "المرحلة",
+    "exportColTitle": "الصفقة",
+    "exportColCompany": "الشركة",
+    "exportColValue": "الإيراد المتوقع",
+    "exportColStatus": "الحالة",
+    "exportColProbability": "الاحتمالية %",
+    "exportColRep": "مندوب المبيعات",
+    "exportColCloseDate": "تاريخ الإغلاق المتوقع",
+    "exportColRotting": "متوقف",
+    "exportColWonLostDate": "تاريخ الاكتساب/الخسارة",
+    "exportColLostReason": "سبب الخسارة",
+    "exportColCreatedAt": "تاريخ الإنشاء",
+    "exportColCreatedBy": "أنشأه",
+    "exportColNotes": "ملاحظات",
+    "exportSubtotal": "المجموع الفرعي ({{count}} صفقة)",
+    "exportGrandTotal": "الإجمالي الكلي ({{count}} صفقة)",
+    "allStages": "جميع المراحل",
+    "allReps": "جميع المندوبين",
+    "allStatuses": "جميع الحالات",
+    "searchPlaceholder": "البحث في الصفقات، العملاء، المندوبين...",
+    "filteredCount": "{{count}} من {{total}} صفقة"
   },
   "inventory": {
     "title": "المخزون",
@@ -902,7 +1053,10 @@
     "failedDeleteBrand": "فشل حذف العلامة التجارية",
     "categoryDeleted": "تم حذف الفئة",
     "failedDeleteCategory": "فشل حذف الفئة",
-    "pageMustBeBetween": "يجب أن تكون الصفحة بين 1 و {{total}}"
+    "pageMustBeBetween": "يجب أن تكون الصفحة بين 1 و {{total}}",
+    "allBrands": "جميع العلامات التجارية",
+    "allCategories": "جميع الفئات",
+    "allStatuses": "جميع الحالات"
   },
   "calendar": {
     "title": "تقويم الفنيين",
@@ -1052,7 +1206,8 @@
     "errorPartNameRequired": "اسم القطعة مطلوب",
     "errorQuantityRequired": "الكمية مطلوبة",
     "errorUnitCostRequired": "تكلفة الوحدة مطلوبة",
-    "errorReorderRequired": "حد إعادة الطلب مطلوب"
+    "errorReorderRequired": "حد إعادة الطلب مطلوب",
+    "allSuppliers": "جميع الموردين"
   },
   "accountSettings": {
     "title": "إعدادات الحساب",
@@ -1132,14 +1287,38 @@
     "preferencesSavedSuccess": "تم حفظ التفضيلات!",
     "failedSavePrefs": "فشل حفظ التفضيلات",
     "notifItems": {
-      "ticket_created": { "label": "تذكرة جديدة", "desc": "عند فتح تذكرة إرجاع جديدة" },
-      "ticket_assigned": { "label": "تذكرة مُعيَّنة إليك", "desc": "عند تعيين تذكرة لحسابك" },
-      "ticket_status_changed": { "label": "تغيير الحالة", "desc": "عند انتقال التذكرة إلى حالة جديدة" },
-      "ticket_priority_changed": { "label": "تغيير الأولوية", "desc": "عند تحديث أولوية التذكرة" },
-      "comment_added": { "label": "تعليق جديد", "desc": "عند إضافة تعليق على التذكرة" },
-      "ticket_due_soon": { "label": "موعد قريب", "desc": "قبل 24 ساعة من موعد استحقاق التذكرة" },
-      "ticket_overdue": { "label": "متأخرة", "desc": "عند تجاوز التذكرة تاريخ استحقاقها" },
-      "daily_summary": { "label": "الملخص اليومي", "desc": "ملخص صباحي لجميع التذاكر المفتوحة" }
+      "ticket_created": {
+        "label": "تذكرة جديدة",
+        "desc": "عند فتح تذكرة إرجاع جديدة"
+      },
+      "ticket_assigned": {
+        "label": "تذكرة مُعيَّنة إليك",
+        "desc": "عند تعيين تذكرة لحسابك"
+      },
+      "ticket_status_changed": {
+        "label": "تغيير الحالة",
+        "desc": "عند انتقال التذكرة إلى حالة جديدة"
+      },
+      "ticket_priority_changed": {
+        "label": "تغيير الأولوية",
+        "desc": "عند تحديث أولوية التذكرة"
+      },
+      "comment_added": {
+        "label": "تعليق جديد",
+        "desc": "عند إضافة تعليق على التذكرة"
+      },
+      "ticket_due_soon": {
+        "label": "موعد قريب",
+        "desc": "قبل 24 ساعة من موعد استحقاق التذكرة"
+      },
+      "ticket_overdue": {
+        "label": "متأخرة",
+        "desc": "عند تجاوز التذكرة تاريخ استحقاقها"
+      },
+      "daily_summary": {
+        "label": "الملخص اليومي",
+        "desc": "ملخص صباحي لجميع التذاكر المفتوحة"
+      }
     },
     "sysNotifCats": {
       "Tickets": "التذاكر",
@@ -1149,28 +1328,94 @@
       "System": "النظام"
     },
     "sysNotifItems": {
-      "ticket_created": { "label": "تذكرة تم إنشاؤها", "desc": "تم فتح تذكرة إرجاع جديدة في النظام" },
-      "ticket_updated": { "label": "تذكرة تم تحديثها", "desc": "تم تعديل تفاصيل التذكرة أو حقولها" },
-      "ticket_deleted": { "label": "تذكرة تم حذفها", "desc": "تم حذف تذكرة إرجاع" },
-      "ticket_assigned": { "label": "تذكرة مُعيَّنة", "desc": "تم تعيين تذكرة لمستخدم" },
-      "ticket_status_changed": { "label": "تغيير الحالة", "desc": "انتقلت التذكرة إلى حالة جديدة" },
-      "ticket_overdue": { "label": "تذكرة متأخرة", "desc": "تجاوزت التذكرة تاريخ استحقاقها" },
-      "due_date_warning": { "label": "تحذير الموعد", "desc": "قبل 24 ساعة من موعد الاستحقاق" },
-      "comment_added": { "label": "تعليق جديد", "desc": "علّق أحدهم على التذكرة" },
-      "customer_created": { "label": "عميل تم إنشاؤه", "desc": "تم إضافة عميل جديد إلى النظام" },
-      "customer_updated": { "label": "عميل تم تحديثه", "desc": "تم تعديل معلومات العميل" },
-      "customer_deleted": { "label": "عميل تم حذفه", "desc": "تم حذف سجل عميل" },
-      "product_created": { "label": "منتج تم إنشاؤه", "desc": "تم إضافة منتج جديد إلى المخزون" },
-      "product_updated": { "label": "منتج تم تحديثه", "desc": "تم تعديل معلومات المنتج" },
-      "product_deleted": { "label": "منتج تم حذفه", "desc": "تم حذف منتج" },
-      "inventory_low": { "label": "مخزون منخفض", "desc": "انخفض مستوى المخزون دون الحد الأدنى" },
-      "user_created": { "label": "مستخدم تم إنشاؤه", "desc": "تم إنشاء حساب مستخدم جديد" },
-      "user_role_changed": { "label": "تغيير الدور", "desc": "تم تحديث دور مستخدم" },
-      "user_suspended": { "label": "مستخدم موقوف/محظور", "desc": "تم تعليق حساب أو قفله" },
-      "user_activated": { "label": "مستخدم مُفعَّل", "desc": "تم إعادة تفعيل حساب" },
-      "user_deleted": { "label": "مستخدم تم حذفه", "desc": "تم حذف حساب مستخدم" },
-      "system_announcement": { "label": "إعلانات النظام", "desc": "رسائل بث من المسؤولين" },
-      "custom_alert": { "label": "تنبيهات مخصصة", "desc": "تنبيهات يدوية يرسلها فريق الإدارة" }
+      "ticket_created": {
+        "label": "تذكرة تم إنشاؤها",
+        "desc": "تم فتح تذكرة إرجاع جديدة في النظام"
+      },
+      "ticket_updated": {
+        "label": "تذكرة تم تحديثها",
+        "desc": "تم تعديل تفاصيل التذكرة أو حقولها"
+      },
+      "ticket_deleted": {
+        "label": "تذكرة تم حذفها",
+        "desc": "تم حذف تذكرة إرجاع"
+      },
+      "ticket_assigned": {
+        "label": "تذكرة مُعيَّنة",
+        "desc": "تم تعيين تذكرة لمستخدم"
+      },
+      "ticket_status_changed": {
+        "label": "تغيير الحالة",
+        "desc": "انتقلت التذكرة إلى حالة جديدة"
+      },
+      "ticket_overdue": {
+        "label": "تذكرة متأخرة",
+        "desc": "تجاوزت التذكرة تاريخ استحقاقها"
+      },
+      "due_date_warning": {
+        "label": "تحذير الموعد",
+        "desc": "قبل 24 ساعة من موعد الاستحقاق"
+      },
+      "comment_added": {
+        "label": "تعليق جديد",
+        "desc": "علّق أحدهم على التذكرة"
+      },
+      "customer_created": {
+        "label": "عميل تم إنشاؤه",
+        "desc": "تم إضافة عميل جديد إلى النظام"
+      },
+      "customer_updated": {
+        "label": "عميل تم تحديثه",
+        "desc": "تم تعديل معلومات العميل"
+      },
+      "customer_deleted": {
+        "label": "عميل تم حذفه",
+        "desc": "تم حذف سجل عميل"
+      },
+      "product_created": {
+        "label": "منتج تم إنشاؤه",
+        "desc": "تم إضافة منتج جديد إلى المخزون"
+      },
+      "product_updated": {
+        "label": "منتج تم تحديثه",
+        "desc": "تم تعديل معلومات المنتج"
+      },
+      "product_deleted": {
+        "label": "منتج تم حذفه",
+        "desc": "تم حذف منتج"
+      },
+      "inventory_low": {
+        "label": "مخزون منخفض",
+        "desc": "انخفض مستوى المخزون دون الحد الأدنى"
+      },
+      "user_created": {
+        "label": "مستخدم تم إنشاؤه",
+        "desc": "تم إنشاء حساب مستخدم جديد"
+      },
+      "user_role_changed": {
+        "label": "تغيير الدور",
+        "desc": "تم تحديث دور مستخدم"
+      },
+      "user_suspended": {
+        "label": "مستخدم موقوف/محظور",
+        "desc": "تم تعليق حساب أو قفله"
+      },
+      "user_activated": {
+        "label": "مستخدم مُفعَّل",
+        "desc": "تم إعادة تفعيل حساب"
+      },
+      "user_deleted": {
+        "label": "مستخدم تم حذفه",
+        "desc": "تم حذف حساب مستخدم"
+      },
+      "system_announcement": {
+        "label": "إعلانات النظام",
+        "desc": "رسائل بث من المسؤولين"
+      },
+      "custom_alert": {
+        "label": "تنبيهات مخصصة",
+        "desc": "تنبيهات يدوية يرسلها فريق الإدارة"
+      }
     }
   },
   "ticketForm": {
@@ -1389,7 +1634,29 @@
     "dealValue": "قيمة الصفقة (جنيه)",
     "convertNote": "سيتم إنشاء حساب عميل جديد من بيانات هذا العميل المحتمل. يصبح العميل المحتمل غير قابل للتعديل (باستثناء الملاحظات) بعد التحويل.",
     "convertButton": "تحويل",
-    "convertValidation": "عنوان الصفقة ومسار المبيعات مطلوبان"
+    "convertValidation": "عنوان الصفقة ومسار المبيعات مطلوبان",
+    "addSingle": "إضافة عميل محتمل",
+    "addSingleDesc": "أنشئ عميلاً محتملاً واحداً يدوياً",
+    "bulkImport": "استيراد جماعي",
+    "bulkImportDesc": "استيراد من ملف CSV",
+    "bulkUploadTitle": "رفع عملاء محتملين بشكل جماعي",
+    "instructions": "التعليمات:",
+    "bulkInst1": "قم بتنزيل قالب CSV أولاً",
+    "bulkInst2": "أدخل بيانات العملاء المحتملين وفق تنسيق القالب",
+    "bulkInst3": "الحقول المطلوبة: full_name, company_name, phone, source",
+    "bulkInst4": "قيم source الصالحة: walk-in, phone, referral, exhibition, website, whatsapp",
+    "bulkInst5": "قيم status الصالحة: new, contacted, qualified, nurturing, inactive, disqualified (تُعيَّن 'new' تلقائياً إن تُرك فارغاً)",
+    "bulkInst6": "الحقول الاختيارية: email, notes",
+    "bulkInst7": "تجنب الفواصل داخل حقول النص — استخدم شرطة بدلاً منها",
+    "downloadTemplate": "تنزيل قالب CSV",
+    "uploadCSVLabel": "رفع ملف CSV",
+    "uploadBtn": "رفع واستيراد",
+    "bulkUploadWarning": "سيُستورد كل عميل محتمل بحالة 'جديد'. يمكنك تحديث الحالات الفردية بعد الاستيراد.",
+    "clickToChangeFile": "انقر لتغيير الملف",
+    "clickToUploadCSV": "انقر لرفع ملف CSV",
+    "dragAndDrop": "أو اسحب وأفلت",
+    "selectCsvFile": "يرجى اختيار ملف CSV",
+    "selectFileFirst": "يرجى اختيار ملف أولاً"
   },
   "leadStatus": {
     "new": "جديد",
@@ -1719,7 +1986,6 @@
     "dataCleanupDesc": "إزالة السجلات القديمة وتحديد مشاكل جودة البيانات",
     "backupRestoreLabel": "النسخ الاحتياطي والاستعادة",
     "backupRestoreDesc": "تصدير جميع البيانات والاستعادة من ملفات النسخ الاحتياطي",
-
     "saving": "جارٍ الحفظ...",
     "cancel": "إلغاء",
     "edit": "تعديل",
@@ -1734,7 +2000,6 @@
     "no": "لا",
     "copy": "نسخ",
     "copied": "✓ تم النسخ",
-
     "sendAlert": {
       "header": "إرسال تنبيه",
       "subtitle": "إرسال إشعار داخل التطبيق للمستخدمين أو المجموعات",
@@ -1756,7 +2021,6 @@
       "successSent": "تم إرسال التنبيه",
       "failedSend": "فشل الإرسال: {{error}}"
     },
-
     "slaPolicies": {
       "header": "سياسات SLA",
       "enabled": "مفعّل",
@@ -1766,7 +2030,6 @@
       "saved": "تم حفظ سياسات SLA",
       "saveFailed": "فشل حفظ سياسات SLA"
     },
-
     "automationRules": {
       "header": "قواعد الأتمتة",
       "subtitle": "تعمل القواعد تلقائياً على التذاكر عند وقوع الأحداث",
@@ -1792,7 +2055,6 @@
       "saved": "تم حفظ قواعد الأتمتة",
       "saveFailed": "فشل حفظ قواعد الأتمتة"
     },
-
     "webhooks": {
       "header": "Webhooks",
       "subtitle": "إرسال أحداث التذاكر إلى Slack وQuickBooks وZapier والمزيد",
@@ -1813,7 +2075,6 @@
       "saved": "تم حفظ Webhooks",
       "saveFailed": "فشل حفظ Webhooks"
     },
-
     "announcements": {
       "header": "الإعلانات",
       "subtitle": "نشر لافتات مرئية لجميع المستخدمين المسجلين",
@@ -1842,7 +2103,6 @@
       "deleted": "تم الحذف",
       "titleRequired": "العنوان والرسالة مطلوبان"
     },
-
     "kb": {
       "header": "قاعدة المعرفة",
       "subtitle": "مقالات الأسئلة الشائعة المعروضة للعملاء في صفحة التتبع العامة",
@@ -1866,12 +2126,10 @@
       "deleted": "تم الحذف",
       "titleBodyRequired": "العنوان والإجابة مطلوبان"
     },
-
     "migration": {
       "dbSetupRequired": "{{feature}} — إعداد قاعدة البيانات مطلوب",
       "runSql": "شغّل SQL التالي في محرر SQL الخاص بـ Supabase لتفعيل هذه الميزة."
     },
-
     "auditLog": {
       "header": "سجل التدقيق",
       "subtitle": "جميع أنشطة المستخدمين في النظام — {{count}} سجل",
@@ -1892,7 +2150,6 @@
       "noEntries": "لا توجد سجلات تطابق عوامل التصفية",
       "loadFailed": "فشل تحميل سجل التدقيق"
     },
-
     "customFields": {
       "header": "الحقول المخصصة",
       "subtitle": "إضافة حقول إضافية للتذاكر والعملاء",
@@ -1935,7 +2192,6 @@
       "deleted": "تم الحذف",
       "deleteConfirm": "حذف هذا الحقل المخصص؟ البيانات المخزنة في هذا الحقل لن تُحذف من السجلات الموجودة."
     },
-
     "dataCleanup": {
       "header": "تنظيف البيانات",
       "subtitle": "إزالة السجلات القديمة وتحديد مشاكل جودة البيانات",
@@ -1965,7 +2221,6 @@
       "deleteConfirm": "حذف {{count}} تذاكر {{label}}؟ لا يمكن التراجع عن هذا الإجراء.",
       "deleted": "تم حذف {{count}} تذاكر {{label}}"
     },
-
     "integrations": {
       "header": "التكاملات",
       "subtitle": "تهيئة Webhooks الصادرة لأحداث التذاكر والعملاء",
@@ -1998,7 +2253,6 @@
       "testSent": "تم إرسال البيانات التجريبية",
       "testFailed": "فشل الوصول إلى رابط Webhook — تحقق من CORS أو الرابط"
     },
-
     "pdfLayout": {
       "header": "تخطيط PDF",
       "subtitle": "تخصيص شكل تذاكر الإرجاع عند الطباعة أو التصدير إلى PDF",
@@ -2048,7 +2302,6 @@
       "sectionSignature": "سطر التوقيع",
       "sectionSignatureDesc": "مساحة توقيع العميل / الفني"
     },
-
     "rmaConfig": {
       "header": "إعدادات الإرجاع",
       "subtitle": "قواعد SLA والتعيين التلقائي وإعدادات التذاكر الافتراضية",
@@ -2074,7 +2327,6 @@
       "loadFailed": "فشل تحميل الإعداد",
       "saved": "تم حفظ الإعداد"
     },
-
     "waSettings": {
       "messagingProviders": "مزودو الرسائل",
       "whatsappLabel": "واتساب",
@@ -2106,7 +2358,6 @@
       "saved": "تم حفظ إعدادات الإشعارات",
       "saveFailed": "فشل الحفظ: {{error}}"
     },
-
     "waLogs": {
       "searchPlaceholder": "البحث في المستلم والحدث…",
       "allStatuses": "جميع الحالات",
@@ -2135,7 +2386,6 @@
       "result_one": "{{count}} نتيجة",
       "result_other": "{{count}} نتائج"
     },
-
     "waTemplates": {
       "count_one": "{{count}} قالب",
       "count_other": "{{count}} قوالب",
@@ -2177,7 +2427,6 @@
       "deleteMessage": "حذف \"{{name}}\"؟ لا يمكن التراجع عن هذا الإجراء.",
       "deleted": "تم حذف القالب"
     },
-
     "waTestCenter": {
       "queueWorker": "معالج قائمة الانتظار",
       "workerDesc": "يعالج مهام الإشعارات المعلقة في قائمة الانتظار. شغّله يدوياً للاختبار أو اضبط pg_cron للمعالجة التلقائية.",
@@ -2337,5 +2586,31 @@
     "searchPlaceholder": "ابحث عن موضوع...",
     "noResults": "لا توجد مقالات تطابق بحثك",
     "backToTracker": "← العودة إلى متتبع الخدمة"
+  },
+  "activities": {
+    "title": "الأنشطة",
+    "subtitle": "{{count}} نشاط متابعة مفتوح",
+    "tabOverdue": "متأخر",
+    "tabToday": "اليوم",
+    "tabAll": "جميع المخططة",
+    "searchPlaceholder": "بحث في الأنشطة...",
+    "filterType": "نوع النشاط",
+    "filterAssignee": "المسند إليه",
+    "allTypes": "جميع الأنواع",
+    "allAssignees": "جميع المسندين",
+    "noOverdue": "لا توجد أنشطة متأخرة",
+    "noOverdueHint": "فريقك على دراية بجميع المتابعات.",
+    "noToday": "لا شيء مستحق اليوم",
+    "noTodayHint": "لا توجد أنشطة مجدولة لهذا اليوم.",
+    "noActivities": "لا توجد أنشطة مخططة",
+    "noActivitiesHint": "ستظهر المتابعات المجدولة هنا.",
+    "relatedLead": "عميل محتمل",
+    "relatedDeal": "صفقة",
+    "noDueDate": "لا يوجد تاريخ استحقاق",
+    "noAssignee": "غير مسند",
+    "markedDoneToast": "تم تحديد النشاط كمنجز",
+    "deletedToast": "تم إلغاء النشاط",
+    "deleteConfirm": "إلغاء هذا النشاط؟",
+    "showingOf": "عرض {{filtered}} من {{total}} نشاط"
   }
 }

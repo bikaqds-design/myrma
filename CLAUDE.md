@@ -15,7 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev            # start dev server (Vite, port 5173)
 npm run build          # production build
 npm run preview        # preview production build
-npm test               # Vitest unit tests (80 tests, 3 suites, ~3.5s) — run before every push
+npm test               # Vitest unit tests (277 tests, 7 suites) — run before every push
 npm run test:watch     # Vitest in watch mode
 npm run test:coverage  # test with coverage report
 npm run lint           # ESLint (0 errors target)
@@ -61,6 +61,10 @@ All top-level pages are lazy-loaded via the `lazyWithReload()` wrapper in `App.j
 | `/invoices` | `Invoices` | required |
 | `/parts` | `PartsInventory` | required |
 | `/reports` | `Reports` | required |
+| `/leads` | `Leads` | required (`leads.view`) |
+| `/leads/:id` | `LeadDetailsRoute` → `LeadDetails` | required (`leads.view`) |
+| `/pipeline` | `Pipeline` | required (`deals.view`) |
+| `/pipeline/:id` | `PipelineDealRoute` → `DealDetail` | required (`deals.view`) |
 | `/tracker` | `RMATracker` | **none (public)** |
 | `/kb` | `KnowledgeBasePublic` | **none (public)** |
 | `*` | `NotFoundPage` | — |
@@ -114,6 +118,11 @@ Domain modules in `src/api/db/` (all TypeScript — export Row types):
 | `system.ts` | System config, announcements, webhooks, SLA, automation rules | `RmaConfigRow`, `WebhookRow`, `SlaConfig`, `AutomationRule` |
 | `audit.ts` | Audit log reads + resilient write queue (H-9) | `AuditLogRow` |
 | `whatsappNotifications.ts` | WhatsApp templates, notification logs, settings, queue | `WhatsAppTemplateRow`, `NotificationLogRow`, `NotificationQueueRow` |
+| `leads.ts` | Lead CRUD + `convert()` atomic RPC (CRM Sprint 2) | `LeadRow` |
+| `deals.ts` | Deal CRUD + `moveStage()`, `markWon()`, `markLost()`, `reopen()`, `bulkDelete()`, `bulkMoveStage()` with auto-log (CRM Sprint 3) | `DealRow` |
+| `activities.ts` | Activity/chatter CRUD + `listForRelated()` bulk query + `delete()` (CRM Sprint 2.5) | `ActivityRow` |
+| `pipelines.ts` | Pipeline + stage CRUD (CRM Sprint 1) | `PipelineRow`, `PipelineStage` |
+| `contacts.ts` | Contact CRUD (CRM Sprint 1) | `ContactRow` |
 
 Import Row types from `src/api/db/index.ts` — all are re-exported there for convenience.
 
@@ -286,8 +295,14 @@ Five large pages are organized as folders. `React.lazy(() => import('./pages/X')
 | `src/pages/Products/` | `index.jsx`, `ProductsListTab.jsx`, `HierarchyTab.jsx`, `_modals.jsx` |
 | `src/pages/UserManagement/` | `index.jsx`, `UsersTab.jsx`, `RolesTab.jsx`, `_shared.jsx`, `_utils.js` — "Role Templates" tab is now a read-only **"Role Reference"** (displays runtime `ROLE_DEFAULT_PERMISSIONS`). "Custom Roles" tab is hidden behind `ENABLE_CUSTOM_ROLES = false` flag (not yet wired end-to-end). |
 | `src/pages/Customers/` | `index.jsx`, `_modals.jsx`, `_constants.js` |
+| `src/pages/Leads/` | `index.jsx` (list + filters), `LeadDetails.jsx` (detail page), `_modals.jsx` (Create/Convert), `_constants.js`, `_shared.jsx` (SortableHeader) |
+| `src/pages/Pipeline/` | `index.jsx` (view switcher, kanban, XLSX export, search/filters, multi-select stage/rep filters, export dropdown, lifted `selectedDeals` state), `DealDetail.jsx` (inline editing, product lines, stages), `DealCommentPanel.jsx` (right-side comment panel), `PipelineListView.jsx` (sortable table, stage pin dropdown, bulk select/delete/move, indigo bulk bar), `PipelineGraphView.jsx`, `PipelinePivotView.jsx`, `PipelineActivityView.jsx`, `_modals.jsx`, `_constants.js`, `_shared.jsx` |
 
 The remaining pages (`Dashboard`, `Reports`, `Invoices`, `PartsInventory`, `ControlPanel`, `AccountSettings`, etc.) are still single files.
+
+**Shared CRM component:** `src/components/ActivityChatter.jsx` — generalized chatter panel (note/schedule/reply/reschedule/reopen/attachments) used by both `LeadDetails.jsx` and `DealDetail.jsx`. Accepts `relatedType`/`relatedId`/`controlledTab`/`onControlledTabChange`/`hideNoteComposer`/`hideHistory` props. Do not re-implement this per-page — always import the shared component.
+
+**AI Assist component:** `src/components/AIAssist.jsx` exists but is **hidden** — all `<AIAssist>` imports and JSX have been removed from Dashboard, Reports, Inventory, CustomerDetails, and RMATickets. The `ai-assist` Edge Function and `ai.assist()` API helper still exist for future re-enabling.
 
 ### Accessibility
 
@@ -337,6 +352,13 @@ CRM upgrade (Track A — `specs/002-crm-upgrade/`), applied in order:
 - `20260702_crm_activities_chatter.sql` — chatter columns (`attachments`, system `log` type)
 - `20260703_crm_activities_replies.sql` — `parent_id` for comment replies
 - `20260704_crm_pipeline_rename_new_lead_stage.sql` — renames B2B "New Lead" stage label to "New Deal" (data UPDATE only)
+- `20260705_crm_remove_b2c_pipeline.sql`
+- `20260706_seed_test_users_and_deals.sql` — 10 test users + 31 deals across all stages
+- `20260707_crm_rename_new_deal_stage_plural.sql` — "New Deal" → "New Deals" label
+- `20260708_crm_sync_deal_values.sql` — back-fills `deals.value` from product lines; enforces probability 100/0 for won/lost
+- `20260709_crm_lead_deal_codes.sql` — adds `lead_code` (LD- prefix) and `deal_code` (DL- prefix) columns; backfills existing rows
+- `20260710_crm_deal_code_rename.sql` — renames backfilled deal codes from DL- to QT- (Quotation lifecycle)
+- `20260711_crm_convert_rpc_deal_code.sql` — updates `crm_convert_lead` RPC to generate QT- `deal_code` atomically on conversion
 
 **The "who" convention for CRM tables:** `assigned_rep` and `created_by` are `text` columns holding the user's **email**, NOT `uuid REFERENCES auth.users`. This was a repeated source of "Invalid uuid" bugs — Zod schemas must validate these as email/string, never `.uuid()`.
 

@@ -101,10 +101,10 @@ export function ByProductTab({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('inventory.searchByProductBrand')}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+              className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
             />
             <svg
-              className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2"
+              className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -119,9 +119,9 @@ export function ByProductTab({
           </div>
           <button
             onClick={() => setShowFilters((f) => !f)}
-            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || activeFilterCount > 0 ? 'border-indigo-500 text-indigo-600 bg-indigo-50' : 'border-gray-300 text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520]'}`}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || activeFilterCount > 0 ? 'border-[#4338ca] text-[#4338ca] bg-indigo-50 dark:bg-indigo-900/20 dark:border-[#a5b4fc] dark:text-[#a5b4fc]' : 'border-[#e6e9ef] dark:border-[#212a38] text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520]'}`}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -131,7 +131,7 @@ export function ByProductTab({
             </svg>
             {t('common.filters')}
             {activeFilterCount > 0 && (
-              <span className="w-4 h-4 bg-indigo-600 text-white text-xs rounded-full flex items-center justify-center">
+              <span className="w-4 h-4 bg-[#4338ca] dark:bg-[#a5b4fc] text-white dark:text-[#0b0f17] text-xs rounded-full flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
@@ -176,7 +176,7 @@ export function ByProductTab({
 
       {/* Filter panel */}
       {showFilters && (
-        <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-[#0f1520] rounded-lg flex-wrap">
+        <div className="flex items-center gap-4 p-4 bg-[#f8f9fb] dark:bg-[#0f1520] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] flex-wrap">
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('inventory.filterProduct')}</label>
             <input
@@ -192,7 +192,7 @@ export function ByProductTab({
             <select
               value={filterBrand}
               onChange={(e) => setFilterBrand(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
+              className="px-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
             >
               <option value="">{t('inventory.filterAll')}</option>
               {brands.map((b) => (
@@ -207,7 +207,7 @@ export function ByProductTab({
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
+              className="px-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
             >
               <option value="">{t('inventory.filterAll')}</option>
               <option value="active_rma">{t('inventory.statusActiveRMA')}</option>

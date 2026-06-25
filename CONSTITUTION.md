@@ -1214,7 +1214,12 @@ d:\myrma-app\
 │   │       ├── notifications.ts # Notification table ops
 │   │       ├── system.ts       # System config ops
 │   │       ├── audit.ts        # Audit log ops
-│   │       └── whatsappNotifications.ts # WhatsApp notification ops
+│   │       ├── whatsappNotifications.ts # WhatsApp notification ops
+│   │       ├── leads.ts        # CRM: Lead CRUD + convert() RPC
+│   │       ├── deals.ts        # CRM: Deal CRUD + stage/won/lost helpers
+│   │       ├── activities.ts   # CRM: Activity/chatter CRUD
+│   │       ├── pipelines.ts    # CRM: Pipeline + stage CRUD
+│   │       └── contacts.ts     # CRM: Contact CRUD
 │   ├── components\
 │   │   ├── ui.jsx              # Shared component library (Button, Input, Modal, etc.)
 │   │   ├── ErrorBoundary.jsx   # App-level error boundary
@@ -1235,9 +1240,12 @@ d:\myrma-app\
 │   │   ├── Products\           # Folder — index.jsx + ProductsListTab, HierarchyTab, _modals
 │   │   ├── Customers\          # Folder — index.jsx + _modals, _constants
 │   │   ├── UserManagement\     # Folder — index.jsx + UsersTab, RolesTab, _shared, _utils
+│   │   ├── Leads\              # Folder — index.jsx + LeadDetails, _modals, _constants, _shared (CRM)
+│   │   ├── Pipeline\           # Folder — index.jsx + DealDetail, DealCommentPanel, 4 view files (CRM)
 │   │   ├── ProductDetails.jsx
 │   │   ├── CustomerDetails.jsx
 │   │   ├── RMATracker.jsx      # Public-facing, no auth required
+│   │   ├── KnowledgeBasePublic.jsx # Public-facing knowledge base, no auth required
 │   │   ├── ControlPanel.jsx    # Admin-only sub-pages
 │   │   └── ...
 │   ├── App.jsx                 # Route definitions, auth check, realtime subscription
@@ -1249,7 +1257,8 @@ d:\myrma-app\
 │   │   ├── send-email\
 │   │   ├── send-whatsapp\
 │   │   ├── notification-worker\
-│   │   └── whatsapp-webhook\
+│   │   ├── whatsapp-webhook\
+│   │   └── ai-assist\          # AI Assist (currently hidden/deferred in UI)
 │   └── migrations\             # Database migrations (YYYYMMDD_description.sql)
 ├── .github\
 │   └── workflows\
@@ -1386,7 +1395,7 @@ TypeScript is adopted in `src/lib/` and `src/api/db/`.
 
 ### 15.1 Current Test Suite
 
-80 tests across 3 suites in `src/lib/`:
+277 tests across 7 suites in `src/lib/`:
 
 | File | Tests | Coverage |
 |------|-------|---------|
@@ -1488,7 +1497,7 @@ security(storage): add anon upload size and MIME type restrictions
 GitHub Actions runs on every push and PR to `main`:
 
 ```
-1. npm test          — Vitest (80 unit tests, must all pass)
+1. npm test          — Vitest (277 unit tests, must all pass)
 2. npm run lint:ci   — ESLint (zero errors gate)
 3. npm run build     — Vite production build (must succeed)
 ```

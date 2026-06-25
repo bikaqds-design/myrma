@@ -2,16 +2,18 @@ import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Toaster, toast } from 'react-hot-toast'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { auth, db, branding as brandingAPI, supabase } from './api/supabaseClient'
 import { useAppearance } from './contexts/AppearanceContext'
 import { resolvePermissions, canDo } from './lib/permissions'
 import { ROLES } from './lib/constants'
 import { safeStorage } from './lib/safeStorage'
 import { registerTicketEventHandlers } from './lib/events/ticketEventHandlers'
+import { registerCrmEventHandlers } from './lib/events/crmEventHandlers'
 
 // Register notification event handlers once at module load
 registerTicketEventHandlers()
+registerCrmEventHandlers()
 import NotificationBell from './components/NotificationBell'
 import Breadcrumb from './components/Breadcrumb'
 import { RouteSkeleton } from './components/Skeleton'
@@ -119,6 +121,7 @@ const Leads = lazyWithReload(() => import('./pages/Leads'))
 const LeadDetails = lazyWithReload(() => import('./pages/Leads/LeadDetails'))
 const Pipeline = lazyWithReload(() => import('./pages/Pipeline'))
 const DealDetails = lazyWithReload(() => import('./pages/Pipeline/DealDetail'))
+const Activities = lazyWithReload(() => import('./pages/Activities'))
 const NotFoundPage = lazyWithReload(() => import('./pages/NotFoundPage'))
 import CommandPalette from './components/CommandPalette'
 
@@ -654,6 +657,15 @@ export default function App() {
     setCurrentUser(updatedUser)
   }
 
+  // ── Overdue activities count — drives the sidebar badge ──────────────────
+  const { data: overdueActivities = [] } = useQuery({
+    queryKey: ['activities', 'overdue-count'],
+    queryFn: () => db.activities.listOverdue(),
+    staleTime: 60_000,
+    enabled: !!currentUser,
+  })
+  const overdueActivityCount = overdueActivities.length
+
   // ── Active state derived from URL ─────────────────────────────────────────
   const isProductsActive = pathname === '/products' || pathname.startsWith('/products/')
   const isCustomersActive = pathname === '/customers' || pathname.startsWith('/customers/')
@@ -704,6 +716,14 @@ export default function App() {
       label: t('nav.pipeline'),
       active: pathname === '/pipeline',
       icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14',
+      requiredPermission: ['deals', 'view'],
+    },
+    {
+      path: '/activities',
+      label: t('nav.activities'),
+      active: pathname === '/activities',
+      icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
+      badge: overdueActivityCount > 0 ? overdueActivityCount : null,
       requiredPermission: ['deals', 'view'],
     },
     {
@@ -839,6 +859,7 @@ export default function App() {
       '/customers': 'Customers',
       '/leads': 'Leads',
       '/pipeline': 'Pipeline',
+      '/activities': 'Activities',
       '/rma-tickets': 'RMA Tickets',
       '/inventory': 'Inventory',
       '/account': 'Account Settings',
@@ -1004,7 +1025,7 @@ export default function App() {
         </div>
 
         <nav className={`flex-1 ${sidebarCompact ? 'p-2' : 'p-4'} space-y-0.5 overflow-y-auto`}>
-          {navItems.map(({ path, label, active, icon, tabParam, children, separator }) => {
+          {navItems.map(({ path, label, active, icon, tabParam, children, separator, badge }) => {
             const hasChildren = !sidebarCompact && !!children?.length
             const isExpanded = expandedItems.has(path)
             const activeTabId = tabParam ? new URLSearchParams(location.search).get(tabParam) : null
@@ -1028,6 +1049,11 @@ export default function App() {
                   {!sidebarCompact && (
                     <>
                       <span className="flex-1 text-start">{label}</span>
+                      {badge != null && (
+                        <span className="w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center flex-shrink-0">
+                          {badge > 99 ? '99+' : badge}
+                        </span>
+                      )}
                       {children?.length > 0 && (
                         <svg
                           className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
@@ -1392,6 +1418,22 @@ export default function App() {
                     currentUserEmail={currentUser?.email}
                     currentUserPermissions={effectiveUserPermissions}
                   />
+                }
+              />
+
+              <Route
+                path="/activities"
+                element={
+                  canDo(effectiveUserRole, effectiveUserPermissions, 'deals', 'view') ||
+                  canDo(effectiveUserRole, effectiveUserPermissions, 'leads', 'view') ? (
+                    <Activities
+                      currentUserRole={effectiveUserRole}
+                      currentUserEmail={currentUser?.email}
+                      currentUserPermissions={effectiveUserPermissions}
+                    />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
                 }
               />
 

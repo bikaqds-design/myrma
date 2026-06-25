@@ -28,6 +28,7 @@ export default function WALogs() {
   const [dateTo, setDateTo]     = useState('')
   const [exporting, setExporting] = useState(false)
   const [retrying, setRetrying]   = useState(null)
+  const [showFilters, setShowFilters] = useState(false)
 
   const queryKey = ['notification-logs', page, provider, status, search, dateFrom, dateTo]
 
@@ -123,42 +124,77 @@ export default function WALogs() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Toolbar */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
           <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(0) }}
             placeholder={t('cp.waLogs.searchPlaceholder')}
-            className={inp} />
-          <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(0) }} className={inp}>
-            <option value="">{t('cp.waLogs.allStatuses')}</option>
-            {Object.keys(STATUS_STYLES).map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select value={provider} onChange={(e) => { setProvider(e.target.value); setPage(0) }} className={inp}>
-            <option value="">{t('cp.waLogs.allProviders')}</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="email">Email</option>
-            <option value="sms">SMS</option>
-          </select>
-          <div className="flex gap-2">
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={`${inp} flex-1`} />
-            <input type="date" value={dateTo}   onChange={(e) => setDateTo(e.target.value)}   className={`${inp} flex-1`} />
-          </div>
+            className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]" />
+          <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
         </div>
-        <div className="flex items-center justify-between mt-3">
-          <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">
-            {isFetching ? 'Loading…' : `${count.toLocaleString()} result${count !== 1 ? 's' : ''}`}
-          </p>
-          <button onClick={handleExport} disabled={exporting}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[#e6e9ef] dark:border-[#212a38] rounded-lg hover:bg-gray-50 dark:hover:bg-[#1a2230] text-gray-700 dark:text-[#e8ebf0] transition-colors disabled:opacity-50">
-            {exporting ? <Spinner size="sm" /> : (
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-            )}
-            {t('cp.waLogs.exportCsv')}
-          </button>
-        </div>
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          aria-expanded={showFilters}
+          aria-controls="walogs-filters-panel"
+          className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${
+            showFilters || provider || status || dateFrom || dateTo
+              ? 'border-indigo-500 text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-400 dark:text-indigo-300'
+              : 'border-[#e6e9ef] dark:border-[#212a38] text-gray-700 dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230]'
+          }`}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+          </svg>
+          {t('common.filters')}
+          {[provider, status, dateFrom, dateTo].filter(Boolean).length > 0 && (
+            <span className="w-4 h-4 bg-indigo-600 text-white text-xs rounded-full flex items-center justify-center">
+              {[provider, status, dateFrom, dateTo].filter(Boolean).length}
+            </span>
+          )}
+        </button>
+        <button onClick={handleExport} disabled={exporting}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-[#e6e9ef] dark:border-[#212a38] rounded-lg hover:bg-gray-50 dark:hover:bg-[#1a2230] text-gray-700 dark:text-[#e8ebf0] transition-colors disabled:opacity-50">
+          {exporting ? <Spinner size="sm" /> : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          )}
+          {t('cp.waLogs.exportCsv')}
+        </button>
+        <p className="text-xs text-gray-500 dark:text-[#9aa4b2] ml-auto whitespace-nowrap">
+          {isFetching ? 'Loading…' : `${count.toLocaleString()} result${count !== 1 ? 's' : ''}`}
+        </p>
       </div>
+
+      {/* Filter panel */}
+      {showFilters && (
+        <div id="walogs-filters-panel" className="p-4 bg-[#f8f9fb] dark:bg-[#0f1520] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(0) }} className={inp}>
+              <option value="">{t('cp.waLogs.allStatuses')}</option>
+              {Object.keys(STATUS_STYLES).map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select value={provider} onChange={(e) => { setProvider(e.target.value); setPage(0) }} className={inp}>
+              <option value="">{t('cp.waLogs.allProviders')}</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="email">Email</option>
+              <option value="sms">SMS</option>
+            </select>
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={inp} />
+            <input type="date" value={dateTo}   onChange={(e) => setDateTo(e.target.value)}   className={inp} />
+          </div>
+          {[provider, status, dateFrom, dateTo].filter(Boolean).length > 0 && (
+            <button
+              onClick={() => { setProvider(''); setStatus(''); setDateFrom(''); setDateTo(''); setPage(0) }}
+              className="mt-3 text-sm text-red-500 dark:text-red-400 hover:underline"
+            >
+              {t('common.clear')}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] overflow-hidden">
@@ -250,4 +286,4 @@ export default function WALogs() {
   )
 }
 
-const inp = 'w-full px-3 py-2 text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg bg-white dark:bg-[#0f1520] text-gray-800 dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent'
+const inp = 'w-full px-3 py-2 text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent'

@@ -41,6 +41,9 @@ export default function Products({
   const products = productsPageData?.productsData ?? []
   const [filteredProducts, setFilteredProducts] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
+  const [filterBrand, setFilterBrand] = useState('')
+  const [filterCategory, setFilterCategory] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
   const [selectedProducts, setSelectedProducts] = useState([])
 
   // Pagination State
@@ -131,7 +134,7 @@ export default function Products({
   useEffect(() => {
     handleSearchAndSort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, products, sortConfig])
+  }, [searchQuery, filterBrand, filterCategory, filterStatus, products, sortConfig])
 
   // Real-time: refresh when products table changes
   useEffect(() => {
@@ -214,6 +217,10 @@ export default function Products({
           product.product_description?.toLowerCase().includes(query)
       )
     }
+
+    if (filterBrand) filtered = filtered.filter((p) => p.brand?.brand_name === filterBrand)
+    if (filterCategory) filtered = filtered.filter((p) => p.category?.category_name === filterCategory)
+    if (filterStatus) filtered = filtered.filter((p) => p.status === filterStatus)
 
     // Apply sorting
     filtered.sort((a, b) => {
@@ -1098,7 +1105,16 @@ export default function Products({
               totalProducts={filteredProducts.length}
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
+              brands={brands}
+              categories={categories}
+              filterBrand={filterBrand}
+              setFilterBrand={setFilterBrand}
+              filterCategory={filterCategory}
+              setFilterCategory={setFilterCategory}
+              filterStatus={filterStatus}
+              setFilterStatus={setFilterStatus}
               selectedProducts={selectedProducts}
+              setSelectedProducts={setSelectedProducts}
               handleSelectProduct={handleSelectProduct}
               handleSelectAll={handleSelectAll}
               handleBulkDelete={handleBulkDelete}

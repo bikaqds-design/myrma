@@ -233,3 +233,112 @@ on `<html>` when `language === 'ar'`. Tailwind's logical-property utilities
 **Font:** Hanken Grotesk works for both scripts (Latin + Arabic numerals in
 mixed UI). For Arabic body text, the system fallback handles Arabic glyphs
 naturally. No additional Arabic font loading is required for the current scope.
+
+## Canonical Search + Filter Components
+
+These are the exact Tailwind class strings every page MUST use. Do not deviate.
+
+### Search input (always full-width inside a `relative` wrapper)
+
+```jsx
+<div className="relative flex-1 min-w-48">
+  <input
+    className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
+    ...
+  />
+  <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2" .../>
+</div>
+```
+
+### Filters button (toggles a collapsible panel)
+
+```jsx
+<button
+  className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${
+    showFilters || activeFilterCount > 0
+      ? 'border-[#4338ca] dark:border-[#a5b4fc] text-[#4338ca] dark:text-[#a5b4fc] bg-indigo-50 dark:bg-indigo-900/20'
+      : 'border-[#e6e9ef] dark:border-[#212a38] text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520]'
+  }`}
+>
+  <svg className="w-4 h-4" .../>  {/* always w-4 h-4, never w-5 h-5 */}
+  {t('common.filters')}
+  {activeFilterCount > 0 && (
+    <span className="w-4 h-4 bg-[#4338ca] dark:bg-[#a5b4fc] text-white dark:text-[#0b0f17] text-xs rounded-full flex items-center justify-center">
+      {activeFilterCount}
+    </span>
+  )}
+</button>
+```
+
+### Filter panel container
+
+```jsx
+<div className="p-4 bg-[#f8f9fb] dark:bg-[#0f1520] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
+```
+
+### Filter panel `<select>` / `<input>` elements
+
+```jsx
+const inp = 'px-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent'
+```
+
+**Reference implementation:** `src/pages/cp/AuditLog.jsx` — exact markup, `aria-expanded`, `aria-controls`, `activeFilterCount` badge, and collapsible panel.
+
+---
+
+## Canonical Bulk Action Bar — UNIFIED 2026-07-09
+
+When rows can be multi-selected for bulk operations, the bar MUST appear as a standalone block **below** the search/filter card and **above** the table. Never place it inside `<PageHeader>` or the toolbar row.
+
+**Reference implementation:** `src/pages/Pipeline/PipelineListView.jsx`
+
+**Pages unified (2026-07-09):** Pipeline, Leads, Customers, Products, RMA Tickets.
+
+### Container
+
+```jsx
+<div className="bg-indigo-50 dark:bg-indigo-900/20 border border-[#4338ca]/20 dark:border-[#a5b4fc]/20 rounded-[14px] px-4 py-2.5 flex items-center gap-3 flex-wrap">
+```
+
+### Selection count label
+
+```jsx
+<span className="text-sm font-medium text-[#4338ca] dark:text-[#a5b4fc]">
+  {count} {t('common.selected')}
+</span>
+```
+
+### Divider
+
+```jsx
+<div className="w-px h-5 bg-[#4338ca]/20 dark:bg-[#a5b4fc]/20" />
+```
+
+### Action selects (change status / change stage / etc.)
+
+```jsx
+<select className="text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg px-2 py-1.5 bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent">
+```
+
+### Apply button (select + apply pattern)
+
+```jsx
+<button className="px-3 py-1.5 bg-[#4338ca] dark:bg-[#a5b4fc] text-white dark:text-[#0b0f17] rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-40 transition-opacity">
+```
+
+### Delete button (soft red — NOT solid)
+
+```jsx
+<button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors border border-red-200 dark:border-red-800">
+  <svg className="w-3.5 h-3.5" ...trash icon... />
+  {t('common.delete')}
+</button>
+```
+
+### Clear / Deselect button (always `ml-auto` — pushes to far right)
+
+```jsx
+<button onClick={clearSelection} className="ml-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]">
+  {t('common.clear')}
+</button>
+```

@@ -229,11 +229,10 @@ export const contactSchema = z.object({
 })
 
 // ── CRM: leads ────────────────────────────────────────────────────────────────
-// "At least one of phone/email present" is a soft warning in data-model.md
-// (walk-in leads occasionally lack both initially), not a hard reject — so
-// it's intentionally not enforced here as a .superRefine(). Surface it as a
-// UI warning instead, not a blocked submit.
 
+// company_name and phone are intentionally optional here — the UI shows
+// soft warnings but the schema must not hard-reject missing values
+// (a lead can be captured with just a name, per Sprint 2 design decision).
 export const leadSchema = z.object({
   full_name: z.string().min(1, 'Full name is required').max(200),
   company_name: z.string().max(200).optional().nullable(),

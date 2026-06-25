@@ -5,7 +5,6 @@ import { useURLTab } from '../../hooks/useURLTab'
 import { supabase, db } from '../../api/supabaseClient'
 import { PageSkeleton } from '../../components/Skeleton'
 import { PageHeader } from '../../components/ui'
-import AIAssist from '../../components/AIAssist'
 import { ROLES } from '../../lib/constants'
 import { groupByProduct } from './_shared'
 import { ExportMenu } from './ExportMenu'
@@ -202,28 +201,13 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
         </button>
       </PageHeader>
 
-      <AIAssist
-        contextType="dashboard"
-        data={{
-          range: 'Current inventory snapshot',
-          open: stats?.total ?? units.length,
-          in_progress: units.filter((u) => u.status === 'Under Repair').length,
-          pending: units.filter((u) => u.status === 'Received').length,
-          overdue: units.filter((u) => u.status === "Can't Repair").length,
-          resolved: units.filter((u) => u.status === 'Repaired').length,
-          total: units.length,
-          sla_percent: 100,
-          resolution_rate: units.length ? Math.round((units.filter((u) => u.status === 'Repaired').length / units.length) * 100) : 0,
-        }}
-      />
-
       <div className="border-b border-gray-200 dark:border-[#212a38]">
         <div className="flex gap-1 overflow-x-auto">
           {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${tab === t.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 dark:text-[#9aa4b2] hover:text-gray-700 dark:text-[#e8ebf0]'}`}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${tab === t.id ? 'border-[#4338ca] text-[#4338ca] dark:border-[#a5b4fc] dark:text-[#a5b4fc]' : 'border-transparent text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]'}`}
             >
               {t.label}
             </button>

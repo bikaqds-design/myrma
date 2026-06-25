@@ -12,7 +12,8 @@
     "parts": "Parts Inventory",
     "reports": "Reports",
     "customerTracker": "Customer Tracker",
-    "controlPanel": "Control Panel"
+    "controlPanel": "Control Panel",
+    "activities": "Activities"
   },
   "common": {
     "save": "Save",
@@ -77,7 +78,9 @@
     "go": "Go",
     "showingRange": "Showing {{start}}–{{end}} of {{total}}",
     "clearAll": "Clear all",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "unknown": "Unknown",
+    "noDate": "No date"
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",
@@ -170,7 +173,11 @@
     "last30Days": "Last 30 days",
     "ticketsLabel": "Tickets",
     "myOpenTickets": "My Open Tickets",
-    "dueSoon": "Due Soon"
+    "dueSoon": "Due Soon",
+    "overdueFollowups": "Overdue Follow-Ups",
+    "overdueFollowupsDesc": "CRM activities past their due date",
+    "viewActivities": "View Activities",
+    "crmSection": "CRM"
   },
   "tickets": {
     "title": "RMA Tickets",
@@ -189,6 +196,8 @@
     "deleteSelected": "Delete Selected",
     "clearFilters": "Clear all",
     "selected": "selected",
+    "selectAll": "Select all",
+    "selectRow": "Select {{name}}",
     "deselect": "Clear",
     "ticketStatusPlaceholder": "Ticket Status…",
     "productStatusPlaceholder": "Product Status…",
@@ -341,7 +350,35 @@
     "sourceUpdated": "Source updated",
     "lockedConverted": "This lead is converted and locked (read-only).",
     "linkedDeal": "Linked Deal",
-    "viewDeal": "View Deal"
+    "viewDeal": "View Deal",
+    "leadLog": "Lead Log",
+    "leadNotesTab": "Lead Notes",
+    "leadNotesPlaceholder": "Add notes about this lead...",
+    "leadInfo": "Lead Information",
+    "allReps": "All Reps",
+    "export": "Export",
+    "exportTooltip": "Export leads to Excel",
+    "exportEmpty": "No leads to export",
+    "exportSuccess": "Exported {{count}} leads",
+    "exportAll": "Export All",
+    "exportAllDesc": "All {{count}} leads",
+    "exportFiltered": "Export Filtered",
+    "exportFilteredDesc": "{{count}} leads matching current filters",
+    "exportSelected": "Export Selected",
+    "exportSelectedDesc": "{{count}} selected leads",
+    "bulkDeleteConfirm": "Permanently delete {{count}} lead(s)? This cannot be undone.",
+    "bulkDeleted": "Deleted {{count}} lead(s)",
+    "bulkStatusChanged": "Status updated for {{count}} lead(s)",
+    "bulkSourceChanged": "Source updated for {{count}} lead(s)",
+    "bulkChangeStatus": "Change Status",
+    "bulkChangeSource": "Change Source",
+    "view_list": "List view",
+    "view_kanban": "Kanban view",
+    "dropHere": "Drop to change status",
+    "createdBy": "Created By",
+    "addLeadDesc": "Fill in a new lead manually",
+    "downloadTemplateDesc": "Get the CSV import template",
+    "importCSVDesc": "Bulk upload leads from a CSV file"
   },
   "activityType": {
     "call": "Call",
@@ -354,6 +391,7 @@
   },
   "activityChatter": {
     "logNote": "Log Note",
+    "addComment": "Deal Log",
     "scheduleActivity": "Schedule Activity",
     "planned": "Planned",
     "history": "History",
@@ -373,11 +411,15 @@
     "logConverted": "Lead converted to a deal",
     "logWon": "Deal marked as Won",
     "logLost": "Deal marked as Lost — {{reason}}",
+    "logReopened": "Deal reopened from {{from}} status — moved to {{to}}",
     "logAssigned": "Reassigned from {{from}} to {{to}}",
     "reschedule": "Reschedule",
     "activityRescheduled": "Activity rescheduled",
+    "cancelActivity": "Cancel",
+    "activityCancelled": "Activity cancelled",
     "reopen": "Reopen",
     "activityReopened": "Activity reopened",
+    "logFieldUpdated": "Updated {{field}}: {{value}}",
     "reply": "Reply",
     "replyPlaceholder": "Write a reply...",
     "commentPlaceholder": "Add a follow-up note for the team...",
@@ -416,14 +458,124 @@
     "dealClosed": "This deal is closed (read-only)",
     "dealInfo": "Deal Info",
     "productLines": "Product Lines",
+    "productLinesTab": "Product Lines",
+    "dealNotesTab": "Deal Notes",
+    "dealNotesPlaceholder": "Add notes about this deal...",
+    "searchCustomer": "Search customer...",
+    "setCloseDate": "Set close date",
+    "clickToEdit": "Click to edit",
+    "commentsPanel": "Comments",
+    "noComments": "No comments yet. Be the first to comment.",
+    "commentPlaceholder": "Write a comment... (Ctrl+Enter to send)",
     "noProductLines": "No product lines added yet.",
     "lineProductPlaceholder": "Product name",
+    "lineProduct": "Product",
+    "lineQty": "Qty",
+    "lineUnitPrice": "Unit Price",
+    "lineSubtotal": "Subtotal",
     "addLine": "Add Line",
     "activity": "Activity",
+    "probability": "Probability",
+    "valueLocked": "Calculated from product lines",
+    "editValue": "Edit value",
+    "closeDate": "Closes",
     "rotting": "No activity in a while — this deal may be going cold",
     "currency": "EGP",
+    "stage": "Stage",
     "noStages": "No pipeline stages found",
-    "noStagesHint": "Ask an admin to configure this pipeline's stages."
+    "noStagesHint": "Ask an admin to configure this pipeline's stages.",
+    "reopenDeal": "Reopen Deal",
+    "reopenSelectStage": "Move back to stage",
+    "reopenStagePlaceholder": "Select a stage...",
+    "dealReopened": "Deal reopened successfully",
+    "unassigned": "Unassigned",
+    "view_kanban": "Kanban",
+    "view_list": "List",
+    "view_graph": "Graph",
+    "view_pivot": "Pivot",
+    "view_activity": "Activity",
+    "filter_all": "All",
+    "filter_active": "Active",
+    "filter_won": "Won",
+    "filter_lost": "Lost",
+    "listSearch": "Search deals...",
+    "listDeals": "deals",
+    "listValue": "Value",
+    "listRep": "Rep",
+    "listStatus": "Status",
+    "listEmpty": "No deals found",
+    "listTotal": "Total",
+    "graphMeasures": "Measures",
+    "graphMeasureCount": "Count",
+    "graphMeasureRevenue": "Revenue",
+    "graphGroupBy": "Group by",
+    "graphGroup_stage": "Stage",
+    "graphGroup_salesperson": "Salesperson",
+    "graphGroup_status": "Status",
+    "graphGroup_month": "Created Month",
+    "graphBy": "by",
+    "statTotalDeals": "Total Deals",
+    "statTotalRevenue": "Total Revenue",
+    "statWonDeals": "Won Deals",
+    "statWonRevenue": "Won Revenue",
+    "pivotRows": "Rows",
+    "pivotCols": "Columns",
+    "pivotMeasure": "Measure",
+    "pivotTotal": "Total",
+    "pivotDim_stage": "Stage",
+    "pivotDim_salesperson": "Salesperson",
+    "pivotDim_status": "Status",
+    "pivotDim_created_month": "Created Month",
+    "pivotDim_close_month": "Expected Close Month",
+    "pivotMeasure_count": "Count",
+    "pivotMeasure_sum_revenue": "Sum of Revenue",
+    "pivotMeasure_avg_revenue": "Avg Revenue",
+    "pivotHint": "Click a column or row header to sort. Values show {{measure}} per group intersection.",
+    "activityDeal": "Deal",
+    "actType_call": "Call",
+    "actType_email": "Email",
+    "actType_meeting": "Meeting",
+    "actType_whatsapp": "WhatsApp",
+    "actType_task": "Task",
+    "actOverdue": "Overdue",
+    "actToday": "Due Today",
+    "actPlanned": "Planned",
+    "export": "Export",
+    "exportTooltip": "Export all deals to Excel",
+    "exportEmpty": "No deals to export",
+    "exportSuccess": "Exported {{count}} deals to Excel",
+    "exportAll": "Export All",
+    "exportAllDesc": "All {{count}} deals",
+    "exportFiltered": "Export Filtered",
+    "exportFilteredDesc": "{{count}} deals matching current filters",
+    "exportSelected": "Export Selected",
+    "exportSelectedDesc": "{{count}} selected deals",
+    "bulkDeleteConfirm": "Permanently delete {{count}} deal(s)? This cannot be undone.",
+    "bulkDeleted": "Deleted {{count}} deal(s)",
+    "bulkChangeStage": "Change Stage",
+    "bulkStageChanged": "Stage updated for {{count}} deal(s)",
+    "exportColStage": "Stage",
+    "exportColTitle": "Opportunity",
+    "exportColCompany": "Company",
+    "exportColValue": "Expected Revenue",
+    "exportColStatus": "Status",
+    "exportColProbability": "Probability %",
+    "exportColRep": "Salesperson",
+    "exportColCloseDate": "Expected Close Date",
+    "exportColRotting": "Rotting",
+    "exportColWonLostDate": "Won/Lost Date",
+    "exportColLostReason": "Lost Reason",
+    "exportColCreatedAt": "Created Date",
+    "exportColCreatedBy": "Created By",
+    "exportColNotes": "Notes",
+    "exportSubtotal": "Subtotal ({{count}} deals)",
+    "exportGrandTotal": "Grand Total ({{count}} deals)",
+    "exportFilterHint": "Use Excel column filters to slice by Stage, Status, Salesperson, etc.",
+    "allStages": "All Stages",
+    "allReps": "All Reps",
+    "allStatuses": "All Statuses",
+    "searchPlaceholder": "Search deals, customers, reps...",
+    "filteredCount": "{{count}} of {{total}} deals"
   },
   "inventory": {
     "title": "Inventory",
@@ -902,7 +1054,10 @@
     "failedDeleteBrand": "Failed to delete brand",
     "categoryDeleted": "Category deleted",
     "failedDeleteCategory": "Failed to delete category",
-    "pageMustBeBetween": "Page must be between 1 and {{total}}"
+    "pageMustBeBetween": "Page must be between 1 and {{total}}",
+    "allBrands": "All Brands",
+    "allCategories": "All Categories",
+    "allStatuses": "All Statuses"
   },
   "calendar": {
     "title": "Tech Calendar",
@@ -1052,7 +1207,8 @@
     "errorPartNameRequired": "Part name is required",
     "errorQuantityRequired": "Quantity is required",
     "errorUnitCostRequired": "Unit cost is required",
-    "errorReorderRequired": "Reorder level is required"
+    "errorReorderRequired": "Reorder level is required",
+    "allSuppliers": "All Suppliers"
   },
   "accountSettings": {
     "title": "Account Settings",
@@ -1132,14 +1288,38 @@
     "preferencesSavedSuccess": "Preferences saved!",
     "failedSavePrefs": "Failed to save preferences",
     "notifItems": {
-      "ticket_created": { "label": "New ticket created", "desc": "When a new RMA ticket is opened" },
-      "ticket_assigned": { "label": "Ticket assigned to you", "desc": "When a ticket is assigned to your account" },
-      "ticket_status_changed": { "label": "Status changed", "desc": "When a ticket moves to a new status" },
-      "ticket_priority_changed": { "label": "Priority changed", "desc": "When a ticket priority is updated" },
-      "comment_added": { "label": "New comment", "desc": "When someone adds a comment on a ticket" },
-      "ticket_due_soon": { "label": "Due soon", "desc": "24 hours before a ticket is due" },
-      "ticket_overdue": { "label": "Overdue", "desc": "When a ticket passes its due date" },
-      "daily_summary": { "label": "Daily summary", "desc": "A morning digest of all open tickets" }
+      "ticket_created": {
+        "label": "New ticket created",
+        "desc": "When a new RMA ticket is opened"
+      },
+      "ticket_assigned": {
+        "label": "Ticket assigned to you",
+        "desc": "When a ticket is assigned to your account"
+      },
+      "ticket_status_changed": {
+        "label": "Status changed",
+        "desc": "When a ticket moves to a new status"
+      },
+      "ticket_priority_changed": {
+        "label": "Priority changed",
+        "desc": "When a ticket priority is updated"
+      },
+      "comment_added": {
+        "label": "New comment",
+        "desc": "When someone adds a comment on a ticket"
+      },
+      "ticket_due_soon": {
+        "label": "Due soon",
+        "desc": "24 hours before a ticket is due"
+      },
+      "ticket_overdue": {
+        "label": "Overdue",
+        "desc": "When a ticket passes its due date"
+      },
+      "daily_summary": {
+        "label": "Daily summary",
+        "desc": "A morning digest of all open tickets"
+      }
     },
     "sysNotifCats": {
       "Tickets": "Tickets",
@@ -1149,28 +1329,94 @@
       "System": "System"
     },
     "sysNotifItems": {
-      "ticket_created": { "label": "Ticket created", "desc": "New RMA ticket opened in the system" },
-      "ticket_updated": { "label": "Ticket updated", "desc": "Ticket details or fields were modified" },
-      "ticket_deleted": { "label": "Ticket deleted", "desc": "An RMA ticket was removed" },
-      "ticket_assigned": { "label": "Ticket assigned", "desc": "A ticket was assigned to a user" },
-      "ticket_status_changed": { "label": "Status changed", "desc": "Ticket moved to a new status" },
-      "ticket_overdue": { "label": "Ticket overdue", "desc": "Ticket has passed its due date" },
-      "due_date_warning": { "label": "Due date warning", "desc": "24 hours before a ticket is due" },
-      "comment_added": { "label": "New comment", "desc": "Someone commented on a ticket" },
-      "customer_created": { "label": "Customer created", "desc": "New customer added to the system" },
-      "customer_updated": { "label": "Customer updated", "desc": "Customer information was modified" },
-      "customer_deleted": { "label": "Customer deleted", "desc": "A customer record was removed" },
-      "product_created": { "label": "Product created", "desc": "New product added to inventory" },
-      "product_updated": { "label": "Product updated", "desc": "Product information was modified" },
-      "product_deleted": { "label": "Product deleted", "desc": "A product was removed" },
-      "inventory_low": { "label": "Low inventory", "desc": "Stock level fell below threshold" },
-      "user_created": { "label": "User created", "desc": "New user account was created" },
-      "user_role_changed": { "label": "Role changed", "desc": "A user's role was updated" },
-      "user_suspended": { "label": "User suspended/locked", "desc": "An account was suspended or locked" },
-      "user_activated": { "label": "User activated", "desc": "An account was reactivated" },
-      "user_deleted": { "label": "User deleted", "desc": "A user account was deleted" },
-      "system_announcement": { "label": "System announcements", "desc": "Broadcast messages from administrators" },
-      "custom_alert": { "label": "Custom alerts", "desc": "Manual alerts sent by the admin team" }
+      "ticket_created": {
+        "label": "Ticket created",
+        "desc": "New RMA ticket opened in the system"
+      },
+      "ticket_updated": {
+        "label": "Ticket updated",
+        "desc": "Ticket details or fields were modified"
+      },
+      "ticket_deleted": {
+        "label": "Ticket deleted",
+        "desc": "An RMA ticket was removed"
+      },
+      "ticket_assigned": {
+        "label": "Ticket assigned",
+        "desc": "A ticket was assigned to a user"
+      },
+      "ticket_status_changed": {
+        "label": "Status changed",
+        "desc": "Ticket moved to a new status"
+      },
+      "ticket_overdue": {
+        "label": "Ticket overdue",
+        "desc": "Ticket has passed its due date"
+      },
+      "due_date_warning": {
+        "label": "Due date warning",
+        "desc": "24 hours before a ticket is due"
+      },
+      "comment_added": {
+        "label": "New comment",
+        "desc": "Someone commented on a ticket"
+      },
+      "customer_created": {
+        "label": "Customer created",
+        "desc": "New customer added to the system"
+      },
+      "customer_updated": {
+        "label": "Customer updated",
+        "desc": "Customer information was modified"
+      },
+      "customer_deleted": {
+        "label": "Customer deleted",
+        "desc": "A customer record was removed"
+      },
+      "product_created": {
+        "label": "Product created",
+        "desc": "New product added to inventory"
+      },
+      "product_updated": {
+        "label": "Product updated",
+        "desc": "Product information was modified"
+      },
+      "product_deleted": {
+        "label": "Product deleted",
+        "desc": "A product was removed"
+      },
+      "inventory_low": {
+        "label": "Low inventory",
+        "desc": "Stock level fell below threshold"
+      },
+      "user_created": {
+        "label": "User created",
+        "desc": "New user account was created"
+      },
+      "user_role_changed": {
+        "label": "Role changed",
+        "desc": "A user's role was updated"
+      },
+      "user_suspended": {
+        "label": "User suspended/locked",
+        "desc": "An account was suspended or locked"
+      },
+      "user_activated": {
+        "label": "User activated",
+        "desc": "An account was reactivated"
+      },
+      "user_deleted": {
+        "label": "User deleted",
+        "desc": "A user account was deleted"
+      },
+      "system_announcement": {
+        "label": "System announcements",
+        "desc": "Broadcast messages from administrators"
+      },
+      "custom_alert": {
+        "label": "Custom alerts",
+        "desc": "Manual alerts sent by the admin team"
+      }
     }
   },
   "ticketForm": {
@@ -1389,7 +1635,29 @@
     "dealValue": "Deal Value (EGP)",
     "convertNote": "A new customer account will be created from this lead's details. The lead becomes read-only (except notes) after conversion.",
     "convertButton": "Convert",
-    "convertValidation": "Deal title and pipeline are required"
+    "convertValidation": "Deal title and pipeline are required",
+    "addSingle": "Add Single Lead",
+    "addSingleDesc": "Create one lead manually",
+    "bulkImport": "Bulk Import",
+    "bulkImportDesc": "Import from CSV",
+    "bulkUploadTitle": "Bulk Upload Leads",
+    "instructions": "Instructions:",
+    "bulkInst1": "Download the CSV template first",
+    "bulkInst2": "Fill in your lead data following the template format",
+    "bulkInst3": "Required fields: full_name, company_name, phone, source",
+    "bulkInst4": "Valid source values: walk-in, phone, referral, exhibition, website, whatsapp",
+    "bulkInst5": "Valid status values: new, contacted, qualified, nurturing, inactive, disqualified (defaults to 'new' if left blank)",
+    "bulkInst6": "Optional fields: email, notes",
+    "bulkInst7": "Avoid commas inside text fields — use a dash instead",
+    "downloadTemplate": "Download CSV Template",
+    "uploadCSVLabel": "Upload CSV File",
+    "uploadBtn": "Upload & Import",
+    "bulkUploadWarning": "Each lead will be imported with 'New' status. You can update individual statuses after import.",
+    "clickToChangeFile": "Click to change file",
+    "clickToUploadCSV": "Click to upload CSV file",
+    "dragAndDrop": "or drag and drop",
+    "selectCsvFile": "Please select a CSV file",
+    "selectFileFirst": "Please select a file first"
   },
   "leadStatus": {
     "new": "New",
@@ -1719,7 +1987,6 @@
     "dataCleanupDesc": "Remove stale records and identify data quality issues",
     "backupRestoreLabel": "Backup & Restore",
     "backupRestoreDesc": "Export all data and restore from backup files",
-
     "saving": "Saving...",
     "cancel": "Cancel",
     "edit": "Edit",
@@ -1734,7 +2001,6 @@
     "no": "No",
     "copy": "Copy",
     "copied": "✓ Copied",
-
     "sendAlert": {
       "header": "Send Alert",
       "subtitle": "Send an in-app notification to users or groups",
@@ -1756,7 +2022,6 @@
       "successSent": "Alert sent",
       "failedSend": "Failed to send: {{error}}"
     },
-
     "slaPolicies": {
       "header": "SLA Policies",
       "enabled": "Enabled",
@@ -1766,7 +2031,6 @@
       "saved": "SLA policies saved",
       "saveFailed": "SLA policies save failed"
     },
-
     "automationRules": {
       "header": "Automation Rules",
       "subtitle": "Rules automatically act on tickets when events occur",
@@ -1792,7 +2056,6 @@
       "saved": "Automation rules saved",
       "saveFailed": "Automation rules save failed"
     },
-
     "webhooks": {
       "header": "Webhooks",
       "subtitle": "Push ticket events to Slack, QuickBooks, Zapier, and more",
@@ -1813,7 +2076,6 @@
       "saved": "Webhooks saved",
       "saveFailed": "Webhooks save failed"
     },
-
     "announcements": {
       "header": "Announcements",
       "subtitle": "Post banners visible to all logged-in users",
@@ -1842,7 +2104,6 @@
       "deleted": "Deleted",
       "titleRequired": "Title and message are required"
     },
-
     "kb": {
       "header": "Knowledge Base",
       "subtitle": "FAQ articles shown to customers on the public tracker page",
@@ -1866,12 +2127,10 @@
       "deleted": "Deleted",
       "titleBodyRequired": "Title and answer are required"
     },
-
     "migration": {
       "dbSetupRequired": "{{feature}} — Database setup required",
       "runSql": "Run the following SQL in your Supabase SQL Editor to enable this feature."
     },
-
     "auditLog": {
       "header": "Audit Log",
       "subtitle": "All user activity across the system — {{count}} records",
@@ -1892,7 +2151,6 @@
       "noEntries": "No log entries match your filters",
       "loadFailed": "Failed to load audit log"
     },
-
     "customFields": {
       "header": "Custom Fields",
       "subtitle": "Add extra fields to tickets and customers",
@@ -1935,7 +2193,6 @@
       "deleted": "Deleted",
       "deleteConfirm": "Delete this custom field? Data stored in this field will not be deleted from existing records."
     },
-
     "dataCleanup": {
       "header": "Data Cleanup",
       "subtitle": "Remove stale records and identify data quality issues",
@@ -1965,7 +2222,6 @@
       "deleteConfirm": "Delete {{count}} {{label}} tickets? This cannot be undone.",
       "deleted": "Deleted {{count}} {{label}} tickets"
     },
-
     "integrations": {
       "header": "Integrations",
       "subtitle": "Configure outbound webhooks for ticket and customer events",
@@ -1998,7 +2254,6 @@
       "testSent": "Test payload sent",
       "testFailed": "Failed to reach webhook URL — check CORS or the URL"
     },
-
     "pdfLayout": {
       "header": "PDF Layout",
       "subtitle": "Customize how RMA tickets look when printed or exported to PDF",
@@ -2048,7 +2303,6 @@
       "sectionSignature": "Signature Line",
       "sectionSignatureDesc": "Customer / technician signature space"
     },
-
     "rmaConfig": {
       "header": "RMA Configuration",
       "subtitle": "SLA rules, auto-assignment, and ticket defaults",
@@ -2074,7 +2328,6 @@
       "loadFailed": "Failed to load config",
       "saved": "Configuration saved"
     },
-
     "waSettings": {
       "messagingProviders": "Messaging Providers",
       "whatsappLabel": "WhatsApp",
@@ -2106,7 +2359,6 @@
       "saved": "Notification settings saved",
       "saveFailed": "Save failed: {{error}}"
     },
-
     "waLogs": {
       "searchPlaceholder": "Search recipient, event…",
       "allStatuses": "All Statuses",
@@ -2135,7 +2387,6 @@
       "result_one": "{{count}} result",
       "result_other": "{{count}} results"
     },
-
     "waTemplates": {
       "count_one": "{{count}} template",
       "count_other": "{{count}} templates",
@@ -2177,7 +2428,6 @@
       "deleteMessage": "Delete \"{{name}}\"? This cannot be undone.",
       "deleted": "Template deleted"
     },
-
     "waTestCenter": {
       "queueWorker": "Queue Worker",
       "workerDesc": "Processes pending notification jobs from the queue. Run manually to test, or set up pg_cron for automatic processing.",
@@ -2337,5 +2587,31 @@
     "searchPlaceholder": "Search for a topic...",
     "noResults": "No articles match your search",
     "backToTracker": "← Back to Service Tracker"
+  },
+  "activities": {
+    "title": "Activities",
+    "subtitle": "{{count}} open follow-up activities",
+    "tabOverdue": "Overdue",
+    "tabToday": "Today",
+    "tabAll": "All Planned",
+    "searchPlaceholder": "Search activities...",
+    "filterType": "Activity Type",
+    "filterAssignee": "Assignee",
+    "allTypes": "All Types",
+    "allAssignees": "All Assignees",
+    "noOverdue": "No overdue activities",
+    "noOverdueHint": "Your team is on top of all follow-ups.",
+    "noToday": "Nothing due today",
+    "noTodayHint": "No activities are scheduled for today.",
+    "noActivities": "No planned activities",
+    "noActivitiesHint": "Scheduled follow-ups will appear here.",
+    "relatedLead": "Lead",
+    "relatedDeal": "Deal",
+    "noDueDate": "No due date",
+    "noAssignee": "Unassigned",
+    "markedDoneToast": "Activity marked as done",
+    "deletedToast": "Activity cancelled",
+    "deleteConfirm": "Cancel this activity?",
+    "showingOf": "Showing {{filtered}} of {{total}} activities"
   }
 }

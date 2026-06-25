@@ -5,6 +5,7 @@ import { activities } from './activities.js'
 
 export interface LeadRow {
   id: string
+  lead_code: string | null
   full_name: string
   company_name: string | null
   phone: string | null
@@ -88,6 +89,16 @@ export const leads = {
       /* non-fatal — status change already persisted */
     }
     return updated
+  },
+  async bulkDelete(ids: string[]): Promise<void> {
+    if (!ids.length) return
+    const { error } = await supabase.from('leads').delete().in('id', ids)
+    if (error) throw error
+  },
+  async bulkUpdate(ids: string[], fields: Partial<Pick<LeadRow, 'status' | 'source'>>): Promise<void> {
+    if (!ids.length) return
+    const { error } = await supabase.from('leads').update(fields).in('id', ids)
+    if (error) throw error
   },
   /**
    * Atomic conversion — calls the crm_convert_lead SECURITY DEFINER RPC

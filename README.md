@@ -20,7 +20,10 @@ myRMA provides end-to-end lifecycle management for product returns, warranty cla
 | **Tech Calendar** | Technician scheduling and workload calendar |
 | **Invoices & Reports** | Invoice generation, reporting dashboards, data exports |
 | **Parts Inventory** | Spare parts tracking for repair operations |
-| **Role-Based Access Control** | 5 roles: `super_admin`, `admin`, `manager`, `technician`, `viewer` |
+| **CRM — Leads** | Lead capture, qualification, status pipeline, chatter (notes/activities/replies), CSV import, convert to deal |
+| **CRM — Pipeline** | Kanban + List + Graph + Pivot + Activity views, drag-and-drop stage moves, Won/Lost actions, XLSX export |
+| **CRM — Deal Detail** | Inline editing, product lines, comment panel, chatter, probability tracking |
+| **Role-Based Access Control** | 6 roles: `super_admin`, `admin`, `manager`, `technician`, `viewer`, `sales_rep` |
 | **Real-Time Notifications** | Live updates via Supabase Realtime, per-user preference controls |
 | **Dark Mode** | Full dark/light theme toggle, persisted per user |
 | **PWA / Offline** | Installable app with offline shell via Workbox service worker |
@@ -111,6 +114,33 @@ supabase/migrations/20260529_repair_permissions.sql
 supabase/migrations/20260531_relax_ticket_status_constraint.sql
 supabase/migrations/20260602_whatsapp_notifications.sql
 supabase/migrations/20260603_user_preferences_rls.sql
+supabase/migrations/20260613_search_by_serial.sql
+supabase/migrations/20260617_kb_articles.sql
+# CRM upgrade (Track A) — apply in order:
+supabase/migrations/20260618_crm_add_sales_rep_role.sql
+supabase/migrations/20260619_crm_contacts.sql
+supabase/migrations/20260620_crm_pipelines.sql
+supabase/migrations/20260621_crm_leads.sql
+supabase/migrations/20260622_crm_deals.sql
+supabase/migrations/20260623_crm_activities.sql
+supabase/migrations/20260624_crm_customers_extend.sql
+supabase/migrations/20260625_crm_notification_events.sql
+supabase/migrations/20260626_crm_leads_convert_rpc.sql
+supabase/migrations/20260627_crm_fix_duplicate_user_roles_check.sql
+supabase/migrations/20260628_crm_assigned_rep_use_email.sql
+supabase/migrations/20260629_crm_created_by_use_email.sql
+supabase/migrations/20260630_crm_convert_lead_customer_code.sql
+supabase/migrations/20260701_crm_leads_add_statuses.sql
+supabase/migrations/20260702_crm_activities_chatter.sql
+supabase/migrations/20260703_crm_activities_replies.sql
+supabase/migrations/20260704_crm_pipeline_rename_new_lead_stage.sql
+supabase/migrations/20260705_crm_remove_b2c_pipeline.sql
+supabase/migrations/20260706_seed_test_users_and_deals.sql
+supabase/migrations/20260707_crm_rename_new_deal_stage_plural.sql
+supabase/migrations/20260708_crm_sync_deal_values.sql
+supabase/migrations/20260709_crm_lead_deal_codes.sql
+supabase/migrations/20260710_crm_deal_code_rename.sql
+supabase/migrations/20260711_crm_convert_rpc_deal_code.sql
 ```
 
 ### 4. Set up storage
@@ -158,7 +188,7 @@ npm run dev
 npm run dev                    # Vite dev server (hot reload, port 5173)
 npm run build                  # Production build → dist/
 npm run preview                # Preview production build locally
-npm test                       # Vitest unit tests (80 tests, ~3.5s)
+npm test                       # Vitest unit tests (277 tests, ~3.5s)
 npm run test:watch             # Vitest in watch mode
 npm run test:coverage          # Coverage report (HTML + text)
 npm run lint                   # ESLint check
@@ -192,7 +222,12 @@ myrma-app/
 │   │       ├── notifications.ts              # Notification table ops
 │   │       ├── system.ts                     # System config (rma_config table)
 │   │       ├── audit.ts                      # Audit log reads
-│   │       └── whatsappNotifications.ts      # WhatsApp templates, notification logs, settings, queue
+│   │       ├── whatsappNotifications.ts      # WhatsApp templates, notification logs, settings, queue
+│   │       ├── leads.ts                      # CRM: Lead CRUD + convert() RPC
+│   │       ├── deals.ts                      # CRM: Deal CRUD + moveStage/markWon/markLost
+│   │       ├── activities.ts                 # CRM: Activity/chatter CRUD + listForRelated
+│   │       ├── pipelines.ts                  # CRM: Pipeline + stage CRUD
+│   │       └── contacts.ts                   # CRM: Contact CRUD
 │   ├── components/
 │   │   ├── ui.jsx                            # Shared component library (Button, Input, Modal, Badge…)
 │   │   ├── ErrorBoundary.jsx                 # App-level error boundary → Sentry
@@ -213,6 +248,8 @@ myrma-app/
 │   │   ├── Products/                         # index.jsx + ProductsListTab, HierarchyTab, _modals
 │   │   ├── Customers/                        # index.jsx + _modals, _constants
 │   │   ├── UserManagement/                   # index.jsx + UsersTab, RolesTab, _shared, _utils
+│   │   ├── Leads/                            # index.jsx + LeadDetails, _modals, _constants, _shared (CRM)
+│   │   ├── Pipeline/                         # index.jsx + DealDetail, DealCommentPanel, 4 view files, _modals/_constants/_shared (CRM)
 │   │   ├── ProductDetails.jsx
 │   │   ├── CustomerDetails.jsx
 │   │   ├── PartsInventory.jsx
@@ -234,7 +271,8 @@ myrma-app/
 │   │   ├── send-email/                       # Email dispatch
 │   │   ├── send-whatsapp/                    # WhatsApp message dispatch via Meta Cloud API
 │   │   ├── notification-worker/              # Queue processor with exponential-backoff retry
-│   │   └── whatsapp-webhook/                 # Meta delivery-status callbacks
+│   │   ├── whatsapp-webhook/                 # Meta delivery-status callbacks
+│   │   └── ai-assist/                        # AI Assist endpoint (currently hidden/deferred in UI)
 │   └── migrations/                           # Database migrations (run in date order)
 ├── .github/
 │   └── workflows/
@@ -288,9 +326,10 @@ Single Supabase Realtime channel `app_notifications` subscribed in `App.jsx`. RL
 |------|-------------|-----------|
 | `super_admin` | Full system access | Everything |
 | `admin` | Full operational access | Everything except system internals |
-| `manager` | Team lead access | Tickets, customers, inventory, reports |
+| `manager` | Team lead access | Tickets, customers, inventory, reports, CRM |
 | `technician` | Technician access | Assigned tickets, parts inventory |
 | `viewer` | Read-only access | View-only on permitted sections |
+| `sales_rep` | CRM sales access | Leads/deals/activities (CRUD), customers (view+edit), pipelines/contacts (view) |
 
 Roles are stored in the `user_roles` table. Default permission sets are defined in `src/lib/permissions.ts` (`ROLE_DEFAULT_PERMISSIONS`). Admins can customize per-user permissions via the Control Panel.
 
@@ -313,7 +352,12 @@ Roles are stored in the `user_roles` table. Default permission sets are defined 
 | `/reports` | Reports | ✓ |
 | `/account` | Account Settings | ✓ |
 | `/control-panel` | Control Panel | ✓ admin+ |
+| `/leads` | Leads (CRM) | ✓ `leads.view` |
+| `/leads/:id` | Lead Detail | ✓ `leads.view` |
+| `/pipeline` | Pipeline (CRM) | ✓ `deals.view` |
+| `/pipeline/:id` | Deal Detail | ✓ `deals.view` |
 | `/tracker` | Public RMA Tracker | ✗ public |
+| `/kb` | Knowledge Base | ✗ public |
 | `/dashboard` | → redirects to `/` | |
 
 ---
@@ -324,7 +368,7 @@ Roles are stored in the `user_roles` table. Default permission sets are defined 
 npm test
 ```
 
-80 unit tests across 3 suites in `src/lib/`:
+277 unit tests across 7 suites in `src/lib/`:
 
 | Suite | Coverage |
 |-------|---------|
@@ -341,7 +385,7 @@ Tests run in under 5 seconds via Vitest with jsdom environment (serialised — `
 GitHub Actions runs automatically on every push and PR to `main`:
 
 ```
-1. npm test              → 80 tests must pass
+1. npm test              → 277 tests must pass
 2. npm run lint:ci       → zero ESLint warnings allowed
 3. npm run build         → production build must succeed
 ```
