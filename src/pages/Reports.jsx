@@ -1056,6 +1056,7 @@ export default function Reports({
     },
   })
 
+
   useEffect(() => {
     if (isError) {
       captureException(error, { page: 'Reports', context: 'loadData' })

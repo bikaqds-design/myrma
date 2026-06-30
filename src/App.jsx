@@ -122,6 +122,9 @@ const LeadDetails = lazyWithReload(() => import('./pages/Leads/LeadDetails'))
 const Pipeline = lazyWithReload(() => import('./pages/Pipeline'))
 const DealDetails = lazyWithReload(() => import('./pages/Pipeline/DealDetail'))
 const Activities = lazyWithReload(() => import('./pages/Activities'))
+const SalesDocuments = lazyWithReload(() => import('./pages/SalesDocuments'))
+const SalesDocumentDetail = lazyWithReload(() => import('./pages/SalesDocuments/SalesDocumentDetail'))
+const Accounting = lazyWithReload(() => import('./pages/Accounting'))
 const NotFoundPage = lazyWithReload(() => import('./pages/NotFoundPage'))
 import CommandPalette from './components/CommandPalette'
 
@@ -192,6 +195,20 @@ function DealDetailsRoute({ currentUserRole, currentUserEmail, currentUserPermis
       currentUserEmail={currentUserEmail}
       currentUserPermissions={currentUserPermissions}
       onBack={() => navigate('/pipeline')}
+    />
+  )
+}
+
+function SalesDocumentDetailRoute({ currentUserRole, currentUserEmail }) {
+  const { type, id } = useParams()
+  const navigate = useNavigate()
+  return (
+    <SalesDocumentDetail
+      docType={type}
+      docId={id}
+      currentUserRole={currentUserRole}
+      currentUserEmail={currentUserEmail}
+      onBack={() => navigate('/sales')}
     />
   )
 }
@@ -303,13 +320,6 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [notifMissing, setNotifMissing] = useState(false)
-  const [expandedItems, setExpandedItems] = useState(() => {
-    const s = new Set()
-    ;['/products', '/inventory', '/reports', '/control-panel'].forEach((p) => {
-      if (pathname === p || pathname.startsWith(p + '/')) s.add(p)
-    })
-    return s
-  })
   const notifChannelRef = useRef(null)
   const userMenuRef = useRef(null)
   const hamburgerRef = useRef(null)
@@ -543,18 +553,6 @@ export default function App() {
     if (pathname !== '/rma-tickets') setSelectedTicketId(null)
   }, [pathname])
 
-  // Auto-expand accordion when navigating to a page with sub-items
-  useEffect(() => {
-    const parent = ['/products', '/inventory', '/reports', '/control-panel'].find(
-      (p) => pathname === p || pathname.startsWith(p + '/')
-    )
-    if (parent) {
-      setExpandedItems((prev) => {
-        if (prev.has(parent)) return prev
-        return new Set([...prev, parent])
-      })
-    }
-  }, [pathname])
 
   const markAllNotifsRead = useCallback(async () => {
     if (!currentUser?.email || !currentUserRole) return
@@ -636,14 +634,6 @@ export default function App() {
     [navigate]
   )
 
-  const toggleExpanded = useCallback((path) => {
-    setExpandedItems((prev) => {
-      const next = new Set(prev)
-      if (next.has(path)) next.delete(path)
-      else next.add(path)
-      return next
-    })
-  }, [])
 
   const handleCmdSelectProduct = useCallback(
     (product) => {
@@ -724,6 +714,20 @@ export default function App() {
       active: pathname === '/activities',
       icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
       badge: overdueActivityCount > 0 ? overdueActivityCount : null,
+      requiredPermission: ['deals', 'view'],
+    },
+    {
+      path: '/sales',
+      label: t('nav.sales'),
+      active: pathname === '/sales',
+      icon: 'M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z',
+      requiredPermission: ['deals', 'view'],
+    },
+    {
+      path: '/accounting',
+      label: t('nav.accounting'),
+      active: pathname === '/accounting',
+      icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 10v2m9-8a9 9 0 11-18 0 9 9 0 0118 0z',
       requiredPermission: ['deals', 'view'],
     },
     {
@@ -860,6 +864,8 @@ export default function App() {
       '/leads': 'Leads',
       '/pipeline': 'Pipeline',
       '/activities': 'Activities',
+      '/sales': 'Sales Documents',
+      '/sales/': 'Sales Document',
       '/rma-tickets': 'RMA Tickets',
       '/inventory': 'Inventory',
       '/account': 'Account Settings',
@@ -1025,21 +1031,14 @@ export default function App() {
         </div>
 
         <nav className={`flex-1 ${sidebarCompact ? 'p-2' : 'p-4'} space-y-0.5 overflow-y-auto`}>
-          {navItems.map(({ path, label, active, icon, tabParam, children, separator, badge }) => {
-            const hasChildren = !sidebarCompact && !!children?.length
-            const isExpanded = expandedItems.has(path)
-            const activeTabId = tabParam ? new URLSearchParams(location.search).get(tabParam) : null
-
+          {navItems.map(({ path, label, active, icon, separator, badge }) => {
             return (
               <div key={path}>
                 {separator && (
                   <div className="pt-2 border-t border-[#e6e9ef] dark:border-[#212a38] my-1" />
                 )}
                 <button
-                  onClick={() => {
-                    if (!active) handleNavigate(path)
-                    if (children?.length) toggleExpanded(path)
-                  }}
+                  onClick={() => handleNavigate(path)}
                   title={sidebarCompact ? label : undefined}
                   className={`w-full flex items-center ${sidebarCompact ? 'justify-center px-2 py-3' : 'gap-3 px-3 py-2.5'} rounded-[10px] text-[13.5px] font-[600] transition-colors ${active ? 'bg-[rgba(67,56,202,0.11)] dark:bg-[rgba(165,180,252,0.16)] text-[#4338ca] dark:text-[#a5b4fc]' : 'text-[#6c6760] dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230]'}`}
                 >
@@ -1054,48 +1053,9 @@ export default function App() {
                           {badge > 99 ? '99+' : badge}
                         </span>
                       )}
-                      {children?.length > 0 && (
-                        <svg
-                          className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      )}
                     </>
                   )}
                 </button>
-
-                {hasChildren && isExpanded && (
-                  <div className="ms-3 mt-0.5 mb-1 space-y-0.5 border-s-2 border-[#e6e9ef] dark:border-[#212a38] ps-2">
-                    {children.map((child) => {
-                      const childActive =
-                        active &&
-                        ((child.activeSections
-                          ? child.activeSections.includes(activeTabId)
-                          : activeTabId === child.tabId) ||
-                          (!activeTabId && children[0].tabId === child.tabId))
-                      return (
-                        <button
-                          key={child.tabId}
-                          onClick={() => {
-                            navigate(`${path}?${tabParam}=${child.tabId}`)
-                            setSidebarOpen(false)
-                          }}
-                          className={`w-full text-start px-3 py-1.5 rounded-[8px] text-[12.5px] font-[500] transition-colors ${
-                            childActive
-                              ? 'bg-[rgba(67,56,202,0.08)] dark:bg-[rgba(165,180,252,0.10)] text-[#4338ca] dark:text-[#a5b4fc]'
-                              : 'text-[#6c6760] dark:text-[#9aa4b2] hover:bg-gray-50 dark:hover:bg-[#1a2230]'
-                          }`}
-                        >
-                          {child.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
               </div>
             )
           })}
@@ -1438,6 +1398,46 @@ export default function App() {
               />
 
               <Route
+                path="/sales"
+                element={
+                  canDo(effectiveUserRole, effectiveUserPermissions, 'deals', 'view') ? (
+                    <SalesDocuments
+                      currentUserRole={effectiveUserRole}
+                      currentUserEmail={currentUser?.email}
+                      currentUserPermissions={effectiveUserPermissions}
+                    />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="/accounting"
+                element={
+                  canDo(effectiveUserRole, effectiveUserPermissions, 'deals', 'view') ? (
+                    <Accounting currentUserEmail={currentUser?.email} />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="/sales/:type/:id"
+                element={
+                  canDo(effectiveUserRole, effectiveUserPermissions, 'deals', 'view') ? (
+                    <SalesDocumentDetailRoute
+                      currentUserRole={effectiveUserRole}
+                      currentUserEmail={currentUser?.email}
+                    />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                }
+              />
+
+              <Route
                 path="/rma-tickets"
                 element={
                   <RMATickets
@@ -1526,9 +1526,9 @@ export default function App() {
                 path="/reports"
                 element={
                   <Reports
-                    userRole={effectiveUserRole}
-                    userEmail={currentUser?.email}
-                    userPermissions={effectiveUserPermissions}
+                    currentUserRole={effectiveUserRole}
+                    currentUserEmail={currentUser?.email}
+                    currentUserPermissions={effectiveUserPermissions}
                   />
                 }
               />

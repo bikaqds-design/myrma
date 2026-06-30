@@ -85,6 +85,15 @@ export const deals = {
     if (error) throw error
     return data || []
   },
+  async listForCustomer(customerId: string): Promise<DealRow[]> {
+    const { data, error } = await supabase
+      .from('deals')
+      .select('*')
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data || []
+  },
   async get(id: string): Promise<DealRow> {
     const { data, error } = await supabase.from('deals').select('*').eq('id', id).single()
     if (error) throw error

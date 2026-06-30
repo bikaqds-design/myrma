@@ -65,6 +65,9 @@ All top-level pages are lazy-loaded via the `lazyWithReload()` wrapper in `App.j
 | `/leads/:id` | `LeadDetailsRoute` → `LeadDetails` | required (`leads.view`) |
 | `/pipeline` | `Pipeline` | required (`deals.view`) |
 | `/pipeline/:id` | `PipelineDealRoute` → `DealDetail` | required (`deals.view`) |
+| `/sales` | `SalesDocuments` | required (`deals.view`) |
+| `/sales/:type/:id` | `SalesDocumentDetail` | required (`deals.view`) |
+| `/accounting` | `Accounting` | required (`deals.view`) |
 | `/tracker` | `RMATracker` | **none (public)** |
 | `/kb` | `KnowledgeBasePublic` | **none (public)** |
 | `*` | `NotFoundPage` | — |
@@ -120,9 +123,16 @@ Domain modules in `src/api/db/` (all TypeScript — export Row types):
 | `whatsappNotifications.ts` | WhatsApp templates, notification logs, settings, queue | `WhatsAppTemplateRow`, `NotificationLogRow`, `NotificationQueueRow` |
 | `leads.ts` | Lead CRUD + `convert()` atomic RPC (CRM Sprint 2) | `LeadRow` |
 | `deals.ts` | Deal CRUD + `moveStage()`, `markWon()`, `markLost()`, `reopen()`, `bulkDelete()`, `bulkMoveStage()` with auto-log (CRM Sprint 3) | `DealRow` |
-| `activities.ts` | Activity/chatter CRUD + `listForRelated()` bulk query + `delete()` (CRM Sprint 2.5) | `ActivityRow` |
+| `activities.ts` | Activity/chatter CRUD + `listForRelated()` bulk query + `delete()` + `reopen()` + `reschedule()` + `listAllPlanned()` + `listCompleted()` (CRM Sprints 2.5, 4) | `ActivityRow` |
 | `pipelines.ts` | Pipeline + stage CRUD (CRM Sprint 1) | `PipelineRow`, `PipelineStage` |
 | `contacts.ts` | Contact CRUD (CRM Sprint 1) | `ContactRow` |
+| `quotations.ts` | Quotation CRUD + lifecycle (`draft→sent→accepted→converted`/`declined`/`cancelled`), `QT-` random codes (CRM Sprint 6) | `QuotationRow`, `QuotationLine` |
+| `salesOrders.ts` | Sales Order CRUD + `markAccepted()` (approval-pool action: reserves inventory + lands directly in `delivered`), `confirm()`/`markDelivered()`/`cancel()`/`convertToInvoice()`, `SO-` random codes (CRM Sprint 6) | `SalesOrderRow`, `SalesOrderLine` |
+| `crmInvoices.ts` | Invoice CRUD + `post()` (assigns gapless `INV-YYYY-NNNNN` via `nextval_for_type` RPC, decrements inventory), `recordPayment()`, `void_()` (CRM Sprint 6) | `CrmInvoiceRow`, `CrmInvoiceLine` |
+| `creditNotes.ts` | Credit Note CRUD + `issue()` (assigns gapless `CN-YYYY-NNNNN`, auto-applies to a linked invoice via `applyToInvoice()` + `crmInvoices.recordPayment()`), `restoreUnits()`, `void_()` (CRM Sprint 6) | `CreditNoteRow`, `CreditNoteLine`, `CreditNoteApplicationRow` |
+| `salesDocuments.ts` | Read-only `listAll()` over the `v_sales_documents` UNION view (powers the Sales Documents "All" tab) + `setArchived()` (CRM Sprint 6) | `SalesDocumentRow`, `SalesDocType` |
+| `payments.ts` | Payment CRUD + `record()` (assigns gapless `PAY-YYYY-NNNNN`, allocates across one or more invoices in one call), `applyToInvoice()`, `void_()` (blocks once applied) (Accounting v1) | `PaymentRow`, `PaymentApplicationRow` |
+| `customerLedger.ts` | Read-only `list(customerId)` over the `v_customer_ledger` UNION view (Customer Details "Billing" tab statement) + `agingReport()` (Current/31-60/61-90/90+ buckets from `crm_invoices`) (Accounting v1) | `LedgerEntryRow`, `AgingInvoiceRow` |
 
 Import Row types from `src/api/db/index.ts` — all are re-exported there for convenience.
 
@@ -297,12 +307,28 @@ Five large pages are organized as folders. `React.lazy(() => import('./pages/X')
 | `src/pages/Customers/` | `index.jsx`, `_modals.jsx`, `_constants.js` |
 | `src/pages/Leads/` | `index.jsx` (list + filters), `LeadDetails.jsx` (detail page), `_modals.jsx` (Create/Convert), `_constants.js`, `_shared.jsx` (SortableHeader) |
 | `src/pages/Pipeline/` | `index.jsx` (view switcher, kanban, XLSX export, search/filters, multi-select stage/rep filters, export dropdown, lifted `selectedDeals` state), `DealDetail.jsx` (inline editing, product lines, stages), `DealCommentPanel.jsx` (right-side comment panel), `PipelineListView.jsx` (sortable table, stage pin dropdown, bulk select/delete/move, indigo bulk bar), `PipelineGraphView.jsx`, `PipelinePivotView.jsx`, `PipelineActivityView.jsx`, `_modals.jsx`, `_constants.js`, `_shared.jsx` |
+| `src/pages/SalesDocuments/` | `index.jsx` (unified Quotation/SO/Invoice/Credit Note list, "All" tab via `v_sales_documents` view, archive tab), `SalesDocumentDetail.jsx` (per-type lifecycle actions: send/approve/convert/post/void, approval-activity raising), `SalesDocumentForm.jsx` (shared create/edit form for QT/SO/Invoice), `_modals.jsx` (`DocumentFormModal`, `RecordPaymentModal`, `VoidModal`, `CreateCreditNoteModal`, `CreateStandaloneCreditNoteModal`) |
+| `src/pages/Accounting/` | `index.jsx` (Payments ledger tab + AR Aging tab), `_modals.jsx` (`RecordPaymentModal` — multi-invoice allocation, oldest-due-first auto-allocate) (Accounting v1) |
 
 The remaining pages (`Dashboard`, `Reports`, `Invoices`, `PartsInventory`, `ControlPanel`, `AccountSettings`, etc.) are still single files.
 
 **Shared CRM component:** `src/components/ActivityChatter.jsx` — generalized chatter panel (note/schedule/reply/reschedule/reopen/attachments) used by both `LeadDetails.jsx` and `DealDetail.jsx`. Accepts `relatedType`/`relatedId`/`controlledTab`/`onControlledTabChange`/`hideNoteComposer`/`hideHistory` props. Do not re-implement this per-page — always import the shared component.
 
 **AI Assist component:** `src/components/AIAssist.jsx` exists but is **hidden** — all `<AIAssist>` imports and JSX have been removed from Dashboard, Reports, Inventory, CustomerDetails, and RMATickets. The `ai-assist` Edge Function and `ai.assist()` API helper still exist for future re-enabling.
+
+### Sales Documents & Accounting (CRM Sprint 6 + Accounting v1)
+
+The funnel is **Lead → Deal → Quotation → Sales Order → Invoice → Credit Note**, with payments tracked separately against invoices. All four document types (`quotations`, `sales_orders`, `crm_invoices`, `credit_notes`) plus `payments` live under `/sales` and `/accounting`.
+
+**Approval-pool pattern:** instead of a separate approvals table, an `activities` row with `type: 'approval'` is raised whenever a document needs manager sign-off. Its `title` field encodes `approval|docType|docId|code|total|customer` (parsed via `parseApprovalTitle()`); `approveDocument(docType, docId)` / `rejectDocument(docType, docId)` in `src/pages/Activities/index.jsx` dispatch to each document type's lifecycle action (`salesOrders.markAccepted()`, `crmInvoices.post()`, etc.). A Sales Order approval **lands directly in `delivered`** (inventory reserved) in one step — there is no separate "Confirm Order"/"Mark Delivered" click. An Invoice's approval activity is raised the moment a draft invoice is created (from SO conversion); approving it calls `post()` (assigns `inv_code`, decrements inventory); rejecting it calls `void_()`.
+
+**Gapless vs. random codes:** `INV-`, `CN-`, and `PAY-` codes are assigned atomically via `nextval_for_type()` (`20260712_document_sequences.sql`) only at issue/post time, not at draft creation — format `PREFIX-YYYY-NNNNN`, resets yearly. `QT-` and `SO-` codes are random 8-digit (`generate_doc_code()`), assigned at creation time since they carry no legal/sequential requirement. Deal codes use `OPP-` (renamed from a colliding `QT-` in `20260726_crm_deal_code_prefix_opp.sql`).
+
+**Two-stage inventory reservation:** `reserve_units`/`deliver_units`/`release_units`/`restore_units` RPCs (`20260719_inventory_reservation.sql`) move serialized units through reserved→delivered, with every state change appended to `stock_moves` (`20260713_stock_moves.sql`, append-only audit trail).
+
+**Application-table pattern (credit notes & payments):** both `credit_note_applications` and `payment_applications` link a credit note / payment to one or more invoices with a per-invoice applied amount, each with a sync trigger (`sync_credit_note_balance` / `sync_payment_balance`) that recalculates the parent's `remaining_balance` / `unapplied_amount`. `crmInvoices.recordPayment()` is the single low-level setter for `amount_paid`/`payment_status` — both `creditNotes.issue()` and `payments.record()`/`applyToInvoice()` call into it, so every reduction in AR balance (whether from a credit note or an actual payment) is reflected the same way. Voiding a credit note or payment that has already been applied is **blocked**, not reversed — there is no automated rollback of `amount_paid` (out of scope; this module is intentionally not a full GL).
+
+**Accounting module v1** (`src/pages/Accounting/`) is a lightweight AR layer, not a full ERP: a `payments` ledger (one payment can be split across multiple open invoices, oldest-`due_date`-first auto-allocate), an AR aging report (Current/31-60/61-90/90+ vs. `due_date`, computed client-side from `crm_invoices`), and a per-customer statement (`v_customer_ledger` view, signed amounts, running balance) on the Customer Details "Billing" tab. `customers.credit_limit` is a soft warning only — it is never enforced and never blocks document creation.
 
 ### Accessibility
 
@@ -331,6 +357,10 @@ Current migrations:
 - `20260531_relax_ticket_status_constraint.sql`
 - `20260602_whatsapp_notifications.sql`
 - `20260603_user_preferences_rls.sql`
+- `20260604_pgcron_notifications.sql` — pg_cron scheduled notifications (requires Supabase Pro)
+- `20260604_priority_changed_email_template.sql`
+- `20260604_ticket_customer_email.sql` — adds `customer_email` to `rma_tickets`
+- `20260604_ticket_resolutions.sql` — replacement/exchange/credit-note/refund outcomes, one per ticket
 - `20260613_search_by_serial.sql`
 - `20260617_kb_articles.sql`
 
@@ -359,6 +389,31 @@ CRM upgrade (Track A — `specs/002-crm-upgrade/`), applied in order:
 - `20260709_crm_lead_deal_codes.sql` — adds `lead_code` (LD- prefix) and `deal_code` (DL- prefix) columns; backfills existing rows
 - `20260710_crm_deal_code_rename.sql` — renames backfilled deal codes from DL- to QT- (Quotation lifecycle)
 - `20260711_crm_convert_rpc_deal_code.sql` — updates `crm_convert_lead` RPC to generate QT- `deal_code` atomically on conversion
+
+Sales Documents (CRM Sprint 6 — Quotation → Sales Order → Invoice → Credit Note), applied in order:
+
+- `20260712_document_sequences.sql` — `document_sequences` table + `nextval_for_type()` RPC (gapless `INV-`/`CN-` codes) + `generate_doc_code()` (random `QT-`/`SO-` codes)
+- `20260713_stock_moves.sql` — append-only ledger for every inventory state change (reserve/deliver/release/restore)
+- `20260714_quotations.sql` — `quotations` table + RLS
+- `20260715_sales_orders.sql` — `sales_orders` table + RLS
+- `20260716_crm_invoices.sql` — `crm_invoices` table + RLS + `post_invoice` RPC
+- `20260717_credit_notes.sql` — `credit_notes` table + RLS + `issue_credit_note` RPC
+- `20260718_credit_note_applications.sql` — `credit_note_applications` table; `sync_credit_note_balance` trigger keeps `applied_amount`/`remaining_balance` in sync
+- `20260719_inventory_reservation.sql` — two-stage stock model (`reserve_units`/`deliver_units`/`release_units`/`restore_units` RPCs)
+- `20260720_sales_documents_view.sql` — `v_sales_documents` UNION view (powers the "All" tab)
+- `20260721_crm_activities_approval_type.sql` — allows `'approval'` as an activity type
+- `20260722_sales_documents_archive.sql` — `archived`/`archived_at`/`archived_by` columns across all four document tables
+- `20260723_sales_orders_approval_statuses.sql` — adds `sent`/`accepted`/`declined` to `sales_orders.status`
+- `20260724_crm_convert_lead_created_by_email.sql` — fixes `crm_convert_lead` to use email (not `auth.uid()`) for `created_by`
+- `20260725_quotations_add_converted_status.sql` — allows `'converted'` quotation status (locks the QT once converted to an SO)
+- `20260726_crm_deal_code_prefix_opp.sql` — renames the deal-code prefix from the colliding `QT-` to `OPP-` (backfill + RPC update)
+
+Accounting Module v1 (payments ledger, AR aging, customer statement, credit limits), applied in order:
+
+- `20260727_crm_payments.sql` — `payments` + `payment_applications` tables + RLS (mirrors `credit_notes`/`credit_note_applications`); `sync_payment_balance` trigger; `record_payment` RPC
+- `20260728_crm_payment_sequence.sql` — registers the `payment` sequence type (`PAY-YYYY-NNNNN`) in `nextval_for_type()`
+- `20260729_crm_customer_credit_limit.sql` — adds `customers.credit_limit` (soft warning only, never enforced)
+- `20260730_crm_customer_ledger_view.sql` — `v_customer_ledger` UNION view (signed invoice/credit-note/payment feed, powers the Billing tab statement)
 
 **The "who" convention for CRM tables:** `assigned_rep` and `created_by` are `text` columns holding the user's **email**, NOT `uuid REFERENCES auth.users`. This was a repeated source of "Invalid uuid" bugs — Zod schemas must validate these as email/string, never `.uuid()`.
 

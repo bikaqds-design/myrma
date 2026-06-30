@@ -12,5 +12,6 @@ export const EMPTY_FORM = {
 export const EMPTY_CONVERT_FORM = {
   title: '',
   pipeline_id: '',
+  stage_id: '',
   value: '',
 }

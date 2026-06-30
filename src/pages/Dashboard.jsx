@@ -24,6 +24,9 @@ export const WIDGET_CATALOG = [
   { id: 'technician_performance', label: 'Technician Performance',     desc: 'Top 5 technicians by close rate',               size: 'full' },
   { id: 'top_issues',             label: 'Top Issues',                 desc: 'Ranked list of most common product issues',     size: 'full' },
   { id: 'overdue_followups',      label: 'Overdue Follow-Ups',         desc: 'CRM activities past their due date',            size: 'half' },
+  { id: 'crm_kpi',               label: 'CRM KPIs',                   desc: 'Open pipeline value, deals won & leads this month', size: 'full' },
+  { id: 'pipeline_by_stage',     label: 'Pipeline by Stage',          desc: 'Open deal count & value per stage bar chart',    size: 'half' },
+  { id: 'rep_leaderboard',       label: 'Rep Leaderboard',            desc: 'Top 5 reps by deals won this month',             size: 'half' },
 ]
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -62,6 +65,13 @@ function tokens(dark) {
 }
 
 // ── Primitives ────────────────────────────────────────────────────────────────
+function fmtCurrency(val) {
+  if (!val) return '$0'
+  if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(1)}M`
+  if (val >= 1_000) return `$${(val / 1_000).toFixed(1)}K`
+  return `$${val.toFixed(0)}`
+}
+
 function SvgGauge({ percent, color, tk, size = 132 }) {
   const thickness = 12
   const r = (size - thickness) / 2
@@ -253,7 +263,27 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
     queryKey: ['activities', 'overdue-count'],
     queryFn: () => db.activities.listOverdue(),
     staleTime: 60_000,
-    enabled: on('overdue_followups'),
+    enabled: on('overdue_followups') || on('crm_kpi'),
+  })
+
+  const crmDataEnabled = on('crm_kpi') || on('pipeline_by_stage') || on('rep_leaderboard')
+  const { data: crmDeals = [] } = useQuery({
+    queryKey: ['crm-deals'],
+    queryFn: () => db.deals.list(),
+    staleTime: 60_000,
+    enabled: crmDataEnabled,
+  })
+  const { data: crmLeads = [] } = useQuery({
+    queryKey: ['crm-leads'],
+    queryFn: () => db.leads.list(),
+    staleTime: 60_000,
+    enabled: on('crm_kpi'),
+  })
+  const { data: crmPipelines = [] } = useQuery({
+    queryKey: ['crm-pipelines'],
+    queryFn: () => db.pipelines.list(),
+    staleTime: 5 * 60_000,
+    enabled: on('pipeline_by_stage'),
   })
 
   const rangedTickets = useMemo(() => {
@@ -403,6 +433,47 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
         return new Date(b.created_date || 0) - new Date(a.created_date || 0)
       })
   }, [tickets, currentUserEmail, currentUserRole])
+
+  const monthStart = useMemo(() => {
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString()
+  }, [])
+
+  const crmStats = useMemo(() => {
+    const openPipelineValue = crmDeals.filter((d) => d.status === 'open').reduce((s, d) => s + (d.value || 0), 0)
+    const dealsWonThisMonth = crmDeals.filter((d) => d.status === 'won' && d.won_at && d.won_at >= monthStart).length
+    const leadsThisMonth = crmLeads.filter((l) => l.created_at >= monthStart).length
+    return { openPipelineValue, dealsWonThisMonth, leadsThisMonth }
+  }, [crmDeals, crmLeads, monthStart])
+
+  const pipelineByStage = useMemo(() => {
+    const openDeals = crmDeals.filter((d) => d.status === 'open')
+    const allStages = crmPipelines.flatMap((p) => (p.stages || []).filter((s) => !s.is_won && !s.is_lost))
+    const stageMap = {}
+    openDeals.forEach((d) => {
+      const stage = allStages.find((s) => s.id === d.stage)
+      const name = stage?.name || d.stage
+      const order = stage?.order ?? 99
+      if (!stageMap[name]) stageMap[name] = { name, count: 0, value: 0, order }
+      stageMap[name].count++
+      stageMap[name].value += d.value || 0
+    })
+    return Object.values(stageMap).sort((a, b) => a.order - b.order)
+  }, [crmDeals, crmPipelines])
+
+  const repLeaderboard = useMemo(() => {
+    const wonThisMonth = crmDeals.filter((d) => d.status === 'won' && d.won_at && d.won_at >= monthStart)
+    const repMap = {}
+    wonThisMonth.forEach((d) => {
+      const rep = d.assigned_rep || '—'
+      if (!repMap[rep]) repMap[rep] = { rep, count: 0, value: 0 }
+      repMap[rep].count++
+      repMap[rep].value += d.value || 0
+    })
+    return Object.values(repMap).sort((a, b) => b.count - a.count || b.value - a.value).slice(0, 5)
+  }, [crmDeals, monthStart])
+
+  const RANK_COLORS = ['#f59e0b', '#94a3b8', '#cd7f32']
 
   const daysBetween = (a) => Math.ceil((new Date() - new Date(a)) / 86400000)
   const openActive = (statusCounts[TICKET_STATUS.OPEN] || 0) + (statusCounts[TICKET_STATUS.IN_PROGRESS] || 0) +
@@ -707,8 +778,87 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
         )}
 
         {/* ── Section: CRM ── */}
-        {on('overdue_followups') && (
+        {(on('crm_kpi') || on('pipeline_by_stage') || on('rep_leaderboard') || on('overdue_followups')) && (
           <SectionLabel tk={tk}>{t('dashboard.crmSection')}</SectionLabel>
+        )}
+
+        {/* CRM KPI tiles */}
+        {on('crm_kpi') && (
+          <>
+            {[
+              { label: t('dashboard.openPipelineValue'), value: fmtCurrency(crmStats.openPipelineValue), color: tk.accent,  caption: t('dashboard.openDealsCaption') },
+              { label: t('dashboard.dealsWonThisMonth'), value: crmStats.dealsWonThisMonth,              color: tk.good,    caption: t('dashboard.thisMonth') },
+              { label: t('dashboard.leadsThisMonth'),   value: crmStats.leadsThisMonth,                 color: '#6366f1',  caption: t('dashboard.thisMonth') },
+              { label: t('dashboard.overdueFollowupsKpi'), value: overdueFollowups.length,              color: tk.bad,     caption: t('dashboard.needsAttention') },
+            ].map(({ label, value, color, caption }) => (
+              <div key={label} className="col-span-12 sm:col-span-6 lg:col-span-3"
+                style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', gap: 0 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: tk.textMuted, letterSpacing: 0.1 }}>{label}</span>
+                <div style={{ display: 'flex', alignItems: 'flex-end', marginTop: 8 }}>
+                  <span style={{ fontSize: 40, fontWeight: 780, color, letterSpacing: -1.4, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <span style={{ fontSize: 12, color: tk.textMuted }}>{caption}</span>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* Pipeline by Stage */}
+        {on('pipeline_by_stage') && (
+          <div className="col-span-12 lg:col-span-6"
+            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18 }}>
+            <CardHead title={t('dashboard.pipelineByStage')} action={t('dashboard.openDealsOnly')} tk={tk} />
+            {pipelineByStage.length === 0 ? (
+              <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', padding: '24px 0' }}>{t('dashboard.noOpenDeals')}</p>
+            ) : (() => {
+              const maxCount = Math.max(...pipelineByStage.map((s) => s.count), 1)
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {pipelineByStage.map((s) => (
+                    <div key={s.name}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: tk.text }}>{s.name}</span>
+                        <span style={{ fontSize: 12, color: tk.textMuted }}>{s.count} · {fmtCurrency(s.value)}</span>
+                      </div>
+                      <div style={{ height: 6, borderRadius: 3, background: tk.track }}>
+                        <div style={{ height: 6, borderRadius: 3, background: tk.accent, width: `${(s.count / maxCount) * 100}%`, transition: 'width 0.5s ease' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+          </div>
+        )}
+
+        {/* Rep Leaderboard */}
+        {on('rep_leaderboard') && (
+          <div className="col-span-12 lg:col-span-6"
+            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18 }}>
+            <CardHead title={t('dashboard.repLeaderboard')} action={t('dashboard.dealsWonThisMonthLabel')} tk={tk} />
+            {repLeaderboard.length === 0 ? (
+              <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', padding: '24px 0' }}>{t('dashboard.noDealsWonYet')}</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {repLeaderboard.map((r, i) => (
+                  <div key={r.rep} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: i ? `1px solid ${tk.borderSoft}` : 'none' }}>
+                    <span style={{ width: 24, height: 24, borderRadius: '50%', background: i < 3 ? RANK_COLORS[i] : tk.track, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                      {i + 1}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: tk.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.rep}</div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: tk.good }}>{r.count}</div>
+                      <div style={{ fontSize: 11, color: tk.textMuted }}>{fmtCurrency(r.value)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {on('overdue_followups') && (

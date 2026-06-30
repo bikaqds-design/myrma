@@ -15,6 +15,7 @@ export interface CustomerRow {
   address: string | null
   cr_number: string | null
   tax_id: string | null
+  credit_limit: number | null
   notes: string | null
   attachments: unknown[] | null
   created_date: string

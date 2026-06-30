@@ -187,13 +187,14 @@ export const CUSTOMER_STATUS = {
   VIP: 'vip',
 } as const
 
-// ── Invoice statuses ─────────────────────────────────────────────────────────
+// ── Invoice statuses (legacy RMA invoices — Invoices.jsx) ────────────────────
 export const INVOICE_STATUS = {
   DRAFT: 'draft',
   SENT: 'sent',
   PAID: 'paid',
   PENDING: 'pending',
   OVERDUE: 'overdue',
+  VOID: 'void',
 } as const
 
 // ── LocalStorage keys ────────────────────────────────────────────────────────
@@ -317,3 +318,123 @@ export const LIFECYCLE_STAGE_LIST: LifecycleStage[] = [
   LIFECYCLE_STAGE.CUSTOMER,
   LIFECYCLE_STAGE.CHURNED,
 ]
+
+// ── Sales Documents: quotation statuses ─────────────────────────────────────
+export const QUOTATION_STATUS = {
+  DRAFT: 'draft',
+  SENT: 'sent',
+  ACCEPTED: 'accepted',
+  DECLINED: 'declined',
+  EXPIRED: 'expired',
+  CANCELLED: 'cancelled',
+} as const
+
+export type QuotationStatus = (typeof QUOTATION_STATUS)[keyof typeof QUOTATION_STATUS]
+
+export const QUOTATION_STATUS_LIST: QuotationStatus[] = [
+  QUOTATION_STATUS.DRAFT,
+  QUOTATION_STATUS.SENT,
+  QUOTATION_STATUS.ACCEPTED,
+  QUOTATION_STATUS.DECLINED,
+  QUOTATION_STATUS.EXPIRED,
+  QUOTATION_STATUS.CANCELLED,
+]
+
+/** Only these statuses allow converting a quotation to a sales order */
+export const QUOTATION_CONVERTIBLE_STATUSES: QuotationStatus[] = [
+  QUOTATION_STATUS.DRAFT,
+  QUOTATION_STATUS.ACCEPTED,
+]
+
+// ── Sales Documents: sales order statuses ────────────────────────────────────
+export const SALES_ORDER_STATUS = {
+  DRAFT: 'draft',
+  CONFIRMED: 'confirmed',
+  DELIVERED: 'delivered',
+  CANCELLED: 'cancelled',
+} as const
+
+export type SalesOrderStatus = (typeof SALES_ORDER_STATUS)[keyof typeof SALES_ORDER_STATUS]
+
+export const SALES_ORDER_STATUS_LIST: SalesOrderStatus[] = [
+  SALES_ORDER_STATUS.DRAFT,
+  SALES_ORDER_STATUS.CONFIRMED,
+  SALES_ORDER_STATUS.DELIVERED,
+  SALES_ORDER_STATUS.CANCELLED,
+]
+
+// ── Sales Documents: invoice document lifecycle status ───────────────────────
+// Separate from payment status — governs editability and whether lines are locked.
+export const INVOICE_DOC_STATUS = {
+  DRAFT: 'draft',
+  POSTED: 'posted',
+  CANCELLED: 'cancelled',
+} as const
+
+export type InvoiceDocStatus = (typeof INVOICE_DOC_STATUS)[keyof typeof INVOICE_DOC_STATUS]
+
+export const INVOICE_DOC_STATUS_LIST: InvoiceDocStatus[] = [
+  INVOICE_DOC_STATUS.DRAFT,
+  INVOICE_DOC_STATUS.POSTED,
+  INVOICE_DOC_STATUS.CANCELLED,
+]
+
+// ── Sales Documents: invoice payment status ──────────────────────────────────
+// Separate from doc status — derived from sum of payments vs total; never
+// manually set. A posted invoice starts as 'unpaid' and progresses as payments
+// are recorded against it.
+export const INVOICE_PAYMENT_STATUS = {
+  UNPAID: 'unpaid',
+  PARTIAL: 'partial',
+  PAID: 'paid',
+  REVERSED: 'reversed',
+} as const
+
+export type InvoicePaymentStatus =
+  (typeof INVOICE_PAYMENT_STATUS)[keyof typeof INVOICE_PAYMENT_STATUS]
+
+export const INVOICE_PAYMENT_STATUS_LIST: InvoicePaymentStatus[] = [
+  INVOICE_PAYMENT_STATUS.UNPAID,
+  INVOICE_PAYMENT_STATUS.PARTIAL,
+  INVOICE_PAYMENT_STATUS.PAID,
+  INVOICE_PAYMENT_STATUS.REVERSED,
+]
+
+// ── Sales Documents: credit note statuses ────────────────────────────────────
+export const CREDIT_NOTE_STATUS = {
+  DRAFT: 'draft',
+  ISSUED: 'issued',
+  APPLIED: 'applied',
+  VOIDED: 'voided',
+} as const
+
+export type CreditNoteStatus = (typeof CREDIT_NOTE_STATUS)[keyof typeof CREDIT_NOTE_STATUS]
+
+export const CREDIT_NOTE_STATUS_LIST: CreditNoteStatus[] = [
+  CREDIT_NOTE_STATUS.DRAFT,
+  CREDIT_NOTE_STATUS.ISSUED,
+  CREDIT_NOTE_STATUS.APPLIED,
+  CREDIT_NOTE_STATUS.VOIDED,
+]
+
+// ── Sales Documents: credit note types ──────────────────────────────────────
+// The type drives whether inventory is restocked. rma_return = restock eligible;
+// rebate / discount / correction = financial-only, no stock movement.
+export const CREDIT_NOTE_TYPE = {
+  RMA_RETURN: 'rma_return',
+  REBATE: 'rebate',
+  DISCOUNT: 'discount',
+  CORRECTION: 'correction',
+} as const
+
+export type CreditNoteType = (typeof CREDIT_NOTE_TYPE)[keyof typeof CREDIT_NOTE_TYPE]
+
+export const CREDIT_NOTE_TYPE_LIST: CreditNoteType[] = [
+  CREDIT_NOTE_TYPE.RMA_RETURN,
+  CREDIT_NOTE_TYPE.REBATE,
+  CREDIT_NOTE_TYPE.DISCOUNT,
+  CREDIT_NOTE_TYPE.CORRECTION,
+]
+
+/** Credit note types that trigger inventory restock on issue */
+export const CREDIT_NOTE_INVENTORY_TYPES: CreditNoteType[] = [CREDIT_NOTE_TYPE.RMA_RETURN]

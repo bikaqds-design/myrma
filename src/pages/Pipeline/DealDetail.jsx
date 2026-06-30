@@ -1,16 +1,19 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
 import { PageSkeleton } from '../../components/Skeleton'
-import { Button, Input } from '../../components/ui'
+import { Button, Input, Spinner } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
 import { ActivityChatter } from '../../components/ActivityChatter'
 import { CommentPanel } from '../../components/CommentPanel'
 import { EMPTY_DEAL_FORM, EMPTY_LOST_FORM } from './_constants'
 import { CreateDealModal, MarkLostModal, ReopenDealModal } from './_modals'
 import { ProductSearchInput } from './_shared'
+import { useURLTab } from '../../hooks/useURLTab'
+import { downloadQuotationPDF } from '../../lib/quotationPdf'
 
 const CARD = 'bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-[18px]'
 
@@ -39,10 +42,40 @@ function Detail({ label, value }) {
   )
 }
 
-const EMPTY_LINE = { product_name: '', qty: 1, unit_price: 0 }
+const EMPTY_QT_LINE = { product_id: null, product_name: '', qty: 1, unit_price: 0, discount_pct: null, tax_pct: null }
+
+function qtStatusCls(status) {
+  const map = {
+    draft:     'bg-gray-100 text-gray-600 dark:bg-[#1a2230] dark:text-[#9aa4b2]',
+    sent:      'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
+    accepted:  'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400',
+    declined:  'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400',
+    expired:   'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
+    cancelled: 'bg-gray-100 text-gray-500 dark:bg-[#1a2230] dark:text-[#4a5568]',
+    converted: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400',
+  }
+  return map[status] ?? map.draft
+}
+
+// Quotations move through an internal approval cycle, not a customer-facing
+// one — surface the status in approval terms (Pending Approval / Approved /
+// Rejected) rather than sent/accepted/declined.
+function qtApprovalLabelKey(status) {
+  const map = {
+    draft:     'pipeline.qtApprovalDraft',
+    sent:      'pipeline.qtApprovalPending',
+    accepted:  'pipeline.qtApprovalApproved',
+    declined:  'pipeline.qtApprovalRejected',
+    expired:   'salesDocs.statusExpired',
+    cancelled: 'salesDocs.statusCancelled',
+    converted: 'salesDocuments.st_converted',
+  }
+  return map[status] ?? 'pipeline.qtApprovalDraft'
+}
 
 export default function DealDetail({ dealId, currentUserRole, currentUserEmail, currentUserPermissions, onBack }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   const { data: deal, isLoading, isError } = useQuery({
@@ -70,6 +103,19 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     queryFn: () => db.products.list(),
     staleTime: 60_000,
   })
+  const { data: quotation = null, isLoading: quotationLoading } = useQuery({
+    queryKey: ['quotation', 'deal', dealId],
+    queryFn: () => db.quotations.getByDeal(dealId),
+    enabled: !!dealId,
+  })
+  // When the QT has been converted to SO, fetch the resulting SO for navigation.
+  const { data: convertedSOs = [] } = useQuery({
+    queryKey: ['sos-by-quotation', quotation?.id],
+    queryFn: () => db.salesOrders.list({ quotationId: quotation.id }),
+    enabled: !!quotation?.id && quotation?.status === 'converted',
+    staleTime: 60_000,
+  })
+  const convertedSO = convertedSOs[0] ?? null
   const salesReps = usersList.filter((u) =>
     u.role === 'sales_rep' || u.role === 'manager' || u.role === 'admin' || u.role === 'super_admin'
   )
@@ -113,12 +159,17 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
   const [notesInput, setNotesInput] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
 
-  // Unified tab for right panel: 'note' | 'activity' | 'lines' | 'deal_notes'
-  const [tab, setTab] = useState('note')
+  // Unified tab for right panel: 'note' | 'activity' | 'quotation' | 'deal_notes'
+  const [tab, setTab] = useURLTab('tab', 'note')
 
-  // Product lines editor state
-  const [lines, setLines] = useState([])
-  const [savingLines, setSavingLines] = useState(false)
+  // Quotation editor state
+  const [editingQuotation, setEditingQuotation] = useState(false)
+  const [qtLines, setQtLines] = useState([])
+  const [qtValidity, setQtValidity] = useState('')
+  const [qtPaymentTerms, setQtPaymentTerms] = useState('')
+  const [qtNotes, setQtNotes] = useState('')
+  const [savingQuotation, setSavingQuotation] = useState(false)
+  const [convertingSO, setConvertingSO] = useState(false)
 
   const canDo = (action) => {
     if (currentUserRole === 'super_admin' || currentUserRole === 'admin') return true
@@ -207,6 +258,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     queryClient.invalidateQueries({ queryKey: ['deal', dealId] })
     queryClient.invalidateQueries({ queryKey: ['deals'] })
     queryClient.invalidateQueries({ queryKey: ['activities', 'deal', dealId] })
+    queryClient.invalidateQueries({ queryKey: ['quotation', 'deal', dealId] })
   }
 
   const isClosed = deal?.status !== 'open'
@@ -245,11 +297,10 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
       toast.error(t('pipeline.createDealValidation'))
       return
     }
-    const hasLines = deal.product_lines.length > 0
     try {
       await db.deals.update(deal.id, {
         title: dealForm.title.trim(),
-        value: hasLines ? deal.value : (dealForm.value ? Number(dealForm.value) : null),
+        value: quotation ? deal.value : (dealForm.value ? Number(dealForm.value) : null),
         probability: Number(dealForm.probability ?? 0),
         expected_close_date: dealForm.expected_close_date || null,
         assigned_rep: dealForm.assigned_rep || null,
@@ -308,29 +359,182 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     }
   }
 
-  const openLinesEditor = () => setLines(deal.product_lines.length > 0 ? deal.product_lines : [{ ...EMPTY_LINE }])
-  const updateLine = (i, field, value) => setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, [field]: value } : l)))
-  const selectLineProduct = (i, product) =>
-    setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, product_id: product.id, product_name: product.product_name } : l)))
-  const addLine = () => setLines((prev) => [...prev, { ...EMPTY_LINE }])
-  const removeLine = (i) => setLines((prev) => prev.filter((_, idx) => idx !== i))
-  const saveLines = async () => {
-    setSavingLines(true)
+  const openQuotationEditor = () => {
+    if (quotation) {
+      setQtLines(quotation.line_items.length > 0 ? quotation.line_items : [{ ...EMPTY_QT_LINE }])
+      setQtValidity(quotation.validity_until ?? '')
+      setQtPaymentTerms(quotation.payment_terms ?? '')
+      setQtNotes(quotation.notes ?? '')
+    } else {
+      setQtLines([{ ...EMPTY_QT_LINE }])
+      setQtValidity('')
+      setQtPaymentTerms('')
+      setQtNotes('')
+    }
+    setEditingQuotation(true)
+  }
+
+  const updateQtLine = (i, field, val) =>
+    setQtLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, [field]: val } : l)))
+  const selectQtProduct = (i, product) =>
+    setQtLines((prev) =>
+      prev.map((l, idx) =>
+        idx === i
+          ? { ...l, product_id: product.id, product_name: product.product_name, unit_price: product.unit_price ?? l.unit_price }
+          : l
+      )
+    )
+  const addQtLine = () => setQtLines((prev) => [...prev, { ...EMPTY_QT_LINE }])
+  const removeQtLine = (i) => setQtLines((prev) => prev.filter((_, idx) => idx !== i))
+
+  const saveQuotation = async () => {
+    setSavingQuotation(true)
     try {
-      const cleaned = lines
-        .filter((l) => l.product_name.trim())
-        .map((l) => ({ product_id: l.product_id || '', product_name: l.product_name.trim(), qty: Number(l.qty) || 1, unit_price: Number(l.unit_price) || 0 }))
-      const linesValue = cleaned.reduce((s, l) => s + l.qty * l.unit_price, 0)
-      await db.deals.update(deal.id, { product_lines: cleaned, value: linesValue || null })
-      toast.success(t('pipeline.dealUpdated'))
-      setLines([])
+      const cleanedLines = qtLines.filter((l) => l.product_name.trim())
+      let saved
+      if (quotation) {
+        saved = await db.quotations.update(quotation.id, {
+          line_items: cleanedLines,
+          validity_until: qtValidity || null,
+          payment_terms: qtPaymentTerms || null,
+          notes: qtNotes || null,
+        })
+        toast.success(t('salesDocs.successUpdated'))
+      } else {
+        saved = await db.quotations.create({
+          customer_id: deal.customer_id,
+          deal_id: deal.id,
+          line_items: cleanedLines,
+          validity_until: qtValidity || null,
+          payment_terms: qtPaymentTerms || null,
+          notes: qtNotes || null,
+          assigned_rep: deal.assigned_rep,
+          created_by: currentUserEmail,
+        })
+        toast.success(t('salesDocs.successCreated'))
+      }
+      await db.deals.update(deal.id, { value: saved.total || null })
+      if (!quotation) {
+        db.activities.logSystem('deal', deal.id, `quotation_created|${saved.qt_code}`, currentUserEmail).catch(() => {})
+      }
+      setEditingQuotation(false)
       refresh()
     } catch (error) {
-      toast.error(t('pipeline.failedSave', { error: error.message }))
+      toast.error(t('salesDocs.errorSaveFailed'))
     } finally {
-      setSavingLines(false)
+      setSavingQuotation(false)
     }
   }
+
+  const ACTION_LOG_KIND = {
+    markSent: 'quotation_sent',
+    markAccepted: 'quotation_accepted',
+    markDeclined: 'quotation_declined',
+    cancel: 'quotation_cancelled',
+    reopen: 'quotation_reopened',
+  }
+
+  // Raise the approval-pool activity that surfaces in the Activities page.
+  // Format: approval|docType|docId|code|total|customer — parsed there to render
+  // the Source badge and dispatch the approve/reject action to this quotation.
+  const createApprovalActivity = () => {
+    const customerName = customer?.company_name || customer?.contact_person || '—'
+    return db.activities.create({
+      related_type: 'deal',
+      related_id: deal.id,
+      type: 'approval',
+      title: `approval|quotation|${quotation.id}|${quotation.qt_code}|${quotation.total ?? 0}|${customerName}`,
+      // Always set a due_date — listAllPlanned() filters out null-due_date rows,
+      // so a null here would hide the approval from the Activities page.
+      due_date: quotation.validity_until || new Date().toISOString(),
+      assigned_rep: quotation.assigned_rep || null,
+      outcome_notes: null,
+      created_by: currentUserEmail,
+    }).catch((err) => {
+      console.error('Failed to create approval activity', err)
+      toast.error(t('pipeline.approvalActivityFailed'))
+    })
+  }
+
+  const handleQuotationStatus = async (action) => {
+    if (!quotation) return
+    try {
+      await db.quotations[action](quotation.id)
+      toast.success(t('pipeline.quotationStatusUpdated'))
+      const kind = ACTION_LOG_KIND[action]
+      if (kind) {
+        db.activities.logSystem('deal', deal.id, `${kind}|${quotation.qt_code}`, currentUserEmail).catch(() => {})
+      }
+      if (action === 'markSent') createApprovalActivity()
+      refresh()
+    } catch {
+      toast.error(t('salesDocs.errorSaveFailed'))
+    }
+  }
+
+  // Reopen a declined/cancelled quotation straight back into the approval queue:
+  // flip it to 'sent' and raise a fresh approval activity.
+  const handleReopenForApproval = async () => {
+    if (!quotation) return
+    try {
+      await db.quotations.markSent(quotation.id)
+      db.activities.logSystem('deal', deal.id, `quotation_reopened|${quotation.qt_code}`, currentUserEmail).catch(() => {})
+      createApprovalActivity()
+      toast.success(t('pipeline.quotationStatusUpdated'))
+      refresh()
+    } catch {
+      toast.error(t('salesDocs.errorSaveFailed'))
+    }
+  }
+
+  const handleConvertToSO = async () => {
+    if (!quotation) return
+    const freeLines = db.quotations.freeFormLines(quotation)
+    if (freeLines.length > 0) {
+      toast.error(t('pipeline.quotationFreeFormError', { count: freeLines.length }))
+      return
+    }
+    setConvertingSO(true)
+    try {
+      await db.quotations.convertToSalesOrder(quotation.id, currentUserEmail)
+      toast.success(t('salesDocs.successConverted'))
+      db.activities.logSystem('deal', deal.id, `quotation_converted|${quotation.qt_code}`, currentUserEmail).catch(() => {})
+      refresh()
+    } catch {
+      toast.error(t('salesDocs.errorConvertFailed'))
+    } finally {
+      setConvertingSO(false)
+    }
+  }
+
+  const handleApproveQuotation = async (activityId) => {
+    if (!quotation) return
+    try {
+      await db.quotations.markAccepted(quotation.id)
+      await db.activities.complete(activityId, `Approved by ${currentUserEmail}`)
+      db.activities.logSystem('deal', deal.id, `quotation_accepted|${quotation.qt_code}`, currentUserEmail).catch(() => {})
+      toast.success(t('pipeline.quotationStatusUpdated'))
+      refresh()
+    } catch {
+      toast.error(t('salesDocs.errorSaveFailed'))
+    }
+  }
+
+  const handleRejectQuotation = async (activityId) => {
+    if (!quotation) return
+    try {
+      await db.quotations.markDeclined(quotation.id)
+      await db.activities.complete(activityId, `Rejected by ${currentUserEmail}`)
+      db.activities.logSystem('deal', deal.id, `quotation_declined|${quotation.qt_code}`, currentUserEmail).catch(() => {})
+      toast.success(t('pipeline.quotationStatusUpdated'))
+      refresh()
+    } catch {
+      toast.error(t('salesDocs.errorSaveFailed'))
+    }
+  }
+
+  const handleDownloadPDF = () =>
+    downloadQuotationPDF({ quotation, customer, relatedType: 'deal', relatedId: deal.id })
 
   if (isLoading) return <PageSkeleton />
   if (isError || !deal) {
@@ -341,11 +545,16 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     )
   }
 
-  const hasProductLines = deal.product_lines.length > 0
-  const editingLines = lines.length > 0
-  const lineItems = editingLines ? lines : deal.product_lines
-  const linesTotal = lineItems.reduce((sum, l) => sum + (Number(l.qty) || 0) * (Number(l.unit_price) || 0), 0)
-  const displayValue = hasProductLines ? deal.product_lines.reduce((s, l) => s + (l.qty || 0) * (l.unit_price || 0), 0) : Number(deal.value || 0)
+  const hasQuotation = !!quotation
+  const canApprove = ['manager', 'admin', 'super_admin'].includes(currentUserRole)
+  const displayValue = hasQuotation ? (quotation?.total ?? 0) : Number(deal.value || 0)
+
+  const qtEditTotal = qtLines.reduce((sum, l) => {
+    const base = (Number(l.qty) || 0) * (Number(l.unit_price) || 0)
+    const disc = base * ((Number(l.discount_pct) || 0) / 100)
+    const net = base - disc
+    return sum + net + net * ((Number(l.tax_pct) || 0) / 100)
+  }, 0)
 
   const TAB_CLS = (active) =>
     `px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
@@ -469,13 +678,13 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
             ) : (
               <>
                 <span
-                  className={`text-xl font-bold text-gray-900 dark:text-[#e8ebf0] ${!hasProductLines ? EDITABLE : ''}`}
-                  onClick={!hasProductLines && canEditDeal ? () => { setValueInput(String(deal.value ?? '')); setEditingValue(true) } : undefined}
-                  title={!hasProductLines && canEditDeal ? t('pipeline.clickToEdit') : undefined}
+                  className={`text-xl font-bold text-gray-900 dark:text-[#e8ebf0] ${!hasQuotation ? EDITABLE : ''}`}
+                  onClick={!hasQuotation && canEditDeal ? () => { setValueInput(String(deal.value ?? '')); setEditingValue(true) } : undefined}
+                  title={!hasQuotation && canEditDeal ? t('pipeline.clickToEdit') : undefined}
                 >
                   {displayValue > 0 ? `${displayValue.toLocaleString()} ${t('pipeline.currency')}` : `— ${t('pipeline.currency')}`}
                 </span>
-                {hasProductLines && (
+                {hasQuotation && (
                   <span className="text-xs text-gray-400 dark:text-[#4a5568]">({t('pipeline.valueLocked')})</span>
                 )}
               </>
@@ -661,7 +870,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
 
         {/* Center: unified tab bar */}
         <div className={`${CARD} lg:col-span-2 !p-0 overflow-hidden`}>
-          {/* Tab row: Add Comment | Schedule Activity | Product Lines | Deal Notes */}
+          {/* Tab row: Add Comment | Schedule Activity | Quotation | Deal Notes */}
           <div className="flex border-b border-[#e6e9ef] dark:border-[#212a38] px-2 overflow-x-auto">
             <button onClick={() => setTab('note')} className={TAB_CLS(tab === 'note')}>
               {t('activityChatter.addComment')}
@@ -669,11 +878,11 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
             <button onClick={() => setTab('activity')} className={TAB_CLS(tab === 'activity')}>
               {t('activityChatter.scheduleActivity')}
             </button>
-            <button onClick={() => setTab('lines')} className={TAB_CLS(tab === 'lines')}>
-              {t('pipeline.productLinesTab')}
-              {deal.product_lines.length > 0 && (
+            <button onClick={() => setTab('quotation')} className={TAB_CLS(tab === 'quotation')}>
+              {t('pipeline.quotationTab')}
+              {hasQuotation && (
                 <span className="ml-1.5 text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-[#a5b4fc] px-1.5 py-0.5 rounded-full">
-                  {deal.product_lines.length}
+                  {quotation.qt_code}
                 </span>
               )}
             </button>
@@ -696,88 +905,269 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
                 onControlledTabChange={setTab}
                 hideNoteComposer
                 hideHistory={tab === 'activity'}
+                currentUserRole={currentUserRole}
+                onApproveActivity={handleApproveQuotation}
+                onRejectActivity={handleRejectQuotation}
               />
             )}
 
-            {/* Product lines tab */}
-            {tab === 'lines' && (
+            {/* Quotation tab */}
+            {tab === 'quotation' && (
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{t('pipeline.productLines')}</h4>
-                  {!editingLines && canEditDeal && (
-                    <Button variant="secondary" size="sm" onClick={openLinesEditor}>
-                      {lineItems.length === 0 ? `+ ${t('pipeline.addLine')}` : t('common.edit')}
-                    </Button>
-                  )}
-                </div>
-
-                {lineItems.length === 0 && !editingLines ? (
-                  <p className="text-sm text-gray-400 dark:text-[#4a5568]">{t('pipeline.noProductLines')}</p>
+                {quotationLoading ? (
+                  <div className="flex justify-center py-6"><Spinner /></div>
+                ) : !quotation && !editingQuotation ? (
+                  <div className="py-6 text-center">
+                    <p className="text-sm text-gray-400 dark:text-[#4a5568] mb-3">{t('pipeline.noQuotation')}</p>
+                    {canEditDeal && (
+                      <Button size="sm" onClick={openQuotationEditor}>+ {t('pipeline.createQuotation')}</Button>
+                    )}
+                  </div>
                 ) : (
-                  <>
-                    {/* Column headers */}
-                    {(editingLines || lineItems.length > 0) && (
-                      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase mb-2 px-1">
-                        <span>{t('pipeline.lineProduct')}</span>
-                        <span className="w-14 text-center">{t('pipeline.lineQty')}</span>
-                        <span className="w-24 text-center">{t('pipeline.lineUnitPrice')}</span>
-                        <span className="w-24 text-right">{t('pipeline.lineSubtotal')}</span>
+                  <div>
+                    {/* Quotation header (view mode only) */}
+                    {quotation && !editingQuotation && (
+                      <>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-mono font-semibold text-[#4338ca] dark:text-[#a5b4fc] bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 rounded">
+                              {quotation.qt_code}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${qtStatusCls(quotation.status)}`}>
+                              {t(qtApprovalLabelKey(quotation.status))}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-indigo-600 dark:text-[#a5b4fc]">
+                              {(quotation.total ?? 0).toLocaleString()} {t('pipeline.currency')}
+                            </span>
+                            {quotation.status === 'accepted' && canApprove && (
+                              <Button variant="secondary" size="sm" onClick={handleDownloadPDF}>
+                                {t('salesDocs.downloadPDF')}
+                              </Button>
+                            )}
+                            {canEditDeal && !['cancelled', 'expired', 'declined', 'converted'].includes(quotation.status) && (
+                              <Button variant="secondary" size="sm" onClick={openQuotationEditor}>
+                                {t('common.edit')}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        {(quotation.validity_until || quotation.payment_terms) && (
+                          <div className="flex flex-wrap gap-3 mb-3 text-xs text-gray-500 dark:text-[#9aa4b2]">
+                            {quotation.validity_until && (
+                              <span>{t('salesDocs.validityUntil')}: {new Date(quotation.validity_until).toLocaleDateString()}</span>
+                            )}
+                            {quotation.payment_terms && (
+                              <span>{t('salesDocs.paymentTerms')}: {quotation.payment_terms}</span>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Line items — view mode */}
+                    {quotation && !editingQuotation && (
+                      <div>
+                        {quotation.line_items.length === 0 ? (
+                          <p className="text-sm text-gray-400 dark:text-[#4a5568]">{t('pipeline.noProductLines')}</p>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-[1fr_40px_80px_50px_50px_70px] gap-1.5 text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase mb-1.5 px-1">
+                              <span>{t('salesDocs.lineProduct')}</span>
+                              <span className="text-center">{t('salesDocs.lineQty')}</span>
+                              <span className="text-right">{t('salesDocs.lineUnitPrice')}</span>
+                              <span className="text-center">{t('salesDocs.lineDiscount')}</span>
+                              <span className="text-center">{t('salesDocs.lineTax')}</span>
+                              <span className="text-right">{t('salesDocs.lineSubtotal')}</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {quotation.line_items.map((l, i) => {
+                                const base = l.qty * l.unit_price
+                                const disc = base * ((l.discount_pct || 0) / 100)
+                                const net = base - disc
+                                const tax = net * ((l.tax_pct || 0) / 100)
+                                return (
+                                  <div key={i} className="grid grid-cols-[1fr_40px_80px_50px_50px_70px] gap-1.5 items-center text-sm text-gray-700 dark:text-[#e8ebf0] px-1">
+                                    <span className="truncate">{l.product_name}</span>
+                                    <span className="text-center text-gray-500 dark:text-[#9aa4b2]">{l.qty}</span>
+                                    <span className="text-right text-gray-500 dark:text-[#9aa4b2]">{Number(l.unit_price).toLocaleString()}</span>
+                                    <span className="text-center text-gray-400 dark:text-[#4a5568] text-xs">{l.discount_pct ? `${l.discount_pct}%` : '—'}</span>
+                                    <span className="text-center text-gray-400 dark:text-[#4a5568] text-xs">{l.tax_pct ? `${l.tax_pct}%` : '—'}</span>
+                                    <span className="text-right font-medium">{(net + tax).toLocaleString()}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                            <div className="mt-2 pt-2 border-t border-[#e6e9ef] dark:border-[#212a38] space-y-0.5 text-xs text-gray-500 dark:text-[#9aa4b2]">
+                              {quotation.discount_amount > 0 && (
+                                <div className="flex justify-between">
+                                  <span>{t('salesDocs.totalDiscount')}</span>
+                                  <span>-{quotation.discount_amount.toLocaleString()}</span>
+                                </div>
+                              )}
+                              {quotation.tax_amount > 0 && (
+                                <div className="flex justify-between">
+                                  <span>{t('salesDocs.totalTax')}</span>
+                                  <span>+{quotation.tax_amount.toLocaleString()}</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between pt-1 text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">
+                                <span>{t('salesDocs.grandTotal')}</span>
+                                <span className="text-indigo-600 dark:text-[#a5b4fc]">{(quotation.total ?? 0).toLocaleString()} {t('pipeline.currency')}</span>
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
 
-                    <div className="space-y-2">
-                      {lineItems.map((l, i) =>
-                        editingLines ? (
-                          <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center">
-                            <ProductSearchInput
-                              value={l.product_name}
-                              onChange={(text) => updateLine(i, 'product_name', text)}
-                              onSelectProduct={(p) => selectLineProduct(i, p)}
-                              products={products}
-                              placeholder={t('pipeline.lineProductPlaceholder')}
-                              className="flex-1"
-                              inputClassName="w-full px-3 py-2 border border-gray-300 dark:border-[#212a38] dark:bg-[#0f1520] dark:text-[#e8ebf0] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm bg-white placeholder-gray-400 transition-colors"
-                            />
-                            <Input type="number" min="1" value={l.qty} onChange={(e) => updateLine(i, 'qty', e.target.value)} className="w-14 text-sm text-center" />
-                            <Input type="number" min="0" value={l.unit_price} onChange={(e) => updateLine(i, 'unit_price', e.target.value)} className="w-24 text-sm" />
-                            <button onClick={() => removeLine(i)} className="w-6 h-6 flex items-center justify-center text-red-400 hover:text-red-600 text-base">×</button>
-                          </div>
-                        ) : (
-                          <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center text-sm text-gray-700 dark:text-[#e8ebf0] px-1">
-                            <span className="truncate">{l.product_name}</span>
-                            <span className="w-14 text-center text-gray-500 dark:text-[#9aa4b2]">× {l.qty}</span>
-                            <span className="w-24 text-center text-gray-500 dark:text-[#9aa4b2]">{Number(l.unit_price).toLocaleString()}</span>
-                            <span className="w-24 text-right font-medium">{(l.qty * l.unit_price).toLocaleString()}</span>
-                          </div>
-                        )
-                      )}
-                    </div>
+                    {/* Line items — edit mode */}
+                    {editingQuotation && (
+                      <div>
+                        <div className="grid grid-cols-[1fr_40px_80px_50px_50px_24px] gap-1.5 text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase mb-1.5 px-1">
+                          <span>{t('salesDocs.lineProduct')}</span>
+                          <span className="text-center">{t('salesDocs.lineQty')}</span>
+                          <span className="text-right">{t('salesDocs.lineUnitPrice')}</span>
+                          <span className="text-center">{t('salesDocs.lineDiscount')}</span>
+                          <span className="text-center">{t('salesDocs.lineTax')}</span>
+                          <span />
+                        </div>
+                        <div className="space-y-1.5">
+                          {qtLines.map((l, i) => (
+                            <div key={i} className="grid grid-cols-[1fr_40px_80px_50px_50px_24px] gap-1.5 items-center">
+                              <ProductSearchInput
+                                value={l.product_name}
+                                onChange={(text) => updateQtLine(i, 'product_name', text)}
+                                onSelectProduct={(p) => selectQtProduct(i, p)}
+                                products={products}
+                                placeholder={t('pipeline.lineProductPlaceholder')}
+                                className="flex-1"
+                                inputClassName="w-full px-2 py-1.5 border border-gray-300 dark:border-[#212a38] dark:bg-[#0f1520] dark:text-[#e8ebf0] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm bg-white placeholder-gray-400 transition-colors"
+                              />
+                              <Input type="number" min="1" value={l.qty} onChange={(e) => updateQtLine(i, 'qty', e.target.value)} className="w-10 text-sm text-center !px-1" />
+                              <Input type="number" min="0" value={l.unit_price} onChange={(e) => updateQtLine(i, 'unit_price', e.target.value)} className="w-20 text-sm text-right !px-1.5" />
+                              <Input type="number" min="0" max="100" value={l.discount_pct ?? ''} onChange={(e) => updateQtLine(i, 'discount_pct', e.target.value !== '' ? Number(e.target.value) : null)} placeholder="0" className="w-12 text-sm text-center !px-1" />
+                              <Input type="number" min="0" max="100" value={l.tax_pct ?? ''} onChange={(e) => updateQtLine(i, 'tax_pct', e.target.value !== '' ? Number(e.target.value) : null)} placeholder="0" className="w-12 text-sm text-center !px-1" />
+                              <button onClick={() => removeQtLine(i)} className="w-6 h-6 flex items-center justify-center text-red-400 hover:text-red-600 text-base">×</button>
+                            </div>
+                          ))}
+                        </div>
 
-                    {editingLines && (
-                      <div className="flex items-center gap-3 mt-3 pt-2 border-t border-[#e6e9ef] dark:border-[#212a38]">
-                        <button onClick={addLine} className="text-sm text-indigo-600 dark:text-[#a5b4fc] hover:underline">
-                          + {t('pipeline.addLine')}
-                        </button>
-                        <div className="ml-auto flex gap-2">
-                          <Button variant="secondary" size="sm" onClick={() => setLines([])}>
-                            {t('common.cancel')}
-                          </Button>
-                          <Button size="sm" onClick={saveLines} loading={savingLines}>
-                            {t('common.save')}
-                          </Button>
+                        {/* Extra fields: validity + payment terms */}
+                        <div className="grid grid-cols-2 gap-2 mt-3">
+                          <div>
+                            <label className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-1 block">{t('salesDocs.validityUntil')}</label>
+                            <Input type="date" value={qtValidity} onChange={(e) => setQtValidity(e.target.value)} className="w-full text-sm" />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-1 block">{t('salesDocs.paymentTerms')}</label>
+                            <Input value={qtPaymentTerms} onChange={(e) => setQtPaymentTerms(e.target.value)} placeholder="e.g. Net 30" className="w-full text-sm" />
+                          </div>
+                        </div>
+
+                        {/* Notes / T&C */}
+                        <div className="mt-3">
+                          <label className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-1 block">
+                            {t('pipeline.quotationNotes')}
+                          </label>
+                          <textarea
+                            value={qtNotes}
+                            onChange={(e) => setQtNotes(e.target.value)}
+                            placeholder={t('pipeline.quotationNotesPlaceholder')}
+                            rows={4}
+                            className="w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-xl text-sm bg-[#f8f9fb] dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#e6e9ef] dark:border-[#212a38]">
+                          <div className="flex items-center gap-3">
+                            <button onClick={addQtLine} className="text-sm text-indigo-600 dark:text-[#a5b4fc] hover:underline">
+                              + {t('salesDocs.addLine')}
+                            </button>
+                            <span className="text-xs text-gray-400 dark:text-[#4a5568]">
+                              {t('salesDocs.grandTotal')}: {qtEditTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })} {t('pipeline.currency')}
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="secondary" size="sm" onClick={() => setEditingQuotation(false)}>
+                              {t('common.cancel')}
+                            </Button>
+                            <Button size="sm" onClick={saveQuotation} loading={savingQuotation}>
+                              {t('common.save')}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     )}
 
-                    {lineItems.length > 0 && (
-                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#e6e9ef] dark:border-[#212a38]">
-                        <span className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{t('common.total')}</span>
-                        <span className="text-sm font-bold text-indigo-600 dark:text-[#a5b4fc]">
-                          {linesTotal.toLocaleString()} {t('pipeline.currency')}
-                        </span>
+                    {/* Notes / T&C (view mode) */}
+                    {quotation && !editingQuotation && quotation.notes && (
+                      <div className="mt-3 pt-3 border-t border-[#e6e9ef] dark:border-[#212a38]">
+                        <p className="text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">
+                          {t('pipeline.quotationNotes')}
+                        </p>
+                        <p className="text-sm text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap leading-relaxed">
+                          {quotation.notes}
+                        </p>
                       </div>
                     )}
-                  </>
+
+                    {/* Status action buttons (view mode only) */}
+                    {quotation && !editingQuotation && quotation.status !== 'expired' && (
+                      <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-[#e6e9ef] dark:border-[#212a38]">
+                        {quotation.status === 'converted' ? (
+                          // Locked — QT has been converted to an SO. Show navigation only.
+                          <>
+                            {convertedSO && (
+                              <button
+                                onClick={() => navigate(`/sales/sales_order/${convertedSO.id}`)}
+                                className="inline-flex items-center gap-1 text-sm text-indigo-600 dark:text-[#a5b4fc] hover:underline"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                </svg>
+                                {t('salesDocuments.qtViewSO')}: <span className="font-mono ml-0.5">{convertedSO.so_code}</span>
+                              </button>
+                            )}
+                            {canApprove && (
+                              <Button variant="secondary" size="sm" onClick={handleDownloadPDF}>
+                                {t('salesDocs.downloadPDF')}
+                              </Button>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {quotation.status === 'draft' && canEditDeal && (
+                              <Button variant="secondary" size="sm" onClick={() => handleQuotationStatus('markSent')}>
+                                {t('pipeline.sendForApproval')}
+                              </Button>
+                            )}
+                            {quotation.status === 'sent' && (
+                              <span className="text-xs text-gray-500 dark:text-[#9aa4b2] self-center italic">
+                                {t('pipeline.qtAwaitingApproval')}
+                              </span>
+                            )}
+                            {['draft', 'sent', 'accepted'].includes(quotation.status) && canEditDeal && (
+                              <Button variant="danger" size="sm" onClick={() => handleQuotationStatus('cancel')}>
+                                {t('common.cancel')}
+                              </Button>
+                            )}
+                            {quotation.status === 'accepted' && (
+                              <Button size="sm" onClick={handleConvertToSO} loading={convertingSO}>
+                                {t('salesDocs.convertToSO')}
+                              </Button>
+                            )}
+                            {['cancelled', 'declined'].includes(quotation.status) && canEditDeal && (
+                              <Button variant="secondary" size="sm" onClick={handleReopenForApproval}>
+                                {t('pipeline.reopenForApproval')}
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -821,7 +1211,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
           pipeline={pipeline}
           salesReps={salesReps}
           editing={deal}
-          hasProductLines={hasProductLines}
+          hasProductLines={hasQuotation}
           onSave={handleSaveEdit}
           onClose={() => setShowEdit(false)}
         />

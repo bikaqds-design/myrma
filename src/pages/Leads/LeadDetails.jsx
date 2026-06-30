@@ -204,7 +204,16 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
   }
 
   const handleOpenConvert = () => {
-    setConvertForm({ ...EMPTY_CONVERT_FORM, title: `${lead.full_name} — ${t('leadModal.dealTitle')}` })
+    const pid = pipelines[0]?.id ?? ''
+    const firstStage = pipelines[0]?.stages
+      ? [...pipelines[0].stages].sort((a, b) => a.order - b.order).find((s) => !s.is_won && !s.is_lost)
+      : null
+    setConvertForm({
+      ...EMPTY_CONVERT_FORM,
+      title: `${lead.full_name} — ${t('leadModal.dealTitle')}`,
+      pipeline_id: pid,
+      stage_id: firstStage?.id ?? '',
+    })
     setShowConvert(true)
   }
 
@@ -618,7 +627,11 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
       {showConvert && (
         <ConvertLeadModal
           lead={lead}
-          pipelines={pipelines}
+          stages={
+            pipelines[0]?.stages
+              ? [...pipelines[0].stages].sort((a, b) => a.order - b.order).filter((s) => !s.is_won && !s.is_lost)
+              : []
+          }
           form={convertForm}
           setForm={setConvertForm}
           onConvert={handleConvert}

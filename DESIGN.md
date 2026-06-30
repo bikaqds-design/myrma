@@ -342,3 +342,214 @@ When rows can be multi-selected for bulk operations, the bar MUST appear as a st
   {t('common.clear')}
 </button>
 ```
+
+---
+
+## Canonical Pagination — UNIFIED 2026-07-09
+
+**Pages unified:** Customers, Products, Leads, Pipeline list view, Activities. Apply to every new list page.
+
+**Reference implementations:** [src/pages/Leads/index.jsx](src/pages/Leads/index.jsx), [src/pages/Pipeline/PipelineListView.jsx](src/pages/Pipeline/PipelineListView.jsx), [src/pages/Activities/index.jsx](src/pages/Activities/index.jsx)
+
+### State (always persisted via safeStorage)
+
+```js
+const [currentPage, setCurrentPage] = useState(1)
+const [itemsPerPage, setItemsPerPage] = useState(() => safeStorage.get('<pageKey>PerPage', 25))
+const [jumpToPage, setJumpToPage] = useState('')
+
+useEffect(() => { safeStorage.set('<pageKey>PerPage', itemsPerPage) }, [itemsPerPage])
+useEffect(() => { setCurrentPage(1) }, [searchQuery, itemsPerPage, ...activeFilters])
+```
+
+### Calculations
+
+```js
+const totalPages = Math.ceil(filteredItems.length / itemsPerPage)
+const startIndex = (currentPage - 1) * itemsPerPage
+const endIndex = Math.min(startIndex + itemsPerPage, filteredItems.length)
+const paginatedItems = filteredItems.slice(startIndex, endIndex)
+```
+
+### Page change handlers
+
+```js
+const handlePageChange = (page) => {
+  if (page >= 1 && page <= totalPages) { setCurrentPage(page); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+}
+const handleJumpToPage = () => {
+  const pageNum = parseInt(jumpToPage)
+  if (pageNum >= 1 && pageNum <= totalPages) { handlePageChange(pageNum); setJumpToPage('') }
+  else toast.error(t('<section>.pageMustBeBetween', { total: totalPages }))
+}
+```
+
+### renderPageNumbers (ellipsis — copy verbatim into each page)
+
+```js
+const renderPageNumbers = () => {
+  const pages = []
+  if (totalPages <= 7) { for (let i = 1; i <= totalPages; i++) pages.push(i) }
+  else if (currentPage <= 4) { for (let i = 1; i <= 5; i++) pages.push(i); pages.push('...'); pages.push(totalPages) }
+  else if (currentPage >= totalPages - 3) { pages.push(1); pages.push('...'); for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i) }
+  else { pages.push(1); pages.push('...'); for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i); pages.push('...'); pages.push(totalPages) }
+  return pages.map((p, i) =>
+    p === '...' ? <span key={`e${i}`} className="px-2 text-[#6c6760] dark:text-[#9aa4b2]">…</span>
+    : <button key={p} onClick={() => handlePageChange(p)}
+        className={`w-8 h-8 rounded text-sm ${currentPage === p ? 'bg-[#4338ca] text-white' : 'text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230]'}`}>{p}</button>
+  )
+}
+```
+
+### Count + per-page row (above table, inside card, border-b separator)
+
+```jsx
+<div className="px-5 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[#e6e9ef] dark:border-[#212a38]">
+  <span className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
+    {t('<section>.showingRange', { from: filteredItems.length === 0 ? 0 : startIndex + 1, to: endIndex, total: filteredItems.length })}
+  </span>
+  <div className="flex items-center gap-2">
+    <label className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('common.itemsPerPage')}:</label>
+    <select value={itemsPerPage} onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
+      className="px-3 py-1 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent">
+      <option value={10}>10</option><option value={25}>25</option>
+      <option value={50}>50</option><option value={100}>100</option>
+    </select>
+  </div>
+</div>
+```
+
+### Pagination footer (below table, border-t, only when totalPages > 1)
+
+```jsx
+{totalPages > 1 && (
+  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-t border-[#e6e9ef] dark:border-[#212a38]">
+    <div className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
+      {t('<section>.showingRange', { from: startIndex + 1, to: endIndex, total: filteredItems.length })}
+    </div>
+    <div className="flex items-center gap-1">
+      <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}
+        className="px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+        {t('common.previous')}
+      </button>
+      <div className="flex items-center gap-1">{renderPageNumbers()}</div>
+      <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages}
+        className="px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+        {t('common.next')}
+      </button>
+    </div>
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('common.jumpToPage')}:</span>
+      <input type="number" min="1" max={totalPages} value={jumpToPage}
+        onChange={(e) => setJumpToPage(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleJumpToPage()}
+        placeholder={currentPage.toString()}
+        className="w-20 px-3 py-1 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent" />
+      <button onClick={handleJumpToPage}
+        className="px-3 py-1 bg-[#4338ca] dark:bg-[#a5b4fc] text-white dark:text-[#0b0f17] rounded-lg hover:opacity-90 text-sm transition-opacity">
+        {t('common.go')}
+      </button>
+    </div>
+  </div>
+)}
+```
+
+### Required i18n keys per section
+
+```json
+"<section>": {
+  "showingRange": "Showing {{from}}–{{to}} of {{total}} <items>",
+  "pageMustBeBetween": "Page must be between 1 and {{total}}"
+}
+```
+
+### Kanban view — recommended pagination style
+
+Do NOT use numbered pages for kanban. Use **per-column load-more** instead: load first N cards per column, show a "Load more (X)" button at the bottom of each column when additional cards exist. Each column's count is independent — scroll one column without affecting others. This matches Odoo's kanban UX and avoids the jarring experience of all columns jumping simultaneously when a page number is clicked.
+
+---
+
+## Canonical SortableHeader — UNIFIED 2026-06-28
+
+**Rule**: Every list page with a table gets sortable column headers. Inline the component per page (page-scoped duplicate, not a cross-folder import — matching the established pattern in `Leads/_shared.jsx` and `Activities/index.jsx`).
+
+**Reference implementations:** [src/pages/Leads/_shared.jsx](src/pages/Leads/_shared.jsx), [src/pages/Activities/index.jsx](src/pages/Activities/index.jsx)
+
+### Component (copy verbatim, rename file-local)
+
+```jsx
+function SortableHeader({ label, sortKey, sortConfig, onSort }) {
+  const isActive = sortConfig.key === sortKey
+  const ariaSort = isActive ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'
+  return (
+    <button onClick={() => onSort(sortKey)} aria-label={`Sort by ${label}`} aria-sort={ariaSort}
+      className="flex items-center gap-1 hover:text-[#211f1b] dark:hover:text-[#e8ebf0] transition-colors">
+      <span>{label}</span>
+      {isActive ? (
+        sortConfig.direction === 'asc'
+          ? <svg className="w-3.5 h-3.5 text-indigo-600 dark:text-[#a5b4fc] ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+          : <svg className="w-3.5 h-3.5 text-indigo-600 dark:text-[#a5b4fc] ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      ) : (
+        <svg className="w-3.5 h-3.5 text-gray-300 dark:text-[#4a5568] ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+      )}
+    </button>
+  )
+}
+```
+
+### State (persisted via safeStorage)
+
+```js
+const [sortConfig, setSortConfig] = useState(() =>
+  safeStorage.get('<pageKey>SortConfig', { key: '<default_key>', direction: 'asc' })
+)
+useEffect(() => { safeStorage.set('<pageKey>SortConfig', sortConfig) }, [sortConfig])
+// Add sortConfig to the page-reset effect dependency array
+```
+
+### Handler
+
+```js
+const handleSort = (key) => {
+  setSortConfig((prev) => ({
+    key,
+    direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+  }))
+}
+```
+
+### Sort logic (inside the filtered useMemo, after all filtering)
+
+```js
+// Sort — runs after search/filter
+f = [...f].sort((a, b) => {
+  let aVal, bVal
+  if (sortConfig.key === 'created_at' || sortConfig.key === 'due_date') {
+    aVal = new Date(a[sortConfig.key] || 0).getTime()
+    bVal = new Date(b[sortConfig.key] || 0).getTime()
+  } else if (sortConfig.key === 'customer') {
+    // computed value — special-case like this
+    aVal = getCustomerName(a).toLowerCase()
+    bVal = getCustomerName(b).toLowerCase()
+  } else {
+    aVal = (a[sortConfig.key] ?? '').toString().toLowerCase()
+    bVal = (b[sortConfig.key] ?? '').toString().toLowerCase()
+  }
+  if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
+  if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
+  return 0
+})
+```
+
+### Usage in thead
+
+```jsx
+<th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+  <SortableHeader label={t('section.colName')} sortKey="field_name" sortConfig={sortConfig} onSort={handleSort} />
+</th>
+```
+
+**Notes:**
+
+- `sortConfig` must be in the `useEffect` page-reset dependency array so page resets to 1 on sort change.
+- Computed-value columns (e.g. Customer name resolved from a map) need a special-case branch in the sort comparator — they cannot use `a[sortConfig.key]` directly.
+- For tabs that use different date fields (e.g. Activities: `due_date` for planned tabs, `completed_at` for logs tab), detect the active tab inside the sort branch rather than using two separate sort keys.

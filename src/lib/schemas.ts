@@ -24,6 +24,12 @@ import {
   LEAD_SOURCE_LIST,
   DEAL_STATUS_LIST,
   ACTIVITY_TYPE_LIST,
+  QUOTATION_STATUS_LIST,
+  SALES_ORDER_STATUS_LIST,
+  INVOICE_DOC_STATUS_LIST,
+  INVOICE_PAYMENT_STATUS_LIST,
+  CREDIT_NOTE_STATUS_LIST,
+  CREDIT_NOTE_TYPE_LIST,
   type Role,
   type TicketStatus,
   type Priority,
@@ -31,6 +37,12 @@ import {
   type LeadSource,
   type DealStatus,
   type ActivityType,
+  type QuotationStatus,
+  type SalesOrderStatus,
+  type InvoiceDocStatus,
+  type InvoicePaymentStatus,
+  type CreditNoteStatus,
+  type CreditNoteType,
 } from './constants.js'
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
@@ -284,6 +296,115 @@ export const dealSchema = z
     }
   })
 
+// ── Sales Documents: shared line schemas ─────────────────────────────────────
+
+// Quotation lines allow free-form products (product_id nullable).
+// product_name is always required — for free-form lines it IS the product.
+export const quotationLineSchema = z.object({
+  product_id: z.string().uuid().optional().nullable(),
+  product_name: z.string().min(1, 'Product name is required').max(300),
+  description: z.string().max(500).optional().nullable(),
+  qty: z.number().int().min(1, 'Quantity must be at least 1'),
+  unit_price: z.number().min(0, 'Price must be 0 or more'),
+  discount_pct: z.number().min(0).max(100).optional().nullable(),
+  tax_pct: z.number().min(0).max(100).optional().nullable(),
+})
+
+// Sales Order and Invoice lines require a real DB product.
+// Validated at the convert step — any free-form quotation line must be
+// promoted to a real product before an SO can be created.
+export const salesOrderLineSchema = z.object({
+  product_id: z.string().uuid('Product must be selected from the catalog'),
+  product_name: z.string().min(1).max(300),
+  description: z.string().max(500).optional().nullable(),
+  qty: z.number().int().min(1, 'Quantity must be at least 1'),
+  unit_price: z.number().min(0, 'Price must be 0 or more'),
+  discount_pct: z.number().min(0).max(100).optional().nullable(),
+  tax_pct: z.number().min(0).max(100).optional().nullable(),
+})
+
+export const invoiceLineSchema = salesOrderLineSchema
+
+// Credit note lines allow partial quantity credits; restock flag is per-line.
+export const creditNoteLineSchema = z.object({
+  product_id: z.string().uuid().optional().nullable(),
+  product_name: z.string().min(1, 'Product name is required').max(300),
+  qty: z.number().int().min(1, 'Quantity must be at least 1'),
+  unit_price: z.number().min(0),
+  restock: z.boolean().default(false),
+  warehouse_id: z.string().uuid().optional().nullable(),
+})
+
+// ── Sales Documents: quotation ────────────────────────────────────────────────
+
+export const quotationSchema = z.object({
+  customer_id: z.string().uuid('Select a customer'),
+  deal_id: z.string().uuid().optional().nullable(),
+  assigned_rep: z.union([z.string().email(), z.literal('')]).optional().nullable(),
+  reference_po: z.string().max(100).optional().nullable(),
+  validity_until: z.string().optional().nullable(),
+  payment_terms: z.string().max(200).optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
+  status: z
+    .enum(QUOTATION_STATUS_LIST as [QuotationStatus, ...QuotationStatus[]])
+    .optional(),
+  line_items: z.array(quotationLineSchema).min(1, 'At least one line item is required'),
+})
+
+// ── Sales Documents: sales order ─────────────────────────────────────────────
+
+export const salesOrderSchema = z.object({
+  customer_id: z.string().uuid('Select a customer'),
+  quotation_id: z.string().uuid().optional().nullable(),
+  assigned_rep: z.union([z.string().email(), z.literal('')]).optional().nullable(),
+  reference_po: z.string().max(100).optional().nullable(),
+  delivery_date: z.string().optional().nullable(),
+  payment_terms: z.string().max(200).optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
+  status: z
+    .enum(SALES_ORDER_STATUS_LIST as [SalesOrderStatus, ...SalesOrderStatus[]])
+    .optional(),
+  line_items: z.array(salesOrderLineSchema).min(1, 'At least one line item is required'),
+})
+
+// ── Sales Documents: CRM invoice ─────────────────────────────────────────────
+// Uses two separate status fields (doc_status + payment_status) — never collapse
+// these into one field. payment_status is derived from recorded payments vs total
+// and should not be set directly by UI forms; it's included here for completeness.
+
+export const crmInvoiceSchema = z.object({
+  customer_id: z.string().uuid('Select a customer'),
+  so_id: z.string().uuid().optional().nullable(),
+  assigned_rep: z.union([z.string().email(), z.literal('')]).optional().nullable(),
+  reference_po: z.string().max(100).optional().nullable(),
+  due_date: z.string().optional().nullable(),
+  payment_terms: z.string().max(200).optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
+  doc_status: z
+    .enum(INVOICE_DOC_STATUS_LIST as [InvoiceDocStatus, ...InvoiceDocStatus[]])
+    .optional(),
+  payment_status: z
+    .enum(INVOICE_PAYMENT_STATUS_LIST as [InvoicePaymentStatus, ...InvoicePaymentStatus[]])
+    .optional(),
+  line_items: z.array(invoiceLineSchema).min(1, 'At least one line item is required'),
+})
+
+// ── Sales Documents: credit note ─────────────────────────────────────────────
+
+export const creditNoteSchema = z.object({
+  customer_id: z.string().uuid('Select a customer'),
+  type: z.enum(CREDIT_NOTE_TYPE_LIST as [CreditNoteType, ...CreditNoteType[]]),
+  source_invoice_id: z.string().uuid().optional().nullable(),
+  ticket_id: z.string().uuid().optional().nullable(),
+  assigned_rep: z.union([z.string().email(), z.literal('')]).optional().nullable(),
+  reason: z.string().min(1, 'Reason is required').max(500),
+  notes: z.string().max(2000).optional().nullable(),
+  status: z
+    .enum(CREDIT_NOTE_STATUS_LIST as [CreditNoteStatus, ...CreditNoteStatus[]])
+    .optional(),
+  line_items: z.array(creditNoteLineSchema).min(1, 'At least one line item is required'),
+})
+
 // ── CRM: activities ───────────────────────────────────────────────────────────
 
 export const activitySchema = z.object({
@@ -313,6 +434,13 @@ export type ContactFormData = z.infer<typeof contactSchema>
 export type LeadFormData = z.infer<typeof leadSchema>
 export type DealFormData = z.infer<typeof dealSchema>
 export type ActivityFormData = z.infer<typeof activitySchema>
+export type QuotationFormData = z.infer<typeof quotationSchema>
+export type SalesOrderFormData = z.infer<typeof salesOrderSchema>
+export type CrmInvoiceFormData = z.infer<typeof crmInvoiceSchema>
+export type CreditNoteFormData = z.infer<typeof creditNoteSchema>
+export type QuotationLineData = z.infer<typeof quotationLineSchema>
+export type SalesOrderLineData = z.infer<typeof salesOrderLineSchema>
+export type CreditNoteLineData = z.infer<typeof creditNoteLineSchema>
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 

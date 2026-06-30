@@ -30,6 +30,13 @@ import { pipelines } from './pipelines.js'
 import { leads } from './leads.js'
 import { deals } from './deals.js'
 import { activities } from './activities.js'
+import { quotations } from './quotations.js'
+import { salesOrders } from './salesOrders.js'
+import { crmInvoices } from './crmInvoices.js'
+import { creditNotes } from './creditNotes.js'
+import { salesDocuments } from './salesDocuments.js'
+import { payments } from './payments.js'
+import { customerLedger } from './customerLedger.js'
 
 export const db = {
   // Users & roles
@@ -90,6 +97,17 @@ export const db = {
   leads,
   deals,
   activities,
+
+  // Sales documents (Sprint 6)
+  quotations,
+  salesOrders,
+  crmInvoices,
+  creditNotes,
+  salesDocuments,
+
+  // Accounting — payments ledger + customer statement/aging
+  payments,
+  customerLedger,
 }
 
 // Re-export all Row types for page components to import
@@ -114,3 +132,10 @@ export type { PipelineRow, PipelineStage } from './pipelines.js'
 export type { LeadRow } from './leads.js'
 export type { DealRow, DealProductLine } from './deals.js'
 export type { ActivityRow, ActivityAttachment, ActivityCreateInput } from './activities.js'
+export type { QuotationRow, QuotationLine } from './quotations.js'
+export type { SalesOrderRow, SalesOrderLine } from './salesOrders.js'
+export type { CrmInvoiceRow, CrmInvoiceLine } from './crmInvoices.js'
+export type { CreditNoteRow, CreditNoteLine, CreditNoteApplicationRow } from './creditNotes.js'
+export type { SalesDocumentRow, SalesDocType } from './salesDocuments.js'
+export type { PaymentRow, PaymentApplicationRow } from './payments.js'
+export type { LedgerEntryRow, LedgerEntryType, AgingBucket, AgingInvoiceRow } from './customerLedger.js'

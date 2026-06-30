@@ -14,6 +14,19 @@ const TYPE_ICON = {
   task: '✅',
   note: '📝',
   log: '🕓',
+  approval: '📋',
+}
+
+// Approval pool format: approval|docType|docId|code|total|customer
+function parseApprovalTitle(title) {
+  const parts = (title || '').split('|')
+  return {
+    docType: parts[1] ?? 'quotation',
+    docId: parts[2] ?? '',
+    code: parts[3] ?? '—',
+    total: Number(parts[4]) || 0,
+    customer: parts[5] ?? '—',
+  }
 }
 
 const NOTE_MAX_LENGTH = 300
@@ -41,6 +54,13 @@ function renderLogTitle(title, t) {
   if (kind === 'field_updated') {
     return t('activityChatter.logFieldUpdated', { field: t(a), value: b || '—' })
   }
+  if (kind === 'quotation_created')   return t('activityChatter.logQuotationCreated',   { code: a })
+  if (kind === 'quotation_sent')      return t('activityChatter.logQuotationSent',       { code: a })
+  if (kind === 'quotation_accepted')  return t('activityChatter.logQuotationAccepted',   { code: a })
+  if (kind === 'quotation_declined')  return t('activityChatter.logQuotationDeclined',   { code: a })
+  if (kind === 'quotation_cancelled') return t('activityChatter.logQuotationCancelled',  { code: a })
+  if (kind === 'quotation_reopened')  return t('activityChatter.logQuotationReopened',   { code: a })
+  if (kind === 'quotation_converted') return t('activityChatter.logQuotationConverted',  { code: a })
   return title
 }
 
@@ -53,10 +73,11 @@ function isOverdue(activity) {
   return !activity.completed_at && activity.due_date && new Date(activity.due_date) < new Date()
 }
 
-export function ActivityChatter({ relatedType, relatedId, currentUserEmail, salesReps, canEdit, controlledTab, onControlledTabChange, hideNoteComposer, hideHistory }) {
+export function ActivityChatter({ relatedType, relatedId, currentUserEmail, salesReps, canEdit, controlledTab, onControlledTabChange, hideNoteComposer, hideHistory, currentUserRole, onApproveActivity, onRejectActivity }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const fileInputRef = useRef(null)
+  const canApprove = ['manager', 'admin', 'super_admin'].includes(currentUserRole)
 
   const [internalTab, setInternalTab] = useState('note')
   const tab = controlledTab ?? internalTab
@@ -160,6 +181,10 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
       toast.error(t('activityChatter.activityTitleRequired'))
       return
     }
+    if (!actDue) {
+      toast.error(t('activityChatter.activityDueDateRequired'))
+      return
+    }
     setSubmitting(true)
     try {
       await db.activities.create({
@@ -167,8 +192,8 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
         related_id: relatedId,
         type: actType,
         title,
-        due_date: actDue ? new Date(actDue).toISOString() : null,
-        assigned_rep: actRep || null,
+        due_date: new Date(actDue).toISOString(),
+        assigned_rep: actRep || currentUserEmail,
         outcome_notes: null,
         created_by: currentUserEmail,
       })
@@ -328,7 +353,7 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                       </option>
                     ))}
                   </Select>
-                  <Input type="datetime-local" value={actDue} onChange={(e) => setActDue(e.target.value)} />
+                  <Input type="datetime-local" value={actDue} onChange={(e) => setActDue(e.target.value)} required />
                 </div>
                 <Input
                   value={actTitle}
@@ -344,7 +369,7 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                       </option>
                     ))}
                   </Select>
-                  <Button size="sm" onClick={handleScheduleActivity} loading={submitting}>
+                  <Button size="sm" onClick={handleScheduleActivity} loading={submitting} disabled={!actTitle.trim() || !actDue}>
                     {t('activityChatter.schedule')}
                   </Button>
                 </div>
@@ -368,8 +393,55 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                 {planned.map((a) => (
                   <li
                     key={a.id}
-                    className={`p-3 rounded-lg border ${isOverdue(a) ? 'border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-900/10' : 'border-gray-200 dark:border-[#212a38] bg-gray-50 dark:bg-[#0f1520]'}`}
+                    className={`p-3 rounded-lg border ${
+                      a.type === 'approval'
+                        ? 'border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/60 dark:bg-indigo-900/10'
+                        : isOverdue(a)
+                          ? 'border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-900/10'
+                          : 'border-gray-200 dark:border-[#212a38] bg-gray-50 dark:bg-[#0f1520]'
+                    }`}
                   >
+                    {a.type === 'approval' ? (
+                      /* ── Approval card ── */
+                      <div>
+                        <div className="flex items-start gap-3">
+                          <span className="text-lg leading-none">📋</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">
+                              {t('activityChatter.approvalRequest')}
+                            </p>
+                            {(() => { const { code, total, customer } = parseApprovalTitle(a.title); return (
+                              <p className="text-xs text-gray-600 dark:text-[#9aa4b2] mt-0.5">
+                                {code} · {customer} · {total.toLocaleString()}
+                                {a.due_date && ` · ${t('salesDocs.validityUntil')}: ${fmtTime(a.due_date)}`}
+                              </p>
+                            )})()}
+                            <p className="text-xs text-indigo-600 dark:text-[#a5b4fc] font-medium mt-1">
+                              {t('activityChatter.pendingApproval')}
+                            </p>
+                          </div>
+                        </div>
+                        {canApprove && onApproveActivity && onRejectActivity && (
+                          <div className="flex gap-2 mt-2 ml-8">
+                            <button
+                              onClick={() => onApproveActivity(a.id)}
+                              className="px-3 py-1 text-xs font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
+                            >
+                              ✓ {t('activityChatter.approvalApprove')}
+                            </button>
+                            <button
+                              onClick={() => onRejectActivity(a.id)}
+                              className="px-3 py-1 text-xs font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
+                            >
+                              ✗ {t('activityChatter.approvalReject')}
+                            </button>
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-400 dark:text-[#4a5568] mt-2 ml-8">
+                          {a.created_by || '—'} · {fmtTime(a.created_at)}
+                        </p>
+                      </div>
+                    ) : (
                     <div className="flex items-start gap-3">
                       <span className="text-lg leading-none">{TYPE_ICON[a.type] || '•'}</span>
                       <div className="flex-1 min-w-0">
@@ -382,7 +454,8 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                         </p>
                       </div>
                     </div>
-                    {reschedulingId === a.id && (
+                    )}
+                    {a.type !== 'approval' && reschedulingId === a.id && (
                       <div className="flex items-center gap-2 mt-2 ml-8">
                         <Input
                           type="datetime-local"
@@ -398,7 +471,7 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                         </button>
                       </div>
                     )}
-                    {canEdit && reschedulingId !== a.id && (
+                    {a.type !== 'approval' && canEdit && reschedulingId !== a.id && (
                       <div className="flex items-center gap-4 mt-2 ml-8">
                         <button onClick={() => handleMarkDone(a)} className="text-xs font-medium text-indigo-600 dark:text-[#a5b4fc] hover:underline">
                           ✓ {t('activityChatter.markDone')}
@@ -434,6 +507,17 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                         <div className="flex-1 min-w-0">
                           {a.type === 'log' ? (
                             <p className="text-sm italic text-gray-500 dark:text-[#9aa4b2]">{renderLogTitle(a.title, t)}</p>
+                          ) : a.type === 'approval' ? (
+                            <div>
+                              <p className="text-sm font-semibold text-gray-800 dark:text-[#e8ebf0]">
+                                {t('activityChatter.approvalRequest')} · {parseApprovalTitle(a.title).code}
+                              </p>
+                              {a.outcome_notes && (
+                                <p className={`text-xs mt-0.5 font-medium ${a.outcome_notes.startsWith('Approved') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                  {a.outcome_notes}
+                                </p>
+                              )}
+                            </div>
                           ) : (
                             <p className="text-sm text-gray-800 dark:text-[#e8ebf0] whitespace-pre-wrap">{a.title}</p>
                           )}

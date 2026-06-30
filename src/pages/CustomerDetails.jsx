@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, storage, branding as brandingAPI } from '../api/supabaseClient'
 import QRCode from 'qrcode'
@@ -22,6 +23,7 @@ export default function CustomerDetails({
 }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const { data: customerPageData, isLoading: loading } = useQuery({
     queryKey: ['customer-details', customerId],
     queryFn: async () => {
@@ -41,12 +43,33 @@ export default function CustomerDetails({
     enabled: !!customerId,
   })
 
+  const { data: contacts = [] } = useQuery({
+    queryKey: ['contacts', customerId],
+    queryFn: () => db.contacts.list(customerId),
+    staleTime: 60_000,
+    enabled: !!customerId,
+  })
+
+  const { data: customerDeals = [] } = useQuery({
+    queryKey: ['customer-deals', customerId],
+    queryFn: () => db.deals.listForCustomer(customerId),
+    staleTime: 60_000,
+    enabled: !!customerId,
+  })
+
   const customer = customerPageData?.customerData ?? null
   const tickets = customerPageData?.ticketsData ?? []
   const [notes, setNotes] = useState([])
   const [activeTab, setActiveTab] = useURLTab('tab', 'profile')
   const [isEditing, setIsEditing] = useState(false)
   const [editForm, setEditForm] = useState({})
+
+  const { data: ledger = [] } = useQuery({
+    queryKey: ['customer-ledger', customerId],
+    queryFn: () => db.customerLedger.list(customerId),
+    staleTime: 30_000,
+    enabled: !!customerId && activeTab === 'billing',
+  })
   const [pendingFiles, setPendingFiles] = useState([])
   const [newNote, setNewNote] = useState('')
   const [editingNote, setEditingNote] = useState(null)
@@ -55,6 +78,12 @@ export default function CustomerDetails({
   const [drawerTicket, setDrawerTicket] = useState(null)   // ticket shown in the RMA detail drawer
   const [drawerComments, setDrawerComments] = useState([])
   const [drawerCommentsLoading, setDrawerCommentsLoading] = useState(false)
+
+  const EMPTY_CONTACT_FORM = { full_name: '', title: '', phone: '', email: '', is_primary: false, notes: '' }
+  const [contactForm, setContactForm] = useState(EMPTY_CONTACT_FORM)
+  const [editingContact, setEditingContact] = useState(null)
+  const [showContactForm, setShowContactForm] = useState(false)
+  const [savingContact, setSavingContact] = useState(false)
 
   const openTicketDrawer = async (ticket) => {
     setDrawerTicket(ticket)
@@ -135,6 +164,7 @@ export default function CustomerDetails({
         address: editForm.address || null,
         cr_number: editForm.cr_number || null,
         tax_id: editForm.tax_id || null,
+        credit_limit: editForm.credit_limit === '' || editForm.credit_limit == null ? null : Number(editForm.credit_limit),
         notes: editForm.notes || null,
         attachments: allAttachments,
         updated_by: currentUserEmail,
@@ -249,6 +279,43 @@ export default function CustomerDetails({
           .catch((err) => captureException(err))
       } catch {
         toast.error(t('customerDetails.errorDeleteNote'))
+      }
+    })
+  }
+
+  const handleSaveContact = async () => {
+    if (!contactForm.full_name.trim()) {
+      toast.error(t('customerDetails.contactNameRequired'))
+      return
+    }
+    setSavingContact(true)
+    try {
+      if (editingContact) {
+        await db.contacts.update(editingContact, contactForm)
+      } else {
+        await db.contacts.create({ ...contactForm, customer_id: customerId, created_by: currentUserEmail })
+      }
+      queryClient.invalidateQueries({ queryKey: ['contacts', customerId] })
+      setContactForm(EMPTY_CONTACT_FORM)
+      setEditingContact(null)
+      setShowContactForm(false)
+      toast.success(editingContact ? t('customerDetails.contactUpdated') : t('customerDetails.contactAdded'))
+    } catch (err) {
+      toast.error(t('customerDetails.errorSaveContact', { error: err.message }))
+    } finally {
+      setSavingContact(false)
+    }
+  }
+
+  const handleDeleteContact = (contactId) => {
+    openConfirm(t('customerDetails.deleteContactTitle'), t('customerDetails.deleteContactMsg'), async () => {
+      closeConfirm()
+      try {
+        await db.contacts.delete(contactId)
+        queryClient.invalidateQueries({ queryKey: ['contacts', customerId] })
+        toast.success(t('customerDetails.contactDeleted'))
+      } catch {
+        toast.error(t('customerDetails.errorDeleteContact'))
       }
     })
   }
@@ -477,9 +544,12 @@ export default function CustomerDetails({
         <div className="border-b border-gray-200">
           <nav className="flex gap-4 sm:gap-6 px-6">
             {[
-              { key: 'profile', label: t('customerDetails.tabProfile'), icon: '👤' },
-              { key: 'rma', label: t('customerDetails.tabRMAHistory', { count: tickets.length }), icon: '🎫' },
-              { key: 'notes', label: t('customerDetails.tabNotes', { count: notes.length }), icon: '📝' },
+              { key: 'profile',  label: t('customerDetails.tabProfile'), icon: '👤' },
+              { key: 'contacts', label: t('customerDetails.tabContacts', { count: contacts.length }), icon: '👥' },
+              { key: 'deals',    label: t('customerDetails.tabDeals', { count: customerDeals.length }), icon: '💼' },
+              { key: 'billing',  label: t('customerDetails.tabBilling'), icon: '💳' },
+              { key: 'rma',      label: t('customerDetails.tabRMAHistory', { count: tickets.length }), icon: '🎫' },
+              { key: 'notes',    label: t('customerDetails.tabNotes', { count: notes.length }), icon: '📝' },
               { key: 'activity', label: t('customerDetails.tabActivity'), icon: '📋' },
             ].map((tab) => (
               <button
@@ -663,6 +733,27 @@ export default function CustomerDetails({
                     />
                   </div>
 
+                  {/* Billing */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
+                      {t('customerDetails.sectionBilling')}
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className={labelClass}>{t('customerDetails.creditLimit')}</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          value={editForm.credit_limit ?? ''}
+                          onChange={(e) => setEditForm({ ...editForm, credit_limit: e.target.value })}
+                          placeholder={t('customerDetails.creditLimitPlaceholder')}
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Notes */}
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
@@ -785,6 +876,21 @@ export default function CustomerDetails({
                         <p className="text-gray-500 text-sm">{t('customerDetails.noAddress')}</p>
                       )}
                     </div>
+
+                    {customer.credit_limit != null && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                          {t('customerDetails.sectionBilling')}
+                        </h3>
+                        <div className="space-y-3">
+                          <DetailRow
+                            icon="💳"
+                            label={t('customerDetails.creditLimit')}
+                            value={Number(customer.credit_limit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     {customer.notes && (
                       <div>
@@ -1020,6 +1126,283 @@ export default function CustomerDetails({
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ==================== CONTACTS TAB ==================== */}
+          {activeTab === 'contacts' && (
+            <div className="space-y-4">
+              {/* Toolbar */}
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-500">{t('customerDetails.contactsHint')}</p>
+                {canDo('edit') && !showContactForm && (
+                  <button
+                    onClick={() => { setContactForm(EMPTY_CONTACT_FORM); setEditingContact(null); setShowContactForm(true) }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    {t('customerDetails.addContact')}
+                  </button>
+                )}
+              </div>
+
+              {/* Add / Edit form */}
+              {showContactForm && (
+                <div className="bg-gray-50 dark:bg-[#0f1520] border border-gray-200 dark:border-[#212a38] rounded-xl p-5 space-y-4">
+                  <h3 className="font-semibold text-gray-900 dark:text-[#e8ebf0]">
+                    {editingContact ? t('customerDetails.editContact') : t('customerDetails.addContact')}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('customerDetails.colContactName')} *</label>
+                      <input type="text" value={contactForm.full_name}
+                        onChange={(e) => setContactForm({ ...contactForm, full_name: e.target.value })}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-[#212a38] rounded-lg bg-white dark:bg-[#121823] text-gray-900 dark:text-[#e8ebf0] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('customerDetails.colTitle')}</label>
+                      <input type="text" value={contactForm.title || ''}
+                        onChange={(e) => setContactForm({ ...contactForm, title: e.target.value })}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-[#212a38] rounded-lg bg-white dark:bg-[#121823] text-gray-900 dark:text-[#e8ebf0] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('common.phone')}</label>
+                      <input type="tel" value={contactForm.phone || ''}
+                        onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-[#212a38] rounded-lg bg-white dark:bg-[#121823] text-gray-900 dark:text-[#e8ebf0] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('common.email')}</label>
+                      <input type="email" value={contactForm.email || ''}
+                        onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-[#212a38] rounded-lg bg-white dark:bg-[#121823] text-gray-900 dark:text-[#e8ebf0] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('common.notes')}</label>
+                    <textarea rows={2} value={contactForm.notes || ''}
+                      onChange={(e) => setContactForm({ ...contactForm, notes: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-[#212a38] rounded-lg bg-white dark:bg-[#121823] text-gray-900 dark:text-[#e8ebf0] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none" />
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" checked={contactForm.is_primary}
+                      onChange={(e) => setContactForm({ ...contactForm, is_primary: e.target.checked })}
+                      className="w-4 h-4 rounded text-indigo-600 border-gray-300 focus:ring-indigo-500" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-[#9aa4b2]">{t('customerDetails.setPrimary')}</span>
+                  </label>
+                  <div className="flex gap-2 justify-end pt-1">
+                    <button onClick={() => { setShowContactForm(false); setEditingContact(null); setContactForm(EMPTY_CONTACT_FORM) }}
+                      className="px-4 py-2 text-sm border border-gray-300 dark:border-[#212a38] text-gray-700 dark:text-[#9aa4b2] rounded-lg hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors">
+                      {t('common.cancel')}
+                    </button>
+                    <button onClick={handleSaveContact} disabled={savingContact}
+                      className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 transition-colors">
+                      {savingContact && <Spinner size="sm" color="white" />}
+                      {t('common.save')}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Contacts table */}
+              {contacts.length === 0 && !showContactForm ? (
+                <div className="text-center py-12 text-gray-500">
+                  <svg className="mx-auto w-10 h-10 mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <p className="font-medium">{t('customerDetails.noContacts')}</p>
+                  <p className="text-sm mt-1">{t('customerDetails.noContactsHint')}</p>
+                </div>
+              ) : contacts.length > 0 && (
+                <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-[#212a38]">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-[#0f1520] border-b border-gray-200 dark:border-[#212a38]">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colContactName')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colTitle')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('common.phone')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('common.email')}</th>
+                        {canDo('edit') && <th className="px-4 py-3" />}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-[#1a2230]">
+                      {contacts.map((c) => (
+                        <tr key={c.id} className="bg-white dark:bg-[#121823] hover:bg-gray-50 dark:hover:bg-[#0f1520] transition-colors">
+                          <td className="px-4 py-3 font-medium text-gray-900 dark:text-[#e8ebf0]">
+                            <div className="flex items-center gap-2">
+                              {c.full_name}
+                              {c.is_primary && (
+                                <span className="px-1.5 py-0.5 text-xs font-semibold rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-[#a5b4fc]">
+                                  {t('customerDetails.primaryBadge')}
+                                </span>
+                              )}
+                            </div>
+                            {c.notes && <p className="text-xs text-gray-400 dark:text-[#4a5568] mt-0.5 truncate max-w-[180px]">{c.notes}</p>}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{c.title || '—'}</td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{c.phone || '—'}</td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{c.email || '—'}</td>
+                          {canDo('edit') && (
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2 justify-end">
+                                <button onClick={() => { setContactForm({ full_name: c.full_name, title: c.title || '', phone: c.phone || '', email: c.email || '', is_primary: c.is_primary, notes: c.notes || '' }); setEditingContact(c.id); setShowContactForm(true) }}
+                                  className="text-xs text-indigo-600 dark:text-[#a5b4fc] hover:underline font-medium">
+                                  {t('common.edit')}
+                                </button>
+                                <button onClick={() => handleDeleteContact(c.id)}
+                                  className="text-xs text-red-500 hover:underline font-medium">
+                                  {t('common.delete')}
+                                </button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ==================== DEALS TAB ==================== */}
+          {activeTab === 'deals' && (
+            <div>
+              {customerDeals.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <svg className="mx-auto w-10 h-10 mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p className="font-medium">{t('customerDetails.noDeals')}</p>
+                  <p className="text-sm mt-1">{t('customerDetails.noDealsHint')}</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-[#212a38]">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-[#0f1520] border-b border-gray-200 dark:border-[#212a38]">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colDealTitle')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colDealStage')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colDealValue')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colDealRep')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('common.status')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colDealDate')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-[#1a2230]">
+                      {customerDeals.map((deal) => {
+                        const statusColor = deal.status === 'won' ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'
+                          : deal.status === 'lost' ? 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'
+                          : 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-[#a5b4fc]'
+                        return (
+                          <tr key={deal.id}
+                            className="bg-white dark:bg-[#121823] hover:bg-indigo-50 dark:hover:bg-[#0f1520] cursor-pointer transition-colors"
+                            onClick={() => navigate(`/pipeline/${deal.id}`)}>
+                            <td className="px-4 py-3">
+                              <div className="font-medium text-gray-900 dark:text-[#e8ebf0]">{deal.title}</div>
+                              {deal.deal_code && <div className="text-xs font-mono text-gray-400 dark:text-[#4a5568]">{deal.deal_code}</div>}
+                            </td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{deal.stage || '—'}</td>
+                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-[#e8ebf0]">
+                              {deal.value != null ? `$${Number(deal.value).toLocaleString()}` : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] truncate max-w-[140px]">{deal.assigned_rep || '—'}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor}`}>
+                                {t(`pipeline.${deal.status}`)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2]">{formatDate(deal.created_at)}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ==================== BILLING TAB ==================== */}
+          {activeTab === 'billing' && (
+            <div className="space-y-4">
+              {(() => {
+                const balance = ledger.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
+                const overLimit = customer?.credit_limit != null && balance > Number(customer.credit_limit)
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="bg-gray-50 dark:bg-[#0f1520] rounded-xl border border-gray-200 dark:border-[#212a38] p-4">
+                      <div className="text-xs uppercase text-gray-500 dark:text-[#9aa4b2] mb-1">{t('customerDetails.outstandingBalance')}</div>
+                      <div className="text-xl font-bold text-gray-900 dark:text-[#e8ebf0]">
+                        {balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                    {customer?.credit_limit != null && (
+                      <div className={`rounded-xl border p-4 ${overLimit ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-gray-50 dark:bg-[#0f1520] border-gray-200 dark:border-[#212a38]'}`}>
+                        <div className={`text-xs uppercase mb-1 ${overLimit ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-[#9aa4b2]'}`}>{t('customerDetails.creditLimit')}</div>
+                        <div className={`text-xl font-bold ${overLimit ? 'text-red-700 dark:text-red-400' : 'text-gray-900 dark:text-[#e8ebf0]'}`}>
+                          {Number(customer.credit_limit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        {overLimit && (
+                          <div className="text-xs text-red-600 dark:text-red-400 mt-1">{t('customerDetails.overCreditLimit')}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {ledger.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <svg className="mx-auto w-10 h-10 mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                  </svg>
+                  <p className="font-medium">{t('customerDetails.noLedgerEntries')}</p>
+                  <p className="text-sm mt-1">{t('customerDetails.noLedgerEntriesHint')}</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-[#212a38]">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-[#0f1520] border-b border-gray-200 dark:border-[#212a38]">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerDate')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerType')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerCode')}</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerAmount')}</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerBalance')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-[#1a2230]">
+                      {(() => {
+                        let running = 0
+                        return ledger.map((entry) => {
+                          running += Number(entry.amount) || 0
+                          const TYPE_LABEL_KEY = {
+                            invoice: 'customerDetails.ledgerTypeInvoice',
+                            credit_note: 'customerDetails.ledgerTypeCreditNote',
+                            payment: 'customerDetails.ledgerTypePayment',
+                          }
+                          return (
+                            <tr key={entry.id} className="bg-white dark:bg-[#121823]">
+                              <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2]">{formatDate(entry.entry_date)}</td>
+                              <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{t(TYPE_LABEL_KEY[entry.entry_type] ?? entry.entry_type)}</td>
+                              <td className="px-4 py-3 font-mono text-xs text-gray-900 dark:text-[#e8ebf0]">{entry.entry_code || '—'}</td>
+                              <td className={`px-4 py-3 text-right font-medium ${entry.amount >= 0 ? 'text-gray-900 dark:text-[#e8ebf0]' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                {entry.amount >= 0 ? '+' : ''}{Number(entry.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                              <td className="px-4 py-3 text-right text-gray-500 dark:text-[#9aa4b2]">
+                                {running.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                            </tr>
+                          )
+                        })
+                      })()}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>

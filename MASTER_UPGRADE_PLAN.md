@@ -1,21 +1,45 @@
-# myRMA — Master Upgrade Plan
+# myRMA → QDS CRM — Master Build Plan
 
-**Branch**: `002-crm-upgrade` | **Date**: 2026-06-22 | **Supersedes**: `CRM_UPGRADE_PLAN.md`, `SYSTEM_UPGRADE_PLAN.md` (both archived to `docs/archive/`)
+**Branch**: `002-crm-upgrade` | **Last updated**: 2026-07-XX | **Supersedes**: `CRM_UPGRADE_PLAN.md`, `SYSTEM_UPGRADE_PLAN.md` (both archived to `docs/archive/`)
 
-**Input**: `specs/002-crm-upgrade/spec.md` (CRM track, formal SpecKit feature) + `docs/archive/CRM_UPGRADE_STUDY.md` (CRM source study) + live Odoo 19 Community source at `D:\odoo-19.0` read as a benchmark for the System track (LGPLv3 — patterns studied, never copied)
+**This is the single file to follow going forward.** Check items off as you go — this file is the persistent build state across sessions.
 
-**This is the single file to follow going forward.** Two parallel tracks, one document, one workflow. Check items off as you go — this file is the persistent state of the build across sessions.
+---
+
+## System Pivot — CRM First
+
+**As of this update, the system is no longer an "RMA system with CRM features." It is now a full CRM platform where the RMA Tickets module is one component (the Service module) among several.**
+
+The product is now: **QDS CRM** — a purpose-built CRM for QDS covering the full customer lifecycle:
+- **Sales**: Leads → Deals → Quotations → Sales Orders → Invoices
+- **Service**: RMA Tickets (existing module, kept intact, becomes the "Service" module)
+- **Accounting**: Customer payments, balances, financial statements (Sprint 7)
+- **Inventory**: Products stock, RMA units, sub-warehouses, auto-adjustment (Sprint 8)
+- **CRM Core**: Contacts, Activities, Pipeline, Reports (Sprints 1–5, largely complete)
+
+**What does NOT change:**
+- All existing code conventions, design tokens, i18n law, Constitution (`CONSTITUTION.md`)
+- The RMA Tickets module — kept, unchanged, renamed "Service" in UI labels only
+- All CRM data built in Sprints 1–5 (leads, deals, pipelines, activities, contacts)
+
+**What changes from here:**
+- New modules (Sales Documents, Accounting, Inventory redesign) are the primary build priority
+- Track B "nice to have" system upgrades are deprioritised below new modules
+- Core `CLAUDE.md` and `DESIGN.md` will be updated progressively as modules ship
 
 ---
 
 ## Summary
 
-myRMA is being upgraded along two tracks simultaneously:
+This plan tracks the full build of QDS CRM across three areas:
 
-- **Track A — CRM**: turns myRMA into a CRM-capable system (leads, deals, pipeline, activities, sales_rep role) per `docs/archive/CRM_UPGRADE_STUDY.md`. Formal SpecKit artifacts for Sprint 1 live in `specs/002-crm-upgrade/` (`spec.md`, `research.md`, `data-model.md`, `contracts/api-modules.md`, `quickstart.md`) — this file is the sprint-by-sprint build tracker that sits above those, same role `CRM_UPGRADE_PLAN.md` played before this merge (now archived).
-- **Track B — System**: upgrades myRMA's existing modules (RMA Tickets, Inventory, Parts, Products, Customers, Invoices, Automation, Webhooks, SLA, Custom Fields, Audit Log) using Odoo as a benchmark, not a blueprint. Every recommendation augments what exists; none propose replacing a working module. Where myRMA's current design already suits a repair-shop SaaS better than Odoo's generic-ERP approach, that's stated explicitly — "no change" is a valid, common conclusion in this track.
+- **Track A — CRM Core** *(Sprints 1–5, largely done)*: leads, deals, pipeline, activities, contacts, sales_rep role, dashboard widgets, customer tabs. Formal SpecKit artifacts in `specs/002-crm-upgrade/`.
+- **Track A — Sales Documents** *(Sprint 6, ✅ COMPLETE 2026-06-30)*: the complete sales funnel — Quotations (linked from deal product lines or standalone), Sales Orders, Invoices, Credit Notes — at `/sales` (route name differs from the original `/invoices` plan, kept distinct from the legacy `Invoices.jsx` RMA-service-invoice page).
+- **Track A — Accounting v1** *(Sprint 7, ✅ COMPLETE 2026-06-30)*: customer payment ledger, AR aging, customer statement, soft credit limits — at `/accounting`. Deliberately not a full GL/ERP; see Sprint 7 section for exact scope and what was deferred.
+- **Track A — Inventory Redesign** *(Sprint 8, future)*: new inventory page replacing the current one; auto-adjusts from sales orders, invoices, credit notes.
+- **Track B — System Upgrades**: bug fixes and quality improvements to existing modules (RMA Tickets, Products, Parts, SLA, Webhooks). Deprioritised below Track A new modules; tackled between sprints.
 
-Both tracks share the same engineering constitution (`CONSTITUTION.md`), the same workflow discipline (below), and the same file. They are tracked together because they touch overlapping ground (e.g. the `activities` chatter built for Track A's leads is the same engine Track B's "finish Custom Fields" and "Customer notes vs activities" items reference).
+All tracks share `CONSTITUTION.md`, the same workflow discipline (below), and this file.
 
 ---
 
@@ -180,6 +204,7 @@ Found while starting to build the Leads page: `assigned_rep` on `leads`/`deals`/
 - [x] Zod schemas still validated `assigned_rep`/etc as `.uuid()` after the DB columns moved to text — fixed to `z.union([z.string().email(), z.literal('')])`
 - [x] Row action menu opened with a scrollbar instead of floating — `overflow-x-auto` on the table wrapper implicitly forces `overflow-y: auto` too (CSS overflow spec); fixed by portal-rendering the menu via `createPortal(..., document.body)` with `position: fixed`
 - [x] Convert-to-deal failed on `customers.customer_code NOT NULL` — `crm_convert_lead()` never set it; fixed via `20260630_crm_convert_lead_customer_code.sql`, generating the same `CB-########` format the UI uses elsewhere
+- [x] `ConvertLeadModal` bug in `LeadDetails.jsx` — two bugs: (1) `handleOpenConvert` only set `title`, leaving `pipeline_id: ''` → validation always fired "Deal title and pipeline are required"; (2) modal was called with `pipelines={pipelines}` but component signature expects `stages` prop (defaulted to `[]`, hiding the stage selector entirely). Fixed: `handleOpenConvert` now mirrors `Leads/index.jsx` logic (auto-sets `pipeline_id` + `stage_id` from `pipelines[0]`); call site now passes computed `stages` array. Also added `stage_id: ''` to `EMPTY_CONVERT_FORM` in `_constants.js`.
 
 **User-requested additions, built Sprint 2 → folded into Sprint 2.5**:
 - [x] Lead comments — initially a `LeadDrawer.jsx` modal reusing `activities` (`type:'note'`, `related_type:'lead'`) — **superseded by Sprint 2.5's full chatter**, logic carried forward
@@ -484,13 +509,17 @@ bg-indigo-50 dark:bg-indigo-900/20 border border-[#4338ca]/20 dark:border-[#a5b4
 
 **Goal**: Reps never miss a follow-up. (Note: the core activity engine — log/schedule/complete/reopen/reschedule, planned vs. history — already exists from Sprint 2.5. This sprint is the system-wide surface for it, not new plumbing.)
 
-- [ ] `src/pages/Activities/index.jsx` — "Today", "Overdue", "All" tabs
-- [ ] Activity quick-log panel on deal detail page (lead detail already has it via `LeadChatter`)
-- [ ] Overdue follow-ups count badge in sidebar
-- [ ] Dashboard widget: "Overdue Follow-Ups" count card
-- [ ] `src/lib/events/crmEventHandlers.ts` — `registerCrmEventHandlers()` alongside `registerTicketEventHandlers()`
-- [ ] WhatsApp template `crm_followup_due` — morning digest, toggleable per-type in `WASettings.jsx`
+- [x] `src/pages/Activities/index.jsx` — full page redesign (2026-06-28): 4-tab layout (All Activities default → Today → Overdue → Activity Logs); table list view with 7 sortable columns: Source badge (Lead/Deal, extensible), User (assigned_rep), Customer (resolved + clickable → `/customers/:id` for deals, `/leads/:id` for leads), Details (type icon + title), Due Date / Completed (dynamic header per tab, overdue red / today amber), Actions (Mark Done / Reschedule inline / Cancel; Reopen on Logs tab); search bar matches Leads/Pipeline design (`shadow-sm`, `max-w-md`, `w-5 h-5` icon, indigo named colors); collapsible filter panel (Type / Assignee / Source); indigo bulk action bar (bulk Mark Done + bulk Cancel); canonical pagination (`activitiesPerPage` safeStorage key); sort config persisted (`activitiesSortConfig`); all strings in `en.json` + `ar.json`.
+- [x] `src/api/db/activities.ts` — `listCompleted()` added: queries `completed_at IS NOT NULL`, non-log type, ordered newest-first; used by the Activity Logs tab.
+- [x] Overdue follow-ups count badge in sidebar — `listOverdue()` in `activities.ts`; `overdueActivityCount` query in `App.jsx`; `badge` property on the Activities nav item (already live)
+- [x] Dashboard widget: "Overdue Follow-Ups" count card — `overdue_followups` in `WIDGET_CATALOG`; list card with day-count badges; green "all clear" empty state; clickable → `/activities?tab=overdue` (already live)
+- [ ] `src/lib/events/crmEventHandlers.ts` — `registerCrmEventHandlers()` alongside `registerTicketEventHandlers()` (postponed)
+- [ ] WhatsApp template `crm_followup_due` — morning digest, toggleable per-type in `WASettings.jsx` (postponed)
 - [ ] All strings in `en.json` + `ar.json`
+
+**Post-build additions (2026-06-28)**:
+
+- [x] Pagination added to `Leads/index.jsx` (safeStorage key `leadsPerPage`) and `Pipeline/PipelineListView.jsx` (safeStorage key `pipelineListPerPage`) — matches canonical pattern in `DESIGN.md`; select-all scoped to current page with cross-page Set merge/delete.
 
 ---
 
@@ -498,16 +527,377 @@ bg-indigo-50 dark:bg-indigo-900/20 border border-[#4338ca]/20 dark:border-[#a5b4
 
 **Goal**: Management visibility. System usable end-to-end.
 
-- [ ] `Dashboard.jsx`: sales KPI section — open pipeline value, deals won this month, leads created this month, overdue follow-ups
-- [ ] `Dashboard.jsx`: "Pipeline by Stage" bar chart (Recharts)
-- [ ] `Dashboard.jsx`: Rep Leaderboard card (top 5 by deals won this month)
-- [ ] `CustomerDetails.jsx`: Contacts tab (list/add/edit/delete) — **can be built alongside Track B's "Invoices tab" item**, same page, same sprint
-- [ ] `CustomerDetails.jsx`: Deals tab (open/won deals for this account)
-- [ ] `Reports.jsx`: CRM section — deals by stage, win/loss rate, leads by source, rep performance
-- [ ] `ControlPanel.jsx`: Pipeline Config sub-page (admin edits stage names)
+- [x] `Dashboard.jsx`: sales KPI section — 4 hero tiles (`crm_kpi` widget): open pipeline value (fmtCurrency), deals won this month, new leads this month, overdue follow-ups count
+- [x] `Dashboard.jsx`: "Pipeline by Stage" horizontal bar chart (`pipeline_by_stage` widget) — open deals grouped by stage, count + value label, normalized bar width
+- [x] `Dashboard.jsx`: Rep Leaderboard card (`rep_leaderboard` widget) — top 5 reps by deals won this month; gold/silver/bronze rank circles; won count + value per row
+- [x] `CustomerDetails.jsx`: Contacts tab — list/add/edit/delete; inline form; Primary badge; `db.contacts.list/create/update/delete`; tab label shows count
+- [x] `CustomerDetails.jsx`: Deals tab — table of all deals for the account; status badge (Open/Won/Lost); row click navigates to `/pipeline/:id`; `db.deals.listForCustomer()` added to `deals.ts`
+- [ ] Reports CRM section — **POSTPONED** to Sprint 7 (new Accounting/Reports engine will be built from scratch)
+- [ ] Pipeline Config in ControlPanel — **POSTPONED** (not yet prioritised)
 - [ ] QA: full end-to-end test with a `sales_rep` account and a manager account
 - [ ] `npm test`, `npm run lint`, `npm run build` all pass
 - [ ] Deploy to staging; get feedback from QDS team before production push
+
+---
+
+## Postponed Items — Deprioritised Below Sprint 6
+
+The following items were planned or in-progress but are formally deprioritised until the Sales Documents module (Sprint 6) is complete. They are NOT deleted — check them off when they are eventually built.
+
+**Track A — Open Sprint 5 items (carry forward):**
+- [ ] QA: full end-to-end test with a `sales_rep` account and a manager account
+- [ ] `npm test`, `npm run lint`, `npm run build` all pass on the CRM modules
+- [ ] Deploy to staging; QDS team feedback before production push
+- [ ] Reports CRM section — deferred to Sprint 7's new accounting+reports engine
+- [ ] Pipeline Config in ControlPanel — deferred until user requests it
+
+**Track A — Deferred feature work:**
+- [ ] `src/lib/events/crmEventHandlers.ts` — CRM WhatsApp event handlers (Sprint 4)
+- [ ] WhatsApp template `crm_followup_due` — morning digest (Sprint 4)
+- [ ] Sprint 2.5 Phase F — lead followers, @mentions, follower table (after Sprint 6)
+
+**Track B — All "Do now" and "Do next" items** remain as listed in Track B → Section B2. They are deprioritised below Sprint 6/7/8 but the list stands unchanged.
+
+---
+
+## Sprint 6 — Sales Documents (Quotation → Sales Order → Invoice → Credit Note) ✅ COMPLETE 2026-06-30
+
+**Goal**: The complete sales funnel, from initial quotation inside a deal through to a paid invoice with credit note support. Replaces the current stub `/invoices` page with a unified Invoicing module.
+
+**Status note**: built across several sessions; this plan's detailed spec below is the original design and matches the shipped implementation closely, with these deviations:
+
+- Route is `/sales` (+ `/sales/:type/:id` detail), not `/invoices` — the legacy `Invoices.jsx` (RMA service invoices, unrelated table) still owns `/invoices`, so reusing that path wasn't viable.
+- Sales Order status model is richer than originally planned: `draft → sent → accepted → declined → confirmed → delivered → cancelled` (adds `sent`/`accepted`/`declined` so SOs run the same manager-approval workflow as Quotations and Invoices — see the Activities "approval pool" pattern in `CLAUDE.md`). Approving an SO now lands it directly in `delivered` with inventory reserved in one step — no separate "Confirm Order"/"Mark Delivered" clicks (a 2026-06-30 round-2 fix).
+- A 14-item bug-fix pass on 2026-06-30 (post-ship QA) covered Activities search/columns, the Leads Converted tab, a Deal-activity due-date bug, the SO/Invoice approval-gate work above, a standalone Credit Note creation flow (not only invoice-bound), Credit Note ↔ invoice application as a payment, Credit Note ↔ RMA ticket auto-close, and the `OPP-` deal-code prefix (renamed from a colliding `QT-`). Full test checklist is in the "Sales Funnel Test Checklist" section near the end of this document.
+
+> ⚠️ **Architecture Lock required before build starts.** Three decisions below (marked `[CONFIRM]`) must be confirmed by the user before any migration or code is written. They are each one-time choices with no cheap rollback.
+
+### Document lifecycle
+
+```
+Lead → Deal ──► [Quotation on Deal] ──► Sales Order ──► Invoice
+                       ↑                     ↑               ↑
+            (Invoicing tab / standalone) (Invoicing tab) (Invoicing tab)
+                                                             ↓
+                                                       Credit Note
+```
+
+- A **Quotation** can be created from inside a Deal, or standalone from the Invoicing tab
+- A **Sales Order** can be created by converting a Quotation, or standalone from the Invoicing tab
+- An **Invoice** can be created by converting a Sales Order, or standalone from the Invoicing tab
+- A **Credit Note** is always linked to a source Invoice (for RMA returns, rebates, discounts, or corrections)
+
+### Architecture Lock Decisions — ✅ ALL CONFIRMED 2026-06-28
+
+**[✅ CONFIRMED-6A] Separate tables**
+Four separate tables (`quotations`, `sales_orders`, `crm_invoices`, `credit_notes`) instead of one unified table with a `doc_type` discriminator. Reason: each document has different columns (quotation has `validity_until`; invoice has `due_date`, `paid_at`, `void_reason`; credit note has `type`, `source_invoice_id`, `affects_inventory`), different status CHECK constraints, and different RLS write rules. The "All Documents" Invoicing tab uses a `v_sales_documents` Postgres VIEW that UNIONs the four tables.
+
+**[✅ CONFIRMED-6B] Quotation as its own table (not embedded on the deal)**
+The deal's current `product_lines` JSONB evolves into a separate `quotations` table with a nullable `deal_id` FK. When a quotation is created from a Deal, a `quotations` row is inserted and linked (`deal_id = deal.id`). The Deal Detail page's "Product Lines" tab becomes the "Quotation" tab showing that row. Standalone quotations from the Invoicing tab have `deal_id = NULL`. This is required because quotations can be created independently of deals.
+
+**[✅ CONFIRMED-6C] Independent code per document type — prefix-rename scheme DROPPED**
+The original plan (QT-12345678 → SO-12345678 → INV-12345678 with a shared base number) is dropped. Research across Odoo, Zoho, QuickBooks, and EU VAT law confirms: (1) one quotation can generate multiple sales orders (partial acceptance); one SO can be invoiced in multiple invoices; sharing a base number breaks immediately in these cases; (2) an invoice's sequential number must be unique within its series — a shared base violates the auditability requirement. Use independent codes per type:
+
+| Document | Code format | Counter type | Assigned when |
+|---|---|---|---|
+| Quotation | `QT-XXXXXXXX` (8 random digits) | Random, server-side RPC | On row create |
+| Sales Order | `SO-XXXXXXXX` (8 random digits) | Random, server-side RPC | On row create |
+| Invoice | `INV-YYYY-NNNNN` (year + 5-digit sequential) | Sequential, gapless, locked | On `post()` transition only — never on draft create |
+| Credit Note | `CN-YYYY-NNNNN` (year + 5-digit sequential) | Sequential, gapless, locked | On `issue()` transition only — never on draft create |
+
+Traceability between documents comes from FK columns (`sales_orders.quotation_id`, `crm_invoices.so_id`, `credit_notes.invoice_id`) and a visible "Created from QT-XXXXXXXX" reference on each document. A `document_sequences` table (or Postgres sequence wrapped in a locked RPC) provides the gapless counter for INV- and CN- codes; a rolled-back draft invoice never burns a number.
+
+### Status workflows (research-validated against Odoo/Zoho/QuickBooks/SAP B1)
+
+| Document | Statuses | Notes |
+|---|---|---|
+| Quotation | `draft` → `sent` → `accepted` \| `declined` \| `expired` \| `cancelled` | `expired` is set by a scheduled job on `validity_until` passing, never by the user. Only `accepted` unlocks "Convert to Sales Order". |
+| Sales Order | `draft` → `confirmed` → `delivered` \| `cancelled` | Lines lock on `confirmed`. Cancelling releases all inventory reservations. `reset_to_draft` allowed only if no downstream invoice exists. |
+| Invoice | `doc_status`: `draft` → `posted` → `cancelled` | Lines lock on `posted`. Never edit a posted invoice — correct via credit note only. |
+| Invoice | `payment_status`: `unpaid` → `partial` → `paid` \| `reversed` | **Separate field** from `doc_status`. Derived from sum of payments vs total — never manually set. |
+| Credit Note | `draft` → `issued` → `applied` \| `voided` | Sequential CN- number assigned on `issued` only. `applied` when `remaining_balance = 0`. |
+
+> **WHY TWO INVOICE STATUS FIELDS**: conflating document lifecycle (editability) with payment state (collections) into one column forces impossible combinations ("cancelled but paid"), breaks AR reporting, and makes partial payments unrepresentable. Odoo's `account.move` uses `state` + `payment_state` exactly this way — it is the single most important schema decision in this sprint.
+
+### Credit Note types (drives inventory behavior)
+
+| Type | Inventory effect | Use case |
+|---|---|---|
+| `rma_return` | ✅ Restores stock (per-line toggle) | Defective/wrong product returned via RMA ticket |
+| `rebate` | ❌ No stock effect | Volume rebate, loyalty credit |
+| `discount` | ❌ No stock effect | Post-invoice discount, goodwill concession |
+| `correction` | ❌ No stock effect | Billing error (wrong qty/price), duplicate charge |
+
+The `type` column is a first-class enum. It drives whether the Restock step appears in the UI and whether the `affects_inventory` flag is set. A `rebate` CN can never accidentally move stock.
+
+### Shared document layout (all 4 documents share this structure)
+
+**Header section**: Document number · Document date · Customer (DB-linked, required on SO/Invoice; required on Quotation too when linked to a deal; optional for standalone quotation draft) · Sales rep · Reference / Customer PO# · Type-specific date field (Quotation: `validity_until`; Sales Order: `delivery_date`; Invoice: `due_date`; Credit Note: `issued_date`) · Payment terms (SO, Invoice only)
+
+**Line items** (JSONB array — always array, never object, per CONSTITUTION rule):
+```
+Line # | Product (DB-linked; free-form name allowed on Quotation only — product_id nullable)
+       | Description | Qty | Unit Price | Discount % | Tax % | Line Subtotal
+```
+
+**Footer**: Subtotal · Total Discount · Total Tax · **Grand Total**
+
+**Key rules**:
+- `product_id` is **nullable** on Quotation lines (free-form / back-to-back orders allowed)
+- `product_id` is **NOT NULL** on Sales Order and Invoice lines — enforced at the Convert step. Any free-form Quotation line with no `product_id` **must be saved as a new product** in the catalog before the SO is created; the conversion step surfaces a "New product detected" confirmation modal with a pre-filled create-product form
+- `customer_id` is **NOT NULL** on Sales Orders and Invoices — enforced at the Convert step
+
+**Actions bar**: Preview PDF · Download PDF · Convert to next stage · Send · Cancel / Void
+
+### Inventory rules (two-stage model)
+
+| Stage | Action | On serialised units (`inventory_units`) | On parts (`parts`) |
+|---|---|---|---|
+| Quotation | Any | **No effect** | **No effect** |
+| Sales Order — `confirm()` | Reserve | Flip `reservation_status` to `'reserved'`, stamp `reserved_by_doc_id` via `SELECT … FOR UPDATE SKIP LOCKED` | `reserved_quantity += qty`, checked under row lock |
+| Sales Order — `cancel()` | Release reservation | Flip reserved units back to `'available'`, clear `reserved_by_doc_id` | `reserved_quantity -= qty` |
+| Invoice — `post()` | Deliver + release | Transition units to `'delivered'`; `reservation_status` clears | `quantity -= qty AND reserved_quantity -= qty` |
+| Invoice — direct (no SO) | Reserve + deliver atomically | Pick available units FOR UPDATE, move straight to `'delivered'` in one RPC | `quantity -= qty` with available check (no intermediate reservation) |
+| Credit Note (`rma_return`) — `issue()` | Restore stock | Return units to `'available'` (or `'active_rma'` if damaged) | `quantity += qty` |
+| Credit Note (rebate/discount/correction) — `issue()` | **No stock effect** | No inventory RPC called | No inventory RPC called |
+
+**Overselling guard**: `salesOrders.confirm()` and `crmInvoices.post()` (direct path) must check **available** (`on_hand − reserved`), never on-hand alone. If any line is short, abort the whole operation and return per-line shortfall detail to the UI for display.
+
+**Stock moves ledger** (`stock_moves` table): every reserve/deliver/release/restore writes an append-only row: `(ref_type, ref_id, doc_type, doc_id, move_type, qty, from_status, to_status, actor_email, created_at)`. This is the audit trail and the reconciliation source if counters drift.
+
+### Step 1 — Constants + Zod schemas
+
+- [ ] Add to `src/lib/constants.ts`:
+  - `QUOTATION_STATUS` (`draft | sent | accepted | declined | expired | cancelled`)
+  - `SALES_ORDER_STATUS` (`draft | confirmed | delivered | cancelled`)
+  - `INVOICE_DOC_STATUS` (`draft | posted | cancelled`)
+  - `INVOICE_PAYMENT_STATUS` (`unpaid | partial | paid | reversed`)
+  - `CREDIT_NOTE_STATUS` (`draft | issued | applied | voided`)
+  - `CREDIT_NOTE_TYPE` (`rma_return | rebate | discount | correction`)
+- [ ] Add Zod schemas to `src/lib/schemas.ts`:
+  - `quotationLineSchema` — `product_id` optional/nullable (free-form allowed)
+  - `salesOrderLineSchema` — `product_id` required (validated at convert step)
+  - `invoiceLineSchema` — same as SO
+  - `creditNoteLineSchema` — `product_id` optional, `restock: boolean`
+- [ ] Full `en.json` + `ar.json` for all new status labels
+
+### Step 2 — DB migrations (apply in order, each idempotent)
+
+- [ ] `20260XXX_document_sequences.sql` — `document_sequences(seq_type text PK, last_value int, year int)` with `nextval_for_type(seq_type text)` SECURITY DEFINER RPC that uses `SELECT ... FOR UPDATE` to guarantee gapless sequential numbers. Seed rows: `('invoice', 0, EXTRACT(YEAR FROM NOW()))`, `('credit_note', 0, EXTRACT(YEAR FROM NOW()))`. This is the locked counter for INV- and CN- codes.
+- [ ] `20260XXX_stock_moves.sql` — `stock_moves` append-only ledger table (see schema above). RLS: staff read own-related, manager+ read all, INSERT only via server-side RPCs (SECURITY DEFINER).
+- [ ] `20260XXX_quotations.sql` — `quotations` table: `id`, `qt_code text UNIQUE NOT NULL`, `deal_id uuid REFERENCES deals(id) ON DELETE SET NULL NULLABLE`, `customer_id uuid REFERENCES customers(id) NOT NULL`, `status` (CHECK constraint), `line_items jsonb NOT NULL DEFAULT '[]'`, `subtotal numeric`, `discount_amount numeric DEFAULT 0`, `tax_amount numeric DEFAULT 0`, `total numeric`, `validity_until date`, `payment_terms text`, `reference_po text`, `notes text`, `assigned_rep text` (email), `created_by text` (email), `created_at timestamptz`. RLS: sales_rep read own + deal's rep, manager+ all; write: manager+ or owner.
+- [ ] `20260XXX_sales_orders.sql` — `sales_orders` table: `id`, `so_code text UNIQUE NOT NULL`, `quotation_id uuid REFERENCES quotations(id) NULLABLE`, `customer_id uuid REFERENCES customers(id) NOT NULL`, `status` (CHECK), `line_items jsonb NOT NULL DEFAULT '[]'`, `subtotal numeric`, `discount_amount numeric DEFAULT 0`, `tax_amount numeric DEFAULT 0`, `total numeric`, `delivery_date date`, `payment_terms text`, `reference_po text`, `notes text`, `assigned_rep text`, `created_by text`, `created_at timestamptz`, `confirmed_at timestamptz`, `delivered_at timestamptz`. RLS: sales_rep read own, manager+ all; write: manager+.
+- [ ] `20260XXX_crm_invoices.sql` — `crm_invoices` table: `id`, `inv_code text UNIQUE` (NULL until posted — assigned by RPC), `so_id uuid REFERENCES sales_orders(id) NULLABLE`, `customer_id uuid REFERENCES customers(id) NOT NULL`, `doc_status text CHECK(... draft/posted/cancelled)`, `payment_status text CHECK(... unpaid/partial/paid/reversed) DEFAULT 'unpaid'`, `line_items jsonb NOT NULL DEFAULT '[]'`, `subtotal numeric`, `discount_amount numeric DEFAULT 0`, `tax_amount numeric DEFAULT 0`, `total numeric`, `amount_paid numeric DEFAULT 0`, `due_date date`, `payment_terms text`, `reference_po text`, `notes text`, `void_reason text`, `assigned_rep text`, `created_by text`, `created_at timestamptz`, `posted_at timestamptz`, `paid_at timestamptz`. RLS: sales_rep read own, manager+ all; write: manager+.
+- [ ] `20260XXX_credit_notes.sql` — `credit_notes` table: `id`, `cn_code text UNIQUE` (NULL until issued), `type text CHECK(... rma_return/rebate/discount/correction)`, `source_invoice_id uuid REFERENCES crm_invoices(id) NULLABLE`, `source_invoice_number text` (denormalized for PDF), `ticket_id uuid NULLABLE` (for `rma_return` type), `customer_id uuid REFERENCES customers(id) NOT NULL`, `status text CHECK(... draft/issued/applied/voided)`, `line_items jsonb NOT NULL DEFAULT '[]'`, `subtotal numeric`, `tax_amount numeric DEFAULT 0`, `total numeric`, `applied_amount numeric DEFAULT 0`, `remaining_balance numeric`, `reason text NOT NULL`, `affects_inventory boolean GENERATED ALWAYS AS (type = 'rma_return') STORED`, `restock_status text CHECK(... not_applicable/pending/restocked) DEFAULT 'not_applicable'`, `assigned_rep text`, `created_by text`, `created_at timestamptz`, `issued_at timestamptz`. RLS: sales_rep read, manager+ write.
+- [ ] `20260XXX_credit_note_applications.sql` — `credit_note_applications(id, credit_note_id FK, invoice_id FK, amount_applied numeric, applied_date timestamptz, applied_by text)`. Trigger updates `credit_notes.applied_amount` and flips `status` to `'applied'` when `remaining_balance` hits 0.
+- [ ] `20260XXX_inventory_reservation.sql` — adds to `inventory_units`: `reservation_status text CHECK('available','reserved','delivered') DEFAULT 'available'`, `reserved_by_doc_type text`, `reserved_by_doc_id uuid`, `reserved_at timestamptz`, `reserved_by_email text`. Adds to `parts`: `reserved_quantity integer NOT NULL DEFAULT 0 CHECK(reserved_quantity >= 0)`. Creates RPCs: `reserve_units(doc_type, doc_id, product_id, qty, actor_email)` and `release_units(doc_type, doc_id, actor_email)` and `deliver_units(doc_type, doc_id, actor_email)` and `restore_units(doc_type, doc_id, actor_email)` — all SECURITY DEFINER, all write to `stock_moves` ledger.
+- [ ] `20260XXX_sales_documents_view.sql` — `CREATE OR REPLACE VIEW v_sales_documents AS` SELECT from all four tables UNIONed with a `doc_type text` discriminator column — powers the "All" tab in the Invoicing page without duplicating queries.
+- [ ] All migrations: idempotent (`IF NOT EXISTS`, `DROP ... IF EXISTS`), named with correct date prefix.
+
+### Step 3 — API modules
+
+- [ ] `src/api/db/quotations.ts` — `QuotationRow` type; `list()`, `get()`, `create()` (generates QT- code via RPC, links `deal_id` if provided), `update()` (draft only), `markSent()`, `markAccepted()`, `markDeclined()`, `markExpired()`, `cancel()`, `convertToSalesOrder()` (creates SO row + validates/promotes free-form lines + returns the new SO id)
+- [ ] `src/api/db/salesOrders.ts` — `SalesOrderRow` type; `list()`, `get()`, `create()`, `update()` (draft only), `confirm()` (validates all `product_id` NOT NULL + runs `reserve_units` RPC per line), `markDelivered()` (runs `deliver_units` RPC), `cancel()` (runs `release_units` RPC), `convertToInvoice()` (creates Invoice row with `doc_status: 'draft'`, links `so_id`)
+- [ ] `src/api/db/crmInvoices.ts` — `CrmInvoiceRow` type; `list()`, `get()`, `create()` (draft, no inv_code yet), `update()` (draft only), `post()` (calls `nextval_for_type('invoice')` RPC to assign `inv_code`, locks lines, runs `deliver_units` if no upstream SO; transitions `doc_status → 'posted'`), `recordPayment(amount)` (updates `amount_paid`, derives `payment_status`), `void_(reason)` (requires a credit note — sets `doc_status: 'cancelled'`, must NOT be called directly without a linked credit note), `markReversed()` (called internally when a credit note is fully applied)
+- [ ] `src/api/db/creditNotes.ts` — `CreditNoteRow` type; `create()` (draft; optionally `fromInvoice(invoiceId)` factory pre-fills lines), `update()` (draft only), `issue()` (assigns CN- code via `nextval_for_type('credit_note')` RPC, posts AR reduction, triggers `restore_units` RPC only when `type === 'rma_return'`), `applyToInvoice(invoiceId, amount)` (inserts into `credit_note_applications`, updates `applied_amount` + `remaining_balance`), `void()`
+- [ ] Update `src/api/db/index.ts` to export all new Row types and modules
+
+### Step 4 — Quotation on Deal Detail
+
+- [ ] Replace the "Product Lines" tab in `DealDetail.jsx` with a "Quotation" tab
+- [ ] On first open (no quotation row exists for this deal), show an "Add Quotation" button that calls `quotations.create({ deal_id: deal.id, customer_id: deal.customer_id, ... })`
+- [ ] If a quotation exists, show the shared `SalesDocumentForm` component (see Step 5) pre-loaded with the quotation row
+- [ ] Quotation status stepper at the top: Draft → Sent → Accepted / Declined / Expired / Cancelled
+- [ ] "Convert to Sales Order" button — active only on `draft`/`accepted` status; triggers `quotations.convertToSalesOrder()`. If any free-form lines (null `product_id`) exist, shows a per-line "New Product" confirmation modal before converting
+- [ ] "Download PDF" button — calls the existing RMA PDF engine with the Quotation template
+- [ ] All strings in `en.json` + `ar.json`
+
+### Step 5 — Shared `SalesDocumentForm` component
+
+`src/components/SalesDocumentForm.jsx` — used by all four document types and the detail/edit pages. Props: `docType` (`'quotation'|'sales_order'|'invoice'|'credit_note'`), `doc` (the row), `onUpdate(fields)`, `readOnly`.
+
+- [ ] **Header section**: renders all shared fields (customer search, rep, reference/PO#, type-specific date field) + a read-only document number when set
+- [ ] **Line item editor**: add row / remove row / reorder (drag or up/down arrows). Each row: product search (DB-linked for all types; free-form override for quotation only — `product_id` nullable). Columns: Product | Description | Qty | Unit Price | Discount % | Tax % | Subtotal (auto-computed). Bottom row: Grand total
+- [ ] **Footer**: Subtotal · Total Discount · Total Tax · Grand Total — all auto-computed, never hand-edited
+- [ ] Free-form product input: visible only when `docType === 'quotation'`; on blur, checks if the text matches an existing product name; if no match, shows a "New product — will be saved on conversion" indicator
+- [ ] When `readOnly`, all fields are display-only; only action buttons are active
+
+### Step 6 — New Invoicing page (`/invoices` replacement)
+
+- [ ] **5-tab layout**: All · Quotations · Sales Orders · Invoices · Credit Notes
+- [ ] Same design pattern as Activities page: search bar (`max-w-md`, `shadow-sm`), collapsible Filters panel, sortConfig persisted to `safeStorage`, canonical pagination
+- [ ] Per-tab list columns:
+
+  | Tab | Columns |
+  |---|---|
+  | All | Type badge · Doc# · Customer · Rep · Date · Total · Status |
+  | Quotations | QT# · Customer · Rep · Date · Validity · Total · Status |
+  | Sales Orders | SO# · Customer · Rep · Date · Delivery · Total · Status |
+  | Invoices | INV# · Customer · Rep · Issue Date · Due Date · Total · Payment Status · Doc Status |
+  | Credit Notes | CN# · Type · Customer · Source Invoice · Date · Total · Remaining · Status |
+
+- [ ] Per-tab filter options: Status multi-select · Assigned Rep · Date range (created_at or type-specific date)
+- [ ] Bulk actions: bulk cancel (quotations / draft SOs), bulk delete (drafts, manager+ only), bulk export
+- [ ] Create buttons: "New Quotation", "New Sales Order", "New Invoice", "New Credit Note" — each opens a create-from-scratch modal (standalone path)
+- [ ] Row click → opens the document detail/edit page
+- [ ] Route: `/invoices` (replaces the current stub component)
+- [ ] All strings in `en.json` + `ar.json`
+
+### Step 7 — Document detail/edit page
+
+Shared route pattern: `/invoices/quotation/:id`, `/invoices/so/:id`, `/invoices/invoice/:id`, `/invoices/cn/:id` (or a single `/invoices/:docType/:id` dynamic route).
+
+- [ ] Renders `SalesDocumentForm` in edit mode (draft) or read-only mode (posted/issued/delivered)
+- [ ] Status stepper at top — type-specific (Quotation stepper vs SO stepper vs Invoice dual-status vs CN stepper)
+- [ ] Invoice detail: both `doc_status` stepper and `payment_status` indicator (e.g. "Posted · Partially Paid 40%" as two separate visual elements)
+- [ ] Conversion action buttons with status guards:
+  - Quotation → SO: enabled on `draft|accepted`; blocked on `cancelled|expired|declined`
+  - SO → Invoice: enabled on `confirmed|delivered`; blocked on `cancelled`
+  - Invoice → Credit Note: enabled on `posted` (any `payment_status`)
+- [ ] "Download PDF" button on all types
+- [ ] Credit Note creation: opens an inline modal pre-filled from the invoice's lines (user can reduce qtys per line)
+- [ ] "Linked from" trail: e.g. "Quotation QT-XXXXXXXX" on a SO detail page, with a clickable link
+- [ ] All strings in `en.json` + `ar.json`
+
+### Step 8 — PDF templates (one per document type)
+
+- [ ] Reuse the existing RMA ticket PDF engine (find and extend the existing `exportPDF` / `generatePDF` helper in the codebase)
+- [ ] Shared layout function with a `docType` discriminator: same branding header (company logo from `branding` settings, address, contact), same line-item table structure, same footer totals
+- [ ] Per-type title and type-specific fields:
+  - Quotation PDF: "Quotation", validity date, "This quotation is valid until [date]" footer note
+  - Sales Order PDF: "Sales Order", delivery date, confirmation number
+  - Invoice PDF: "Tax Invoice", due date, payment terms, bank/payment details section
+  - Credit Note PDF: "Credit Note", original invoice reference ("Credit against INV-2026-00042"), reason
+- [ ] RTL/Arabic support: same `dir` + `t()` passing convention as existing PDF code
+- [ ] Company branding: logo, address, VAT/tax registration number from `branding` settings
+
+### Step 9 — Inventory integration (wires Step 2 RPCs into API methods)
+
+- [ ] `salesOrders.confirm()` calls `reserve_units` RPC for each line; if any line returns a shortfall, throws and surfaces per-line shortage in the UI ("Product X: need 3, only 1 available")
+- [ ] `salesOrders.cancel()` calls `release_units` RPC; all reserved units return to `'available'`
+- [ ] `crmInvoices.post()` on the direct path (no upstream SO) calls `deliver_units` RPC in one atomic step (reserve + decrement combined)
+- [ ] `crmInvoices.post()` on the SO-conversion path calls `deliver_units` to release the reservation and decrement
+- [ ] `creditNotes.issue()` on `type === 'rma_return'` calls `restore_units` RPC for lines with `restock: true`; lines with `restock: false` (scrapped/damaged) get no stock RPC
+- [ ] Guard: `invoice.void()` is never called directly without an associated credit note. Instead, `creditNotes.issue()` internally calls `invoice.markReversed()` (when the credit fully covers the invoice)
+
+### Sprint 6 gate
+
+- [x] All DB migrations applied and verified in Supabase SQL Editor, no errors (confirmed by user 2026-06-30, through migration `20260730_crm_customer_ledger_view.sql`)
+- [x] `npm test`, `npm run lint`, `npm run build` all pass (277/277 tests, 0 lint errors, build green — re-verified 2026-06-30 after the round-2 bug-fix pass)
+- [x] Architecture Locks CONFIRM-6A, CONFIRM-6B, CONFIRM-6C signed off before any code was written
+- [ ] Full click-through (both paths): Deal → Quotation tab → Convert to SO → Convert to Invoice → PDF; standalone from Invoicing tab for each document type — **manual QA pending**, tracked in the Sales Funnel Test Checklist below
+- [ ] Free-form product promotion: create a quotation with a non-DB product name → convert to SO → confirm the "new product" modal → verify the product now exists in the catalog — **manual QA pending**
+- [ ] Inventory cycle: SO confirm reserves units → Invoice post decrements → Credit Note (rma_return) restores; verify `stock_moves` ledger rows for each step — **manual QA pending**
+- [ ] Invoice code gapless check: delete two draft invoices, post a third → verify INV- sequence has no gap — **manual QA pending**
+- [ ] Credit note applied: issue a CN against an invoice, apply it → verify `remaining_balance` reaches 0 and status flips to `applied` — **manual QA pending**
+
+---
+
+## Sprint 7 — Accounting (Customer Financial Tracking) ✅ COMPLETE (v1) 2026-06-30
+
+**Goal**: Customer payment tracking against the sales funnel — explicitly **not** a full ERP/GL system. Confirmed scope with the user before building (via `AskUserQuestion`): one payment can be split across multiple open invoices; this round covers the payments ledger, customer financial tab, AR aging report, and customer credit limits; lives at a new top-level `/accounting` page (payments ledger + aging) with the customer statement as a drill-down on `CustomerDetails.jsx`.
+
+**What was actually built** (see `CLAUDE.md` → "Sales Documents & Accounting" for the architecture):
+
+- `payments` + `payment_applications` tables (migration `20260727_crm_payments.sql`) — mirrors the `credit_notes`/`credit_note_applications` pattern exactly (same RLS tiers, same trigger-syncs-balance pattern)
+- Gapless `PAY-YYYY-NNNNN` codes via the existing `nextval_for_type()` RPC (`20260728_crm_payment_sequence.sql`)
+- `customers.credit_limit` — soft warning only, never enforced/blocking (`20260729_crm_customer_credit_limit.sql`)
+- `v_customer_ledger` view — signed invoice/credit-note/payment feed, same UNION-of-tables shape as `v_sales_documents` (`20260730_crm_customer_ledger_view.sql`)
+- `src/api/db/payments.ts`, `src/api/db/customerLedger.ts` — new API modules
+- New `/accounting` page: Payments ledger tab + AR Aging tab (Current/31-60/61-90/90+ vs. `due_date`)
+- New "Billing" tab on `CustomerDetails.jsx`: chronological statement with running balance + credit limit field/warning
+- The existing invoice-page "Record Payment" button now routes through the new ledger (`payments.record()`) instead of mutating `crm_invoices.amount_paid` directly, so every payment recorded anywhere is tracked
+
+**Deliberately deferred / out of scope for v1** (do not add without asking the user first):
+
+- No general ledger / journal entries / double-entry bookkeeping
+- No automated reversal of `amount_paid` when a payment is voided — voiding is blocked once a payment has any applications (same precedent as `creditNotes.void_()`)
+- No multi-currency, no bank reconciliation
+- No customer statement PDF (the original placeholder scope above) — only the in-app Billing tab statement
+- No dashboard AR widgets (Total AR outstanding / overdue / cash collected) on the main Dashboard
+- No DSO/collections-effectiveness reporting, no automated payment reminders, no hard enforcement of credit limits
+- The system-wide `/reports` CRM section mentioned in the original placeholder scope was not built as part of this sprint
+
+---
+
+## Sprint 8 — Inventory Redesign
+
+**Goal**: Replace the current Inventory page with a clean, sprint-6-integrated architecture that tracks on-hand, reserved, and available stock across products and parts.
+
+**Status**: ⏳ Blocked on Sprint 6 inventory integration (Step 9) — user will provide a detailed spec before this sprint starts.
+
+**Known scope from user's description** (placeholder until detailed spec is provided):
+- New page from scratch — current `src/pages/Inventory/` folder deleted, new page starts clean
+- List view: all products with real-time on-hand / reserved / available counts (derived from `inventory_units` row states and `parts.quantity` + `parts.reserved_quantity`)
+- Sub-warehouses: create child locations under the main warehouse; units assignable to sub-location (extends the existing `warehouses` table with a `parent_id` nullable FK)
+- Stock auto-adjusted by: Sales Order confirm → Invoice post → Credit Note issue (already live from Sprint 6 Step 9 — this sprint only surfaces it in the new UI)
+- RMA units: same page, filtered view (not a separate page); `active_rma` status units visible in a dedicated column or filter
+- Search bar + Filters + sort + pagination — same design pattern as Activities/Invoicing pages
+
+**Architecture dependencies from Sprint 6**:
+- `stock_moves` ledger (Sprint 6 Step 2) must be live — Sprint 8 will surface this as a movement history timeline per product/unit
+- `inventory_units.reservation_status` + `parts.reserved_quantity` columns must be live
+
+---
+
+## Sales Funnel Test Checklist (Sprint 6 round-2 fixes + Sprint 7 Accounting v1)
+
+Manual QA checklist covering the 2026-06-30 work: the 14-item sales-funnel bug-fix pass on top of Sprint 6, plus Sprint 7 (Accounting v1). Run this top to bottom before signing off the Sprint 6 / Sprint 7 gates above. Migrations required first, applied in order (confirmed done by user 2026-06-30): `20260726_crm_deal_code_prefix_opp.sql` → `20260727_crm_payments.sql` → `20260728_crm_payment_sequence.sql` → `20260729_crm_customer_credit_limit.sql` → `20260730_crm_customer_ledger_view.sql`.
+
+| # | Stage | Test | Expected Result |
+|---|-------|------|------------------|
+| 1 | Activities | Search by a lead/deal/QT/SO/INV/CN code | Matching activity rows appear |
+| 2 | Activities | Check the activity table | "Created" column shows alongside Due Date/Completed |
+| 3 | Activities | Open an invoice-approval card raised after SO→Invoice conversion | Card shows the linked SO's code as the reference (invoice has no `inv_code` yet at draft time) |
+| 4 | Activities | Approve/reject a Quotation and a Sales Order approval card | Both still route correctly |
+| 5 | Leads | Convert a lead to a deal | Lead disappears from main tab, appears in new "Converted" tab |
+| 6 | Leads | Open the Converted tab | Status field, source field, checkboxes stay locked/read-only |
+| 7 | Deal / Pipeline | On a Deal, click "Schedule Activity" and leave due date empty | Submit is blocked / validation error shown |
+| 8 | Deal / Pipeline | Schedule a Deal activity with a due date | Activity appears on the Activities page (previously never appeared) |
+| 9 | Deal / Pipeline | Create a new deal directly (not via convert) | Generated code uses `OPP-` prefix |
+| 10 | Deal / Pipeline | Convert a Lead to a Deal via the `crm_convert_lead` RPC | Generated deal code also uses `OPP-` (server-side path) |
+| 11 | Deal / Pipeline | View a deal created before the migration | Old `QT-` code is backfilled to `OPP-` |
+| 12 | Quotation | Create, send, and accept a quotation | Unaffected — flow works exactly as before |
+| 13 | Quotation → SO | Convert an accepted quotation to a Sales Order | SO created with line items carried over, `so_code` assigned |
+| 14 | Sales Order | Send an SO, then approve it from the Activities approval pool | SO lands directly in `delivered` with inventory reserved — no intermediate clicks |
+| 15 | Sales Order | Open any SO at any status | No "Confirm Order" or "Mark Delivered" button appears anywhere |
+| 16 | Sales Order | Approve an SO where a line item exceeds available stock | Approval fails with an error; SO stays at `sent` |
+| 17 | Sales Order | Cancel an SO before it's invoiced | Status → `cancelled`, any reservation released |
+| 18 | Sales Order | View a `delivered` SO | "Download PDF" is available |
+| 19 | SO → Invoice | Convert a delivered SO to an invoice a second time | Blocked — "already converted" error |
+| 20 | Invoice | Convert SO → Invoice | New invoice shows "Awaiting approval in Activities"; no "Post Invoice" button visible |
+| 21 | Invoice | Approve the invoice from the Activities approval pool | Invoice becomes `posted`, `inv_code` assigned, linked SO inventory decremented |
+| 22 | Invoice | Reject an invoice approval instead | Invoice is voided |
+| 23 | Invoice | Open a posted invoice | No "Create Credit Note" button present |
+| 24 | Invoice | Record a payment / void a posted invoice | Both still work as before |
+| 25 | Credit Note | Open Sales Documents → "+ New" | "New Credit Note" option is present |
+| 26 | Credit Note | Submit the new CN modal with no customer / no reason / no line items | Submission blocked until all three are filled |
+| 27 | Credit Note | Create a standalone CN with no invoice link, then issue it | `cn_code` assigned, status → `issued` |
+| 28 | Credit Note | Create a standalone CN linked to an open invoice, save, then issue | Linked invoice's `amount_paid`/`payment_status` updates automatically on issue |
+| 29 | Credit Note | Issue a CN whose amount is less than the invoice's remaining balance | Invoice `payment_status` → `partial` |
+| 30 | Credit Note | Issue a CN whose amount covers the full remaining balance | Invoice `payment_status` → `paid` |
+| 31 | Credit Note | Check "Link to invoice" before selecting a customer | Checkbox disabled until a customer is chosen |
+| 32 | Credit Note | Link to a customer with no open invoices | "No open invoices" message shown instead of an empty dropdown |
+| 33 | Credit Note | Void a draft or issued CN | Still works (status → `voided`) |
+| 34 | RMA Ticket → CN | Open an RMA ticket with no linked CRM customer | "Issue Credit Note" button is hidden |
+| 35 | RMA Ticket → CN | Open an open ticket with a linked customer | "Issue Credit Note" button is visible |
+| 36 | RMA Ticket → CN | Fill in the CN form from the ticket and submit | CN is created **and** issued in one step |
+| 37 | RMA Ticket → CN | After issuing | Ticket status auto-updates to `Closed` |
+| 38 | RMA Ticket → CN | Check the ticket's activity/history log | Entry logged: `credit_note_created` with the CN code + reason |
+| 39 | RMA Ticket → CN | Re-open the same ticket afterward | "Issue Credit Note" button no longer shows |
+| 40 | i18n | Switch app language to Arabic | Every new string renders translated, no raw keys, RTL layout intact |
+| 41 | Build | `npm test -- --run`, `npm run lint`, `npm run build` | 277/277 tests pass, 0 lint errors, build succeeds |
+| 42 | Accounting | Open the sidebar nav | New "Accounting" item appears, routes to `/accounting` |
+| 43 | Accounting → Payments | From a posted invoice, "Record Payment," pick a method, submit | `payments` + `payment_applications` rows created; invoice `amount_paid`/`payment_status` updates |
+| 44 | Accounting → Payments | From `/accounting`, "+ Record Payment," pick a customer with 2+ open invoices, "Auto-allocate" | Suggests oldest-due-date-first allocation across invoices, editable per row |
+| 45 | Accounting → Payments | Submit a payment where the amount exceeds the sum of allocations | Leftover shows as `unapplied_amount` on the payment row |
+| 46 | Accounting → Payments | Try to void a payment that has at least one allocation | Blocked with an error |
+| 47 | Accounting → Aging | Open the AR Aging tab with several customers carrying overdue invoices | Outstanding totals bucketed correctly into Current/31-60/61-90/90+ |
+| 48 | Customer Details → Billing | Open a customer with invoices, a credit note, and a payment on file | "Billing" tab shows all three in date order with a correct running balance |
+| 49 | Customer Details → Billing | Set a Credit Limit on a customer's profile, save | Field persists; reopen and confirm it's still set |
+| 50 | Customer Details → Billing | Set a credit limit below the customer's outstanding balance | Billing tab shows a red "over credit limit" warning (display-only) |
+| 51 | i18n | Switch to Arabic, visit `/accounting` and a customer's Billing tab | All new strings translated, no raw keys |
+| 52 | Build | `npm test -- --run`, `npm run lint`, `npm run build` | 277/277 tests pass, 0 lint errors, build succeeds (Accounting v1) |
 
 ---
 

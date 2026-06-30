@@ -173,4 +173,15 @@ export const activities = {
     if (error) throw error
     return data || []
   },
+  // All completed (non-log) activities, newest first — used by Activity Logs tab.
+  async listCompleted(): Promise<ActivityRow[]> {
+    const { data, error } = await supabase
+      .from('activities')
+      .select('*')
+      .not('completed_at', 'is', null)
+      .neq('type', 'log')
+      .order('completed_at', { ascending: false })
+    if (error) throw error
+    return data || []
+  },
 }

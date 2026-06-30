@@ -23,6 +23,8 @@ myRMA provides end-to-end lifecycle management for product returns, warranty cla
 | **CRM — Leads** | Lead capture, qualification, status pipeline, chatter (notes/activities/replies), CSV import, convert to deal |
 | **CRM — Pipeline** | Kanban + List + Graph + Pivot + Activity views, drag-and-drop stage moves, Won/Lost actions, XLSX export |
 | **CRM — Deal Detail** | Inline editing, product lines, comment panel, chatter, probability tracking |
+| **CRM — Sales Documents** | Quotation → Sales Order → Invoice → Credit Note funnel, manager-approval workflow, gapless invoice/credit-note numbering, two-stage inventory reservation |
+| **CRM — Accounting** | Customer payments ledger (multi-invoice allocation), AR aging report, per-customer statement, soft credit limits |
 | **Role-Based Access Control** | 6 roles: `super_admin`, `admin`, `manager`, `technician`, `viewer`, `sales_rep` |
 | **Real-Time Notifications** | Live updates via Supabase Realtime, per-user preference controls |
 | **Dark Mode** | Full dark/light theme toggle, persisted per user |

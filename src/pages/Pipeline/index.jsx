@@ -396,7 +396,7 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
   const handleOpenCreate = (stageId = null) => {
     const id = typeof stageId === 'string' ? stageId : null
     const targetStage = id || stages.find((s) => !s.is_won && !s.is_lost)?.id || ''
-    setPendingDealCode(`QT-${Math.floor(10000000 + Math.random() * 90000000)}`)
+    setPendingDealCode(`OPP-${Math.floor(10000000 + Math.random() * 90000000)}`)
     setDealForm({ ...EMPTY_DEAL_FORM, pipeline_id: pipelineId, stage: targetStage })
     setShowCreate(true)
   }

@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, storage, notifications } from '../../api/supabaseClient'
 import { ProductSearchInput } from './_shared'
 import ActivityTimeline from './ActivityTimeline'
 import toast from 'react-hot-toast'
 import Modal from '../../components/Modal'
 import { Button, Spinner } from '../../components/ui'
-import { ROLES } from '../../lib/constants'
+import { ROLES, TICKET_STATUS, TICKET_STATUS_RESOLVED } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
+import { CreateStandaloneCreditNoteModal } from '../SalesDocuments/_modals'
 import {
   getStatusColor,
   getPriorityColor,
@@ -76,6 +77,35 @@ export function TicketDrawer({
   const [resolutionSaving, setResolutionSaving] = useState(false)
   const EMPTY_RES = { type: 'replacement', replacement_product_name: '', replacement_serial: '', amount: '', currency: 'USD', reason: '', reference_number: '' }
   const [resForm, setResForm] = useState(EMPTY_RES)
+
+  // Credit note (RMA return) state
+  const [showIssueCNModal, setShowIssueCNModal] = useState(false)
+  const [issuingCN, setIssuingCN] = useState(false)
+  const { data: cnCustomers = [] } = useQuery({
+    queryKey: ['customers'],
+    queryFn: () => db.customers.list(),
+    enabled: showIssueCNModal,
+    staleTime: 60_000,
+  })
+
+  const handleIssueCNFromTicket = async (cn) => {
+    setIssuingCN(true)
+    try {
+      const cnCode = await db.creditNotes.issue(cn.id, userEmail)
+      await db.rmaTickets.update(ticket.id, { ticket_status: TICKET_STATUS.CLOSED })
+      logActivity('credit_note_created', `${cnCode} issued — ${cn.reason}`)
+      queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
+      queryClient.invalidateQueries({ queryKey: ['rma-tickets-count'] })
+      queryClient.invalidateQueries({ queryKey: ['sales-documents'] })
+      toast.success(t('salesDocuments.cnFromTicketToast', { code: cnCode }))
+      setShowIssueCNModal(false)
+    } catch (err) {
+      captureException(err, { page: 'RMATickets', context: 'issueCNFromTicket' })
+      toast.error(t('ticketDrawer.issueCreditNoteFailed'))
+    } finally {
+      setIssuingCN(false)
+    }
+  }
 
   // Load all detail data whenever the ticket changes
   useEffect(() => {
@@ -296,6 +326,17 @@ export function TicketDrawer({
             <p className="text-sm font-mono text-indigo-600 mt-0.5">{ticket.rma_number}</p>
           </div>
           <div className="flex items-center gap-2">
+            {ticket.customer_id && !TICKET_STATUS_RESOLVED.includes(ticket.ticket_status) && (
+              <button
+                onClick={() => setShowIssueCNModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 text-sm font-medium"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5-1a1 1 0 11-2 0 1 1 0 012 0zm6 6a1 1 0 11-2 0 1 1 0 012 0zM3 9V5a2 2 0 012-2h4l10 10-6 6L3 9z" />
+                </svg>
+                {t('salesDocuments.issueCreditNoteAction')}
+              </button>
+            )}
             <button
               onClick={() => onExportPDF(ticket)}
               className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
@@ -1457,6 +1498,20 @@ export function TicketDrawer({
           </Button>
         </div>
       </div>
+
+      {showIssueCNModal && (
+        <CreateStandaloneCreditNoteModal
+          customers={cnCustomers}
+          products={products}
+          currentUserEmail={userEmail}
+          initialCustomerId={ticket.customer_id}
+          initialType="rma_return"
+          initialTicketId={ticket.id}
+          lockCustomer
+          onClose={() => { if (!issuingCN) setShowIssueCNModal(false) }}
+          onCreated={handleIssueCNFromTicket}
+        />
+      )}
     </Modal>
   )
 }

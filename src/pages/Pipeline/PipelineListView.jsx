@@ -1,6 +1,8 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import toast from 'react-hot-toast'
+import { safeStorage } from '../../lib/safeStorage'
 
 const SURFACE = 'bg-white dark:bg-[#121823]'
 const BORDER = 'border-[#e6e9ef] dark:border-[#212a38]'
@@ -95,8 +97,22 @@ export default function PipelineListView({
   const [openStagePinId, setOpenStagePinId] = useState(null)
   const [bulkStage, setBulkStage] = useState('')
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(() => safeStorage.get('pipelineListPerPage', 25))
+  const [jumpToPage, setJumpToPage] = useState('')
+
   const stageMap = useMemo(() => Object.fromEntries(stages.map((s) => [s.id, s])), [stages])
   const openStages = useMemo(() => stages.filter((s) => !s.is_won && !s.is_lost), [stages])
+
+  useEffect(() => {
+    safeStorage.set('pipelineListPerPage', itemsPerPage)
+  }, [itemsPerPage])
+
+  // Reset to page 1 when the deals list changes (filter/search applied in parent)
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [deals])
 
   const sorted = useMemo(() => {
     return [...deals].sort((a, b) => {
@@ -120,6 +136,62 @@ export default function PipelineListView({
     else { setSortCol(col); setSortDir('asc') }
   }
 
+  const totalPages = Math.ceil(sorted.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = Math.min(startIndex + itemsPerPage, sorted.length)
+  const paged = sorted.slice(startIndex, endIndex)
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
+  const handleJumpToPage = () => {
+    const pageNum = parseInt(jumpToPage)
+    if (pageNum >= 1 && pageNum <= totalPages) {
+      handlePageChange(pageNum)
+      setJumpToPage('')
+    } else {
+      toast.error(t('pipeline.pageMustBeBetween', { total: totalPages }))
+    }
+  }
+
+  const renderPageNumbers = () => {
+    const pages = []
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i)
+    } else if (currentPage <= 4) {
+      for (let i = 1; i <= 5; i++) pages.push(i)
+      pages.push('...')
+      pages.push(totalPages)
+    } else if (currentPage >= totalPages - 3) {
+      pages.push(1)
+      pages.push('...')
+      for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i)
+    } else {
+      pages.push(1)
+      pages.push('...')
+      for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i)
+      pages.push('...')
+      pages.push(totalPages)
+    }
+    return pages.map((p, i) =>
+      p === '...' ? (
+        <span key={`e${i}`} className="px-2 text-[#6c6760] dark:text-[#9aa4b2]">…</span>
+      ) : (
+        <button
+          key={p}
+          onClick={() => handlePageChange(p)}
+          className={`w-8 h-8 rounded text-sm ${currentPage === p ? 'bg-[#4338ca] text-white' : 'text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230]'}`}
+        >
+          {p}
+        </button>
+      )
+    )
+  }
+
   // Close stage pin only when clicking outside any .stage-pin-root container
   React.useEffect(() => {
     const handler = (e) => {
@@ -130,10 +202,12 @@ export default function PipelineListView({
   }, [])
 
   const totalValue = sorted.reduce((s, d) => s + (Number(d.value) || 0), 0)
-  const allSelected = sorted.length > 0 && sorted.every((d) => selectedDeals.has(d.id))
+  const allSelected = paged.length > 0 && paged.every((d) => selectedDeals.has(d.id))
 
   const handleSelectAll = (checked) => {
-    onSelectedChange(checked ? new Set(sorted.map((d) => d.id)) : new Set())
+    const next = new Set(selectedDeals)
+    paged.forEach((d) => { if (checked) next.add(d.id); else next.delete(d.id) })
+    onSelectedChange(next)
   }
   const handleSelectOne = (id, checked) => {
     const next = new Set(selectedDeals)
@@ -208,18 +282,34 @@ export default function PipelineListView({
         </div>
       )}
 
-      <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
-        {sorted.length} {t('pipeline.listDeals')} · {totalValue.toLocaleString()}{' '}
-        {t('pipeline.currency')}
-        {selectedDeals.size > 0 && (
-          <span className="ml-2 text-[#4338ca] dark:text-[#a5b4fc] font-medium">
-            · {selectedDeals.size} {t('common.selected')}
-          </span>
-        )}
-      </p>
-
       {/* Table */}
-      <div className={`${SURFACE} border ${BORDER} rounded-[14px] overflow-hidden`}>
+      <div className={`${SURFACE} border ${BORDER} rounded-[14px]`}>
+        {/* Count + per-page row */}
+        <div className={`px-5 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b ${BORDER}`}>
+          <span className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
+            {t('pipeline.showingRange', { from: sorted.length === 0 ? 0 : startIndex + 1, to: endIndex, total: sorted.length })}
+            {' · '}
+            {totalValue.toLocaleString()} {t('pipeline.currency')}
+            {selectedDeals.size > 0 && (
+              <span className="ml-2 text-[#4338ca] dark:text-[#a5b4fc] font-medium">
+                · {selectedDeals.size} {t('common.selected')}
+              </span>
+            )}
+          </span>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('common.itemsPerPage')}:</label>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
+              className={`px-3 py-1 border ${BORDER} rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent`}
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -252,14 +342,14 @@ export default function PipelineListView({
               </tr>
             </thead>
             <tbody>
-              {sorted.length === 0 ? (
+              {paged.length === 0 ? (
                 <tr>
                   <td colSpan={totalCols} className="px-4 py-10 text-center text-sm text-[#6c6760] dark:text-[#9aa4b2]">
                     {t('pipeline.listEmpty')}
                   </td>
                 </tr>
               ) : (
-                sorted.map((deal, ri) => {
+                paged.map((deal, ri) => {
                   const cust = customerMap[deal.customer_id]
                   const isSelected = selectedDeals.has(deal.id)
                   return (
@@ -285,7 +375,7 @@ export default function PipelineListView({
                         />
                       </td>
                       {/* Row number */}
-                      <td className="px-2 py-3 text-xs text-gray-400 dark:text-[#4a5568] font-mono">{ri + 1}</td>
+                      <td className="px-2 py-3 text-xs text-[#a09d99] dark:text-[#4a5568] font-mono">{startIndex + ri + 1}</td>
                       {/* Deal code */}
                       <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                         <button
@@ -342,7 +432,7 @@ export default function PipelineListView({
                   <td colSpan={6} className="px-4 py-2.5 text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2]">
                     {t('pipeline.listTotal')} ({sorted.length})
                   </td>
-                  {/* value */}
+                  {/* value — always shows grand total for all filtered deals */}
                   <td className="px-4 py-2.5 text-xs font-semibold text-[#211f1b] dark:text-[#e8ebf0] text-right whitespace-nowrap">
                     {totalValue.toLocaleString()} {t('pipeline.currency')}
                   </td>
@@ -353,6 +443,50 @@ export default function PipelineListView({
             )}
           </table>
         </div>
+        {/* Pagination footer */}
+        {totalPages > 1 && (
+          <div className={`flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-t ${BORDER}`}>
+            <div className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
+              {t('pipeline.showingRange', { from: startIndex + 1, to: endIndex, total: sorted.length })}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className={`px-3 py-2 border ${BORDER} rounded-lg text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
+              >
+                {t('common.previous')}
+              </button>
+              <div className="flex items-center gap-1">{renderPageNumbers()}</div>
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-2 border ${BORDER} rounded-lg text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
+              >
+                {t('common.next')}
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('common.jumpToPage')}:</span>
+              <input
+                type="number"
+                min="1"
+                max={totalPages}
+                value={jumpToPage}
+                onChange={(e) => setJumpToPage(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleJumpToPage()}
+                placeholder={currentPage.toString()}
+                className={`w-20 px-3 py-1 border ${BORDER} rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent`}
+              />
+              <button
+                onClick={handleJumpToPage}
+                className="px-3 py-1 bg-[#4338ca] dark:bg-[#a5b4fc] text-white dark:text-[#0b0f17] rounded-lg hover:opacity-90 text-sm transition-opacity"
+              >
+                {t('common.go')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

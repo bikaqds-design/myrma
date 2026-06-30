@@ -236,8 +236,14 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   const [convertForm, setConvertForm] = useState(EMPTY_CONVERT_FORM)
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null })
   const [activeView, setActiveView] = useURLTab('view', 'list')
+  const [statusTab, setStatusTab] = useURLTab('status', 'active')
   const [selectedLeads, setSelectedLeads] = useState(new Set())
   const [pendingLeadCode, setPendingLeadCode] = useState('')
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(() => safeStorage.get('leadsPerPage', 25))
+  const [jumpToPage, setJumpToPage] = useState('')
 
   const openConfirm = (title, message, onConfirm) => setConfirmDialog({ open: true, title, message, onConfirm })
   const closeConfirm = () => setConfirmDialog((d) => ({ ...d, open: false }))
@@ -245,6 +251,12 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   useEffect(() => {
     safeStorage.set('leadsSortConfig', sortConfig)
   }, [sortConfig])
+  useEffect(() => {
+    safeStorage.set('leadsPerPage', itemsPerPage)
+  }, [itemsPerPage])
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, itemsPerPage, filterStatuses, filterSources, filterReps, statusTab])
 
   const canDo = (action) => {
     if (currentUserRole === 'super_admin' || currentUserRole === 'admin') return true
@@ -382,7 +394,10 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   const statusMenuLead = leads.find((l) => l.id === statusMenu.id)
   const sourceMenuLead = leads.find((l) => l.id === sourceMenu.id)
 
+  const convertedCount = leads.filter((l) => l.status === 'converted').length
+
   const filteredLeads = leads
+    .filter((l) => (statusTab === 'converted' ? l.status === 'converted' : l.status !== 'converted'))
     .filter((l) => {
       if (filterStatuses.size > 0 && !filterStatuses.has(l.status)) return false
       if (filterSources.size > 0 && !filterSources.has(l.source)) return false
@@ -423,6 +438,62 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
     }))
+  }
+
+  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = Math.min(startIndex + itemsPerPage, filteredLeads.length)
+  const paginatedLeads = filteredLeads.slice(startIndex, endIndex)
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
+  const handleJumpToPage = () => {
+    const pageNum = parseInt(jumpToPage)
+    if (pageNum >= 1 && pageNum <= totalPages) {
+      handlePageChange(pageNum)
+      setJumpToPage('')
+    } else {
+      toast.error(t('leads.pageMustBeBetween', { total: totalPages }))
+    }
+  }
+
+  const renderLeadsPageNumbers = () => {
+    const pages = []
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i)
+    } else if (currentPage <= 4) {
+      for (let i = 1; i <= 5; i++) pages.push(i)
+      pages.push('...')
+      pages.push(totalPages)
+    } else if (currentPage >= totalPages - 3) {
+      pages.push(1)
+      pages.push('...')
+      for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i)
+    } else {
+      pages.push(1)
+      pages.push('...')
+      for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i)
+      pages.push('...')
+      pages.push(totalPages)
+    }
+    return pages.map((p, i) =>
+      p === '...' ? (
+        <span key={`e${i}`} className="px-2 text-[#6c6760] dark:text-[#9aa4b2]">…</span>
+      ) : (
+        <button
+          key={p}
+          onClick={() => handlePageChange(p)}
+          className={`w-8 h-8 rounded text-sm ${currentPage === p ? 'bg-[#4338ca] text-white' : 'text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230]'}`}
+        >
+          {p}
+        </button>
+      )
+    )
   }
 
   const generateLeadCode = () => `LD-${Math.floor(10000000 + Math.random() * 90000000)}`
@@ -808,6 +879,35 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
         )}
       </PageHeader>
 
+      {/* Status tabs — Active (default) vs Converted (view-only) */}
+      <div className="flex gap-1 border-b border-[#e6e9ef] dark:border-[#212a38]">
+        {[
+          { id: 'active', label: t('leads.tabActive'), count: leads.length - convertedCount },
+          { id: 'converted', label: t('leads.tabConverted'), count: convertedCount },
+        ].map(({ id, label, count }) => (
+          <button
+            key={id}
+            onClick={() => setStatusTab(id)}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${
+              statusTab === id
+                ? 'border-[#4338ca] dark:border-[#a5b4fc] text-[#4338ca] dark:text-[#a5b4fc]'
+                : 'border-transparent text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]'
+            }`}
+          >
+            {label}
+            {count > 0 && (
+              <span className={`px-1.5 py-0.5 rounded-full text-xs ${
+                statusTab === id
+                  ? 'bg-[#4338ca]/10 dark:bg-[#a5b4fc]/10 text-[#4338ca] dark:text-[#a5b4fc]'
+                  : 'bg-[#f4f6f9] dark:bg-[#1a2230] text-[#6c6760] dark:text-[#9aa4b2]'
+              }`}>
+                {count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       {/* Search + filter — shared across both views */}
       <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] shadow-sm">
         <div className="px-5 py-4">
@@ -854,7 +954,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                     label={t('leads.allStatuses')}
                     selected={filterStatuses}
                     onChange={setFilterStatuses}
-                    options={LEAD_STATUS_LIST.map((s) => ({ value: s, label: t(`leadStatus.${s}`) }))}
+                    options={LEAD_STATUS_LIST.filter((s) => statusTab === 'converted' || s !== 'converted').map((s) => ({ value: s, label: t(`leadStatus.${s}`) }))}
                   />
                   <MultiCheckFilter
                     label={t('leads.allSources')}
@@ -932,46 +1032,66 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
 
       {/* List view */}
       {activeView === 'list' && (
-        <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
+          {/* Count + per-page row */}
+          <div className="px-5 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[#e6e9ef] dark:border-[#212a38]">
+            <span className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
+              {t('leads.showingRange', { from: filteredLeads.length === 0 ? 0 : startIndex + 1, to: endIndex, total: filteredLeads.length })}
+            </span>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('common.itemsPerPage')}:</label>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
+                className="px-3 py-1 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-[#0f1520] border-y border-gray-200 dark:border-[#212a38]">
+              <thead className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
                 <tr>
                   <th className="pl-4 pr-2 py-3 w-8">
                     <input
                       type="checkbox"
                       className="rounded border-gray-300 dark:border-[#212a38] text-indigo-600 focus:ring-indigo-500"
-                      checked={filteredLeads.filter((l) => l.status !== 'converted').length > 0 && filteredLeads.filter((l) => l.status !== 'converted').every((l) => selectedLeads.has(l.id))}
+                      checked={paginatedLeads.filter((l) => l.status !== 'converted').length > 0 && paginatedLeads.filter((l) => l.status !== 'converted').every((l) => selectedLeads.has(l.id))}
                       onChange={(e) => {
-                        if (e.target.checked) setSelectedLeads(new Set(filteredLeads.filter((l) => l.status !== 'converted').map((l) => l.id)))
-                        else setSelectedLeads(new Set())
+                        const selectable = paginatedLeads.filter((l) => l.status !== 'converted').map((l) => l.id)
+                        if (e.target.checked) setSelectedLeads((prev) => new Set([...prev, ...selectable]))
+                        else setSelectedLeads((prev) => { const next = new Set(prev); selectable.forEach((id) => next.delete(id)); return next })
                       }}
                       aria-label={t('common.selectAll')}
                     />
                   </th>
-                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase w-10">#</th>
-                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase w-32">{t('common.code')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">
+                  <th className="px-2 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase w-10">#</th>
+                  <th className="px-2 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase w-32">{t('common.code')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                     <SortableHeader label={t('leads.colName')} sortKey="full_name" sortConfig={sortConfig} onSort={handleSort} />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('leads.colContact')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('leads.colContact')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                     <SortableHeader label={t('leads.colSource')} sortKey="source" sortConfig={sortConfig} onSort={handleSort} />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                     <SortableHeader label={t('common.status')} sortKey="status" sortConfig={sortConfig} onSort={handleSort} />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                     <SortableHeader label={t('leads.colAssignedRep')} sortKey="assigned_rep" sortConfig={sortConfig} onSort={handleSort} />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                     <SortableHeader label={t('common.createdAt')} sortKey="created_at" sortConfig={sortConfig} onSort={handleSort} />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('common.actions')}</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('common.actions')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-[#212a38]">
-                {filteredLeads.length === 0 ? (
+              <tbody className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
+                {paginatedLeads.length === 0 ? (
                   <tr>
                     <td colSpan="10">
                       <EmptyState
@@ -983,8 +1103,8 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                     </td>
                   </tr>
                 ) : (
-                  filteredLeads.map((l, idx) => (
-                    <tr key={l.id} className={`hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors ${selectedLeads.has(l.id) ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}`}>
+                  paginatedLeads.map((l, idx) => (
+                    <tr key={l.id} className={`hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520] transition-colors ${selectedLeads.has(l.id) ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}`}>
                       <td className="pl-4 pr-2 py-3">
                         <input
                           type="checkbox"
@@ -1000,7 +1120,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                           aria-label={t('common.selectRow', { name: l.full_name })}
                         />
                       </td>
-                      <td className="px-2 py-3 text-xs text-gray-400 dark:text-[#4a5568] font-mono">{idx + 1}</td>
+                      <td className="px-2 py-3 text-xs text-[#a09d99] dark:text-[#4a5568] font-mono">{startIndex + idx + 1}</td>
                       <td className="px-2 py-3">
                         <button
                           onClick={() => navigate(`/leads/${l.id}`)}
@@ -1134,6 +1254,50 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
               </tbody>
             </table>
           </div>
+          {/* Pagination footer */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-t border-[#e6e9ef] dark:border-[#212a38]">
+              <div className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
+                {t('leads.showingRange', { from: startIndex + 1, to: endIndex, total: filteredLeads.length })}
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {t('common.previous')}
+                </button>
+                <div className="flex items-center gap-1">{renderLeadsPageNumbers()}</div>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {t('common.next')}
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('common.jumpToPage')}:</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={totalPages}
+                  value={jumpToPage}
+                  onChange={(e) => setJumpToPage(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleJumpToPage()}
+                  placeholder={currentPage.toString()}
+                  className="w-20 px-3 py-1 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
+                />
+                <button
+                  onClick={handleJumpToPage}
+                  className="px-3 py-1 bg-[#4338ca] dark:bg-[#a5b4fc] text-white dark:text-[#0b0f17] rounded-lg hover:opacity-90 text-sm transition-opacity"
+                >
+                  {t('common.go')}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
