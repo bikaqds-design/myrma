@@ -234,66 +234,23 @@ export const quotations = {
     return data as QuotationRow
   },
 
-  /** Returns IDs of any lines that have no product_id (free-form lines). */
+  /** Returns any lines that have no product_id (free-form lines). */
   freeFormLines(qt: QuotationRow): QuotationLine[] {
     return qt.line_items.filter((l) => !l.product_id)
   },
 
   /**
-   * convertToSalesOrder: creates a sales_orders row from this quotation.
-   * Caller must ensure all free-form lines have been promoted to real products
-   * first (check freeFormLines() and show the promotion modal before calling).
-   * Returns the new sales order id.
+   * convertToSalesOrder: delegates to the convert_quotation_to_so RPC which
+   * inserts the SO and flips qt.status='converted' atomically in one Postgres
+   * transaction, with a FOR UPDATE lock that prevents duplicate SOs from
+   * concurrent double-clicks (FR-005, FR-006, H4a).
    */
-  async convertToSalesOrder(
-    quotationId: string,
-    actorEmail: string
-  ): Promise<string> {
-    const qt = await quotations.get(quotationId)
-    if (!qt) throw new Error('Quotation not found')
-    if (['cancelled', 'declined', 'converted'].includes(qt.status)) {
-      throw new Error(`Cannot convert a ${qt.status} quotation to a sales order`)
-    }
-
-    // Validate all lines have a product_id
-    const freeLines = quotations.freeFormLines(qt)
-    if (freeLines.length > 0) {
-      throw new Error(
-        `${freeLines.length} line(s) have no product — promote them to real products first`
-      )
-    }
-
-    // Generate SO code server-side
-    const { data: codeData, error: codeErr } = await supabase.rpc('generate_doc_code', {
-      p_prefix: 'SO',
+  async convertToSalesOrder(quotationId: string, actorEmail: string): Promise<string> {
+    const { data, error } = await supabase.rpc('convert_quotation_to_so', {
+      p_quotation_id: quotationId,
+      p_actor_email: actorEmail,
     })
-    if (codeErr) throw codeErr
-
-    const { data, error } = await supabase
-      .from('sales_orders')
-      .insert({
-        so_code: codeData as string,
-        quotation_id: quotationId,
-        customer_id: qt.customer_id,
-        status: 'draft',
-        line_items: qt.line_items,
-        subtotal: qt.subtotal,
-        discount_amount: qt.discount_amount,
-        tax_amount: qt.tax_amount,
-        total: qt.total,
-        payment_terms: qt.payment_terms,
-        reference_po: qt.reference_po,
-        notes: qt.notes,
-        assigned_rep: qt.assigned_rep ?? actorEmail,
-        created_by: actorEmail,
-      })
-      .select('id')
-      .single()
     if (error) throw error
-
-    // Mark the quotation as converted so it cannot be re-converted.
-    await supabase.from('quotations').update({ status: 'converted' }).eq('id', quotationId)
-
-    return (data as { id: string }).id
+    return data as string
   },
 }

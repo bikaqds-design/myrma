@@ -1,6 +1,6 @@
 # myRMA → QDS CRM — Master Build Plan
 
-**Branch**: `002-crm-upgrade` | **Last updated**: 2026-07-XX | **Supersedes**: `CRM_UPGRADE_PLAN.md`, `SYSTEM_UPGRADE_PLAN.md` (both archived to `docs/archive/`)
+**Branch**: `test` | **Last updated**: 2026-07-01 (folds in the 2026-07-01 architecture audit — see Sprint 7.6) | **Supersedes**: `CRM_UPGRADE_PLAN.md`, `SYSTEM_UPGRADE_PLAN.md`, `sales-funnel-audit.md` (all archived to `docs/archive/`)
 
 **This is the single file to follow going forward.** Check items off as you go — this file is the persistent build state across sessions.
 
@@ -34,9 +34,13 @@ The product is now: **QDS CRM** — a purpose-built CRM for QDS covering the ful
 This plan tracks the full build of QDS CRM across three areas:
 
 - **Track A — CRM Core** *(Sprints 1–5, largely done)*: leads, deals, pipeline, activities, contacts, sales_rep role, dashboard widgets, customer tabs. Formal SpecKit artifacts in `specs/002-crm-upgrade/`.
-- **Track A — Sales Documents** *(Sprint 6, ✅ COMPLETE 2026-06-30)*: the complete sales funnel — Quotations (linked from deal product lines or standalone), Sales Orders, Invoices, Credit Notes — at `/sales` (route name differs from the original `/invoices` plan, kept distinct from the legacy `Invoices.jsx` RMA-service-invoice page).
+- **Track A — Sales Documents** *(Sprint 6, ✅ COMPLETE 2026-06-30)*: the complete sales funnel — Quotations (linked from deal product lines or standalone), Sales Orders, Invoices, Credit Notes — at `/sales` (route name differs from the original `/invoices` plan; at the time, kept distinct from the legacy `Invoices.jsx` RMA-service-invoice page, which was fully removed 2026-07-02 — the `/invoices` and `/parts` legacy pages, nav items, and dead code were deleted once Sales Documents/Inventory fully superseded them; `crm_invoices` is now the sole canonical invoice system).
 - **Track A — Accounting v1** *(Sprint 7, ✅ COMPLETE 2026-06-30)*: customer payment ledger, AR aging, customer statement, soft credit limits — at `/accounting`. Deliberately not a full GL/ERP; see Sprint 7 section for exact scope and what was deferred.
-- **Track A — Inventory Redesign** *(Sprint 8, future)*: new inventory page replacing the current one; auto-adjusts from sales orders, invoices, credit notes.
+- **Track A — Sales Funnel Hardening** *(Sprint 7.5, ✅ COMPLETE 2026-07-01)*: atomic `SECURITY DEFINER` lifecycle RPCs for every transition; inventory-line classification helper; server-side role enforcement; bulk guards; converted-lead DB trigger. Source: `sales-funnel-audit.md` (now retired — findings incorporated in Sprint 7.5 section below).
+- **Track A — Inventory Model Reconciliation** *(Sprint 7.6, ✅ COMPLETE 2026-07-01)*: inserted after the 2026-07-01 architecture audit. Reconciled the two coexisting stock-status axes, wired the existing `products.product_type` into stock classification (no new column), a sellable-status allow-list, a serial-uniqueness index, and — discovered live during this sprint — the foundational `inventory_units.product_id` column the reservation RPCs had referenced since creation but never actually had. All 5 gate tests verified via direct SQL against production.
+- **Track A — Inventory & Warehouse Management** *(Sprint 8, ✅ BUILT 2026-07-01, RPC layer VERIFIED 2026-07-02)*: dual stock-tracking model (serialized + bulk `warehouse_stock`); rebuilt Inventory page (funnel-aware Overview, Stock Breakdown modal, dual-mode Receive Stock, Stock Movements tab) alongside the 5 preserved RMA-ticket-status tabs; warehouse types/manager/archive; atomic transfer/adjust; bulk action bar. 6 schema migrations (`20260740`–`20260745`) applied and confirmed. **RPC-layer correctness now proven by the automated `db-tests` CI harness** (`supabase/tests/inventory_hardening.sql` + `inventory_hardening2.sql`, 26 checks) — reserve/deliver/release conservation, over-reservation rejection, duplicate-serial rejection, transfer/adjust guards, `release`/`deliver_warehouse_stock` idempotency all pass live. **Manual UI click-through QA + the deferred Sprint 6/7 52-item funnel checklist are still pending** — RPC correctness is necessary but not sufficient for that box; see Sprint 8 gate below for exactly which items are now checked vs. still needing a live click-through.
+- **Track A — Purchase Module** *(Sprint 9, ✅ BUILT 2026-07-01, RPC layer VERIFIED 2026-07-02)*: Vendor → Proforma Invoice → Purchase Order → Vendor Invoice → atomic dual-mode receipt; `/purchasing` page; supports partial (multi-shipment) receipt; full procurement audit trail via `vendor_invoice_id` FK + `stock_moves`. 5 migrations (`20260746`–`20260750`) applied and confirmed. **`receive_vendor_invoice` now covered by `db-tests`**: bulk full receipt + `vi_code` assignment, serialized partial-then-complete receipt (same code reused), duplicate-serial-across-invoices rejection — all pass live. Manual UI click-through (Stock Movements tab origin display, Arabic/dark-mode) still pending.
+- **Track A — Security & DB-Test Hardening** *(Sprint H, ✅ COMPLETE 2026-07-02)*: full-system CTO/security/QA audit (`AUDIT_REPORT_2026-07-02.md`) — every Critical and High finding fixed and verified live: money/authz RPC guards, allocation validation, spoofable-actor fix, payment/credit-note reversal ledger, CORS allowlist + security headers, Edge Function pre-auth bypass fix, and a permanent `db-tests` CI harness (3 SQL files, 34 checks) covering every money and inventory/purchasing RPC. See Sprint H section below.
 - **Track B — System Upgrades**: bug fixes and quality improvements to existing modules (RMA Tickets, Products, Parts, SLA, Webhooks). Deprioritised below Track A new modules; tackled between sprints.
 
 All tracks share `CONSTITUTION.md`, the same workflow discipline (below), and this file.
@@ -50,9 +54,9 @@ This section documents the standing process, made explicit per your request so i
 1. **Explain before implementing.** Before writing any code or migration for a sprint/step, state in plain language: what's changing, why, which files/tables are touched, and what the tradeoffs or risks are. This applies to every checklist item below, not just the big ones.
 2. **Wait for confirmation.** Don't start implementation until you've said go — either an explicit "yes/confirm/start," or an `AskUserQuestion` answer when there's a genuine fork in approach. Routine, low-risk follow-through on an already-confirmed sprint doesn't need re-confirmation for every sub-step.
 3. **Build.** Migrations are idempotent SQL files in `supabase/migrations/` (`IF NOT EXISTS`/`DROP ... IF EXISTS` patterns), named `YYYYMMDD_description.sql`. Code follows `CONSTITUTION.md` (locked stack, RLS rules, i18n law, design tokens, etc.) without exception.
-4. **Test.** `npm test`, `npm run lint:ci`, `npm run build` must all pass before a step is marked done. Any new SQL migration is pasted into Supabase SQL Editor by you and confirmed "Success" before the corresponding code that depends on it ships.
+4. **Test.** `npm test`, `npm run lint:ci`, `npm run build` must all pass before a step is marked done. **Before any migration that alters an existing table or its data, take a Supabase backup / PITR checkpoint first** — proven necessary by Sprint 7.5 finding H3, where a stray script was one `db push` from wiping production. Migrations that change existing data ship with a tested down-path or an explicit "irreversible — backup taken" note. Lifecycle/RLS/RPC invariants (reserve→deliver→release, gapless-no-gap, void-blocked-when-applied, RLS-denies-self-approve) get an **integration test** (pgTAP or seeded Vitest against a disposable Supabase branch) — not just the `src/lib/` pure-function unit tests. A regression in `post_invoice`/`reserve_units` must not be able to ship green. Any new SQL migration is pasted into Supabase SQL Editor by you and confirmed "Success" before the corresponding code that depends on it ships.
 5. **Report how to test.** Every implemented step gets explicit manual click-through instructions — this is non-negotiable, not just for big features.
-6. **Next.** Move to the next checklist item only after the current one is checked off and verified. Don't start Sprint/Phase N+1 until Sprint/Phase N's checklist is 100% done (a hard gate carried over from the original CRM plan).
+6. **Next.** Move to the next checklist item only after the current one is checked off and verified. Don't start Sprint/Phase N+1 until Sprint/Phase N's checklist is 100% done (a hard gate carried over from the original CRM plan). **A sprint is `BUILT` when code + unit tests + build are green; it is only `COMPLETE`/`VERIFIED` once its manual QA checklist has actually been run. `BUILT ≠ done` — never advance on `BUILT` alone.** (Audit finding A6, 2026-07-01: Sprints 3/5/6/7 were marked COMPLETE with their QA boxes still unchecked — this is the discipline correction.)
 7. **Bugs found mid-build get fixed in place and logged inline** in this document (not in a separate bug tracker) — the running narrative of what broke and why is part of this file's value, same as it was in the original `CRM_UPGRADE_PLAN.md`.
 8. **Translation is part of "done."** Every new user-facing string ships in `en.json` **and** `ar.json` in the same step — never English-only.
 9. **Git discipline**: never push to `main`. Pushes to `test` happen only on explicit per-instance request — a prior push approval is not a standing permission for the next one.
@@ -566,7 +570,7 @@ The following items were planned or in-progress but are formally deprioritised u
 
 **Status note**: built across several sessions; this plan's detailed spec below is the original design and matches the shipped implementation closely, with these deviations:
 
-- Route is `/sales` (+ `/sales/:type/:id` detail), not `/invoices` — the legacy `Invoices.jsx` (RMA service invoices, unrelated table) still owns `/invoices`, so reusing that path wasn't viable.
+- Route is `/sales` (+ `/sales/:type/:id` detail), not `/invoices` — at the time, the legacy `Invoices.jsx` (RMA service invoices, unrelated table) still owned `/invoices`, so reusing that path wasn't viable. That page was fully removed 2026-07-02 (see line 37 above); `/invoices` is not reused now that it's free — `/sales` stays the permanent route.
 - Sales Order status model is richer than originally planned: `draft → sent → accepted → declined → confirmed → delivered → cancelled` (adds `sent`/`accepted`/`declined` so SOs run the same manager-approval workflow as Quotations and Invoices — see the Activities "approval pool" pattern in `CLAUDE.md`). Approving an SO now lands it directly in `delivered` with inventory reserved in one step — no separate "Confirm Order"/"Mark Delivered" clicks (a 2026-06-30 round-2 fix).
 - A 14-item bug-fix pass on 2026-06-30 (post-ship QA) covered Activities search/columns, the Leads Converted tab, a Deal-activity due-date bug, the SO/Invoice approval-gate work above, a standalone Credit Note creation flow (not only invoice-bound), Credit Note ↔ invoice application as a payment, Credit Note ↔ RMA ticket auto-close, and the `OPP-` deal-code prefix (renamed from a colliding `QT-`). Full test checklist is in the "Sales Funnel Test Checklist" section near the end of this document.
 
@@ -820,23 +824,334 @@ Shared route pattern: `/invoices/quotation/:id`, `/invoices/so/:id`, `/invoices/
 
 ---
 
-## Sprint 8 — Inventory Redesign
+## Sprint 7.5 — Sales Funnel Hardening ✅ COMPLETE 2026-07-01
 
-**Goal**: Replace the current Inventory page with a clean, sprint-6-integrated architecture that tracks on-hand, reserved, and available stock across products and parts.
+**Source**: `sales-funnel-audit.md` (enterprise audit run 2026-06-30 against `test @ 0e78b1b`). Findings incorporated here; the separate audit file is retired — `MASTER_UPGRADE_PLAN.md` is the single source of truth going forward.
 
-**Status**: ⏳ Blocked on Sprint 6 inventory integration (Step 9) — user will provide a detailed spec before this sprint starts.
+**Trigger**: after Sprint 7 shipped, an audit of the full Lead → Invoice funnel found 16 findings (7 HIGH sub-items, 5 MEDIUM, 4 LOW) that broke or compromised the funnel at the DB level. All 16 resolved in this sprint.
 
-**Known scope from user's description** (placeholder until detailed spec is provided):
-- New page from scratch — current `src/pages/Inventory/` folder deleted, new page starts clean
-- List view: all products with real-time on-hand / reserved / available counts (derived from `inventory_units` row states and `parts.quantity` + `parts.reserved_quantity`)
-- Sub-warehouses: create child locations under the main warehouse; units assignable to sub-location (extends the existing `warehouses` table with a `parent_id` nullable FK)
-- Stock auto-adjusted by: Sales Order confirm → Invoice post → Credit Note issue (already live from Sprint 6 Step 9 — this sprint only surfaces it in the new UI)
-- RMA units: same page, filtered view (not a separate page); `active_rma` status units visible in a dedicated column or filter
-- Search bar + Filters + sort + pagination — same design pattern as Activities/Invoicing pages
+### What was already solid before this sprint
 
-**Architecture dependencies from Sprint 6**:
-- `stock_moves` ledger (Sprint 6 Step 2) must be live — Sprint 8 will surface this as a movement history timeline per product/unit
-- `inventory_units.reservation_status` + `parts.reserved_quantity` columns must be live
+- Lead→Customer→Deal is one atomic `SECURITY DEFINER` RPC with internal authz check
+- Gapless INV-/CN- numbering via `document_sequences` + row-locked `nextval_for_type`
+- Customer ledger math (`v_customer_ledger` signed union) correct on the happy path
+- Two invoice status fields (`doc_status` + `payment_status`) — correct Odoo-style modeling
+- `assigned_rep`/`created_by` stored as email text, validated as email in Zod — the "who" convention
+- SO→Invoice has a DB idempotency guard (prevents duplicate invoices from one SO)
+
+### Audit findings — all resolved
+
+| ID | Severity | Finding | Fix |
+|---|---|---|---|
+| H1 | 🔴 HIGH | SO approval crashes for non-serialized products — service/non-stock lines hit `reserve_units` → "Insufficient stock"; funnel dead-ends for the majority of sellable items | `funnel_reserve_line` helper (`20260732`): serialized units → `reserve_units`, all other product types → no-op |
+| H2 | 🔴 HIGH | Approved SO inventory stranded forever — `cancel()` rejected from `delivered`; no release path existed | `cancel_sales_order` RPC (`20260733`): works from any non-invoiced status, calls `release_units` to free all reserved units |
+| H3 | 🔴 HIGH | Data-reset script lived in `supabase/migrations/` — a normal `db push` would wipe production | Moved to `scripts/manual/` (never touched by migration runner) |
+| H4a | 🔴 HIGH | QT→SO conversion: two separate writes (insert SO, update QT status) — partial failure leaves duplicate SOs | `convert_quotation_to_so` SECURITY DEFINER RPC (`20260733`): one transaction, idempotency guard, null-product-id check |
+| H4b | 🔴 HIGH | Invoice post: stock delivery in a separate await after the RPC — crash between them leaves invoice posted but stock not decremented | `post_invoice` RPC (`20260734`): delivers stock in same transaction |
+| H4c | 🔴 HIGH | CN issue: 4 separate awaits (RPC + get + applyToInvoice + recordPayment) — any mid-sequence failure desyncs AR ledger | `issue_credit_note` RPC (`20260735`): applies to source invoice in same transaction |
+| H4d | 🔴 HIGH | Payment record: loop of separate awaits (insert payment + recordPayment per invoice) — failure mid-loop leaves partial allocation | `record_payment` RPC (`20260735`): receives `p_allocations jsonb` array, allocates all invoices in one transaction |
+| M1 | 🟠 MEDIUM | No row locks on any lifecycle transition — double-click or concurrent approvals could post twice / burn sequence numbers | All lifecycle RPCs now open with `SELECT ... FOR UPDATE` before any write |
+| M2 | 🟠 MEDIUM | `deals.bulkMoveStage()`: no stage validation, no terminal field reset — could move a won deal to an invalid stage and leave `won_at` set | Validates stage exists in every selected deal's pipeline; resets `won_at`/`lost_at`/`lost_reason` + `status='open'` for terminal deals (`20260736` + `deals.ts`) |
+| M3 | 🟠 MEDIUM | `leads.bulkUpdate()` bypasses the converted-lead immutability guard that `update()` enforces | Pre-flight `converted_at` check added (`leads.ts`); backed by `guard_converted_lead` BEFORE UPDATE trigger on `leads` table |
+| M4 | 🟠 MEDIUM | Voiding a paid invoice left a dangling AR credit and unrestored stock — only `doc_status` was checked, not payment applications | `void_invoice` RPC (`20260734`): blocks if any `payment_applications` or `credit_note_applications` exist; restores delivered stock via `stock_moves` lookup |
+| M5 | 🟠 MEDIUM | Approval role enforced UI-only via a `canApprove` constant — a `sales_rep` could self-approve by calling the API directly | All approve/reject/post/void RPCs check `rma_is_manager_or_above()` server-side as their first statement |
+| L1 | 🟡 LOW | `crm_convert_lead` accepted an unknown `p_existing_customer_id` silently (FK error, not a clean message); also a regression in `20260726` put `auth.uid()` back as `created_by` | EXISTS check added; `created_by` regression fixed to `rma_current_user_email()` (`20260736`) |
+| L2 | 🟡 LOW | Cancel button on `delivered` SO was dead UI (old `cancel()` always rejected that status) | Resolved by H2 fix — button is now functional |
+| L3 | 🟡 LOW | Free-form QT lines (null `product_id`) flow into totals | Pre-existing guard: `convert_quotation_to_so` RPC (`20260733`) blocks conversion if any line has null `product_id` |
+| L4 | 🟡 LOW | Dead `canApprove` constant in `SalesDocumentDetail.jsx` (role check moved into RPCs, constant never read) | Removed; `currentUserRole` param prefixed `_currentUserRole` |
+
+### Migrations applied (all confirmed by user 2026-07-01)
+
+| Migration | What it does |
+|---|---|
+| `20260732_funnel_line_reservation.sql` | `funnel_reserve_line` helper — classifies product by catalog type at reserve time |
+| `20260733_so_lifecycle_rpcs.sql` | `convert_quotation_to_so`, `approve_sales_order`, `reject_sales_order`, `cancel_sales_order` |
+| `20260734_invoice_lifecycle_rpcs.sql` | `post_invoice` (extended — stock delivery in same tx), `void_invoice` (new — blocks if applied, restores stock) |
+| `20260735_cn_payment_lifecycle_rpcs.sql` | `issue_credit_note` (extended — applies to invoice in same tx), `record_payment` (extended — `p_allocations jsonb`, all in one tx) |
+| `20260736_lead_deal_guards.sql` | `guard_converted_lead` BEFORE UPDATE trigger on `leads`; `crm_convert_lead` customer-existence check + `created_by` fix |
+
+### Code changes
+
+| File | Change |
+|---|---|
+| `src/api/db/quotations.ts` | `convertToSalesOrder()` → thin RPC wrapper |
+| `src/api/db/salesOrders.ts` | `markAccepted`/`markDeclined`/`cancel` → thin RPC wrappers; `confirm`/`markDelivered` removed (now redundant) |
+| `src/api/db/crmInvoices.ts` | `post()` simplified; `void_()` → `void_invoice` RPC |
+| `src/api/db/creditNotes.ts` | `issue()` → thin RPC wrapper (post-RPC client steps removed — now inside DB) |
+| `src/api/db/payments.ts` | `record()` → passes `p_allocations` JSON array to RPC (client-side loop removed) |
+| `src/pages/Activities/index.jsx` | `markDeclined` call now passes `currentUserEmail` |
+| `src/pages/SalesDocuments/SalesDocumentDetail.jsx` | Dead `canApprove` constant removed; `currentUserRole` → `_currentUserRole` |
+| `src/api/db/leads.ts` | `bulkUpdate()` → pre-flight `converted_at` check added |
+| `src/api/db/deals.ts` | `bulkMoveStage()` → pipeline-stage validation + terminal field reset |
+
+**Gate**: `npm test` 277/277 · `npm run lint` 0 errors · `npm run build` ✓
+
+### What this revealed — the data pipeline gap
+
+The hardening pass confirmed all lifecycle transitions are now atomic and role-enforced at the DB level. However, **full end-to-end testing is blocked by a data pipeline gap**: there is no path for new stock to enter `inventory_units` as `available` units except through the RMA repair workflow. This means the H1/H2 inventory reservation fixes work correctly but cannot be verified without available units.
+
+Two modules are needed to close this gap — and they must be built in dependency order:
+1. **Sprint 8 (Inventory Redesign)** — surfaces the two-stage model in the UI and adds a "Receive Stock" action so the funnel can be tested immediately.
+2. **Sprint 9 (Purchase Module)** — the permanent, auditable inflow path (vendor → PO → vendor invoice → stock received).
+
+Sprint 8 must come first: you need to be able to see and manage inventory before you can verify that purchase receipts are creating usable stock. Building Purchase first without an Inventory UI to inspect it would make debugging blind. (A schema-only **Sprint 7.6** — added after the 2026-07-01 audit — now sits between 7.5 and 8; see below.)
+
+---
+
+## Sprint 7.6 — Inventory Model Reconciliation (schema-only, no UI) ✅ COMPLETE 2026-07-01
+
+**Status**: ✅ COMPLETE — all 3 migrations applied, all 5 gate tests verified against production via direct SQL (see Sprint 7.6 gate below). Sprint 8 is now unblocked.
+
+**Why this existed**: the audit found the funnel's inventory layer has two coexisting, unreconciled status axes, two live overselling holes, and no serial-uniqueness guard. Sprint 8 was specced against the wrong column and could not have been built correctly until these were fixed. Execution also surfaced a fourth, more foundational defect (A0 — see below) that predated the audit entirely. All were schema/RPC changes — fixed here, before Sprint 8's UI got built on top of them.
+
+### Audit findings folded into this plan (2026-07-01)
+
+| ID | Severity | Finding | Evidence | Resolution |
+|---|---|---|---|---|
+| A0 | 🔴 Critical — **discovered live**, deeper than the original audit | **`reserve_units`/`funnel_reserve_line` have never been able to execute against real data.** Two column references never resolved: (a) `inventory_units.product_id` — doesn't exist; the table predates the sales funnel and only ever had free-text `product_name` (RMA repair workflow); (b) `reserve_units`' `ORDER BY created_at` — real column is `created_date`. Postgres doesn't validate plpgsql column references at `CREATE FUNCTION` time, so `20260719`/`20260732` applied "successfully" and sat silently broken. **This is the true root cause of "full end-to-end funnel testing is blocked"** — deeper than the "no available stock" framing in the Sprint 7.5 retrospective. `release_units`/`deliver_units`/`restore_units` are unaffected (no `product_id`/`created_at` references). | Live `information_schema.columns` query on `inventory_units` (2026-07-01) — 18 real columns, no `product_id`, no `created_at` | `20260737_inventory_units_add_product_id.sql` (new column, nullable, no backfill — confirmed with user) must run **before** `20260738`; `20260738` also fixes `created_at` → `created_date` |
+| A1 | 🔴 Critical | **Two status axes unreconciled.** `inventory_units.status` is the RMA-repair lifecycle (`active_rma`/`closed`/`company_stock`/`sent_to_manufacturer`/…); the funnel state (`available`/`reserved`/`delivered`) lives in the separate `reservation_status` column. Sprint 8 was specced to derive counts from `status`. | `inventory.ts` status writes; `20260719_inventory_reservation.sql:16-18` | §1 + Sprint 8 rewrite: funnel counts group by `reservation_status`, filtered to a sellable-`status` allow-list |
+| A2 | 🔴 Critical | **Overselling hole #1.** `funnel_reserve_line` classifies serialized-vs-service by "does the product have ANY `inventory_units` row right now." A new or sold-out serialized product → 0 rows → silent no-op → sells with no stock decrement. | `20260732_funnel_line_reservation.sql:29-39` | §2: classify by the **existing** `products.product_type` enum (`hardware`/`software`/`accessory`/`service` — `20260526_check_constraints.sql:121-124`), not row existence — **no new column needed**, this was already-built schema the original audit missed |
+| A3 | 🔴 High | **Overselling hole #2.** `reserve_units` only excludes `status IN ('closed')`, so an `active_rma` unit (on the repair bench) — or `sent_to_manufacturer`/`resolved` — can be reserved and delivered on a Sales Order. | `20260719:62,74` | §3: explicit sellable-`status` allow-list in `reserve_units` |
+| A4 | 🟠 Med-High | **No serial uniqueness.** No UNIQUE on `inventory_units.serial_number`, yet Sprint 8 "Receive Stock" and Sprint 9 vendor-invoice receipt both mass-insert serials → duplicate physical units, corrupts traceability + double-counts stock. | no such constraint in any migration | §4: partial UNIQUE index + duplicate-serial guard in every receive RPC |
+| A5 | 🟠 Medium | **No backup/rollback/staging discipline** in the workflow, despite H3 proving a prod-wipe was one `db push` away. | old workflow rule 4 | Workflow rules 4 & 6 updated |
+| A6 | 🟠 Medium | **Testing gate stated but not honored** — Sprints 3/5/6/7 marked COMPLETE with QA boxes unchecked; 277 unit tests cover only `src/lib/` pure fns — zero integration/RLS/RPC coverage. | Definition of Done; 52-item checklist unrun | `BUILT` vs `VERIFIED` split; integration tier + deferred 52-item checklist run as Sprint 8 gate |
+| A7 | 🟡 Low | Sprint 9 doc-types table said VI code is assigned "on confirmation"; the RPC assigns it at receipt. The RPC is correct (don't burn a gapless legal number before goods land) — the table was wrong. | plan (old) Sprint 9 | Sprint 9 table corrected |
+| A8 | 🟡 Low | Sprint 9's single `received` status can't model a PO arriving in multiple shipments. | plan (old) Sprint 9 | Sprint 9: `partially_received` + per-line `qty_received` |
+
+A0 surfaced live during Sprint 7.6 execution (deeper than the original audit); A1–A4 are the schema fixes originally planned; A5–A8 are folded into the workflow, Sprint 8 gate, and Sprint 9 spec respectively. Full audit narrative: chat 2026-07-01.
+
+### Build checklist (schema/RPC only — no UI, no page changes)
+
+**Three migrations written** (split from the original single-file plan once live testing surfaced A0 and the §4 data dependency):
+
+| File | Contains | Status |
+|---|---|---|
+| `20260737_inventory_units_add_product_id.sql` | A0(a): adds `inventory_units.product_id` (nullable FK to `products`, no backfill — confirmed with user) + index | ✅ Applied 2026-07-01, confirmed "Success" |
+| `20260738_inventory_model_reconciliation.sql` | A0(b) `created_at`→`created_date` fix, §1 (A1), §2 (A2), §3 (A3) | ✅ Applied 2026-07-01, confirmed "Success" |
+| `20260739_inventory_serial_uniqueness.sql` | §4 (A4) | First apply attempt failed — 8 non-closed rows shared a serial (`'1'`×4, `'2'`×2, `'d'`×2), all `active_rma` placeholder values. Cleaned up via `scripts/manual/archive/20260740_inventory_units_dedupe_placeholder_serials.sql` (nulled those 8 rows by exact id — zero funnel impact, none were `company_stock`). ✅ Re-applied 2026-07-01, confirmed "Success" — verified live by Test 5 below (duplicate insert correctly rejected with `23505`) |
+
+None checked off per the `BUILT ≠ VERIFIED` rule — pending your apply + gate verification.
+
+- [x] **§0 — Foundational: `product_id` + `created_at` (A0).** Discovered live 2026-07-01 when §4's index creation failed and a schema introspection query revealed `inventory_units` has no `product_id` column at all (it predates the sales funnel — RMA-repair-only, free-text `product_name`). Every `WHERE product_id = ...` in `reserve_units`/`funnel_reserve_line` has never resolved; `reserve_units`' `ORDER BY created_at` also referenced a nonexistent column (real name: `created_date`). Postgres doesn't validate plpgsql body columns at `CREATE FUNCTION` time, so `20260719`/`20260732` applied "successfully" and sat silently broken — **this, not "no available stock," is the true reason full funnel testing was blocked.** `20260737` adds the column (nullable, no backfill); `20260738` fixes the `ORDER BY`.
+- [x] **§1 — Reconcile the two status axes (A1).** `COMMENT ON COLUMN` documents the contract directly on `inventory_units.status` (physical/RMA lifecycle: `active_rma`/`company_stock`/`sent_to_manufacturer`/`closed`, per `chk_inventory_status`) and `reservation_status` (funnel state: `available`/`reserved`/`delivered`, added by `20260719`) — orthogonal, never conflate. Sellable = `status = 'company_stock'`. **No backfill UPDATE included** — data-dependent and not something to guess at blindly; if you find units that are functionally sellable stock but not currently `status = 'company_stock'`, correct those by hand (or ask for a targeted migration once you know which rows).
+- [x] **§2 — Product-level serialization flag (A2) — reuses existing schema, no new column.** `funnel_reserve_line` rewritten to look up `products.product_type` and branch on it instead of "does an `inventory_units` row exist": `product_type = 'service'` → no-op (with a `RAISE EXCEPTION` if the product itself doesn't exist — defensive, since this is `SECURITY DEFINER`); anything else (`hardware`/`software`/`accessory`) → `reserve_units`, which now correctly raises `Insufficient stock` at 0 available, including for a brand-new or fully sold-out product.
+- [x] **§3 — Sellable-status allow-list (A3).** `reserve_units` rewritten: both the availability COUNT and the `FOR UPDATE SKIP LOCKED` selection now filter `status = 'company_stock'` instead of `status NOT IN ('closed')`. An `active_rma` (on the repair bench) or `sent_to_manufacturer` unit can never be reserved for a Sales Order.
+- [x] **§4 — Serial uniqueness (A4).** Partial UNIQUE index on `inventory_units.serial_number`, `WHERE serial_number IS NOT NULL AND serial_number <> '' AND status <> 'closed'`. **First apply attempt failed 2026-07-01**: `ERROR 23505 — Key (serial_number)=(1) is duplicated` — production had 8 non-closed units sharing a serial (`'1'`×4, `'2'`×2, `'d'`×2), all `active_rma` placeholder values. Resolved via `scripts/manual/archive/20260740_inventory_units_dedupe_placeholder_serials.sql` (nulled by exact id); `20260739` re-applied successfully. Excludes NULL and `''` (repair-ticket units without a captured serial share both — `inventory.ts` `createUnitsFromTicket`) so no-serial units don't collide with each other. `receive_stock` (Sprint 8) and `receive_vendor_invoice` (Sprint 9) will add friendly per-serial duplicate errors when those RPCs are written — this migration only added the enforcement mechanism.
+- [x] All three migrations are idempotent (`CREATE OR REPLACE FUNCTION`, `ADD COLUMN IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`); applied in order `20260737` → `20260738` → (cleanup) → `20260739`, all confirmed "Success" in Supabase SQL Editor.
+
+### Open questions — ✅ both resolved 2026-07-01
+
+- [x] **Stock classification** — reuses the existing `products.product_type` enum, no new column. **Confirmed**: only `product_type = 'service'` is non-stock; `hardware`/`software`/`accessory` always require serialized `inventory_units` (0 available on any of those three is a hard `Insufficient stock` error, never a no-op). Drives §2.
+- [x] **Canonical sellable `status` value** — resolved directly from the DB, no live-data audit needed: `chk_inventory_status` (`20260526_check_constraints.sql:89-92`) only allows `active_rma` / `company_stock` / `sent_to_manufacturer` / `closed`. Sellable = **`company_stock`** only. Drives §1 and §3.
+
+### Sprint 7.6 gate — ✅ ALL VERIFIED 2026-07-01
+
+- [x] Backup taken; `20260737` then `20260738` applied and confirmed "Success" in Supabase SQL Editor
+- [x] `npm test`, `npm run lint`, `npm run build` all pass (277/277, 0 errors, build ✓ — verified after every migration written in this sprint)
+- [x] **Basic execution test (A0)**: verified directly — `funnel_reserve_line`/`reserve_units` called via SQL Editor with no `column does not exist` error; this alone was never true before this sprint
+- [x] **Sold-out test**: called `funnel_reserve_line` against a `hardware` product with 0 linked `company_stock` units → correctly raised `Insufficient stock: need 1, only 0 available` (no longer a silent no-op)
+- [x] **RMA-unit test**: flipped a unit to `active_rma` while `reservation_status='available'` → correctly excluded, `funnel_reserve_line` still raised `Insufficient stock`
+- [x] **Happy-path regression test**: created a real `company_stock` unit linked via `product_id` → `funnel_reserve_line` succeeded, unit correctly transitioned to `reservation_status='reserved'`, `reserved_by_doc_type='manual'` — confirms A0's fix didn't just move the failure elsewhere
+- [x] Duplicate-serial diagnostic run, resolved via cleanup script, `20260739` applied; **duplicate-serial test**: inserting an already-existing live serial correctly rejected with `23505`
+
+All 5 tests run directly against production via the Supabase SQL Editor (Sprint 8 doesn't exist yet to test through the UI). Test data (`GATE-TEST-0001` unit + its `stock_moves` row) deleted 2026-07-01 — confirmed clean. Service-product no-op path (§2) not separately verified — catalog has no `service`-type products yet to test against; the code path is a single-branch no-op with no side effects, low risk, revisit whenever a service product/document line is first used for real.
+
+---
+
+## Sprint 8 — Inventory & Warehouse Management 🔵 NEXT (expanded scope 2026-07-01)
+
+**Status**: 🔵 NEXT — Sprint 7.6 is complete and its gate fully verified. Original Sprint 8 scope (Receive Stock + funnel-aware Overview) is unchanged in substance but the sprint was significantly expanded 2026-07-01 after a full inventory/warehouse-management spec was reviewed against the current architecture. Split into 4 phases below so the highest-risk piece (schema) ships and is tested in isolation first — same discipline that caught A0 in Sprint 7.6.
+
+**Goal**: Replace the current Inventory page with a funnel-aware, dual-model (serialized + bulk-quantity) design; add real warehouse management (types, archive, atomic transfer); broaden the movement-type taxonomy; and provide a "Receive Stock" path so the full sales funnel can be tested end-to-end before the Purchase Module (Sprint 9) exists.
+
+### Architecture Lock — confirmed 2026-07-01, do not re-litigate mid-build
+
+- [x] **Dual stock-tracking model**: `products.stock_tracking_mode` (`serialized` | `bulk`) is a new, independent column — `product_type` (`hardware`/`software`/`accessory`/`service`) still governs whether a line touches inventory at all (`service` = never); `stock_tracking_mode` governs *how* non-service stock is tracked. Default `serialized` (matches the Sprint 7.6 decision — no behavior change for existing products unless explicitly switched to `bulk`).
+- [x] **`warehouse_stock` is a new, genuinely separate table** (not a rollup) — the bulk-quantity counterpart to `inventory_units`, mirroring the `parts.quantity`/`reserved_quantity` counter pattern but with a warehouse dimension `parts` has never had.
+- [x] **Bulk reservation freely splits across warehouses** — no warehouse pinning on document lines, matching how serialized reservation already behaves (any available unit, any warehouse). No schema change to `quotations`/`sales_orders`/`crm_invoices` line items.
+- [x] **RMA Distribution buckets are a relabel, not a new workflow stage** — the Stock Breakdown view's "Received/Inspection/Repair/Ready" buckets map onto the *existing* ticket `product_status` values for display only. No change to `TicketForm`/`TicketDrawer`/the ticket status state machine.
+- [x] **Permission enforcement stays manager+-only server-side** (`rma_is_manager_or_above()`, same pattern as every Sprint 7.5/7.6 RPC) on Receive Stock / Transfer / Adjust / Archive Warehouse. **No new granular permission-key matrix** (`inventory.*`/`warehouse.*`/`rma.stock.*`) — overridden per the standing "don't add new permission gates yet" rule (roles system is being rebuilt separately).
+- [x] **The 5 existing RMA-ticket-status tabs (Received/Under Repair/Repaired/Can't Repair/RMA Stock) are preserved exactly as-is** — they track `rma_tickets.products[].product_status`, a completely different data source from `inventory_units`/`warehouse_stock`, and are unrelated to the sales-funnel gap this sprint closes. New funnel tabs are added alongside, not replacing them. `CompanyStockTab.jsx`/`ManufacturerTab.jsx` main components are confirmed dead code (unreachable — only their modal exports `CreateBatchModal`/`ProductDetailModal`/`TransferModal` are live) and may be cleaned up, but that's incidental to this sprint, not required by it.
+
+### What changes vs. current Inventory page
+
+| Area | Current state | After Sprint 8 |
+|---|---|---|
+| Stock states | `status` field only (RMA-repair: `active_rma`/`closed`/`company_stock`/…) | **Two orthogonal axes (post-7.6):** `reservation_status` (funnel: `available`/`reserved`/`delivered`) as the primary state for `serialized` products; `warehouse_stock.quantity`/`reserved_quantity` for `bulk` products. `status` (physical/RMA lifecycle) stays a secondary badge for serialized units. |
+| Entering stock | No path — units only come from the RMA repair workflow | "Receive Stock" (manager+): branches by product's `stock_tracking_mode` — serial entry for `serialized`, quantity+warehouse entry for `bulk` |
+| Movement history | Not surfaced anywhere | Per-product `stock_moves` timeline: receive → reserve → deliver → release / restore / transfer / adjust, with clickable SO/INV doc links |
+| Stock breakdown | Not surfaced anywhere | Drawer per product: Warehouse Distribution, Reserved (grouped by source SO/INV), RMA Distribution (relabeled ticket statuses) |
+| Warehouses | Existing tab, no type/manager/archive-safety | Type (Main/Branch/Service Center/RMA/Transit/Virtual), manager, notes columns; archive blocked while any live stock exists in that warehouse |
+| Transfers | Direct field mutation, no validation, no log (Track B B1.2 gap) | Atomic RPC — validates availability, moves stock, writes a `stock_moves` `transfer` row, all-or-nothing |
+| Bulk actions | None | Export selected / bulk transfer / bulk adjust / assign to warehouse / recalculate stock / print report |
+| RMA-ticket-status tabs | 5 tabs (Received/Under Repair/Repaired/Can't Repair/RMA Stock) | **Unchanged** — see Architecture Lock above |
+
+### Phase 8a — Schema foundation (migrations + RPCs only, no UI)
+
+Built and tested in isolation first, same discipline as Sprint 7.6 — this is the highest-risk part (a 3-way rewrite of `funnel_reserve_line`, the same function that had two real production bugs found in it this session).
+
+**6 migrations — ✅ COMPLETE, all applied and gate-verified 2026-07-01** (one bug found & fixed during gate testing — see note below; all tests then passed):
+
+| File | Contains |
+|---|---|
+| `20260740_inventory_bulk_stock_schema.sql` | `products.stock_tracking_mode`; `warehouse_stock` table + RLS; `warehouses` gains `warehouse_type`/`manager`/`notes`; `stock_moves.move_type` extended (+`receive`,`transfer`) and `ref_type` extended (+`warehouse_stock`) — both via catalog lookup for the constraint name, not a guessed one, per the lesson from Sprint 7.6's two real bugs |
+| `20260741_warehouse_stock_reservation_rpcs.sql` | `reserve_warehouse_stock`, `release_warehouse_stock`, `deliver_warehouse_stock`, `restore_warehouse_stock` |
+| `20260742_funnel_reserve_line_bulk_branch.sql` | `funnel_reserve_line` 3-way rewrite — smallest possible diff from `20260738`'s version, service/serialized paths untouched byte-for-byte |
+| `20260743_receive_stock_rpc.sql` | `receive_stock`, dual-mode, friendly duplicate-serial error |
+| `20260744_transfer_stock_rpc.sql` | `transfer_stock`, atomic, dual-mode, logs both sides for bulk transfers |
+| `20260745_adjust_archive_recalculate_rpcs.sql` | `adjust_stock`, `archive_warehouse`, `recalculate_stock` |
+
+- [x] `products.stock_tracking_mode text NOT NULL DEFAULT 'serialized' CHECK (IN ('serialized','bulk'))`
+- [x] `warehouse_stock` table: `id, product_id → products(id), warehouse_id → warehouses(id), quantity integer CHECK(>=0), reserved_quantity integer CHECK(>=0 AND <= quantity), updated_at`, `UNIQUE(product_id, warehouse_id)`. RLS mirrors `parts`/`inventory_units` (staff read, manager+ write).
+- [x] `warehouses` gains `warehouse_type text CHECK (IN ('main','branch','service_center','rma','transit','virtual'))`, `manager text` (email, matching the "who" convention), `notes text`. `is_active` already exists — no new column needed for archive itself.
+- [x] `stock_moves.move_type` CHECK extended: `reserve/deliver/release/restore/adjust` → add `receive`, `transfer`. `stock_moves.ref_type` CHECK also extended: `unit/part` → add `warehouse_stock` (a `warehouse_stock` row is a distinct concept from `parts` — reusing `'part'` would make `ref_id` ambiguous between two different tables).
+- [x] `funnel_reserve_line` rewritten to a 3-way branch: `product_type = 'service'` → no-op (unchanged) · `stock_tracking_mode = 'serialized'` → `reserve_units` (unchanged, just-fixed in 7.6) · `stock_tracking_mode = 'bulk'` → new `reserve_warehouse_stock`. **Verified**: serialized-path regression test (7.6's Test 7) still errors identically — the 3-way rewrite left service/serialized branches untouched.
+- [x] New RPCs mirroring the serialized set, operating on `warehouse_stock` rows with `FOR UPDATE` row locks, splitting across multiple warehouse rows if needed to satisfy a quantity (confirmed: free split, no pinning): `reserve_warehouse_stock`, `release_warehouse_stock`, `deliver_warehouse_stock`, `restore_warehouse_stock`. **Design note**: unlike `inventory_units`, a `warehouse_stock` row has no per-document reservation marker (it's a shared counter — multiple documents can each hold a slice of the same row concurrently), so `release`/`deliver_warehouse_stock` compute "how much of THIS document's reservation is on THIS row" by reading it back out of `stock_moves` (net reserve-minus-prior-release-or-deliver per row) rather than trusting a stored marker. This makes both **idempotent by construction** — verified live: a second `release` call no-op'd correctly with no double-credit.
+- [x] `receive_stock(p_product_id, ..., p_actor_email)` — branches by `stock_tracking_mode`: `serialized` takes a serial + inserts one `inventory_units` row (as originally specced, `7.6 §4` duplicate-serial guard applies, now with a friendly error message instead of a raw `23505`); `bulk` takes a warehouse_id + quantity and upserts `warehouse_stock.quantity`. Writes a `stock_moves` `receive` row either way. `rma_is_manager_or_above()` enforced. (Interim manual path — Sprint 9 replaces with vendor-invoice-driven receipt for both modes.)
+- [x] `transfer_stock(...)` — atomic RPC: `serialized` moves one unit's `warehouse_id` (blocked if `reservation_status != 'available'` — can't move a unit that's promised to an order); `bulk` decrements source / increments destination `warehouse_stock.quantity` under row lock (blocked if insufficient *available*, i.e. `quantity - reserved_quantity`). Writes a `stock_moves` `transfer` row — for `bulk`, one on **each** side (source and destination) so the movement history is complete from either warehouse's perspective; `from_status`/`to_status` carry the warehouse UUIDs (as text) rather than a reservation-status transition, since transfers don't change `reservation_status`. All-or-nothing — no partial transfer state.
+- [x] `adjust_stock(...)` — manual correction: `serialized` changes a unit's `status` (found/missing/damaged, constrained by the existing `chk_inventory_status` CHECK) + logs `adjust`; `bulk` applies a signed quantity delta to `warehouse_stock.quantity` + logs `adjust` with before/after values.
+- [x] `archive_warehouse(...)` — sets `is_active = false` only if zero live `inventory_units` reference that `warehouse_id` (any non-`closed` status) AND zero `warehouse_stock` rows for it have `quantity > 0`. Otherwise raises a clean error naming the blocking counts.
+- [x] `recalculate_stock(p_product_id, p_warehouse_id)` — **only meaningful for `bulk`** (serialized availability is always a live `COUNT(*)`, nothing to drift). **Deliberately scoped down during implementation**: only recomputes `reserved_quantity` (via the same net-reserved query already proven in `release`/`deliver_warehouse_stock`) — does **not** attempt to replay the full `quantity` history from `stock_moves`, since a transfer touches two rows and a fragile whole-ledger replay wasn't worth the risk for a manual, low-frequency admin tool. `reserved_quantity` is the counter actually at risk of drift given the multi-document splitting logic; `quantity` is a directly-managed counter (receive/adjust) with no equivalent risk.
+
+**Phase 8a gate — ✅ ALL VERIFIED 2026-07-01** (direct-SQL against production, same approach as Sprint 7.6 — no UI exists yet):
+
+- [x] Test 1 — receive into two warehouses (A:6, B:4) ✓
+- [x] Test 2 — reserve 8, correctly split across both (A:6 reserved, B:2 reserved) ✓
+- [x] Test 3 — release clears both to 0; second release call no-ops (idempotency confirmed) ✓
+- [x] Test 4 — transfer 3 (A:6→3, B:4→7); over-transfer of 100 correctly blocked ✓
+- [x] Test 5 — adjust −2 then +5 applied correctly ✓
+- [x] Test 6 — archive blocked while stock present, succeeds once zeroed ✓
+- [x] Test 7 — serialized-path regression (7.6) errors identically — 3-way rewrite left it untouched ✓
+- [x] `npm test` 277/277, `npm run lint` 0 errors, `npm run build` ✓ (no JS/TS touched this phase)
+- [x] Test data cleaned up afterward
+
+**Bug found & fixed during gate testing 2026-07-01 (3rd real bug in this exact reservation subsystem this session — A0's `product_id`, A0's `created_at`, now this)**: `release_warehouse_stock`/`deliver_warehouse_stock` filtered `stock_moves` with `sm.doc_id = p_doc_id`. When `p_doc_id` is `NULL` (a real, legitimate case — `doc_type='manual'` calls pass `NULL` for `doc_id`), SQL's `NULL = NULL` evaluates to `NULL`/false, not true — so the lookup silently matched zero rows and the function was a permanent no-op for any NULL-doc_id reservation. Caught because the gate test's release call visibly did nothing (`reserved_quantity` unchanged), which then correctly surfaced as cascading "insufficient available stock" / CHECK-constraint errors in the transfer and adjust tests that followed — all downstream symptoms of the one root cause, not independent bugs. **No data was corrupted** — the broken release call simply performed zero writes. Fixed in `20260741_warehouse_stock_reservation_rpcs.sql` by changing both occurrences to `sm.doc_id IS NOT DISTINCT FROM p_doc_id` (NULL-safe equality). Swept every Phase 8a file for the same pattern — no other occurrences found. Corrected `20260741` re-applied and all downstream tests then passed.
+
+**Also noted for the rest of Sprint 8's testing**: never bundle an "expect success" call and an "expect failure" call in the same Supabase SQL Editor submission — the editor runs a multi-statement paste as one transaction, so the failure rolls back the success too (bit us once in Test 4; re-ran as separate submissions and it passed). Same gotcha as the `20260739` multi-statement rollback earlier this session.
+
+### Phase 8b — Core Inventory UI (Overview, Stock Breakdown, Receive Stock, Stock Movements) ✅ BUILT 2026-07-01
+
+**All checklist items shipped, gate green (`npm test` 277/277, lint 0 errors, build ✓) after every increment. Status: BUILT, not yet VERIFIED — manual click-through QA (given to the user earlier) still pending before this phase can be marked COMPLETE.**
+
+- [x] **API layer** (`src/api/db/inventory.ts`, `catalog.ts`, `index.ts`): `ProductRow.stock_tracking_mode`; `InventoryUnitRow` extended with `product_id`/`reservation_status`/`reserved_by_*` (these existed in the DB since Sprint 7.6/8a but were never added to the TS type — a real gap from when the reservation system was non-functional, closed now); `WarehouseRow.warehouse_type`/`manager`/`notes`; new `WarehouseStockRow`, `StockMoveRow`, `ProductStockSummary` types; new `warehouseStock` and `stockMoves` read modules; new `warehouses.archive()`; new RPC wrappers `inventory.receiveStock()`/`transferStock()`/`adjustStock()`/`recalculateStock()`; new `inventory.getStockSummary()` (fetch-raw-then-aggregate-in-JS, matching the existing `getStats()` convention in this file rather than a new DB view — product/unit counts at this system's scale don't warrant one yet, see Phase 8d).
+- [x] Rebuild `src/pages/Inventory/` — 2 new tabs (**Overview** redesigned, **Stock Movements** added) alongside the 5 preserved RMA-ticket-status tabs + Warehouses (see Architecture Lock) — old `getStats()`/`stats` fetch removed as genuinely dead code once Overview no longer consumed it.
+- [x] **Overview tab** (`OverviewTab.jsx`, fully rewritten): per-product summary from `getStockSummary()` — available (green) / reserved (amber) / delivered (blue) counts, tracking-mode badge (serialized/bulk), search-by-name filter, sorted by total descending. Replaces the old RMA-repair-centric "Stock by Brand" breakdown per this sprint's explicit redesign (not one of the 5 preserved tabs). Row click opens the Stock Breakdown modal.
+- [x] **Stock Breakdown modal** (`StockBreakdownModal.jsx`, new): Product Info (SKU/brand/category/total, joined from the already-fetched `products` list) · Warehouse Distribution (per-warehouse unit count for serialized, `warehouse_stock` row for bulk) · Reserved (grouped by `reserved_by_doc_id` for serialized; net reserve-minus-release/deliver computed client-side from `stock_moves` for bulk, same ledger logic proven in the `release`/`deliver_warehouse_stock` RPCs — clickable through to `/sales/:type/:id`) · RMA Distribution (real stored ticket `product_status` labels, matched by `product_name` — **not** force-mapped to "Received/Inspection/Repair/Ready", since no existing status means "Inspection" and inventing one wasn't confirmed; shown as-is instead). **Built on the existing `Modal` component** (Radix Dialog, already used everywhere else for detail overlays) rather than a new bespoke slide-over — reuses its focus-trap/escape/aria accessibility rather than reinventing it; deviates from the plan's literal "slide-over" wording but is the same reuse-over-invent judgment call as everywhere else in this codebase.
+- [x] **Receive Stock modal** (`ReceiveStockModal.jsx`, new, manager+ gated client-side via a direct role check — `[MANAGER, ADMIN, SUPER_ADMIN].includes(userRole)` — matching the "no new granular permission matrix" decision, server-side enforcement is the real gate via `rma_is_manager_or_above()` inside the RPC): product search (reuses `ProductSearchInput` from `Pipeline/_shared.jsx` — already cross-imported by `SalesDocumentForm.jsx`, so this follows an existing precedent rather than adding a 3rd duplicate copy), then branches by the selected product's `stock_tracking_mode` — serial entry (multi-line textarea, deduplicated, one `receive_stock` call per serial with per-serial error toasts so one bad serial doesn't block the rest) for `serialized`; quantity + warehouse for `bulk`. "Receive Stock" button added to the page header.
+- [x] **Stock Movements tab** (`StockMovementsTab.jsx`, new): flat `stock_moves` table — date, move type (color-coded, includes `receive`/`transfer`), product/serial or product@warehouse (resolved client-side from already-fetched `units`/`warehouseStock`/`products`/`warehouses` — no extra queries), qty, document (clickable → `/sales/:type/:id` for `sales_order`/`invoice`/`credit_note`; plain label for `manual`), actor. Move-type filter dropdown.
+- [x] **Row actions** (`TransferStockModal.jsx`, `AdjustStockModal.jsx`, new, both wired into the Stock Breakdown modal, manager+ gated client-side): Transfer/Adjust buttons per warehouse row (bulk) or per available serialized unit (`AvailableUnits` section — only `reservation_status='available'` units, matching `transfer_stock`'s own guard). **Design decision**: left the existing `TransferModal.jsx`/`db.inventory.transferUnits()` (used by the 5 preserved RMA-ticket-status tabs + `ByProductTab`) completely untouched rather than "upgrading" it per the plan's original wording — that component supports a "System Pool" (null-warehouse) destination and doesn't check reservation state, neither of which the new atomic `transfer_stock` RPC supports (it requires a real destination warehouse and blocks non-available units). Narrowing the old feature's behavior for its existing RMA-workflow callers would have violated "preserve working features"; instead this ships as a new, purpose-built flow for funnel stock specifically, reached only from the Stock Breakdown modal.
+- [x] Search — Overview has a name search, Stock Movements has a move-type filter. **Deferred, not built**: full multi-field filter panel (status/warehouse/date range) and pagination — current data volumes don't need it yet (same Phase 8d reasoning as `getStockSummary()`); revisit if/when the underlying lists approach the existing 5,000-row cap.
+- [x] All strings `en.json` + `ar.json` for everything shipped so far (Overview/Stock Movements keys from the prior update, plus `productInfo`, `colSku`, `colCategoryLabel`, `warehouseDistribution`, `noWarehouseStock`, `noWarehouseAssigned`, `reservedDistribution`, `noReservations`, `rmaDistribution`, `noRmaActivity`, `receiveStockButton`/`Title`/`Validation`/`Submit`, `selectProduct`, `quantity`, `serialNumbers`/`Placeholder`/`Hint`, `receiveStockQtyRequired`, `receiveStockSerialRequired`/`Failed`, `receiveStockSuccess` (pluralized), `receiveStockBulkSuccess`); dark mode with Direction B tokens throughout what's built.
+
+### Phase 8c — Warehouse management + bulk actions ✅ BUILT 2026-07-01
+
+Gate green after every increment (`npm test` 277/277, lint 0 errors, build ✓).
+
+- [x] **Warehouses tab** extended (`WarehousesTab.jsx`, `CreateWarehouseModal`): `warehouse_type` (select, 6 options), `manager` (email text field), `notes` (textarea) added to create/edit form. **Archive replaces hard delete**: `handleDelete`/`db.warehouses.delete()` call site replaced with `handleArchive`/`db.warehouses.archive()` (the `archive_warehouse` RPC from Sprint 8a) — blocks server-side with a clean error naming the blocking counts if any live serialized units or bulk quantity still reference the warehouse. Row-action icon swapped from a trash can to an archive-box glyph (amber hover, not red) so it doesn't read as destructive. **Also fixed while in this file**: `WarehouseRow` TS type was missing `created_by` (same class of gap as the `InventoryUnitRow` reservation fields found in Sprint 7.6/8a — the column is passed by the existing create handler but was never reflected in the type); added for completeness. **Not touched**: the many pre-existing `t('inventory:xxx')` colon-namespace calls throughout this file are a latent bug (only one i18next namespace, `translation`, is registered in `src/lib/i18n.js` — `inventory:` resolves to nothing) — out of scope for this sprint, left as-is; all new strings added here correctly use `inventory.xxx` dot notation.
+- [x] **Bulk action bar** (`OverviewTab.jsx`, canonical pattern from `PipelineListView.jsx` — checkbox column + select-all + indigo bar): Export Selected (CSV via existing `downloadCSV` helper), Print Stock Report (lazy-loaded `jspdf`, matches the existing PDF pattern in `WarehousesTab.jsx`), Bulk Transfer / Bulk Adjust / Recalculate Stock (manager+ gated, new `BulkStockActionModal.jsx`). **Defined, documented scope** (each op is a loop of the already-proven single-item RPCs, not a new server-side bulk RPC — there is no natural "bulk" version of a per-product-per-warehouse operation): Bulk Transfer moves *all* current stock of each selected product to one destination warehouse (per-row for bulk, per-available-unit for serialized; units with no warehouse assigned are skipped). Bulk Adjust and Recalculate apply to **bulk-tracked products only** — serialized products are skipped with a toast explaining why (adjusting every available unit's status uniformly wasn't a clearly-requested behavior; the per-unit Adjust in the Stock Breakdown modal covers that case). "Assign to warehouse" from the original spec was folded into Bulk Transfer rather than built as a separate, functionally-identical action.
+- [x] ~~`TransferModal.jsx` upgraded to call the new atomic `transfer_stock` RPC~~ — **superseded by a Phase 8b decision**: left untouched, new `TransferStockModal.jsx` built instead for funnel stock specifically. See Phase 8b's row-actions entry for the full reasoning (old component's "System Pool" + no-reservation-check behavior would have been narrowed for its existing RMA-workflow callers).
+
+**Sprint 8 (Phases 8a/8b/8c) is now fully BUILT.** Status: BUILT, not VERIFIED — the manual click-through QA given to the user across this sprint (Overview, Stock Breakdown, Receive Stock, Stock Movements, Warehouse archive, bulk actions) is still pending before Sprint 8 as a whole can be marked COMPLETE and its gate (including the deferred Sprint 6/7 52-item funnel checklist) run.
+
+### Phase 8d — Performance (only if/when actually needed)
+
+- [ ] If the product catalog or `inventory_units`/`warehouse_stock` row counts approach the existing 5,000-row client-side cap (`CLAUDE.md` "List caps"), switch the Overview tab to server-side pagination using the existing `listPaged()` pattern already used elsewhere. **Not built speculatively** — flagged here so it isn't forgotten, built only when the cap is actually approached.
+
+### Sprint 8 gate (all phases)
+
+> **2026-07-02 note on the checkboxes below:** items marked `[x] (RPC-verified)` are proven correct at the database/RPC layer by the automated `db-tests` CI harness (`supabase/tests/inventory_hardening.sql` + `inventory_hardening2.sql`) — a real Postgres, real assertions, but **not** a browser click-through. That's necessary, not sufficient: the underlying stock math is now provably right, but nobody has confirmed the Inventory page *displays* it correctly. Items still needing an actual click-through stay unchecked.
+
+- [x] Sprint 7.6 shipped and its gate green (hard prerequisite) — ✅ already done
+- [x] Phase 8a migrations applied (backup taken first) and confirmed in Supabase SQL Editor; Phase 8a gate tests (above) pass via direct SQL — all migrations through `20260755` applied and confirmed 2026-07-02
+- [x] `npm test`, `npm run lint`, `npm run build` all pass after 8b/8c
+- [x] (RPC-verified) Receive Stock (both modes) → correct row/counter created, `stock_moves` shows `receive`; a duplicate serial is rejected (serialized) / quantity accumulates correctly (bulk) — `inventory_hardening.sql` CHECK 1/2/7
+- [ ] Full funnel cycle, both modes: Receive Stock → SO approve (reserved) → Invoice post (delivered) → Invoice void (returns to available) — visible in Inventory page and Stock Movements at every step. *(RPC-level reserve→deliver conservation is proven — CHECK 3/5 — but "visible in Inventory page" is a UI claim, unchecked until clicked through.)*
+- [ ] Cancel a delivered SO before invoicing → stock returns to available → `stock_moves` shows `release`. *(Proven for bulk — CHECK 10 releases a reserved-not-yet-delivered row. NOT directly tested for serialized — `inventory_hardening.sql` only covers release-after-delivery (a no-op, CHECK 6), not release-while-still-reserved. Gap, not a pass — worth a small follow-up check.)*
+- [x] (RPC-verified) Transfer test: atomic success case + blocked case (insufficient available / unit not `available`) — `inventory_hardening2.sql` CHECK 1/2/3/4
+- [ ] Archive-warehouse test: blocked while live stock exists, succeeds once empty — **not covered by any automated test yet**, genuine gap (only RPC not exercised in either inventory test file)
+- [ ] **Deferred Sprint 6/7 52-item funnel checklist runs and passes HERE** — still a manual UI checklist, not something an RPC test can satisfy
+- [ ] Confirm the 5 preserved RMA-ticket-status tabs still render and function exactly as before (regression check on the Architecture Lock decision)
+- [ ] Arabic + dark mode verified on all new screens
+
+---
+
+## Sprint 9 — Purchase Module ✅ BUILT 2026-07-01
+
+**Status**: ✅ BUILT — all 5 migrations written, API layer + `/purchasing` UI shipped, gate green (`npm test` 277/277, lint 0 errors, build ✓ — 69 precache entries, 2 new lazy chunks). Status: BUILT, not VERIFIED — the Sprint 9 gate below (a live procurement cycle, including partial receipt and duplicate-serial rejection) still needs to be run once the migrations are applied.
+
+**Migrations written** (apply in order, after Sprint 8a's `20260740`–`20260745`):
+
+| File | Contains |
+|---|---|
+| `20260746_purchase_vendors.sql` | `vendors` table + RLS |
+| `20260747_purchase_documents.sql` | `proforma_invoices`/`purchase_orders`/`vendor_invoices` tables + RLS; registers the `vendor_invoice` sequence type + adds the `VI` prefix to `nextval_for_type`; extends `stock_moves.doc_type` with `vendor_invoice` |
+| `20260748_inventory_units_vendor_invoice_fk.sql` | `inventory_units.vendor_invoice_id` nullable FK + index |
+| `20260749_receive_vendor_invoice_rpc.sql` | `receive_vendor_invoice` atomic dual-mode RPC |
+| `20260750_purchase_documents_view.sql` | `v_purchase_documents` UNION view |
+
+**Code**: `src/api/db/purchasing.ts` (new — `vendors`/`proformaInvoices`/`purchaseOrders`/`vendorInvoices`/`purchaseDocuments` modules + row types, registered in `db/index.ts`); `src/pages/Purchasing/` (new — `index.jsx` 5-tab list, `_modals.jsx` 4 create modals, `PurchaseDocumentDetail.jsx` lifecycle + dual-mode receive modal); `App.jsx` route/nav wiring (`/purchasing` + `/purchasing/:type/:id`, gated by the existing `['deals','view']` permission — no new gate). Full `en.json`/`ar.json` `purchasing` namespace + `nav.purchasing`.
+
+**Key implementation decisions & deviations from the original spec:**
+- **`receive_vendor_invoice` is dual-mode** (serialized *and* bulk) — the original Sprint 9 spec predated Sprint 8's bulk-tracking model. Serialized lines take `serials[]` (one `inventory_units` row each, 7.6 §4 duplicate guard via a friendly per-serial error); bulk lines take `qty` (upserts `warehouse_stock`). Branches on `products.stock_tracking_mode`, same convention as `receive_stock`.
+- **`stock_moves.doc_type` had to be extended with `vendor_invoice`** (not reuse `invoice`) — a `vendor_invoices.id` is a distinct entity from a sales `crm_invoices.id`; reusing `invoice` would make `doc_id` ambiguous and break the Stock Movements tab's "click to `/sales/:type/:id`" link. Constraint dropped via catalog lookup (same defensive pattern as Sprint 8a), not a guessed name.
+- **`qty_received` folded via `jsonb_agg`** rebuild of `line_items` (arrays preserve order in JSONB — the same discipline as everywhere else in this project), status flips to `received` only when `bool_and(qty_received >= qty_ordered)`, else `partially_received`.
+- **UI is a deliberately smaller v1 than `SalesDocuments`** — no sort/filter-panel/pagination/bulk actions on the list yet (this is a brand-new module, not a many-iteration-refined one; add if usage justifies). Vendor edit/detail is also v1 (create + list only; editing a vendor row is not yet wired).
+- **`PurchaseDocumentDetail` lifecycle actions** are plain client-side status writes (markSent/markAccepted/markConfirmed/cancel) — unlike the sales funnel's approval-pool RPCs, purchase documents have no manager-approval workflow requirement, so no `SECURITY DEFINER` lifecycle RPCs were needed beyond the receive path. RLS (manager+ write) is the enforcement layer.
+
+**Purpose**: Replace the manual "Receive Stock" button from Sprint 8 with a full procurement audit trail. Every inventory unit can be traced back to a specific vendor, purchase order, and confirmed vendor invoice. This is the permanent, auditable path for how new stock enters the system.
+
+### Document flow
+
+```
+Vendor ──▶ Proforma Invoice (optional) ──▶ Purchase Order ──▶ Vendor Invoice
+                                                                     │
+                                                          [Confirm & Receive]
+                                                                     │
+                                                  inventory_units (status='available')
+                                                  stock_moves (move_type='receive')
+```
+
+### Document types and codes
+
+| Document | Code | Assigned when |
+|---|---|---|
+| Proforma Invoice | `PI-XXXXXXXX` (8 random digits) | On create |
+| Purchase Order | `PO-XXXXXXXX` (8 random digits) | On create |
+| Vendor Invoice | `VI-YYYY-NNNNN` (year + 5-digit sequential, gapless) | **On physical receipt** (inside `receive_vendor_invoice`) — never on draft or confirm. A gapless legal number is not burned until goods actually land (audit A7). |
+
+### "Confirm Vendor Invoice" RPC (atomic)
+
+Single `SECURITY DEFINER` function `receive_vendor_invoice(p_vi_id, p_receipt_lines jsonb, p_actor_email)`:
+- Locks VI row `FOR UPDATE`, checks `status IN ('confirmed','partially_received')`, enforces `rma_is_manager_or_above()`
+- For each `{product_id, serials[]}` element in `p_receipt_lines`: **rejects any serial that already exists as a live unit (7.6 §4)**, then inserts one `inventory_units` row per serial at `reservation_status='available'` + a sellable `status`, sets `vendor_invoice_id` FK, increments that line's `qty_received`
+- Writes a `stock_moves` row per unit (`move_type='receive'`, `doc_type='vendor_invoice'`, `doc_id=vi_id`)
+- Assigns `VI-YYYY-NNNNN` via `nextval_for_type('vendor_invoice')` **on the first receipt only** (idempotent — a later partial receipt reuses the existing code); sets status to `received` when every line's `qty_received = qty_ordered`, else `partially_received` (audit A8)
+- All in one transaction — either the whole receipt lands or none of it does
+
+### New tables (migrations, idempotent)
+
+- `vendors` — `id`, `name`, `contact_person`, `email`, `phone`, `tax_id`, `payment_terms`, `created_by`; RLS: staff read, manager+ write
+- `proforma_invoices` — `id`, `pi_code`, `vendor_id`, `status`, `line_items jsonb`, `total`, `notes`, `created_by`, `created_at`
+- `purchase_orders` — `id`, `po_code`, `vendor_id`, `proforma_invoice_id` (nullable FK), `status`, `line_items jsonb`, `total`, `expected_delivery_date`, `notes`, `created_by`, `created_at`
+- `vendor_invoices` — `id`, `vi_code` (null until received), `purchase_order_id` (nullable FK), `vendor_id`, `status` (`draft`→`confirmed`→`partially_received`→`received`→`cancelled`), `line_items jsonb` (each line carries `qty_ordered` + `qty_received` so a PO arriving in multiple shipments is representable — audit A8), `total`, `invoice_date`, `notes`, `created_by`, `created_at`, `confirmed_at`, `received_at`
+- Add `vendor_invoice_id uuid` column to `inventory_units` (nullable FK — traces every unit back to its purchase)
+- Register `'vendor_invoice'` sequence type in `nextval_for_type()` (`document_sequences` table)
+
+### UI placement
+
+New `/purchasing` page (mirrors `/sales` structurally) with 5 tabs: All · Proforma Invoices · Purchase Orders · Vendor Invoices · Vendors. Powered by a `v_purchase_documents` UNION view (same pattern as `v_sales_documents`).
+
+### Sprint 9 gate
+
+> Same RPC-verified-vs-click-through distinction as the Sprint 8 gate note above.
+
+- [x] `npm test`, `npm run lint`, `npm run build` all pass (277/277, 0 errors, build ✓)
+- [x] All migrations applied and confirmed in Supabase SQL Editor (backup first) — applied and confirmed 2026-07-02 (through `20260755`)
+- [x] (RPC-verified, partial) Full procurement cycle... verify `inventory_units` created at `reservation_status='available'` + sellable `status`, `VI-` code assigned only at receipt — `inventory_hardening2.sql` CHECK 11 (bulk)/CHECK 12 (serialized) assert quantity/status/code directly. `inventory_units.vendor_invoice_id` set and `stock_moves` shows `receive` rows are confirmed **by reading the RPC body**, not independently asserted by the test — a small honest gap, not a false claim.
+- [x] (RPC-verified) Partial receipt: receive fewer serials than ordered → VI status → `partially_received`; receive the rest → `received`, same `VI-` code reused — `inventory_hardening2.sql` CHECK 12, asserts the code identity across both calls directly
+- [x] (RPC-verified) Duplicate-serial: receiving a serial that already exists is rejected — `inventory_hardening2.sql` CHECK 13
+- [ ] From the Sprint 8 Inventory page, a received unit's movement history shows `VI-YYYY-NNNNN` as origin (via the Stock Movements tab, `doc_type='vendor_invoice'`) — UI rendering, unchecked
+- [ ] Arabic + dark mode on all new screens
 
 ---
 
@@ -901,6 +1216,59 @@ Manual QA checklist covering the 2026-06-30 work: the 14-item sales-funnel bug-f
 
 ---
 
+## Sprint H — Security & DB-Test Hardening ✅ COMPLETE 2026-07-02
+
+**Source**: full-system CTO/security/QA audit — `AUDIT_REPORT_2026-07-02.md` (repo root) is the living, detailed fix-tracker; this section is a summary, not a duplicate. Read the report for the complete findings, root-cause analysis, and dated fix log.
+
+**Trigger**: user asked for a brutally honest, adversarial audit of the whole system after Sprints 6–9 shipped. Verdict: **APPROVED WITH MAJOR CHANGES** — the architecture was sound but the money/authorization layer had real holes, and Sprint 8/9's migrations had never been proven against a live database (the same failure class as the `inventory_units.product_id` bug found in Sprint 7.6).
+
+### Critical + High findings — all resolved and verified live
+
+| ID | Finding | Fix |
+|---|---|---|
+| CRIT-1 | Money RPCs (`record_payment`, `issue_credit_note`, etc.) had `SECURITY DEFINER` with no internal role check and no `REVOKE` — any authenticated user, potentially `anon`, could call them | Guard added to every money/inventory RPC; comprehensive `REVOKE`/`GRANT` lockdown across all 24 client-invoked RPCs (`20260751`, `20260752`) |
+| CRIT-2 | `record_payment` never validated `sum(allocations) ≤ payment amount` or that the invoice belonged to the paying customer — a $100 payment could "pay" $500 of invoices | Running-sum guard + customer-match check + `FOR UPDATE` locks + `CHECK (unapplied_amount >= 0)` (`20260751`) |
+| CRIT-3 | Every RPC trusted a client-supplied `p_actor_email` — the audit trail was forgeable | Actor derived server-side from the JWT (`rma_current_user_email()`) in every money RPC; a `BEFORE INSERT` trigger does the same for the `stock_moves` ledger (`20260751`, `20260753`) |
+| CRIT-4 | Sprint 8/9 migrations (`20260737`–`20260750`) had never been applied to a live database — "built" ≠ "proven" | Applied in order 2026-07-02; a real bug was caught on the first attempt (`RAISE '...%%...'` — an escaped-literal typo that rolled back the whole 17-migration batch) and fixed |
+| CRIT-5 | Voiding an applied payment/credit note was blocked outright — no correction path for a misallocated payment | Reversal ledger: `reverse_payment_application`/`reverse_credit_note_application` (one line) + `void_payment`/`void_credit_note` (reverse all, then void) — negative-signed rows, never a delete/UPDATE of history, matching `stock_moves` discipline (`20260754`) |
+| HIGH-1 | CI only triggered on `main`, which the team never pushes to — CI effectively never ran | Triggers extended to `test` + all PRs |
+| HIGH-2 | `applyToInvoice` (payment + credit note) was a non-atomic client-side read-then-write — races under concurrent applies | Moved into transactional RPCs (`apply_payment_to_invoice`, `apply_credit_note_to_invoice`) |
+| HIGH-3 | Zero automated tests on the RPC/money/inventory paths — the code most likely to lose money had no regression protection | New `db-tests` CI job: 3 SQL files, 34 checks, covering every money RPC and every inventory/purchasing RPC — see below |
+| HIGH-4 | No security headers; every Edge Function hardcoded `Access-Control-Allow-Origin: '*'` | CSP/HSTS/frame-deny headers in `vercel.json`; `ALLOWED_ORIGINS`-driven allowlist (`supabase/functions/_shared/cors.ts`) across all 8 functions |
+| HIGH-5 | `admin-reset-password` only scanned the first 1,000 auth users — password resets silently broke past that | Paginated lookup |
+| HIGH-6 | 50 broken `t('inventory:xxx')` colon-namespace i18n keys shipped in `WarehousesTab.jsx` | Fixed to dot notation |
+| MED-7 → severity upgrade found while fixing it | `notification-worker`'s `x-trigger-source` check was "reject only if absent" — **any** value let an unauthenticated caller drain the queue, not just a low-privilege one | Tightened to an exact match against what the real pg_cron job sends; Bearer-token path on both `notification-worker` and `send-whatsapp` gated to non-viewer staff. Fully closing the pg_cron gap needs a Vault-backed secret — flagged, not done blind (needs live project access) |
+| — | (found while writing DB tests, not in the original audit) `restore_units`' documented `p_to_status='active_rma'` path conflated the two status axes `status`/`reservation_status` this project's own architecture notes say to never conflate — raised a CHECK violation, masked because the only caller never used that path | Fixed (`20260755`); the previously-broken path now has direct test coverage |
+
+### `db-tests` CI harness (closes HIGH-3, generalizes CRIT-4)
+
+New GitHub Actions job: installs the Supabase CLI, runs `supabase start` (applies every migration from scratch — an ongoing, automated version of the CRIT-4 check), then runs three SQL files via `psql -v ON_ERROR_STOP=1`, each `RAISE EXCEPTION`ing with the specific failing check on any assertion failure:
+
+| File | Checks | Covers |
+|---|---|---|
+| `supabase/tests/audit_hardening.sql` | 8 | CRIT-1/2/3/5 + HIGH-2 — role guard, allocation validation, actor stamping, reversal, atomic apply |
+| `supabase/tests/inventory_hardening.sql` | 12 | `reserve/deliver/release_units` (serialized) + `reserve/release/deliver_warehouse_stock` (bulk) conservation, over-reservation rejection, duplicate-serial rejection, bulk-reservation idempotency under a duplicate call |
+| `supabase/tests/inventory_hardening2.sql` | 14 | `transfer_stock`, `adjust_stock`, `recalculate_stock`, `restore_units`, `restore_warehouse_stock`, `receive_vendor_invoice` (both modes, partial-then-complete receipt, duplicate-serial-across-invoices) |
+
+All 34 checks pass live (confirmed by user, 2026-07-02). Local equivalent: `npm run test:db` (needs Docker + `psql`).
+
+### Migrations applied (all confirmed by user 2026-07-02)
+
+`20260751_harden_money_rpcs.sql` → `20260752_lockdown_rpc_execute.sql` → `20260753_stock_moves_actor_from_jwt.sql` → `20260754_payment_cn_reversal.sql` → `20260755_fix_restore_units_status_conflation.sql`. Also: a small `NULLIF` guard added to `20260706_seed_test_users_and_deals.sql` for a from-scratch (zero-customer) database, discovered while building the `db-tests` harness.
+
+### Explicitly deferred — policy decisions, not bugs
+
+- **Credit-limit enforcement** (block / warn-with-override / advisory) — user wants to test the live funnel first before choosing. Currently advisory-only, unchanged.
+- **Legacy `invoices` table retirement** — `crm_invoices` is confirmed canonical; `Reports.jsx` and `RolesTab.jsx` (the two remaining dependents) will be **rebuilt**, not incrementally migrated, once the above is settled.
+- **Vault-backed `x-worker-secret`** for full `notification-worker` pre-auth closure — needs live Supabase project access (Vault secret creation + matching the Edge Function secret), not something to wire blind.
+- **God-component decomposition** (`CustomerDetails.jsx` 1,913 lines, `ControlPanel.jsx` 1,805, `RMATickets/index.jsx` 1,703, `BrandingSettings.jsx` 1,487) — pure maintainability, no bug. Needs a live click-through loop, not a blind refactor; recommended starting point is `ControlPanel.jsx` (already a thin shell over 14 separate sub-page files, lowest risk of the four).
+
+### Gate
+
+277/277 tests, 0 lint errors, build ✓ throughout every increment of this sprint (touched SQL/CI/Edge Functions/docs only — see the audit report's fix log for the itemized diff per pass).
+
+---
+
 # TRACK B — System-Wide Module Upgrades (Odoo Benchmark)
 
 **Method**: Odoo 19 Community source (`D:\odoo-19.0`, LGPLv3) read module-by-module as a reference architecture, never copied. Every "current state" claim was verified against the live myRMA codebase (file:line cited), not assumed from documentation.
@@ -913,7 +1281,7 @@ Surfaced while verifying current-state ground truth — not comparisons to Odoo,
 
 | # | Finding | File | Risk |
 |---|---|---|---|
-| 1 | `INVOICE_STATUS` constant doesn't include `'void'`, but `Invoices.jsx` references it as a real status | `src/lib/constants.ts`, `src/pages/Invoices.jsx:827,981` | Type-safety gap |
+| 1 | ~~`INVOICE_STATUS` constant doesn't include `'void'`, but `Invoices.jsx` references it as a real status~~ — **moot, 2026-07-02**: `Invoices.jsx` was fully deleted once Sales Documents superseded it; `crm_invoices`/`CrmInvoiceRow` (TypeScript, includes `'cancelled'`) is the live type now | ~~`src/lib/constants.ts`, `src/pages/Invoices.jsx:827,981`~~ | Resolved by deletion |
 | 2 | Custom Fields engine is fully built (CRUD, 6 field types, generic `entity_type`) but **not consumed anywhere** | `src/pages/cp/CustomFields.jsx`, `system.ts:176-212` | Dead feature |
 | 3 | SLA `pauseOnHold` flag exists and is shown in the admin UI but is **never read** anywhere | `system.ts:322-359` | Misleading admin UI |
 | 4 | SLA breach detection is fully manual — due date computed once at creation, nothing flags an active breach | `TicketForm.jsx:529-534` | "Due date display" only, not real SLA enforcement |
@@ -1095,6 +1463,13 @@ Surfaced while verifying current-state ground truth — not comparisons to Odoo,
 | JSONB key-order issue in `product_lines`/`stages`/any future JSONB column | Low | High | Always arrays, never objects — see Constitution Check above. |
 | WhatsApp notification volume spikes | Medium | Low | Each notification type individually toggleable in `WASettings.jsx`. |
 | Partial invoicing (Track B #16) started speculatively without a confirmed business need | Low (gated) | High | Explicitly held behind your confirmation in Section B2 — not scheduled by default. |
+| Two inventory status axes conflated in code/UI (`status` vs `reservation_status`) | Medium | High | Reconciled in Sprint 7.6 §1; funnel counts always group by `reservation_status`; contract documented in migration headers. |
+| Serialized-but-empty product silently sells as a service (overselling) | Medium | Critical | Sprint 7.6 §2: classify by the existing `products.product_type` (only `service` is non-stock), not row existence; 0-available → hard `Insufficient stock`. |
+| RMA/repair unit reserved & shipped as fresh stock | Medium | High | Sprint 7.6 §3: sellable-`status` allow-list in `reserve_units`. |
+| Duplicate serial received — double-counted stock, broken traceability | Medium | High | Sprint 7.6 §4: partial UNIQUE index + per-serial guard in every receive RPC. |
+| `COMPLETE` checkmarks overstate real completion (no integration/E2E tests) | High | Medium | `BUILT` vs `VERIFIED` split (workflow rule 6); integration test tier + deferred 52-item checklist run as Sprint 8 gate. |
+| Migration wipes/rolls back production data with no backup | Low | Critical | Workflow rule 4: PITR/backup before any table-altering migration; staging-first; tested down-path or explicit irreversible note. |
+| Tax/VAT model (single doc-level `tax_amount`) inadequate for EGP/ETA compliance | Medium | High | Flagged for decision before more posted invoices accumulate; per-line tax + VAT-ID retrofit onto gapless-numbered invoices is expensive later. |
 
 ---
 
@@ -1166,14 +1541,14 @@ Surfaced while verifying current-state ground truth — not comparisons to Odoo,
 ### Files to touch (Track B, "Do now" tier)
 | File | Item |
 |---|---|
-| `src/lib/constants.ts` | Add `'void'` to `INVOICE_STATUS` |
+| ~~`src/lib/constants.ts`~~ | ~~Add `'void'` to `INVOICE_STATUS`~~ — moot, 2026-07-02 (see B0 #1) |
 | `src/pages/cp/CustomFields.jsx`, `TicketForm.jsx`, `CustomerDetails.jsx` | Wire custom field rendering |
 | `src/pages/cp/*SLA*`, `system.ts` | Fix/remove `pauseOnHold` |
 | `src/api/db/inventory.ts` | Guard parts stock decrement |
 | `src/api/db/catalog.ts`, `Products/index.jsx`, a new migration | Soft-delete for products |
-| `src/pages/Invoices.jsx` | Wire `paid_date` into UI |
+| ~~`src/pages/Invoices.jsx`~~ | ~~Wire `paid_date` into UI~~ — moot, page deleted 2026-07-02 |
 | `src/pages/Customers/_modals.jsx` | Reuse dedup logic on manual create |
-| `src/pages/CustomerDetails.jsx` | Invoices tab |
+| ~~`src/pages/CustomerDetails.jsx`~~ | ~~Invoices tab~~ — done differently: shipped as the "Billing" tab (Accounting v1, Sprint 7) against `crm_invoices` via `v_customer_ledger` |
 
 ---
 

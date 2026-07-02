@@ -100,7 +100,7 @@ const ADAPTERS = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function SalesDocumentDetail({ docType, docId, currentUserRole, currentUserEmail, onBack }) {
+export default function SalesDocumentDetail({ docType, docId, currentUserRole: _currentUserRole, currentUserEmail, onBack }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -110,7 +110,6 @@ export default function SalesDocumentDetail({ docType, docId, currentUserRole, c
   const isSO         = docType === 'sales_order'
   const isInvoice    = docType === 'invoice'
   const isCreditNote = docType === 'credit_note'
-  const canApprove   = ['manager', 'admin', 'super_admin'].includes(currentUserRole)
 
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -351,10 +350,10 @@ export default function SalesDocumentDetail({ docType, docId, currentUserRole, c
       toast.success(t('salesDocuments.issuedToast', { code: cnCode }))
     }
   })
-  const handleVoidCN = () => {
+  const handleVoidCN = (reason) => {
     setShowVoidModal(false)
     runAction(async () => {
-      await db.creditNotes.void_(doc.id, currentUserEmail)
+      await db.creditNotes.void_(doc.id, reason, currentUserEmail)
       toast.success(t('salesDocuments.voidedToast'))
     })
   }

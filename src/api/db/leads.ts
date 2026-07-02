@@ -97,6 +97,16 @@ export const leads = {
   },
   async bulkUpdate(ids: string[], fields: Partial<Pick<LeadRow, 'status' | 'source'>>): Promise<void> {
     if (!ids.length) return
+    // Mirror the single-row update() guard: block if any selected lead is converted.
+    const { data: existing, error: fetchErr } = await supabase
+      .from('leads')
+      .select('id, converted_at')
+      .in('id', ids)
+    if (fetchErr) throw fetchErr
+    const converted = (existing ?? []).filter((r) => r.converted_at !== null)
+    if (converted.length > 0) {
+      throw new Error(`Cannot bulk-edit ${converted.length} converted lead(s)`)
+    }
     const { error } = await supabase.from('leads').update(fields).in('id', ids)
     if (error) throw error
   },

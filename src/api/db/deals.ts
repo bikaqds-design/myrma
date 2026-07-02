@@ -196,11 +196,38 @@ export const deals = {
   },
   async bulkMoveStage(ids: string[], stageId: string): Promise<void> {
     if (!ids.length) return
+    // Validate stage is present in every pipeline represented by the selection.
+    const { data: dealRows, error: fetchErr } = await supabase
+      .from('deals')
+      .select('id, pipeline_id, status')
+      .in('id', ids)
+    if (fetchErr) throw fetchErr
+    const dealList = (dealRows ?? []) as Array<{ id: string; pipeline_id: string; status: string }>
+    const pipelineIds = [...new Set(dealList.map((d) => d.pipeline_id))]
+    const { data: pipelineRows, error: pipeErr } = await supabase
+      .from('pipelines')
+      .select('id, stages')
+      .in('id', pipelineIds)
+    if (pipeErr) throw pipeErr
+    for (const p of (pipelineRows ?? []) as Array<{ id: string; stages: PipelineStage[] }>) {
+      if (!p.stages.some((s) => s.id === stageId)) {
+        throw new Error(`Stage "${stageId}" is not valid for all selected deals' pipelines`)
+      }
+    }
     const { error } = await supabase
       .from('deals')
       .update({ stage: stageId, updated_at: new Date().toISOString() })
       .in('id', ids)
     if (error) throw error
+    // Reset won/lost terminal fields for any deals that were in a terminal state.
+    const terminalIds = dealList.filter((d) => d.status === 'won' || d.status === 'lost').map((d) => d.id)
+    if (terminalIds.length > 0) {
+      const { error: termErr } = await supabase
+        .from('deals')
+        .update({ status: 'open', won_at: null, lost_at: null, lost_reason: null })
+        .in('id', terminalIds)
+      if (termErr) throw termErr
+    }
   },
   async reopen(id: string, stageId: string, actorEmail: string | null = null): Promise<DealRow> {
     const { data: current, error: fetchError } = await supabase

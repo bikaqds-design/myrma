@@ -1,5 +1,4 @@
 import { supabase } from '../client.js'
-import { crmInvoices } from './crmInvoices'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -17,6 +16,9 @@ export interface PaymentRow {
   created_by: string
   created_at: string
   updated_at: string
+  voided_at: string | null
+  voided_by: string | null
+  void_reason: string | null
 }
 
 export interface PaymentApplicationRow {
@@ -26,6 +28,9 @@ export interface PaymentApplicationRow {
   amount_applied: number
   applied_date: string
   applied_by: string
+  is_reversal: boolean
+  reverses_application_id: string | null
+  reversal_reason: string | null
 }
 
 // ── Module ────────────────────────────────────────────────────────────────────
@@ -53,15 +58,12 @@ export const payments = {
   },
 
   /**
-   * record: creates a payment (code assigned atomically via the record_payment
-   * RPC, mirroring how issue_credit_note assigns cn_code) and immediately
-   * applies it across the given allocations. Each allocation inserts a
-   * payment_applications row (the sync_payment_balance trigger keeps
-   * unapplied_amount in sync) and calls crmInvoices.recordPayment() so the
-   * invoice's amount_paid/payment_status reflect it — same pattern
-   * creditNotes.issue() already uses for credit-note applications.
-   * Any amount not covered by allocations stays as unapplied_amount, usable
-   * later via applyToInvoice() (e.g. a customer overpayment/prepayment).
+   * record: delegates to the extended record_payment RPC which creates the
+   * payment row and applies all allocations atomically in one Postgres
+   * transaction. Closes H4d — no more loop of separate awaits between the
+   * payment insert and each invoice balance update.
+   * Any amount not covered by allocations stays as unapplied_amount (usable
+   * later via applyToInvoice for customer prepayments/overpayments).
    */
   async record(input: {
     customer_id: string
@@ -73,7 +75,8 @@ export const payments = {
     created_by: string
     allocations?: { invoice_id: string; amount: number }[]
   }): Promise<PaymentRow> {
-    const { data: paymentId, error: rpcErr } = await supabase.rpc('record_payment', {
+    const allocations = (input.allocations ?? []).filter((a) => a.amount > 0)
+    const { data: paymentId, error } = await supabase.rpc('record_payment', {
       p_customer_id: input.customer_id,
       p_amount: input.amount,
       p_method: input.method,
@@ -81,19 +84,9 @@ export const payments = {
       p_payment_date: input.payment_date ?? null,
       p_notes: input.notes ?? null,
       p_actor_email: input.created_by,
+      p_allocations: JSON.stringify(allocations),
     })
-    if (rpcErr) throw rpcErr
-
-    for (const alloc of input.allocations ?? []) {
-      if (alloc.amount <= 0) continue
-      await payments.applyToInvoice({
-        paymentId: paymentId as string,
-        invoiceId: alloc.invoice_id,
-        amount: alloc.amount,
-        actorEmail: input.created_by,
-      })
-    }
-
+    if (error) throw error
     const payment = await payments.get(paymentId as string)
     if (!payment) throw new Error('Payment not found after creation')
     return payment
@@ -101,7 +94,11 @@ export const payments = {
 
   /**
    * applyToInvoice: applies some or all of this payment's unapplied balance
-   * to an invoice. Mirrors creditNotes.applyToInvoice() exactly.
+   * to an invoice. Delegates to the apply_payment_to_invoice RPC so the
+   * application insert and the invoice-balance update happen in ONE Postgres
+   * transaction (closes HIGH-2 — the previous read-then-write was non-atomic
+   * and raced under concurrent applies). The RPC also enforces the manager+
+   * guard, unapplied-balance check, and customer-match server-side.
    */
   async applyToInvoice(input: {
     paymentId: string
@@ -109,60 +106,61 @@ export const payments = {
     amount: number
     actorEmail: string
   }): Promise<PaymentApplicationRow> {
-    const payment = await payments.get(input.paymentId)
-    if (!payment) throw new Error('Payment not found')
-    if (payment.status !== 'active') {
-      throw new Error(`Payment must be active to apply (current: ${payment.status})`)
-    }
-    if (input.amount > payment.unapplied_amount) {
-      throw new Error(
-        `Amount ${input.amount} exceeds unapplied balance ${payment.unapplied_amount}`
-      )
-    }
-
-    const { data, error } = await supabase
-      .from('payment_applications')
-      .insert({
-        payment_id: input.paymentId,
-        invoice_id: input.invoiceId,
-        amount_applied: input.amount,
-        applied_by: input.actorEmail,
-      })
-      .select()
-      .single()
+    const { data: appId, error } = await supabase.rpc('apply_payment_to_invoice', {
+      p_payment_id: input.paymentId,
+      p_invoice_id: input.invoiceId,
+      p_amount: input.amount,
+      p_actor_email: input.actorEmail,
+    })
     if (error) throw error
-
-    await crmInvoices.recordPayment(input.invoiceId, input.amount, input.actorEmail)
-
+    const { data, error: readErr } = await supabase
+      .from('payment_applications')
+      .select('*')
+      .eq('id', appId as string)
+      .single()
+    if (readErr) throw readErr
     return data as PaymentApplicationRow
   },
 
   /**
-   * void_: cancels an active payment. Cannot void one that has already been
-   * applied to invoices — same guard as creditNotes.void_(); a real reversal
-   * would need to roll back amount_paid on every linked invoice, which is
-   * GL-territory and out of scope for this module.
+   * void_: delegates to the void_payment RPC (closes CRIT-5). Reverses every
+   * still-active application of this payment — inserting a negative
+   * payment_applications row per line, restoring each invoice's amount_paid —
+   * then marks the payment voided. Never mutates or deletes existing
+   * application rows, matching the append-only ledger discipline already
+   * used for stock_moves. A payment with nothing applied simply voids with
+   * zero reversal rows.
    */
-  async void_(id: string, actorEmail: string): Promise<PaymentRow> {
-    const payment = await payments.get(id)
-    if (!payment) throw new Error('Payment not found')
-    if (payment.status === 'voided') {
-      throw new Error('Payment is already voided')
-    }
-    if (payment.amount !== payment.unapplied_amount) {
-      throw new Error('Cannot void a payment that has already been applied to invoices')
-    }
-
-    const { data, error } = await supabase
-      .from('payments')
-      .update({ status: 'voided' })
-      .eq('id', id)
-      .select()
-      .single()
+  async void_(id: string, reason: string, actorEmail: string): Promise<PaymentRow> {
+    const { error } = await supabase.rpc('void_payment', {
+      p_payment_id: id,
+      p_reason: reason,
+      p_actor_email: actorEmail,
+    })
     if (error) throw error
+    const payment = await payments.get(id)
+    if (!payment) throw new Error('Payment not found after void')
+    return payment
+  },
 
-    void actorEmail
-    return data as PaymentRow
+  /**
+   * reverseApplication: reverses ONE application line without voiding the
+   * whole payment — the fix for the CRIT-2 scenario where a payment was
+   * applied to the wrong invoice. Restores the payment's unapplied_amount so
+   * it can be re-applied correctly.
+   */
+  async reverseApplication(
+    applicationId: string,
+    reason: string,
+    actorEmail: string
+  ): Promise<string> {
+    const { data, error } = await supabase.rpc('reverse_payment_application', {
+      p_application_id: applicationId,
+      p_reason: reason,
+      p_actor_email: actorEmail,
+    })
+    if (error) throw error
+    return data as string
   },
 
   async getApplications(paymentId: string): Promise<PaymentApplicationRow[]> {

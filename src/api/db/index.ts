@@ -16,7 +16,7 @@ import {
   slaConfig,
   automationRules,
 } from './system.js'
-import { inventory, warehouses, parts, ticketParts, timeEntries, invoices } from './inventory.js'
+import { inventory, warehouses, warehouseStock, stockMoves, parts, ticketParts, timeEntries, invoices } from './inventory.js'
 import { notifications } from './notifications.js'
 import {
   whatsappTemplates,
@@ -37,6 +37,7 @@ import { creditNotes } from './creditNotes.js'
 import { salesDocuments } from './salesDocuments.js'
 import { payments } from './payments.js'
 import { customerLedger } from './customerLedger.js'
+import { vendors, proformaInvoices, purchaseOrders, vendorInvoices, purchaseDocuments } from './purchasing.js'
 
 export const db = {
   // Users & roles
@@ -74,6 +75,8 @@ export const db = {
   // Inventory & parts
   inventory,
   warehouses,
+  warehouseStock,
+  stockMoves,
   parts,
   ticketParts,
   timeEntries,
@@ -108,6 +111,13 @@ export const db = {
   // Accounting — payments ledger + customer statement/aging
   payments,
   customerLedger,
+
+  // Purchase Module (Sprint 9)
+  vendors,
+  proformaInvoices,
+  purchaseOrders,
+  vendorInvoices,
+  purchaseDocuments,
 }
 
 // Re-export all Row types for page components to import
@@ -121,6 +131,7 @@ export type { BrandRow, CategoryRow, SubcategoryRow, ProductRow } from './catalo
 export type {
   InventoryUnitRow, ManufacturerBatchRow, WarehouseRow,
   PartRow, TicketPartRow, TimeEntryRow, InvoiceRow, InventoryStatsRow,
+  WarehouseStockRow, StockMoveRow, ProductStockSummary,
 } from './inventory.js'
 export type {
   WhatsAppTemplateRow, TemplateVariable, NotificationLogRow,
@@ -139,3 +150,7 @@ export type { CreditNoteRow, CreditNoteLine, CreditNoteApplicationRow } from './
 export type { SalesDocumentRow, SalesDocType } from './salesDocuments.js'
 export type { PaymentRow, PaymentApplicationRow } from './payments.js'
 export type { LedgerEntryRow, LedgerEntryType, AgingBucket, AgingInvoiceRow } from './customerLedger.js'
+export type {
+  VendorRow, PurchaseLine, ProformaInvoiceRow, PurchaseOrderRow, VendorInvoiceRow,
+  PurchaseDocType, PurchaseDocumentRow,
+} from './purchasing.js'

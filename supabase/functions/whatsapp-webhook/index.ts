@@ -16,11 +16,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { corsOriginHeaders } from '../_shared/cors.ts'
 
 interface WAStatus {
   id: string
@@ -55,6 +51,16 @@ interface WAWebhookPayload {
 }
 
 serve(async (req: Request) => {
+  // Note: this endpoint is called server-to-server by Meta, not from a
+  // browser — CORS headers have no real effect here since Meta's HTTP client
+  // doesn't enforce them (CORS is a browser mechanism). The actual security
+  // boundary is WHATSAPP_WEBHOOK_VERIFY_TOKEN below. Applied for consistency
+  // with the other functions, not as a meaningful security fix on its own.
+  const CORS = {
+    ...corsOriginHeaders(req),
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  }
+
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   const verifyToken = Deno.env.get('WHATSAPP_WEBHOOK_VERIFY_TOKEN') ?? ''

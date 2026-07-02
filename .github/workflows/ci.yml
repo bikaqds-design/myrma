@@ -1,10 +1,12 @@
 name: CI
 
+# Runs on the working branch (`test`) and on main, plus any PR. Previously this
+# only triggered on `main` — which the team never pushes to (standing rule:
+# push to `test` only) — so CI effectively never ran (audit HIGH-1).
 on:
   push:
-    branches: [main]
+    branches: [main, test]
   pull_request:
-    branches: [main]
 
 jobs:
   ci:
@@ -34,3 +36,50 @@ jobs:
           # Vite needs these at build time; use placeholder values in CI
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+
+  # Closes audit HIGH-3 ("zero automated tests on the money/inventory RPC
+  # paths"). Spins up a real local Postgres via the Supabase CLI, applies
+  # every migration in supabase/migrations/ from scratch (also a standing
+  # regression check that the full migration history still applies cleanly —
+  # generalizing CRIT-4's "migrations were never proven against a live DB"),
+  # then runs supabase/tests/audit_hardening.sql, which RAISEs an exception
+  # (failing this job with the exact check named) if any assertion fails.
+  # No Supabase account/secrets needed — `supabase start` is purely local.
+  db-tests:
+    name: DB · Audit Hardening Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase (applies all migrations)
+        run: supabase start
+
+      - name: Install postgresql-client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Run audit-hardening SQL assertions
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -f supabase/tests/audit_hardening.sql
+
+      - name: Run inventory-hardening SQL assertions
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -f supabase/tests/inventory_hardening.sql
+
+      - name: Run inventory-RPC-hardening SQL assertions (part 2)
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -f supabase/tests/inventory_hardening2.sql
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop

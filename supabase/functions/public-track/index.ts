@@ -13,12 +13,7 @@
 //     rate limiter (Upstash, etc.) — defer until needed.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
+import { corsOriginHeaders } from '../_shared/cors.ts'
 
 // ─── Rate limiter (per-instance, in-memory) ──────────────────────────────────
 const RATE_LIMIT_PER_MINUTE = 15
@@ -46,19 +41,28 @@ function getClientIp(req: Request): string {
   )
 }
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-}
-
 // ─── Whitelisted column selection ────────────────────────────────────────────
 const TICKET_PUBLIC_COLUMNS =
   'id, rma_number, ticket_status, priority, created_date, due_date, general_description, customer_name, products, accessories_received'
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
+// corsHeaders and json() are defined per-request (not module-level) — Deno's
+// request runtime can interleave concurrent requests within one isolate, so a
+// shared mutable corsHeaders would risk one request's response carrying
+// another request's Origin. A closure captured fresh per invocation avoids
+// that race while keeping every json(...) call site below unchanged.
 Deno.serve(async (req) => {
+  const corsHeaders = {
+    ...corsOriginHeaders(req),
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  }
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }

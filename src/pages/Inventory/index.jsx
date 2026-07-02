@@ -1,10 +1,10 @@
-import React, { useEffect, useCallback } from 'react'
+import React, { useEffect, useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useURLTab } from '../../hooks/useURLTab'
 import { supabase, db } from '../../api/supabaseClient'
 import { PageSkeleton } from '../../components/Skeleton'
-import { PageHeader } from '../../components/ui'
+import { PageHeader, Button } from '../../components/ui'
 import { ROLES } from '../../lib/constants'
 import { groupByProduct } from './_shared'
 import { ExportMenu } from './ExportMenu'
@@ -12,7 +12,12 @@ import { ProductStatusTab } from './ProductStatusTab'
 import { OverviewTab } from './OverviewTab'
 import { ByProductTab } from './ByProductTab'
 import { WarehousesTab } from './WarehousesTab'
+import { StockMovementsTab } from './StockMovementsTab'
+import { StockBreakdownModal } from './StockBreakdownModal'
+import { ReceiveStockModal } from './ReceiveStockModal'
 // xlsx and jspdf are loaded on-demand (A-7: lazy heavy deps)
+
+const MANAGER_OR_ABOVE = [ROLES.MANAGER, ROLES.ADMIN, ROLES.SUPER_ADMIN]
 
 // ─── Main Inventory Component ──────────────────────────────────────────────────
 export default function Inventory({ userRole, userEmail, userPermissions, onNavigateToTicket }) {
@@ -21,15 +26,17 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
     userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN
       ? true
       : userPermissions?.inventory?.[a] === true
+  const isManagerOrAbove = MANAGER_OR_ABOVE.includes(userRole)
+  const [breakdownProductId, setBreakdownProductId] = useState(null)
+  const [showReceiveStock, setShowReceiveStock] = useState(false)
 
   const queryClient = useQueryClient()
   const { data: invData, isLoading: loading } = useQuery({
     queryKey: ['inventory'],
     queryFn: async () => {
-      const [ur, br, sr, brandList, productList, whRes, tkRes] = await Promise.all([
+      const [ur, br, brandList, productList, whRes, tkRes, stockSummary, movesRes, wsRes] = await Promise.all([
         db.inventory.listUnits(),
         db.inventory.listBatches(),
-        db.inventory.getStats(),
         db.brands.list().catch(() => []),
         db.products.list().catch(() => []),
         db.warehouses.list().catch(() => ({ missing: true, data: [] })),
@@ -37,23 +44,29 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
           .from('rma_tickets')
           .select('id,rma_number,ticket_status,customer_name,assigned_technician,created_date,products')
           .then((r) => r.data || []),
+        db.inventory.getStockSummary().catch(() => []),
+        db.stockMoves.list().catch(() => ({ missing: true, data: [] })),
+        db.warehouseStock.list().catch(() => ({ missing: true, data: [] })),
       ])
       const map = {}
       for (const p of productList || [])
         if (p.product_name) map[p.product_name] = p.brand?.brand_name || ''
-      return { ur, br, sr, brandList, brandMap: map, whRes, tkRes }
+      return { ur, br, brandList, productList, brandMap: map, whRes, tkRes, stockSummary, movesRes, wsRes }
     },
   })
 
   const tableMissing = invData?.ur?.missing ?? false
   const units = invData?.ur?.data ?? []
   const batches = invData?.br?.missing ? [] : (invData?.br?.data ?? [])
-  const stats = invData?.sr ?? null
   const brands = invData?.brandList ?? []
   const brandMap = invData?.brandMap ?? {}
   const whMissing = invData?.whRes?.missing ?? false
   const warehouses = invData?.whRes?.data ?? []
   const rmaTickets = invData?.tkRes ?? []
+  const stockSummary = invData?.stockSummary ?? []
+  const stockMoves = invData?.movesRes?.missing ? [] : (invData?.movesRes?.data ?? [])
+  const products = invData?.productList ?? []
+  const warehouseStockRows = invData?.wsRes?.missing ? [] : (invData?.wsRes?.data ?? [])
 
   const [tab, setTab] = useURLTab('tab', 'overview')
 
@@ -176,12 +189,18 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
     { id: 'repaired', label: `${t('inventory.repaired')} (${repairedProds.length})` },
     { id: 'cant-repair', label: `${t('inventory.cantRepair')} (${cantRepairProds.length})` },
     { id: 'rma-stock', label: `${t('inventory.rmaStock')} (${rmaStockProds.length})` },
+    { id: 'stock-movements', label: `${t('inventory.stockMovements')} (${stockMoves.length})` },
     { id: 'warehouses', label: `${t('inventory.warehouses')} (${warehouses.length})` },
   ]
 
   return (
     <div className="space-y-6">
       <PageHeader title={t('inventory.title')} subtitle={t('inventory.subtitle')}>
+        {isManagerOrAbove && (
+          <Button variant="primary" size="sm" onClick={() => setShowReceiveStock(true)}>
+            {t('inventory.receiveStockButton')}
+          </Button>
+        )}
         {canDo('export') && (
           <ExportMenu units={units} batches={batches} warehouses={warehouses} brandMap={brandMap} />
         )}
@@ -217,11 +236,14 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
 
       {tab === 'overview' && (
         <OverviewTab
-          stats={stats}
+          stockSummary={stockSummary}
+          onNavigate={setBreakdownProductId}
           units={units}
-          brands={brands}
-          brandMap={brandMap}
-          onNavigate={setTab}
+          warehouseStockRows={warehouseStockRows}
+          warehouses={warehouses}
+          userEmail={userEmail}
+          isManagerOrAbove={isManagerOrAbove}
+          onRefresh={invalidateInventory}
         />
       )}
       {tab === 'by-product' && (
@@ -277,6 +299,15 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
           onReload={invalidateInventory}
         />
       )}
+      {tab === 'stock-movements' && (
+        <StockMovementsTab
+          moves={stockMoves}
+          units={units}
+          warehouseStockRows={warehouseStockRows}
+          products={products}
+          warehouses={warehouses}
+        />
+      )}
       {tab === 'warehouses' && (
         <WarehousesTab
           units={units}
@@ -290,6 +321,30 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
           onReload={invalidateInventory}
         />
       )}
+
+      <StockBreakdownModal
+        open={!!breakdownProductId}
+        onClose={() => setBreakdownProductId(null)}
+        productSummary={stockSummary.find((s) => s.product_id === breakdownProductId) ?? null}
+        product={products.find((p) => p.id === breakdownProductId) ?? null}
+        units={units}
+        warehouseStockRows={warehouseStockRows}
+        warehouses={warehouses}
+        flatProducts={flatProducts}
+        moves={stockMoves}
+        userEmail={userEmail}
+        isManagerOrAbove={isManagerOrAbove}
+        onRefresh={invalidateInventory}
+      />
+
+      <ReceiveStockModal
+        open={showReceiveStock}
+        onClose={() => setShowReceiveStock(false)}
+        products={products}
+        warehouses={warehouses}
+        userEmail={userEmail}
+        onSuccess={invalidateInventory}
+      />
     </div>
   )
 }

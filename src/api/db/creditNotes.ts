@@ -1,5 +1,4 @@
 import { supabase } from '../client.js'
-import { crmInvoices } from './crmInvoices'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -35,6 +34,9 @@ export interface CreditNoteRow {
   created_at: string
   updated_at: string
   issued_at: string | null
+  voided_at: string | null
+  voided_by: string | null
+  void_reason: string | null
 }
 
 export interface CreditNoteApplicationRow {
@@ -44,6 +46,9 @@ export interface CreditNoteApplicationRow {
   amount_applied: number
   applied_date: string
   applied_by: string
+  is_reversal: boolean
+  reverses_application_id: string | null
+  reversal_reason: string | null
 }
 
 // ── Module ────────────────────────────────────────────────────────────────────
@@ -145,21 +150,14 @@ export const creditNotes = {
   },
 
   /**
-   * issue: draft → issued. Calls issue_credit_note RPC to assign the
-   * gapless CN-YYYY-NNNNN code atomically. Returns the assigned cn_code.
+   * issue: delegates to the extended issue_credit_note RPC which assigns the
+   * gapless CN code, sets status='issued', and (if source_invoice_id is set)
+   * inserts the credit_note_applications row and updates the invoice's
+   * amount_paid/payment_status — all in one Postgres transaction. Closes H4c.
    *
-   * Inventory restock (rma_return type) is a separate two-step flow:
-   *   1. The UI resolves actual inventory_units.id values for the returned items.
+   * Inventory restock (rma_return type) remains a separate two-step flow:
+   *   1. UI resolves inventory_units.id values for the returned items.
    *   2. Call restoreUnits() with those IDs.
-   * This keeps the issue step fast and avoids coupling the code-assignment
-   * RPC to potentially slow unit lookups.
-   *
-   * If the CN is linked to a source invoice (source_invoice_id), the
-   * standard AR practice (no separate "payment" concept since there's no
-   * full accounting module yet) is to apply the CN straight to that
-   * invoice's outstanding balance via credit_note_applications, then
-   * mirror the same amount onto the invoice's amount_paid/payment_status
-   * through the existing recordPayment() path.
    */
   async issue(cnId: string, actorEmail: string): Promise<string> {
     const { data, error } = await supabase.rpc('issue_credit_note', {
@@ -167,25 +165,7 @@ export const creditNotes = {
       p_actor_email: actorEmail,
     })
     if (error) throw error
-    const code = data as string
-
-    const cn = await creditNotes.get(cnId)
-    if (cn?.source_invoice_id) {
-      const inv = await crmInvoices.get(cn.source_invoice_id)
-      const remainingOnInvoice = inv ? Math.max((inv.total ?? 0) - (inv.amount_paid ?? 0), 0) : 0
-      const applyAmount = Math.min(cn.remaining_balance, remainingOnInvoice)
-      if (applyAmount > 0) {
-        await creditNotes.applyToInvoice({
-          creditNoteId: cnId,
-          invoiceId: cn.source_invoice_id,
-          amount: applyAmount,
-          actorEmail,
-        })
-        await crmInvoices.recordPayment(cn.source_invoice_id, applyAmount, actorEmail)
-      }
-    }
-
-    return code
+    return data as string
   },
 
   /**
@@ -223,54 +203,63 @@ export const creditNotes = {
     amount: number
     actorEmail: string
   }): Promise<CreditNoteApplicationRow> {
-    const cn = await creditNotes.get(input.creditNoteId)
-    if (!cn) throw new Error('Credit note not found')
-    if (cn.status !== 'issued') {
-      throw new Error(`Credit note must be issued before applying (current: ${cn.status})`)
-    }
-    if (input.amount > cn.remaining_balance) {
-      throw new Error(
-        `Amount ${input.amount} exceeds remaining balance ${cn.remaining_balance}`
-      )
-    }
-
-    const { data, error } = await supabase
-      .from('credit_note_applications')
-      .insert({
-        credit_note_id: input.creditNoteId,
-        invoice_id: input.invoiceId,
-        amount_applied: input.amount,
-        applied_by: input.actorEmail,
-      })
-      .select()
-      .single()
+    // Delegates to apply_credit_note_to_invoice RPC: the application insert and
+    // the invoice-balance update run in ONE transaction (HIGH-2). The previous
+    // client path inserted the application row but never reduced the invoice's
+    // amount_paid, so applying a CN left the customer still owing the full
+    // amount. The RPC also enforces manager+ guard, remaining-balance check,
+    // and customer-match server-side.
+    const { data: appId, error } = await supabase.rpc('apply_credit_note_to_invoice', {
+      p_cn_id: input.creditNoteId,
+      p_invoice_id: input.invoiceId,
+      p_amount: input.amount,
+      p_actor_email: input.actorEmail,
+    })
     if (error) throw error
+    const { data, error: readErr } = await supabase
+      .from('credit_note_applications')
+      .select('*')
+      .eq('id', appId as string)
+      .single()
+    if (readErr) throw readErr
     return data as CreditNoteApplicationRow
   },
 
   /**
-   * void_: cancels a draft or issued credit note. Cannot void an 'applied' CN.
+   * void_: delegates to the void_credit_note RPC (closes CRIT-5). Reverses
+   * every still-active application of this credit note — inserting a
+   * negative credit_note_applications row per line, restoring each invoice's
+   * amount_paid — then marks the credit note voided. A draft or unapplied
+   * issued CN simply voids with zero reversal rows, same as before.
    */
-  async void_(id: string, actorEmail: string): Promise<CreditNoteRow> {
-    const cn = await creditNotes.get(id)
-    if (!cn) throw new Error('Credit note not found')
-    if (cn.status === 'applied') {
-      throw new Error('Cannot void a credit note that has already been applied to invoices')
-    }
-    if (cn.status === 'voided') {
-      throw new Error('Credit note is already voided')
-    }
-
-    const { data, error } = await supabase
-      .from('credit_notes')
-      .update({ status: 'voided' })
-      .eq('id', id)
-      .select()
-      .single()
+  async void_(id: string, reason: string, actorEmail: string): Promise<CreditNoteRow> {
+    const { error } = await supabase.rpc('void_credit_note', {
+      p_cn_id: id,
+      p_reason: reason,
+      p_actor_email: actorEmail,
+    })
     if (error) throw error
+    const cn = await creditNotes.get(id)
+    if (!cn) throw new Error('Credit note not found after void')
+    return cn
+  },
 
-    void actorEmail
-    return data as CreditNoteRow
+  /**
+   * reverseApplication: reverses ONE application line without voiding the
+   * whole credit note — mirrors payments.reverseApplication().
+   */
+  async reverseApplication(
+    applicationId: string,
+    reason: string,
+    actorEmail: string
+  ): Promise<string> {
+    const { data, error } = await supabase.rpc('reverse_credit_note_application', {
+      p_application_id: applicationId,
+      p_reason: reason,
+      p_actor_email: actorEmail,
+    })
+    if (error) throw error
+    return data as string
   },
 
   async getApplications(creditNoteId: string): Promise<CreditNoteApplicationRow[]> {

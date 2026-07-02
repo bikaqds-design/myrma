@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
 import { useURLTab } from '../../hooks/useURLTab'
 import { Button, PageHeader } from '../../components/ui'
 import { PageSkeleton } from '../../components/Skeleton'
 import { RecordPaymentModal } from './_modals'
+import { VoidModal } from '../SalesDocuments/_modals'
 
 const METHOD_LABEL_KEY = {
   cash: 'accounting.methodCash',
@@ -35,6 +37,7 @@ export default function Accounting({ currentUserEmail }) {
   const queryClient = useQueryClient()
   const [tab, setTab] = useURLTab('tab', 'payments')
   const [showRecordModal, setShowRecordModal] = useState(false)
+  const [voidingPaymentId, setVoidingPaymentId] = useState(null)
   const [search, setSearch] = useState('')
 
   const { data: payments = [], isLoading: paymentsLoading } = useQuery({
@@ -111,6 +114,23 @@ export default function Accounting({ currentUserEmail }) {
     queryClient.invalidateQueries({ queryKey: ['sales-documents'] })
   }
 
+  // Voiding an already-applied payment reverses every application line
+  // server-side (see void_payment RPC) before marking it voided — closes
+  // CRIT-5. Invoice balances change as a result, so invalidate those too.
+  const handleVoidPayment = (reason) => {
+    const id = voidingPaymentId
+    setVoidingPaymentId(null)
+    db.payments
+      .void_(id, reason, currentUserEmail)
+      .then(() => {
+        toast.success(t('accounting.voidedToast'))
+        queryClient.invalidateQueries({ queryKey: ['payments'] })
+        queryClient.invalidateQueries({ queryKey: ['ar-aging'] })
+        queryClient.invalidateQueries({ queryKey: ['sales-documents'] })
+      })
+      .catch((err) => toast.error(err.message || t('common.error')))
+  }
+
   if ((tab === 'payments' && paymentsLoading) || (tab === 'aging' && agingLoading)) {
     return <PageSkeleton cols={6} />
   }
@@ -127,6 +147,13 @@ export default function Accounting({ currentUserEmail }) {
           currentUserEmail={currentUserEmail}
           onClose={() => setShowRecordModal(false)}
           onRecorded={handleRecorded}
+        />
+      )}
+
+      {voidingPaymentId && (
+        <VoidModal
+          onClose={() => setVoidingPaymentId(null)}
+          onConfirm={handleVoidPayment}
         />
       )}
 
@@ -174,12 +201,13 @@ export default function Accounting({ currentUserEmail }) {
                   <th className="px-4 py-3 text-right text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colAmount')}</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colUnapplied')}</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colStatus')}</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colActions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredPayments.length === 0 ? (
                   <tr>
-                    <td colSpan={8}>
+                    <td colSpan={9}>
                       <div className="py-16 flex flex-col items-center text-center">
                         <svg className="w-12 h-12 text-[#a09d99] dark:text-[#4a5568] mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.4} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
@@ -203,6 +231,13 @@ export default function Accounting({ currentUserEmail }) {
                         <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_PILL[p.status] ?? STATUS_PILL.active}`}>
                           {t(`accounting.status_${p.status}`)}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {p.status === 'active' && (
+                          <Button variant="danger" size="sm" onClick={() => setVoidingPaymentId(p.id)}>
+                            {t('accounting.voidBtn')}
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))

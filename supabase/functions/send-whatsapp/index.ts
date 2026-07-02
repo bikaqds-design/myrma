@@ -13,11 +13,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { corsOriginHeaders } from '../_shared/cors.ts'
 
 interface SendRequest {
   to: string
@@ -39,10 +35,14 @@ interface WAResponse {
   error?: WAError
 }
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
-
 serve(async (req: Request) => {
+  const CORS = {
+    ...corsOriginHeaders(req),
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  }
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
+
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   // ── Auth ────────────────────────────────────────────────────────────────
@@ -57,6 +57,19 @@ serve(async (req: Request) => {
     authHeader.replace('Bearer ', '')
   )
   if (authErr || !user) return json({ error: 'Unauthorized' }, 401)
+
+  // Audit MED-7: getUser() only proved the caller is SOMEONE authenticated,
+  // not that they're allowed to send WhatsApp messages — a 'viewer' could
+  // burn the org's Meta send quota. Gate to non-viewer staff, matching the
+  // rma_is_staff() AND role <> 'viewer' idiom used throughout the RLS layer.
+  const { data: roleRow } = await supabaseAdmin
+    .from('user_roles')
+    .select('role')
+    .eq('user_email', user.email)
+    .single()
+  if (!roleRow || roleRow.role === 'viewer') {
+    return json({ error: 'Forbidden: viewers cannot send WhatsApp messages' }, 403)
+  }
 
   // ── Config ──────────────────────────────────────────────────────────────
   const accessToken   = Deno.env.get('WHATSAPP_ACCESS_TOKEN')

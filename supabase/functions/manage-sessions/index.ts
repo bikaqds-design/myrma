@@ -8,15 +8,19 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsOriginHeaders } from '../_shared/cors.ts'
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-const json = (b: unknown, s = 200) =>
-  new Response(JSON.stringify(b), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } })
-
+// CORS and json() are per-request closures, not module-level — Deno can
+// interleave concurrent requests within one isolate, so a shared mutable
+// CORS constant would risk one request's response carrying another's Origin.
 serve(async (req: Request) => {
+  const CORS = {
+    ...corsOriginHeaders(req),
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  }
+  const json = (b: unknown, s = 200) =>
+    new Response(JSON.stringify(b), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } })
+
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   const supabaseUrl    = Deno.env.get('SUPABASE_URL')!

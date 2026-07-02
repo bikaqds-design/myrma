@@ -15,16 +15,16 @@ myRMA provides end-to-end lifecycle management for product returns, warranty cla
 | **RMA Ticket Management** | Create, assign, track, and resolve return tickets with full audit trail |
 | **Customer Management** | Customer directory with RMA history and communication log |
 | **Product Catalog** | Product/SKU management with inventory tie-in |
-| **Inventory Tracking** | Parts inventory, stock levels, warehouse locations |
+| **Inventory & Warehouse Management** | Dual serialized/bulk stock model, funnel-aware stock summary, stock breakdown drill-down, receive stock, warehouse transfer/adjust, movement audit trail |
 | **Public RMA Tracker** | Customer-facing portal to look up ticket status without logging in |
 | **Tech Calendar** | Technician scheduling and workload calendar |
-| **Invoices & Reports** | Invoice generation, reporting dashboards, data exports |
-| **Parts Inventory** | Spare parts tracking for repair operations |
+| **Reports** | Reporting dashboards, data exports |
 | **CRM — Leads** | Lead capture, qualification, status pipeline, chatter (notes/activities/replies), CSV import, convert to deal |
 | **CRM — Pipeline** | Kanban + List + Graph + Pivot + Activity views, drag-and-drop stage moves, Won/Lost actions, XLSX export |
 | **CRM — Deal Detail** | Inline editing, product lines, comment panel, chatter, probability tracking |
 | **CRM — Sales Documents** | Quotation → Sales Order → Invoice → Credit Note funnel, manager-approval workflow, gapless invoice/credit-note numbering, two-stage inventory reservation |
 | **CRM — Accounting** | Customer payments ledger (multi-invoice allocation), AR aging report, per-customer statement, soft credit limits |
+| **CRM — Purchasing** | Vendor → Proforma Invoice → Purchase Order → Vendor Invoice → atomic dual-mode stock receipt, full procurement audit trail |
 | **Role-Based Access Control** | 6 roles: `super_admin`, `admin`, `manager`, `technician`, `viewer`, `sales_rep` |
 | **Real-Time Notifications** | Live updates via Supabase Realtime, per-user preference controls |
 | **Dark Mode** | Full dark/light theme toggle, persisted per user |
@@ -143,6 +143,33 @@ supabase/migrations/20260708_crm_sync_deal_values.sql
 supabase/migrations/20260709_crm_lead_deal_codes.sql
 supabase/migrations/20260710_crm_deal_code_rename.sql
 supabase/migrations/20260711_crm_convert_rpc_deal_code.sql
+# Sales Documents — CRM Sprint 6 (apply in order):
+supabase/migrations/20260712_document_sequences.sql
+supabase/migrations/20260713_stock_moves.sql
+supabase/migrations/20260714_quotations.sql
+supabase/migrations/20260715_sales_orders.sql
+supabase/migrations/20260716_crm_invoices.sql
+supabase/migrations/20260717_credit_notes.sql
+supabase/migrations/20260718_credit_note_applications.sql
+supabase/migrations/20260719_inventory_reservation.sql
+supabase/migrations/20260720_sales_documents_view.sql
+supabase/migrations/20260721_crm_activities_approval_type.sql
+supabase/migrations/20260722_sales_documents_archive.sql
+supabase/migrations/20260723_sales_orders_approval_statuses.sql
+supabase/migrations/20260724_crm_convert_lead_created_by_email.sql
+supabase/migrations/20260725_quotations_add_converted_status.sql
+supabase/migrations/20260726_crm_deal_code_prefix_opp.sql
+# Accounting Module v1 (apply in order):
+supabase/migrations/20260727_crm_payments.sql
+supabase/migrations/20260728_crm_payment_sequence.sql
+supabase/migrations/20260729_crm_customer_credit_limit.sql
+supabase/migrations/20260730_crm_customer_ledger_view.sql
+# Sales Funnel Hardening — Sprint 7.5 (apply in order):
+supabase/migrations/20260732_funnel_line_reservation.sql
+supabase/migrations/20260733_so_lifecycle_rpcs.sql
+supabase/migrations/20260734_invoice_lifecycle_rpcs.sql
+supabase/migrations/20260735_cn_payment_lifecycle_rpcs.sql
+supabase/migrations/20260736_lead_deal_guards.sql
 ```
 
 ### 4. Set up storage
@@ -219,17 +246,25 @@ myrma-app/
 │   │       ├── tickets.ts                    # RMA ticket CRUD + public tracker lookup
 │   │       ├── customers.ts                  # Customer CRUD
 │   │       ├── catalog.ts                    # Product catalog CRUD
-│   │       ├── inventory.ts                  # Inventory CRUD
+│   │       ├── inventory.ts                  # Inventory CRUD + dual-mode stock (warehouseStock, stockMoves, receiveStock/transferStock/adjustStock/recalculateStock)
 │   │       ├── users.ts                      # User role management
 │   │       ├── notifications.ts              # Notification table ops
 │   │       ├── system.ts                     # System config (rma_config table)
 │   │       ├── audit.ts                      # Audit log reads
 │   │       ├── whatsappNotifications.ts      # WhatsApp templates, notification logs, settings, queue
 │   │       ├── leads.ts                      # CRM: Lead CRUD + convert() RPC
-│   │       ├── deals.ts                      # CRM: Deal CRUD + moveStage/markWon/markLost
+│   │       ├── deals.ts                      # CRM: Deal CRUD + moveStage/markWon/markLost/bulkMoveStage
 │   │       ├── activities.ts                 # CRM: Activity/chatter CRUD + listForRelated
 │   │       ├── pipelines.ts                  # CRM: Pipeline + stage CRUD
-│   │       └── contacts.ts                   # CRM: Contact CRUD
+│   │       ├── contacts.ts                   # CRM: Contact CRUD
+│   │       ├── quotations.ts                 # CRM: Quotation CRUD + lifecycle (draft→sent→accepted→converted/declined)
+│   │       ├── salesOrders.ts                # CRM: Sales Order CRUD + markAccepted/confirm/markDelivered/cancel/convertToInvoice
+│   │       ├── crmInvoices.ts                # CRM: Invoice CRUD + post() (gapless INV-YYYY-NNNNN) + recordPayment() + void_()
+│   │       ├── creditNotes.ts                # CRM: Credit Note CRUD + issue() (gapless CN-YYYY-NNNNN) + restoreUnits() + void_()
+│   │       ├── salesDocuments.ts             # CRM: Read-only listAll() over v_sales_documents + setArchived()
+│   │       ├── payments.ts                   # Accounting: Payment CRUD + record() (gapless PAY-YYYY-NNNNN) + applyToInvoice() + void_()
+│   │       ├── customerLedger.ts             # Accounting: list(customerId) over v_customer_ledger + agingReport()
+│   │       └── purchasing.ts                 # Purchase Module: vendors, proformaInvoices, purchaseOrders, vendorInvoices (+ receive() RPC), purchaseDocuments over v_purchase_documents
 │   ├── components/
 │   │   ├── ui.jsx                            # Shared component library (Button, Input, Modal, Badge…)
 │   │   ├── ErrorBoundary.jsx                 # App-level error boundary → Sentry
@@ -245,18 +280,19 @@ myrma-app/
 │   │   └── safeStorage.ts                    # localStorage wrapper (get/set/remove — Safari-safe)
 │   ├── pages/                                # Top-level page components (all lazy-loaded)
 │   │   ├── Dashboard.jsx
-│   │   ├── Inventory/                        # index.jsx + 10 sub-files (ExportMenu, tabs, modals…)
+│   │   ├── Inventory/                        # index.jsx + 16 sub-files (ExportMenu, tabs, breakdown/receive/transfer/adjust/bulk modals…)
 │   │   ├── RMATickets/                       # index.jsx + TicketForm, TicketDrawer, _shared, _utils
 │   │   ├── Products/                         # index.jsx + ProductsListTab, HierarchyTab, _modals
 │   │   ├── Customers/                        # index.jsx + _modals, _constants
 │   │   ├── UserManagement/                   # index.jsx + UsersTab, RolesTab, _shared, _utils
 │   │   ├── Leads/                            # index.jsx + LeadDetails, _modals, _constants, _shared (CRM)
 │   │   ├── Pipeline/                         # index.jsx + DealDetail, DealCommentPanel, 4 view files, _modals/_constants/_shared (CRM)
+│   │   ├── SalesDocuments/                   # index.jsx + SalesDocumentDetail, SalesDocumentForm, _modals (CRM Sprint 6)
+│   │   ├── Accounting/                       # index.jsx (Payments + AR Aging tabs) + _modals (Accounting v1)
+│   │   ├── Purchasing/                       # index.jsx (5-tab list) + PurchaseDocumentDetail, _modals (Sprint 9)
 │   │   ├── ProductDetails.jsx
 │   │   ├── CustomerDetails.jsx
-│   │   ├── PartsInventory.jsx
 │   │   ├── TechCalendar.jsx
-│   │   ├── Invoices.jsx
 │   │   ├── Reports.jsx
 │   │   ├── AccountSettings.jsx
 │   │   ├── ControlPanel.jsx                  # Admin: User Mgmt, Branding, Config, Audit Log…
@@ -348,9 +384,7 @@ Roles are stored in the `user_roles` table. Default permission sets are defined 
 | `/customers` | Customers | ✓ |
 | `/customers/:id` | Customer Detail | ✓ |
 | `/inventory` | Inventory | ✓ |
-| `/parts` | Parts Inventory | ✓ |
 | `/calendar` | Tech Calendar | ✓ |
-| `/invoices` | Invoices | ✓ |
 | `/reports` | Reports | ✓ |
 | `/account` | Account Settings | ✓ |
 | `/control-panel` | Control Panel | ✓ admin+ |
@@ -358,6 +392,9 @@ Roles are stored in the `user_roles` table. Default permission sets are defined 
 | `/leads/:id` | Lead Detail | ✓ `leads.view` |
 | `/pipeline` | Pipeline (CRM) | ✓ `deals.view` |
 | `/pipeline/:id` | Deal Detail | ✓ `deals.view` |
+| `/sales` | Sales Documents (CRM) | ✓ `deals.view` |
+| `/sales/:type/:id` | Sales Document Detail | ✓ `deals.view` |
+| `/accounting` | Accounting (AR) | ✓ `deals.view` |
 | `/tracker` | Public RMA Tracker | ✗ public |
 | `/kb` | Knowledge Base | ✗ public |
 | `/dashboard` | → redirects to `/` | |

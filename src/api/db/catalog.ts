@@ -33,6 +33,7 @@ export interface ProductRow {
   category_id: string | null
   subcategory_id: string | null
   product_type: string
+  stock_tracking_mode: 'serialized' | 'bulk'
   status: string
   warranty_months: number | null
   product_description: string | null

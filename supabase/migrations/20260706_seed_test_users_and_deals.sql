@@ -104,7 +104,11 @@ INSERT INTO public.deals (
 SELECT
   s.title,
   -- cycle customers: customer 1 → deal 1, customer 2 → deal 2, …, wraps around
-  (SELECT id FROM custs WHERE n = ((s.seq - 1) % (SELECT cnt FROM cust_count) + 1)),
+  -- NULLIF guards a from-scratch DB (CI, new environment) with zero customers —
+  -- the WHERE clause below already excludes that case via cnt > 0, but this
+  -- makes the SELECT list itself safe regardless of evaluation order, rather
+  -- than relying on the planner short-circuiting before reaching modulo-by-zero.
+  (SELECT id FROM custs WHERE n = ((s.seq - 1) % NULLIF((SELECT cnt FROM cust_count), 0) + 1)),
   (SELECT pid FROM pipeline),
   s.stage,
   s.value_egp,

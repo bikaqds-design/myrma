@@ -19,6 +19,7 @@ npm run lint:ci        # ESLint strict for CI (blocks on warnings too)
 npm run lint:fix       # ESLint auto-fix
 npm run format         # Prettier write
 npm run format:check   # Prettier check (used in CI)
+npm run test:db        # DB test tier: supabase start + runs supabase/tests/audit_hardening.sql — needs Docker + psql
 ```
 
 ## Environment
@@ -54,8 +55,6 @@ All top-level pages are lazy-loaded via the `lazyWithReload()` wrapper in `App.j
 | `/account` | `AccountSettings` | required |
 | `/control-panel` | `ControlPanel` | admin+ |
 | `/calendar` | `TechCalendar` | required |
-| `/invoices` | `Invoices` | required |
-| `/parts` | `PartsInventory` | required |
 | `/reports` | `Reports` | required |
 | `/leads` | `Leads` | required (`leads.view`) |
 | `/leads/:id` | `LeadDetailsRoute` → `LeadDetails` | required (`leads.view`) |
@@ -64,6 +63,8 @@ All top-level pages are lazy-loaded via the `lazyWithReload()` wrapper in `App.j
 | `/sales` | `SalesDocuments` | required (`deals.view`) |
 | `/sales/:type/:id` | `SalesDocumentDetail` | required (`deals.view`) |
 | `/accounting` | `Accounting` | required (`deals.view`) |
+| `/purchasing` | `Purchasing` | required (`deals.view`) |
+| `/purchasing/:type/:id` | `PurchaseDocumentDetailRoute` → `PurchaseDocumentDetail` | required (`deals.view`) |
 | `/tracker` | `RMATracker` | **none (public)** |
 | `/kb` | `KnowledgeBasePublic` | **none (public)** |
 | `*` | `NotFoundPage` | — |
@@ -111,7 +112,7 @@ Domain modules in `src/api/db/`:
 | `tickets.ts` | RMA ticket CRUD + `rmaTracker` public lookup (via Edge Function) |
 | `customers.ts` | Customer CRUD |
 | `catalog.ts` | Product/catalog CRUD |
-| `inventory.ts` | Inventory CRUD |
+| `inventory.ts` | Inventory CRUD; dual-mode stock (Sprint 8): `warehouseStock`/`stockMoves`, `getStockSummary()`, `warehouses.archive()`, `receiveStock()`/`transferStock()`/`adjustStock()`/`recalculateStock()` RPC wrappers |
 | `users.ts` | User role management |
 | `notifications.ts` | Notification table ops |
 | `system.ts` | System config (`rma_config` table) |
@@ -129,6 +130,7 @@ Domain modules in `src/api/db/`:
 | `salesDocuments.ts` | Read-only `listAll()` over `v_sales_documents` (the "All" tab) + `setArchived()` (CRM Sprint 6) |
 | `payments.ts` | Payment CRUD + `record()` (gapless `PAY-YYYY-NNNNN`, allocates across one or more invoices), `applyToInvoice()`, `void_()` (Accounting v1) |
 | `customerLedger.ts` | Read-only `list(customerId)` over `v_customer_ledger` (Billing tab statement) + `agingReport()` (Accounting v1) |
+| `purchasing.ts` | Purchase Module (Sprint 9): `vendors`, `proformaInvoices`, `purchaseOrders`, `vendorInvoices` (+ `receive()` → atomic `receive_vendor_invoice` RPC), `purchaseDocuments.listAll()` over `v_purchase_documents` |
 
 Many optional tables (e.g. `announcements`, `custom_field_definitions`, `inventory_units`, `warehouses`) may not exist in every deployment. All `db.*` helpers that target these tables guard with `error.code === '42P01'` (table not found) and return `{ missing: true, data: [] }` instead of throwing.
 
@@ -258,6 +260,8 @@ Live in `supabase/functions/`:
 
 All Edge Functions validate the caller's JWT before performing privileged operations. Never expose the service role key to the browser.
 
+**CORS:** all 8 functions import `corsOriginHeaders(req)` from `supabase/functions/_shared/cors.ts` (reflects `Origin` only if on the `ALLOWED_ORIGINS` secret; falls back to `*` if unset — set that secret to actually pin CORS). Computed per-request inside the handler, never module-level (Deno can interleave requests in one isolate). `notification-worker`'s `x-trigger-source` check was tightened from "any value" to an exact match against what `20260604_pgcron_notifications.sql` sends (was a real pre-auth bypass). Both `notification-worker` and `send-whatsapp` gate their Bearer-token path to non-viewer staff (was: any authenticated user).
+
 ### WhatsApp / Messaging system
 
 Provider-agnostic notification layer that fires on ticket lifecycle events.
@@ -295,7 +299,7 @@ Five large pages are organized as folders. `React.lazy(() => import('./pages/X')
 
 | Folder | Files |
 |--------|-------|
-| `src/pages/Inventory/` | `index.jsx` (shell), `_shared.jsx`, `ExportMenu.jsx`, `TransferModal.jsx`, `ProductStatusTab.jsx`, `OverviewTab.jsx`, `ByProductTab.jsx`, `CompanyStockTab.jsx`, `ProductDetailModal.jsx`, `WarehousesTab.jsx`, `ManufacturerTab.jsx` |
+| `src/pages/Inventory/` | `index.jsx` (shell — 5 preserved RMA-ticket-status tabs + Overview/Stock Movements/Warehouses), `_shared.jsx`, `ExportMenu.jsx`, `TransferModal.jsx` (RMA-workflow only, unchanged), `ProductStatusTab.jsx`, `OverviewTab.jsx` (funnel-aware, Sprint 8), `ByProductTab.jsx`, `CompanyStockTab.jsx`/`ManufacturerTab.jsx` (dead as top-level tabs), `ProductDetailModal.jsx`, `WarehousesTab.jsx` (archive, Sprint 8c), `StockMovementsTab.jsx`, `StockBreakdownModal.jsx`, `ReceiveStockModal.jsx`, `TransferStockModal.jsx`, `AdjustStockModal.jsx`, `BulkStockActionModal.jsx` (Sprint 8) |
 | `src/pages/RMATickets/` | `index.jsx` (shell + table), `TicketForm.jsx` (owns form state), `TicketDrawer.jsx` (owns comment/time/parts state), `_shared.jsx` (SortableHeader), `_utils.js` (pure helpers) |
 | `src/pages/Products/` | `index.jsx`, `ProductsListTab.jsx`, `HierarchyTab.jsx`, `_modals.jsx` |
 | `src/pages/UserManagement/` | `index.jsx`, `UsersTab.jsx`, `RolesTab.jsx`, `_shared.jsx`, `_utils.js` — "Role Templates" tab is now a read-only **"Role Reference"** (displays runtime `ROLE_DEFAULT_PERMISSIONS`). "Custom Roles" tab is hidden behind `ENABLE_CUSTOM_ROLES = false` flag (not yet wired end-to-end). |
@@ -304,6 +308,7 @@ Five large pages are organized as folders. `React.lazy(() => import('./pages/X')
 | `src/pages/Pipeline/` | `index.jsx` (view switcher, kanban, XLSX export, search/filters, multi-select stage/rep filters, export dropdown, lifted `selectedDeals` state), `DealDetail.jsx` (inline editing, product lines, stages), `DealCommentPanel.jsx` (right-side comment panel), `PipelineListView.jsx` (sortable table, stage pin dropdown, bulk select/delete/move, indigo bulk bar), `PipelineGraphView.jsx`, `PipelinePivotView.jsx`, `PipelineActivityView.jsx`, `_modals.jsx`, `_constants.js`, `_shared.jsx` |
 | `src/pages/SalesDocuments/` | `index.jsx` (unified Quotation/SO/Invoice/Credit Note list via `v_sales_documents`), `SalesDocumentDetail.jsx` (per-type lifecycle actions), `SalesDocumentForm.jsx`, `_modals.jsx` |
 | `src/pages/Accounting/` | `index.jsx` (Payments ledger tab + AR Aging tab), `_modals.jsx` (`RecordPaymentModal` — multi-invoice allocation) (Accounting v1) |
+| `src/pages/Purchasing/` | `index.jsx` (5-tab list via `v_purchase_documents`), `PurchaseDocumentDetail.jsx` (lifecycle + dual-mode receive), `_modals.jsx` (create modals) (Sprint 9) |
 
 The remaining pages (`Dashboard`, `Reports`, `Invoices`, `PartsInventory`, `ControlPanel`, `AccountSettings`, etc.) are still single files.
 
@@ -319,7 +324,7 @@ Funnel: **Lead → Deal → Quotation → Sales Order → Invoice → Credit Not
 
 **Codes:** `INV-`/`CN-`/`PAY-` are gapless `PREFIX-YYYY-NNNNN` via `nextval_for_type()`, assigned at issue/post time. `QT-`/`SO-` are random 8-digit, assigned at creation. Deal codes use `OPP-`.
 
-**Application-table pattern:** `credit_note_applications` and `payment_applications` both link to one or more invoices with sync triggers recalculating the parent's balance; `crmInvoices.recordPayment()` is the single setter for `amount_paid`/`payment_status`. Voiding an applied credit note or payment is **blocked**, not reversed.
+**Application-table pattern — append-only ledger:** `credit_note_applications`/`payment_applications` link to one or more invoices with sync triggers recalculating the parent's balance from `SUM(amount_applied)`. As of `20260754_payment_cn_reversal.sql`, these have no `UNIQUE(parent_id, invoice_id)` constraint — a reversal is a new negative-`amount_applied` row (never a delete/UPDATE of history), so apply → reverse → re-apply is supported. `amount_paid`/`payment_status` are set inside the `SECURITY DEFINER` RPCs directly (`record_payment`, `issue_credit_note`, `apply_*_to_invoice`, `_reverse_*_application`) — `crmInvoices.recordPayment()` is dead code. **Voiding an applied credit note or payment now reverses every active application first** (`void_payment`/`void_credit_note`), then voids — closing the prior "blocked, not reversed" gap. A single line can also be reversed without voiding the whole payment/CN via `reverse_payment_application`/`reverse_credit_note_application`. `void_invoice`'s guard changed from "any application row exists" to "net applied amount > 0" so it isn't permanently blocked once a reversal leaves paired rows in place.
 
 **Accounting v1** is a lightweight AR layer, not a full ERP: payments ledger (multi-invoice allocation), AR aging report (Current/31-60/61-90/90+), customer statement (`v_customer_ledger`). `customers.credit_limit` is a soft warning only, never enforced.
 
@@ -405,6 +410,45 @@ Accounting Module v1, applied in order:
 - `20260729_crm_customer_credit_limit.sql` — `customers.credit_limit` (soft warning only)
 - `20260730_crm_customer_ledger_view.sql` — `v_customer_ledger` UNION view
 
+Sales Funnel Hardening (Sprint 7.5), applied in order:
+
+- `20260732_funnel_line_reservation.sql` — `funnel_reserve_line` helper; classifies product lines as serialized (→ `reserve_units`) vs. service/non-stock (→ no-op)
+- `20260733_so_lifecycle_rpcs.sql` — `confirm_sales_order` + `cancel_sales_order` SECURITY DEFINER RPCs; `cancel` releases reserved stock
+- `20260734_invoice_lifecycle_rpcs.sql` — `post_invoice` + `void_invoice` SECURITY DEFINER RPCs; `void` blocks on applied payments/CNs; both enforce `rma_is_manager_or_above()`
+- `20260735_cn_payment_lifecycle_rpcs.sql` — `issue_credit_note` + `void_credit_note` + `record_payment` SECURITY DEFINER RPCs; void blocks once applied
+- `20260736_lead_deal_guards.sql` — `guard_converted_lead()` BEFORE UPDATE trigger (converted leads immutable except `notes`); fixes `created_by` regression in `crm_convert_lead`
+
+Inventory Model Reconciliation (Sprint 7.6), applied in order:
+
+- `20260737_inventory_units_add_product_id.sql` — adds `inventory_units.product_id` (nullable, no backfill) — referenced since creation but never existed
+- `20260738_inventory_model_reconciliation.sql` — fixes `reserve_units`' `ORDER BY created_at` → `created_date`; documents `status` vs `reservation_status`; `funnel_reserve_line` classifies by `products.product_type`; `reserve_units` restricted to `status='company_stock'`
+- `20260739_inventory_serial_uniqueness.sql` — partial UNIQUE index on `serial_number`
+
+Inventory & Warehouse Management (Sprint 8), applied in order:
+
+- `20260740_inventory_bulk_stock_schema.sql` — `products.stock_tracking_mode`; `warehouse_stock` table; `warehouses` type/manager/notes; extends `stock_moves` move_type/ref_type
+- `20260741_warehouse_stock_reservation_rpcs.sql` — `reserve/release/deliver/restore_warehouse_stock`
+- `20260742_funnel_reserve_line_bulk_branch.sql` — `funnel_reserve_line` 3-way branch (service/serialized/bulk)
+- `20260743_receive_stock_rpc.sql` — `receive_stock` dual-mode manual receive
+- `20260744_transfer_stock_rpc.sql` — `transfer_stock` atomic dual-mode transfer
+- `20260745_adjust_archive_recalculate_rpcs.sql` — `adjust_stock`, `archive_warehouse`, `recalculate_stock`
+
+Purchase Module (Sprint 9), applied in order:
+
+- `20260746_purchase_vendors.sql` — `vendors` table
+- `20260747_purchase_documents.sql` — `proforma_invoices`/`purchase_orders`/`vendor_invoices`; registers `vendor_invoice` sequence (`VI-` prefix); extends `stock_moves.doc_type`
+- `20260748_inventory_units_vendor_invoice_fk.sql` — `inventory_units.vendor_invoice_id`
+- `20260749_receive_vendor_invoice_rpc.sql` — `receive_vendor_invoice` atomic dual-mode RPC, partial receipt support
+- `20260750_purchase_documents_view.sql` — `v_purchase_documents` UNION view
+
+Audit hardening (2026-07-02 — see `AUDIT_REPORT_2026-07-02.md`):
+
+- `20260751_harden_money_rpcs.sql` — CRIT-1/2/3 + HIGH-2 (money layer): `record_payment`/`issue_credit_note` gain manager+ guard + server-derived actor; `record_payment` validates allocation-sum ≤ amount + customer-match + posted (`FOR UPDATE`); `sync_payment_balance` de-clamped + `CHECK (unapplied_amount >= 0)`; new transactional `apply_payment_to_invoice`/`apply_credit_note_to_invoice` RPCs (client `applyToInvoice` now delegates). SECURITY DEFINER bypasses RLS → in-body guards enforce authz.
+- `20260752_lockdown_rpc_execute.sql` — CRIT-1 (REVOKE half): dynamically REVOKEs PUBLIC/anon EXECUTE + GRANTs authenticated/service_role on all 24 client RPCs (overloads via `pg_proc`); `rma_*` helpers excluded.
+- `20260753_stock_moves_actor_from_jwt.sql` — CRIT-3 (inventory ledger): BEFORE INSERT trigger on `stock_moves` overwrites `actor_email` with `rma_current_user_email()` when a JWT is present. One trigger covers all inventory/reservation/receipt RPC ledger writes (avoids risky full-body rewrites of functions already amended by `20260738`/`20260742`). `inventory_units.reserved_by_email` is a minor residual.
+- `20260754_payment_cn_reversal.sql` — CRIT-5: `reverse_payment_application`/`reverse_credit_note_application` (reverse one line) + `void_payment`/`void_credit_note` (reverse all active lines, then void) RPCs. Drops `UNIQUE(parent_id, invoice_id)` on both application tables, relaxes `amount_applied` CHECK for negative reversal rows (see Application-table pattern note). Fixes `sync_credit_note_balance`'s one-directional status flip and `void_invoice`'s now-permanent EXISTS guard (net-SUM check).
+- `20260755_fix_restore_units_status_conflation.sql` — `restore_units` set `reservation_status = p_to_status` directly, so the documented `p_to_status='active_rma'` call wrote an invalid `reservation_status` (CHECK violation) — conflated the two status axes. Masked in production (`creditNotes.restoreUnits()` only ever passed `'available'`). Fixed to always resolve `reservation_status` to `'available'` on restore.
+
 ### RLS SQL helper functions
 
 In any SQL policy, use the `public.rma_*` functions:
@@ -425,6 +469,7 @@ All UI primitives come from `src/components/ui.jsx`. Never re-implement buttons,
 
 ### CI/CD
 
-GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR to `main`:  
-**test → lint:ci → build** — all three must pass. Node 20, `npm ci` (`--legacy-peer-deps` is set in `.npmrc`).
+GitHub Actions (`.github/workflows/ci.yml`) runs on push to `main` and `test`, plus every PR. Two required jobs:
+- **`ci`** — `test → lint:ci → build`. Node 20, `npm ci` (`--legacy-peer-deps` in `.npmrc`).
+- **`db-tests`** — `supabase start` (applies all migrations from scratch, also a regression check that the migration history stays clean) then three files via `psql -v ON_ERROR_STOP=1`: `audit_hardening.sql` (CRIT-1/2/3/5 + HIGH-2), `inventory_hardening.sql` (reserve/deliver/release conservation, over-reservation/duplicate-serial rejection, idempotency of `release`/`deliver_warehouse_stock`), and `inventory_hardening2.sql` (transfer/adjust/recalculate/restore/`receive_vendor_invoice` — found+fixed a real `restore_units` bug, see `20260755` above). Local: `npm run test:db` (needs Docker + psql).
 

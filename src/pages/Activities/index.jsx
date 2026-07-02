@@ -414,9 +414,9 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
   const rejectDocument = (docType, docId) => {
     switch (docType) {
       case 'quotation':   return db.quotations.markDeclined(docId)
-      case 'sales_order': return db.salesOrders.markDeclined(docId)
+      case 'sales_order': return db.salesOrders.markDeclined(docId, currentUserEmail)
       case 'invoice':     return db.crmInvoices.void_(docId, `Rejected by ${currentUserEmail}`, currentUserEmail)
-      case 'credit_note': return db.creditNotes.void_(docId, currentUserEmail)
+      case 'credit_note': return db.creditNotes.void_(docId, `Rejected by ${currentUserEmail}`, currentUserEmail)
       default:            return Promise.resolve()
     }
   }

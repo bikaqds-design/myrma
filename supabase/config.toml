@@ -1,3 +1,10 @@
+project_id = "myrma-app"
+
+# Local Postgres for `supabase start` — used by the DB test tier
+# (supabase/tests/, .github/workflows/ci.yml "DB · Audit Hardening Tests" job).
+# Port matches the CLI's own default; kept explicit for clarity, not required.
+[db]
+port = 54322
 
 [functions.send-email]
 enabled = true

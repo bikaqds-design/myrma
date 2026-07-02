@@ -18,15 +18,10 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsOriginHeaders } from '../_shared/cors.ts'
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-worker-secret, x-trigger-source',
-}
 const BATCH_SIZE        = 10
 const RATE_LIMIT_MS     = 200   // min ms between messages within one batch
-const json = (b: unknown, s = 200) =>
-  new Response(JSON.stringify(b), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } })
 
 interface QueueJob {
   id: string
@@ -53,6 +48,13 @@ interface WAResponse {
 }
 
 serve(async (req: Request) => {
+  const CORS = {
+    ...corsOriginHeaders(req),
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-worker-secret, x-trigger-source',
+  }
+  const json = (b: unknown, s = 200) =>
+    new Response(JSON.stringify(b), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } })
+
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   const supabaseUrl      = Deno.env.get('SUPABASE_URL')!
@@ -61,10 +63,25 @@ serve(async (req: Request) => {
 
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey)
 
-  // ── Auth: worker secret OR valid JWT OR internal trigger ──────────────────
+  // ── Auth: worker secret OR valid staff JWT OR pg_cron trigger ─────────────
+  // Audit MED-7 (+ a more severe gap found while fixing it): the previous
+  // x-trigger-source check was `!req.headers.get('x-trigger-source')` — i.e.
+  // "reject only if the header is ABSENT." Any value at all (attacker-chosen,
+  // not just 'pg_cron') satisfied it, meaning any unauthenticated caller could
+  // drain the queue and burn WhatsApp/email send quota. Tightened to an exact
+  // match against what the pg_cron migration (20260604_pgcron_notifications.sql)
+  // actually sends, so the real cron job is unaffected. This is still a
+  // client-supplied string, not a real secret — closing it fully requires the
+  // cron job to also send x-worker-secret (Supabase Vault-backed), which
+  // needs to be wired up against the live project and is a follow-up, not
+  // done here.
+  // The Bearer-token branch previously accepted ANY authenticated user
+  // (including 'viewer') — added a role check so only non-viewer staff can
+  // trigger the worker, closing MED-7 itself.
   const workerSecret    = Deno.env.get('WORKER_SECRET')
   const providedSecret  = req.headers.get('x-worker-secret')
   const authHeader      = req.headers.get('Authorization') ?? ''
+  const triggerSource   = req.headers.get('x-trigger-source')
 
   if (workerSecret && providedSecret === workerSecret) {
     // cron / external caller with correct secret — allowed
@@ -73,7 +90,16 @@ serve(async (req: Request) => {
       authHeader.replace('Bearer ', '')
     )
     if (error || !user) return json({ error: 'Unauthorized' }, 401)
-  } else if (!req.headers.get('x-trigger-source')) {
+
+    const { data: roleRow } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_email', user.email)
+      .single()
+    if (!roleRow || roleRow.role === 'viewer') {
+      return json({ error: 'Forbidden: viewers cannot trigger the notification worker' }, 403)
+    }
+  } else if (triggerSource !== 'pg_cron') {
     return json({ error: 'Unauthorized' }, 401)
   }
 

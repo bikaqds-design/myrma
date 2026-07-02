@@ -179,128 +179,47 @@ export const salesOrders = {
   },
 
   /**
-   * markAccepted: approval-pool action for a sales order. Reserves inventory
-   * for every line item and lands the SO directly in 'delivered' status
-   * (confirmed_at + delivered_at both stamped) in one atomic step — there is
-   * no separate "Confirm Order" / "Mark Delivered" click in the UI anymore.
-   * If reserve_units() fails (insufficient stock) the whole approval fails
-   * and the SO stays at 'sent' so the manager sees the error.
+   * markAccepted: delegates to approve_sales_order RPC which reserves every
+   * line's inventory by derived type (serialized → reserve_units; service →
+   * no-op) and sets status='delivered' atomically in one transaction.
+   * Role check (manager+) is enforced server-side. Closes H1, H4a, M1, M5.
    */
   async markAccepted(soId: string, actorEmail: string): Promise<SalesOrderRow> {
-    const so = await salesOrders.get(soId)
-    if (!so) throw new Error('Sales order not found')
-
-    for (const line of so.line_items) {
-      const { error: resErr } = await supabase.rpc('reserve_units', {
-        p_doc_type: 'sales_order',
-        p_doc_id: soId,
-        p_product_id: line.product_id,
-        p_qty: line.qty,
-        p_actor_email: actorEmail,
-      })
-      if (resErr) throw resErr
-    }
-
-    const now = new Date().toISOString()
-    const { data, error } = await supabase
-      .from('sales_orders')
-      .update({ status: 'delivered', confirmed_at: now, delivered_at: now })
-      .eq('id', soId)
-      .select()
-      .single()
+    const { data, error } = await supabase.rpc('approve_sales_order', {
+      p_so_id: soId,
+      p_actor_email: actorEmail,
+    })
     if (error) throw error
-    return data as SalesOrderRow
-  },
-
-  async markDeclined(soId: string): Promise<SalesOrderRow> {
-    const { data, error } = await supabase
-      .from('sales_orders')
-      .update({ status: 'declined' })
-      .eq('id', soId)
-      .select()
-      .single()
-    if (error) throw error
-    return data as SalesOrderRow
+    const rows = data as SalesOrderRow[]
+    return rows[0]
   },
 
   /**
-   * confirm: transitions accepted → confirmed.
-   * Calls reserve_units for each line item to lock inventory.
-   * Raises if any product has insufficient available stock.
-   * Requires prior approval (status must be 'accepted') — use markSent() +
-   * Activities-page approval to reach that state first.
+   * markDeclined: delegates to reject_sales_order RPC (role-checked, locked).
    */
-  async confirm(soId: string, actorEmail: string): Promise<SalesOrderRow> {
-    const so = await salesOrders.get(soId)
-    if (!so) throw new Error('Sales order not found')
-    if (so.status !== 'accepted') {
-      throw new Error(`Sales order must be approved before confirming (current: ${so.status})`)
-    }
-
-    // Reserve inventory for each line (serialised units only; parts handled separately)
-    for (const line of so.line_items) {
-      await supabase.rpc('reserve_units', {
-        p_doc_type: 'sales_order',
-        p_doc_id: soId,
-        p_product_id: line.product_id,
-        p_qty: line.qty,
-        p_actor_email: actorEmail,
-      })
-    }
-
-    const { data, error } = await supabase
-      .from('sales_orders')
-      .update({ status: 'confirmed', confirmed_at: new Date().toISOString() })
-      .eq('id', soId)
-      .select()
-      .single()
+  async markDeclined(soId: string, actorEmail = 'system'): Promise<SalesOrderRow> {
+    const { data, error } = await supabase.rpc('reject_sales_order', {
+      p_so_id: soId,
+      p_actor_email: actorEmail,
+    })
     if (error) throw error
-    return data as SalesOrderRow
+    const rows = data as SalesOrderRow[]
+    return rows[0]
   },
 
   /**
-   * markDelivered: transitions confirmed → delivered.
-   * Actual inventory decrement happens when the linked invoice is posted.
-   */
-  async markDelivered(soId: string): Promise<SalesOrderRow> {
-    const { data, error } = await supabase
-      .from('sales_orders')
-      .update({ status: 'delivered', delivered_at: new Date().toISOString() })
-      .eq('id', soId)
-      .select()
-      .single()
-    if (error) throw error
-    return data as SalesOrderRow
-  },
-
-  /**
-   * cancel: transitions draft/confirmed → cancelled.
-   * Releases any inventory reservations held by this SO.
+   * cancel: delegates to cancel_sales_order RPC which checks for a live
+   * invoice first, releases serialized unit reservations, then sets
+   * status='cancelled'. Works from any not-yet-invoiced status. Closes H2.
    */
   async cancel(soId: string, actorEmail: string): Promise<SalesOrderRow> {
-    const so = await salesOrders.get(soId)
-    if (!so) throw new Error('Sales order not found')
-    if (so.status === 'delivered') {
-      throw new Error('Cannot cancel a delivered sales order — raise a credit note instead')
-    }
-
-    if (so.status === 'confirmed') {
-      const { error: relErr } = await supabase.rpc('release_units', {
-        p_doc_type: 'sales_order',
-        p_doc_id: soId,
-        p_actor_email: actorEmail,
-      })
-      if (relErr) throw relErr
-    }
-
-    const { data, error } = await supabase
-      .from('sales_orders')
-      .update({ status: 'cancelled' })
-      .eq('id', soId)
-      .select()
-      .single()
+    const { data, error } = await supabase.rpc('cancel_sales_order', {
+      p_so_id: soId,
+      p_actor_email: actorEmail,
+    })
     if (error) throw error
-    return data as SalesOrderRow
+    const rows = data as SalesOrderRow[]
+    return rows[0]
   },
 
   /**

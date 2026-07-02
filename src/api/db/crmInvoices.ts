@@ -169,10 +169,10 @@ export const crmInvoices = {
   },
 
   /**
-   * post: draft → posted. Calls the SECURITY DEFINER post_invoice RPC which
-   * assigns the gapless INV-YYYY-NNNNN code atomically. Also triggers
-   * deliver_units to decrement on-hand stock for the linked SO (if any).
-   * Returns the assigned inv_code.
+   * post: delegates to the updated post_invoice RPC which assigns the gapless
+   * INV code, sets status='posted', and delivers reserved inventory all in one
+   * Postgres transaction. Closing H4b — no more split await between code
+   * assignment and stock delivery. Role check (manager+) is server-side.
    */
   async post(invoiceId: string, actorEmail: string): Promise<string> {
     const { data, error } = await supabase.rpc('post_invoice', {
@@ -180,18 +180,6 @@ export const crmInvoices = {
       p_actor_email: actorEmail,
     })
     if (error) throw error
-
-    // Decrement inventory: deliver all units reserved by the linked SO
-    const inv = await crmInvoices.get(invoiceId)
-    if (inv?.so_id) {
-      const { error: delErr } = await supabase.rpc('deliver_units', {
-        p_doc_type: 'sales_order',
-        p_doc_id: inv.so_id,
-        p_actor_email: actorEmail,
-      })
-      if (delErr) throw delErr
-    }
-
     return data as string
   },
 
@@ -241,32 +229,20 @@ export const crmInvoices = {
   },
 
   /**
-   * void_: cancels a posted invoice. Requires a void_reason.
-   * Sets payment_status to 'reversed'. Does NOT auto-release inventory —
-   * caller must raise a credit note for RMA cases.
+   * void_: delegates to void_invoice RPC which blocks if any payments or
+   * credit notes have been applied (M4) and restores serialized inventory for
+   * a clean posted-but-unpaid invoice. Role check (manager+) is server-side.
    */
   async void_(id: string, reason: string, actorEmail: string): Promise<CrmInvoiceRow> {
-    const inv = await crmInvoices.get(id)
-    if (!inv) throw new Error('Invoice not found')
-    if (inv.doc_status !== 'posted') {
-      throw new Error('Only posted invoices can be voided')
-    }
-    if (!reason.trim()) throw new Error('A void reason is required')
-
-    const { data, error } = await supabase
-      .from('crm_invoices')
-      .update({
-        doc_status: 'cancelled',
-        payment_status: 'reversed',
-        void_reason: reason,
-      })
-      .eq('id', id)
-      .select()
-      .single()
+    const { error } = await supabase.rpc('void_invoice', {
+      p_invoice_id: id,
+      p_reason: reason,
+      p_actor_email: actorEmail,
+    })
     if (error) throw error
-
-    void actorEmail
-    return data as CrmInvoiceRow
+    const inv = await crmInvoices.get(id)
+    if (!inv) throw new Error('Invoice not found after void')
+    return inv
   },
 
   /** listBySalesDocument: fetch all invoices for the unified All-tab view. */

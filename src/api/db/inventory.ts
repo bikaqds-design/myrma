@@ -7,6 +7,7 @@ export interface InventoryUnitRow {
   id: string
   rma_ticket_id: string | null
   rma_number: string | null
+  product_id: string | null
   product_name: string
   serial_number: string | null
   warranty_status: string | null
@@ -17,6 +18,11 @@ export interface InventoryUnitRow {
   warehouse_id: string | null
   manufacturer_batch_id: string | null
   created_date: string
+  reservation_status: 'available' | 'reserved' | 'delivered'
+  reserved_by_doc_type: string | null
+  reserved_by_doc_id: string | null
+  reserved_at: string | null
+  reserved_by_email: string | null
 }
 
 export interface ManufacturerBatchRow {
@@ -42,6 +48,49 @@ export interface WarehouseRow {
   description: string | null
   is_active: boolean
   created_date: string
+  created_by: string | null
+  warehouse_type: 'main' | 'branch' | 'service_center' | 'rma' | 'transit' | 'virtual' | null
+  manager: string | null
+  notes: string | null
+}
+
+export interface WarehouseStockRow {
+  id: string
+  product_id: string
+  warehouse_id: string
+  quantity: number
+  reserved_quantity: number
+  updated_at: string
+}
+
+export interface ProductStockSummary {
+  product_id: string
+  product_name: string
+  stock_tracking_mode: 'serialized' | 'bulk'
+  available: number
+  reserved: number
+  /**
+   * For `bulk` products this is always 0 — bulk delivery decrements
+   * `quantity` directly (like `parts.quantity`), leaving no persistent
+   * "delivered" bucket the way serialized units keep a permanent
+   * reservation_status='delivered' row. The stock_moves ledger is the
+   * historical record for bulk deliveries, not a live counter.
+   */
+  delivered: number
+}
+
+export interface StockMoveRow {
+  id: string
+  ref_type: 'unit' | 'part' | 'warehouse_stock'
+  ref_id: string
+  doc_type: 'sales_order' | 'invoice' | 'credit_note' | 'manual'
+  doc_id: string | null
+  move_type: 'reserve' | 'deliver' | 'release' | 'restore' | 'adjust' | 'receive' | 'transfer'
+  qty: number
+  from_status: string | null
+  to_status: string | null
+  actor_email: string
+  created_at: string
 }
 
 export interface PartRow {
@@ -267,6 +316,150 @@ export const inventory = {
       .in('id', unitIds)
     if (error) throw error
   },
+
+  // ── Sprint 8 Phase 8a RPC wrappers — dual-mode (serialized + bulk) ────────────
+
+  /**
+   * receiveStock — the interim manual stock-entry path (Sprint 9's Purchase
+   * Module will replace this with vendor-invoice-driven receipt). Pass
+   * `serial` for a serialized product, `qty` for a bulk-tracked one — the
+   * RPC branches on the product's stock_tracking_mode server-side.
+   */
+  async receiveStock(params: {
+    productId: string
+    warehouseId: string
+    actorEmail: string
+    serial?: string
+    qty?: number
+  }): Promise<void> {
+    const { error } = await supabase.rpc('receive_stock', {
+      p_product_id: params.productId,
+      p_warehouse_id: params.warehouseId,
+      p_actor_email: params.actorEmail,
+      p_serial: params.serial ?? null,
+      p_qty: params.qty ?? null,
+    })
+    if (error) throw error
+  },
+
+  /**
+   * transferStock — atomic warehouse transfer (Sprint 8 Phase 8a). Pass
+   * `unitId` for a serialized unit, `qty` for bulk-tracked quantity.
+   */
+  async transferStock(params: {
+    productId: string
+    fromWarehouseId: string
+    toWarehouseId: string
+    actorEmail: string
+    unitId?: string
+    qty?: number
+  }): Promise<void> {
+    const { error } = await supabase.rpc('transfer_stock', {
+      p_product_id: params.productId,
+      p_from_warehouse_id: params.fromWarehouseId,
+      p_to_warehouse_id: params.toWarehouseId,
+      p_actor_email: params.actorEmail,
+      p_unit_id: params.unitId ?? null,
+      p_qty: params.qty ?? null,
+    })
+    if (error) throw error
+  },
+
+  /**
+   * adjustStock — manual correction. Pass `unitId` + `newStatus` for a
+   * serialized unit (found/missing/damaged/etc.), or `qtyDelta` (signed) for
+   * bulk-tracked quantity.
+   */
+  async adjustStock(params: {
+    productId: string
+    warehouseId: string
+    actorEmail: string
+    unitId?: string
+    newStatus?: string
+    qtyDelta?: number
+    reason?: string
+  }): Promise<void> {
+    const { error } = await supabase.rpc('adjust_stock', {
+      p_product_id: params.productId,
+      p_warehouse_id: params.warehouseId,
+      p_actor_email: params.actorEmail,
+      p_unit_id: params.unitId ?? null,
+      p_new_status: params.newStatus ?? null,
+      p_qty_delta: params.qtyDelta ?? null,
+      p_reason: params.reason ?? null,
+    })
+    if (error) throw error
+  },
+
+  /**
+   * recalculateStock — bulk-tracked reconciliation tool only (serialized
+   * availability is always a live COUNT, nothing to drift). Recomputes
+   * reserved_quantity from the stock_moves ledger for one product+warehouse.
+   */
+  async recalculateStock(productId: string, warehouseId: string, actorEmail: string): Promise<void> {
+    const { error } = await supabase.rpc('recalculate_stock', {
+      p_product_id: productId,
+      p_warehouse_id: warehouseId,
+      p_actor_email: actorEmail,
+    })
+    if (error) throw error
+  },
+
+  /**
+   * getStockSummary — per-product available/reserved/delivered, branching by
+   * stock_tracking_mode. Follows the same fetch-raw-rows-then-aggregate-in-JS
+   * pattern as getStats() above rather than a DB view — matches existing
+   * convention in this file, and product/unit counts at this system's scale
+   * don't warrant a server-side aggregate yet (see Sprint 8 Phase 8d).
+   */
+  async getStockSummary(): Promise<ProductStockSummary[]> {
+    const [productsRes, unitsRes, stockRes] = await Promise.all([
+      supabase
+        .from('products')
+        .select('id, product_name, stock_tracking_mode')
+        .neq('product_type', 'service'),
+      supabase
+        .from('inventory_units')
+        .select('product_id, reservation_status')
+        .eq('status', 'company_stock')
+        .not('product_id', 'is', null),
+      supabase.from('warehouse_stock').select('product_id, quantity, reserved_quantity'),
+    ])
+    if (productsRes.error) throw productsRes.error
+    if (unitsRes.error) throw unitsRes.error
+    if (stockRes.error && stockRes.error.code !== '42P01') throw stockRes.error
+
+    const products = productsRes.data || []
+    const units = unitsRes.data || []
+    const stockRows = stockRes.data || []
+
+    const summaries: ProductStockSummary[] = products.map((p) => {
+      if (p.stock_tracking_mode === 'bulk') {
+        const rows = stockRows.filter((s) => s.product_id === p.id)
+        const totalQty = rows.reduce((sum, s) => sum + s.quantity, 0)
+        const totalReserved = rows.reduce((sum, s) => sum + s.reserved_quantity, 0)
+        return {
+          product_id: p.id,
+          product_name: p.product_name,
+          stock_tracking_mode: 'bulk',
+          available: totalQty - totalReserved,
+          reserved: totalReserved,
+          delivered: 0,
+        }
+      }
+      const productUnits = units.filter((u) => u.product_id === p.id)
+      return {
+        product_id: p.id,
+        product_name: p.product_name,
+        stock_tracking_mode: 'serialized',
+        available: productUnits.filter((u) => u.reservation_status === 'available').length,
+        reserved: productUnits.filter((u) => u.reservation_status === 'reserved').length,
+        delivered: productUnits.filter((u) => u.reservation_status === 'delivered').length,
+      }
+    })
+
+    return summaries
+  },
 }
 
 // ── Warehouses ────────────────────────────────────────────────────────────────
@@ -297,6 +490,65 @@ export const warehouses = {
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from('warehouses').delete().eq('id', id)
     if (error) throw error
+  },
+  /**
+   * archive — soft-delete via the archive_warehouse RPC (Sprint 8 Phase 8a).
+   * Server-side blocks the archive if any live serialized units or bulk
+   * quantity still reference this warehouse; the RPC's error message names
+   * the blocking counts. Prefer this over delete() for warehouses that may
+   * have been used — delete() remains for the empty/never-used case.
+   */
+  async archive(id: string, actorEmail: string): Promise<void> {
+    const { error } = await supabase.rpc('archive_warehouse', {
+      p_warehouse_id: id,
+      p_actor_email: actorEmail,
+    })
+    if (error) throw error
+  },
+}
+
+// ── Warehouse stock (bulk-quantity tracking, Sprint 8 Phase 8a) ─────────────────
+
+export const warehouseStock = {
+  async list(): Promise<TableResult<WarehouseStockRow[]>> {
+    try {
+      const { data, error } = await supabase.from('warehouse_stock').select('*')
+      if (error) {
+        if (error.code === '42P01') return { missing: true, data: [] }
+        throw error
+      }
+      return { missing: false, data: data || [] }
+    } catch {
+      return { missing: true, data: [] }
+    }
+  },
+  async listByProduct(productId: string): Promise<WarehouseStockRow[]> {
+    const { data, error } = await supabase
+      .from('warehouse_stock')
+      .select('*')
+      .eq('product_id', productId)
+    if (error) throw error
+    return data || []
+  },
+}
+
+// ── Stock moves (append-only movement ledger) ───────────────────────────────────
+
+export const stockMoves = {
+  async list(filters?: { refType?: string; refIds?: string[] }): Promise<TableResult<StockMoveRow[]>> {
+    try {
+      let query = supabase.from('stock_moves').select('*').order('created_at', { ascending: false })
+      if (filters?.refType) query = query.eq('ref_type', filters.refType)
+      if (filters?.refIds?.length) query = query.in('ref_id', filters.refIds)
+      const { data, error } = await query
+      if (error) {
+        if (error.code === '42P01') return { missing: true, data: [] }
+        throw error
+      }
+      return { missing: false, data: data || [] }
+    } catch {
+      return { missing: true, data: [] }
+    }
   },
 }
 

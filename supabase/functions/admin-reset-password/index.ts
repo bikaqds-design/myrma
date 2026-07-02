@@ -3,13 +3,14 @@
 // Uses the service_role key (server-side only — never exposed to the browser).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { corsOriginHeaders } from '../_shared/cors.ts'
 
 Deno.serve(async (req) => {
+  const corsHeaders = {
+    ...corsOriginHeaders(req),
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  }
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -82,15 +83,27 @@ Deno.serve(async (req) => {
     })
   }
 
-  // Look up the target user by email
-  const { data: { users }, error: listError } = await adminClient.auth.admin.listUsers({ perPage: 1000 })
-  if (listError) {
-    return new Response(JSON.stringify({ error: listError.message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+  // Look up the target user by email.
+  // Audit HIGH-5: the previous code fetched only the first 1,000 users and
+  // .find()'d in memory — past 1,000 accounts, existing users were not found,
+  // so resets fell into the "create user" branch and failed on a duplicate.
+  // Paginate until we find the target (or run out of pages) so lookup is
+  // correct regardless of directory size.
+  const targetEmailLc = targetEmail.toLowerCase()
+  let target: { id: string; email?: string } | undefined
+  const PER_PAGE = 1000
+  const MAX_PAGES = 100 // hard stop: 100k users — well beyond this app's scale
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const { data: { users }, error: listError } = await adminClient.auth.admin.listUsers({ page, perPage: PER_PAGE })
+    if (listError) {
+      return new Response(JSON.stringify({ error: listError.message }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    target = users.find(u => (u.email ?? '').toLowerCase() === targetEmailLc)
+    if (target) break
+    if (users.length < PER_PAGE) break // last page reached
   }
-
-  const target = users.find(u => u.email === targetEmail)
 
   if (!target) {
     // User doesn't exist in Supabase Auth yet — create them.

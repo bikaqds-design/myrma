@@ -114,8 +114,6 @@ const RMATickets = lazyWithReload(() => import('./pages/RMATickets'))
 const Inventory = lazyWithReload(() => import('./pages/Inventory'))
 const ControlPanel = lazyWithReload(() => import('./pages/ControlPanel'))
 const TechCalendar = lazyWithReload(() => import('./pages/TechCalendar'))
-const Invoices = lazyWithReload(() => import('./pages/Invoices'))
-const PartsInventory = lazyWithReload(() => import('./pages/PartsInventory'))
 const Reports = lazyWithReload(() => import('./pages/Reports'))
 const Leads = lazyWithReload(() => import('./pages/Leads'))
 const LeadDetails = lazyWithReload(() => import('./pages/Leads/LeadDetails'))
@@ -125,6 +123,8 @@ const Activities = lazyWithReload(() => import('./pages/Activities'))
 const SalesDocuments = lazyWithReload(() => import('./pages/SalesDocuments'))
 const SalesDocumentDetail = lazyWithReload(() => import('./pages/SalesDocuments/SalesDocumentDetail'))
 const Accounting = lazyWithReload(() => import('./pages/Accounting'))
+const Purchasing = lazyWithReload(() => import('./pages/Purchasing'))
+const PurchaseDocumentDetail = lazyWithReload(() => import('./pages/Purchasing/PurchaseDocumentDetail'))
 const NotFoundPage = lazyWithReload(() => import('./pages/NotFoundPage'))
 import CommandPalette from './components/CommandPalette'
 
@@ -209,6 +209,19 @@ function SalesDocumentDetailRoute({ currentUserRole, currentUserEmail }) {
       currentUserRole={currentUserRole}
       currentUserEmail={currentUserEmail}
       onBack={() => navigate('/sales')}
+    />
+  )
+}
+
+function PurchaseDocumentDetailRoute({ currentUserEmail }) {
+  const { type, id } = useParams()
+  const navigate = useNavigate()
+  return (
+    <PurchaseDocumentDetail
+      docType={type}
+      docId={id}
+      currentUserEmail={currentUserEmail}
+      onBack={() => navigate('/purchasing')}
     />
   )
 }
@@ -731,6 +744,13 @@ export default function App() {
       requiredPermission: ['deals', 'view'],
     },
     {
+      path: '/purchasing',
+      label: t('nav.purchasing'),
+      active: pathname === '/purchasing',
+      icon: 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z',
+      requiredPermission: ['deals', 'view'],
+    },
+    {
       path: '/rma-tickets',
       label: t('nav.rmaTickets'),
       active: pathname === '/rma-tickets',
@@ -761,20 +781,6 @@ export default function App() {
       active: pathname === '/calendar',
       icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
       requiredPermission: ['calendar', 'view'],
-    },
-    {
-      path: '/invoices',
-      label: t('nav.invoices'),
-      active: pathname === '/invoices',
-      icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
-      requiredPermission: ['invoices', 'view'],
-    },
-    {
-      path: '/parts',
-      label: t('nav.parts'),
-      active: pathname === '/parts',
-      icon: 'M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z',
-      requiredPermission: ['parts', 'view'],
     },
     {
       path: '/reports',
@@ -871,8 +877,6 @@ export default function App() {
       '/account': 'Account Settings',
       '/control-panel': 'Control Panel',
       '/calendar': 'Calendar',
-      '/invoices': 'Invoices',
-      '/parts': 'Parts Inventory',
       '/reports': 'Reports',
     }
     return MAP[pathname] ?? pathname.slice(1).replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
@@ -1424,6 +1428,28 @@ export default function App() {
               />
 
               <Route
+                path="/purchasing"
+                element={
+                  canDo(effectiveUserRole, effectiveUserPermissions, 'deals', 'view') ? (
+                    <Purchasing currentUserEmail={currentUser?.email} />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="/purchasing/:type/:id"
+                element={
+                  canDo(effectiveUserRole, effectiveUserPermissions, 'deals', 'view') ? (
+                    <PurchaseDocumentDetailRoute currentUserEmail={currentUser?.email} />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                }
+              />
+
+              <Route
                 path="/sales/:type/:id"
                 element={
                   canDo(effectiveUserRole, effectiveUserPermissions, 'deals', 'view') ? (
@@ -1496,28 +1522,6 @@ export default function App() {
                     userEmail={currentUser?.email}
                     userPermissions={effectiveUserPermissions}
                     onNavigateToTicket={handleNavigateToTicket}
-                  />
-                }
-              />
-
-              <Route
-                path="/invoices"
-                element={
-                  <Invoices
-                    userRole={effectiveUserRole}
-                    userEmail={currentUser?.email}
-                    userPermissions={effectiveUserPermissions}
-                  />
-                }
-              />
-
-              <Route
-                path="/parts"
-                element={
-                  <PartsInventory
-                    userRole={effectiveUserRole}
-                    userEmail={currentUser?.email}
-                    userPermissions={effectiveUserPermissions}
                   />
                 }
               />
