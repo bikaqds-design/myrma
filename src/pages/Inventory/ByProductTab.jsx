@@ -345,7 +345,7 @@ export function ByProductTab({
                         </td>
                         <td className="px-3 py-1.5 text-center border-r border-gray-100 dark:border-[#212a38]">
                           {g.active_rma > 0 ? (
-                            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700">
+                            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400">
                               {g.active_rma}
                             </span>
                           ) : (
@@ -354,7 +354,7 @@ export function ByProductTab({
                         </td>
                         <td className="px-3 py-1.5 text-center border-r border-gray-100 dark:border-[#212a38]">
                           {g.company_stock > 0 ? (
-                            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-700">
+                            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
                               {g.company_stock}
                             </span>
                           ) : (

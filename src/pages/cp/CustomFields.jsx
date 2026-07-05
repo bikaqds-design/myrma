@@ -207,7 +207,7 @@ export default function CustomFields({ currentUserEmail }) {
           <button
             key={v}
             onClick={() => setFilterAppliesTo(v)}
-            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${filterAppliesTo === v ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${filterAppliesTo === v ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2] hover:bg-gray-200 dark:hover:bg-[#212a38]'}`}
           >
             {v === '' ? t('cp.customFields.filterAll') : v === 'ticket' ? t('cp.customFields.filterTickets') : t('cp.customFields.filterCustomers')}
           </button>
@@ -245,7 +245,7 @@ export default function CustomFields({ currentUserEmail }) {
                 </td>
                 <td className="px-4 py-3">
                   <span
-                    className={`px-2 py-0.5 rounded text-xs font-medium ${f.applies_to === 'ticket' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}
+                    className={`px-2 py-0.5 rounded text-xs font-medium ${f.applies_to === 'ticket' ? 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400' : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'}`}
                   >
                     {f.applies_to}
                   </span>

@@ -474,7 +474,7 @@ export function CompanyStockTab({
                         <td className="px-4 py-3 text-gray-900 dark:text-[#e8ebf0] font-semibold">{g.product_name}</td>
                         <td className="px-4 py-3">
                           {g.replacement > 0 ? (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400">
                               {g.replacement}
                             </span>
                           ) : (
@@ -483,7 +483,7 @@ export function CompanyStockTab({
                         </td>
                         <td className="px-4 py-3">
                           {g.credit_note > 0 ? (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400">
                               {g.credit_note}
                             </span>
                           ) : (

@@ -494,9 +494,9 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
   const initials = (displayName || currentUser?.email || '?')[0].toUpperCase()
 
   const roleColors = {
-    super_admin: 'bg-purple-100 text-purple-700 border-purple-200',
-    admin: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-    technician: 'bg-gray-100 text-gray-700 border-gray-200',
+    super_admin: 'bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800',
+    admin: 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
+    technician: 'bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#9aa4b2] border-gray-200 dark:border-[#212a38]',
   }
 
   return (
@@ -1126,7 +1126,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium text-gray-800">{w.label}</p>
                         <span
-                          className={`text-xs px-1.5 py-0.5 rounded font-medium ${w.size === 'full' ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-100 text-gray-500'}`}
+                          className={`text-xs px-1.5 py-0.5 rounded font-medium ${w.size === 'full' ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'}`}
                         >
                           {w.size === 'full' ? t('accountSettings.widgetFullWidth') : t('accountSettings.widgetHalfWidth')}
                         </span>
