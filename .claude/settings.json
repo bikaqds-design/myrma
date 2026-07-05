@@ -111,10 +111,26 @@
       "Bash(grep -n \">[A-Za-z][^<]*</\\\\|toast\\\\.\\\\\\(error\\\\|success\\\\\\)\\(\" src/pages/UserManagement/UsersTab.jsx)",
       "Bash(grep -v \"t\\('\\\\|{t\\(\\\\|t\\(\\\\`\\\\|//\\\\|className\")",
       "Bash(grep -c \"t\\('\" src/pages/AccountSettings.jsx)",
-      "Bash(grep -c \"t\\('\" src/pages/ControlPanel.jsx)"
+      "Bash(grep -c \"t\\('\" src/pages/ControlPanel.jsx)",
+      "Read(//d/myappz-website/**)",
+      "PowerShell(Set-Location D:\\\\myappz-website; $ar = Get-Content out\\\\ar\\\\index.html -Raw; $en = Get-Content out\\\\en\\\\index.html -Raw; \"AR dir=rtl wrapper: \" + $ar.Contains\\('dir=\"rtl\"'\\); \"AR arabic copy: \" + $ar.Contains\\('أدر أعمالك'\\); \"AR locale-ar class: \" + $ar.Contains\\('locale-ar'\\); \"EN hero: \" + $en.Contains\\('Run your entire business'\\); \"EN theme script: \" + $en.Contains\\('localeScript'.ToLower\\(\\) \\) ; \"Locale script present: \" + $en.Contains\\('d.dir=ar'\\); $root = Get-Content out\\\\index.html -Raw; \"Root redirect noscript: \" + $root.Contains\\('url=/en/'\\))",
+      "Bash(git check-ignore *)",
+      "Bash(echo \"\\(diff exit: $?\\)\")",
+      "Bash(echo \"\\(exit: $?, empty = not tracked/not shown by git status at all\\)\")",
+      "Bash(Select-String -Pattern \"Branding\")",
+      "Bash(ls node_modules/.bin/playwright)",
+      "Bash(ls node_modules/@playwright)",
+      "Bash(git commit -m ' *)",
+      "Bash(awk 'NR==1494,NR==1550' src/pages/RMATickets/index.jsx)",
+      "Bash(awk 'NR==1377,NR==1501' src/pages/RMATickets/index.jsx)",
+      "Bash(docker info *)",
+      "PowerShell(Start-Process \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\")",
+      "PowerShell(\"Docker Desktop launch requested\")"
     ],
     "additionalDirectories": [
-      "C:\\Users\\bika_\\.claude\\projects\\d--myrma-app"
+      "C:\\Users\\bika_\\.claude\\projects\\d--myrma-app",
+      "D:\\myappz-website",
+      "D:\\myappz-website\\src\\components\\layout"
     ]
   }
 }

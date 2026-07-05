@@ -63,10 +63,24 @@
       "Bash(grep -v \":0$\")",
       "Bash(grep -n \"^\\\\.claude\\\\|claude/\" .gitignore)",
       "Bash(git -C .claude/worktrees/agent-ae7c43c42dbe641aa branch --show-current)",
-      "Bash(git -C .claude/worktrees/agent-ae7c43c42dbe641aa log --oneline -3)"
+      "Bash(git -C .claude/worktrees/agent-ae7c43c42dbe641aa log --oneline -3)",
+      "Bash(git -C .claude/worktrees/agent-ae7c43c42dbe641aa status --porcelain)",
+      "Bash(git -C .claude/worktrees/agent-ae7c43c42dbe641aa diff --cached --stat)",
+      "Bash(git -C .claude/worktrees/agent-ae7c43c42dbe641aa diff --cached -- src/components/NotificationBell.jsx)",
+      "Bash(git -C .claude/worktrees/agent-ae7c43c42dbe641aa diff --cached -- src/components/ui.jsx)",
+      "Bash(git -C .claude/worktrees/agent-ae7c43c42dbe641aa diff --cached)",
+      "Bash(git apply *)",
+      "PowerShell(node --version)",
+      "PowerShell(npm --version)",
+      "PowerShell(Set-Location D:\\\\myappz-website; npm install framer-motion lucide-react next-themes clsx tailwind-merge next-mdx-remote gray-matter 2>&1 | Select-Object -Last 5; \\(Get-Content package.json | ConvertFrom-Json\\).dependencies)",
+      "Read(//d/myappz-website/**)",
+      "Read(//d/myappz-website/src/app/**)",
+      "PowerShell(Set-Location D:\\\\myappz-website; $names = @\\('Linkedin','Twitter','Youtube','BarChart3','ChartColumn','Kanban','Gauge','LifeBuoy','Warehouse','HardHat','LayoutGrid','MessageCircle','ShieldCheck','Languages','UserPlus','Users','Wallet','Zap','BookOpen','Boxes','Clock','FileText','Landmark','Plug','Receipt','ShoppingCart','Smartphone','ArrowRight','ArrowLeft','ChevronDown','Menu','X','Moon','Sun','Check','Minus','Play','Clapperboard','Search','Bell','LayoutDashboard','Sparkles','Blocks','Globe2','Globe','Compass','Eye','HeartHandshake','Quote','Map','MapPin','Phone','Mail','CalendarCheck','MessagesSquare','Presentation','Briefcase','CheckCircle2','CircleCheck','Loader2','LoaderCircle','Send','History','GraduationCap'\\); $file = Get-Content node_modules\\\\lucide-react\\\\dist\\\\lucide-react.d.ts -Raw; foreach \\($n in $names\\) { if \\($file -notmatch \\('\\\\b' + $n + '\\\\b'\\)\\) { Write-Output \"MISSING: $n\" } })"
     ],
     "additionalDirectories": [
-      "C:\\Users\\bika_\\.claude"
+      "C:\\Users\\bika_\\.claude",
+      "D:\\myappz-website",
+      "D:\\myappz-website\\src\\components\\layout"
     ]
   }
 }
