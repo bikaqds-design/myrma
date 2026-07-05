@@ -37,7 +37,9 @@ import { creditNotes } from './creditNotes.js'
 import { salesDocuments } from './salesDocuments.js'
 import { payments } from './payments.js'
 import { customerLedger } from './customerLedger.js'
-import { vendors, proformaInvoices, purchaseOrders, vendorInvoices, purchaseDocuments } from './purchasing.js'
+import { purchaseOrders, vendorInvoices, purchaseDocuments } from './purchasing.js'
+import { vendorPayments } from './vendorPayments.js'
+import { vendorLedger } from './vendorLedger.js'
 
 export const db = {
   // Users & roles
@@ -112,12 +114,12 @@ export const db = {
   payments,
   customerLedger,
 
-  // Purchase Module (Sprint 9)
-  vendors,
-  proformaInvoices,
+  // Purchase Module (vendors are Brands — see catalog.brands)
   purchaseOrders,
   vendorInvoices,
   purchaseDocuments,
+  vendorPayments,
+  vendorLedger,
 }
 
 // Re-export all Row types for page components to import
@@ -151,6 +153,10 @@ export type { SalesDocumentRow, SalesDocType } from './salesDocuments.js'
 export type { PaymentRow, PaymentApplicationRow } from './payments.js'
 export type { LedgerEntryRow, LedgerEntryType, AgingBucket, AgingInvoiceRow } from './customerLedger.js'
 export type {
-  VendorRow, PurchaseLine, ProformaInvoiceRow, PurchaseOrderRow, VendorInvoiceRow,
+  PurchaseLine, PurchaseOrderRow, VendorInvoiceRow,
   PurchaseDocType, PurchaseDocumentRow,
 } from './purchasing.js'
+export type { VendorPaymentRow, VendorPaymentApplicationRow } from './vendorPayments.js'
+export type {
+  VendorLedgerEntryRow, VendorLedgerEntryType, ApAgingBucket, ApAgingInvoiceRow,
+} from './vendorLedger.js'

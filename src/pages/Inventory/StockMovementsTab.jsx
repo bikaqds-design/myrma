@@ -13,7 +13,8 @@ const MOVE_TYPE_BADGE = {
 }
 
 // Doc types that have a navigable detail page — 'manual' has none.
-const NAVIGABLE_DOC_TYPES = new Set(['sales_order', 'invoice', 'credit_note'])
+const NAVIGABLE_DOC_TYPES = new Set(['sales_order', 'invoice', 'credit_note', 'vendor_invoice'])
+const PURCHASING_DOC_TYPES = new Set(['vendor_invoice'])
 
 // ─── Stock Movements — flat audit-trail table over stock_moves (Sprint 8 Phase 8b) ─
 export function StockMovementsTab({ moves, units, warehouseStockRows, products, warehouses }) {
@@ -129,7 +130,11 @@ export function StockMovementsTab({ moves, units, warehouseStockRows, products, 
                     <td className="px-5 py-3">
                       {NAVIGABLE_DOC_TYPES.has(m.doc_type) && m.doc_id ? (
                         <button
-                          onClick={() => navigate(`/sales/${m.doc_type}/${m.doc_id}`)}
+                          onClick={() =>
+                            navigate(
+                              `${PURCHASING_DOC_TYPES.has(m.doc_type) ? '/purchasing' : '/sales'}/${m.doc_type}/${m.doc_id}`
+                            )
+                          }
                           className="text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
                         >
                           {t(`inventory.docType_${m.doc_type}`)}

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import Modal from '../../components/Modal'
 import { Button } from '../../components/ui'
+import { VendorFieldsSection } from '../Purchasing/_modals'
 
 export function AddProductModal({
   productForm,
@@ -352,6 +353,16 @@ export function AddBrandModal({
               <option value="active">{t('products.statusActive')}</option>
               <option value="inactive">{t('products.statusInactive')}</option>
             </select>
+          </div>
+
+          <div className="border-t border-gray-200 pt-4">
+            <label className="block text-sm font-semibold text-gray-700 mb-3">{t('products.vendorDetailsSection')}</label>
+            <p className="text-xs text-gray-500 mb-3">{t('products.vendorDetailsHint')}</p>
+            <VendorFieldsSection
+              values={brandForm}
+              onChange={(patch) => setBrandForm({ ...brandForm, ...patch })}
+              t={t}
+            />
           </div>
 
           <div>

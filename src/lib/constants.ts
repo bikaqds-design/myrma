@@ -438,3 +438,51 @@ export const CREDIT_NOTE_TYPE_LIST: CreditNoteType[] = [
 
 /** Credit note types that trigger inventory restock on issue */
 export const CREDIT_NOTE_INVENTORY_TYPES: CreditNoteType[] = [CREDIT_NOTE_TYPE.RMA_RETURN]
+
+// ── Purchasing: Purchase Order statuses ─────────────────────────────────────
+// Non-financial document — never touches inventory. completed/partially_completed
+// are set server-side by receive_vendor_invoice when a linked Vendor Invoice is
+// received (20260758_receive_vi_po_completion.sql), not by direct client update.
+export const PO_STATUS = {
+  DRAFT: 'draft',
+  SENT: 'sent',
+  PENDING_CONFIRMATION: 'pending_confirmation',
+  CONFIRMED: 'confirmed',
+  PARTIALLY_COMPLETED: 'partially_completed',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+  EXPIRED: 'expired',
+} as const
+
+export type PoStatus = (typeof PO_STATUS)[keyof typeof PO_STATUS]
+
+export const PO_STATUS_FLOW: PoStatus[] = [
+  PO_STATUS.DRAFT,
+  PO_STATUS.SENT,
+  PO_STATUS.PENDING_CONFIRMATION,
+  PO_STATUS.CONFIRMED,
+  PO_STATUS.PARTIALLY_COMPLETED,
+  PO_STATUS.COMPLETED,
+]
+
+// ── Purchasing: Vendor Invoice statuses ─────────────────────────────────────
+// The financial document — approval gates receipt, receipt triggers inventory
+// + the vendor-payable balance.
+export const VI_STATUS = {
+  DRAFT: 'draft',
+  PENDING_APPROVAL: 'pending_approval',
+  APPROVED: 'approved',
+  PARTIALLY_RECEIVED: 'partially_received',
+  RECEIVED: 'received',
+  CANCELLED: 'cancelled',
+} as const
+
+export type ViStatus = (typeof VI_STATUS)[keyof typeof VI_STATUS]
+
+export const VI_STATUS_FLOW: ViStatus[] = [
+  VI_STATUS.DRAFT,
+  VI_STATUS.PENDING_APPROVAL,
+  VI_STATUS.APPROVED,
+  VI_STATUS.PARTIALLY_RECEIVED,
+  VI_STATUS.RECEIVED,
+]

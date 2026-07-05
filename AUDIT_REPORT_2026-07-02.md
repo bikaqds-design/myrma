@@ -173,13 +173,18 @@ Hot lookups filter by FK (`payment_applications.invoice_id`, `crm_invoices.so_id
 ## 4. Medium-Severity Findings
 
 - **MED-1 — God components.** `CustomerDetails.jsx` (1,913 lines), `ControlPanel.jsx` (1,805), `RMATickets/index.jsx` (1,703), `BrandingSettings.jsx` (1,487). These are maintenance and merge-conflict hotspots and exceed any reasonable review budget. Extract tabs/sections into folder-based sub-components (you already do this well for Inventory/Pipeline — apply the same to these). **Status:** OPEN
+  - **Quantified 2026-07-05** via an automated code-quality pass (`code-reviewer` skill, `code_quality_checker.py` against `src/`) — confirms this isn't just a line-count problem, there are specific oversized functions inside `ControlPanel.jsx` worth targeting first if/when this refactor happens:
+    - `saveEdit` — **403 lines** (8× the 50-line threshold)
+    - `handleSend` — 167 lines; `handleSave` — 150 lines
+    - The `ControlPanel` component itself — cyclomatic complexity **24** (2.4× the threshold of 10)
+    - (Same tool flagged 4,382 "code smells" total across `src/`, but 94% were `magic_number` false positives — the checker has no CSS-in-JSX awareness and misread Tailwind hex colors like `#121823`, this project's own documented dark-mode token, and class-name suffixes like `bg-red-900` as literal business-logic magic numbers. Only the `long_function`/`high_complexity` categories carried real signal; everything else from that run was discarded as noise, not reported here.)
 - **MED-2 — Client-side 5,000-row caps with in-memory filtering.** `db.customers/rmaTickets/products.list()` cap at 5k and the pages filter/sort in JS (documented in CLAUDE.md as intentional). This is a hard scale ceiling; the *first* tenant to exceed 5k rows silently loses data from views. Add a visible "showing first 5,000" banner now, and plan server-side pagination before it bites. **Status:** OPEN
 - **MED-3 — Two permanent "Receive Stock" paths.** `receive_stock` (interim, no audit trail) and `receive_vendor_invoice` (permanent, traceable) both live in the codebase and both write stock. Operators can create stock with no vendor provenance via the interim path. Decide: gate the interim path behind a permission, or retire it once Purchasing is live. **Status:** OPEN
 - **MED-4 — Credit limit is decorative.** `customers.credit_limit` is a soft warning, never enforced (by design). Fine for v1, but call it out to stakeholders — the system will happily let a customer exceed their limit with no block or approval step. **Status:** OPEN
 - **MED-5 — `reserved_quantity` can be reconciled but `quantity` cannot.** `recalculate_stock` only reconciles `reserved_quantity`, not the on-hand `quantity` (by design). If `quantity` ever drifts (bad manual adjust, failed partial receipt), there is no repair path short of SQL. **Status:** OPEN
 - **MED-6 — No optimistic-concurrency on document edits.** Sales/purchase document updates are last-write-wins (`update(Partial<Row>)`). Two managers editing the same invoice silently clobber each other. Consider an `updated_at` precondition. **Status:** OPEN
-- ~~**MED-7 — `send-whatsapp` / `notification-worker` verify a JWT but not a role.**~~ They called `getUser()` (authenticated) but any authenticated user could trigger sends/worker runs. **Status: FIXED** — both now gate the Bearer-token path to non-viewer staff. **Severity upgrade found while fixing this:** `notification-worker`'s third auth branch was `!req.headers.get('x-trigger-source')` — "reject only if the header is *absent*" — so any value at all (not just the intended `pg_cron`) satisfied it, meaning any **unauthenticated** caller (not just a low-privilege one) could drain the queue and burn send quota. This was more severe than originally described. Tightened to an exact match against what the pg_cron migration actually sends; full closure needs the cron job to also send a Vault-backed secret (follow-up, not done — see `CLAUDE.md`).
-- **MED-8 — Stray nested `myrma-app/` directory** containing a duplicate `CLAUDE.md`, tracked in git status. Repo hygiene — remove or explain it. **Status:** OPEN
+- ~~**MED-7 — `send-whatsapp` / `notification-worker` verify a JWT but not a role.**~~ They called `getUser()` (authenticated) but any authenticated user could trigger sends/worker runs. **Status: FIXED** — both now gate the Bearer-token path to non-viewer staff. **Severity upgrade found while fixing this:** `notification-worker`'s third auth branch was `!req.headers.get('x-trigger-source')` — "reject only if the header is *absent*" — so any value at all (not just the intended `pg_cron`) satisfied it, meaning any **unauthenticated** caller (not just a low-privilege one) could drain the queue and burn send quota. This was more severe than originally described. Tightened to an exact match against what the pg_cron migration actually sends; full closure needs the cron job to also send a Vault-backed secret. **Explicitly postponed by user 2026-07-05** after weighing risk vs. reward: current gap is quota-abuse-only (low severity); the fix touches the live pg_cron schedule that sends overdue-ticket reminders, and a mistake there risks silently breaking a working feature rather than closing a low-stakes hole. Deferred for a future, careful pass — not forgotten.
+- ~~**MED-8 — Stray nested `myrma-app/` directory** containing a duplicate `CLAUDE.md`, tracked in git status. Repo hygiene — remove or explain it.~~ **Status: FIXED** — confirmed untracked SpecKit scaffold boilerplate (not gitignored, no real content), deleted 2026-07-05.
 
 ---
 
@@ -281,7 +286,8 @@ None of these require re-architecture. They require a focused hardening sprint: 
 | HIGH-5 | `admin-reset-password` 1,000-user scan cap | High | **FIXED** (paginated) |
 | HIGH-6 | 50 broken `inventory:` i18n keys | High | **FIXED** (`WarehousesTab.jsx`) |
 | HIGH-7 | Missing FK indexes | High | **NO CHANGE NEEDED** — all flagged FKs already indexed (audit overstated) |
-| MED-1..8 | See §4 | Medium | OPEN |
+| MED-1..7 | See §4 | Medium | OPEN |
+| MED-8 | Stray nested `myrma-app/` directory | Medium | **FIXED** — deleted 2026-07-05 |
 
 *Update the Status column as fixes land. This file is the source of truth for the hardening sprint.*
 
@@ -427,3 +433,24 @@ Completes HIGH-3: the last 5 inventory/purchasing RPCs (`transfer_stock`, `adjus
 **Gate:** 277/277 tests, 0 lint errors, build ✓ (unchanged — this pass touches only SQL/CI/docs). Wired into the `db-tests` CI job as a third `psql -f` step and appended to `npm run test:db`.
 
 **Update 2026-07-02, same day — verified:** migration `20260755` applied cleanly; `inventory_hardening2.sql` ran to completion with no exception (a pure `DO` block with no final `SELECT`, so "success, no rows" *is* the pass signal — a failure would show an `ERROR` naming the specific check, as it did for the `doc_type` bug above). **All 14 checks pass, including CHECK 9b**, which directly exercises the previously-broken `restore_units(p_to_status => 'active_rma')` path — confirming the fix in `20260755` actually works, not just that it compiles. **HIGH-3 is now fully closed**: all 3 DB test files (34 checks total) pass live, and every inventory/purchasing RPC in the system has coverage.
+
+---
+
+## Fix Log — 2026-07-05 (independent automated review pass — no new findings, one enrichment)
+
+Ran the `code-reviewer` skill's three tools (`pr_analyzer.py`, `code_quality_checker.py`, `review_report_generator.py`) against `test` vs `main` — the full Sprint 7.5-9 + Sprint H commit, as a second, independently-tooled pass over work this document already covers.
+
+**Automated verdict was ❌ BLOCK / 40/100 — verified and overturned.** Every one of the tool's 4 flagged Critical/High/Medium items was checked against the actual diff and confirmed a **false positive**, all from the same root cause: the analyzer runs source-code regexes (SQL string concatenation, C# `unsafe` blocks, TS `any`/C# `dynamic`) against **all** changed files including `.md` documentation, with no file-type discrimination:
+
+| Flagged | File | Actual content |
+|---|---|---|
+| SQL injection (Critical) | `AUDIT_REPORT_2026-07-02.md` | Prose describing RPC behavior ("insert SO + flip qt.status"), not executable SQL |
+| SQL injection (Critical) | `specs/003-sales-funnel-hardening/research.md` | Same — a table cell of prose |
+| C# `unsafe` block (High) | `specs/003-sales-funnel-hardening/plan.md` | The phrase "unsafe void" — a business-logic governance gap in prose. Zero C# exists anywhere in this repo |
+| TS `any`/C# `dynamic` (Medium) | `AGENTS.md` | The English word "any" in "any authenticated user" / "any application row exists" |
+
+Zero real findings survived verification — reported via `ReportFindings` with an empty array, per that tool's own instruction for this exact outcome.
+
+**One genuine, new data point, folded into MED-1 above rather than filed separately:** `code_quality_checker.py` against `src/` flagged 4,382 "code smells," 94% of which (`magic_number`) were the same false-positive class — the checker has no CSS-in-JSX awareness and misread Tailwind hex colors (`#121823`, this project's own dark-mode token) and class-name suffixes (`bg-red-900`) as business-logic magic numbers; discarded as noise. The remaining `long_function`/`high_complexity` categories corroborated MED-1's God-component finding with real numbers worth keeping: `ControlPanel.jsx`'s `saveEdit` function is 403 lines (8× threshold), `handleSend`/`handleSave` run 150–167 lines, and the `ControlPanel` component itself has cyclomatic complexity 24 (2.4× threshold).
+
+**Net effect:** no new Critical/High/Medium findings. Confirms the commit is clean by a second, independent tool — and gives MED-1 a concrete starting point (`saveEdit`) whenever that refactor is scheduled, rather than "somewhere in these 1,800 lines."

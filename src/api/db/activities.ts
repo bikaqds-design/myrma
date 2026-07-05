@@ -12,7 +12,7 @@ export interface ActivityAttachment {
 
 export interface ActivityRow {
   id: string
-  related_type: 'lead' | 'deal' | 'customer' | 'contact'
+  related_type: 'lead' | 'deal' | 'customer' | 'contact' | 'purchase_order' | 'vendor_invoice'
   related_id: string
   type: string
   title: string
@@ -44,6 +44,8 @@ const RELATED_TABLE: Record<ActivityRow['related_type'], string> = {
   deal: 'deals',
   customer: 'customers',
   contact: 'contacts',
+  purchase_order: 'purchase_orders',
+  vendor_invoice: 'vendor_invoices',
 }
 
 async function assertRelatedExists(

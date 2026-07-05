@@ -104,6 +104,11 @@ export default function Products({
     brand_description: '',
     status: 'active',
     brand_logo_url: null,
+    contact_person: '',
+    email: '',
+    phone: '',
+    tax_id: '',
+    payment_terms: '',
   })
 
   const [categoryForm, setCategoryForm] = useState({
@@ -787,6 +792,11 @@ export default function Products({
         brand_description: brandForm.brand_description,
         status: brandForm.status,
         brand_logo_url: logoUrl,
+        contact_person: brandForm.contact_person || null,
+        email: brandForm.email || null,
+        phone: brandForm.phone || null,
+        tax_id: brandForm.tax_id || null,
+        payment_terms: brandForm.payment_terms || null,
         created_by: currentUserEmail,
         updated_by: currentUserEmail,
       }
@@ -975,6 +985,11 @@ export default function Products({
       brand_description: brand.brand_description || '',
       status: brand.status || 'active',
       brand_logo_url: brand.brand_logo_url || null,
+      contact_person: brand.contact_person || '',
+      email: brand.email || '',
+      phone: brand.phone || '',
+      tax_id: brand.tax_id || '',
+      payment_terms: brand.payment_terms || '',
     })
     setLogoPreview(brand.brand_logo_url)
     setLogoFile(null)
@@ -1024,6 +1039,11 @@ export default function Products({
       brand_description: '',
       status: 'active',
       brand_logo_url: null,
+      contact_person: '',
+      email: '',
+      phone: '',
+      tax_id: '',
+      payment_terms: '',
     })
     setLogoFile(null)
     setLogoPreview(null)

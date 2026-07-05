@@ -1079,6 +1079,24 @@ Gate green after every increment (`npm test` 277/277, lint 0 errors, build ✓).
 
 **Status**: ✅ BUILT — all 5 migrations written, API layer + `/purchasing` UI shipped, gate green (`npm test` 277/277, lint 0 errors, build ✓ — 69 precache entries, 2 new lazy chunks). Status: BUILT, not VERIFIED — the Sprint 9 gate below (a live procurement cycle, including partial receipt and duplicate-serial rejection) still needs to be run once the migrations are applied.
 
+> **⚠️ Superseded 2026-07-05 by the Purchase Module Redesign** (see the new section immediately below this one). The `vendors`/`proforma_invoices` tables, the PI→PO→VI funnel, and the 5-tab `/purchasing` list described in this section no longer reflect the live schema or UI — they were replaced, not extended. This section is kept as the historical record of what Sprint 9 originally shipped.
+
+## Sprint 9R — Purchase Module Redesign ✅ BUILT 2026-07-05
+
+**Trigger**: user-authored redesign spec — Brands should be the vendors (no separate `vendors` table), Proforma Invoices should be removed entirely, the funnel should be **Purchase Order (non-financial) → Vendor Invoice (financial: inventory + payable)**, POs need a professional PDF, and the module needs a real Vendor Payments (Accounts Payable) ledger mirroring the customer AR side.
+
+**User decisions locked in before build**: start fresh (wipe all existing purchasing data — the module was only days old, no real data at risk); build full AP payments now, not just a balance display; drop the `proforma_invoices` table, not just the UI; vendor details editable from both Products→Brands and Purchasing→Vendors; managers gain write access to `brands` (was admin-only); VI rejection sends it back to `draft` (editable/resubmittable), not cancelled.
+
+**Migrations** (`20260756`–`20260762`, 7 files) — see the itemized list in [`CLAUDE.md`](CLAUDE.md)'s Database migrations section for exactly what each one does. Highlights: `20260757_purchasing_reset.sql` is the destructive reset (wipes data, drops `vendors`/`proforma_invoices`, repoints FKs to `brands`); `20260760_vendor_payments.sql` is the AP layer, **hardened from day one** (the AR `payments` table needed a follow-up audit pass — `20260751`/`20260754` — for the same guards; AP got them from the start).
+
+**Code**: `src/api/db/purchasing.ts` rewritten (`vendors`/`proformaInvoices` namespaces removed; `purchaseOrders`/`vendorInvoices` gain the new fields/statuses/lifecycle methods); new `vendorPayments.ts` + `vendorLedger.ts` (AP mirror of `payments.ts`/`customerLedger.ts`); `catalog.ts` `BrandRow` fixed (was drifted — missing `brand_description`/`status`) and widened with vendor fields; `activities.ts` `related_type` widened for `purchase_order`/`vendor_invoice`; `src/lib/constants.ts` gains `PO_STATUS`/`VI_STATUS` + flow arrays. `src/pages/Purchasing/` fully rebuilt to `SalesDocuments`-parity (search/sort/filter/pagination/bulk-archive/XLSX export on the list; status-timeline stepper + `ActivityChatter` history + PDF download + Record Payment on the detail page). New `src/lib/purchaseOrderPdf.js` (reuses the shared `documentPdf.js` engine — added an optional `billToLabel` param, backward-compatible, so quotation/SO/invoice PDFs are unaffected). `src/pages/Accounting/index.jsx` gains "Vendor Payments"/"AP Aging" tabs. `src/pages/Products/_modals.jsx` brand form gains a "Vendor details" section (shared `VendorFieldsSection` component, also used by Purchasing's vendor edit modal). `src/pages/Activities/index.jsx` approval-pool dispatch extended for `vendor_invoice`. Full `en.json`/`ar.json` key coverage.
+
+**Tests**: `supabase/tests/inventory_hardening2.sql` updated (brands instead of vendors, new status names, new CHECK 14 for PO-completion sync); new `supabase/tests/vendor_payments.sql` (10 checks mirroring `audit_hardening.sql`'s AR checks — split allocation, over-allocation rejection, draft/vendor-mismatch rejection, viewer denial, actor-spoofing rejection, reversal + re-apply, void-reverses-all, direct-insert CHECK trip); wired into `.github/workflows/ci.yml` and `npm run test:db`.
+
+**Gate**: 277/277 unit tests, 0 lint errors, build ✓ after every increment. **Not yet run**: the `db-tests` CI job against a real Postgres (no Docker available in this session — first real verification happens on push via GitHub Actions) and manual UI click-through (create vendor → PO → send → confirm → PDF → convert to VI → submit for approval → approve from Activities → receive partial/full → record a split vendor payment → check AP aging → void/reverse a payment).
+
+**Known residual, documented and accepted**: any pre-existing `inventory_units` rows linked to a vendor invoice lose that `vendor_invoice_id` link in the reset (stock itself is untouched, only the receipt-paperwork pointer clears) — moot in practice since the module had no real data yet.
+
 **Migrations written** (apply in order, after Sprint 8a's `20260740`–`20260745`):
 
 | File | Contains |
@@ -1260,7 +1278,7 @@ All 34 checks pass live (confirmed by user, 2026-07-02). Local equivalent: `npm 
 
 - **Credit-limit enforcement** (block / warn-with-override / advisory) — user wants to test the live funnel first before choosing. Currently advisory-only, unchanged.
 - **Legacy `invoices` table retirement** — `crm_invoices` is confirmed canonical; `Reports.jsx` and `RolesTab.jsx` (the two remaining dependents) will be **rebuilt**, not incrementally migrated, once the above is settled.
-- **Vault-backed `x-worker-secret`** for full `notification-worker` pre-auth closure — needs live Supabase project access (Vault secret creation + matching the Edge Function secret), not something to wire blind.
+- **Vault-backed `x-worker-secret`** for full `notification-worker` pre-auth closure — **explicitly postponed by user 2026-07-05**: fix touches the live pg_cron schedule sending overdue-ticket reminders; a mistake risks silently breaking a working feature to close a low-severity (quota-abuse-only) gap. Deferred for a future, careful pass done alongside the user checking the live cron job first, not wired blind.
 - **God-component decomposition** (`CustomerDetails.jsx` 1,913 lines, `ControlPanel.jsx` 1,805, `RMATickets/index.jsx` 1,703, `BrandingSettings.jsx` 1,487) — pure maintainability, no bug. Needs a live click-through loop, not a blind refactor; recommended starting point is `ControlPanel.jsx` (already a thin shell over 14 separate sub-page files, lowest risk of the four).
 
 ### Gate

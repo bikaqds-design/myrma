@@ -52,16 +52,17 @@ const SOURCE_BADGE = {
 }
 
 const SOURCE_LABEL_KEY = {
-  lead:        'activities.sourceLead',
-  deal:        'activities.sourceDeal',
-  quotation:   'activities.sourceQuotation',
-  sales_order: 'activities.sourceSalesOrder',
-  invoice:     'activities.sourceInvoice',
-  credit_note: 'activities.sourceCreditNote',
+  lead:            'activities.sourceLead',
+  deal:            'activities.sourceDeal',
+  quotation:       'activities.sourceQuotation',
+  sales_order:     'activities.sourceSalesOrder',
+  invoice:         'activities.sourceInvoice',
+  credit_note:     'activities.sourceCreditNote',
+  vendor_invoice:  'activities.sourceVendorInvoice',
 }
 
 // The selectable document sources in the filter dropdown (approval pool).
-const DOC_SOURCES = ['quotation', 'sales_order', 'invoice', 'credit_note']
+const DOC_SOURCES = ['quotation', 'sales_order', 'invoice', 'credit_note', 'vendor_invoice']
 
 // Approval pool format: approval|docType|docId|code|total|customer
 function parseApprovalTitle(title) {
@@ -219,7 +220,8 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
   const getCustomerLink = React.useCallback((a) => {
     if (a.type === 'approval') {
       const { docType, docId } = parseApprovalTitle(a.title)
-      return docId ? `/sales/${docType}/${docId}` : null
+      if (!docId) return null
+      return docType === 'vendor_invoice' ? `/purchasing/${docType}/${docId}` : `/sales/${docType}/${docId}`
     }
     if (a.related_type === 'lead') return leadMap[a.related_id] ? `/leads/${a.related_id}` : null
     if (a.related_type === 'deal') return dealMap[a.related_id] ? `/pipeline/${a.related_id}` : null
@@ -404,20 +406,25 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
   // wired for when their document UIs gain a "Submit for Approval" action.
   const approveDocument = (docType, docId) => {
     switch (docType) {
-      case 'quotation':   return db.quotations.markAccepted(docId)
-      case 'sales_order': return db.salesOrders.markAccepted(docId, currentUserEmail)
-      case 'invoice':     return db.crmInvoices.post(docId, currentUserEmail)
-      case 'credit_note': return db.creditNotes.issue(docId, currentUserEmail)
-      default:            return Promise.resolve()
+      case 'quotation':      return db.quotations.markAccepted(docId)
+      case 'sales_order':    return db.salesOrders.markAccepted(docId, currentUserEmail)
+      case 'invoice':        return db.crmInvoices.post(docId, currentUserEmail)
+      case 'credit_note':    return db.creditNotes.issue(docId, currentUserEmail)
+      case 'vendor_invoice': return db.vendorInvoices.approve(docId)
+      default:               return Promise.resolve()
     }
   }
   const rejectDocument = (docType, docId) => {
     switch (docType) {
-      case 'quotation':   return db.quotations.markDeclined(docId)
-      case 'sales_order': return db.salesOrders.markDeclined(docId, currentUserEmail)
-      case 'invoice':     return db.crmInvoices.void_(docId, `Rejected by ${currentUserEmail}`, currentUserEmail)
-      case 'credit_note': return db.creditNotes.void_(docId, `Rejected by ${currentUserEmail}`, currentUserEmail)
-      default:            return Promise.resolve()
+      case 'quotation':      return db.quotations.markDeclined(docId)
+      case 'sales_order':    return db.salesOrders.markDeclined(docId, currentUserEmail)
+      case 'invoice':        return db.crmInvoices.void_(docId, `Rejected by ${currentUserEmail}`, currentUserEmail)
+      case 'credit_note':    return db.creditNotes.void_(docId, `Rejected by ${currentUserEmail}`, currentUserEmail)
+      // VI rejection sends it back to draft (editable/resubmittable), not
+      // cancelled — user-chosen (2026-07-05), unlike the stricter sales-invoice
+      // void-on-reject pattern above.
+      case 'vendor_invoice': return db.vendorInvoices.rejectToDraft(docId)
+      default:               return Promise.resolve()
     }
   }
 
@@ -428,8 +435,13 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
       await approveDocument(docType, docId)
       await db.activities.complete(activity.id, `Approved by ${currentUserEmail}`)
       invalidateAll()
-      queryClient.invalidateQueries({ queryKey: ['sales-document', docType, docId] })
-      queryClient.invalidateQueries({ queryKey: ['sales-documents'] })
+      if (docType === 'vendor_invoice') {
+        queryClient.invalidateQueries({ queryKey: ['purchase-document', docType, docId] })
+        queryClient.invalidateQueries({ queryKey: ['purchase-documents'] })
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['sales-document', docType, docId] })
+        queryClient.invalidateQueries({ queryKey: ['sales-documents'] })
+      }
       toast.success(t('activities.approvedToast'))
     } catch (err) {
       console.error('Approve failed', err)
@@ -444,8 +456,13 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
       await rejectDocument(docType, docId)
       await db.activities.complete(activity.id, `Rejected by ${currentUserEmail}`)
       invalidateAll()
-      queryClient.invalidateQueries({ queryKey: ['sales-document', docType, docId] })
-      queryClient.invalidateQueries({ queryKey: ['sales-documents'] })
+      if (docType === 'vendor_invoice') {
+        queryClient.invalidateQueries({ queryKey: ['purchase-document', docType, docId] })
+        queryClient.invalidateQueries({ queryKey: ['purchase-documents'] })
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['sales-document', docType, docId] })
+        queryClient.invalidateQueries({ queryKey: ['sales-documents'] })
+      }
       toast.success(t('activities.rejectedToast'))
     } catch (err) {
       console.error('Reject failed', err)

@@ -66,6 +66,7 @@ export function buildDocumentHTML({
   documentName = '',          // big top-right name e.g. "Price Quotation"
   docCode = '',               // shown as "# <code>"
   billTo = '',
+  billToLabel = 'Bill To:',   // 'Vendor:' for purchase documents
   billToDetails = null,       // { name?, address?, mobile?, email? } — extra lines under company
   metaRows = [],              // [{ label, value }]
   balanceLabel = '',
@@ -139,7 +140,7 @@ export function buildDocumentHTML({
     <div class="cn">${esc(layout.companyName)}</div>
     ${identityLines}
     ${billTo ? `<div class="bill">
-      <div class="bl">Bill To:</div>
+      <div class="bl">${esc(billToLabel)}</div>
       <div class="bn">${esc(billTo)}</div>
       ${billToDetails?.name ? `<div class="cl">${esc(billToDetails.name)}</div>` : ''}
       ${billToDetails?.address ? `<div class="cl">${esc(billToDetails.address)}</div>` : ''}

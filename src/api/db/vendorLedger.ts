@@ -1,0 +1,92 @@
+import { supabase } from '../client.js'
+import { vendorInvoices } from './purchasing'
+
+// ── Row types ─────────────────────────────────────────────────────────────────
+// AP mirror of customerLedger.ts — reads v_vendor_ledger
+// (20260761_vendor_ledger_view.sql).
+
+export type VendorLedgerEntryType = 'vendor_invoice' | 'vendor_payment'
+
+export interface VendorLedgerEntryRow {
+  id: string
+  entry_type: VendorLedgerEntryType
+  entry_code: string | null
+  vendor_id: string
+  amount: number
+  status: string
+  due_date: string | null
+  entry_date: string
+  created_at: string
+}
+
+export type ApAgingBucket = 'current' | 'd31_60' | 'd61_90' | 'd90_plus'
+
+export interface ApAgingInvoiceRow {
+  vendor_id: string
+  invoice_id: string
+  vi_code: string | null
+  due_date: string | null
+  remaining: number
+  daysPastDue: number
+  bucket: ApAgingBucket
+}
+
+function bucketFor(daysPastDue: number): ApAgingBucket {
+  if (daysPastDue <= 30) return 'current'
+  if (daysPastDue <= 60) return 'd31_60'
+  if (daysPastDue <= 90) return 'd61_90'
+  return 'd90_plus'
+}
+
+const PAYABLE_STATUSES = ['approved', 'partially_received', 'received']
+
+// ── Module ────────────────────────────────────────────────────────────────────
+
+export const vendorLedger = {
+  /**
+   * list: the full signed transaction feed for one vendor (vendor invoices,
+   * vendor payments), reading v_vendor_ledger. Powers a per-vendor statement,
+   * mirroring the Customer Details "Billing" tab.
+   */
+  async list(vendorId: string): Promise<VendorLedgerEntryRow[]> {
+    const { data, error } = await supabase
+      .from('v_vendor_ledger')
+      .select('*')
+      .eq('vendor_id', vendorId)
+      .order('entry_date', { ascending: true })
+    if (error) {
+      if (error.code === '42P01') return []
+      throw error
+    }
+    return (data ?? []) as VendorLedgerEntryRow[]
+  },
+
+  /**
+   * apAgingReport: one row per payable vendor invoice with an outstanding
+   * balance, bucketed by days past due relative to due_date — the AP
+   * analogue of customerLedger.agingReport().
+   */
+  async apAgingReport(): Promise<ApAgingInvoiceRow[]> {
+    const invoices = await vendorInvoices.list()
+    const today = Date.now()
+    return invoices
+      .filter((inv) => PAYABLE_STATUSES.includes(inv.status))
+      .map((inv) => {
+        const remaining = Math.round(((inv.total ?? 0) - (inv.amount_paid ?? 0)) * 100) / 100
+        if (remaining <= 0.001) return null
+        const daysPastDue = inv.due_date
+          ? Math.floor((today - new Date(inv.due_date).getTime()) / 86_400_000)
+          : 0
+        return {
+          vendor_id: inv.vendor_id,
+          invoice_id: inv.id,
+          vi_code: inv.vi_code,
+          due_date: inv.due_date,
+          remaining,
+          daysPastDue,
+          bucket: bucketFor(daysPastDue),
+        } as ApAgingInvoiceRow
+      })
+      .filter((row): row is ApAgingInvoiceRow => row !== null)
+  },
+}

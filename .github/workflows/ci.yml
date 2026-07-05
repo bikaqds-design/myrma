@@ -80,6 +80,12 @@ jobs:
             -v ON_ERROR_STOP=1 \
             -f supabase/tests/inventory_hardening2.sql
 
+      - name: Run vendor-payments (Accounts Payable) SQL assertions
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -f supabase/tests/vendor_payments.sql
+
       - name: Stop Supabase
         if: always()
         run: supabase stop

@@ -34,8 +34,10 @@ DECLARE
   v_p_recalc   uuid;
   v_p_rst_ser  uuid;  v_p_rst_bulk uuid;
   v_p_vi_bulk  uuid;  v_p_vi_ser   uuid;
+  v_p_po_sync  uuid;
   v_wh1        uuid;  v_wh2        uuid;
   v_vi_bulk    uuid;  v_vi_ser     uuid;  v_vi_dup uuid;
+  v_po_sync    uuid;  v_vi_po_sync uuid;  v_po_status text;
   -- work vars
   v_unit       uuid;
   v_reserved_unit uuid;
@@ -88,10 +90,14 @@ BEGIN
     ('CI-INV2-VIBLK-'  || floor(random()*100000)::text, 'CI vendor-invoice bulk',  'hardware', 'active', 'bulk')       RETURNING id INTO v_p_vi_bulk;
   INSERT INTO public.products (sku, product_name, product_type, status, stock_tracking_mode) VALUES
     ('CI-INV2-VISER-'  || floor(random()*100000)::text, 'CI vendor-invoice ser',   'hardware', 'active', 'serialized') RETURNING id INTO v_p_vi_ser;
+  INSERT INTO public.products (sku, product_name, product_type, status, stock_tracking_mode) VALUES
+    ('CI-INV2-POSYNC-' || floor(random()*100000)::text, 'CI PO-completion sync',   'hardware', 'active', 'bulk')       RETURNING id INTO v_p_po_sync;
 
   INSERT INTO public.warehouses (name) VALUES ('CI Test WH1') RETURNING id INTO v_wh1;
   INSERT INTO public.warehouses (name) VALUES ('CI Test WH2') RETURNING id INTO v_wh2;
-  INSERT INTO public.vendors (name, created_by) VALUES ('CI Test Vendor', v_mgr) RETURNING id INTO v_vendor;
+  -- Brands ARE the vendors in the redesigned Purchasing module (no more
+  -- standalone `vendors` table) — see 20260756/20260757.
+  INSERT INTO public.brands (brand_name) VALUES ('CI Test Brand') RETURNING id INTO v_vendor;
 
   -- ══════════════════════════ transfer_stock ══════════════════════════════
 
@@ -243,7 +249,7 @@ BEGIN
   v_check_count := v_check_count + 1;
   INSERT INTO public.vendor_invoices (vendor_id, status, line_items, total, created_by)
   VALUES (
-    v_vendor, 'confirmed',
+    v_vendor, 'approved',
     jsonb_build_array(jsonb_build_object('product_id', v_p_vi_bulk::text, 'qty_ordered', 10, 'qty_received', 0)),
     0, v_mgr
   ) RETURNING id INTO v_vi_bulk;
@@ -267,7 +273,7 @@ BEGIN
   v_check_count := v_check_count + 1;
   INSERT INTO public.vendor_invoices (vendor_id, status, line_items, total, created_by)
   VALUES (
-    v_vendor, 'confirmed',
+    v_vendor, 'approved',
     jsonb_build_array(jsonb_build_object('product_id', v_p_vi_ser::text, 'qty_ordered', 3, 'qty_received', 0)),
     0, v_mgr
   ) RETURNING id INTO v_vi_ser;
@@ -300,7 +306,7 @@ BEGIN
   v_check_count := v_check_count + 1;
   INSERT INTO public.vendor_invoices (vendor_id, status, line_items, total, created_by)
   VALUES (
-    v_vendor, 'confirmed',
+    v_vendor, 'approved',
     jsonb_build_array(jsonb_build_object('product_id', v_p_vi_ser::text, 'qty_ordered', 1, 'qty_received', 0)),
     0, v_mgr
   ) RETURNING id INTO v_vi_dup;
@@ -316,29 +322,73 @@ BEGIN
     NULL; -- expected
   END;
 
+  -- ══════════════════ receive_vendor_invoice → PO completion sync ═════════
+  -- New in the Purchasing redesign (20260758): receiving a VI linked to a PO
+  -- must sync the PO's own status to partially_completed/completed.
+
+  -- ── CHECK 14: partial receipt → PO 'partially_completed'; full → 'completed' ──
+  v_check_count := v_check_count + 1;
+  INSERT INTO public.purchase_orders (po_code, vendor_id, status, line_items, total, created_by)
+  VALUES (
+    'CI-PO-SYNC-' || floor(random()*100000)::text, v_vendor, 'confirmed',
+    jsonb_build_array(jsonb_build_object('product_id', v_p_po_sync::text, 'qty_ordered', 10, 'qty_received', 0)),
+    0, v_mgr
+  ) RETURNING id INTO v_po_sync;
+
+  INSERT INTO public.vendor_invoices (vendor_id, purchase_order_id, status, line_items, total, created_by)
+  VALUES (
+    v_vendor, v_po_sync, 'approved',
+    jsonb_build_array(jsonb_build_object('product_id', v_p_po_sync::text, 'qty_ordered', 10, 'qty_received', 0)),
+    0, v_mgr
+  ) RETURNING id INTO v_vi_po_sync;
+
+  PERFORM public.receive_vendor_invoice(
+    v_vi_po_sync,
+    jsonb_build_array(jsonb_build_object('product_id', v_p_po_sync::text, 'warehouse_id', v_wh1::text, 'qty', 4)),
+    v_mgr
+  );
+  SELECT status INTO v_po_status FROM public.purchase_orders WHERE id = v_po_sync;
+  IF v_po_status IS DISTINCT FROM 'partially_completed' THEN
+    v_failures := array_append(v_failures,
+      format('CHECK 14a (PO completion sync, partial): PO status=%s (expected partially_completed)', v_po_status));
+  END IF;
+
+  PERFORM public.receive_vendor_invoice(
+    v_vi_po_sync,
+    jsonb_build_array(jsonb_build_object('product_id', v_p_po_sync::text, 'warehouse_id', v_wh1::text, 'qty', 6)),
+    v_mgr
+  );
+  SELECT status INTO v_po_status FROM public.purchase_orders WHERE id = v_po_sync;
+  IF v_po_status IS DISTINCT FROM 'completed' THEN
+    v_failures := array_append(v_failures,
+      format('CHECK 14b (PO completion sync, full): PO status=%s (expected completed)', v_po_status));
+  END IF;
+
   -- ── Cleanup: hard-delete everything seeded, FK-safe order ──
   -- inventory_units.vendor_invoice_id → vendor_invoices has no ON DELETE, so
   -- units MUST be deleted before their vendor_invoices.
   DELETE FROM public.stock_moves WHERE ref_type = 'unit' AND ref_id IN (
     SELECT id FROM public.inventory_units WHERE product_id = ANY(ARRAY[
       v_p_tr_ser, v_p_tr_bulk, v_p_adj_ser, v_p_adj_bulk, v_p_recalc,
-      v_p_rst_ser, v_p_rst_bulk, v_p_vi_bulk, v_p_vi_ser]));
+      v_p_rst_ser, v_p_rst_bulk, v_p_vi_bulk, v_p_vi_ser, v_p_po_sync]));
   DELETE FROM public.stock_moves WHERE ref_type = 'warehouse_stock' AND ref_id IN (
     SELECT id FROM public.warehouse_stock WHERE product_id = ANY(ARRAY[
       v_p_tr_ser, v_p_tr_bulk, v_p_adj_ser, v_p_adj_bulk, v_p_recalc,
-      v_p_rst_ser, v_p_rst_bulk, v_p_vi_bulk, v_p_vi_ser]));
+      v_p_rst_ser, v_p_rst_bulk, v_p_vi_bulk, v_p_vi_ser, v_p_po_sync]));
   DELETE FROM public.inventory_units WHERE product_id = ANY(ARRAY[
     v_p_tr_ser, v_p_tr_bulk, v_p_adj_ser, v_p_adj_bulk, v_p_recalc,
-    v_p_rst_ser, v_p_rst_bulk, v_p_vi_bulk, v_p_vi_ser]);
+    v_p_rst_ser, v_p_rst_bulk, v_p_vi_bulk, v_p_vi_ser, v_p_po_sync]);
   DELETE FROM public.warehouse_stock WHERE product_id = ANY(ARRAY[
     v_p_tr_ser, v_p_tr_bulk, v_p_adj_ser, v_p_adj_bulk, v_p_recalc,
-    v_p_rst_ser, v_p_rst_bulk, v_p_vi_bulk, v_p_vi_ser]);
-  DELETE FROM public.vendor_invoices WHERE id = ANY(ARRAY[v_vi_bulk, v_vi_ser, v_vi_dup]);
-  DELETE FROM public.vendors WHERE id = v_vendor;
+    v_p_rst_ser, v_p_rst_bulk, v_p_vi_bulk, v_p_vi_ser, v_p_po_sync]);
+  DELETE FROM public.vendor_invoices WHERE id = ANY(ARRAY[v_vi_bulk, v_vi_ser, v_vi_dup, v_vi_po_sync]);
+  DELETE FROM public.purchase_orders WHERE id = v_po_sync;
+  -- Brands ARE the vendors now — delete the throwaway brand, not a `vendors` row.
+  DELETE FROM public.brands WHERE id = v_vendor;
   DELETE FROM public.warehouses WHERE id = ANY(ARRAY[v_wh1, v_wh2]);
   DELETE FROM public.products WHERE id = ANY(ARRAY[
     v_p_tr_ser, v_p_tr_bulk, v_p_adj_ser, v_p_adj_bulk, v_p_recalc,
-    v_p_rst_ser, v_p_rst_bulk, v_p_vi_bulk, v_p_vi_ser]);
+    v_p_rst_ser, v_p_rst_bulk, v_p_vi_bulk, v_p_vi_ser, v_p_po_sync]);
 
   IF array_length(v_failures, 1) > 0 THEN
     RAISE EXCEPTION E'% of % inventory-RPC-hardening check(s) FAILED:\n%',

@@ -213,13 +213,14 @@ function SalesDocumentDetailRoute({ currentUserRole, currentUserEmail }) {
   )
 }
 
-function PurchaseDocumentDetailRoute({ currentUserEmail }) {
+function PurchaseDocumentDetailRoute({ currentUserRole, currentUserEmail }) {
   const { type, id } = useParams()
   const navigate = useNavigate()
   return (
     <PurchaseDocumentDetail
       docType={type}
       docId={id}
+      currentUserRole={currentUserRole}
       currentUserEmail={currentUserEmail}
       onBack={() => navigate('/purchasing')}
     />
@@ -1431,7 +1432,11 @@ export default function App() {
                 path="/purchasing"
                 element={
                   canDo(effectiveUserRole, effectiveUserPermissions, 'deals', 'view') ? (
-                    <Purchasing currentUserEmail={currentUser?.email} />
+                    <Purchasing
+                      currentUserRole={effectiveUserRole}
+                      currentUserEmail={currentUser?.email}
+                      currentUserPermissions={effectiveUserPermissions}
+                    />
                   ) : (
                     <Navigate to="/" replace />
                   )
@@ -1442,7 +1447,10 @@ export default function App() {
                 path="/purchasing/:type/:id"
                 element={
                   canDo(effectiveUserRole, effectiveUserPermissions, 'deals', 'view') ? (
-                    <PurchaseDocumentDetailRoute currentUserEmail={currentUser?.email} />
+                    <PurchaseDocumentDetailRoute
+                      currentUserRole={effectiveUserRole}
+                      currentUserEmail={currentUser?.email}
+                    />
                   ) : (
                     <Navigate to="/" replace />
                   )

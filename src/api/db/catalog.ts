@@ -5,8 +5,19 @@ import { supabase } from '../client.js'
 export interface BrandRow {
   id: string
   brand_name: string
+  brand_description: string | null
   brand_logo_url: string | null
-  created_date: string
+  status: 'active' | 'inactive' | null
+  created_date: string | null
+  created_by: string | null
+  updated_date: string | null
+  updated_by: string | null
+  // Vendor fields (Purchasing redesign — Brands ARE the vendors, 20260756).
+  contact_person: string | null
+  email: string | null
+  phone: string | null
+  tax_id: string | null
+  payment_terms: string | null
 }
 
 export interface CategoryRow {
