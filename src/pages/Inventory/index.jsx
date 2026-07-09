@@ -244,6 +244,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
           userEmail={userEmail}
           isManagerOrAbove={isManagerOrAbove}
           onRefresh={invalidateInventory}
+          onNavigateToTicket={onNavigateToTicket}
         />
       )}
       {tab === 'by-product' && (
@@ -330,7 +331,6 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
         units={units}
         warehouseStockRows={warehouseStockRows}
         warehouses={warehouses}
-        flatProducts={flatProducts}
         moves={stockMoves}
         userEmail={userEmail}
         isManagerOrAbove={isManagerOrAbove}

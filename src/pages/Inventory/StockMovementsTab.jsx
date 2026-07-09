@@ -13,8 +13,13 @@ const MOVE_TYPE_BADGE = {
 }
 
 // Doc types that have a navigable detail page — 'manual' has none.
-const NAVIGABLE_DOC_TYPES = new Set(['sales_order', 'invoice', 'credit_note', 'vendor_invoice'])
+const NAVIGABLE_DOC_TYPES = new Set(['sales_order', 'invoice', 'credit_note', 'vendor_invoice', 'rma_ticket'])
 const PURCHASING_DOC_TYPES = new Set(['vendor_invoice'])
+
+function routeForMove(m) {
+  if (m.doc_type === 'rma_ticket') return `/rma-tickets?ticket=${m.doc_id}`
+  return `${PURCHASING_DOC_TYPES.has(m.doc_type) ? '/purchasing' : '/sales'}/${m.doc_type}/${m.doc_id}`
+}
 
 // ─── Stock Movements — flat audit-trail table over stock_moves (Sprint 8 Phase 8b) ─
 export function StockMovementsTab({ moves, units, warehouseStockRows, products, warehouses }) {
@@ -130,11 +135,7 @@ export function StockMovementsTab({ moves, units, warehouseStockRows, products, 
                     <td className="px-5 py-3">
                       {NAVIGABLE_DOC_TYPES.has(m.doc_type) && m.doc_id ? (
                         <button
-                          onClick={() =>
-                            navigate(
-                              `${PURCHASING_DOC_TYPES.has(m.doc_type) ? '/purchasing' : '/sales'}/${m.doc_type}/${m.doc_id}`
-                            )
-                          }
+                          onClick={() => navigate(routeForMove(m))}
                           className="text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
                         >
                           {t(`inventory.docType_${m.doc_type}`)}

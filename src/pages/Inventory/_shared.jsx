@@ -89,6 +89,13 @@ export const TICKET_STATUS_CLS = {
   Completed:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
 }
 
+// System RMA/transit/virtual location code (e.g. 'RMA-RECEIVED') -> its i18n
+// key (e.g. 'inventory.loc_RMA_RECEIVED'). DB codes stay English/fixed —
+// only the displayed label is translated.
+export function locationI18nKey(code) {
+  return `inventory.loc_${String(code || '').replace(/-/g, '_')}`
+}
+
 // ─── Utilities ─────────────────────────────────────────────────────────────────
 export function daysSince(iso) {
   if (!iso) return 0

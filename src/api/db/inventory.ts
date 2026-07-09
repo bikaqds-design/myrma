@@ -77,6 +77,30 @@ export interface ProductStockSummary {
    * historical record for bulk deliveries, not a live counter.
    */
   delivered: number
+  /** Every physically-existing unit/qty: sellable (main+branch) + RMA/transit locations. Excludes SCRAP and closed units. */
+  physical_total: number
+  /** company_stock qty/units in warehouses of type 'main' (or legacy NULL-type, treated as the default location). */
+  main_qty: number
+  /** Per-branch (warehouse_type='branch') breakdown of company_stock qty/units. */
+  branches: WarehouseQtyBreakdown[]
+  /** Per-system-RMA-location breakdown of active_rma units (Received/Under Repair/Repaired/Can't Repair/Stock/Replacement/Credit Note/Scrap). */
+  rma: RmaLocationBreakdown[]
+  /** false for a synthetic row built from RMA units whose product_name has no matching catalog product (product_id is NULL). */
+  in_catalog: boolean
+}
+
+export interface WarehouseQtyBreakdown {
+  warehouse_id: string
+  name: string
+  code: string | null
+  qty: number
+}
+
+export interface RmaLocationBreakdown {
+  warehouse_id: string
+  code: string
+  name: string
+  count: number
 }
 
 export interface StockMoveRow {
@@ -466,38 +490,89 @@ export const inventory = {
   },
 
   /**
-   * getStockSummary — per-product available/reserved/delivered, branching by
-   * stock_tracking_mode. Follows the same fetch-raw-rows-then-aggregate-in-JS
-   * pattern as getStats() above rather than a DB view — matches existing
-   * convention in this file, and product/unit counts at this system's scale
-   * don't warrant a server-side aggregate yet (see Sprint 8 Phase 8d).
+   * getStockSummary — per-product Available/Reserved/Delivered PLUS the
+   * Warehouse Module R1 dashboard fields: Physical Total, Main, per-branch
+   * and per-RMA-location breakdowns. Follows the same
+   * fetch-raw-rows-then-aggregate-in-JS pattern as getStats() rather than a
+   * DB view — matches existing convention in this file, and product/unit
+   * counts at this system's scale don't warrant a server-side aggregate yet.
+   *
+   * "Main" = warehouses of type 'main' OR legacy NULL-type warehouses
+   * (every warehouse created before the warehouse_type column existed) —
+   * treated as the default sellable location, never more restrictive than
+   * before this model. "Branches" = warehouse_type='branch' only.
+   * physical_total excludes the SCRAP location and 'closed'-status units.
+   *
+   * Units whose product_id is NULL (created from a ticket whose product
+   * doesn't match any catalog product by name) surface as synthetic
+   * in_catalog:false rows, grouped by product_name — RMA counts only, no
+   * available/reserved/delivered/branches/main (there is no catalog product
+   * to attach those to).
    */
   async getStockSummary(): Promise<ProductStockSummary[]> {
-    const [productsRes, unitsRes, stockRes] = await Promise.all([
+    const [productsRes, unitsRes, stockRes, warehousesRes] = await Promise.all([
       supabase
         .from('products')
         .select('id, product_name, stock_tracking_mode')
         .neq('product_type', 'service'),
       supabase
         .from('inventory_units')
-        .select('product_id, reservation_status')
-        .eq('status', 'company_stock')
-        .not('product_id', 'is', null),
-      supabase.from('warehouse_stock').select('product_id, quantity, reserved_quantity'),
+        .select('product_id, product_name, status, reservation_status, warehouse_id')
+        .in('status', ['company_stock', 'active_rma']),
+      supabase.from('warehouse_stock').select('product_id, warehouse_id, quantity, reserved_quantity'),
+      supabase.from('warehouses').select('id, name, code, warehouse_type, is_system'),
     ])
     if (productsRes.error) throw productsRes.error
     if (unitsRes.error) throw unitsRes.error
     if (stockRes.error && stockRes.error.code !== '42P01') throw stockRes.error
+    if (warehousesRes.error && warehousesRes.error.code !== '42P01') throw warehousesRes.error
 
     const products = productsRes.data || []
     const units = unitsRes.data || []
     const stockRows = stockRes.data || []
+    const warehouseList = warehousesRes.data || []
+    const whById = new Map(warehouseList.map((w) => [w.id, w]))
+
+    const isMainOrLegacy = (w: (typeof warehouseList)[number] | undefined) =>
+      !w || !w.warehouse_type || w.warehouse_type === 'main'
+    const isBranch = (w: (typeof warehouseList)[number] | undefined) => w?.warehouse_type === 'branch'
+
+    function branchBreakdown(rowsWithWarehouse: { warehouse_id: string | null; qty: number }[]) {
+      const map = new Map<string, WarehouseQtyBreakdown>()
+      for (const row of rowsWithWarehouse) {
+        const w = row.warehouse_id ? whById.get(row.warehouse_id) : undefined
+        if (!isBranch(w) || !w) continue
+        const entry = map.get(w.id) || { warehouse_id: w.id, name: w.name, code: w.code, qty: 0 }
+        entry.qty += row.qty
+        map.set(w.id, entry)
+      }
+      return [...map.values()]
+    }
+
+    function rmaBreakdown(rmaUnits: { warehouse_id: string | null }[]) {
+      const map = new Map<string, RmaLocationBreakdown>()
+      for (const u of rmaUnits) {
+        const w = u.warehouse_id ? whById.get(u.warehouse_id) : undefined
+        if (!w?.is_system) continue // unplaced (pre-backfill) or a non-system warehouse — not a real RMA location
+        const entry = map.get(w.id) || { warehouse_id: w.id, code: w.code || '', name: w.name, count: 0 }
+        entry.count += 1
+        map.set(w.id, entry)
+      }
+      return [...map.values()]
+    }
 
     const summaries: ProductStockSummary[] = products.map((p) => {
       if (p.stock_tracking_mode === 'bulk') {
         const rows = stockRows.filter((s) => s.product_id === p.id)
         const totalQty = rows.reduce((sum, s) => sum + s.quantity, 0)
         const totalReserved = rows.reduce((sum, s) => sum + s.reserved_quantity, 0)
+        const mainQty = rows
+          .filter((r) => isMainOrLegacy(whById.get(r.warehouse_id)))
+          .reduce((sum, r) => sum + r.quantity, 0)
+        const branches = branchBreakdown(rows.map((r) => ({ warehouse_id: r.warehouse_id, qty: r.quantity })))
+        const physicalTotal = rows
+          .filter((r) => whById.get(r.warehouse_id)?.code !== 'SCRAP')
+          .reduce((sum, r) => sum + r.quantity, 0)
         return {
           product_id: p.id,
           product_name: p.product_name,
@@ -505,9 +580,24 @@ export const inventory = {
           available: totalQty - totalReserved,
           reserved: totalReserved,
           delivered: 0,
+          physical_total: physicalTotal,
+          main_qty: mainQty,
+          branches,
+          rma: [], // bulk products don't get RMA-ticket units in R1 (createUnitsFromTicket is serialized-only)
+          in_catalog: true,
         }
       }
+
       const productUnits = units.filter((u) => u.product_id === p.id)
+      const companyStockUnits = productUnits.filter((u) => u.status === 'company_stock')
+      const rmaUnits = productUnits.filter((u) => u.status === 'active_rma')
+      const mainQty = companyStockUnits.filter((u) => isMainOrLegacy(whById.get(u.warehouse_id))).length
+      const branches = branchBreakdown(companyStockUnits.map((u) => ({ warehouse_id: u.warehouse_id, qty: 1 })))
+      const rma = rmaBreakdown(rmaUnits)
+      const physicalTotal =
+        companyStockUnits.filter((u) => whById.get(u.warehouse_id)?.code !== 'SCRAP').length +
+        rma.filter((r) => r.code !== 'SCRAP').reduce((sum, r) => sum + r.count, 0)
+
       return {
         product_id: p.id,
         product_name: p.product_name,
@@ -515,8 +605,41 @@ export const inventory = {
         available: productUnits.filter((u) => u.reservation_status === 'available').length,
         reserved: productUnits.filter((u) => u.reservation_status === 'reserved').length,
         delivered: productUnits.filter((u) => u.reservation_status === 'delivered').length,
+        physical_total: physicalTotal,
+        main_qty: mainQty,
+        branches,
+        rma,
+        in_catalog: true,
       }
     })
+
+    // Synthetic rows for active_rma units whose product_id is NULL (no catalog
+    // match at ticket-creation time) — grouped by product_name so they're still
+    // visible on the dashboard instead of silently disappearing.
+    const unmatchedByName = new Map<string, typeof units>()
+    for (const u of units) {
+      if (u.product_id || u.status !== 'active_rma') continue
+      const key = u.product_name || 'Unknown Product'
+      const list = unmatchedByName.get(key) || []
+      list.push(u)
+      unmatchedByName.set(key, list)
+    }
+    for (const [name, rmaUnits] of unmatchedByName) {
+      const rma = rmaBreakdown(rmaUnits)
+      summaries.push({
+        product_id: `unmatched:${name}`,
+        product_name: name,
+        stock_tracking_mode: 'serialized',
+        available: 0,
+        reserved: 0,
+        delivered: 0,
+        physical_total: rma.filter((r) => r.code !== 'SCRAP').reduce((sum, r) => sum + r.count, 0),
+        main_qty: 0,
+        branches: [],
+        rma,
+        in_catalog: false,
+      })
+    }
 
     return summaries
   },

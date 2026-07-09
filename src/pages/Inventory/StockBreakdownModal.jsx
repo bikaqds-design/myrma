@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import Modal from '../../components/Modal'
 import { TransferStockModal } from './TransferStockModal'
 import { AdjustStockModal } from './AdjustStockModal'
+import { locationI18nKey } from './_shared'
 
 const NAVIGABLE_DOC_TYPES = new Set(['sales_order', 'invoice', 'credit_note'])
 
@@ -19,7 +20,6 @@ export function StockBreakdownModal({
   units,
   warehouseStockRows,
   warehouses,
-  flatProducts,
   moves,
   userEmail,
   isManagerOrAbove,
@@ -107,21 +107,11 @@ export function StockBreakdownModal({
     return Object.values(byDoc)
   }, [productSummary, isBulk, warehouseStockRows, moves, units])
 
-  // Ticket product_status buckets — matched by product_name since RMA ticket
-  // line items have no FK to the catalog (free-text, pre-dates the funnel).
-  // Shown as the real stored status labels rather than force-mapped into
-  // "Received/Inspection/Repair/Ready" buckets — there's no existing status
-  // that cleanly means "Inspection", and inventing one wasn't confirmed.
-  const rmaRows = useMemo(() => {
-    if (!productSummary) return []
-    const matching = flatProducts.filter((p) => p.product_name === productSummary.product_name)
-    const counts = {}
-    for (const p of matching) {
-      const status = p.product_status || 'Received'
-      counts[status] = (counts[status] || 0) + 1
-    }
-    return Object.entries(counts).map(([status, count]) => ({ status, count }))
-  }, [productSummary, flatProducts])
+  // RMA distribution — reads real inventory_units locations (Warehouse Module
+  // R1) instead of the old ticket-JSONB product_status derivation. Single
+  // source of truth: getStockSummary() already groups active_rma units per
+  // system location.
+  const rmaRows = productSummary?.rma || []
 
   if (!productSummary) return null
 
@@ -150,6 +140,10 @@ export function StockBreakdownModal({
             <div>
               <span className="text-[#6c6760] dark:text-[#9aa4b2]">{t('inventory.colTotal')}: </span>
               <span className="font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{total}</span>
+            </div>
+            <div>
+              <span className="text-[#6c6760] dark:text-[#9aa4b2]">{t('inventory.colPhysicalTotal')}: </span>
+              <span className="font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{productSummary.physical_total}</span>
             </div>
           </div>
         </section>
@@ -268,8 +262,8 @@ export function StockBreakdownModal({
           ) : (
             <ul className="space-y-1 text-sm">
               {rmaRows.map((r) => (
-                <li key={r.status} className="flex justify-between">
-                  <span className="text-[#211f1b] dark:text-[#e8ebf0]">{r.status}</span>
+                <li key={r.warehouse_id} className="flex justify-between">
+                  <span className="text-[#211f1b] dark:text-[#e8ebf0]">{t(locationI18nKey(r.code))}</span>
                   <span className="font-medium text-[#211f1b] dark:text-[#e8ebf0]">{r.count}</span>
                 </li>
               ))}
