@@ -194,23 +194,18 @@ export const purchaseOrders = {
     if (error) throw error
     return data[0]
   },
+  /** markSent — also used as the "Send for Approval" step; the PO sits here until a manager approves it (via Activities) into Confirmed. */
   async markSent(id: string): Promise<void> {
     const { error } = await supabase.from('purchase_orders').update({ status: 'sent' }).eq('id', id)
-    if (error) throw error
-  },
-  async markPendingConfirmation(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('purchase_orders')
-      .update({ status: 'pending_confirmation' })
-      .eq('id', id)
     if (error) throw error
   },
   async markConfirmed(id: string): Promise<void> {
     const { error } = await supabase.from('purchase_orders').update({ status: 'confirmed' }).eq('id', id)
     if (error) throw error
   },
-  async markExpired(id: string): Promise<void> {
-    const { error } = await supabase.from('purchase_orders').update({ status: 'expired' }).eq('id', id)
+  /** rejectToDraft — sends a pending-approval PO back to draft, editable and resubmittable (mirrors vendorInvoices.rejectToDraft). */
+  async rejectToDraft(id: string): Promise<void> {
+    const { error } = await supabase.from('purchase_orders').update({ status: 'draft' }).eq('id', id)
     if (error) throw error
   },
   async cancel(id: string): Promise<void> {
@@ -262,11 +257,10 @@ export const purchaseOrders = {
 // inventory + the vendor-payable balance (see vendorPayments.ts).
 
 export const vendorInvoices = {
-  async list(): Promise<VendorInvoiceRow[]> {
-    const { data, error } = await supabase
-      .from('vendor_invoices')
-      .select('*')
-      .order('created_at', { ascending: false })
+  async list(filters?: { purchaseOrderId?: string }): Promise<VendorInvoiceRow[]> {
+    let q = supabase.from('vendor_invoices').select('*').order('created_at', { ascending: false })
+    if (filters?.purchaseOrderId) q = q.eq('purchase_order_id', filters.purchaseOrderId)
+    const { data, error } = await q
     if (error) throw error
     return data || []
   },

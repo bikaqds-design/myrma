@@ -58,11 +58,15 @@ const SOURCE_LABEL_KEY = {
   sales_order:     'activities.sourceSalesOrder',
   invoice:         'activities.sourceInvoice',
   credit_note:     'activities.sourceCreditNote',
+  purchase_order:  'activities.sourcePurchaseOrder',
   vendor_invoice:  'activities.sourceVendorInvoice',
 }
 
 // The selectable document sources in the filter dropdown (approval pool).
-const DOC_SOURCES = ['quotation', 'sales_order', 'invoice', 'credit_note', 'vendor_invoice']
+const DOC_SOURCES = ['quotation', 'sales_order', 'invoice', 'credit_note', 'purchase_order', 'vendor_invoice']
+
+// Doc types whose detail page lives under /purchasing instead of /sales.
+const PURCHASE_DOC_TYPES = new Set(['purchase_order', 'vendor_invoice'])
 
 // Approval pool format: approval|docType|docId|code|total|customer
 function parseApprovalTitle(title) {
@@ -221,7 +225,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
     if (a.type === 'approval') {
       const { docType, docId } = parseApprovalTitle(a.title)
       if (!docId) return null
-      return docType === 'vendor_invoice' ? `/purchasing/${docType}/${docId}` : `/sales/${docType}/${docId}`
+      return PURCHASE_DOC_TYPES.has(docType) ? `/purchasing/${docType}/${docId}` : `/sales/${docType}/${docId}`
     }
     if (a.related_type === 'lead') return leadMap[a.related_id] ? `/leads/${a.related_id}` : null
     if (a.related_type === 'deal') return dealMap[a.related_id] ? `/pipeline/${a.related_id}` : null
@@ -410,6 +414,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
       case 'sales_order':    return db.salesOrders.markAccepted(docId, currentUserEmail)
       case 'invoice':        return db.crmInvoices.post(docId, currentUserEmail)
       case 'credit_note':    return db.creditNotes.issue(docId, currentUserEmail)
+      case 'purchase_order': return db.purchaseOrders.markConfirmed(docId)
       case 'vendor_invoice': return db.vendorInvoices.approve(docId)
       default:               return Promise.resolve()
     }
@@ -420,9 +425,10 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
       case 'sales_order':    return db.salesOrders.markDeclined(docId, currentUserEmail)
       case 'invoice':        return db.crmInvoices.void_(docId, `Rejected by ${currentUserEmail}`, currentUserEmail)
       case 'credit_note':    return db.creditNotes.void_(docId, `Rejected by ${currentUserEmail}`, currentUserEmail)
-      // VI rejection sends it back to draft (editable/resubmittable), not
-      // cancelled — user-chosen (2026-07-05), unlike the stricter sales-invoice
-      // void-on-reject pattern above.
+      // PO/VI rejection sends them back to draft (editable/resubmittable),
+      // not cancelled — user-chosen (2026-07-05/06), unlike the stricter
+      // sales-invoice void-on-reject pattern above.
+      case 'purchase_order': return db.purchaseOrders.rejectToDraft(docId)
       case 'vendor_invoice': return db.vendorInvoices.rejectToDraft(docId)
       default:               return Promise.resolve()
     }
@@ -435,7 +441,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
       await approveDocument(docType, docId)
       await db.activities.complete(activity.id, `Approved by ${currentUserEmail}`)
       invalidateAll()
-      if (docType === 'vendor_invoice') {
+      if (PURCHASE_DOC_TYPES.has(docType)) {
         queryClient.invalidateQueries({ queryKey: ['purchase-document', docType, docId] })
         queryClient.invalidateQueries({ queryKey: ['purchase-documents'] })
       } else {
@@ -456,7 +462,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
       await rejectDocument(docType, docId)
       await db.activities.complete(activity.id, `Rejected by ${currentUserEmail}`)
       invalidateAll()
-      if (docType === 'vendor_invoice') {
+      if (PURCHASE_DOC_TYPES.has(docType)) {
         queryClient.invalidateQueries({ queryKey: ['purchase-document', docType, docId] })
         queryClient.invalidateQueries({ queryKey: ['purchase-documents'] })
       } else {

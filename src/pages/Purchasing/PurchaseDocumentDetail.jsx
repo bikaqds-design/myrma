@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
-import { PO_STATUS_FLOW, VI_STATUS_FLOW } from '../../lib/constants'
 import { PageHeader, Spinner, Button, Label, Select, Input } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
 import { ActivityChatter } from '../../components/ActivityChatter'
@@ -41,12 +40,10 @@ const ADAPTERS = {
   purchase_order: {
     fetch: (id) => db.purchaseOrders.get(id),
     code: (r) => r.po_code,
-    flow: PO_STATUS_FLOW,
   },
   vendor_invoice: {
     fetch: (id) => db.vendorInvoices.get(id),
     code: (r) => r.vi_code,
-    flow: VI_STATUS_FLOW,
   },
 }
 
@@ -71,43 +68,6 @@ function TotalRow({ label, value, muted }) {
     <div className="flex items-center justify-between">
       <span className={cls}>{label}</span>
       <span className={cls}>{value}</span>
-    </div>
-  )
-}
-
-// Read-only progress stepper — status transitions happen via the explicit
-// lifecycle buttons below, not by clicking a step (unlike the Deal stage
-// pills, skipping a purchasing step would bypass the approval/receive guards).
-function StatusStepper({ flow, current, t }) {
-  const currentIdx = flow.indexOf(current)
-  const isTerminalOther = currentIdx === -1 // cancelled / expired
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {flow.map((s, idx) => {
-        const done = !isTerminalOther && idx < currentIdx
-        const active = !isTerminalOther && idx === currentIdx
-        return (
-          <React.Fragment key={s}>
-            <span
-              className={`px-3 py-1 text-xs rounded-full font-medium ${
-                active
-                  ? 'bg-[#4338ca] text-white dark:bg-[#a5b4fc] dark:text-[#0b0f17]'
-                  : done
-                  ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                  : 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#4a5568]'
-              }`}
-            >
-              {statusLabel(s, t)}
-            </span>
-            {idx < flow.length - 1 && <span className="text-gray-300 dark:text-[#212a38]">→</span>}
-          </React.Fragment>
-        )
-      })}
-      {isTerminalOther && (
-        <span className={`px-3 py-1 text-xs rounded-full font-medium ${statusPillCls(current)}`}>
-          {statusLabel(current, t)}
-        </span>
-      )}
     </div>
   )
 }
@@ -145,6 +105,19 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
     enabled: isVI && !!doc?.purchase_order_id,
   })
 
+  // For PO detail: has a Vendor Invoice already been created from this PO?
+  // A PO converts to exactly one VI — once that exists, "Create Vendor
+  // Invoice" must not be offered again (mirrors the SO -> Invoice lock in
+  // SalesDocumentDetail.jsx).
+  const { data: visFromPO = [] } = useQuery({
+    queryKey: ['vendor-invoices-by-po', doc?.id],
+    queryFn: () => db.vendorInvoices.list({ purchaseOrderId: doc.id }),
+    enabled: isPO && !!doc?.id,
+    staleTime: 30_000,
+  })
+  const linkedVIFromPO = visFromPO.find((vi) => vi.status !== 'cancelled') ?? null
+  const poIsConverted = isPO && !!linkedVIFromPO
+
   const { data: warehouses = [] } = useQuery({
     queryKey: ['warehouses'],
     queryFn: () => db.warehouses.list().then((r) => (r.missing ? [] : r.data)),
@@ -173,10 +146,29 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
   const logVI = (kind) => db.activities.logSystem('vendor_invoice', doc.id, `${kind}|${doc.vi_code || doc.id}`, currentUserEmail).catch(() => {})
 
   // ── Purchase Order actions ────────────────────────────────────────────────
-  const handlePOSend = () => runAction(async () => { await db.purchaseOrders.markSent(doc.id); logPO('po_sent'); toast.success(t('purchasing.statusUpdated')) })
-  const handlePOPendingConfirmation = () => runAction(async () => { await db.purchaseOrders.markPendingConfirmation(doc.id); logPO('po_pending_confirmation'); toast.success(t('purchasing.statusUpdated')) })
-  const handlePOConfirm = () => runAction(async () => { await db.purchaseOrders.markConfirmed(doc.id); logPO('po_confirmed'); toast.success(t('purchasing.statusUpdated')) })
-  const handlePOExpire = () => runAction(async () => { await db.purchaseOrders.markExpired(doc.id); logPO('po_expired'); toast.success(t('purchasing.statusUpdated')) })
+  // Same approval-pool pattern as Quotation/Sales Order/Invoice: Draft ->
+  // Send for Approval (raises an activity + moves to 'sent') -> a manager
+  // approves from Activities -> Confirmed. No separate manual "mark
+  // confirmed" step here; that only happens via the Activities approval.
+  const createPOApprovalActivity = () => {
+    const vendorName = vendor?.brand_name || '—'
+    return db.activities.create({
+      related_type: 'purchase_order',
+      related_id: doc.id,
+      type: 'approval',
+      title: `approval|purchase_order|${doc.id}|${doc.po_code}|${doc.total ?? 0}|${vendorName}`,
+      due_date: doc.expected_delivery_date || new Date().toISOString(),
+      assigned_rep: null,
+      outcome_notes: null,
+      created_by: currentUserEmail,
+    }).catch((err) => { console.error('PO approval activity failed', err); toast.error(t('purchasing.approvalActivityFailed')) })
+  }
+  const handlePOSendForApproval = () => runAction(async () => {
+    await db.purchaseOrders.markSent(doc.id)
+    logPO('po_sent_for_approval')
+    await createPOApprovalActivity()
+    toast.success(t('purchasing.statusUpdated'))
+  })
   const handlePOCancel = () => {
     if (!window.confirm(t('purchasing.cancelConfirm'))) return
     runAction(async () => { await db.purchaseOrders.cancel(doc.id); logPO('po_cancelled'); toast.success(t('purchasing.statusUpdated')) })
@@ -184,13 +176,14 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
   const handleConvertToVI = () => runAction(async () => {
     const vi = await db.purchaseOrders.convertToVendorInvoice(doc.id, currentUserEmail)
     logPO('po_converted_to_vi')
+    queryClient.invalidateQueries({ queryKey: ['vendor-invoices-by-po', doc.id] })
     toast.success(t('purchasing.viCreated'))
     navigate(`/purchasing/vendor_invoice/${vi.id}`)
   })
   const handleDownloadPOPDF = () => downloadPOPDF({ purchaseOrder: doc, vendor })
 
   // ── Vendor Invoice actions ─────────────────────────────────────────────────
-  const createApprovalActivity = () => {
+  const createVIApprovalActivity = () => {
     const vendorName = vendor?.brand_name || '—'
     const code = doc.vi_code || linkedPO?.po_code || '—'
     return db.activities.create({
@@ -207,7 +200,7 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
   const handleSubmitForApproval = () => runAction(async () => {
     await db.vendorInvoices.submitForApproval(doc.id)
     logVI('vi_submitted_for_approval')
-    await createApprovalActivity()
+    await createVIApprovalActivity()
     toast.success(t('purchasing.statusUpdated'))
   })
   const handleVICancel = () => {
@@ -248,28 +241,22 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
         <div className="flex items-center gap-2 flex-wrap justify-end">
           {isPO && !doc.archived && (
             <>
-              {canEditPO && (
+              {!poIsConverted && canEditPO && (
                 <Button variant="secondary" size="sm" onClick={() => setShowEdit(true)}>{t('salesDocuments.edit')}</Button>
               )}
-              {doc.status === 'draft' && (
-                <Button variant="secondary" size="sm" onClick={handlePOSend} loading={busy}>{t('purchasing.markSent')}</Button>
+              {!poIsConverted && doc.status === 'draft' && (
+                <Button variant="secondary" size="sm" onClick={handlePOSendForApproval} loading={busy}>{t('pipeline.sendForApproval')}</Button>
               )}
-              {doc.status === 'sent' && (
-                <Button variant="secondary" size="sm" onClick={handlePOPendingConfirmation} loading={busy}>{t('purchasing.markPendingConfirmation')}</Button>
-              )}
-              {['sent', 'pending_confirmation'].includes(doc.status) && (
-                <Button variant="primary" size="sm" onClick={handlePOConfirm} loading={busy}>{t('purchasing.markConfirmed')}</Button>
+              {!poIsConverted && doc.status === 'sent' && (
+                <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2] italic self-center">{t('salesDocuments.awaitingApproval')}</span>
               )}
               {doc.status !== 'draft' && (
                 <Button variant="secondary" size="sm" onClick={handleDownloadPOPDF}>{t('purchasing.downloadPDF')}</Button>
               )}
-              {['confirmed', 'partially_completed'].includes(doc.status) && (
+              {!poIsConverted && ['confirmed', 'partially_completed'].includes(doc.status) && (
                 <Button size="sm" onClick={handleConvertToVI} loading={busy}>{t('purchasing.createVendorInvoice')}</Button>
               )}
-              {['draft', 'sent', 'pending_confirmation'].includes(doc.status) && (
-                <Button variant="secondary" size="sm" onClick={handlePOExpire} loading={busy}>{t('purchasing.markExpired')}</Button>
-              )}
-              {['draft', 'sent', 'pending_confirmation', 'confirmed'].includes(doc.status) && (
+              {!poIsConverted && ['draft', 'sent', 'confirmed'].includes(doc.status) && (
                 <Button variant="danger" size="sm" onClick={handlePOCancel} loading={busy}>{t('common.cancel')}</Button>
               )}
             </>
@@ -281,10 +268,10 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
                 <Button variant="secondary" size="sm" onClick={() => setShowEdit(true)}>{t('salesDocuments.edit')}</Button>
               )}
               {doc.status === 'draft' && (
-                <Button variant="secondary" size="sm" onClick={handleSubmitForApproval} loading={busy}>{t('purchasing.submitForApproval')}</Button>
+                <Button variant="secondary" size="sm" onClick={handleSubmitForApproval} loading={busy}>{t('pipeline.sendForApproval')}</Button>
               )}
               {doc.status === 'pending_approval' && (
-                <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2] italic self-center">{t('purchasing.awaitingApproval')}</span>
+                <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2] italic self-center">{t('salesDocuments.awaitingApproval')}</span>
               )}
               {['approved', 'partially_received'].includes(doc.status) && (
                 <Button size="sm" onClick={() => setShowReceive(true)}>{t('purchasing.confirmAndReceive')}</Button>
@@ -351,6 +338,9 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
           <span className="font-mono text-sm font-semibold text-[#4338ca] dark:text-[#a5b4fc] bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 rounded">
             {code}
           </span>
+          <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${statusPillCls(doc.status)}`}>
+            {statusLabel(doc.status, t)}
+          </span>
           {doc.archived && (
             <span className="px-2 py-0.5 text-xs rounded-full font-medium bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
               {t('purchasing.archivedBadge')}
@@ -369,10 +359,17 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
               {t('purchasing.linkedFromPO')}: <span className="font-mono">{linkedPO.po_code}</span>
             </button>
           )}
-        </div>
-
-        <div className="mb-4">
-          <StatusStepper flow={adapter.flow} current={doc.status} t={t} />
+          {poIsConverted && (
+            <button
+              onClick={() => navigate(`/purchasing/vendor_invoice/${linkedVIFromPO.id}`)}
+              className="inline-flex items-center gap-1 text-xs text-green-700 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300 transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
+              {t('purchasing.viewVendorInvoice')}: <span className="font-mono">{linkedVIFromPO.vi_code || t('purchasing.st_draft')}</span>
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">

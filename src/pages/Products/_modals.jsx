@@ -300,7 +300,6 @@ export function AddBrandModal({
       title={editingBrand ? t('products.editBrand') : t('products.addNewBrand')}
       hideHeader
       noPadding
-      scrollable={false}
     >
       <div>
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
