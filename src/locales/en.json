@@ -635,6 +635,7 @@
   "inventory": {
     "title": "Inventory",
     "subtitle": "Track RMA units through their full lifecycle",
+    "autoMoveFailed": "Ticket saved, but moving the unit(s) to their new RMA location failed. Please check Stock Movements.",
     "overview": "Overview",
     "allUnits": "All Units",
     "received": "Received",

@@ -15,6 +15,7 @@ import Modal from '../../components/Modal'
 import { Button } from '../../components/ui'
 import { ROLES } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
+import { buildRmaMoves, dispatchRmaStageMoves } from '../../lib/rmaStageMoves'
 import { ticketSchema, getFirstError } from '../../lib/schemas'
 import {
   generateRmaNumber,
@@ -246,6 +247,10 @@ function dispatchCreateSideEffects(newTicket, ticketData, rmaNumber, userEmail, 
   if (!newTicket?.id) return
   db.inventory
     .createUnitsFromTicket(newTicket.id, newTicket.rma_number || rmaNumber, ticketData.products)
+    .then((createdUnits) => {
+      const moves = buildRmaMoves(createdUnits, ticketData.products)
+      if (moves.length) return db.inventory.moveRmaUnits(newTicket.id, moves, userEmail)
+    })
     .catch((err) => captureException(err, { page: 'RMATickets', context: 'createInventoryUnit' }))
   const techEmails =
     ticketData.assigned_technician && ticketData.assigned_technician !== userEmail
@@ -571,6 +576,14 @@ export function TicketForm({
         await logTicketChanges(editingTicket.id, editingTicket.rma_number, editingTicket, ticketData, newAttachments, userEmail)
         dispatchUpdateNotifications(editingTicket, ticketData, userEmail)
         fireUpdateEmails(editingTicket, ticketData, resolvedCustomerEmail, userEmail, t)
+        const oldStatuses = (editingTicket.products || []).map((p) => p.product_status || '')
+        const newStatuses = (ticketData.products || []).map((p) => p.product_status || '')
+        if (JSON.stringify(oldStatuses) !== JSON.stringify(newStatuses)) {
+          dispatchRmaStageMoves(editingTicket.id, ticketData.products, userEmail).catch((err) => {
+            captureException(err, { page: 'RMATickets', context: 'dispatchRmaStageMoves:edit' })
+            toast.error(t('inventory.autoMoveFailed'))
+          })
+        }
         toast.success(t('ticketForm.ticketUpdated'))
       } else {
         newTicket = await db.rmaTickets.create({

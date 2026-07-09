@@ -405,6 +405,66 @@ export const inventory = {
     if (error) throw error
   },
 
+  // ── Warehouse Module R1 — RMA stage auto-move / promote-to-sellable ──────────
+
+  /**
+   * listUnitsByTicket — every inventory_units row created from a given RMA
+   * ticket, regardless of current status/location. Used to compute auto-moves
+   * whenever a ticket's product statuses are saved.
+   */
+  async listUnitsByTicket(ticketId: string): Promise<InventoryUnitRow[]> {
+    const { data, error } = await supabase
+      .from('inventory_units')
+      .select('*')
+      .eq('rma_ticket_id', ticketId)
+    if (error) {
+      if (error.code === '42P01') return []
+      throw error
+    }
+    return data || []
+  },
+
+  /**
+   * moveRmaUnits — relocates units to the matching system RMA location
+   * (RMA-RECEIVED/RMA-REPAIR/RMA-REPAIRED/RMA-CANTREPAIR/RMA-STOCK/...).
+   * Idempotent server-side — a unit already at its target is a no-op.
+   * Returns the count of units actually moved.
+   */
+  async moveRmaUnits(
+    ticketId: string,
+    moves: { unit_id: string; to_code: string }[],
+    actorEmail: string
+  ): Promise<number> {
+    if (!moves.length) return 0
+    const { data, error } = await supabase.rpc('move_rma_units', {
+      p_ticket_id: ticketId,
+      p_moves: moves,
+      p_actor_email: actorEmail,
+    })
+    if (error) throw error
+    return data ?? 0
+  },
+
+  /**
+   * promoteRmaUnit — the previously-missing path from active_rma to sellable
+   * company_stock. Manager+ only (enforced server-side); blocked for reserved
+   * units and for is_system/non-sellable destinations.
+   */
+  async promoteRmaUnit(params: {
+    unitId: string
+    warehouseId: string
+    actorEmail: string
+    resolutionType?: string
+  }): Promise<void> {
+    const { error } = await supabase.rpc('promote_rma_unit', {
+      p_unit_id: params.unitId,
+      p_warehouse_id: params.warehouseId,
+      p_actor_email: params.actorEmail,
+      p_resolution_type: params.resolutionType ?? null,
+    })
+    if (error) throw error
+  },
+
   /**
    * getStockSummary — per-product available/reserved/delivered, branching by
    * stock_tracking_mode. Follows the same fetch-raw-rows-then-aggregate-in-JS

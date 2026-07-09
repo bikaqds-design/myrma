@@ -486,3 +486,76 @@ export const VI_STATUS_FLOW: ViStatus[] = [
   VI_STATUS.PARTIALLY_RECEIVED,
   VI_STATUS.RECEIVED,
 ]
+
+// ── Warehouse Module R1: system RMA/transit/virtual locations ──────────────
+// Fixed codes seeded + protected by 20260764_warehouse_system_locations.sql.
+// RMA ticket product-status changes auto-move units between these via
+// move_rma_units (see src/lib/rmaStageMoves.ts).
+export const SYSTEM_WAREHOUSE_CODES = {
+  RMA_RECEIVED: 'RMA-RECEIVED',
+  RMA_REPAIR: 'RMA-REPAIR',
+  RMA_REPAIRED: 'RMA-REPAIRED',
+  RMA_CANTREPAIR: 'RMA-CANTREPAIR',
+  RMA_STOCK: 'RMA-STOCK',
+  REPLACEMENT: 'REPLACEMENT',
+  CREDIT_NOTE: 'CREDIT-NOTE',
+  SCRAP: 'SCRAP',
+} as const
+
+export type SystemWarehouseCode = (typeof SYSTEM_WAREHOUSE_CODES)[keyof typeof SYSTEM_WAREHOUSE_CODES]
+
+/** The 5 RMA-stage locations, in workflow order (excludes Replacement/Credit Note/Scrap) */
+export const RMA_STAGE_CODES: SystemWarehouseCode[] = [
+  SYSTEM_WAREHOUSE_CODES.RMA_RECEIVED,
+  SYSTEM_WAREHOUSE_CODES.RMA_REPAIR,
+  SYSTEM_WAREHOUSE_CODES.RMA_REPAIRED,
+  SYSTEM_WAREHOUSE_CODES.RMA_CANTREPAIR,
+  SYSTEM_WAREHOUSE_CODES.RMA_STOCK,
+]
+
+/**
+ * Ticket product_status (free text, from rma_tickets.products[].product_status)
+ * -> the system location a unit auto-moves to. Unmapped/empty text falls back
+ * to RMA_RECEIVED (a unit with no recognized stage is treated as just-received).
+ * Replacement AND Credit Note both land in RMA_STOCK — the ticket status is
+ * intent only; the real onward move is driven by the actual CN-issue/
+ * replacement-shipment event (R2), not the ticket status itself.
+ */
+export const RMA_STAGE_LOCATION: Record<string, SystemWarehouseCode> = {
+  Received: SYSTEM_WAREHOUSE_CODES.RMA_RECEIVED,
+  'Under Repair': SYSTEM_WAREHOUSE_CODES.RMA_REPAIR,
+  Repaired: SYSTEM_WAREHOUSE_CODES.RMA_REPAIRED,
+  "Can't Repair": SYSTEM_WAREHOUSE_CODES.RMA_CANTREPAIR,
+  Replacement: SYSTEM_WAREHOUSE_CODES.RMA_STOCK,
+  'Credit Note': SYSTEM_WAREHOUSE_CODES.RMA_STOCK,
+}
+
+// ── Warehouse types: capability flags (Warehouse Module R1) ─────────────────
+// Display/UI-only filtering (destination pickers etc.) — the existing RPCs
+// enforce no server-side capability guard yet (see plan risk R7). A NULL
+// warehouse_type (every warehouse created before this model) is treated as
+// full-capability so legacy warehouses never become more restrictive than
+// they already were.
+export const WAREHOUSE_TYPE_CAPABILITIES = {
+  main: { sellable: true, receivable: true, transferable: true },
+  branch: { sellable: true, receivable: true, transferable: true },
+  service_center: { sellable: false, receivable: true, transferable: true },
+  rma: { sellable: false, receivable: false, transferable: true },
+  transit: { sellable: false, receivable: false, transferable: true },
+  virtual: { sellable: false, receivable: false, transferable: false },
+} as const
+
+export type WarehouseType = keyof typeof WAREHOUSE_TYPE_CAPABILITIES
+
+export interface WarehouseCapabilities {
+  sellable: boolean
+  receivable: boolean
+  transferable: boolean
+}
+
+export function warehouseCapabilities(type: string | null | undefined): WarehouseCapabilities {
+  if (!type || !(type in WAREHOUSE_TYPE_CAPABILITIES)) {
+    return { sellable: true, receivable: true, transferable: true }
+  }
+  return WAREHOUSE_TYPE_CAPABILITIES[type as WarehouseType]
+}

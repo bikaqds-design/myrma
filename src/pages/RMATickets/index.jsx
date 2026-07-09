@@ -11,6 +11,7 @@ import { Button, PageHeader } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
 import { ROLES, TICKET_STATUS_RESOLVED, TICKET_STATUS_LIST, PRIORITY_LIST } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
+import { dispatchRmaStageMoves } from '../../lib/rmaStageMoves'
 import { SortableHeader, ShortcutsHelp } from './_shared'
 import { getStatusColor, getPriorityColor, formatDate } from './_utils'
 import { KanbanView } from './_kanban'
@@ -521,22 +522,40 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     }
     setBulkProcessing(true)
     try {
-      await Promise.all(
-        selectedTickets.map((id) => {
+      const updates = selectedTickets
+        .map((id) => {
           const ticket = tickets.find((t) => t.id === id)
-          if (!ticket) return Promise.resolve()
+          if (!ticket) return null
           const updatedProducts = (ticket.products || []).map((p) => ({
             ...p,
             product_status: bulkProductStatus,
             status_date: new Date().toISOString(),
           }))
-          return db.rmaTickets.update(id, {
+          return { id, updatedProducts }
+        })
+        .filter(Boolean)
+
+      await Promise.all(
+        updates.map(({ id, updatedProducts }) =>
+          db.rmaTickets.update(id, {
             products: updatedProducts,
             updated_by: userEmail,
             updated_date: new Date().toISOString(),
           })
-        })
+        )
       )
+
+      const moveResults = await Promise.allSettled(
+        updates.map(({ id, updatedProducts }) => dispatchRmaStageMoves(id, updatedProducts, userEmail))
+      )
+      const moveFailures = moveResults.filter((r) => r.status === 'rejected')
+      if (moveFailures.length) {
+        moveFailures.forEach((r) =>
+          captureException(r.reason, { page: 'RMATickets', context: 'dispatchRmaStageMoves:bulk' })
+        )
+        toast.error(t('inventory.autoMoveFailed'))
+      }
+
       toast.success(t('tickets.bulkProductStatusUpdated', { status: bulkProductStatus, count: selectedTickets.length }))
       db.auditLog
         .log(
