@@ -15,7 +15,7 @@ myRMA provides end-to-end lifecycle management for product returns, warranty cla
 | **RMA Ticket Management** | Create, assign, track, and resolve return tickets with full audit trail |
 | **Customer Management** | Customer directory with RMA history and communication log |
 | **Product Catalog** | Product/SKU management with inventory tie-in |
-| **Inventory & Warehouse Management** | Dual serialized/bulk stock model, funnel-aware stock summary, stock breakdown drill-down, receive stock, warehouse transfer/adjust, movement audit trail |
+| **Inventory & Warehouse Management** | Dual serialized/bulk stock model, Warehouse Dashboard (Available/Reserved/Physical Total/Main/Branches/RMA), RMA stages as real inventory locations with auto-move + promote-to-sellable, stock breakdown drill-down, receive stock, warehouse transfer/adjust, movement audit trail |
 | **Public RMA Tracker** | Customer-facing portal to look up ticket status without logging in |
 | **Tech Calendar** | Technician scheduling and workload calendar |
 | **Reports** | Reporting dashboards, data exports |
@@ -24,7 +24,7 @@ myRMA provides end-to-end lifecycle management for product returns, warranty cla
 | **CRM — Deal Detail** | Inline editing, product lines, comment panel, chatter, probability tracking |
 | **CRM — Sales Documents** | Quotation → Sales Order → Invoice → Credit Note funnel, manager-approval workflow, gapless invoice/credit-note numbering, two-stage inventory reservation |
 | **CRM — Accounting** | Customer payments ledger (multi-invoice allocation), AR aging report, per-customer statement, soft credit limits |
-| **CRM — Purchasing** | Vendor → Proforma Invoice → Purchase Order → Vendor Invoice → atomic dual-mode stock receipt, full procurement audit trail |
+| **CRM — Purchasing** | Brands-as-vendors, Purchase Order → Vendor Invoice funnel with manager-approval step, PO PDF export, atomic dual-mode stock receipt, Vendor Payments (AP) ledger, full procurement audit trail |
 | **Role-Based Access Control** | 6 roles: `super_admin`, `admin`, `manager`, `technician`, `viewer`, `sales_rep` |
 | **Real-Time Notifications** | Live updates via Supabase Realtime, per-user preference controls |
 | **Dark Mode** | Full dark/light theme toggle, persisted per user |
@@ -170,6 +170,43 @@ supabase/migrations/20260733_so_lifecycle_rpcs.sql
 supabase/migrations/20260734_invoice_lifecycle_rpcs.sql
 supabase/migrations/20260735_cn_payment_lifecycle_rpcs.sql
 supabase/migrations/20260736_lead_deal_guards.sql
+# Inventory Model Reconciliation — Sprint 7.6 (apply in order):
+supabase/migrations/20260737_inventory_units_add_product_id.sql
+supabase/migrations/20260738_inventory_model_reconciliation.sql
+supabase/migrations/20260739_inventory_serial_uniqueness.sql
+# Inventory & Warehouse Management — Sprint 8 (apply in order):
+supabase/migrations/20260740_inventory_bulk_stock_schema.sql
+supabase/migrations/20260741_warehouse_stock_reservation_rpcs.sql
+supabase/migrations/20260742_funnel_reserve_line_bulk_branch.sql
+supabase/migrations/20260743_receive_stock_rpc.sql
+supabase/migrations/20260744_transfer_stock_rpc.sql
+supabase/migrations/20260745_adjust_archive_recalculate_rpcs.sql
+# Purchase Module — Sprint 9 (apply in order):
+supabase/migrations/20260746_purchase_vendors.sql
+supabase/migrations/20260747_purchase_documents.sql
+supabase/migrations/20260748_inventory_units_vendor_invoice_fk.sql
+supabase/migrations/20260749_receive_vendor_invoice_rpc.sql
+supabase/migrations/20260750_purchase_documents_view.sql
+# Audit Hardening — 2026-07-02 (apply in order):
+supabase/migrations/20260751_harden_money_rpcs.sql
+supabase/migrations/20260752_lockdown_rpc_execute.sql
+supabase/migrations/20260753_stock_moves_actor_from_jwt.sql
+supabase/migrations/20260754_payment_cn_reversal.sql
+supabase/migrations/20260755_fix_restore_units_status_conflation.sql
+# Purchase Module Redesign — 2026-07-05, Brands as vendors, PO→VI funnel, AP payments (apply in order):
+supabase/migrations/20260756_brands_vendor_fields.sql
+supabase/migrations/20260757_purchasing_reset.sql
+supabase/migrations/20260758_receive_vi_po_completion.sql
+supabase/migrations/20260759_activities_purchase_related_types.sql
+supabase/migrations/20260760_vendor_payments.sql
+supabase/migrations/20260761_vendor_ledger_view.sql
+supabase/migrations/20260762_purchase_documents_view.sql
+supabase/migrations/20260763_vendor_invoices_updated_at.sql
+# Warehouse Module Redesign — R1, 2026-07-09, RMA stages as real locations + Warehouse Dashboard (apply in order):
+supabase/migrations/20260764_warehouse_system_locations.sql
+supabase/migrations/20260765_stock_moves_rma_ticket_doctype.sql
+supabase/migrations/20260766_rma_move_rpcs.sql
+supabase/migrations/20260767_backfill_rma_unit_locations.sql
 ```
 
 ### 4. Set up storage
@@ -217,7 +254,7 @@ npm run dev
 npm run dev                    # Vite dev server (hot reload, port 5173)
 npm run build                  # Production build → dist/
 npm run preview                # Preview production build locally
-npm test                       # Vitest unit tests (277 tests, ~3.5s)
+npm test                       # Vitest unit tests (287 tests, 8 suites)
 npm run test:watch             # Vitest in watch mode
 npm run test:coverage          # Coverage report (HTML + text)
 npm run lint                   # ESLint check
@@ -407,13 +444,14 @@ Roles are stored in the `user_roles` table. Default permission sets are defined 
 npm test
 ```
 
-277 unit tests across 7 suites in `src/lib/`:
+287 unit tests across 8 suites in `src/lib/` and `src/test/`:
 
 | Suite | Coverage |
 |-------|---------|
 | `constants.test.js` | All constant values and type correctness |
 | `permissions.test.js` | `canDo()` across all role/permission combinations |
 | `schemas.test.js` | Zod schemas with valid + invalid inputs |
+| `rmaStageMoves.test.js` | `buildRmaMoves()` serial/name matching + RMA-location mapping (Warehouse R1) |
 
 Tests run in under 5 seconds via Vitest with jsdom environment (serialised — `fileParallelism: false`).
 
@@ -421,12 +459,18 @@ Tests run in under 5 seconds via Vitest with jsdom environment (serialised — `
 
 ## CI/CD
 
-GitHub Actions runs automatically on every push and PR to `main`:
+GitHub Actions runs automatically on every push to `main` and `test`, plus every PR. Two required jobs:
 
 ```
-1. npm test              → 277 tests must pass
-2. npm run lint:ci       → zero ESLint warnings allowed
-3. npm run build         → production build must succeed
+ci job:
+  1. npm test              → 287 tests must pass
+  2. npm run lint:ci       → zero ESLint warnings allowed
+  3. npm run build         → production build must succeed
+
+db-tests job:
+  supabase start (applies every migration from scratch) then runs the
+  supabase/tests/*.sql assertion files via psql — money + inventory +
+  warehouse RPC invariants. No Supabase account needed (local Postgres).
 ```
 
 The build step uses Supabase placeholder values from GitHub Secrets (falls back gracefully in CI).

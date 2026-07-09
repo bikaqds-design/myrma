@@ -1395,13 +1395,14 @@ TypeScript is adopted in `src/lib/` and `src/api/db/`.
 
 ### 15.1 Current Test Suite
 
-277 tests across 7 suites in `src/lib/`:
+287 tests across 8 suites in `src/lib/` and `src/test/`:
 
 | File | Tests | Coverage |
 |------|-------|---------|
 | `constants.test.js` | Unit tests for all constant values and type correctness | Constants are correct and non-empty |
 | `permissions.test.js` | Tests for `canDo()` across all role/permission combinations | All role transitions, bypass logic |
 | `schemas.test.js` | Validation schema tests for all Zod schemas | Valid inputs pass, invalid inputs fail |
+| `rmaStageMoves.test.js` | `buildRmaMoves()` serial/name matching + RMA-location mapping | Warehouse Module R1 auto-move logic |
 
 Run with `npm test` (Vitest).
 
