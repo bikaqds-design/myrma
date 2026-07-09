@@ -75,8 +75,11 @@ export function ExportMenu({ units, batches, warehouses, brandMap }) {
     const rows = warehouses.map((w) => ({
       Name: w.name,
       Code: w.code || '',
+      Type: w.warehouse_type || '',
+      System: w.is_system ? 'Yes' : 'No',
       Location: w.location || '',
       Description: w.description || '',
+      Manager: w.manager || '',
       'Unit Count': units.filter((u) => u.warehouse_id === w.id).length,
       Active: w.is_active ? 'Yes' : 'No',
       Created: fmt(w.created_date),

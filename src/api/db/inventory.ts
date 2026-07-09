@@ -332,6 +332,15 @@ export const inventory = {
     }
   },
 
+  /**
+   * @deprecated RMA-workflow warehouse assignment — a direct field mutation
+   * with no stock_moves ledger row and no reservation check. Still used by
+   * ByProductTab / WarehouseDetailModal / ProductDetailModal (the RMA repair
+   * workflow). New funnel/warehouse code should use the atomic RPC wrappers
+   * (transferStock / adjustStock / moveRmaUnits / promoteRmaUnit) instead.
+   * Consolidating these two paths is a Warehouse Module R2 item — see CLAUDE.md
+   * (the feature sets differ; don't merge blindly).
+   */
   async transferUnits(unitIds: string[], warehouseId: string | null): Promise<void> {
     if (!unitIds.length) throw new Error('No unit IDs provided')
     const { error } = await supabase

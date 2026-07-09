@@ -925,13 +925,13 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
             <CardHead title={t('dashboard.inventorySnapshot')} action={`${invProductCounts.allUnits} ${t('dashboard.units')}`} tk={tk} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, flex: 1 }}>
               {[
-                { label: t('inventory.received'),    value: invProductCounts.received,    color: '#0ea5e9', tab: 'received'     },
-                { label: t('inventory.underRepair'), value: invProductCounts.underRepair, color: '#f97316', tab: 'under-repair' },
-                { label: t('inventory.repaired'),    value: invProductCounts.repaired,    color: '#14b8a6', tab: 'repaired'     },
-                { label: t('inventory.cantRepair'),  value: invProductCounts.cantRepair,  color: '#ef4444', tab: 'cant-repair'  },
-                { label: t('inventory.rmaStock'),    value: invProductCounts.rmaStock,    color: '#6366f1', tab: 'rma-stock'    },
+                { label: t('inventory.received'),    value: invProductCounts.received,    color: '#0ea5e9' },
+                { label: t('inventory.underRepair'), value: invProductCounts.underRepair, color: '#f97316' },
+                { label: t('inventory.repaired'),    value: invProductCounts.repaired,    color: '#14b8a6' },
+                { label: t('inventory.cantRepair'),  value: invProductCounts.cantRepair,  color: '#ef4444' },
+                { label: t('inventory.rmaStock'),    value: invProductCounts.rmaStock,    color: '#6366f1' },
               ].map((c) => (
-                <button key={c.label} onClick={() => onNavigate?.(`/inventory?tab=${c.tab}`)}
+                <button key={c.label} onClick={() => onNavigate?.('/inventory')}
                   style={{ background: tk.surfaceInset, borderRadius: 10, padding: '14px 12px', textAlign: 'left', border: 'none', cursor: 'pointer', transition: 'filter .15s' }}
                   onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(0.95)'}
                   onMouseLeave={(e) => e.currentTarget.style.filter = 'none'}>

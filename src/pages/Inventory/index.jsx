@@ -8,7 +8,6 @@ import { PageHeader, Button } from '../../components/ui'
 import { ROLES } from '../../lib/constants'
 import { groupByProduct } from './_shared'
 import { ExportMenu } from './ExportMenu'
-import { ProductStatusTab } from './ProductStatusTab'
 import { OverviewTab } from './OverviewTab'
 import { ByProductTab } from './ByProductTab'
 import { WarehousesTab } from './WarehousesTab'
@@ -34,16 +33,12 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
   const { data: invData, isLoading: loading } = useQuery({
     queryKey: ['inventory'],
     queryFn: async () => {
-      const [ur, br, brandList, productList, whRes, tkRes, stockSummary, movesRes, wsRes] = await Promise.all([
+      const [ur, br, brandList, productList, whRes, stockSummary, movesRes, wsRes] = await Promise.all([
         db.inventory.listUnits(),
         db.inventory.listBatches(),
         db.brands.list().catch(() => []),
         db.products.list().catch(() => []),
         db.warehouses.list().catch(() => ({ missing: true, data: [] })),
-        supabase
-          .from('rma_tickets')
-          .select('id,rma_number,ticket_status,customer_name,assigned_technician,created_date,products')
-          .then((r) => r.data || []),
         db.inventory.getStockSummary().catch(() => []),
         db.stockMoves.list().catch(() => ({ missing: true, data: [] })),
         db.warehouseStock.list().catch(() => ({ missing: true, data: [] })),
@@ -51,7 +46,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
       const map = {}
       for (const p of productList || [])
         if (p.product_name) map[p.product_name] = p.brand?.brand_name || ''
-      return { ur, br, brandList, productList, brandMap: map, whRes, tkRes, stockSummary, movesRes, wsRes }
+      return { ur, br, brandList, productList, brandMap: map, whRes, stockSummary, movesRes, wsRes }
     },
   })
 
@@ -62,7 +57,6 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
   const brandMap = invData?.brandMap ?? {}
   const whMissing = invData?.whRes?.missing ?? false
   const warehouses = invData?.whRes?.data ?? []
-  const rmaTickets = invData?.tkRes ?? []
   const stockSummary = invData?.stockSummary ?? []
   const stockMoves = invData?.movesRes?.missing ? [] : (invData?.movesRes?.data ?? [])
   const products = invData?.productList ?? []
@@ -125,73 +119,22 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
       </div>
     )
 
-  const stockUnits = units.filter((u) => u.status === 'company_stock')
   const allGroups = groupByProduct(units, brandMap)
-  const _stockGroups = groupByProduct(stockUnits, brandMap)
 
-  // Inventory logic per ticket + product status:
-  // Cancelled tickets           → removed from all inventory tabs
-  // Completed + Received/UnderRepair/Repaired/CantRepair → removed from all inventory tabs
-  // Completed + Replacement/CreditNote → kept in RMA Stock
-  // New/InProgress/OnHold + any product status → shown in the matching inventory tab
-  const flatProducts = rmaTickets
-    .filter((t) => t.ticket_status !== 'Cancelled')
-    .flatMap((t) =>
-      (t.products || []).map((p) => ({
-        ...p,
-        ticket_id: t.id,
-        rma_number: t.rma_number,
-        customer_name: t.customer_name,
-        ticket_status: t.ticket_status,
-        assigned_technician: t.assigned_technician,
-        created_date: t.created_date,
-      }))
-    )
-    .filter((p) => {
-      // Completed tickets: only Replacement/CreditNote remain in inventory (RMA Stock)
-      if (p.ticket_status === 'Completed') {
-        return p.product_status === 'Replacement' || p.product_status === 'Credit Note'
-      }
-      return true
-    })
-
-  // Active-only tabs (New / In Progress / On Hold)
-  const receivedProds = flatProducts.filter(
-    (p) => p.ticket_status !== 'Completed' && (p.product_status === 'Received' || !p.product_status)
-  )
-  const underRepairProds = flatProducts.filter(
-    (p) => p.ticket_status !== 'Completed' && p.product_status === 'Under Repair'
-  )
-  const repairedProds = flatProducts.filter(
-    (p) => p.ticket_status !== 'Completed' && p.product_status === 'Repaired'
-  )
-  const cantRepairProds = flatProducts.filter(
-    (p) => p.ticket_status !== 'Completed' && p.product_status === "Can't Repair"
-  )
-
-  // Build a set of unit keys that have already been transferred to a warehouse
-  const transferredKeys = new Set(
-    units
-      .filter((u) => u.warehouse_id)
-      .map((u) => `${u.rma_ticket_id}||${u.serial_number || u.product_name}`)
-  )
-  const rmaStockProds = flatProducts.filter((p) => {
-    if (p.product_status !== 'Replacement' && p.product_status !== 'Credit Note') return false
-    const key = `${p.ticket_id}||${p.serial_number || p.product_name}`
-    return !transferredKeys.has(key)
-  })
-
+  // The 5 RMA-stage tabs (received/under-repair/repaired/cant-repair/rma-stock)
+  // were removed in the Warehouse Module R1 redesign — RMA units now live in
+  // real system locations (RMA-RECEIVED etc.), surfaced on the Overview
+  // dashboard's RMA column + drawer instead of derived from ticket JSONB here.
+  const TAB_IDS = ['overview', 'by-product', 'stock-movements', 'warehouses']
   const tabs = [
     { id: 'overview', label: t('inventory.overview') },
     { id: 'by-product', label: `${t('inventory.allUnits')} (${units.length})` },
-    { id: 'received', label: `${t('inventory.received')} (${receivedProds.length})` },
-    { id: 'under-repair', label: `${t('inventory.underRepair')} (${underRepairProds.length})` },
-    { id: 'repaired', label: `${t('inventory.repaired')} (${repairedProds.length})` },
-    { id: 'cant-repair', label: `${t('inventory.cantRepair')} (${cantRepairProds.length})` },
-    { id: 'rma-stock', label: `${t('inventory.rmaStock')} (${rmaStockProds.length})` },
     { id: 'stock-movements', label: `${t('inventory.stockMovements')} (${stockMoves.length})` },
     { id: 'warehouses', label: `${t('inventory.warehouses')} (${warehouses.length})` },
   ]
+  // Stale deep links (e.g. ?tab=received from a bookmarked old URL) fall back
+  // to the dashboard rather than rendering a blank page.
+  const activeTab = TAB_IDS.includes(tab) ? tab : 'overview'
 
   return (
     <div className="space-y-6">
@@ -222,19 +165,19 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
 
       <div className="border-b border-gray-200 dark:border-[#212a38]">
         <div className="flex gap-1 overflow-x-auto">
-          {tabs.map((t) => (
+          {tabs.map((tb) => (
             <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${tab === t.id ? 'border-[#4338ca] text-[#4338ca] dark:border-[#a5b4fc] dark:text-[#a5b4fc]' : 'border-transparent text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]'}`}
+              key={tb.id}
+              onClick={() => setTab(tb.id)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === tb.id ? 'border-[#4338ca] text-[#4338ca] dark:border-[#a5b4fc] dark:text-[#a5b4fc]' : 'border-transparent text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]'}`}
             >
-              {t.label}
+              {tb.label}
             </button>
           ))}
         </div>
       </div>
 
-      {tab === 'overview' && (
+      {activeTab === 'overview' && (
         <OverviewTab
           stockSummary={stockSummary}
           onNavigate={setBreakdownProductId}
@@ -247,7 +190,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
           onNavigateToTicket={onNavigateToTicket}
         />
       )}
-      {tab === 'by-product' && (
+      {activeTab === 'by-product' && (
         <ByProductTab
           groups={allGroups}
           brands={brands}
@@ -259,48 +202,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
           onNavigateToTicket={onNavigateToTicket}
         />
       )}
-      {tab === 'received' && (
-        <ProductStatusTab
-          products={receivedProds}
-          brandMap={brandMap}
-          onNavigateToTicket={onNavigateToTicket}
-        />
-      )}
-      {tab === 'under-repair' && (
-        <ProductStatusTab
-          products={underRepairProds}
-          brandMap={brandMap}
-          onNavigateToTicket={onNavigateToTicket}
-        />
-      )}
-      {tab === 'repaired' && (
-        <ProductStatusTab
-          products={repairedProds}
-          brandMap={brandMap}
-          onNavigateToTicket={onNavigateToTicket}
-        />
-      )}
-      {tab === 'cant-repair' && (
-        <ProductStatusTab
-          products={cantRepairProds}
-          brandMap={brandMap}
-          onNavigateToTicket={onNavigateToTicket}
-        />
-      )}
-      {tab === 'rma-stock' && (
-        <ProductStatusTab
-          products={rmaStockProds}
-          showTypeCol
-          brandMap={brandMap}
-          onNavigateToTicket={onNavigateToTicket}
-          warehouses={warehouses}
-          units={units}
-          canTransfer={canDo('transfer')}
-          userEmail={userEmail}
-          onReload={invalidateInventory}
-        />
-      )}
-      {tab === 'stock-movements' && (
+      {activeTab === 'stock-movements' && (
         <StockMovementsTab
           moves={stockMoves}
           units={units}
@@ -309,7 +211,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
           warehouses={warehouses}
         />
       )}
-      {tab === 'warehouses' && (
+      {activeTab === 'warehouses' && (
         <WarehousesTab
           units={units}
           warehouses={warehouses}

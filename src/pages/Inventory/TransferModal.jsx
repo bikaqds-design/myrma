@@ -3,14 +3,25 @@ import { useTranslation } from 'react-i18next'
 import { Spinner } from '../../components/ui'
 
 // ─── Transfer Modal ────────────────────────────────────────────────────────────
+// RMA-workflow warehouse assignment (ByProductTab / WarehouseDetailModal /
+// ProductDetailModal → db.inventory.transferUnits, the old direct-mutation
+// path). The "System Pool" (null-warehouse) destination was removed in the
+// Warehouse Module R1 redesign — every unit now belongs in a real location
+// (RMA units land in the system RMA locations via move_rma_units), so there
+// is no longer an "unassigned pool" to transfer into. is_system locations are
+// also excluded from the destination list here: units reach those only via
+// the RMA auto-move / promote flow, never a manual RMA-workflow transfer.
 export function TransferModal({ units: unitIds, warehouses, currentWarehouseId, onConfirm, onClose }) {
   const { t } = useTranslation()
   const [dest, setDest] = useState('')
   const [saving, setSaving] = useState(false)
+  const destWarehouses = warehouses.filter(
+    (w) => w.is_active && !w.is_system && w.id !== currentWarehouseId
+  )
   const handleConfirm = async () => {
-    if (!dest && dest !== '__system') return
+    if (!dest) return
     setSaving(true)
-    await onConfirm(dest === '__system' ? null : dest)
+    await onConfirm(dest)
     setSaving(false)
   }
   return (
@@ -26,55 +37,34 @@ export function TransferModal({ units: unitIds, warehouses, currentWarehouseId, 
           <label className="block text-xs font-semibold text-gray-700 mb-2">
             {t('inventory.selectDestWarehouse')}
           </label>
-          <label
-            className={`flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition-all ${dest === '__system' ? 'border-gray-400 bg-gray-50' : 'border-gray-200 hover:border-gray-300'}`}
-          >
-            <input
-              type="radio"
-              name="dest"
-              value="__system"
-              checked={dest === '__system'}
-              onChange={() => setDest('__system')}
-              className="text-indigo-600"
-            />
-            <div>
-              <div className="font-medium text-sm text-gray-900">{t('inventory.systemPool')}</div>
-              <div className="text-xs text-gray-500">
-                {t('inventory.systemPoolDesc')}
+          {destWarehouses.map((wh) => (
+            <label
+              key={wh.id}
+              className={`flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition-all ${dest === wh.id ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 hover:border-indigo-200'}`}
+            >
+              <input
+                type="radio"
+                name="dest"
+                value={wh.id}
+                checked={dest === wh.id}
+                onChange={() => setDest(wh.id)}
+                className="text-indigo-600"
+              />
+              <div>
+                <div className="font-medium text-sm text-gray-900">{wh.name}</div>
+                {(wh.code || wh.location) && (
+                  <div className="text-xs text-gray-500">
+                    {[wh.code, wh.location].filter(Boolean).join(' · ')}
+                  </div>
+                )}
               </div>
-            </div>
-          </label>
-          {warehouses
-            .filter((w) => w.is_active && w.id !== currentWarehouseId)
-            .map((wh) => (
-              <label
-                key={wh.id}
-                className={`flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition-all ${dest === wh.id ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 hover:border-indigo-200'}`}
-              >
-                <input
-                  type="radio"
-                  name="dest"
-                  value={wh.id}
-                  checked={dest === wh.id}
-                  onChange={() => setDest(wh.id)}
-                  className="text-indigo-600"
-                />
-                <div>
-                  <div className="font-medium text-sm text-gray-900">{wh.name}</div>
-                  {(wh.code || wh.location) && (
-                    <div className="text-xs text-gray-500">
-                      {[wh.code, wh.location].filter(Boolean).join(' · ')}
-                    </div>
-                  )}
-                </div>
-              </label>
-            ))}
-          {warehouses.filter((w) => w.is_active && w.id !== currentWarehouseId).length === 0 &&
-            warehouses.length === 0 && (
-              <p className="text-sm text-gray-500 text-center py-4">
-                {t('inventory.noWarehousesAvailable')}
-              </p>
-            )}
+            </label>
+          ))}
+          {destWarehouses.length === 0 && (
+            <p className="text-sm text-gray-500 text-center py-4">
+              {t('inventory.noWarehousesAvailable')}
+            </p>
+          )}
         </div>
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
           <button

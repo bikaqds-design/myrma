@@ -768,11 +768,7 @@ export default function App() {
       children: [
         { tabId: 'overview', label: t('inventory.overview') },
         { tabId: 'by-product', label: t('inventory.allUnits') },
-        { tabId: 'received', label: t('inventory.received') },
-        { tabId: 'under-repair', label: t('inventory.underRepair') },
-        { tabId: 'repaired', label: t('inventory.repaired') },
-        { tabId: 'cant-repair', label: t('inventory.cantRepair') },
-        { tabId: 'rma-stock', label: t('inventory.rmaStock') },
+        { tabId: 'stock-movements', label: t('inventory.stockMovements') },
         { tabId: 'warehouses', label: t('inventory.warehouses') },
       ],
     },
