@@ -1,6 +1,14 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { downloadCSV } from './_shared'
+import { safeStorage } from '../../lib/safeStorage'
+import {
+  downloadCSV,
+  Pagination,
+  InvToolbar,
+  InvFilterPanel,
+  InvFilterField,
+  INV_FILTER_SELECT_CLS,
+} from './_shared'
 import { BulkStockActionModal } from './BulkStockActionModal'
 import { BranchesDrawer } from './BranchesDrawer'
 import { RmaDrawer } from './RmaDrawer'
@@ -28,19 +36,48 @@ export function OverviewTab({
   onNavigateToTicket,
 }) {
   const { t } = useTranslation()
+  const searchRef = useRef(null)
   const [search, setSearch] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
+  const [filterTracking, setFilterTracking] = useState('')
+  const [filterStock, setFilterStock] = useState('')
   const [selected, setSelected] = useState(new Set())
   const [bulkAction, setBulkAction] = useState(null)
   const [branchesTarget, setBranchesTarget] = useState(null)
   const [rmaTarget, setRmaTarget] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(() => safeStorage.get('invOverviewPerPage', 25))
+
+  const activeFilterCount = [filterTracking, filterStock].filter(Boolean).length
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    const rows = q
-      ? stockSummary.filter((r) => r.product_name.toLowerCase().includes(q))
-      : stockSummary
+    const rows = stockSummary.filter((r) => {
+      const matchSearch = !q || r.product_name.toLowerCase().includes(q)
+      const matchTracking = !filterTracking || r.stock_tracking_mode === filterTracking
+      const rmaTotal = r.rma.reduce((sum, x) => sum + x.count, 0)
+      const matchStock =
+        !filterStock ||
+        (filterStock === 'available' && r.available > 0) ||
+        (filterStock === 'reserved' && r.reserved > 0) ||
+        (filterStock === 'rma' && rmaTotal > 0) ||
+        (filterStock === 'out' && r.physical_total === 0)
+      return matchSearch && matchTracking && matchStock
+    })
     return [...rows].sort((a, b) => b.physical_total - a.physical_total)
-  }, [stockSummary, search])
+  }, [stockSummary, search, filterTracking, filterStock])
+
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
+    [filtered, currentPage, itemsPerPage]
+  )
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, filterTracking, filterStock, itemsPerPage])
+  useEffect(() => {
+    safeStorage.set('invOverviewPerPage', itemsPerPage)
+  }, [itemsPerPage])
 
   const selectableSummary = useMemo(() => stockSummary.filter((s) => s.in_catalog), [stockSummary])
   const selectedSummaries = useMemo(
@@ -178,18 +215,46 @@ export function OverviewTab({
         </div>
       )}
 
-      <div className="flex items-center gap-3">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t('inventory.searchProductPlaceholder')}
-          className="max-w-md w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] shadow-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
-        />
-        <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">
-          {t('inventory.productCount', { count: filtered.length })}
-        </span>
-      </div>
+      <InvToolbar
+        searchRef={searchRef}
+        search={search}
+        onSearchChange={setSearch}
+        placeholder={t('inventory.searchProductPlaceholder')}
+        showFilters={showFilters}
+        onToggleFilters={() => setShowFilters((f) => !f)}
+        activeFilterCount={activeFilterCount}
+        right={
+          <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">
+            {t('inventory.productCount', { count: filtered.length })}
+          </span>
+        }
+      />
+
+      <InvFilterPanel
+        show={showFilters}
+        activeFilterCount={activeFilterCount}
+        onClear={() => {
+          setFilterTracking('')
+          setFilterStock('')
+        }}
+      >
+        <InvFilterField label={t('inventory.colTrackingMode')}>
+          <select value={filterTracking} onChange={(e) => setFilterTracking(e.target.value)} className={INV_FILTER_SELECT_CLS}>
+            <option value="">{t('inventory.filterAll')}</option>
+            <option value="serialized">{t('inventory.tracking_serialized')}</option>
+            <option value="bulk">{t('inventory.tracking_bulk')}</option>
+          </select>
+        </InvFilterField>
+        <InvFilterField label={t('inventory.filterStock')}>
+          <select value={filterStock} onChange={(e) => setFilterStock(e.target.value)} className={INV_FILTER_SELECT_CLS}>
+            <option value="">{t('inventory.filterAll')}</option>
+            <option value="available">{t('inventory.filterHasAvailable')}</option>
+            <option value="reserved">{t('inventory.filterHasReserved')}</option>
+            <option value="rma">{t('inventory.filterHasRma')}</option>
+            <option value="out">{t('inventory.filterOutOfStock')}</option>
+          </select>
+        </InvFilterField>
+      </InvFilterPanel>
 
       {filtered.length === 0 ? (
         <div className="text-center py-20 bg-white dark:bg-[#121823] rounded-[14px] border border-[#e6e9ef] dark:border-[#212a38]">
@@ -224,7 +289,7 @@ export function OverviewTab({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#f0f2f6] dark:divide-[#1a2230]">
-                {filtered.map((row) => {
+                {paginated.map((row) => {
                   const branchTotal = row.branches.reduce((sum, b) => sum + b.qty, 0)
                   const rmaTotal = row.rma.reduce((sum, r) => sum + r.count, 0)
                   return (
@@ -301,6 +366,16 @@ export function OverviewTab({
             </table>
           </div>
         </div>
+      )}
+
+      {filtered.length > 0 && (
+        <Pagination
+          total={filtered.length}
+          page={currentPage}
+          itemsPerPage={itemsPerPage}
+          setItemsPerPage={setItemsPerPage}
+          onPage={setCurrentPage}
+        />
       )}
 
       {bulkAction && (

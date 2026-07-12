@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { safeStorage } from '../../lib/safeStorage'
-import { Pagination, downloadCSV } from './_shared'
+import { Pagination, downloadCSV, InvToolbar, InvFilterPanel, InvFilterField, INV_FILTER_SELECT_CLS } from './_shared'
 import { ProductDetailModal } from './ProductDetailModal'
 
 // ─── All Units — By Product ───────────────────────────────────────────────────
@@ -92,55 +92,20 @@ export function ByProductTab({
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2 flex-1 max-w-2xl">
-          <div className="relative flex-1">
-            <input
-              ref={searchRef}
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('inventory.searchByProductBrand')}
-              className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
-            />
-            <svg
-              className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </div>
-          <button
-            onClick={() => setShowFilters((f) => !f)}
-            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${showFilters || activeFilterCount > 0 ? 'border-[#4338ca] text-[#4338ca] bg-indigo-50 dark:bg-indigo-900/20 dark:border-[#a5b4fc] dark:text-[#a5b4fc]' : 'border-[#e6e9ef] dark:border-[#212a38] text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520]'}`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"
-              />
-            </svg>
-            {t('common.filters')}
-            {activeFilterCount > 0 && (
-              <span className="w-4 h-4 bg-[#4338ca] dark:bg-[#a5b4fc] text-white dark:text-[#0b0f17] text-xs rounded-full flex items-center justify-center">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
-        </div>
-        <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">
-          {t('inventory.productCount', { count: filtered.length })}
-        </span>
-      </div>
+      <InvToolbar
+        searchRef={searchRef}
+        search={search}
+        onSearchChange={setSearch}
+        placeholder={t('inventory.searchByProductBrand')}
+        showFilters={showFilters}
+        onToggleFilters={() => setShowFilters((f) => !f)}
+        activeFilterCount={activeFilterCount}
+        right={
+          <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">
+            {t('inventory.productCount', { count: filtered.length })}
+          </span>
+        }
+      />
 
       {selectedRows.length > 0 && (
         <div className="flex items-center gap-3 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl">
@@ -175,61 +140,44 @@ export function ByProductTab({
       )}
 
       {/* Filter panel */}
-      {showFilters && (
-        <div className="flex items-center gap-4 p-4 bg-[#f8f9fb] dark:bg-[#0f1520] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] flex-wrap">
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('inventory.filterProduct')}</label>
-            <input
-              type="text"
-              value={filterProduct}
-              onChange={(e) => setFilterProduct(e.target.value)}
-              placeholder={t('inventory.typeProductName')}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 w-44"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('inventory.filterBrand')}</label>
-            <select
-              value={filterBrand}
-              onChange={(e) => setFilterBrand(e.target.value)}
-              className="px-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
-            >
-              <option value="">{t('inventory.filterAll')}</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.brand_name}>
-                  {b.brand_name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-[#e8ebf0]">{t('inventory.filterStatus')}</label>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
-            >
-              <option value="">{t('inventory.filterAll')}</option>
-              <option value="active_rma">{t('inventory.statusActiveRMA')}</option>
-              <option value="company_stock">{t('inventory.statusCompanyStock')}</option>
-              <option value="sent_to_manufacturer">{t('inventory.statusSentToManufacturer')}</option>
-              <option value="closed">{t('inventory.statusClosed')}</option>
-            </select>
-          </div>
-          {activeFilterCount > 0 && (
-            <button
-              onClick={() => {
-                setFilterBrand('')
-                setFilterStatus('')
-                setFilterProduct('')
-              }}
-              className="text-sm text-red-600 hover:underline ml-auto"
-            >
-              {t('inventory.clearFilters')}
-            </button>
-          )}
-        </div>
-      )}
+      <InvFilterPanel
+        show={showFilters}
+        activeFilterCount={activeFilterCount}
+        onClear={() => {
+          setFilterBrand('')
+          setFilterStatus('')
+          setFilterProduct('')
+        }}
+      >
+        <InvFilterField label={t('inventory.filterProduct')}>
+          <input
+            type="text"
+            value={filterProduct}
+            onChange={(e) => setFilterProduct(e.target.value)}
+            placeholder={t('inventory.typeProductName')}
+            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 w-44"
+          />
+        </InvFilterField>
+        <InvFilterField label={t('inventory.filterBrand')}>
+          <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)} className={INV_FILTER_SELECT_CLS}>
+            <option value="">{t('inventory.filterAll')}</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.brand_name}>
+                {b.brand_name}
+              </option>
+            ))}
+          </select>
+        </InvFilterField>
+        <InvFilterField label={t('inventory.filterStatus')}>
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={INV_FILTER_SELECT_CLS}>
+            <option value="">{t('inventory.filterAll')}</option>
+            <option value="active_rma">{t('inventory.statusActiveRMA')}</option>
+            <option value="company_stock">{t('inventory.statusCompanyStock')}</option>
+            <option value="sent_to_manufacturer">{t('inventory.statusSentToManufacturer')}</option>
+            <option value="closed">{t('inventory.statusClosed')}</option>
+          </select>
+        </InvFilterField>
+      </InvFilterPanel>
 
       {filtered.length === 0 ? (
         <div className="text-center py-20 bg-white dark:bg-[#121823] rounded-lg border border-gray-200 dark:border-[#212a38] flex flex-col items-center gap-3">

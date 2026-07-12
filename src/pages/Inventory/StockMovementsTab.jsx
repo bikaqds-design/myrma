@@ -1,6 +1,16 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { safeStorage } from '../../lib/safeStorage'
+import {
+  Pagination,
+  InvToolbar,
+  InvFilterPanel,
+  InvFilterField,
+  INV_FILTER_SELECT_CLS,
+} from './_shared'
+
+const DOC_TYPES = ['sales_order', 'invoice', 'credit_note', 'vendor_invoice', 'rma_ticket', 'manual']
 
 const MOVE_TYPE_BADGE = {
   receive: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
@@ -25,7 +35,13 @@ function routeForMove(m) {
 export function StockMovementsTab({ moves, units, warehouseStockRows, products, warehouses }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const searchRef = useRef(null)
+  const [search, setSearch] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
   const [moveTypeFilter, setMoveTypeFilter] = useState('')
+  const [docTypeFilter, setDocTypeFilter] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(() => safeStorage.get('invMovementsPerPage', 25))
 
   const unitById = useMemo(() => {
     const map = {}
@@ -67,30 +83,80 @@ export function StockMovementsTab({ moves, units, warehouseStockRows, products, 
     return move.ref_id
   }
 
-  const filtered = useMemo(
-    () => (moveTypeFilter ? moves.filter((m) => m.move_type === moveTypeFilter) : moves),
-    [moves, moveTypeFilter]
+  const activeFilterCount = [moveTypeFilter, docTypeFilter].filter(Boolean).length
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return moves.filter((m) => {
+      const matchMove = !moveTypeFilter || m.move_type === moveTypeFilter
+      const matchDoc = !docTypeFilter || m.doc_type === docTypeFilter
+      const matchSearch =
+        !q ||
+        describeRef(m).toLowerCase().includes(q) ||
+        (m.actor_email || '').toLowerCase().includes(q)
+      return matchMove && matchDoc && matchSearch
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moves, moveTypeFilter, docTypeFilter, search, unitById, wsById, productNameById, warehouseNameById])
+
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
+    [filtered, currentPage, itemsPerPage]
   )
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, moveTypeFilter, docTypeFilter, itemsPerPage])
+  useEffect(() => {
+    safeStorage.set('invMovementsPerPage', itemsPerPage)
+  }, [itemsPerPage])
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <select
-          value={moveTypeFilter}
-          onChange={(e) => setMoveTypeFilter(e.target.value)}
-          className="px-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
-        >
-          <option value="">{t('inventory.filterAll')}</option>
-          {Object.keys(MOVE_TYPE_BADGE).map((mt) => (
-            <option key={mt} value={mt}>
-              {t(`inventory.moveType_${mt}`)}
-            </option>
-          ))}
-        </select>
-        <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">
-          {t('inventory.movementCount', { count: filtered.length })}
-        </span>
-      </div>
+      <InvToolbar
+        searchRef={searchRef}
+        search={search}
+        onSearchChange={setSearch}
+        placeholder={t('inventory.searchMovementsPlaceholder')}
+        showFilters={showFilters}
+        onToggleFilters={() => setShowFilters((f) => !f)}
+        activeFilterCount={activeFilterCount}
+        right={
+          <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">
+            {t('inventory.movementCount', { count: filtered.length })}
+          </span>
+        }
+      />
+
+      <InvFilterPanel
+        show={showFilters}
+        activeFilterCount={activeFilterCount}
+        onClear={() => {
+          setMoveTypeFilter('')
+          setDocTypeFilter('')
+        }}
+      >
+        <InvFilterField label={t('inventory.colMoveType')}>
+          <select value={moveTypeFilter} onChange={(e) => setMoveTypeFilter(e.target.value)} className={INV_FILTER_SELECT_CLS}>
+            <option value="">{t('inventory.filterAll')}</option>
+            {Object.keys(MOVE_TYPE_BADGE).map((mt) => (
+              <option key={mt} value={mt}>
+                {t(`inventory.moveType_${mt}`)}
+              </option>
+            ))}
+          </select>
+        </InvFilterField>
+        <InvFilterField label={t('inventory.colDoc')}>
+          <select value={docTypeFilter} onChange={(e) => setDocTypeFilter(e.target.value)} className={INV_FILTER_SELECT_CLS}>
+            <option value="">{t('inventory.filterAll')}</option>
+            {DOC_TYPES.map((dt) => (
+              <option key={dt} value={dt}>
+                {t(`inventory.docType_${dt}`)}
+              </option>
+            ))}
+          </select>
+        </InvFilterField>
+      </InvFilterPanel>
 
       {filtered.length === 0 ? (
         <div className="text-center py-20 bg-white dark:bg-[#121823] rounded-[14px] border border-[#e6e9ef] dark:border-[#212a38]">
@@ -120,7 +186,7 @@ export function StockMovementsTab({ moves, units, warehouseStockRows, products, 
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#f0f2f6] dark:divide-[#1a2230]">
-                {filtered.map((m) => (
+                {paginated.map((m) => (
                   <tr key={m.id} className="hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230] transition-colors">
                     <td className="px-5 py-3 text-[#6c6760] dark:text-[#9aa4b2] whitespace-nowrap">
                       {new Date(m.created_at).toLocaleString()}
@@ -153,6 +219,16 @@ export function StockMovementsTab({ moves, units, warehouseStockRows, products, 
             </table>
           </div>
         </div>
+      )}
+
+      {filtered.length > 0 && (
+        <Pagination
+          total={filtered.length}
+          page={currentPage}
+          itemsPerPage={itemsPerPage}
+          setItemsPerPage={setItemsPerPage}
+          onPage={setCurrentPage}
+        />
       )}
     </div>
   )

@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { supabase, db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { safeStorage } from '../../lib/safeStorage'
 import { Spinner } from '../../components/ui'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import {
@@ -13,8 +14,15 @@ import {
   ResolutionBadge,
   WarrantyBadge,
   daysSince,
+  Pagination,
+  InvToolbar,
+  InvFilterPanel,
+  InvFilterField,
+  INV_FILTER_SELECT_CLS,
 } from './_shared'
 import { TransferModal } from './TransferModal'
+
+const WAREHOUSE_TYPES = ['main', 'branch', 'service_center', 'rma', 'transit', 'virtual']
 
 // ─── Warehouse export helpers ──────────────────────────────────────────────────
 // Note: toast messages in these module-level async functions are left hardcoded
@@ -152,11 +160,18 @@ export function WarehousesTab({
   onReload,
 }) {
   const { t } = useTranslation()
+  const searchRef = useRef(null)
   const [selectedWh, setSelectedWh] = useState(null)
   const [editingWh, setEditingWh] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
   const [deleting, setDeleting] = useState(null)
   const [showSQL, setShowSQL] = useState(whMissing)
+  const [search, setSearch] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
+  const [filterType, setFilterType] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(() => safeStorage.get('invWarehousesPerPage', 25))
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
     title: '',
@@ -179,15 +194,45 @@ export function WarehousesTab({
       return 'sellable'
     return 'other'
   }
-  const groupedWarehouses = useMemo(() => {
-    const groups = { sellable: [], other: [], system: [] }
-    for (const wh of warehouses) groups[groupOf(wh)].push(wh)
-    return [
-      { key: 'sellable', label: t('inventory.whGroupSellable'), rows: groups.sellable },
-      { key: 'other', label: t('inventory.whGroupOther'), rows: groups.other },
-      { key: 'system', label: t('inventory.whGroupSystem'), rows: groups.system },
-    ].filter((g) => g.rows.length > 0)
-  }, [warehouses, t])
+  const GROUP_LABELS = {
+    sellable: t('inventory.whGroupSellable'),
+    other: t('inventory.whGroupOther'),
+    system: t('inventory.whGroupSystem'),
+  }
+
+  const activeFilterCount = [filterType, filterStatus].filter(Boolean).length
+
+  // Filter → order by group → paginate. Group headers are rendered inline as
+  // the group changes on the current page, so grouping + pagination coexist.
+  const orderedRows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const matches = warehouses.filter((wh) => {
+      const matchSearch =
+        !q ||
+        [wh.name, wh.code, wh.location, wh.manager].some((v) => (v || '').toLowerCase().includes(q))
+      const matchType = !filterType || wh.warehouse_type === filterType
+      const matchStatus =
+        !filterStatus ||
+        (filterStatus === 'active' && wh.is_active) ||
+        (filterStatus === 'inactive' && !wh.is_active)
+      return matchSearch && matchType && matchStatus
+    })
+    const order = { sellable: 0, other: 1, system: 2 }
+    return [...matches].sort((a, b) => order[groupOf(a)] - order[groupOf(b)])
+  }, [warehouses, search, filterType, filterStatus])
+
+  const paginatedRows = useMemo(
+    () => orderedRows.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
+    [orderedRows, currentPage, itemsPerPage]
+  )
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, filterType, filterStatus, itemsPerPage])
+  useEffect(() => {
+    safeStorage.set('invWarehousesPerPage', itemsPerPage)
+  }, [itemsPerPage])
+
   const colCount = canManage ? 8 : 7
 
   // Archive (soft-delete) replaces the old hard delete — calls archive_warehouse
@@ -269,35 +314,64 @@ export function WarehousesTab({
         </div>
       )}
 
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-sm text-gray-500">
-          {warehouses.length === 1
-            ? t('inventory.warehouseCountSingle', { count: warehouses.length })
-            : t('inventory.warehouseCountPlural', { count: warehouses.length })}
-          {warehouses.length > 0 && (
-            <span className="ml-2 text-gray-500">
-              {t('inventory.warehouseTotalUnits', { count: totalUnits })}
-            </span>
-          )}
-        </p>
-        {canManage && !whMissing && (
-          <button
-            onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+      {/* Toolbar (search + filters) — only when there are warehouses to filter */}
+      {!whMissing && warehouses.length > 0 && (
+        <>
+          <InvToolbar
+            searchRef={searchRef}
+            search={search}
+            onSearchChange={setSearch}
+            placeholder={t('inventory.searchWarehousePlaceholder')}
+            showFilters={showFilters}
+            onToggleFilters={() => setShowFilters((f) => !f)}
+            activeFilterCount={activeFilterCount}
+            right={
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">
+                  {t('inventory.warehouseTotalUnits', { count: totalUnits })}
+                </span>
+                {canManage && (
+                  <button
+                    onClick={() => setShowCreate(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    {t('inventory.newWarehouse')}
+                  </button>
+                )}
+              </div>
+            }
+          />
+          <InvFilterPanel
+            show={showFilters}
+            activeFilterCount={activeFilterCount}
+            onClear={() => {
+              setFilterType('')
+              setFilterStatus('')
+            }}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            {t('inventory.newWarehouse')}
-          </button>
-        )}
-      </div>
+            <InvFilterField label={t('inventory.warehouseTypeLabel')}>
+              <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className={INV_FILTER_SELECT_CLS}>
+                <option value="">{t('inventory.filterAll')}</option>
+                {WAREHOUSE_TYPES.map((wt) => (
+                  <option key={wt} value={wt}>
+                    {t(`inventory.warehouseType_${wt}`)}
+                  </option>
+                ))}
+              </select>
+            </InvFilterField>
+            <InvFilterField label={t('inventory.colStatus')}>
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={INV_FILTER_SELECT_CLS}>
+                <option value="">{t('inventory.filterAll')}</option>
+                <option value="active">{t('inventory.statusActive')}</option>
+                <option value="inactive">{t('inventory.statusInactive')}</option>
+              </select>
+            </InvFilterField>
+          </InvFilterPanel>
+        </>
+      )}
 
       {/* Warehouse table */}
       {whMissing ? (
@@ -370,128 +444,142 @@ export function WarehousesTab({
               </tr>
             </thead>
             <tbody>
-              {groupedWarehouses.map((group) => (
-                <React.Fragment key={group.key}>
-                  <tr>
-                    <td
-                      colSpan={colCount}
-                      className="px-4 py-1.5 bg-gray-50 border-b border-gray-200 text-[10px] font-bold uppercase tracking-wider text-gray-500"
+              {paginatedRows.length === 0 && (
+                <tr>
+                  <td colSpan={colCount} className="px-4 py-10 text-center text-gray-500 text-sm">
+                    {t('common.noResults')}
+                  </td>
+                </tr>
+              )}
+              {(() => {
+                let prevGroup = null
+                const out = []
+                paginatedRows.forEach((wh, idx) => {
+                  const g = groupOf(wh)
+                  if (g !== prevGroup) {
+                    prevGroup = g
+                    out.push(
+                      <tr key={`hdr-${g}`}>
+                        <td
+                          colSpan={colCount}
+                          className="px-4 py-1.5 bg-gray-50 border-b border-gray-200 text-[10px] font-bold uppercase tracking-wider text-gray-500"
+                        >
+                          {GROUP_LABELS[g]}
+                        </td>
+                      </tr>
+                    )
+                  }
+                  const cnt = whUnits(wh.id).length
+                  out.push(
+                    <tr
+                      key={wh.id}
+                      onClick={() => setSelectedWh({ ...wh, isSystem: false })}
+                      className={`border-b border-gray-100 cursor-pointer hover:bg-indigo-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'} ${!wh.is_active ? 'opacity-60' : ''}`}
                     >
-                      {group.label} ({group.rows.length})
-                    </td>
-                  </tr>
-                  {group.rows.map((wh, idx) => {
-                    const cnt = whUnits(wh.id).length
-                    return (
-                      <tr
-                        key={wh.id}
-                        onClick={() => setSelectedWh({ ...wh, isSystem: false })}
-                        className={`border-b border-gray-100 cursor-pointer hover:bg-indigo-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'} ${!wh.is_active ? 'opacity-60' : ''}`}
-                      >
-                        <td className="px-4 py-2.5 border-r border-gray-100">
-                          <span className="font-mono text-indigo-700 font-semibold">
-                            {wh.code || '—'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 border-r border-gray-100 font-medium text-gray-900">
-                          <div className="flex items-center gap-1.5">
-                            {wh.name}
-                            {wh.is_system && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-gray-200 text-gray-600 uppercase tracking-wide">
-                                {t('inventory.whSystemBadge')}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-2.5 border-r border-gray-100 text-gray-500">
-                          {wh.location || '—'}
-                        </td>
-                        <td className="px-4 py-2.5 border-r border-gray-100 text-gray-500 max-w-[200px] truncate">
-                          {wh.description || '—'}
-                        </td>
-                        <td className="px-4 py-2.5 border-r border-gray-100 text-center">
-                          <span
-                            className={`px-2 py-0.5 rounded text-xs font-semibold ${cnt > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}
-                          >
-                            {cnt}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 border-r border-gray-100 text-center">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-medium ${wh.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
-                          >
-                            {wh.is_active ? t('inventory.statusActive') : t('inventory.statusInactive')}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 border-r border-gray-100 text-gray-500">
-                          {wh.created_date ? new Date(wh.created_date).toLocaleDateString() : '—'}
-                        </td>
-                        {canManage && (
-                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                            {wh.is_system ? (
-                              <div className="flex items-center justify-center text-gray-300" title={t('inventory.whSystemLocked')}>
+                      <td className="px-4 py-2.5 border-r border-gray-100">
+                        <span className="font-mono text-indigo-700 font-semibold">
+                          {wh.code || '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 border-r border-gray-100 font-medium text-gray-900">
+                        <div className="flex items-center gap-1.5">
+                          {wh.name}
+                          {wh.is_system && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-gray-200 text-gray-600 uppercase tracking-wide">
+                              {t('inventory.whSystemBadge')}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 border-r border-gray-100 text-gray-500">
+                        {wh.location || '—'}
+                      </td>
+                      <td className="px-4 py-2.5 border-r border-gray-100 text-gray-500 max-w-[200px] truncate">
+                        {wh.description || '—'}
+                      </td>
+                      <td className="px-4 py-2.5 border-r border-gray-100 text-center">
+                        <span
+                          className={`px-2 py-0.5 rounded text-xs font-semibold ${cnt > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}
+                        >
+                          {cnt}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 border-r border-gray-100 text-center">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-medium ${wh.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+                        >
+                          {wh.is_active ? t('inventory.statusActive') : t('inventory.statusInactive')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 border-r border-gray-100 text-gray-500">
+                        {wh.created_date ? new Date(wh.created_date).toLocaleDateString() : '—'}
+                      </td>
+                      {canManage && (
+                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                          {wh.is_system ? (
+                            <div className="flex items-center justify-center text-gray-300" title={t('inventory.whSystemLocked')}>
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                                />
+                              </svg>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 justify-center">
+                              <button
+                                onClick={() => setEditingWh(wh)}
+                                className="p-1 text-gray-500 hover:text-indigo-600 rounded hover:bg-indigo-50 transition-colors"
+                              >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
                                     strokeWidth={2}
-                                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                                   />
                                 </svg>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1 justify-center">
-                                <button
-                                  onClick={() => setEditingWh(wh)}
-                                  className="p-1 text-gray-500 hover:text-indigo-600 rounded hover:bg-indigo-50 transition-colors"
-                                >
-                                  <svg
-                                    className="w-3.5 h-3.5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                    />
-                                  </svg>
-                                </button>
-                                <button
-                                  onClick={() => handleArchive(wh)}
-                                  disabled={deleting === wh.id}
-                                  title={t('inventory.archiveWarehouse')}
-                                  aria-label={t('inventory.archiveWarehouse')}
-                                  className="p-1 text-gray-500 hover:text-amber-600 rounded hover:bg-amber-50 transition-colors disabled:opacity-40"
-                                >
-                                  <svg
-                                    className="w-3.5 h-3.5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M5 8h14M5 8a2 2 0 01-2-2V4a2 2 0 012-2h14a2 2 0 012 2v2a2 2 0 01-2 2M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
-                                    />
-                                  </svg>
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        )}
-                      </tr>
-                    )
-                  })}
-                </React.Fragment>
-              ))}
+                              </button>
+                              <button
+                                onClick={() => handleArchive(wh)}
+                                disabled={deleting === wh.id}
+                                title={t('inventory.archiveWarehouse')}
+                                aria-label={t('inventory.archiveWarehouse')}
+                                className="p-1 text-gray-500 hover:text-amber-600 rounded hover:bg-amber-50 transition-colors disabled:opacity-40"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M5 8h14M5 8a2 2 0 01-2-2V4a2 2 0 012-2h14a2 2 0 012 2v2a2 2 0 01-2 2M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+                                  />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })
+                return out
+              })()}
             </tbody>
           </table>
         </div>
+      )}
+
+      {!whMissing && warehouses.length > 0 && orderedRows.length > 0 && (
+        <Pagination
+          total={orderedRows.length}
+          page={currentPage}
+          itemsPerPage={itemsPerPage}
+          setItemsPerPage={setItemsPerPage}
+          onPage={setCurrentPage}
+        />
       )}
 
       {selectedWh && (
