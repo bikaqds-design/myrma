@@ -148,6 +148,55 @@ export const deals = {
     }
     return data[0]
   },
+
+  /**
+   * Move a deal to a different pipeline. Stages belong to a pipeline, so the deal's
+   * current stage is meaningless in the destination — the caller must supply a stage
+   * from the target pipeline, and both columns are written in one update so the deal
+   * is never left pointing at a stage that doesn't exist in its pipeline.
+   *
+   * Separate from moveStage(), which deliberately validates against the deal's
+   * CURRENT pipeline and so can never express a cross-pipeline move.
+   */
+  async movePipeline(
+    id: string,
+    pipelineId: string,
+    stage: string,
+    actorEmail: string | null = null
+  ): Promise<DealRow> {
+    const { data: current, error: fetchError } = await supabase
+      .from('deals')
+      .select('pipeline_id, stage')
+      .eq('id', id)
+      .single()
+    if (fetchError) throw fetchError
+
+    const targetStages = await getPipelineStages(pipelineId)
+    if (!targetStages.some((s) => s.id === stage)) {
+      throw new Error(`Stage "${stage}" is not valid for the destination pipeline`)
+    }
+
+    const { data, error } = await supabase
+      .from('deals')
+      .update({ pipeline_id: pipelineId, stage, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+    if (error) throw error
+
+    if (current.pipeline_id !== pipelineId) {
+      const fromStages = await getPipelineStages(current.pipeline_id).catch(() => [])
+      activities
+        .logSystem(
+          'deal',
+          id,
+          `stage_changed|${stageName(fromStages, current.stage)}|${stageName(targetStages, stage)}`,
+          actorEmail
+        )
+        .catch(() => {})
+    }
+    return data[0]
+  },
+
   async markWon(id: string, actorEmail: string | null = null): Promise<DealRow> {
     const pipelineId = await getDealPipelineId(id)
     const stages = await getPipelineStages(pipelineId)

@@ -14,6 +14,7 @@ import { CreateDealModal, MarkLostModal, ReopenDealModal } from './_modals'
 import { ProductSearchInput } from './_shared'
 import { useURLTab } from '../../hooks/useURLTab'
 import { downloadQuotationPDF } from '../../lib/quotationPdf'
+import { dealValueFor, canMarkDealWon } from '../../lib/dealValue'
 
 const CARD = 'bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-[18px]'
 
@@ -103,19 +104,29 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     queryFn: () => db.products.list(),
     staleTime: 60_000,
   })
-  const { data: quotation = null, isLoading: quotationLoading } = useQuery({
-    queryKey: ['quotation', 'deal', dealId],
-    queryFn: () => db.quotations.getByDeal(dealId),
+  // A deal can hold any number of quotations, each independent: each converts to
+  // its own SO, and approving one does not affect the others.
+  const { data: quotations = [], isLoading: quotationLoading } = useQuery({
+    queryKey: ['quotations', 'deal', dealId],
+    queryFn: () => db.quotations.list({ dealId }),
     enabled: !!dealId,
   })
-  // When the QT has been converted to SO, fetch the resulting SO for navigation.
+  const convertedQtIds = useMemo(
+    () => quotations.filter((q) => q.status === 'converted').map((q) => q.id),
+    [quotations]
+  )
+  // One lookup for every converted QT, keyed back to its quotation for navigation.
   const { data: convertedSOs = [] } = useQuery({
-    queryKey: ['sos-by-quotation', quotation?.id],
-    queryFn: () => db.salesOrders.list({ quotationId: quotation.id }),
-    enabled: !!quotation?.id && quotation?.status === 'converted',
+    queryKey: ['sos-by-quotations', convertedQtIds],
+    queryFn: () => db.salesOrders.list({ quotationIds: convertedQtIds }),
+    enabled: convertedQtIds.length > 0,
     staleTime: 60_000,
   })
-  const convertedSO = convertedSOs[0] ?? null
+  const soByQuotationId = useMemo(() => {
+    const m = {}
+    for (const so of convertedSOs) if (!m[so.quotation_id]) m[so.quotation_id] = so
+    return m
+  }, [convertedSOs])
   const salesReps = usersList.filter((u) =>
     u.role === 'sales_rep' || u.role === 'manager' || u.role === 'admin' || u.role === 'super_admin'
   )
@@ -129,6 +140,15 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
   const [showLost, setShowLost] = useState(false)
   const [lostForm, setLostForm] = useState(EMPTY_LOST_FORM)
   const [showReopen, setShowReopen] = useState(false)
+
+  // Contacts are customer-scoped, so this follows the customer currently chosen in
+  // the edit form (which can now be changed) rather than the deal's saved customer.
+  const { data: dealContacts = [] } = useQuery({
+    queryKey: ['contacts', dealForm.customer_id],
+    queryFn: () => db.contacts.list(dealForm.customer_id),
+    enabled: showEdit && !!dealForm.customer_id,
+    staleTime: 60_000,
+  })
 
   // Inline value edit (only when no product lines)
   const [editingValue, setEditingValue] = useState(false)
@@ -163,13 +183,16 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
   const [tab, setTab] = useURLTab('tab', 'note')
 
   // Quotation editor state
-  const [editingQuotation, setEditingQuotation] = useState(false)
+  // Which quotation the editor is working on: null = closed, '' = creating a new
+  // one, otherwise the id of the quotation being edited.
+  const [editingQtId, setEditingQtId] = useState(null)
   const [qtLines, setQtLines] = useState([])
   const [qtValidity, setQtValidity] = useState('')
   const [qtPaymentTerms, setQtPaymentTerms] = useState('')
   const [qtNotes, setQtNotes] = useState('')
   const [savingQuotation, setSavingQuotation] = useState(false)
-  const [convertingSO, setConvertingSO] = useState(false)
+  // Id of the quotation currently converting, so only that row shows a spinner.
+  const [convertingSOId, setConvertingSOId] = useState(null)
 
   const canDo = (action) => {
     if (currentUserRole === 'super_admin' || currentUserRole === 'admin') return true
@@ -203,10 +226,32 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
       .slice(0, 10)
   }, [customers, customerSearch])
 
-  const saveField = async (field, value) => {
+  // Mirrors LeadDetails' FIELD_KEY_MAP so the deal log records field edits, not
+  // just stage/quotation events. ActivityChatter renders 'field_updated|key|value'
+  // by running the middle segment through t(), so these must be i18n keys.
+  const DEAL_FIELD_KEY_MAP = {
+    title:               'pipeline.dealTitle',
+    customer_id:         'pipeline.customer',
+    contact_id:          'customers.contactPerson',
+    value:               'leadModal.dealValue',
+    expected_close_date: 'pipeline.expectedCloseDate',
+    probability:         'pipeline.probability',
+    assigned_rep:        'leadModal.assignRep',
+  }
+
+  // displayValue lets callers log something human-readable where the stored value
+  // is an id (customer_id logs the company name, not a uuid).
+  const saveField = async (field, value, displayValue) => {
     try {
       await db.deals.update(deal.id, { [field]: value })
       toast.success(t('pipeline.dealUpdated'))
+      const fieldKey = DEAL_FIELD_KEY_MAP[field]
+      if (fieldKey) {
+        const shown = displayValue ?? value
+        db.activities
+          .logSystem('deal', deal.id, `field_updated|${fieldKey}|${shown || '—'}`, currentUserEmail)
+          .catch(() => {})
+      }
       refresh()
     } catch (error) {
       toast.error(t('pipeline.failedSave', { error: error.message }))
@@ -220,7 +265,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
   }
 
   const handleSelectCustomer = (c) => {
-    saveField('customer_id', c.id)
+    saveField('customer_id', c.id, c.company_name || c.contact_person)
     setEditingCustomer(false)
     setCustomerSearch('')
   }
@@ -258,7 +303,8 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     queryClient.invalidateQueries({ queryKey: ['deal', dealId] })
     queryClient.invalidateQueries({ queryKey: ['deals'] })
     queryClient.invalidateQueries({ queryKey: ['activities', 'deal', dealId] })
-    queryClient.invalidateQueries({ queryKey: ['quotation', 'deal', dealId] })
+    queryClient.invalidateQueries({ queryKey: ['quotations', 'deal', dealId] })
+    queryClient.invalidateQueries({ queryKey: ['sos-by-quotations'] })
   }
 
   const isClosed = deal?.status !== 'open'
@@ -275,6 +321,11 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     }
   }
 
+  // Opens CreateDealModal in edit mode — a single dialog for the fields that are
+  // otherwise separate inline edits. Stage is hidden in edit mode (it has its own
+  // control with move-stage logging), so the modal's editable set is exactly what
+  // handleSaveEdit persists. contact_id/pipeline_id ride along in form state but
+  // are not rendered — changing pipeline would orphan stage, which needs a remap.
   const handleOpenEdit = () => {
     setDealForm({
       title: deal.title || '',
@@ -293,20 +344,47 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
   }
 
   const handleSaveEdit = async () => {
-    if (!dealForm.title.trim()) {
+    if (!dealForm.title.trim() || !dealForm.customer_id) {
       toast.error(t('pipeline.createDealValidation'))
       return
     }
+    // Moving pipeline requires a destination stage — movePipeline rejects a stage
+    // that isn't in the target pipeline, so catch it here with a clearer message.
+    if (dealForm.pipeline_id !== deal.pipeline_id && !dealForm.stage) {
+      toast.error(t('pipeline.pipelineChangeStageHint'))
+      return
+    }
+    const patch = {
+      title: dealForm.title.trim(),
+      customer_id: dealForm.customer_id,
+      contact_id: dealForm.contact_id || null,
+      // With quotations present the value is derived from them, never typed in.
+      value: quotations.length > 0 ? deal.value : (dealForm.value ? Number(dealForm.value) : null),
+      probability: Number(dealForm.probability ?? 0),
+      expected_close_date: dealForm.expected_close_date || null,
+      assigned_rep: dealForm.assigned_rep || null,
+      notes: dealForm.notes || null,
+    }
     try {
-      await db.deals.update(deal.id, {
-        title: dealForm.title.trim(),
-        value: quotation ? deal.value : (dealForm.value ? Number(dealForm.value) : null),
-        probability: Number(dealForm.probability ?? 0),
-        expected_close_date: dealForm.expected_close_date || null,
-        assigned_rep: dealForm.assigned_rep || null,
-        notes: dealForm.notes || null,
-      })
+      await db.deals.update(deal.id, patch)
+      // A pipeline move rewrites pipeline_id + stage together and logs the move —
+      // deals.update() can't do it safely, since the old stage doesn't exist in the
+      // destination pipeline.
+      if (dealForm.pipeline_id && dealForm.pipeline_id !== deal.pipeline_id) {
+        await db.deals.movePipeline(deal.id, dealForm.pipeline_id, dealForm.stage, currentUserEmail)
+      }
       toast.success(t('pipeline.dealUpdated'))
+      // Log only the fields that actually changed, so a no-op save adds no noise.
+      for (const [field, fieldKey] of Object.entries(DEAL_FIELD_KEY_MAP)) {
+        if (patch[field] === undefined || patch[field] === deal[field]) continue
+        const shown =
+          field === 'customer_id' ? dealForm.customer_label
+          : field === 'contact_id' ? dealContacts.find((c) => c.id === patch[field])?.full_name
+          : patch[field]
+        db.activities
+          .logSystem('deal', deal.id, `field_updated|${fieldKey}|${shown || '—'}`, currentUserEmail)
+          .catch(() => {})
+      }
       setShowEdit(false)
       refresh()
     } catch (error) {
@@ -314,9 +392,34 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     }
   }
 
+  // Archive replaces the old "Cancel" action: nothing is deleted or status-flipped,
+  // the QT just moves to the Archive tab on /sales. Uses the same setArchived call
+  // that page uses, so the two stay in sync by construction.
+  const handleToggleArchiveQuotation = async (qt) => {
+    const nowArchived = !qt.archived
+    try {
+      await db.salesDocuments.setArchived('quotation', qt.id, nowArchived, currentUserEmail)
+      toast.success(t(nowArchived ? 'salesDocuments.archivedToast' : 'salesDocuments.restoredToast'))
+      // Archiving removes a quotation from the deal's value; restoring adds it back.
+      await syncDealValue(quotations.map((q) => (q.id === qt.id ? { ...q, archived: nowArchived } : q)))
+      refresh()
+    } catch (error) {
+      toast.error(t('pipeline.failedSave', { error: error.message }))
+    }
+  }
+
   const handleMarkWon = async () => {
+    // A deal with quotations can only be won once at least one is converted to a
+    // Sales Order — otherwise its "actual" value would be 0 and the win wouldn't
+    // be backed by a real order. Deals with no quotations are unaffected.
+    if (!canMarkDealWon(quotations)) {
+      toast.error(t('pipeline.wonNeedsConvertedQuotation'))
+      return
+    }
     try {
       await db.deals.markWon(deal.id, currentUserEmail)
+      // Value flips from forecast to actual now that the deal is closed.
+      await syncDealValue(quotations, 'won')
       toast.success(t('pipeline.dealMarkedWon'))
       refresh()
     } catch (error) {
@@ -327,6 +430,8 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
   const handleReopen = async (stageId) => {
     try {
       await db.deals.reopen(deal.id, stageId, currentUserEmail)
+      // Back to forecast: the value climbs again to include pending quotations.
+      await syncDealValue(quotations, 'open')
       toast.success(t('pipeline.dealReopened'))
       setShowReopen(false)
       refresh()
@@ -339,6 +444,8 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     if (!lostForm.reason.trim()) return
     try {
       await db.deals.markLost(deal.id, lostForm.reason.trim(), currentUserEmail)
+      // Closed: value drops to whatever actually converted (often nothing).
+      await syncDealValue(quotations, 'lost')
       toast.success(t('pipeline.dealMarkedLost'))
       setShowLost(false)
       setLostForm(EMPTY_LOST_FORM)
@@ -359,20 +466,35 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     }
   }
 
-  const openQuotationEditor = () => {
-    if (quotation) {
-      setQtLines(quotation.line_items.length > 0 ? quotation.line_items : [{ ...EMPTY_QT_LINE }])
-      setQtValidity(quotation.validity_until ?? '')
-      setQtPaymentTerms(quotation.payment_terms ?? '')
-      setQtNotes(quotation.notes ?? '')
+  // Value rules live in src/lib/dealValue.ts (pure + unit-tested) — see that file
+  // for the forecast-vs-actual contract.
+  //
+  // dealStatus is passed explicitly because callers often need the value for the
+  // status the deal is ABOUT to have (marking won, reopening), not its current one.
+  const syncDealValue = async (list, dealStatus = deal.status) => {
+    // Deals with no quotations carry a hand-typed value — never overwrite it.
+    if (list.length === 0) return
+    const total = dealValueFor(list, dealStatus)
+    await db.deals.update(deal.id, { value: total || null })
+  }
+
+  // Pass a quotation to edit it, or nothing to start a new one on this deal.
+  const openQuotationEditor = (qt) => {
+    if (qt) {
+      setQtLines(qt.line_items.length > 0 ? qt.line_items : [{ ...EMPTY_QT_LINE }])
+      setQtValidity(qt.validity_until ?? '')
+      setQtPaymentTerms(qt.payment_terms ?? '')
+      setQtNotes(qt.notes ?? '')
+      setEditingQtId(qt.id)
     } else {
       setQtLines([{ ...EMPTY_QT_LINE }])
       setQtValidity('')
       setQtPaymentTerms('')
       setQtNotes('')
+      setEditingQtId('')
     }
-    setEditingQuotation(true)
   }
+  const closeQuotationEditor = () => setEditingQtId(null)
 
   const updateQtLine = (i, field, val) =>
     setQtLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, [field]: val } : l)))
@@ -388,38 +510,41 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
   const removeQtLine = (i) => setQtLines((prev) => prev.filter((_, idx) => idx !== i))
 
   const saveQuotation = async () => {
+    const isNew = !editingQtId
     setSavingQuotation(true)
     try {
       const cleanedLines = qtLines.filter((l) => l.product_name.trim())
+      const fields = {
+        line_items: cleanedLines,
+        validity_until: qtValidity || null,
+        payment_terms: qtPaymentTerms || null,
+        notes: qtNotes || null,
+      }
       let saved
-      if (quotation) {
-        saved = await db.quotations.update(quotation.id, {
-          line_items: cleanedLines,
-          validity_until: qtValidity || null,
-          payment_terms: qtPaymentTerms || null,
-          notes: qtNotes || null,
-        })
-        toast.success(t('salesDocs.successUpdated'))
-      } else {
+      if (isNew) {
         saved = await db.quotations.create({
+          ...fields,
           customer_id: deal.customer_id,
           deal_id: deal.id,
-          line_items: cleanedLines,
-          validity_until: qtValidity || null,
-          payment_terms: qtPaymentTerms || null,
-          notes: qtNotes || null,
           assigned_rep: deal.assigned_rep,
           created_by: currentUserEmail,
         })
         toast.success(t('salesDocs.successCreated'))
-      }
-      await db.deals.update(deal.id, { value: saved.total || null })
-      if (!quotation) {
         db.activities.logSystem('deal', deal.id, `quotation_created|${saved.qt_code}`, currentUserEmail).catch(() => {})
+      } else {
+        saved = await db.quotations.update(editingQtId, fields)
+        toast.success(t('salesDocs.successUpdated'))
       }
-      setEditingQuotation(false)
+      // Deal value = sum of every open quotation, so replace this one's contribution
+      // with its new total (the cached list still holds the pre-save figure).
+      await syncDealValue(
+        isNew
+          ? [...quotations, saved]
+          : quotations.map((q) => (q.id === saved.id ? saved : q))
+      )
+      closeQuotationEditor()
       refresh()
-    } catch (error) {
+    } catch {
       toast.error(t('salesDocs.errorSaveFailed'))
     } finally {
       setSavingQuotation(false)
@@ -434,20 +559,34 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     reopen: 'quotation_reopened',
   }
 
+  // The status each action lands the quotation on, so the deal value can be
+  // recomputed without waiting for the list to refetch. Declining or cancelling
+  // drops that quotation out of the forecast entirely.
+  const ACTION_RESULT_STATUS = {
+    markSent: 'sent',
+    markAccepted: 'accepted',
+    markDeclined: 'declined',
+    cancel: 'cancelled',
+    reopen: 'draft',
+  }
+
+  const withQtStatus = (qtId, status) =>
+    quotations.map((q) => (q.id === qtId ? { ...q, status } : q))
+
   // Raise the approval-pool activity that surfaces in the Activities page.
   // Format: approval|docType|docId|code|total|customer — parsed there to render
   // the Source badge and dispatch the approve/reject action to this quotation.
-  const createApprovalActivity = () => {
+  const createApprovalActivity = (qt) => {
     const customerName = customer?.company_name || customer?.contact_person || '—'
     return db.activities.create({
       related_type: 'deal',
       related_id: deal.id,
       type: 'approval',
-      title: `approval|quotation|${quotation.id}|${quotation.qt_code}|${quotation.total ?? 0}|${customerName}`,
+      title: `approval|quotation|${qt.id}|${qt.qt_code}|${qt.total ?? 0}|${customerName}`,
       // Always set a due_date — listAllPlanned() filters out null-due_date rows,
       // so a null here would hide the approval from the Activities page.
-      due_date: quotation.validity_until || new Date().toISOString(),
-      assigned_rep: quotation.assigned_rep || null,
+      due_date: qt.validity_until || new Date().toISOString(),
+      assigned_rep: qt.assigned_rep || null,
       outcome_notes: null,
       created_by: currentUserEmail,
     }).catch((err) => {
@@ -456,16 +595,18 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     })
   }
 
-  const handleQuotationStatus = async (action) => {
-    if (!quotation) return
+  const handleQuotationStatus = async (action, qt) => {
+    if (!qt) return
     try {
-      await db.quotations[action](quotation.id)
+      await db.quotations[action](qt.id)
       toast.success(t('pipeline.quotationStatusUpdated'))
       const kind = ACTION_LOG_KIND[action]
       if (kind) {
-        db.activities.logSystem('deal', deal.id, `${kind}|${quotation.qt_code}`, currentUserEmail).catch(() => {})
+        db.activities.logSystem('deal', deal.id, `${kind}|${qt.qt_code}`, currentUserEmail).catch(() => {})
       }
-      if (action === 'markSent') createApprovalActivity()
+      const nextStatus = ACTION_RESULT_STATUS[action]
+      if (nextStatus) await syncDealValue(withQtStatus(qt.id, nextStatus))
+      if (action === 'markSent') createApprovalActivity(qt)
       refresh()
     } catch {
       toast.error(t('salesDocs.errorSaveFailed'))
@@ -474,12 +615,14 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
 
   // Reopen a declined/cancelled quotation straight back into the approval queue:
   // flip it to 'sent' and raise a fresh approval activity.
-  const handleReopenForApproval = async () => {
-    if (!quotation) return
+  const handleReopenForApproval = async (qt) => {
+    if (!qt) return
     try {
-      await db.quotations.markSent(quotation.id)
-      db.activities.logSystem('deal', deal.id, `quotation_reopened|${quotation.qt_code}`, currentUserEmail).catch(() => {})
-      createApprovalActivity()
+      await db.quotations.markSent(qt.id)
+      db.activities.logSystem('deal', deal.id, `quotation_reopened|${qt.qt_code}`, currentUserEmail).catch(() => {})
+      // Reopening a dead quotation puts its value back into the forecast.
+      await syncDealValue(withQtStatus(qt.id, 'sent'))
+      createApprovalActivity(qt)
       toast.success(t('pipeline.quotationStatusUpdated'))
       refresh()
     } catch {
@@ -487,32 +630,49 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     }
   }
 
-  const handleConvertToSO = async () => {
-    if (!quotation) return
-    const freeLines = db.quotations.freeFormLines(quotation)
+  const handleConvertToSO = async (qt) => {
+    if (!qt) return
+    const freeLines = db.quotations.freeFormLines(qt)
     if (freeLines.length > 0) {
       toast.error(t('pipeline.quotationFreeFormError', { count: freeLines.length }))
       return
     }
-    setConvertingSO(true)
+    setConvertingSOId(qt.id)
     try {
-      await db.quotations.convertToSalesOrder(quotation.id, currentUserEmail)
+      await db.quotations.convertToSalesOrder(qt.id, currentUserEmail)
       toast.success(t('salesDocs.successConverted'))
-      db.activities.logSystem('deal', deal.id, `quotation_converted|${quotation.qt_code}`, currentUserEmail).catch(() => {})
+      db.activities.logSystem('deal', deal.id, `quotation_converted|${qt.qt_code}`, currentUserEmail).catch(() => {})
+      // No change while the deal is open (converted still counts as live), but it
+      // does change what the deal would be worth once closed.
+      await syncDealValue(withQtStatus(qt.id, 'converted'))
       refresh()
     } catch {
       toast.error(t('salesDocs.errorConvertFailed'))
     } finally {
-      setConvertingSO(false)
+      setConvertingSOId(null)
     }
   }
 
-  const handleApproveQuotation = async (activityId) => {
-    if (!quotation) return
+  // The approval activity encodes its target as approval|quotation|<id>|... — with
+  // several quotations per deal the activity is the only thing that says which one.
+  // Falls back to the sole quotation for legacy activities raised before this.
+  const quotationForActivity = (activity) => {
+    const id = activity?.title?.split('|')[2]
+    return quotations.find((q) => q.id === id) ?? (quotations.length === 1 ? quotations[0] : null)
+  }
+
+  const resolveApproval = async (activityId, activity, action, logKind) => {
+    const qt = quotationForActivity(activity)
+    if (!qt) {
+      toast.error(t('salesDocs.errorSaveFailed'))
+      return
+    }
     try {
-      await db.quotations.markAccepted(quotation.id)
-      await db.activities.complete(activityId, `Approved by ${currentUserEmail}`)
-      db.activities.logSystem('deal', deal.id, `quotation_accepted|${quotation.qt_code}`, currentUserEmail).catch(() => {})
+      await db.quotations[action](qt.id)
+      await db.activities.complete(activityId, `${logKind === 'quotation_accepted' ? 'Approved' : 'Rejected'} by ${currentUserEmail}`)
+      db.activities.logSystem('deal', deal.id, `${logKind}|${qt.qt_code}`, currentUserEmail).catch(() => {})
+      // Rejecting drops this quotation out of the deal's forecast.
+      await syncDealValue(withQtStatus(qt.id, ACTION_RESULT_STATUS[action]))
       toast.success(t('pipeline.quotationStatusUpdated'))
       refresh()
     } catch {
@@ -520,21 +680,13 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     }
   }
 
-  const handleRejectQuotation = async (activityId) => {
-    if (!quotation) return
-    try {
-      await db.quotations.markDeclined(quotation.id)
-      await db.activities.complete(activityId, `Rejected by ${currentUserEmail}`)
-      db.activities.logSystem('deal', deal.id, `quotation_declined|${quotation.qt_code}`, currentUserEmail).catch(() => {})
-      toast.success(t('pipeline.quotationStatusUpdated'))
-      refresh()
-    } catch {
-      toast.error(t('salesDocs.errorSaveFailed'))
-    }
-  }
+  const handleApproveQuotation = (activityId, activity) =>
+    resolveApproval(activityId, activity, 'markAccepted', 'quotation_accepted')
+  const handleRejectQuotation = (activityId, activity) =>
+    resolveApproval(activityId, activity, 'markDeclined', 'quotation_declined')
 
-  const handleDownloadPDF = () =>
-    downloadQuotationPDF({ quotation, customer, relatedType: 'deal', relatedId: deal.id })
+  const handleDownloadPDF = (qt) =>
+    downloadQuotationPDF({ quotation: qt, customer, relatedType: 'deal', relatedId: deal.id })
 
   if (isLoading) return <PageSkeleton />
   if (isError || !deal) {
@@ -545,9 +697,12 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     )
   }
 
-  const hasQuotation = !!quotation
+  const hasQuotation = quotations.length > 0
   const canApprove = ['manager', 'admin', 'super_admin'].includes(currentUserRole)
-  const displayValue = hasQuotation ? (quotation?.total ?? 0) : Number(deal.value || 0)
+  const displayValue = hasQuotation ? dealValueFor(quotations, deal.status) : Number(deal.value || 0)
+  // A deal with quotations needs at least one converted to a Sales Order before it
+  // can be won; deals with no quotations at all are unaffected.
+  const canMarkWon = canMarkDealWon(quotations)
 
   const qtEditTotal = qtLines.reduce((sum, l) => {
     const base = (Number(l.qty) || 0) * (Number(l.unit_price) || 0)
@@ -555,6 +710,82 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     const net = base - disc
     return sum + net + net * ((Number(l.tax_pct) || 0) / 100)
   }, 0)
+
+  // One editor, reused for "new quotation" and "edit existing" — only ever one is
+  // open at a time (editingQtId), so a single node is enough.
+  const quotationEditorNode = (
+    <div>
+      <div className="grid grid-cols-[1fr_40px_80px_50px_50px_24px] gap-1.5 text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase mb-1.5 px-1">
+        <span>{t('salesDocs.lineProduct')}</span>
+        <span className="text-center">{t('salesDocs.lineQty')}</span>
+        <span className="text-right">{t('salesDocs.lineUnitPrice')}</span>
+        <span className="text-center">{t('salesDocs.lineDiscount')}</span>
+        <span className="text-center">{t('salesDocs.lineTax')}</span>
+        <span />
+      </div>
+      <div className="space-y-1.5">
+        {qtLines.map((l, i) => (
+          <div key={i} className="grid grid-cols-[1fr_40px_80px_50px_50px_24px] gap-1.5 items-center">
+            <ProductSearchInput
+              value={l.product_name}
+              onChange={(text) => updateQtLine(i, 'product_name', text)}
+              onSelectProduct={(p) => selectQtProduct(i, p)}
+              products={products}
+              placeholder={t('pipeline.lineProductPlaceholder')}
+              className="flex-1"
+              inputClassName="w-full px-2 py-1.5 border border-gray-300 dark:border-[#212a38] dark:bg-[#0f1520] dark:text-[#e8ebf0] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm bg-white placeholder-gray-400 transition-colors"
+            />
+            <Input type="number" min="1" value={l.qty} onChange={(e) => updateQtLine(i, 'qty', e.target.value)} className="w-10 text-sm text-center !px-1" />
+            <Input type="number" min="0" value={l.unit_price} onChange={(e) => updateQtLine(i, 'unit_price', e.target.value)} className="w-20 text-sm text-right !px-1.5" />
+            <Input type="number" min="0" max="100" value={l.discount_pct ?? ''} onChange={(e) => updateQtLine(i, 'discount_pct', e.target.value !== '' ? Number(e.target.value) : null)} placeholder="0" className="w-12 text-sm text-center !px-1" />
+            <Input type="number" min="0" max="100" value={l.tax_pct ?? ''} onChange={(e) => updateQtLine(i, 'tax_pct', e.target.value !== '' ? Number(e.target.value) : null)} placeholder="0" className="w-12 text-sm text-center !px-1" />
+            <button onClick={() => removeQtLine(i)} className="w-6 h-6 flex items-center justify-center text-red-400 hover:text-red-600 text-base">×</button>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 mt-3">
+        <div>
+          <label className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-1 block">{t('salesDocs.validityUntil')}</label>
+          <Input type="date" value={qtValidity} onChange={(e) => setQtValidity(e.target.value)} className="w-full text-sm" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-1 block">{t('salesDocs.paymentTerms')}</label>
+          <Input value={qtPaymentTerms} onChange={(e) => setQtPaymentTerms(e.target.value)} placeholder="e.g. Net 30" className="w-full text-sm" />
+        </div>
+      </div>
+
+      <div className="mt-3">
+        <label className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-1 block">{t('pipeline.quotationNotes')}</label>
+        <textarea
+          value={qtNotes}
+          onChange={(e) => setQtNotes(e.target.value)}
+          placeholder={t('pipeline.quotationNotesPlaceholder')}
+          rows={4}
+          className="w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-xl text-sm bg-[#f8f9fb] dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
+        />
+      </div>
+
+      <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#e6e9ef] dark:border-[#212a38]">
+        <div className="flex items-center gap-3">
+          <button onClick={addQtLine} className="text-sm text-indigo-600 dark:text-[#a5b4fc] hover:underline">
+            + {t('salesDocs.addLine')}
+          </button>
+          <span className="text-xs text-gray-400 dark:text-[#4a5568]">
+            {t('salesDocs.grandTotal')}: {qtEditTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })} {t('pipeline.currency')}
+          </span>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={closeQuotationEditor}>
+            {t('common.cancel')}
+          </Button>
+          <Button size="sm" onClick={saveQuotation} loading={savingQuotation}>
+            {t('common.save')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
 
   const TAB_CLS = (active) =>
     `px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
@@ -575,6 +806,11 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
           ← {t('common.back')}
         </button>
         <div className="flex items-center gap-2">
+          {canEditDeal && (
+            <Button variant="secondary" size="sm" onClick={handleOpenEdit}>
+              {t('pipeline.editDeal')}
+            </Button>
+          )}
           {isClosed && canDo('edit') && (
             <Button variant="secondary" size="sm" onClick={() => setShowReopen(true)}>
               {t('pipeline.reopenDeal')}
@@ -802,7 +1038,13 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
               {canDo('edit') && (
                 <button
                   onClick={handleMarkWon}
-                  className="px-3 py-1 text-xs rounded-full font-medium bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors"
+                  disabled={!canMarkWon}
+                  title={!canMarkWon ? t('pipeline.wonNeedsConvertedQuotation') : undefined}
+                  className={`px-3 py-1 text-xs rounded-full font-medium transition-colors ${
+                    canMarkWon
+                      ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/40'
+                      : 'bg-gray-100 dark:bg-[#1a2230] text-gray-400 dark:text-[#4a5568] cursor-not-allowed'
+                  }`}
                 >
                   ✓ {t('pipeline.markWon')}
                 </button>
@@ -880,9 +1122,10 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
             </button>
             <button onClick={() => setTab('quotation')} className={TAB_CLS(tab === 'quotation')}>
               {t('pipeline.quotationTab')}
+              {/* A single QT still shows its code; several show the count instead. */}
               {hasQuotation && (
                 <span className="ml-1.5 text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-[#a5b4fc] px-1.5 py-0.5 rounded-full">
-                  {quotation.qt_code}
+                  {quotations.length === 1 ? quotations[0].qt_code : quotations.length}
                 </span>
               )}
             </button>
@@ -911,262 +1154,206 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
               />
             )}
 
-            {/* Quotation tab */}
+            {/* Quotation tab — a deal can hold any number of quotations, each
+                independent: its own approval, its own conversion to a Sales Order. */}
             {tab === 'quotation' && (
               <div>
                 {quotationLoading ? (
                   <div className="flex justify-center py-6"><Spinner /></div>
-                ) : !quotation && !editingQuotation ? (
-                  <div className="py-6 text-center">
-                    <p className="text-sm text-gray-400 dark:text-[#4a5568] mb-3">{t('pipeline.noQuotation')}</p>
-                    {canEditDeal && (
-                      <Button size="sm" onClick={openQuotationEditor}>+ {t('pipeline.createQuotation')}</Button>
-                    )}
-                  </div>
                 ) : (
-                  <div>
-                    {/* Quotation header (view mode only) */}
-                    {quotation && !editingQuotation && (
-                      <>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-mono font-semibold text-[#4338ca] dark:text-[#a5b4fc] bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 rounded">
-                              {quotation.qt_code}
-                            </span>
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${qtStatusCls(quotation.status)}`}>
-                              {t(qtApprovalLabelKey(quotation.status))}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-indigo-600 dark:text-[#a5b4fc]">
-                              {(quotation.total ?? 0).toLocaleString()} {t('pipeline.currency')}
-                            </span>
-                            {quotation.status === 'accepted' && canApprove && (
-                              <Button variant="secondary" size="sm" onClick={handleDownloadPDF}>
-                                {t('salesDocs.downloadPDF')}
-                              </Button>
-                            )}
-                            {canEditDeal && !['cancelled', 'expired', 'declined', 'converted'].includes(quotation.status) && (
-                              <Button variant="secondary" size="sm" onClick={openQuotationEditor}>
-                                {t('common.edit')}
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        {(quotation.validity_until || quotation.payment_terms) && (
-                          <div className="flex flex-wrap gap-3 mb-3 text-xs text-gray-500 dark:text-[#9aa4b2]">
-                            {quotation.validity_until && (
-                              <span>{t('salesDocs.validityUntil')}: {new Date(quotation.validity_until).toLocaleDateString()}</span>
-                            )}
-                            {quotation.payment_terms && (
-                              <span>{t('salesDocs.paymentTerms')}: {quotation.payment_terms}</span>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    {/* Line items — view mode */}
-                    {quotation && !editingQuotation && (
-                      <div>
-                        {quotation.line_items.length === 0 ? (
-                          <p className="text-sm text-gray-400 dark:text-[#4a5568]">{t('pipeline.noProductLines')}</p>
-                        ) : (
-                          <>
-                            <div className="grid grid-cols-[1fr_40px_80px_50px_50px_70px] gap-1.5 text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase mb-1.5 px-1">
-                              <span>{t('salesDocs.lineProduct')}</span>
-                              <span className="text-center">{t('salesDocs.lineQty')}</span>
-                              <span className="text-right">{t('salesDocs.lineUnitPrice')}</span>
-                              <span className="text-center">{t('salesDocs.lineDiscount')}</span>
-                              <span className="text-center">{t('salesDocs.lineTax')}</span>
-                              <span className="text-right">{t('salesDocs.lineSubtotal')}</span>
-                            </div>
-                            <div className="space-y-1.5">
-                              {quotation.line_items.map((l, i) => {
-                                const base = l.qty * l.unit_price
-                                const disc = base * ((l.discount_pct || 0) / 100)
-                                const net = base - disc
-                                const tax = net * ((l.tax_pct || 0) / 100)
-                                return (
-                                  <div key={i} className="grid grid-cols-[1fr_40px_80px_50px_50px_70px] gap-1.5 items-center text-sm text-gray-700 dark:text-[#e8ebf0] px-1">
-                                    <span className="truncate">{l.product_name}</span>
-                                    <span className="text-center text-gray-500 dark:text-[#9aa4b2]">{l.qty}</span>
-                                    <span className="text-right text-gray-500 dark:text-[#9aa4b2]">{Number(l.unit_price).toLocaleString()}</span>
-                                    <span className="text-center text-gray-400 dark:text-[#4a5568] text-xs">{l.discount_pct ? `${l.discount_pct}%` : '—'}</span>
-                                    <span className="text-center text-gray-400 dark:text-[#4a5568] text-xs">{l.tax_pct ? `${l.tax_pct}%` : '—'}</span>
-                                    <span className="text-right font-medium">{(net + tax).toLocaleString()}</span>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                            <div className="mt-2 pt-2 border-t border-[#e6e9ef] dark:border-[#212a38] space-y-0.5 text-xs text-gray-500 dark:text-[#9aa4b2]">
-                              {quotation.discount_amount > 0 && (
-                                <div className="flex justify-between">
-                                  <span>{t('salesDocs.totalDiscount')}</span>
-                                  <span>-{quotation.discount_amount.toLocaleString()}</span>
-                                </div>
-                              )}
-                              {quotation.tax_amount > 0 && (
-                                <div className="flex justify-between">
-                                  <span>{t('salesDocs.totalTax')}</span>
-                                  <span>+{quotation.tax_amount.toLocaleString()}</span>
-                                </div>
-                              )}
-                              <div className="flex justify-between pt-1 text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">
-                                <span>{t('salesDocs.grandTotal')}</span>
-                                <span className="text-indigo-600 dark:text-[#a5b4fc]">{(quotation.total ?? 0).toLocaleString()} {t('pipeline.currency')}</span>
-                              </div>
-                            </div>
-                          </>
-                        )}
+                  <div className="space-y-3">
+                    {canEditDeal && editingQtId === null && (
+                      <div className="flex justify-end">
+                        <Button size="sm" onClick={() => openQuotationEditor()}>
+                          + {t('pipeline.createQuotation')}
+                        </Button>
                       </div>
                     )}
 
-                    {/* Line items — edit mode */}
-                    {editingQuotation && (
-                      <div>
-                        <div className="grid grid-cols-[1fr_40px_80px_50px_50px_24px] gap-1.5 text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase mb-1.5 px-1">
-                          <span>{t('salesDocs.lineProduct')}</span>
-                          <span className="text-center">{t('salesDocs.lineQty')}</span>
-                          <span className="text-right">{t('salesDocs.lineUnitPrice')}</span>
-                          <span className="text-center">{t('salesDocs.lineDiscount')}</span>
-                          <span className="text-center">{t('salesDocs.lineTax')}</span>
-                          <span />
-                        </div>
-                        <div className="space-y-1.5">
-                          {qtLines.map((l, i) => (
-                            <div key={i} className="grid grid-cols-[1fr_40px_80px_50px_50px_24px] gap-1.5 items-center">
-                              <ProductSearchInput
-                                value={l.product_name}
-                                onChange={(text) => updateQtLine(i, 'product_name', text)}
-                                onSelectProduct={(p) => selectQtProduct(i, p)}
-                                products={products}
-                                placeholder={t('pipeline.lineProductPlaceholder')}
-                                className="flex-1"
-                                inputClassName="w-full px-2 py-1.5 border border-gray-300 dark:border-[#212a38] dark:bg-[#0f1520] dark:text-[#e8ebf0] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm bg-white placeholder-gray-400 transition-colors"
-                              />
-                              <Input type="number" min="1" value={l.qty} onChange={(e) => updateQtLine(i, 'qty', e.target.value)} className="w-10 text-sm text-center !px-1" />
-                              <Input type="number" min="0" value={l.unit_price} onChange={(e) => updateQtLine(i, 'unit_price', e.target.value)} className="w-20 text-sm text-right !px-1.5" />
-                              <Input type="number" min="0" max="100" value={l.discount_pct ?? ''} onChange={(e) => updateQtLine(i, 'discount_pct', e.target.value !== '' ? Number(e.target.value) : null)} placeholder="0" className="w-12 text-sm text-center !px-1" />
-                              <Input type="number" min="0" max="100" value={l.tax_pct ?? ''} onChange={(e) => updateQtLine(i, 'tax_pct', e.target.value !== '' ? Number(e.target.value) : null)} placeholder="0" className="w-12 text-sm text-center !px-1" />
-                              <button onClick={() => removeQtLine(i)} className="w-6 h-6 flex items-center justify-center text-red-400 hover:text-red-600 text-base">×</button>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Extra fields: validity + payment terms */}
-                        <div className="grid grid-cols-2 gap-2 mt-3">
-                          <div>
-                            <label className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-1 block">{t('salesDocs.validityUntil')}</label>
-                            <Input type="date" value={qtValidity} onChange={(e) => setQtValidity(e.target.value)} className="w-full text-sm" />
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-1 block">{t('salesDocs.paymentTerms')}</label>
-                            <Input value={qtPaymentTerms} onChange={(e) => setQtPaymentTerms(e.target.value)} placeholder="e.g. Net 30" className="w-full text-sm" />
-                          </div>
-                        </div>
-
-                        {/* Notes / T&C */}
-                        <div className="mt-3">
-                          <label className="text-xs text-gray-500 dark:text-[#9aa4b2] mb-1 block">
-                            {t('pipeline.quotationNotes')}
-                          </label>
-                          <textarea
-                            value={qtNotes}
-                            onChange={(e) => setQtNotes(e.target.value)}
-                            placeholder={t('pipeline.quotationNotesPlaceholder')}
-                            rows={4}
-                            className="w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-xl text-sm bg-[#f8f9fb] dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#e6e9ef] dark:border-[#212a38]">
-                          <div className="flex items-center gap-3">
-                            <button onClick={addQtLine} className="text-sm text-indigo-600 dark:text-[#a5b4fc] hover:underline">
-                              + {t('salesDocs.addLine')}
-                            </button>
-                            <span className="text-xs text-gray-400 dark:text-[#4a5568]">
-                              {t('salesDocs.grandTotal')}: {qtEditTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })} {t('pipeline.currency')}
-                            </span>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button variant="secondary" size="sm" onClick={() => setEditingQuotation(false)}>
-                              {t('common.cancel')}
-                            </Button>
-                            <Button size="sm" onClick={saveQuotation} loading={savingQuotation}>
-                              {t('common.save')}
-                            </Button>
-                          </div>
-                        </div>
+                    {/* Editor for a brand-new quotation sits above the existing list */}
+                    {editingQtId === '' && (
+                      <div className="border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-3">
+                        {quotationEditorNode}
                       </div>
                     )}
 
-                    {/* Notes / T&C (view mode) */}
-                    {quotation && !editingQuotation && quotation.notes && (
-                      <div className="mt-3 pt-3 border-t border-[#e6e9ef] dark:border-[#212a38]">
-                        <p className="text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">
-                          {t('pipeline.quotationNotes')}
-                        </p>
-                        <p className="text-sm text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap leading-relaxed">
-                          {quotation.notes}
-                        </p>
+                    {quotations.length === 0 && editingQtId === null && (
+                      <div className="py-6 text-center">
+                        <p className="text-sm text-gray-400 dark:text-[#4a5568]">{t('pipeline.noQuotation')}</p>
                       </div>
                     )}
 
-                    {/* Status action buttons (view mode only) */}
-                    {quotation && !editingQuotation && quotation.status !== 'expired' && (
-                      <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-[#e6e9ef] dark:border-[#212a38]">
-                        {quotation.status === 'converted' ? (
-                          // Locked — QT has been converted to an SO. Show navigation only.
-                          <>
-                            {convertedSO && (
-                              <button
-                                onClick={() => navigate(`/sales/sales_order/${convertedSO.id}`)}
-                                className="inline-flex items-center gap-1 text-sm text-indigo-600 dark:text-[#a5b4fc] hover:underline"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                                </svg>
-                                {t('salesDocuments.qtViewSO')}: <span className="font-mono ml-0.5">{convertedSO.so_code}</span>
-                              </button>
-                            )}
-                            {canApprove && (
-                              <Button variant="secondary" size="sm" onClick={handleDownloadPDF}>
-                                {t('salesDocs.downloadPDF')}
-                              </Button>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            {quotation.status === 'draft' && canEditDeal && (
-                              <Button variant="secondary" size="sm" onClick={() => handleQuotationStatus('markSent')}>
-                                {t('pipeline.sendForApproval')}
-                              </Button>
-                            )}
-                            {quotation.status === 'sent' && (
-                              <span className="text-xs text-gray-500 dark:text-[#9aa4b2] self-center italic">
-                                {t('pipeline.qtAwaitingApproval')}
+                    {quotations.map((qt) => {
+                      const convertedSO = soByQuotationId[qt.id] ?? null
+                      if (editingQtId === qt.id) {
+                        return (
+                          <div key={qt.id} className="border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-3">
+                            {quotationEditorNode}
+                          </div>
+                        )
+                      }
+                      return (
+                        <div key={qt.id} className="border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-mono font-semibold text-[#4338ca] dark:text-[#a5b4fc] bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 rounded">
+                                {qt.qt_code}
                               </span>
-                            )}
-                            {['draft', 'sent', 'accepted'].includes(quotation.status) && canEditDeal && (
-                              <Button variant="danger" size="sm" onClick={() => handleQuotationStatus('cancel')}>
-                                {t('common.cancel')}
-                              </Button>
-                            )}
-                            {quotation.status === 'accepted' && (
-                              <Button size="sm" onClick={handleConvertToSO} loading={convertingSO}>
-                                {t('salesDocs.convertToSO')}
-                              </Button>
-                            )}
-                            {['cancelled', 'declined'].includes(quotation.status) && canEditDeal && (
-                              <Button variant="secondary" size="sm" onClick={handleReopenForApproval}>
-                                {t('pipeline.reopenForApproval')}
-                              </Button>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    )}
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${qtStatusCls(qt.status)}`}>
+                                {t(qtApprovalLabelKey(qt.status))}
+                              </span>
+                              {qt.archived && (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-[#1a2230] dark:text-[#9aa4b2]">
+                                  {t('salesDocuments.archivedBadge')}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-indigo-600 dark:text-[#a5b4fc]">
+                                {(qt.total ?? 0).toLocaleString()} {t('pipeline.currency')}
+                              </span>
+                              {qt.status === 'accepted' && canApprove && (
+                                <Button variant="secondary" size="sm" onClick={() => handleDownloadPDF(qt)}>
+                                  {t('salesDocs.downloadPDF')}
+                                </Button>
+                              )}
+                              {/* 'accepted' locks the QT: once approved it must not change,
+                                  or the approved figures and the SO could diverge. */}
+                              {canEditDeal && editingQtId === null && !['cancelled', 'expired', 'declined', 'converted', 'accepted'].includes(qt.status) && (
+                                <Button variant="secondary" size="sm" onClick={() => openQuotationEditor(qt)}>
+                                  {t('common.edit')}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+
+                          {(qt.validity_until || qt.payment_terms) && (
+                            <div className="flex flex-wrap gap-3 mb-3 text-xs text-gray-500 dark:text-[#9aa4b2]">
+                              {qt.validity_until && (
+                                <span>{t('salesDocs.validityUntil')}: {new Date(qt.validity_until).toLocaleDateString()}</span>
+                              )}
+                              {qt.payment_terms && (
+                                <span>{t('salesDocs.paymentTerms')}: {qt.payment_terms}</span>
+                              )}
+                            </div>
+                          )}
+
+                          {qt.line_items.length === 0 ? (
+                            <p className="text-sm text-gray-400 dark:text-[#4a5568]">{t('pipeline.noProductLines')}</p>
+                          ) : (
+                            <>
+                              <div className="grid grid-cols-[1fr_40px_80px_50px_50px_70px] gap-1.5 text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase mb-1.5 px-1">
+                                <span>{t('salesDocs.lineProduct')}</span>
+                                <span className="text-center">{t('salesDocs.lineQty')}</span>
+                                <span className="text-right">{t('salesDocs.lineUnitPrice')}</span>
+                                <span className="text-center">{t('salesDocs.lineDiscount')}</span>
+                                <span className="text-center">{t('salesDocs.lineTax')}</span>
+                                <span className="text-right">{t('salesDocs.lineSubtotal')}</span>
+                              </div>
+                              <div className="space-y-1.5">
+                                {qt.line_items.map((l, i) => {
+                                  const base = l.qty * l.unit_price
+                                  const disc = base * ((l.discount_pct || 0) / 100)
+                                  const net = base - disc
+                                  const tax = net * ((l.tax_pct || 0) / 100)
+                                  return (
+                                    <div key={i} className="grid grid-cols-[1fr_40px_80px_50px_50px_70px] gap-1.5 items-center text-sm text-gray-700 dark:text-[#e8ebf0] px-1">
+                                      <span className="truncate">{l.product_name}</span>
+                                      <span className="text-center text-gray-500 dark:text-[#9aa4b2]">{l.qty}</span>
+                                      <span className="text-right text-gray-500 dark:text-[#9aa4b2]">{Number(l.unit_price).toLocaleString()}</span>
+                                      <span className="text-center text-gray-400 dark:text-[#4a5568] text-xs">{l.discount_pct ? `${l.discount_pct}%` : '—'}</span>
+                                      <span className="text-center text-gray-400 dark:text-[#4a5568] text-xs">{l.tax_pct ? `${l.tax_pct}%` : '—'}</span>
+                                      <span className="text-right font-medium">{(net + tax).toLocaleString()}</span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                              <div className="mt-2 pt-2 border-t border-[#e6e9ef] dark:border-[#212a38] space-y-0.5 text-xs text-gray-500 dark:text-[#9aa4b2]">
+                                {qt.discount_amount > 0 && (
+                                  <div className="flex justify-between">
+                                    <span>{t('salesDocs.totalDiscount')}</span>
+                                    <span>-{qt.discount_amount.toLocaleString()}</span>
+                                  </div>
+                                )}
+                                {qt.tax_amount > 0 && (
+                                  <div className="flex justify-between">
+                                    <span>{t('salesDocs.totalTax')}</span>
+                                    <span>+{qt.tax_amount.toLocaleString()}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between pt-1 text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">
+                                  <span>{t('salesDocs.grandTotal')}</span>
+                                  <span className="text-indigo-600 dark:text-[#a5b4fc]">{(qt.total ?? 0).toLocaleString()} {t('pipeline.currency')}</span>
+                                </div>
+                              </div>
+                            </>
+                          )}
+
+                          {qt.notes && (
+                            <div className="mt-3 pt-3 border-t border-[#e6e9ef] dark:border-[#212a38]">
+                              <p className="text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide mb-1">
+                                {t('pipeline.quotationNotes')}
+                              </p>
+                              <p className="text-sm text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap leading-relaxed">
+                                {qt.notes}
+                              </p>
+                            </div>
+                          )}
+
+                          {qt.status !== 'expired' && (
+                            <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-[#e6e9ef] dark:border-[#212a38]">
+                              {qt.status === 'converted' ? (
+                                // Locked — this QT became an SO. Navigation only.
+                                <>
+                                  {convertedSO && (
+                                    <button
+                                      onClick={() => navigate(`/sales/sales_order/${convertedSO.id}`)}
+                                      className="inline-flex items-center gap-1 text-sm text-indigo-600 dark:text-[#a5b4fc] hover:underline"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                      </svg>
+                                      {t('salesDocuments.qtViewSO')}: <span className="font-mono ml-0.5">{convertedSO.so_code}</span>
+                                    </button>
+                                  )}
+                                  {/* No PDF button here: handleDownloadPDF emits the QUOTATION pdf,
+                                      which is the wrong document once the QT is converted. Use the
+                                      "View SO" link above and export the SO from its own page. */}
+                                </>
+                              ) : (
+                                <>
+                                  {qt.status === 'draft' && canEditDeal && (
+                                    <Button variant="secondary" size="sm" onClick={() => handleQuotationStatus('markSent', qt)}>
+                                      {t('pipeline.sendForApproval')}
+                                    </Button>
+                                  )}
+                                  {qt.status === 'sent' && (
+                                    <span className="text-xs text-gray-500 dark:text-[#9aa4b2] self-center italic">
+                                      {t('pipeline.qtAwaitingApproval')}
+                                    </span>
+                                  )}
+                                  {canEditDeal && (
+                                    <Button variant="secondary" size="sm" onClick={() => handleToggleArchiveQuotation(qt)}>
+                                      {t(qt.archived ? 'salesDocuments.restore' : 'salesDocuments.archive')}
+                                    </Button>
+                                  )}
+                                  {qt.status === 'accepted' && (
+                                    <Button size="sm" onClick={() => handleConvertToSO(qt)} loading={convertingSOId === qt.id}>
+                                      {t('salesDocs.convertToSO')}
+                                    </Button>
+                                  )}
+                                  {['cancelled', 'declined'].includes(qt.status) && canEditDeal && (
+                                    <Button variant="secondary" size="sm" onClick={() => handleReopenForApproval(qt)}>
+                                      {t('pipeline.reopenForApproval')}
+                                    </Button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -1208,7 +1395,9 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
           form={dealForm}
           setForm={setDealForm}
           customers={customers}
+          contacts={dealContacts}
           pipeline={pipeline}
+          pipelines={pipelines}
           salesReps={salesReps}
           editing={deal}
           hasProductLines={hasQuotation}

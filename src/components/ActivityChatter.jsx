@@ -423,14 +423,17 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                         </div>
                         {canApprove && onApproveActivity && onRejectActivity && (
                           <div className="flex gap-2 mt-2 ml-8">
+                            {/* The activity is passed alongside its id because its title
+                                encodes which document the approval targets — a parent may
+                                hold several. Extra arg; existing callers can ignore it. */}
                             <button
-                              onClick={() => onApproveActivity(a.id)}
+                              onClick={() => onApproveActivity(a.id, a)}
                               className="px-3 py-1 text-xs font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
                             >
                               ✓ {t('activityChatter.approvalApprove')}
                             </button>
                             <button
-                              onClick={() => onRejectActivity(a.id)}
+                              onClick={() => onRejectActivity(a.id, a)}
                               className="px-3 py-1 text-xs font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
                             >
                               ✗ {t('activityChatter.approvalReject')}

@@ -438,7 +438,9 @@ export default function SalesDocumentDetail({ docType, docId, currentUserRole: _
           {/* ── Quotation actions ── */}
           {isQuotation && !doc.archived && (
             <>
-              {!qtIsConverted && !['cancelled', 'expired', 'declined'].includes(n.status) && (
+              {/* 'accepted' locks the QT: once approved it must not change, or the
+                  approved figures and the resulting SO could diverge. */}
+              {!qtIsConverted && !['cancelled', 'expired', 'declined', 'accepted'].includes(n.status) && (
                 <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
                   {t('salesDocuments.edit')}
                 </Button>

@@ -107,11 +107,33 @@ function CustomerSearchField({ customers, value, label, onSelect }) {
 
 // ─── CREATE DEAL MODAL ──────────────────────────────────────────────────────
 
-export function CreateDealModal({ form, setForm, dealCode, customers, pipeline, salesReps, editing, hasProductLines, onSave, onClose }) {
+export function CreateDealModal({ form, setForm, dealCode, customers, contacts = [], pipeline, pipelines = [], salesReps, editing, hasProductLines, onSave, onClose }) {
   const { t } = useTranslation()
   const set = (key, val) => setForm((prev) => ({ ...prev, [key]: val }))
 
-  const stages = pipeline ? [...pipeline.stages].sort((a, b) => a.order - b.order).filter((s) => !s.is_won && !s.is_lost) : []
+  const openStages = (p) =>
+    p ? [...p.stages].sort((a, b) => a.order - b.order).filter((s) => !s.is_won && !s.is_lost) : []
+
+  // In edit mode the form's pipeline_id can differ from the deal's current one.
+  const selectedPipeline = pipelines.find((p) => p.id === form.pipeline_id) ?? pipeline
+  const stages = openStages(selectedPipeline)
+
+  // Stages belong to a pipeline, so moving pipelines invalidates the deal's stage.
+  // Surface the stage picker (normally hidden when editing) only for that case.
+  const pipelineChanged = !!editing && !!pipeline && form.pipeline_id !== pipeline.id
+
+  const changePipeline = (nextId) => {
+    const next = pipelines.find((p) => p.id === nextId)
+    const backToOriginal = nextId === pipeline?.id
+    setForm((prev) => ({
+      ...prev,
+      pipeline_id: nextId,
+      // Default to the destination's first open stage so the deal is never left on
+      // a stage that doesn't exist in its pipeline; switching back restores the
+      // stage the deal actually had.
+      stage: (backToOriginal ? editing?.stage : null) ?? openStages(next)[0]?.id ?? '',
+    }))
+  }
 
   return (
     <ModalOverlay onClose={onClose}>
@@ -138,22 +160,51 @@ export function CreateDealModal({ form, setForm, dealCode, customers, pipeline, 
           </Field>
 
           <Field label={t('pipeline.customer')} required>
-            {editing ? (
-              <p className="text-sm text-gray-700 dark:text-[#e8ebf0] py-2">{form.customer_label}</p>
-            ) : (
-              <CustomerSearchField
-                customers={customers}
-                value={form.customer_id}
-                label={form.customer_label}
-                onSelect={(c) => {
-                  set('customer_id', c ? c.id : '')
-                  set('customer_label', c ? c.company_name || c.contact_person : '')
-                }}
-              />
-            )}
+            <CustomerSearchField
+              customers={customers}
+              value={form.customer_id}
+              label={form.customer_label}
+              onSelect={(c) => {
+                set('customer_id', c ? c.id : '')
+                set('customer_label', c ? c.company_name || c.contact_person : '')
+                // Contacts belong to a customer — a stale contact_id from the previous
+                // customer would point at someone unrelated to the new one.
+                set('contact_id', '')
+              }}
+            />
           </Field>
 
-          {!editing && (
+          {/* Only shown when the selected customer actually has contacts — the create
+              flow passes none, and a dropdown whose only option is "No contact" is noise. */}
+          {contacts.length > 0 && (
+            <Field label={t('customers.contactPerson')}>
+              <Select value={form.contact_id || ''} onChange={(e) => set('contact_id', e.target.value)}>
+                <option value="">{t('pipeline.noContact')}</option>
+                {contacts.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.full_name}{c.title ? ` · ${c.title}` : ''}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
+          {/* Pipeline is editable, but only via a deliberate remap — see below. */}
+          {editing && pipelines.length > 1 && (
+            <Field label={t('pipeline.pipelineLabel')} required>
+              <Select value={form.pipeline_id} onChange={(e) => changePipeline(e.target.value)}>
+                {pipelines.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
+          {/* Stage: always on create; on edit only when the pipeline was changed, since
+              the deal's old stage does not exist in the destination pipeline. */}
+          {(!editing || pipelineChanged) && (
             <Field label={t('pipeline.stage')} required>
               <Select value={form.stage} onChange={(e) => set('stage', e.target.value)}>
                 {stages.map((s) => (
@@ -162,6 +213,11 @@ export function CreateDealModal({ form, setForm, dealCode, customers, pipeline, 
                   </option>
                 ))}
               </Select>
+              {pipelineChanged && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  {t('pipeline.pipelineChangeStageHint')}
+                </p>
+              )}
             </Field>
           )}
 

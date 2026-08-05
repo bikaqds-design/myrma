@@ -73,12 +73,15 @@ export const salesOrders = {
     status?: string
     assignedRep?: string
     quotationId?: string
+    /** Resolve SOs for several quotations at once — a deal can hold many. */
+    quotationIds?: string[]
   }): Promise<SalesOrderRow[]> {
     let q = supabase.from('sales_orders').select('*').order('created_at', { ascending: false })
     if (filters?.customerId) q = q.eq('customer_id', filters.customerId)
     if (filters?.status) q = q.eq('status', filters.status)
     if (filters?.assignedRep) q = q.eq('assigned_rep', filters.assignedRep)
     if (filters?.quotationId) q = q.eq('quotation_id', filters.quotationId)
+    if (filters?.quotationIds) q = q.in('quotation_id', filters.quotationIds)
     const { data, error } = await q
     if (error) {
       if (error.code === '42P01') return []

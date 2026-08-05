@@ -94,6 +94,10 @@ export const quotations = {
     return data as QuotationRow
   },
 
+  /**
+   * @deprecated A deal can hold many quotations — this returns only the most
+   * recent one and will silently hide the rest. Use list({ dealId }) instead.
+   */
   async getByDeal(dealId: string): Promise<QuotationRow | null> {
     const { data, error } = await supabase
       .from('quotations')
