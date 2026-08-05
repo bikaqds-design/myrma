@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev            # start dev server (Vite, port 5173)
 npm run build          # production build
 npm run preview        # preview production build
-npm test               # Vitest unit tests (277 tests, 7 suites) — run before every push
+npm test               # Vitest unit tests (305 tests, 9 suites) — run before every push
 npm run test:watch     # Vitest in watch mode
 npm run test:coverage  # test with coverage report
 npm run lint           # ESLint (0 errors target)
@@ -147,6 +147,8 @@ Many optional tables (e.g. `announcements`, `custom_field_definitions`, `invento
 - `permissions.ts` — `canDo(role, permissions, section, action)` helper + `ROLE_DEFAULT_PERMISSIONS` + `resolvePermissions(role, stored)`. `super_admin` and `admin` bypass all checks automatically.
 - `schemas.ts` — Zod validation schemas.
 - `safeStorage.ts` — `safeStorage.get(key, fallback)` / `safeStorage.set(key, value)` / `safeStorage.remove(key)`. All `localStorage` access must go through this helper — it silently catches quota errors and Safari private-mode restrictions. Never call `localStorage.*` directly.
+- `dealValue.ts` — `dealValueFor(quotations, dealStatus)` / `canMarkDealWon(quotations)`. Forecast-vs-actual deal-value rule (see Sales Documents below). Never re-implement inline.
+- `rmaStageMoves.ts` — `buildRmaMoves()`, the pure client half of the Warehouse R1 RMA auto-move.
 
 `.js` extensions in imports resolve to `.ts` files via Vite/TypeScript bundler resolution.
 
@@ -319,6 +321,12 @@ The remaining pages (`Dashboard`, `Reports`, `Invoices`, `PartsInventory`, `Cont
 ### Sales Documents & Accounting (CRM Sprint 6 + Accounting v1)
 
 Funnel: **Lead → Deal → Quotation → Sales Order → Invoice → Credit Note**, payments tracked separately against invoices. Lives at `/sales` and `/accounting`.
+
+**A deal holds MANY quotations (2026-08-05)** — each independent (own approval, own SO conversion). Use `quotations.list({ dealId })`; `getByDeal()` is `@deprecated` (returns only the newest). `salesOrders.list()` accepts `quotationIds[]`. `ActivityChatter` passes the activity object to `onApproveActivity`/`onRejectActivity` so the handler can tell which quotation an approval targets.
+
+**Deal value** (`src/lib/dealValue.ts`, unit-tested): `open` → Σ live quotations (`draft`/`sent`/`accepted`/`converted`) = forecast; `won`/`lost` → Σ converted only = actual. Cancelled/declined/expired/archived count toward neither. Deals with **no** quotations keep a hand-typed value — never overwrite it. Keyed off `deal.status`, never stage names (stages are user-configurable). `canMarkDealWon()` blocks a win until something has converted. Re-sync on every quotation transition **and** on deal won/lost/**reopen**.
+
+**Pipeline change needs a stage remap:** `deals.movePipeline()` validates the stage against the destination pipeline and writes `pipeline_id` + `stage` together. `moveStage()` validates against the deal's *current* pipeline and cannot express the move.
 
 **Approval-pool pattern:** an `activities` row with `type: 'approval'` (title encodes `approval|docType|docId|code|total|customer`) is raised when a document needs sign-off; `approveDocument()`/`rejectDocument()` in `Activities/index.jsx` dispatch to the lifecycle action. SO approval lands directly in `delivered` (inventory reserved) in one step.
 

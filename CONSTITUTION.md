@@ -1395,7 +1395,7 @@ TypeScript is adopted in `src/lib/` and `src/api/db/`.
 
 ### 15.1 Current Test Suite
 
-287 tests across 8 suites in `src/lib/` and `src/test/`:
+305 tests across 9 suites in `src/lib/` and `src/test/`:
 
 | File | Tests | Coverage |
 |------|-------|---------|
@@ -1403,6 +1403,7 @@ TypeScript is adopted in `src/lib/` and `src/api/db/`.
 | `permissions.test.js` | Tests for `canDo()` across all role/permission combinations | All role transitions, bypass logic |
 | `schemas.test.js` | Validation schema tests for all Zod schemas | Valid inputs pass, invalid inputs fail |
 | `rmaStageMoves.test.js` | `buildRmaMoves()` serial/name matching + RMA-location mapping | Warehouse Module R1 auto-move logic |
+| `dealValue.test.js` | `dealValueFor()` open/won/lost value + `canMarkDealWon()` | Forecast-vs-actual deal value rule |
 
 Run with `npm test` (Vitest).
 

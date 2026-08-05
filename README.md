@@ -19,9 +19,9 @@ myRMA provides end-to-end lifecycle management for product returns, warranty cla
 | **Public RMA Tracker** | Customer-facing portal to look up ticket status without logging in |
 | **Tech Calendar** | Technician scheduling and workload calendar |
 | **Reports** | Reporting dashboards, data exports |
-| **CRM — Leads** | Lead capture, qualification, status pipeline, chatter (notes/activities/replies), CSV import, convert to deal |
+| **CRM — Leads** | Lead capture, qualification, status pipeline, chatter (notes/activities/replies), CSV import, convert to deal, All/Active/Converted/Disqualified tabs with reopen |
 | **CRM — Pipeline** | Kanban + List + Graph + Pivot + Activity views, drag-and-drop stage moves, Won/Lost actions, XLSX export |
-| **CRM — Deal Detail** | Inline editing, product lines, comment panel, chatter, probability tracking |
+| **CRM — Deal Detail** | Inline editing, full edit dialog (customer/contact/pipeline with stage remap), **multiple independent quotations per deal**, forecast-vs-actual deal value, product lines, comment panel, chatter, probability tracking |
 | **CRM — Sales Documents** | Quotation → Sales Order → Invoice → Credit Note funnel, manager-approval workflow, gapless invoice/credit-note numbering, two-stage inventory reservation |
 | **CRM — Accounting** | Customer payments ledger (multi-invoice allocation), AR aging report, per-customer statement, soft credit limits |
 | **CRM — Purchasing** | Brands-as-vendors, Purchase Order → Vendor Invoice funnel with manager-approval step, PO PDF export, atomic dual-mode stock receipt, Vendor Payments (AP) ledger, full procurement audit trail |
@@ -254,7 +254,7 @@ npm run dev
 npm run dev                    # Vite dev server (hot reload, port 5173)
 npm run build                  # Production build → dist/
 npm run preview                # Preview production build locally
-npm test                       # Vitest unit tests (287 tests, 8 suites)
+npm test                       # Vitest unit tests (305 tests, 9 suites)
 npm run test:watch             # Vitest in watch mode
 npm run test:coverage          # Coverage report (HTML + text)
 npm run lint                   # ESLint check
@@ -444,7 +444,7 @@ Roles are stored in the `user_roles` table. Default permission sets are defined 
 npm test
 ```
 
-287 unit tests across 8 suites in `src/lib/` and `src/test/`:
+305 unit tests across 9 suites in `src/lib/` and `src/test/`:
 
 | Suite | Coverage |
 |-------|---------|
@@ -452,6 +452,7 @@ npm test
 | `permissions.test.js` | `canDo()` across all role/permission combinations |
 | `schemas.test.js` | Zod schemas with valid + invalid inputs |
 | `rmaStageMoves.test.js` | `buildRmaMoves()` serial/name matching + RMA-location mapping (Warehouse R1) |
+| `dealValue.test.js` | `dealValueFor()` forecast-vs-actual deal value + `canMarkDealWon()` guard |
 
 Tests run in under 5 seconds via Vitest with jsdom environment (serialised — `fileParallelism: false`).
 
@@ -463,7 +464,7 @@ GitHub Actions runs automatically on every push to `main` and `test`, plus every
 
 ```
 ci job:
-  1. npm test              → 287 tests must pass
+  1. npm test              → 305 tests must pass
   2. npm run lint:ci       → zero ESLint warnings allowed
   3. npm run build         → production build must succeed
 
