@@ -237,6 +237,13 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null })
   const [activeView, setActiveView] = useURLTab('view', 'list')
   const [statusTab, setStatusTab] = useURLTab('status', 'active')
+
+  // Kanban is a status board, so it only makes sense on the 'all' tab — every
+  // other tab is a single-status slice. Derived rather than forced into state so
+  // a deep link like ?status=converted&view=kanban degrades to list instead of
+  // rendering an empty board, and the chosen view is remembered on return to 'all'.
+  const kanbanAllowed = statusTab === 'all'
+  const effectiveView = kanbanAllowed ? activeView : 'list'
   const [selectedLeads, setSelectedLeads] = useState(new Set())
   const [pendingLeadCode, setPendingLeadCode] = useState('')
 
@@ -395,9 +402,20 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   const sourceMenuLead = leads.find((l) => l.id === sourceMenu.id)
 
   const convertedCount = leads.filter((l) => l.status === 'converted').length
+  const disqualifiedCount = leads.filter((l) => l.status === 'disqualified').length
+
+  // Tab partition: 'all' shows everything (and is the only tab where Kanban is
+  // offered — the other tabs are single-status slices, so a status board there
+  // would collapse to one column).
+  const matchesTab = (l) => {
+    if (statusTab === 'all') return true
+    if (statusTab === 'converted') return l.status === 'converted'
+    if (statusTab === 'disqualified') return l.status === 'disqualified'
+    return l.status !== 'converted' && l.status !== 'disqualified'
+  }
 
   const filteredLeads = leads
-    .filter((l) => (statusTab === 'converted' ? l.status === 'converted' : l.status !== 'converted'))
+    .filter(matchesTab)
     .filter((l) => {
       if (filterStatuses.size > 0 && !filterStatuses.has(l.status)) return false
       if (filterSources.size > 0 && !filterSources.has(l.source)) return false
@@ -571,6 +589,20 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
         toast.error(t('leads.failedSave', { error: error.message }))
       }
     })
+  }
+
+  // Reopen a disqualified lead back into the active pool. Returns it to 'new'
+  // rather than a remembered prior status — the lead is being re-qualified from
+  // scratch, and no prior-status column exists to restore from.
+  const handleReopenLead = async (lead) => {
+    try {
+      await db.leads.update(lead.id, { status: 'new' })
+      toast.success(t('leads.leadReopened'))
+      db.auditLog.log(currentUserEmail, 'lead_reopened', `Reopened lead ${lead.full_name}`).catch(() => {})
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
+    } catch (error) {
+      toast.error(t('leads.failedSave', { error: error.message }))
+    }
   }
 
   const handleOpenConvert = (lead) => {
@@ -751,13 +783,13 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
       <PageHeader title={t('leads.title')} subtitle={t('leads.subtitle')}>
         {/* View switcher */}
         <div className="flex gap-1 bg-[#f4f6f9] dark:bg-[#0f1520] rounded-lg p-1">
-          {LEADS_VIEWS.map(({ key, Icon }) => (
+          {LEADS_VIEWS.filter(({ key }) => key !== 'kanban' || kanbanAllowed).map(({ key, Icon }) => (
             <button
               key={key}
               onClick={() => setActiveView(key)}
               title={t(`leads.view_${key}`)}
               className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors ${
-                activeView === key
+                effectiveView === key
                   ? 'bg-white dark:bg-[#121823] text-[#4338ca] dark:text-[#a5b4fc] shadow-sm'
                   : 'text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]'
               }`}
@@ -882,8 +914,10 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
       {/* Status tabs — Active (default) vs Converted (view-only) */}
       <div className="flex gap-1 border-b border-[#e6e9ef] dark:border-[#212a38]">
         {[
-          { id: 'active', label: t('leads.tabActive'), count: leads.length - convertedCount },
+          { id: 'all', label: t('leads.tabAll'), count: leads.length },
+          { id: 'active', label: t('leads.tabActive'), count: leads.length - convertedCount - disqualifiedCount },
           { id: 'converted', label: t('leads.tabConverted'), count: convertedCount },
+          { id: 'disqualified', label: t('leads.tabDisqualified'), count: disqualifiedCount },
         ].map(({ id, label, count }) => (
           <button
             key={id}
@@ -1031,7 +1065,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
       )}
 
       {/* List view */}
-      {activeView === 'list' && (
+      {effectiveView === 'list' && (
         <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
           {/* Count + per-page row */}
           <div className="px-5 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[#e6e9ef] dark:border-[#212a38]">
@@ -1244,6 +1278,17 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                                   {t('leads.disqualify')}
                                 </button>
                               )}
+                              {l.status === 'disqualified' && canDo('edit') && (
+                                <button
+                                  onClick={() => {
+                                    handleReopenLead(l)
+                                    setOpenMenuId(null)
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm text-indigo-600 hover:bg-gray-50 dark:hover:bg-[#1a2230]"
+                                >
+                                  {t('leads.reopenLead')}
+                                </button>
+                              )}
                             </div>,
                             document.body
                           )}
@@ -1302,7 +1347,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
       )}
 
       {/* Kanban view */}
-      {activeView === 'kanban' && (
+      {effectiveView === 'kanban' && (
         <LeadsKanbanView
           leads={filteredLeads}
           onStatusChange={handleKanbanStatusChange}

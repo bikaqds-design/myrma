@@ -400,7 +400,11 @@
     "downloadTemplateDesc": "Get the CSV import template",
     "importCSVDesc": "Bulk upload leads from a CSV file",
     "showingRange": "Showing {{from}}–{{to}} of {{total}} leads",
-    "pageMustBeBetween": "Page must be between 1 and {{total}}"
+    "pageMustBeBetween": "Page must be between 1 and {{total}}",
+    "tabAll": "All Leads",
+    "tabDisqualified": "Disqualified",
+    "reopenLead": "Reopen Lead",
+    "leadReopened": "Lead reopened"
   },
   "activityType": {
     "call": "Call",
@@ -630,7 +634,11 @@
     "qtApprovalApproved": "Approved",
     "qtApprovalRejected": "Rejected",
     "qtAwaitingApproval": "Awaiting approval in Activities",
-    "reopenForApproval": "Reopen for Approval"
+    "reopenForApproval": "Reopen for Approval",
+    "noContact": "No contact",
+    "pipelineLabel": "Pipeline",
+    "pipelineChangeStageHint": "Changing pipeline moves this deal to a new stage — pick the stage it should land on.",
+    "wonNeedsConvertedQuotation": "Convert at least one quotation to a Sales Order before marking this deal won."
   },
   "inventory": {
     "title": "Inventory",
@@ -699,7 +707,7 @@
     "promoteFailed": "Failed to promote unit — check it isn't reserved and the destination is sellable",
     "daysInStage_one": "{{count}} day here",
     "daysInStage_other": "{{count}} days here",
-    "viewTicket": "View ticket",
+    "viewTicket": "View Ticket",
     "loc_RMA_RECEIVED": "RMA – Received",
     "loc_RMA_REPAIR": "RMA – Under Repair",
     "loc_RMA_REPAIRED": "RMA – Repaired",
@@ -724,7 +732,7 @@
     "receiveStockBulkSuccess": "Received {{qty}} units into stock",
     "receiveStockSubmit": "Receive Stock",
     "transferValidation": "Select a valid destination warehouse",
-    "transferSuccess": "Stock transferred",
+    "transferSuccess": "Units transferred successfully",
     "adjustDeltaRequired": "Enter a non-zero quantity delta",
     "adjustStatusRequired": "Select a new status",
     "adjustSuccess": "Stock adjusted",
@@ -844,7 +852,6 @@
     "colTicket": "Ticket",
     "colCustomer": "Customer",
     "colTechnician": "Technician",
-    "viewTicket": "View Ticket",
     "noUnitsForProduct": "No units found for this product",
     "unitDetails": "Unit Details",
     "batchNum": "Batch #",
@@ -884,7 +891,6 @@
     "warehouseLocationLabel": "Location (Optional)",
     "warehouseDescLabel": "Description (Optional)",
     "activeLabel": "Active",
-    "transferSuccess": "Units transferred successfully",
     "transferFailed": "Failed to transfer units",
     "noCompanyStockYet": "No company stock yet",
     "noCompanyStockHint": "Units resolved as \"Company Stock\" from RMA tickets will appear here",
@@ -918,7 +924,6 @@
     "colInWarranty": "In Warranty",
     "colOutWarranty": "Out of Warranty",
     "colTypes": "Types",
-    "colDate": "Date",
     "noSerialNumber": "No S/N",
     "manageLink": "Manage →",
     "transferToWarehouse": "Transfer to Warehouse",

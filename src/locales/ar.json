@@ -400,7 +400,11 @@
     "downloadTemplateDesc": "تحميل نموذج استيراد CSV",
     "importCSVDesc": "رفع العملاء المحتملين بشكل جماعي من ملف CSV",
     "showingRange": "عرض {{from}}–{{to}} من أصل {{total}} عميل محتمل",
-    "pageMustBeBetween": "يجب أن تكون الصفحة بين 1 و {{total}}"
+    "pageMustBeBetween": "يجب أن تكون الصفحة بين 1 و {{total}}",
+    "tabAll": "كل العملاء المحتملين",
+    "tabDisqualified": "المستبعدون",
+    "reopenLead": "إعادة فتح العميل المحتمل",
+    "leadReopened": "تمت إعادة فتح العميل المحتمل"
   },
   "activityType": {
     "call": "اتصال",
@@ -629,7 +633,12 @@
     "qtApprovalApproved": "معتمد",
     "qtApprovalRejected": "مرفوض",
     "qtAwaitingApproval": "بانتظار الاعتماد في صفحة الأنشطة",
-    "reopenForApproval": "إعادة الإرسال للاعتماد"
+    "reopenForApproval": "إعادة الإرسال للاعتماد",
+    "exportFilterHint": "استخدم عوامل تصفية أعمدة Excel للتقسيم حسب المرحلة أو الحالة أو مندوب المبيعات وغيرها.",
+    "noContact": "بدون جهة اتصال",
+    "pipelineLabel": "مسار المبيعات",
+    "pipelineChangeStageHint": "تغيير مسار المبيعات ينقل هذه الصفقة إلى مرحلة جديدة — اختر المرحلة التي ستنتقل إليها.",
+    "wonNeedsConvertedQuotation": "حوّل عرض سعر واحدًا على الأقل إلى أمر بيع قبل تعيين الصفقة كرابحة."
   },
   "inventory": {
     "title": "المخزون",
@@ -723,7 +732,7 @@
     "receiveStockBulkSuccess": "تم استلام {{qty}} وحدة في المخزون",
     "receiveStockSubmit": "استلام المخزون",
     "transferValidation": "اختر مستودع وجهة صالح",
-    "transferSuccess": "تم نقل المخزون",
+    "transferSuccess": "تم نقل الوحدات بنجاح",
     "adjustDeltaRequired": "أدخل كمية غير صفرية",
     "adjustStatusRequired": "اختر حالة جديدة",
     "adjustSuccess": "تم تعديل المخزون",
@@ -843,7 +852,6 @@
     "colTicket": "التذكرة",
     "colCustomer": "العميل",
     "colTechnician": "الفني",
-    "viewTicket": "عرض التذكرة",
     "noUnitsForProduct": "لا توجد وحدات لهذا المنتج",
     "unitDetails": "تفاصيل الوحدة",
     "batchNum": "رقم الدفعة",
@@ -883,7 +891,6 @@
     "warehouseLocationLabel": "الموقع (اختياري)",
     "warehouseDescLabel": "الوصف (اختياري)",
     "activeLabel": "نشط",
-    "transferSuccess": "تم نقل الوحدات بنجاح",
     "transferFailed": "فشل نقل الوحدات",
     "noCompanyStockYet": "لا يوجد مخزون للشركة بعد",
     "noCompanyStockHint": "ستظهر هنا الوحدات التي تم حلها كـ \"مخزون الشركة\" من تذاكر الإرجاع",
@@ -917,7 +924,6 @@
     "colInWarranty": "تحت الضمان",
     "colOutWarranty": "خارج الضمان",
     "colTypes": "الأنواع",
-    "colDate": "التاريخ",
     "noSerialNumber": "لا رقم تسلسلي",
     "manageLink": "إدارة ←",
     "transferToWarehouse": "نقل إلى المستودع",

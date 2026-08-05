@@ -97,6 +97,10 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
 
   // Inline edit state
   const [editingName, setEditingName] = useState(false)
+  // Separate flag for the Lead Info panel's name field — the header has its own
+  // name editor (shown only when the lead has no company_name), and sharing one
+  // flag would open both inputs at once, each with autoFocus.
+  const [editingNameInfo, setEditingNameInfo] = useState(false)
   const [nameInput, setNameInput] = useState('')
   const [editingCompany, setEditingCompany] = useState(false)
   const [companyInput, setCompanyInput] = useState('')
@@ -155,6 +159,7 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
     if (!nameInput.trim()) return
     saveField('full_name', nameInput.trim())
     setEditingName(false)
+    setEditingNameInfo(false)
   }
   const handleSaveCompany = () => {
     saveField('company_name', companyInput.trim() || null)
@@ -383,10 +388,23 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
           {/* Full Name */}
           <div>
             <div className="text-xs text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide">{t('leadModal.fullName')}</div>
-            {editingName ? null : (
+            {editingNameInfo ? (
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  type="text"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  autoFocus
+                  className="flex-1 text-sm border border-indigo-500 dark:border-indigo-400 rounded px-2 py-1 dark:bg-[#0f1520] dark:text-[#e8ebf0] focus:outline-none min-w-0"
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingNameInfo(false) }}
+                />
+                <button onClick={handleSaveName} className="text-xs text-indigo-600 dark:text-[#a5b4fc] font-medium hover:underline whitespace-nowrap">{t('common.save')}</button>
+                <button onClick={() => setEditingNameInfo(false)} className="text-xs text-gray-400 hover:underline">×</button>
+              </div>
+            ) : (
               <span
                 className={`text-sm text-gray-900 dark:text-[#e8ebf0] mt-0.5 inline-block ${EDITABLE}`}
-                onClick={canEdit ? () => { setNameInput(lead.full_name || ''); setEditingName(true) } : undefined}
+                onClick={canEdit ? () => { setNameInput(lead.full_name || ''); setEditingNameInfo(true) } : undefined}
                 title={canEdit ? t('pipeline.clickToEdit') : undefined}
               >
                 {lead.full_name || '—'}
