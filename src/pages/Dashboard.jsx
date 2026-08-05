@@ -480,7 +480,10 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
     (statusCounts[TICKET_STATUS.PENDING] || 0) + (statusCounts[TICKET_STATUS.ON_HOLD] || 0)
   const sparkWeekly = weeklyTrend.map((d) => d.tickets)
 
-  const dashboardAIData = useMemo(() => ({
+  // Payload for the currently-hidden <AIAssist> panel. Kept (underscore-prefixed
+  // to satisfy lint) because the ai-assist Edge Function and ai.assist() helper
+  // are retained for future re-enabling — see CLAUDE.md.
+  const _dashboardAIData = useMemo(() => ({
     range,
     open: statusCounts[TICKET_STATUS.OPEN] || 0,
     in_progress: statusCounts[TICKET_STATUS.IN_PROGRESS] || 0,
