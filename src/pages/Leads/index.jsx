@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { db, supabase } from '../../api/supabaseClient'
 import { PageSkeleton } from '../../components/Skeleton'
-import { PageHeader } from '../../components/ui'
+import { PageHeader, Ltr } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { leadSchema, getFirstError } from '../../lib/schemas'
@@ -1170,7 +1170,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                         {l.company_name && <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">{l.full_name}</div>}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600 dark:text-[#9aa4b2]">
-                        {l.phone || l.email || '—'}
+                        {l.phone || l.email ? <Ltr>{l.phone || l.email}</Ltr> : '—'}
                       </td>
                       <td className="px-4 py-3">
                         {canEditStatus(l) ? (

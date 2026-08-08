@@ -854,28 +854,37 @@ export default function App() {
   )
 
   // ── Derive page title for mobile header ───────────────────────────────────
+  // Runs through t() so the header matches the rest of the chrome — it used to
+  // be a hardcoded English map, which left the bar reading "Deal Details" while
+  // the whole page beneath it was Arabic (found in manual QA 2026-08-05,
+  // WAREHOUSE_R1_TEST_CHECKLIST.md §E). Reuses the existing `nav.*` keys so the
+  // header and the sidebar entry for a page always agree.
   const mobileTitle = (() => {
-    if (pathname.startsWith('/products/')) return 'Product Details'
-    if (pathname.startsWith('/customers/')) return 'Customer Details'
-    if (pathname.startsWith('/leads/')) return 'Lead Details'
-    if (pathname.startsWith('/pipeline/')) return 'Deal Details'
+    if (pathname.startsWith('/products/')) return t('nav.productDetails')
+    if (pathname.startsWith('/customers/')) return t('nav.customerDetails')
+    if (pathname.startsWith('/leads/')) return t('nav.leadDetails')
+    if (pathname.startsWith('/pipeline/')) return t('nav.dealDetails')
     const MAP = {
-      '/': 'Dashboard',
-      '/dashboard': 'Dashboard',
-      '/products': 'Products',
-      '/customers': 'Customers',
-      '/leads': 'Leads',
-      '/pipeline': 'Pipeline',
-      '/activities': 'Activities',
-      '/sales': 'Sales Documents',
-      '/sales/': 'Sales Document',
-      '/rma-tickets': 'RMA Tickets',
-      '/inventory': 'Inventory',
-      '/account': 'Account Settings',
-      '/control-panel': 'Control Panel',
-      '/calendar': 'Calendar',
-      '/reports': 'Reports',
+      '/': t('nav.dashboard'),
+      '/dashboard': t('nav.dashboard'),
+      '/products': t('nav.products'),
+      '/customers': t('nav.customers'),
+      '/leads': t('nav.leads'),
+      '/pipeline': t('nav.pipeline'),
+      '/activities': t('nav.activities'),
+      '/sales': t('nav.salesDocuments'),
+      '/sales/': t('nav.salesDocument'),
+      '/accounting': t('nav.accounting'),
+      '/purchasing': t('nav.purchasing'),
+      '/rma-tickets': t('nav.rmaTickets'),
+      '/inventory': t('nav.inventory'),
+      '/account': t('nav.accountSettings'),
+      '/control-panel': t('nav.controlPanel'),
+      '/calendar': t('nav.calendar'),
+      '/reports': t('nav.reports'),
     }
+    // Unmapped routes fall back to a title-cased slug — English-shaped, but it
+    // only ever fires for a route nobody has added a key for yet.
     return MAP[pathname] ?? pathname.slice(1).replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
   })()
 

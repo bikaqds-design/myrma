@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
 import { PageSkeleton } from '../../components/Skeleton'
-import { Button } from '../../components/ui'
+import { Button, Ltr } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { ActivityChatter } from '../../components/ActivityChatter'
@@ -461,7 +461,7 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
                 onClick={canEdit ? () => { setPhoneInput(lead.phone || ''); setEditingPhone(true) } : undefined}
                 title={canEdit ? t('pipeline.clickToEdit') : undefined}
               >
-                {lead.phone || '—'}
+                {lead.phone ? <Ltr>{lead.phone}</Ltr> : '—'}
               </span>
             )}
           </div>

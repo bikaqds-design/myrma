@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { CardSkeleton } from '../components/Skeleton'
 import AttachmentsField from '../components/AttachmentsField'
-import { Button, Spinner } from '../components/ui'
+import { Button, Spinner, Ltr } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
 import { ROLES, TICKET_STATUS } from '../lib/constants'
 import { captureException } from '../lib/sentry'
@@ -1244,7 +1244,7 @@ export default function CustomerDetails({
                             {c.notes && <p className="text-xs text-gray-400 dark:text-[#4a5568] mt-0.5 truncate max-w-[180px]">{c.notes}</p>}
                           </td>
                           <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{c.title || '—'}</td>
-                          <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{c.phone || '—'}</td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{c.phone ? <Ltr>{c.phone}</Ltr> : '—'}</td>
                           <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{c.email || '—'}</td>
                           {canDo('edit') && (
                             <td className="px-4 py-3">

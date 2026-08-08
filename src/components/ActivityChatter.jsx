@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { db, storage, supabase } from '../api/supabaseClient'
 import { Button, Textarea, Input, Select, Spinner } from './ui'
 import { ACTIVITY_TYPE_SCHEDULABLE } from '../lib/constants'
+import { approvalRequestLabel } from '../lib/approvalLabels'
 
 const TYPE_ICON = {
   call: '📞',
@@ -408,7 +409,7 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                           <span className="text-lg leading-none">📋</span>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">
-                              {t('activityChatter.approvalRequest')}
+                              {approvalRequestLabel(t, parseApprovalTitle(a.title).docType)}
                             </p>
                             {(() => { const { code, total, customer } = parseApprovalTitle(a.title); return (
                               <p className="text-xs text-gray-600 dark:text-[#9aa4b2] mt-0.5">
@@ -513,7 +514,7 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                           ) : a.type === 'approval' ? (
                             <div>
                               <p className="text-sm font-semibold text-gray-800 dark:text-[#e8ebf0]">
-                                {t('activityChatter.approvalRequest')} · {parseApprovalTitle(a.title).code}
+                                {approvalRequestLabel(t, parseApprovalTitle(a.title).docType)} · {parseApprovalTitle(a.title).code}
                               </p>
                               {a.outcome_notes && (
                                 <p className={`text-xs mt-0.5 font-medium ${a.outcome_notes.startsWith('Approved') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>

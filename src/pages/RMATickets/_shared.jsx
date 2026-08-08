@@ -55,7 +55,11 @@ export function ShortcutsHelp({ onClose }) {
   )
 }
 
-export function ProductSearchInput({ value, onChange, products = [], placeholder = 'Search or type product name…', className = '', inputClassName = '' }) {
+// onSelectProduct fires only when a catalog row is picked from the dropdown,
+// and carries the whole product so the caller can keep its id. Typing instead
+// fires onChange alone — the caller treats that as "no longer a catalog
+// product" and clears any id it was holding.
+export function ProductSearchInput({ value, onChange, onSelectProduct, products = [], placeholder = 'Search or type product name…', className = '', inputClassName = '' }) {
   const [query, setQuery] = useState(value || '')
   const [open, setOpen] = useState(false)
   const containerRef = useRef(null)
@@ -87,7 +91,7 @@ export function ProductSearchInput({ value, onChange, products = [], placeholder
         <div className="absolute top-full left-0 mt-1 w-full z-30 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] py-1 max-h-48 overflow-y-auto">
           {filtered.map((p) => (
             <button key={p.id} type="button"
-              onClick={() => { setQuery(p.product_name); onChange(p.product_name); setOpen(false) }}
+              onClick={() => { setQuery(p.product_name); onSelectProduct ? onSelectProduct(p) : onChange(p.product_name); setOpen(false) }}
               className="w-full px-3 py-2 text-left text-sm hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520] flex items-center justify-between gap-2">
               <span className="font-medium text-[#211f1b] dark:text-[#e8ebf0] truncate">{p.product_name}</span>
               {p.brand?.brand_name && <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2] flex-shrink-0">{p.brand.brand_name}</span>}

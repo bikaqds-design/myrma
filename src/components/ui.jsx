@@ -151,6 +151,26 @@ const INPUT_BASE =
   'focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors ' +
   'disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed'
 
+/**
+ * Renders latin-script data — phone numbers, emails, codes, serials — that must
+ * keep left-to-right order even inside an RTL page.
+ *
+ * Without this the Unicode bidi algorithm moves leading/trailing symbols to the
+ * visual other end: in Arabic, `+966520968114` renders as `966520968114+`, which
+ * reads as a different (and wrong) number. Found in manual QA on 2026-08-05
+ * (WAREHOUSE_R1_TEST_CHECKLIST.md §E).
+ *
+ * `dir="ltr"` alone fixes ordering; `unicode-bidi: isolate` also stops the value
+ * from disturbing the ordering of the RTL text around it.
+ */
+export function Ltr({ children, className = '', as: Tag = 'span', ...props }) {
+  return (
+    <Tag dir="ltr" style={{ unicodeBidi: 'isolate' }} className={className} {...props}>
+      {children}
+    </Tag>
+  )
+}
+
 // forwardRef so react-hook-form's register() ref attaches to the DOM node —
 // without it the ref is silently dropped and RHF never reads the value.
 export const Input = React.forwardRef(function Input({ className = '', ...props }, ref) {

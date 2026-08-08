@@ -9,6 +9,7 @@ import { canDo } from '../../lib/permissions'
 import { PageHeader } from '../../components/ui'
 import { safeStorage } from '../../lib/safeStorage'
 import { PageSkeleton } from '../../components/Skeleton'
+import { APPROVAL_DOC_TYPE_LABEL_KEY, approvalRequestLabel } from '../../lib/approvalLabels'
 
 // ── Type icons + colors ────────────────────────────────────────────────────
 const TYPE_ICON_PATHS = {
@@ -51,19 +52,17 @@ const SOURCE_BADGE = {
   credit_note: 'bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400',
 }
 
+// lead/deal are the non-approval sources (an activity's own related_type); the
+// document types come from the shared approval map so the Source column, the
+// filter dropdown and the "… Approval Request" label can never disagree.
 const SOURCE_LABEL_KEY = {
   lead:            'activities.sourceLead',
   deal:            'activities.sourceDeal',
-  quotation:       'activities.sourceQuotation',
-  sales_order:     'activities.sourceSalesOrder',
-  invoice:         'activities.sourceInvoice',
-  credit_note:     'activities.sourceCreditNote',
-  purchase_order:  'activities.sourcePurchaseOrder',
-  vendor_invoice:  'activities.sourceVendorInvoice',
+  ...APPROVAL_DOC_TYPE_LABEL_KEY,
 }
 
 // The selectable document sources in the filter dropdown (approval pool).
-const DOC_SOURCES = ['quotation', 'sales_order', 'invoice', 'credit_note', 'purchase_order', 'vendor_invoice']
+const DOC_SOURCES = Object.keys(APPROVAL_DOC_TYPE_LABEL_KEY)
 
 // Doc types whose detail page lives under /purchasing instead of /sales.
 const PURCHASE_DOC_TYPES = new Set(['purchase_order', 'vendor_invoice'])
@@ -419,11 +418,24 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
       default:               return Promise.resolve()
     }
   }
+  // An invoice awaiting approval is still a draft, and void_invoice refuses
+  // drafts ("Only posted invoices can be voided") — its job is to undo a post
+  // by restoring delivered inventory. So route by the invoice's actual state:
+  // draft → cancelDraft, posted (a re-raised approval) → the full void.
+  // Both land on doc_status = 'cancelled'.
+  const rejectInvoice = async (docId) => {
+    const reason = `Rejected by ${currentUserEmail}`
+    const inv = await db.crmInvoices.get(docId)
+    return inv?.doc_status === 'draft'
+      ? db.crmInvoices.cancelDraft(docId, reason, currentUserEmail)
+      : db.crmInvoices.void_(docId, reason, currentUserEmail)
+  }
+
   const rejectDocument = (docType, docId) => {
     switch (docType) {
       case 'quotation':      return db.quotations.markDeclined(docId)
       case 'sales_order':    return db.salesOrders.markDeclined(docId, currentUserEmail)
-      case 'invoice':        return db.crmInvoices.void_(docId, `Rejected by ${currentUserEmail}`, currentUserEmail)
+      case 'invoice':        return rejectInvoice(docId)
       case 'credit_note':    return db.creditNotes.void_(docId, `Rejected by ${currentUserEmail}`, currentUserEmail)
       // PO/VI rejection sends them back to draft (editable/resubmittable),
       // not cancelled — user-chosen (2026-07-05/06), unlike the stricter
@@ -830,10 +842,10 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
                             <ActivityTypeIcon type={activity.type} size={13} />
                           </div>
                           {activity.type === 'approval' ? (
-                            (() => { const { code, total } = parseApprovalTitle(activity.title); return (
+                            (() => { const { docType, code, total } = parseApprovalTitle(activity.title); return (
                               <div className="min-w-0">
                                 <p className="text-sm font-medium text-[#211f1b] dark:text-[#e8ebf0] line-clamp-1">
-                                  {t('activityChatter.approvalRequest')} · {code}
+                                  {approvalRequestLabel(t, docType)} · {code}
                                 </p>
                                 <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">
                                   {t('activityType.approval')} · {total.toLocaleString()}
