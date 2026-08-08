@@ -83,7 +83,11 @@ export const vendorPayments = {
       p_payment_date: input.payment_date ?? null,
       p_notes: input.notes ?? null,
       p_actor_email: input.created_by,
-      p_allocations: JSON.stringify(allocations),
+      // Array, not JSON.stringify(...) — see the identical fix in payments.ts.
+      // A string arrives as a jsonb scalar and record_vendor_payment's
+      // jsonb_array_elements(p_allocations) fails with
+      // "cannot extract elements from a scalar".
+      p_allocations: allocations,
     })
     if (error) throw error
     const payment = await vendorPayments.get(paymentId as string)

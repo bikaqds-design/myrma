@@ -76,6 +76,34 @@ export default function SalesDocumentForm({ docType, initial = null, customers =
     return { subtotal, discount, tax, grand: subtotal - discount + tax }
   }, [lines])
 
+  // A draft invoice's only route forward is the Activities approval pool — the
+  // detail page deliberately shows "Awaiting approval in Activities" instead of
+  // a Post button. The SO → Invoice path raises this activity at conversion
+  // (SalesDocumentDetail.createInvoiceApprovalActivity); a standalone invoice
+  // created here needs the same, or it sits in draft forever with nothing left
+  // to click. Quotations/SOs don't need it — they have an explicit "Send for
+  // Approval" action of their own.
+  const createInvoiceApprovalActivity = (invoice) => {
+    const customer = customers.find((c) => c.id === invoice.customer_id)
+    const customerName = customer?.company_name || customer?.contact_person || '—'
+    // No inv_code exists yet (post() assigns it), so the code slot carries the
+    // customer's own code to keep the pool row searchable.
+    const code = customer?.customer_code || ''
+    return db.activities.create({
+      related_type: 'customer',
+      related_id: invoice.customer_id,
+      type: 'approval',
+      title: `approval|invoice|${invoice.id}|${code}|${invoice.total ?? 0}|${customerName}`,
+      due_date: invoice.due_date || new Date().toISOString(),
+      assigned_rep: invoice.assigned_rep || null,
+      outcome_notes: null,
+      created_by: currentUserEmail,
+    }).catch((err) => {
+      console.error('invoice approval activity failed', err)
+      toast.error(t('pipeline.approvalActivityFailed'))
+    })
+  }
+
   const handleSave = async () => {
     if (!customerId) { toast.error(t('salesDocuments.errNoCustomer')); return }
     const cleaned = lines.filter((l) => l.product_name.trim())
@@ -123,7 +151,8 @@ export default function SalesDocumentForm({ docType, initial = null, customers =
         await MODULE.update(initial.id, editFields)
         toast.success(t('salesDocuments.savedToast'))
       } else {
-        await MODULE.create(createPayload)
+        const created = await MODULE.create(createPayload)
+        if (docType === 'invoice') await createInvoiceApprovalActivity(created)
         toast.success(t('salesDocuments.createdToast'))
       }
       onSaved?.()

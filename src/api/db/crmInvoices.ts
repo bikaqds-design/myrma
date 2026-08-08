@@ -245,6 +245,37 @@ export const crmInvoices = {
     return inv
   },
 
+  /**
+   * cancelDraft: kills a never-posted invoice. void_() cannot do this —
+   * void_invoice raises "Only posted invoices can be voided (current: draft)"
+   * because its job is to *undo* posting: it restores the serialized units the
+   * post delivered. A draft never delivered any, so there is nothing to
+   * restore and the RPC's guard is correct; drafts just need their own path.
+   *
+   * Reaches the same end state (cancelled + void_reason) without touching
+   * stock. payment_status stays 'unpaid' rather than 'reversed' — nothing was
+   * ever paid on a draft, so there is nothing to reverse.
+   *
+   * Used when a manager rejects an invoice in the Activities approval pool
+   * (funnel row 22); before this, the reject threw P0001 and the invoice sat
+   * in draft forever.
+   */
+  async cancelDraft(id: string, reason: string, actorEmail: string): Promise<CrmInvoiceRow> {
+    const { data, error } = await supabase
+      .from('crm_invoices')
+      .update({ doc_status: 'cancelled', void_reason: reason })
+      .eq('id', id)
+      // Guard: refuse to touch anything that has already been posted — that
+      // path must go through void_invoice so inventory is restored.
+      .eq('doc_status', 'draft')
+      .select()
+      .single()
+    if (error) throw error
+
+    void actorEmail // audit trail hook, mirrors void_/post
+    return data as CrmInvoiceRow
+  },
+
   /** listBySalesDocument: fetch all invoices for the unified All-tab view. */
   async listAll(filters?: {
     assignedRep?: string

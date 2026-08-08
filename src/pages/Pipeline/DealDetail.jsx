@@ -248,9 +248,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
       const fieldKey = DEAL_FIELD_KEY_MAP[field]
       if (fieldKey) {
         const shown = displayValue ?? value
-        db.activities
-          .logSystem('deal', deal.id, `field_updated|${fieldKey}|${shown || '—'}`, currentUserEmail)
-          .catch(() => {})
+        logEvent(`field_updated|${fieldKey}|${shown || '—'}`)
       }
       refresh()
     } catch (error) {
@@ -299,7 +297,30 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     }
   }
 
-  const refresh = () => {
+  // ── Deal Log write tracking ───────────────────────────────────────────────
+  // Activity-log writes are fire-and-forget on purpose: a failed log must never
+  // fail the user's save. But refresh() used to invalidate immediately, so the
+  // refetch raced those INSERTs and usually won — the Deal Log then showed a
+  // stale feed until the page was reloaded, and nothing invalidated again once
+  // the writes landed. Found three times in manual QA on 2026-08-05
+  // (WAREHOUSE_R1_TEST_CHECKLIST.md §B/§C): quotation submitted for approval,
+  // and deal field edits, both missing from the log until a manual reload.
+  //
+  // logEvent keeps each in-flight write so refresh() can await them before
+  // refetching. Failures are still swallowed — awaiting a settled rejection is
+  // enough to know the refetch will see whatever did land.
+  const pendingLogs = useRef([])
+
+  const logEvent = (message) => {
+    const p = db.activities.logSystem('deal', deal.id, message, currentUserEmail).catch(() => {})
+    pendingLogs.current.push(p)
+    return p
+  }
+
+  const refresh = async () => {
+    const inFlight = pendingLogs.current
+    pendingLogs.current = []
+    if (inFlight.length) await Promise.allSettled(inFlight)
     queryClient.invalidateQueries({ queryKey: ['deal', dealId] })
     queryClient.invalidateQueries({ queryKey: ['deals'] })
     queryClient.invalidateQueries({ queryKey: ['activities', 'deal', dealId] })
@@ -381,9 +402,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
           field === 'customer_id' ? dealForm.customer_label
           : field === 'contact_id' ? dealContacts.find((c) => c.id === patch[field])?.full_name
           : patch[field]
-        db.activities
-          .logSystem('deal', deal.id, `field_updated|${fieldKey}|${shown || '—'}`, currentUserEmail)
-          .catch(() => {})
+        logEvent(`field_updated|${fieldKey}|${shown || '—'}`)
       }
       setShowEdit(false)
       refresh()
@@ -530,7 +549,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
           created_by: currentUserEmail,
         })
         toast.success(t('salesDocs.successCreated'))
-        db.activities.logSystem('deal', deal.id, `quotation_created|${saved.qt_code}`, currentUserEmail).catch(() => {})
+        logEvent(`quotation_created|${saved.qt_code}`)
       } else {
         saved = await db.quotations.update(editingQtId, fields)
         toast.success(t('salesDocs.successUpdated'))
@@ -602,7 +621,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
       toast.success(t('pipeline.quotationStatusUpdated'))
       const kind = ACTION_LOG_KIND[action]
       if (kind) {
-        db.activities.logSystem('deal', deal.id, `${kind}|${qt.qt_code}`, currentUserEmail).catch(() => {})
+        logEvent(`${kind}|${qt.qt_code}`)
       }
       const nextStatus = ACTION_RESULT_STATUS[action]
       if (nextStatus) await syncDealValue(withQtStatus(qt.id, nextStatus))
@@ -619,7 +638,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     if (!qt) return
     try {
       await db.quotations.markSent(qt.id)
-      db.activities.logSystem('deal', deal.id, `quotation_reopened|${qt.qt_code}`, currentUserEmail).catch(() => {})
+      logEvent(`quotation_reopened|${qt.qt_code}`)
       // Reopening a dead quotation puts its value back into the forecast.
       await syncDealValue(withQtStatus(qt.id, 'sent'))
       createApprovalActivity(qt)
@@ -641,7 +660,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     try {
       await db.quotations.convertToSalesOrder(qt.id, currentUserEmail)
       toast.success(t('salesDocs.successConverted'))
-      db.activities.logSystem('deal', deal.id, `quotation_converted|${qt.qt_code}`, currentUserEmail).catch(() => {})
+      logEvent(`quotation_converted|${qt.qt_code}`)
       // No change while the deal is open (converted still counts as live), but it
       // does change what the deal would be worth once closed.
       await syncDealValue(withQtStatus(qt.id, 'converted'))
@@ -670,7 +689,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     try {
       await db.quotations[action](qt.id)
       await db.activities.complete(activityId, `${logKind === 'quotation_accepted' ? 'Approved' : 'Rejected'} by ${currentUserEmail}`)
-      db.activities.logSystem('deal', deal.id, `${logKind}|${qt.qt_code}`, currentUserEmail).catch(() => {})
+      logEvent(`${logKind}|${qt.qt_code}`)
       // Rejecting drops this quotation out of the deal's forecast.
       await syncDealValue(withQtStatus(qt.id, ACTION_RESULT_STATUS[action]))
       toast.success(t('pipeline.quotationStatusUpdated'))

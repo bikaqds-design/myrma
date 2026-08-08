@@ -273,7 +273,22 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
   const salesReps = usersList.filter((u) => u.role === 'sales_rep' || u.role === 'manager')
   const customerMap = useMemo(() => Object.fromEntries(customers.map((c) => [c.id, c])), [customers])
 
-  const pipelineId = pipelines[0]?.id ?? null
+  // Which pipeline the board is showing. Kept in the URL (?pipeline=<id>) so the
+  // choice survives a reload and can be shared, matching how `view` works above.
+  //
+  // This used to be hardcoded to `pipelines[0]`, with no switcher anywhere in
+  // List / Kanban / Graph / Pivot / Filters. The Edit Deal dialog will happily
+  // move a deal to another pipeline, so a moved deal simply vanished — invisible
+  // to the board and to its own search — and the only route back was
+  // Customers → <customer> → Deals. Found in manual QA 2026-08-05
+  // (WAREHOUSE_R1_TEST_CHECKLIST.md §B).
+  //
+  // Falls back to the first pipeline when the param is absent or names a
+  // pipeline that no longer exists, so a stale bookmark degrades to a working
+  // board rather than an empty one.
+  const [pipelineParam, setPipelineParam] = useURLTab('pipeline', '')
+  const pipelineId =
+    pipelines.find((p) => p.id === pipelineParam)?.id ?? pipelines[0]?.id ?? null
 
   // Deliberately not filtered to status:'open' — Won/Lost deals must still
   // render in their own terminal columns (the Won/Lost columns exist
@@ -485,6 +500,22 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
   return (
     <div className="p-4 lg:p-6">
       <PageHeader title={t('pipeline.title')} subtitle={t('pipeline.subtitle')}>
+        {/* Pipeline switcher — only meaningful with more than one pipeline.
+            Without it a deal moved to another pipeline is unreachable. */}
+        {pipelines.length > 1 && (
+          <select
+            value={pipelineId ?? ''}
+            onChange={(e) => setPipelineParam(e.target.value)}
+            aria-label={t('pipeline.selectPipeline')}
+            className="px-3 py-2 rounded-lg border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#121823] text-sm text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+          >
+            {pipelines.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        )}
         {/* View switcher */}
         <div className="flex gap-1 bg-[#f4f6f9] dark:bg-[#0f1520] rounded-lg p-1">
           {VIEWS.map(({ key, Icon }) => (

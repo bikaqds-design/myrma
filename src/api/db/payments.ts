@@ -84,7 +84,13 @@ export const payments = {
       p_payment_date: input.payment_date ?? null,
       p_notes: input.notes ?? null,
       p_actor_email: input.created_by,
-      p_allocations: JSON.stringify(allocations),
+      // Pass the array itself, NOT JSON.stringify(...). supabase-js serialises
+      // the whole RPC body as JSON, so a string here arrives as a jsonb *scalar*
+      // (`"[]"`) rather than an array, and record_payment's
+      // `jsonb_array_elements(p_allocations)` then fails with
+      // "cannot extract elements from a scalar" — which killed every payment
+      // recorded from an invoice (WAREHOUSE_R1_TEST_CHECKLIST.md funnel row 43).
+      p_allocations: allocations,
     })
     if (error) throw error
     const payment = await payments.get(paymentId as string)
