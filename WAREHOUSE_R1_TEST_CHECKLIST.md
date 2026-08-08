@@ -649,7 +649,7 @@ belongs to that customer; no live customer's AR balance was touched.
 | # | Result |
 |---|--------|
 | 43 | Recording a payment from a posted invoice creates the `payments` + `payment_applications` rows and moves the invoice's `amount_paid`/`payment_status`. This is the row that surfaced **BUG #11** (`p_allocations` sent as a JSON string, so every payment failed with *"cannot extract elements from a scalar"*); passing after that fix. |
-| 46 | ⚠️ **The row's stated expectation is out of date — the code is right, the checklist row is wrong.** Row 46 expects *"void a payment that has at least one allocation → Blocked with an error."* Verified live on `PAY-2026-00011` (80.00, allocated 60 + 5): the void **succeeds**, reverses every application, and restores each invoice — `INV-2026-00019` Paid → **Unpaid**, `INV-2026-00020` Partial → **Unpaid**, the payment's `unapplied_amount` 15.00 → **80.00**, status **Voided**. <br><br>That is deliberate. Migration `20260754_payment_cn_reversal.sql` states it outright: *"void_payment / void_credit_note: reverse EVERY still-active application of a payment/CN, then mark it voided. This is what a 'Void' button now does even when the payment/CN has been applied — the exact fix the audit asked for."* The row predates that migration. What **is** still blocked is voiding an **invoice** that has payments applied (`void_invoice` → *"Reverse payments/credit notes before voiding"*) — a different operation. **Row 46 should be reworded** to the reverse-and-void expectation. |
+| 46 | ✅ **Passes. The row's stated expectation was out of date — the code was right, the row was wrong; `MASTER_UPGRADE_PLAN.md` row 46 has since been reworded (2026-08-07) with a note explaining why the behaviour must not be "fixed" back.** The row originally expected *"void a payment that has at least one allocation → Blocked with an error."* Verified live on `PAY-2026-00011` (80.00, allocated 60 + 5): the void **succeeds**, reverses every application, and restores each invoice — `INV-2026-00019` Paid → **Unpaid**, `INV-2026-00020` Partial → **Unpaid**, the payment's `unapplied_amount` 15.00 → **80.00**, status **Voided**. <br><br>That is deliberate. Migration `20260754_payment_cn_reversal.sql` states it outright: *"void_payment / void_credit_note: reverse EVERY still-active application of a payment/CN, then mark it voided. This is what a 'Void' button now does even when the payment/CN has been applied — the exact fix the audit asked for."* The row predates that migration. What **is** still blocked is voiding an **invoice** that has payments applied (`void_invoice` → *"Reverse payments/credit notes before voiding"*) — a different operation. **Row 46 should be reworded** to the reverse-and-void expectation. **Done.** |
 | 44 | With three open invoices for one customer, **Auto-allocate (oldest first)** spread an 80.00 payment as **60.00 → `INV-2026-00019` (due 7/5)**, **20.00 → `INV-2026-00020` (due 9/28)**, **0 → `INV-2026-00018` (no due date, sorted last)**. Each row is an editable number input — changed the second to 5.00 by hand and it held. |
 | 45 | Submitted 80.00 against 65.00 of allocations. The modal previewed **Allocated: 65.00 · Unapplied: 15.00** before submit, and **`PAY-2026-00011`** persisted with `unapplied_amount` **15.00**. |
 | 47 | Re-verified with real data. Buckets sum exactly: 31,835.93 + 1,823.91 + 42,438.31 + 58,811.84 = **134,909.99** = Total Outstanding. QA Throwaway Co's **105.00 in Current** is provably right (35.00 remaining on `INV-…20` due 9/28 + 70.00 on `INV-…18`, both not yet due). |
@@ -789,9 +789,12 @@ reads **الحسابات**.
 
 ### Funnel checklist — final state
 
-**All 52 rows run. 51 pass; row 46 passes against the *code* but its stated expectation is
-stale** (see the Accounting table — the row wants "blocked", the deliberate post-`20260754`
-behaviour is "reverse every application, then void"). Reword the row; do not change the code.
+**All 52 rows run. All 52 pass.**
+
+Row 46 was the one wrinkle: it passed against the code while its *written* expectation was stale
+— the row wanted "blocked", but the deliberate post-`20260754` behaviour is "reverse every
+application, then void". `MASTER_UPGRADE_PLAN.md` row 46 was reworded on 2026-08-07 and carries a
+note explaining why the code must not be changed back. Nothing outstanding.
 
 Five defects were found and fixed in this pass — **#12** (migration `20260771`, applied by the
 user and verified), **#13**, **#14**, **#15**, **#16** — every one confirmed live in the browser

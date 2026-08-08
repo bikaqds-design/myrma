@@ -1227,13 +1227,32 @@ Manual QA checklist covering the 2026-06-30 work: the 14-item sales-funnel bug-f
 | 43 | Accounting → Payments | From a posted invoice, "Record Payment," pick a method, submit | `payments` + `payment_applications` rows created; invoice `amount_paid`/`payment_status` updates |
 | 44 | Accounting → Payments | From `/accounting`, "+ Record Payment," pick a customer with 2+ open invoices, "Auto-allocate" | Suggests oldest-due-date-first allocation across invoices, editable per row |
 | 45 | Accounting → Payments | Submit a payment where the amount exceeds the sum of allocations | Leftover shows as `unapplied_amount` on the payment row |
-| 46 | Accounting → Payments | Try to void a payment that has at least one allocation | Blocked with an error |
+| 46 | Accounting → Payments | Void a payment that has at least one allocation | **Succeeds** — every still-active application is reversed (a negative `payment_applications` row per line), each invoice's `amount_paid`/`payment_status` is restored, the payment's `unapplied_amount` returns to its full amount, and the payment goes `voided`. See the note below. |
 | 47 | Accounting → Aging | Open the AR Aging tab with several customers carrying overdue invoices | Outstanding totals bucketed correctly into Current/31-60/61-90/90+ |
 | 48 | Customer Details → Billing | Open a customer with invoices, a credit note, and a payment on file | "Billing" tab shows all three in date order with a correct running balance |
 | 49 | Customer Details → Billing | Set a Credit Limit on a customer's profile, save | Field persists; reopen and confirm it's still set |
 | 50 | Customer Details → Billing | Set a credit limit below the customer's outstanding balance | Billing tab shows a red "over credit limit" warning (display-only) |
 | 51 | i18n | Switch to Arabic, visit `/accounting` and a customer's Billing tab | All new strings translated, no raw keys |
 | 52 | Build | `npm test -- --run`, `npm run lint`, `npm run build` | 277/277 tests pass, 0 lint errors, build succeeds (Accounting v1) |
+
+> **Note on row 46 — corrected 2026-08-07.** This row previously read *"Try to void a
+> payment that has at least one allocation → Blocked with an error."* That was written before
+> migration `20260754_payment_cn_reversal.sql`, which **deliberately changed the behaviour** and
+> says so in its own header: *"void_payment / void_credit_note: reverse EVERY still-active
+> application of a payment/CN, then mark it voided. This is what a 'Void' button now does even
+> when the payment/CN has been applied — the exact fix the audit asked for."*
+>
+> Verified live on `PAY-2026-00011` (80.00, allocated 60 + 5): the void succeeded,
+> `INV-2026-00019` went Paid → Unpaid, `INV-2026-00020` Partial → Unpaid, and the payment's
+> `unapplied_amount` went 15.00 → 80.00 with status `voided`.
+>
+> **The code is correct; the row was stale.** Do not "fix" `void_payment` to block — that would
+> undo the audit remediation and leave a misapplied payment with no way out except a manual
+> per-line reversal.
+>
+> What *is* still blocked is a different operation: voiding an **invoice** that has payments or
+> credit notes applied to it (`void_invoice` → *"Reverse payments/credit notes before voiding"*).
+> Rows 24 and 46 are easy to conflate; they are not the same check.
 
 ---
 
