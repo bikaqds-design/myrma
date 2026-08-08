@@ -22,6 +22,7 @@ DECLARE
   v_ticket1      uuid;
   v_ticket2      uuid;
   v_unit1        uuid;  v_unit2 uuid;  v_unit3 uuid;  v_unit4 uuid;  v_unit5 uuid;  v_unit6 uuid;
+  v_unit_res     uuid;  -- CHECK 6b: active_rma + reserved (own variable; v_unit6 is reused later)
   v_wh_check     uuid;
   v_status       text;
   v_res          text;
@@ -148,6 +149,34 @@ BEGIN
     v_failures := array_append(v_failures, 'CHECK 6 (move unknown to_code blocked): was NOT blocked');
   EXCEPTION WHEN OTHERS THEN
     NULL; -- expected
+  END;
+
+  -- ── CHECK 6b: moving a RESERVED active_rma unit is rejected ──
+  -- Added 2026-08-06. This is the rejection behind the UI's
+  -- `inventory.autoMoveFailed` toast ("Ticket saved, but moving the unit(s)…
+  -- failed") — WAREHOUSE_R1_TEST_CHECKLIST.md §4. That row sat unrunnable for
+  -- the whole manual QA pass because the application cannot produce the state:
+  -- the sales funnel only ever reserves `company_stock`, never an RMA unit. It
+  -- is trivially stageable here, so the guard is asserted in CI rather than
+  -- left to a tester who can never reach it.
+  --
+  -- Unlike the checks above this asserts the SQLSTATE, not merely "something
+  -- threw" — a negative test that accepts any error would also pass if the
+  -- fixture itself were malformed.
+  v_check_count := v_check_count + 1;
+  INSERT INTO public.inventory_units (product_id, product_name, status, reservation_status, warehouse_id, rma_ticket_id, created_date)
+  VALUES (v_p1, 'CI RMA-location product', 'active_rma', 'reserved', v_rma_received, v_ticket1, now())
+  RETURNING id INTO v_unit_res;
+  BEGIN
+    PERFORM public.move_rma_units(v_ticket1,
+      jsonb_build_array(jsonb_build_object('unit_id', v_unit_res::text, 'to_code', 'RMA-REPAIR')), v_mgr);
+    v_failures := array_append(v_failures, 'CHECK 6b (move reserved unit blocked): was NOT blocked');
+  EXCEPTION
+    WHEN sqlstate 'P0001' THEN
+      NULL; -- expected: "cannot auto-move a reserved/delivered unit"
+    WHEN OTHERS THEN
+      v_failures := array_append(v_failures,
+        format('CHECK 6b (move reserved unit blocked): wrong error %s — %s', SQLSTATE, SQLERRM));
   END;
 
   -- ══════════════════════════ promote_rma_unit ═════════════════════════════
