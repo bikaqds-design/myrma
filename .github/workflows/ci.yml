@@ -49,6 +49,44 @@ jobs:
     name: DB · Audit Hardening Tests
     runs-on: ubuntu-latest
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # TEMPORARILY DISABLED (2026-08-07). Remove this single `if: false` line to
+    # re-enable — the job definition below is intact and unchanged.
+    #
+    # Why: `supabase start` rebuilds a database from scratch by applying every
+    # migration to an empty Postgres. That cannot work here, because the schema
+    # was originally created by Base44 and the migrations only ever ALTER it.
+    # Thirteen core tables are never created by any migration:
+    #
+    #   customers, customer_notes, email_templates, inventory_units,
+    #   manufacturer_batches, notifications, products, rma_tickets,
+    #   ticket_activity, ticket_comments, user_preferences, user_roles,
+    #   warehouses
+    #
+    # So the first migration that does e.g. `ALTER TABLE public.products …`
+    # (20260740, Sprint 8a) hits "relation does not exist" and the job dies
+    # before a single SQL assertion runs. This has failed on every push since
+    # the job was added in 9cc2be4 on 2026-07-02 — it has never been green, and
+    # has therefore never actually verified anything. A permanently-red check
+    # trains people to ignore CI, including the Test/Lint/Build job that does
+    # give real signal, so it is parked rather than left failing.
+    #
+    # What unblocks it: a baseline migration that creates those 13 tables,
+    # ordered before 20260524_*. Generate with
+    #   supabase db dump --linked --schema public -f baseline.sql
+    # (needs Docker), trim to the tables above, make it idempotent, commit as
+    # supabase/migrations/00000000000000_baseline.sql, then
+    #   supabase migration repair --status applied 00000000000000
+    # so the live project does not try to re-run it.
+    #
+    # NOTE: `npm run test:db` in package.json has the exact same problem for
+    # the same reason — it also starts with `npx supabase start`.
+    #
+    # None of this affects the live database or deploys. The failure is only in
+    # the throwaway CI database.
+    # ─────────────────────────────────────────────────────────────────────────
+    if: false
+
     steps:
       - uses: actions/checkout@v4
 
