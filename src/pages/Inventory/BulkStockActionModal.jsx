@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
 import Modal from '../../components/Modal'
 import { Button, Label, Select, Input } from '../../components/ui'
+import { destinationWarehouses } from '../../lib/warehouseDestinations.js'
 
 // ─── Bulk Stock Actions — transfer / adjust / recalculate across a multi-select
 // product set (Sprint 8 Phase 8c). Each action is a loop of the same
@@ -189,13 +190,11 @@ export function BulkStockActionModal({
             <Label>{t('inventory.selectDestWarehouse')}</Label>
             <Select value={destWarehouseId} onChange={(e) => setDestWarehouseId(e.target.value)} className="mt-1 w-full">
               <option value="">{t('common.select')}</option>
-              {warehouses
-                .filter((w) => w.is_active)
-                .map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
+              {destinationWarehouses(warehouses).map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
             </Select>
           </div>
         )}
@@ -210,13 +209,11 @@ export function BulkStockActionModal({
                 className="mt-1 w-full"
               >
                 <option value="">{t('common.select')}</option>
-                {warehouses
-                  .filter((w) => w.is_active)
-                  .map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
+                {destinationWarehouses(warehouses).map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
               </Select>
             </div>
             <div>

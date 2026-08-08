@@ -9,6 +9,7 @@ import EmptyState from '../../components/EmptyState'
 import { ActivityChatter } from '../../components/ActivityChatter'
 import Modal from '../../components/Modal'
 import { downloadPOPDF } from '../../lib/purchaseOrderPdf'
+import { destinationWarehouses } from '../../lib/warehouseDestinations'
 import { CreatePurchaseOrderModal, VendorInvoiceFormModal, RecordVendorPaymentModal } from './_modals'
 
 const STATUS_PILL = {
@@ -525,7 +526,7 @@ function ReceiveVendorInvoiceModal({ vi, warehouses, products, onClose, userEmai
           <Label required>{t('inventory.selectDestWarehouse')}</Label>
           <Select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className="w-full">
             <option value="">{t('common.select')}</option>
-            {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+            {destinationWarehouses(warehouses).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </Select>
         </div>
 

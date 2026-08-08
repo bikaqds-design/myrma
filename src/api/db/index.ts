@@ -134,6 +134,7 @@ export type {
   InventoryUnitRow, ManufacturerBatchRow, WarehouseRow,
   PartRow, TicketPartRow, TimeEntryRow, InvoiceRow, InventoryStatsRow,
   WarehouseStockRow, StockMoveRow, ProductStockSummary,
+  CreateUnitsResult, FailedUnitInsert,
 } from './inventory.js'
 export type {
   WhatsAppTemplateRow, TemplateVariable, NotificationLogRow,

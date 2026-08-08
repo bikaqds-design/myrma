@@ -26,6 +26,10 @@ export const DEFAULT_DUE = () => {
 }
 
 export const EMPTY_PRODUCT = {
+  // Set when the product is picked from the catalog dropdown; null for a typed
+  // name. Carried onto the inventory_unit so the Warehouse Dashboard can group
+  // the RMA by product — see src/lib/rmaUnitCreate.ts.
+  product_id: null,
   product_name: '',
   serial_number: '',
   product_status: 'Received',

@@ -517,15 +517,27 @@ export function WarehousesTab({
                       {canManage && (
                         <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
                           {wh.is_system ? (
-                            <div className="flex items-center justify-center text-gray-300" title={t('inventory.whSystemLocked')}>
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                                />
-                              </svg>
+                            // Protected row: name/code/type/active are trigger-enforced
+                            // (20260764), but location/description/manager/notes stay
+                            // editable — so the lock opens the modal in metadata-only
+                            // mode rather than blocking every edit. No archive button:
+                            // archive_warehouse() rejects system rows outright.
+                            <div className="flex items-center justify-center">
+                              <button
+                                onClick={() => setEditingWh(wh)}
+                                title={t('inventory.whSystemLocked')}
+                                aria-label={t('inventory.whSystemLocked')}
+                                className="p-1 text-gray-300 hover:text-indigo-600 rounded hover:bg-indigo-50 transition-colors"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                                  />
+                                </svg>
+                              </button>
                             </div>
                           ) : (
                             <div className="flex items-center gap-1 justify-center">
@@ -1009,6 +1021,11 @@ function WarehouseDetailModal({
 function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose }) {
   const { t } = useTranslation()
   const isEdit = !!initialData?.id
+  // System locations open in metadata-only mode: the 20260764 trigger rejects any
+  // change to code/name/warehouse_type/is_active, so those inputs are locked and
+  // left out of the payload entirely — sending them unchanged would still work,
+  // but omitting them keeps a stray edit from ever reaching the trigger.
+  const isSystem = !!initialData?.is_system
 
   const autoCode = React.useMemo(() => {
     if (isEdit) return initialData?.code || ''
@@ -1036,16 +1053,23 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
     if (!name.trim()) return
     setSaving(true)
     try {
-      await onSave({
-        name: name.trim(),
-        code: code.trim() || null,
+      const metadata = {
         location: location.trim() || null,
         description: desc.trim() || null,
-        is_active: active,
-        warehouse_type: warehouseType || null,
         manager: manager.trim() || null,
         notes: notes.trim() || null,
-      })
+      }
+      await onSave(
+        isSystem
+          ? metadata
+          : {
+              ...metadata,
+              name: name.trim(),
+              code: code.trim() || null,
+              is_active: active,
+              warehouse_type: warehouseType || null,
+            }
+      )
     } catch {
       toast.error(t('inventory.failedToSaveWarehouse'))
     } finally {
@@ -1066,6 +1090,11 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
               <span className="font-mono font-semibold text-indigo-600">{autoCode}</span>
             </p>
           )}
+          {isSystem && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mt-2">
+              {t('inventory.whSystemEditHint')}
+            </p>
+          )}
         </div>
         <div className="p-6 space-y-4">
           <div>
@@ -1076,8 +1105,9 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t('inventory.warehouseNamePlaceholder')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
-              autoFocus
+              disabled={isSystem}
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+              autoFocus={!isSystem}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -1088,7 +1118,8 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
               <input
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent font-mono"
+                disabled={isSystem}
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent font-mono disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
               />
             </div>
             <div>
@@ -1123,7 +1154,8 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
               <select
                 value={warehouseType}
                 onChange={(e) => setWarehouseType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+                disabled={isSystem}
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
               >
                 <option value="">{t('common.select')}</option>
                 {['main', 'branch', 'service_center', 'rma', 'transit', 'virtual'].map((wt) => (
@@ -1156,7 +1188,7 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
               className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
             />
           </div>
-          {isEdit && (
+          {isEdit && !isSystem && (
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"

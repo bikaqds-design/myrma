@@ -1,4 +1,7 @@
 import { supabase } from '../client.js'
+import { buildTicketUnits } from '../../lib/rmaUnitCreate.js'
+import type { TicketProductInput, CatalogProduct } from '../../lib/rmaUnitCreate.js'
+import { summarizeSerializedUnits } from '../../lib/stockSummary.js'
 import type { TableResult } from './types.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -181,37 +184,113 @@ export interface InventoryStatsRow {
   total: number
 }
 
-interface TicketProductInput {
-  product_name?: string
-  serial_number?: string
-  warranty_status?: string
+/** A unit that could not be inserted, with enough detail to name it in a toast. */
+export interface FailedUnitInsert {
+  product_name: string
+  serial_number: string
+  message: string
+  code: string | null
+}
+
+export interface CreateUnitsResult {
+  created: InventoryUnitRow[]
+  /** Non-empty means the caller MUST surface an error — see the note below. */
+  failed: FailedUnitInsert[]
+  /** `inventory_units` doesn't exist in this deployment (optional table). Not an error. */
+  missing: boolean
 }
 
 // ── Inventory Units ───────────────────────────────────────────────────────────
 
 export const inventory = {
+  /**
+   * Creates one `inventory_units` row per product on a newly-saved RMA ticket.
+   *
+   * Two failure modes were found in manual QA on 2026-08-05
+   * (WAREHOUSE_R1_TEST_CHECKLIST.md §2) and are fixed here:
+   *
+   *  1. **All-or-nothing.** Every unit went in as one `.insert(units)` batch, so
+   *     a single duplicate serial discarded the whole ticket's units. The batch
+   *     is still attempted first (one round trip, the overwhelmingly common
+   *     case), but on failure each row is retried individually so a bad row
+   *     only costs itself. A multi-row INSERT is a single atomic statement, so
+   *     nothing was written when the batch errored — the retry cannot duplicate
+   *     a row the batch already inserted.
+   *
+   *  2. **Silent failure.** This used to `return []` on any error, leaving the
+   *     UI to report success while no unit existed and no stock move was
+   *     written. Failures are now returned in `failed` for the caller to toast;
+   *     they are deliberately NOT thrown, because a ticket that saved fine
+   *     should not be reported as a failed save.
+   */
+  /**
+   * The id + name of every catalog product, for re-linking RMA ticket lines to
+   * `products`. Deliberately tolerant: if the lookup fails the unit is still
+   * created, just without a `product_id` — losing the dashboard grouping is bad,
+   * losing the unit is worse.
+   */
+  async listCatalogForUnitLinking(): Promise<CatalogProduct[]> {
+    const { data, error } = await supabase.from('products').select('id, product_name')
+    if (error) return []
+    return data || []
+  },
+
   async createUnitsFromTicket(
     ticketId: string,
     rmaNumber: string,
     products: TicketProductInput[]
-  ): Promise<InventoryUnitRow[]> {
-    if (!products?.length) return []
-    const units = products
-      .filter((p) => p.product_name || p.serial_number)
-      .map((p) => ({
-        rma_ticket_id: ticketId,
-        rma_number: rmaNumber,
-        product_name: p.product_name || '',
-        serial_number: p.serial_number || '',
-        warranty_status: p.warranty_status || '',
-        status: 'active_rma',
-        created_date: new Date().toISOString(),
-      }))
-    if (!units.length) return []
-    const { data, error } = await supabase.from('inventory_units').insert(units).select()
+  ): Promise<CreateUnitsResult> {
+    // The catalog lookup re-links each line to its `products` row: the form now
+    // stores product_id when the user picks from the dropdown, but a typed name
+    // (and every ticket saved before that existed) still has to be matched by
+    // name. Without it the unit is invisible to getStockSummary's per-product
+    // grouping — see buildTicketUnits.
+    const catalog = await this.listCatalogForUnitLinking()
+    const units = buildTicketUnits(ticketId, rmaNumber, products, undefined, catalog)
+    if (!units.length) return { created: [], failed: [], missing: false }
+
+    const batch = await supabase.from('inventory_units').insert(units).select()
+    if (!batch.error) return { created: batch.data || [], failed: [], missing: false }
+    if (batch.error.code === '42P01') return { created: [], failed: [], missing: true }
+
+    const created: InventoryUnitRow[] = []
+    const failed: FailedUnitInsert[] = []
+    for (const unit of units) {
+      const { data, error } = await supabase.from('inventory_units').insert([unit]).select()
+      if (error) {
+        failed.push({
+          product_name: unit.product_name,
+          serial_number: unit.serial_number,
+          message: error.message,
+          code: error.code ?? null,
+        })
+      } else if (data?.length) {
+        created.push(...data)
+      }
+    }
+    return { created, failed, missing: false }
+  },
+
+  /**
+   * Looks up which of the given serials are already held by a live
+   * `inventory_units` row. The `status <> 'closed'` filter deliberately mirrors
+   * the partial index `inv_units_serial_unique_idx`
+   * (`20260739_inventory_serial_uniqueness.sql`) — a closed unit may legitimately
+   * repeat a serial that later comes back on a new ticket, so it is not a conflict.
+   *
+   * Used by the ticket form to reject a duplicate serial before saving. Returns
+   * `[]` when the table is absent so an optional-table deployment never blocks a save.
+   */
+  async findTrackedSerials(serials: string[]): Promise<InventoryUnitRow[]> {
+    if (!serials?.length) return []
+    const { data, error } = await supabase
+      .from('inventory_units')
+      .select('*')
+      .in('serial_number', serials)
+      .neq('status', 'closed')
     if (error) {
       if (error.code === '42P01') return []
-      return []
+      throw error
     }
     return data || []
   },
@@ -597,27 +676,23 @@ export const inventory = {
         }
       }
 
-      const productUnits = units.filter((u) => u.product_id === p.id)
-      const companyStockUnits = productUnits.filter((u) => u.status === 'company_stock')
-      const rmaUnits = productUnits.filter((u) => u.status === 'active_rma')
-      const mainQty = companyStockUnits.filter((u) => isMainOrLegacy(whById.get(u.warehouse_id))).length
-      const branches = branchBreakdown(companyStockUnits.map((u) => ({ warehouse_id: u.warehouse_id, qty: 1 })))
-      const rma = rmaBreakdown(rmaUnits)
-      const physicalTotal =
-        companyStockUnits.filter((u) => whById.get(u.warehouse_id)?.code !== 'SCRAP').length +
-        rma.filter((r) => r.code !== 'SCRAP').reduce((sum, r) => sum + r.count, 0)
+      // All the arithmetic lives in src/lib/stockSummary.ts so it can be tested
+      // without a Supabase mock — see src/test/stockSummary.test.js, which
+      // locks down the rule that RMA units are physically present but never
+      // sellable.
+      const counts = summarizeSerializedUnits(units.filter((u) => u.product_id === p.id), whById)
 
       return {
         product_id: p.id,
         product_name: p.product_name,
         stock_tracking_mode: 'serialized',
-        available: productUnits.filter((u) => u.reservation_status === 'available').length,
-        reserved: productUnits.filter((u) => u.reservation_status === 'reserved').length,
-        delivered: productUnits.filter((u) => u.reservation_status === 'delivered').length,
-        physical_total: physicalTotal,
-        main_qty: mainQty,
-        branches,
-        rma,
+        available: counts.available,
+        reserved: counts.reserved,
+        delivered: counts.delivered,
+        physical_total: counts.physical_total,
+        main_qty: counts.main_qty,
+        branches: counts.branches,
+        rma: counts.rma,
         in_catalog: true,
       }
     })

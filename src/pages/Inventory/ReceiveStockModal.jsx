@@ -5,6 +5,7 @@ import { db } from '../../api/supabaseClient'
 import Modal from '../../components/Modal'
 import { Button, Label, Select, Input, Textarea } from '../../components/ui'
 import { ProductSearchInput } from '../Pipeline/_shared'
+import { destinationWarehouses } from '../../lib/warehouseDestinations.js'
 
 // ─── Receive Stock — interim manual stock-entry path (Sprint 8 Phase 8a/8b) ────
 // Sprint 9's Purchase Module replaces this with vendor-invoice-driven receipt.
@@ -118,7 +119,7 @@ export function ReceiveStockModal({ open, onClose, products, warehouses, userEma
               <Label>{t('inventory.selectDestWarehouse')}</Label>
               <Select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className="mt-1 w-full">
                 <option value="">{t('common.select')}</option>
-                {warehouses.map((w) => (
+                {destinationWarehouses(warehouses).map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.name}
                   </option>

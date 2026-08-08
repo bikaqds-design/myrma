@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
 import Modal from '../../components/Modal'
 import { Button, Label, Select, Input } from '../../components/ui'
+import { destinationWarehouses } from '../../lib/warehouseDestinations.js'
 
 // ─── Transfer Stock — funnel-aware atomic transfer (Sprint 8 Phase 8b) ─────────
 // Deliberately separate from the existing TransferModal.jsx (used by the 5
@@ -81,13 +82,11 @@ export function TransferStockModal({
           <Label>{t('inventory.selectDestWarehouse')}</Label>
           <Select value={toWarehouseId} onChange={(e) => setToWarehouseId(e.target.value)} className="mt-1 w-full">
             <option value="">{t('common.select')}</option>
-            {warehouses
-              .filter((w) => w.is_active && w.id !== fromWarehouseId)
-              .map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
+            {destinationWarehouses(warehouses, { excludeId: fromWarehouseId }).map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
           </Select>
         </div>
 

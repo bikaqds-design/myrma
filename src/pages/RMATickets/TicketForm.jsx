@@ -16,6 +16,7 @@ import { Button } from '../../components/ui'
 import { ROLES } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
 import { buildRmaMoves, dispatchRmaStageMoves } from '../../lib/rmaStageMoves'
+import { serialsToCheck, findSerialConflicts, describeFailedUnits } from '../../lib/rmaUnitCreate'
 import { ticketSchema, getFirstError } from '../../lib/schemas'
 import {
   generateRmaNumber,
@@ -243,15 +244,55 @@ function fireUpdateEmails(editingTicket, newData, resolvedCustomerEmail, userEma
   }
 }
 
-function dispatchCreateSideEffects(newTicket, ticketData, rmaNumber, userEmail, resolvedCustomerEmail) {
+/**
+ * Pre-save guard for the create path: a serial already held by a live
+ * inventory_units row violates inv_units_serial_unique_idx, and so does the
+ * same serial typed twice on one ticket. Rejecting here gives the user the
+ * offending serial by name instead of a post-save toast.
+ *
+ * Returns [] if the lookup itself fails — a broken pre-check must never block
+ * a save. createUnitsFromTicket now degrades gracefully on its own.
+ */
+async function findTicketSerialConflicts(products) {
+  const serials = serialsToCheck(products)
+  if (!serials.length) return []
+  let tracked
+  try {
+    tracked = await db.inventory.findTrackedSerials(serials)
+  } catch (err) {
+    captureException(err, { page: 'RMATickets', context: 'findTrackedSerials' })
+    return []
+  }
+  return findSerialConflicts(products, tracked)
+}
+
+function dispatchCreateSideEffects(newTicket, ticketData, rmaNumber, userEmail, resolvedCustomerEmail, t) {
   if (!newTicket?.id) return
   db.inventory
     .createUnitsFromTicket(newTicket.id, newTicket.rma_number || rmaNumber, ticketData.products)
-    .then((createdUnits) => {
-      const moves = buildRmaMoves(createdUnits, ticketData.products)
+    .then((result) => {
+      // A partial failure used to be invisible: the units silently vanished
+      // while the UI reported success (WAREHOUSE_R1_TEST_CHECKLIST.md §2).
+      if (result.failed.length) {
+        captureException(
+          new Error(`createUnitsFromTicket: ${result.failed.length} unit(s) failed — ${result.failed[0].message}`),
+          { page: 'RMATickets', context: 'createInventoryUnit' }
+        )
+        toast.error(
+          t('inventory.unitCreateFailed', {
+            failedCount: result.failed.length,
+            details: describeFailedUnits(result.failed),
+          }),
+          { duration: 8000 }
+        )
+      }
+      const moves = buildRmaMoves(result.created, ticketData.products)
       if (moves.length) return db.inventory.moveRmaUnits(newTicket.id, moves, userEmail)
     })
-    .catch((err) => captureException(err, { page: 'RMATickets', context: 'createInventoryUnit' }))
+    .catch((err) => {
+      captureException(err, { page: 'RMATickets', context: 'createInventoryUnit' })
+      toast.error(t('inventory.unitCreateFailedAll'), { duration: 8000 })
+    })
   const techEmails =
     ticketData.assigned_technician && ticketData.assigned_technician !== userEmail
       ? [ticketData.assigned_technician]
@@ -484,6 +525,20 @@ export function TicketForm({
     setFormData({ ...formData, products: p })
   }
 
+  /**
+   * Sets the product name and its catalog link together.
+   *
+   * Picking from the dropdown passes the product, so the unit created on save
+   * can be grouped under it on the Warehouse Dashboard. Typing passes null —
+   * the name no longer identifies a catalog row, and keeping a stale id would
+   * file the RMA against whatever the user picked before.
+   */
+  const setProductChoice = (i, name, product = null) => {
+    const p = [...formData.products]
+    p[i] = { ...p[i], product_name: name, product_id: product?.id ?? null }
+    setFormData({ ...formData, products: p })
+  }
+
   const handleDeleteAttachment = async (att, i) => {
     try {
       if (att.path) await storage.deleteFile(att.path)
@@ -521,6 +576,29 @@ export function TicketForm({
     if (!validation.success) {
       toast.error(getFirstError(validation))
       return
+    }
+
+    // Create path only — editing a ticket never inserts inventory_units rows,
+    // it only moves the ones the ticket already has.
+    if (!editingTicket) {
+      const conflicts = await findTicketSerialConflicts(formData.products)
+      if (conflicts.length) {
+        const dupes = conflicts.filter((c) => c.reason === 'duplicate_in_ticket')
+        const tracked = conflicts.filter((c) => c.reason === 'already_tracked')
+        if (dupes.length) {
+          toast.error(
+            t('ticketForm.serialDuplicateInTicket', { serials: dupes.map((c) => c.serial).join(', ') }),
+            { duration: 8000 }
+          )
+        }
+        if (tracked.length) {
+          toast.error(
+            t('ticketForm.serialAlreadyTracked', { serials: tracked.map((c) => c.serial).join(', ') }),
+            { duration: 8000 }
+          )
+        }
+        return
+      }
     }
 
     setUploading(true)
@@ -591,7 +669,7 @@ export function TicketForm({
           created_by: userEmail,
           created_date: new Date().toISOString(),
         })
-        dispatchCreateSideEffects(newTicket, ticketData, rmaNumber, userEmail, resolvedCustomerEmail)
+        dispatchCreateSideEffects(newTicket, ticketData, rmaNumber, userEmail, resolvedCustomerEmail, t)
         db.userActivity
           .create(userEmail, 'ticket_created', `Created ticket ${rmaNumber} for ${ticketData.customer_name}`)
           .catch(() => {})
@@ -884,7 +962,7 @@ export function TicketForm({
                             const s = [...productSearches]
                             s[idx] = e.target.value
                             setProductSearches(s)
-                            updateProduct(idx, 'product_name', e.target.value)
+                            setProductChoice(idx, e.target.value)
                             const d = [...showProductDropdowns]
                             d[idx] = true
                             setShowProductDropdowns(d)
@@ -910,7 +988,7 @@ export function TicketForm({
                                     const s = [...productSearches]
                                     s[idx] = p.product_name
                                     setProductSearches(s)
-                                    updateProduct(idx, 'product_name', p.product_name)
+                                    setProductChoice(idx, p.product_name, p)
                                     const d = [...showProductDropdowns]
                                     d[idx] = false
                                     setShowProductDropdowns(d)

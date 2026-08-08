@@ -79,6 +79,26 @@ export function StockBreakdownModal({
     )
   }, [productSummary, isBulk, units])
 
+  // Units parked outside stock by an Adjust — 'sent_to_manufacturer', 'closed',
+  // and anything else that is neither company stock nor on an RMA. They used to
+  // appear nowhere actionable: availableUnits excludes them, the reserved and
+  // RMA sections don't list them, and the All Units drill-in is read-only — so
+  // adjusting a unit off stock was a one-way door with no route back
+  // (WAREHOUSE_R1_TEST_CHECKLIST.md §9). Listing them here restores Adjust so
+  // the status can be corrected.
+  //
+  // Deliberately NOT offered Transfer: transfer_stock requires an available
+  // company_stock unit and would reject them anyway.
+  const offStockUnits = useMemo(() => {
+    if (!productSummary || isBulk) return []
+    return units.filter(
+      (u) =>
+        u.product_id === productSummary.product_id &&
+        u.status !== 'company_stock' &&
+        u.status !== 'active_rma'
+    )
+  }, [productSummary, isBulk, units])
+
   const reservedRows = useMemo(() => {
     if (!productSummary) return []
     if (isBulk) {
@@ -220,6 +240,33 @@ export function StockBreakdownModal({
                 ))}
               </ul>
             )}
+          </section>
+        )}
+
+        {!isBulk && isManagerOrAbove && offStockUnits.length > 0 && (
+          <section>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-[#6c6760] dark:text-[#9aa4b2] mb-2">
+              {t('inventory.offStockUnits')}
+            </h4>
+            <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2] mb-2">
+              {t('inventory.offStockUnitsHint')}
+            </p>
+            <ul className="space-y-1 text-sm">
+              {offStockUnits.map((u) => (
+                <li key={u.id} className="flex items-center justify-between">
+                  <span className="text-[#211f1b] dark:text-[#e8ebf0]">
+                    {u.serial_number || t('inventory.noSerial')}
+                    <span className="ml-2 text-xs text-[#6c6760] dark:text-[#9aa4b2]">{u.status}</span>
+                  </span>
+                  <button
+                    onClick={() => setAdjustTarget({ warehouseId: u.warehouse_id, unit: u })}
+                    className="text-xs text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
+                  >
+                    {t('inventory.actionAdjust')}
+                  </button>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 
