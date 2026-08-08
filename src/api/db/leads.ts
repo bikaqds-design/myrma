@@ -95,12 +95,32 @@ export const leads = {
     const { error } = await supabase.from('leads').delete().in('id', ids)
     if (error) throw error
   },
-  async bulkUpdate(ids: string[], fields: Partial<Pick<LeadRow, 'status' | 'source'>>): Promise<void> {
+  /**
+   * bulkUpdate — apply status/source to many leads at once.
+   *
+   * Status transitions are auto-logged here, exactly as updateStatus() does for
+   * a single lead. Without this the bulk path was a silent hole in the audit
+   * trail: Sprint 2.5 Phase B promises "every status change auto-logs a
+   * type:'log' activity", but the bulk action wrote none, so a lead's history
+   * could show a transition *to* a status it was no longer in with nothing
+   * explaining the change (found in manual QA 2026-08-08 — a lead sat at "New"
+   * whose newest log entry read "changed to Disqualified").
+   *
+   * One log row per lead that actually changed; leads already on the target
+   * status are skipped, matching updateStatus()'s no-op-if-same behaviour.
+   * Logging is non-fatal — a failed log never rolls back a persisted change.
+   */
+  async bulkUpdate(
+    ids: string[],
+    fields: Partial<Pick<LeadRow, 'status' | 'source'>>,
+    actorEmail: string | null = null
+  ): Promise<void> {
     if (!ids.length) return
-    // Mirror the single-row update() guard: block if any selected lead is converted.
+    // Mirror the single-row update() guard: block if any selected lead is
+    // converted. `status` is selected too so the transition can be logged.
     const { data: existing, error: fetchErr } = await supabase
       .from('leads')
-      .select('id, converted_at')
+      .select('id, status, converted_at')
       .in('id', ids)
     if (fetchErr) throw fetchErr
     const converted = (existing ?? []).filter((r) => r.converted_at !== null)
@@ -109,6 +129,20 @@ export const leads = {
     }
     const { error } = await supabase.from('leads').update(fields).in('id', ids)
     if (error) throw error
+
+    if (fields.status) {
+      const changed = (existing ?? []).filter((r) => r.status !== fields.status)
+      await Promise.allSettled(
+        changed.map((r) =>
+          activities.logSystem(
+            'lead',
+            r.id,
+            `status_changed|${r.status}|${fields.status}`,
+            actorEmail
+          )
+        )
+      )
+    }
   },
   /**
    * Atomic conversion — calls the crm_convert_lead SECURITY DEFINER RPC

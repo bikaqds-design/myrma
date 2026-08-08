@@ -247,6 +247,9 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
       open: true,
       title: t('leads.deleteLeadTitle'),
       message: t('leads.deleteLeadConfirm', { name: lead?.full_name }),
+      // The i18n keys are legacy-named ("delete…") but their text is already
+      // disqualify wording; only the button label was still saying Delete.
+      confirmLabel: t('leads.disqualify'),
       onConfirm: async () => {
         setConfirmDialog((d) => ({ ...d, open: false }))
         await handleStatusChange('disqualified')
@@ -657,10 +660,14 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
         />
       )}
 
+      {/* confirmLabel is explicit because ConfirmDialog defaults to "Delete".
+          The only thing this dialog confirms is disqualification, which does
+          not delete anything — the lead stays and simply becomes read-only. */}
       <ConfirmDialog
         open={confirmDialog.open}
         title={confirmDialog.title}
         message={confirmDialog.message}
+        confirmLabel={confirmDialog.confirmLabel}
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog((d) => ({ ...d, open: false }))}
       />

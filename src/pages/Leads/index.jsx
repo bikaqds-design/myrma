@@ -664,7 +664,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   const handleBulkStatusChange = async (status) => {
     const ids = nonConvertedSelected()
     try {
-      await db.leads.bulkUpdate(ids, { status })
+      await db.leads.bulkUpdate(ids, { status }, currentUserEmail)
       toast.success(t('leads.bulkStatusChanged', { count: ids.length }))
       setSelectedLeads(new Set())
       queryClient.invalidateQueries({ queryKey: ['leads'] })
@@ -676,7 +676,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   const handleBulkSourceChange = async (source) => {
     const ids = nonConvertedSelected()
     try {
-      await db.leads.bulkUpdate(ids, { source })
+      await db.leads.bulkUpdate(ids, { source }, currentUserEmail)
       toast.success(t('leads.bulkSourceChanged', { count: ids.length }))
       setSelectedLeads(new Set())
       queryClient.invalidateQueries({ queryKey: ['leads'] })
