@@ -219,6 +219,43 @@ export const products = {
     if (error) throw error
     return data?.[0]
   },
+
+  /**
+   * hasStock: does this product hold any stock under EITHER tracking model?
+   *
+   * Gates the `stock_tracking_mode` selector. The two models live in different
+   * tables — serialized in `inventory_units`, bulk in `warehouse_stock` — and
+   * every reader picks its table from the product's current mode. Flipping the
+   * mode while stock exists therefore does not migrate anything: it just points
+   * every view at the empty table, and the stock silently vanishes from the UI
+   * while still sitting in the database.
+   *
+   * So the mode is editable only while both sides are empty. `20260772` enforces
+   * the same rule in Postgres; this is the check that lets the form disable the
+   * control and explain why, instead of waiting for the trigger to raise.
+   *
+   * Counts live units only (`company_stock`/`active_rma`) — matching
+   * getStockSummary — so a product whose units are all sold/scrapped is still
+   * free to switch.
+   */
+  async hasStock(productId: string): Promise<boolean> {
+    const [unitsRes, bulkRes] = await Promise.all([
+      supabase
+        .from('inventory_units')
+        .select('id', { count: 'exact', head: true })
+        .eq('product_id', productId)
+        .in('status', ['company_stock', 'active_rma']),
+      supabase
+        .from('warehouse_stock')
+        .select('id', { count: 'exact', head: true })
+        .eq('product_id', productId)
+        .gt('quantity', 0),
+    ])
+    if (unitsRes.error) throw unitsRes.error
+    // warehouse_stock may not exist on an un-migrated database — treat as empty.
+    if (bulkRes.error && bulkRes.error.code !== '42P01') throw bulkRes.error
+    return (unitsRes.count ?? 0) > 0 || (bulkRes.count ?? 0) > 0
+  },
   async bulkCreate(productsData: Partial<ProductRow>[]): Promise<ProductRow[]> {
     const { data, error } = await supabase.from('products').insert(productsData).select()
     if (error) throw error

@@ -16,6 +16,7 @@ export function AddProductModal({
   handleSaveProduct,
   onClose,
   editingProduct,
+  trackingModeLocked = false,
 }) {
   const { t } = useTranslation()
   const filteredCategories = categories.filter((c) => c.brand_id === productForm.brand_id)
@@ -173,6 +174,37 @@ export function AddProductModal({
               </select>
             </div>
           </div>
+
+          {/* Tracking mode decides which table this product's stock lives in
+              (inventory_units vs warehouse_stock), so it is locked once stock
+              exists — see 20260772, which enforces the same rule server-side.
+              Services never touch inventory, so the control is irrelevant for
+              them and is hidden rather than shown disabled. */}
+          {productForm.product_type !== 'service' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {t('products.stockTrackingMode')}
+              </label>
+              <select
+                value={productForm.stock_tracking_mode}
+                onChange={(e) =>
+                  setProductForm({ ...productForm, stock_tracking_mode: e.target.value })
+                }
+                disabled={trackingModeLocked}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+              >
+                {/* Reuses the inventory namespace so the words here match the
+                    TRACKING column on Inventory → Overview exactly. */}
+                <option value="serialized">{t('inventory.tracking_serialized')}</option>
+                <option value="bulk">{t('inventory.tracking_bulk')}</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {trackingModeLocked
+                  ? t('products.trackingModeLocked')
+                  : t('products.trackingModeHint')}
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

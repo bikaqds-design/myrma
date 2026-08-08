@@ -93,11 +93,20 @@ export default function Products({
     product_name: '',
     product_type: 'hardware',
     status: 'active',
+    stock_tracking_mode: 'serialized',
     warranty_months: 12,
     product_description: '',
     product_link: '',
     product_image_url: null,
   })
+
+  // Whether the product being edited already holds stock — freezes the
+  // tracking-mode selector, because switching models points every reader at
+  // the other (empty) table and hides the stock. Always false for a new
+  // product. Resolved async on opening the edit form; defaults to locked=false
+  // and only ever relaxes the UI, never the database (20260772 is the real
+  // guard, so a stale false here surfaces as a server error, not corruption).
+  const [trackingModeLocked, setTrackingModeLocked] = useState(false)
 
   const [brandForm, setBrandForm] = useState({
     brand_name: '',
@@ -693,6 +702,13 @@ export default function Products({
         subcategory_id: productForm.subcategory_id || null,
         product_type: productForm.product_type,
         status: productForm.status,
+        // A service never touches inventory, so it keeps the column's default
+        // rather than carrying a meaningless mode. Omitting the key also means
+        // an edit that only flips a product to 'service' never trips the
+        // 20260772 trigger.
+        ...(productForm.product_type === 'service'
+          ? {}
+          : { stock_tracking_mode: productForm.stock_tracking_mode }),
         warranty_months: productForm.warranty_months,
         product_description: productForm.product_description,
         product_link: productForm.product_link,
@@ -968,6 +984,7 @@ export default function Products({
       product_name: product.product_name || '',
       product_type: product.product_type || 'hardware',
       status: product.status || 'active',
+      stock_tracking_mode: product.stock_tracking_mode || 'serialized',
       warranty_months: product.warranty_months || 12,
       product_description: product.product_description || '',
       product_link: product.product_link || '',
@@ -975,6 +992,11 @@ export default function Products({
     })
     setImagePreview(product.product_image_url)
     setImageFile(null)
+    setTrackingModeLocked(false)
+    db.products
+      .hasStock(product.id)
+      .then(setTrackingModeLocked)
+      .catch(() => {}) // the DB trigger still enforces it; leave the field usable
     setShowAddProduct(true)
   }
 
@@ -1023,6 +1045,7 @@ export default function Products({
       product_name: '',
       product_type: 'hardware',
       status: 'active',
+      stock_tracking_mode: 'serialized',
       warranty_months: 12,
       product_description: '',
       product_link: '',
@@ -1031,6 +1054,7 @@ export default function Products({
     setImageFile(null)
     setImagePreview(null)
     setEditingProduct(null)
+    setTrackingModeLocked(false)
   }
 
   const resetBrandForm = () => {
@@ -1208,6 +1232,7 @@ export default function Products({
           imagePreview={imagePreview}
           handleImageChange={handleImageChange}
           handleSaveProduct={handleSaveProduct}
+          trackingModeLocked={trackingModeLocked}
           onClose={() => {
             setShowAddProduct(false)
             resetProductForm()
