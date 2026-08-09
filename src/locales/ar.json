@@ -3373,6 +3373,12 @@
     "vendorNoLedger": "لا توجد فواتير أو مدفوعات مسجلة لهذا المورد بعد.",
     "ledgerTypeVendorInvoice": "فاتورة مورد",
     "ledgerTypeVendorPayment": "دفعة",
-    "viewVendor": "عرض المورد"
+    "viewVendor": "عرض المورد",
+    "receiptHistory": "سجل الاستلام",
+    "receiptCount_one": "استلام واحد",
+    "receiptCount_other": "{{count}} عمليات استلام",
+    "unitsReceived_one": "تم استلام وحدة واحدة",
+    "unitsReceived_other": "تم استلام {{count}} وحدة",
+    "receivedBy": "بواسطة {{name}}"
   }
 }

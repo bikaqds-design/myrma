@@ -3369,6 +3369,12 @@
     "vendorNoLedger": "No invoices or payments recorded for this vendor yet.",
     "ledgerTypeVendorInvoice": "Vendor Invoice",
     "ledgerTypeVendorPayment": "Payment",
-    "viewVendor": "View vendor"
+    "viewVendor": "View vendor",
+    "receiptHistory": "Receipt History",
+    "receiptCount_one": "{{count}} receipt",
+    "receiptCount_other": "{{count}} receipts",
+    "unitsReceived_one": "{{count}} unit received",
+    "unitsReceived_other": "{{count}} units received",
+    "receivedBy": "by {{name}}"
   }
 }

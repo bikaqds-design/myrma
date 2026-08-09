@@ -132,9 +132,18 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
     enabled: isVI,
   })
 
+  // The movement ledger this invoice wrote. Only receipts are read, so a PO —
+  // which never moves stock itself — does not query at all.
+  const { data: receiptMoves = [] } = useQuery({
+    queryKey: ['purchase-receipts', docId],
+    queryFn: () => db.stockMoves.receiptsForDocument('vendor_invoice', docId).then((r) => r.data),
+    enabled: isVI && !!docId,
+  })
+
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['purchase-document', docType, docId] })
     queryClient.invalidateQueries({ queryKey: ['purchase-documents'] })
+    queryClient.invalidateQueries({ queryKey: ['purchase-receipts', docId] })
   }
 
   const runAction = async (fn) => {
@@ -486,6 +495,10 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
         </div>
       )}
 
+      {isVI && receiptMoves.length > 0 && (
+        <ReceiptHistory moves={receiptMoves} warehouses={warehouses} />
+      )}
+
       <div className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] overflow-hidden">
         <ActivityChatter relatedType={docType} relatedId={doc.id} currentUserEmail={currentUserEmail} canEdit currentUserRole={currentUserRole} />
       </div>
@@ -494,6 +507,112 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
 }
 
 // ─── Receive Vendor Invoice — dual-mode confirmation & receipt ─────────────────
+/**
+ * ReceiptHistory — what physically arrived against this invoice, and when.
+ *
+ * Until now the line table's "Qty Received" was the only trace on this page: it
+ * says four of six arrived but not that three came on Monday and one on Friday,
+ * which serials they were, or who booked them in. That detail existed only in
+ * Inventory → Stock Movements, unfiltered and several clicks away from the
+ * document it belongs to.
+ *
+ * Receipts are reconstructed by grouping on created_at. The receive RPC inserts
+ * every move of one call in a single transaction, and created_at defaults to
+ * NOW() — transaction time, identical across the batch — so a shared timestamp
+ * means one receiving event. There is no receipt id to group on instead.
+ */
+function ReceiptHistory({ moves, warehouses }) {
+  const { t } = useTranslation()
+  const warehouseName = (id) => warehouses.find((w) => w.id === id)?.name || '—'
+
+  const batches = []
+  const byTime = new Map()
+  for (const m of moves) {
+    if (!byTime.has(m.created_at)) {
+      const batch = { at: m.created_at, actor: m.actor_email, moves: [] }
+      byTime.set(m.created_at, batch)
+      batches.push(batch)
+    }
+    byTime.get(m.created_at).moves.push(m)
+  }
+
+  return (
+    <div className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] mb-4 overflow-hidden">
+      <div className="px-[18px] py-3 border-b border-[#e6e9ef] dark:border-[#212a38] flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{t('purchasing.receiptHistory')}</h3>
+        <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">
+          {t('purchasing.receiptCount', { count: batches.length })}
+        </span>
+      </div>
+      <div className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
+        {batches.map((batch) => {
+          // Serialized moves are one row per unit; bulk moves carry qty. Summing
+          // qty is right for both.
+          const totalQty = batch.moves.reduce((sum, m) => sum + Number(m.qty || 0), 0)
+          // Collapse the per-unit rows back into one line per product, so a
+          // ten-serial receipt reads as one line with ten chips.
+          const byProduct = new Map()
+          for (const m of batch.moves) {
+            const key = `${m.product_name || '—'}|${m.warehouse_id || ''}`
+            if (!byProduct.has(key)) {
+              byProduct.set(key, {
+                productName: m.product_name || '—',
+                warehouseId: m.warehouse_id,
+                qty: 0,
+                serials: [],
+              })
+            }
+            const g = byProduct.get(key)
+            g.qty += Number(m.qty || 0)
+            if (m.serial_number) g.serials.push(m.serial_number)
+          }
+
+          return (
+            <div key={batch.at} className="px-[18px] py-3.5">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2.5">
+                <span className="text-sm font-medium text-[#211f1b] dark:text-[#e8ebf0]">
+                  {new Date(batch.at).toLocaleString()}
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400">
+                  {t('purchasing.unitsReceived', { count: totalQty })}
+                </span>
+                <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2]" dir="auto">
+                  {t('purchasing.receivedBy', { name: batch.actor || '—' })}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {[...byProduct.values()].map((g, i) => (
+                  <div key={i} className="text-sm">
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <span className="text-[#211f1b] dark:text-[#e8ebf0]" dir="auto">{g.productName}</span>
+                      <span className="text-[#6c6760] dark:text-[#9aa4b2]">× {g.qty}</span>
+                      <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">
+                        → {warehouseName(g.warehouseId)}
+                      </span>
+                    </div>
+                    {g.serials.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {g.serials.map((s) => (
+                          <span
+                            key={s}
+                            className="px-1.5 py-0.5 rounded font-mono text-[11px] bg-[#f5f6f8] dark:bg-[#1a2230] text-[#6c6760] dark:text-[#9aa4b2]"
+                          >
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function ReceiveVendorInvoiceModal({ vi, warehouses, products, onClose, userEmail, onSuccess }) {
   const { t } = useTranslation()
   const [warehouseId, setWarehouseId] = useState('')

@@ -110,7 +110,10 @@ export interface StockMoveRow {
   id: string
   ref_type: 'unit' | 'part' | 'warehouse_stock'
   ref_id: string
-  doc_type: 'sales_order' | 'invoice' | 'credit_note' | 'manual'
+  // 'vendor_invoice' was added to the DB constraint by 20260747 (a vendor
+  // invoice id is a distinct entity from a sales crm_invoices id, so reusing
+  // 'invoice' would make doc_id ambiguous) but never reached this type.
+  doc_type: 'sales_order' | 'invoice' | 'credit_note' | 'vendor_invoice' | 'manual'
   doc_id: string | null
   move_type: 'reserve' | 'deliver' | 'release' | 'restore' | 'adjust' | 'receive' | 'transfer'
   qty: number
@@ -118,6 +121,16 @@ export interface StockMoveRow {
   to_status: string | null
   actor_email: string
   created_at: string
+}
+
+/**
+ * A stock_moves row joined to whatever its polymorphic ref_id points at, so a
+ * receipt can be displayed without the caller re-resolving units and stock.
+ */
+export interface ReceiptMoveRow extends StockMoveRow {
+  serial_number: string | null
+  product_name: string | null
+  warehouse_id: string | null
 }
 
 export interface PartRow {
@@ -813,6 +826,102 @@ export const stockMoves = {
         throw error
       }
       return { missing: false, data: data || [] }
+    } catch {
+      return { missing: true, data: [] }
+    }
+  },
+
+  /**
+   * receiptsForDocument — every ledger row one purchase document produced,
+   * enriched with the serial / product / warehouse the stock_moves row does not
+   * itself carry. ref_id is polymorphic ('unit' points at inventory_units,
+   * 'warehouse_stock' at warehouse_stock) so there is no foreign key for
+   * PostgREST to embed through and the lookups have to be done by hand.
+   *
+   * Ordered oldest-first: a receipt history reads as a sequence of events.
+   */
+  async receiptsForDocument(
+    docType: StockMoveRow['doc_type'],
+    docId: string
+  ): Promise<TableResult<ReceiptMoveRow[]>> {
+    try {
+      const { data, error } = await supabase
+        .from('stock_moves')
+        .select('*')
+        .eq('doc_type', docType)
+        .eq('doc_id', docId)
+        .eq('move_type', 'receive')
+        .order('created_at', { ascending: true })
+      if (error) {
+        if (error.code === '42P01') return { missing: true, data: [] }
+        throw error
+      }
+      const moves = (data || []) as StockMoveRow[]
+      if (!moves.length) return { missing: false, data: [] }
+
+      const unitIds = moves.filter((m) => m.ref_type === 'unit').map((m) => m.ref_id)
+      const stockIds = moves.filter((m) => m.ref_type === 'warehouse_stock').map((m) => m.ref_id)
+
+      const [unitsRes, stockRes] = await Promise.all([
+        unitIds.length
+          ? supabase
+              .from('inventory_units')
+              .select('id, serial_number, product_name, warehouse_id')
+              .in('id', unitIds)
+          : Promise.resolve({ data: [], error: null }),
+        stockIds.length
+          ? supabase.from('warehouse_stock').select('id, product_id, warehouse_id').in('id', stockIds)
+          : Promise.resolve({ data: [], error: null }),
+      ])
+
+      const unitById = new Map(
+        (unitsRes.data || []).map((u: Record<string, unknown>) => [u.id as string, u])
+      )
+      const stockById = new Map(
+        (stockRes.data || []).map((s: Record<string, unknown>) => [s.id as string, s])
+      )
+
+      // A bulk move only reaches a product through warehouse_stock, so the
+      // product name needs one more hop that the serialized path does not.
+      const productIds = [
+        ...new Set(
+          (stockRes.data || [])
+            .map((s: Record<string, unknown>) => s.product_id as string | null)
+            .filter((id): id is string => Boolean(id))
+        ),
+      ]
+      const productsRes = productIds.length
+        ? await supabase.from('products').select('id, product_name').in('id', productIds)
+        : { data: [] }
+      const productNameById = new Map(
+        (productsRes.data || []).map((p: Record<string, unknown>) => [
+          p.id as string,
+          p.product_name as string,
+        ])
+      )
+
+      const enriched: ReceiptMoveRow[] = moves.map((m) => {
+        if (m.ref_type === 'unit') {
+          const u = unitById.get(m.ref_id)
+          return {
+            ...m,
+            serial_number: (u?.serial_number as string) ?? null,
+            product_name: (u?.product_name as string) ?? null,
+            warehouse_id: (u?.warehouse_id as string) ?? null,
+          }
+        }
+        const s = stockById.get(m.ref_id)
+        return {
+          ...m,
+          serial_number: null,
+          product_name: s?.product_id
+            ? productNameById.get(s.product_id as string) ?? null
+            : null,
+          warehouse_id: (s?.warehouse_id as string) ?? null,
+        }
+      })
+
+      return { missing: false, data: enriched }
     } catch {
       return { missing: true, data: [] }
     }
