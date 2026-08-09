@@ -3236,6 +3236,8 @@
     "colPhone": "الهاتف",
     "colPaymentTerms": "شروط الدفع",
     "noVendorsYet": "لا يوجد موردون بعد",
+    "noVendorsMatch": "لا يوجد موردون مطابقون لبحثك",
+    "searchVendorsPlaceholder": "ابحث بالمورد أو جهة الاتصال أو البريد أو الهاتف…",
     "colType": "النوع",
     "colCode": "الكود",
     "colVendor": "المورد",

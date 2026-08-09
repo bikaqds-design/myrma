@@ -3232,6 +3232,8 @@
     "colPhone": "Phone",
     "colPaymentTerms": "Payment Terms",
     "noVendorsYet": "No vendors yet",
+    "noVendorsMatch": "No vendors match your search",
+    "searchVendorsPlaceholder": "Search by vendor, contact, email, or phone…",
     "colType": "Type",
     "colCode": "Code",
     "colVendor": "Vendor",

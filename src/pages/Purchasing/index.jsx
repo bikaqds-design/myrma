@@ -45,6 +45,103 @@ function SortableHeader({ label, sortKey, sortConfig, onSort }) {
   )
 }
 
+function SearchBox({ value, onChange, placeholder }) {
+  return (
+    <div className="relative flex-1 max-w-md">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
+      />
+      <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    </div>
+  )
+}
+
+/**
+ * The "showing 1–25 of 60" strip above a table, with the page-size picker.
+ * Extracted when the Vendors tab gained paging, so the two tables cannot drift.
+ */
+function ListRangeBar({ from, to, total, itemsPerPage, onItemsPerPage }) {
+  const { t } = useTranslation()
+  return (
+    <div className="px-5 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[#e6e9ef] dark:border-[#212a38]">
+      <span className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
+        {t('purchasing.showingRange', { from, to, total })}
+      </span>
+      <div className="flex items-center gap-2">
+        <label className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('common.itemsPerPage')}:</label>
+        <select
+          value={itemsPerPage}
+          onChange={(e) => onItemsPerPage(parseInt(e.target.value))}
+          className="px-3 py-1 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
+        >
+          <option value={10}>10</option>
+          <option value={25}>25</option>
+          <option value={50}>50</option>
+          <option value={100}>100</option>
+        </select>
+      </div>
+    </div>
+  )
+}
+
+/** Page buttons + jump-to-page footer, shared by the documents and Vendors tabs. */
+function PaginationBar({
+  currentPage, totalPages, from, to, total,
+  onPage, jumpToPage, setJumpToPage, onJump, renderPageNumbers,
+}) {
+  const { t } = useTranslation()
+  if (totalPages <= 1) return null
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-t border-[#e6e9ef] dark:border-[#212a38]">
+      <div className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
+        {t('purchasing.showingRange', { from, to, total })}
+      </div>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onPage(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {t('common.previous')}
+        </button>
+        <div className="flex items-center gap-1">{renderPageNumbers()}</div>
+        <button
+          onClick={() => onPage(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {t('common.next')}
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('common.jumpToPage')}:</span>
+        <input
+          type="number"
+          min="1"
+          max={totalPages}
+          value={jumpToPage}
+          onChange={(e) => setJumpToPage(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onJump()}
+          placeholder={currentPage.toString()}
+          className="w-20 px-3 py-1 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
+        />
+        <button
+          onClick={onJump}
+          className="px-3 py-1 bg-[#4338ca] dark:bg-[#a5b4fc] text-white dark:text-[#0b0f17] rounded-lg hover:opacity-90 text-sm transition-opacity"
+        >
+          {t('common.go')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Purchasing — Vendor(=Brand) -> Purchase Order -> Vendor Invoice -> Receive ─
 export default function Purchasing({ currentUserRole, currentUserEmail, currentUserPermissions }) {
   const { t } = useTranslation()
@@ -71,8 +168,13 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
   const [filterStatus, setFilterStatus] = useState('')
   const [filterVendor, setFilterVendor] = useState('')
 
+  const isVendorsTab = tab === 'vendors'
+
   const [sortConfig, setSortConfig] = useState(() =>
     safeStorage.get('purchasingSortConfig', { key: 'created_at', direction: 'desc' })
+  )
+  const [vendorSort, setVendorSort] = useState(() =>
+    safeStorage.get('purchasingVendorSort', { key: 'brand_name', direction: 'asc' })
   )
 
   const [currentPage, setCurrentPage] = useState(1)
@@ -101,7 +203,11 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
   // ── Effects ─────────────────────────────────────────────────────────────────
   useEffect(() => { safeStorage.set('purchasingPerPage', itemsPerPage) }, [itemsPerPage])
   useEffect(() => { safeStorage.set('purchasingSortConfig', sortConfig) }, [sortConfig])
-  useEffect(() => { setCurrentPage(1) }, [search, filterStatus, filterVendor, tab, itemsPerPage, sortConfig])
+  useEffect(() => { safeStorage.set('purchasingVendorSort', vendorSort) }, [vendorSort])
+  useEffect(() => { setCurrentPage(1) }, [search, filterStatus, filterVendor, tab, itemsPerPage, sortConfig, vendorSort])
+  // The search box is shared between documents and vendors, and a code that
+  // matched a PO will match no vendor. Carrying it across reads as an empty tab.
+  useEffect(() => { setSearch('') }, [tab])
   useEffect(() => { setSelectedKeys(new Set()) }, [tab])
   useEffect(() => {
     const handler = (e) => { if (!newMenuRef.current?.contains(e.target)) setNewMenuOpen(false) }
@@ -176,11 +282,47 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
 
   const activeFilterCount = [filterStatus, filterVendor].filter(Boolean).length
 
+  // Vendors are a different shape to documents — no status, no total, no dates —
+  // so they get their own search and sort rather than being forced through the
+  // document pipeline above. They share the paging state below, since only one
+  // tab is ever on screen.
+  const vendorFiltered = useMemo(() => {
+    let f = vendorList
+    if (search) {
+      const q = search.toLowerCase()
+      f = f.filter((v) =>
+        [v.brand_name, v.contact_person, v.email, v.phone].some((field) =>
+          (field ?? '').toLowerCase().includes(q)
+        )
+      )
+    }
+    return [...f].sort((a, b) => {
+      const aVal = (a[vendorSort.key] ?? '').toString().toLowerCase()
+      const bVal = (b[vendorSort.key] ?? '').toString().toLowerCase()
+      // Blanks sort last in either direction; a contact-less vendor at the top
+      // of an A-Z list is noise, not information.
+      if (!aVal && bVal) return 1
+      if (aVal && !bVal) return -1
+      if (aVal < bVal) return vendorSort.direction === 'asc' ? -1 : 1
+      if (aVal > bVal) return vendorSort.direction === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [vendorList, search, vendorSort])
+
+  const handleVendorSort = (key) => {
+    setVendorSort((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
   // ── Pagination ───────────────────────────────────────────────────────────────
-  const totalPages = Math.ceil(filtered.length / itemsPerPage)
+  const rows = isVendorsTab ? vendorFiltered : filtered
+  const totalPages = Math.ceil(rows.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = Math.min(startIndex + itemsPerPage, filtered.length)
-  const paginated = filtered.slice(startIndex, endIndex)
+  const endIndex = Math.min(startIndex + itemsPerPage, rows.length)
+  const paginated = rows.slice(startIndex, endIndex)
+  const rangeFrom = rows.length === 0 ? 0 : startIndex + 1
 
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
@@ -219,7 +361,6 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
   ]
 
   const isArchiveTab = tab === 'archive'
-  const isVendorsTab = tab === 'vendors'
   const showTypeCol = tab === 'all' || isArchiveTab
   const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : '—')
 
@@ -397,30 +538,52 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
       </div>
 
       {isVendorsTab ? (
+        <>
+        {/* No status or vendor filter here — a vendor has neither, so search is
+            the only narrowing that means anything on this tab. */}
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] shadow-sm">
+          <div className="px-5 py-4 flex items-center gap-3 flex-wrap">
+            <SearchBox value={search} onChange={setSearch} placeholder={t('purchasing.searchVendorsPlaceholder')} />
+          </div>
+        </div>
+
         <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden">
+          <ListRangeBar
+            from={rangeFrom}
+            to={endIndex}
+            total={rows.length}
+            itemsPerPage={itemsPerPage}
+            onItemsPerPage={setItemsPerPage}
+          />
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
                 <tr>
                   {[
-                    t('purchasing.colVendorName'), t('purchasing.colContactPerson'), t('common.email'),
-                    t('purchasing.phone'), t('purchasing.paymentTerms'), '',
-                  ].map((h, i) => (
-                    <th key={i} className="px-5 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase tracking-wider">
-                      {h}
+                    { label: t('purchasing.colVendorName'), key: 'brand_name' },
+                    { label: t('purchasing.colContactPerson'), key: 'contact_person' },
+                    { label: t('common.email'), key: 'email' },
+                    { label: t('purchasing.phone'), key: 'phone' },
+                    { label: t('purchasing.paymentTerms'), key: 'payment_terms' },
+                  ].map(({ label, key }) => (
+                    <th key={key} className="px-5 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase tracking-wider">
+                      <SortableHeader label={label} sortKey={key} sortConfig={vendorSort} onSort={handleVendorSort} />
                     </th>
                   ))}
+                  <th className="px-5 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#f0f2f6] dark:divide-[#1a2230]">
-                {vendorList.length === 0 ? (
+                {paginated.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-5 py-10 text-center text-sm text-[#6c6760] dark:text-[#9aa4b2]">
-                      {t('purchasing.noVendorsYet')}
+                      {/* Distinguishes "no vendors at all" from "none match the
+                          search" — the fix for the latter is to clear the box. */}
+                      {vendorList.length === 0 ? t('purchasing.noVendorsYet') : t('purchasing.noVendorsMatch')}
                     </td>
                   </tr>
                 ) : (
-                  vendorList.map((v) => (
+                  paginated.map((v) => (
                     <tr key={v.id} className="hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230]">
                       <td className="px-5 py-3 font-medium">
                         {/* Name drills into the vendor page; Edit stays a separate
@@ -447,7 +610,20 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
               </tbody>
             </table>
           </div>
+          <PaginationBar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            from={rangeFrom}
+            to={endIndex}
+            total={rows.length}
+            onPage={handlePageChange}
+            jumpToPage={jumpToPage}
+            setJumpToPage={setJumpToPage}
+            onJump={handleJumpToPage}
+            renderPageNumbers={renderPageNumbers}
+          />
         </div>
+        </>
       ) : (
         <>
           {/* Search + filters */}
@@ -455,18 +631,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
             <div className="px-5 py-4">
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-3 flex-wrap">
-                  <div className="relative flex-1 max-w-md">
-                    <input
-                      type="text"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder={t('purchasing.searchPlaceholder')}
-                      className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
-                    />
-                    <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
+                  <SearchBox value={search} onChange={setSearch} placeholder={t('purchasing.searchPlaceholder')} />
                   <button
                     onClick={() => setShowFilters(!showFilters)}
                     aria-expanded={showFilters}
@@ -585,28 +750,13 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
           <>
           {/* Table */}
           <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
-            <div className="px-5 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[#e6e9ef] dark:border-[#212a38]">
-              <span className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
-                {t('purchasing.showingRange', {
-                  from: filtered.length === 0 ? 0 : startIndex + 1,
-                  to: endIndex,
-                  total: filtered.length,
-                })}
-              </span>
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('common.itemsPerPage')}:</label>
-                <select
-                  value={itemsPerPage}
-                  onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
-                  className="px-3 py-1 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
-                >
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-              </div>
-            </div>
+            <ListRangeBar
+              from={rangeFrom}
+              to={endIndex}
+              total={rows.length}
+              itemsPerPage={itemsPerPage}
+              onItemsPerPage={setItemsPerPage}
+            />
 
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -717,49 +867,18 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
               </table>
             </div>
 
-            {totalPages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-t border-[#e6e9ef] dark:border-[#212a38]">
-                <div className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
-                  {t('purchasing.showingRange', { from: startIndex + 1, to: endIndex, total: filtered.length })}
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {t('common.previous')}
-                  </button>
-                  <div className="flex items-center gap-1">{renderPageNumbers()}</div>
-                  <button
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {t('common.next')}
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('common.jumpToPage')}:</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max={totalPages}
-                    value={jumpToPage}
-                    onChange={(e) => setJumpToPage(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleJumpToPage()}
-                    placeholder={currentPage.toString()}
-                    className="w-20 px-3 py-1 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
-                  />
-                  <button
-                    onClick={handleJumpToPage}
-                    className="px-3 py-1 bg-[#4338ca] dark:bg-[#a5b4fc] text-white dark:text-[#0b0f17] rounded-lg hover:opacity-90 text-sm transition-opacity"
-                  >
-                    {t('common.go')}
-                  </button>
-                </div>
-              </div>
-            )}
+            <PaginationBar
+              currentPage={currentPage}
+              totalPages={totalPages}
+              from={rangeFrom}
+              to={endIndex}
+              total={rows.length}
+              onPage={handlePageChange}
+              jumpToPage={jumpToPage}
+              setJumpToPage={setJumpToPage}
+              onJump={handleJumpToPage}
+              renderPageNumbers={renderPageNumbers}
+            />
           </div>
           </>
           )}
