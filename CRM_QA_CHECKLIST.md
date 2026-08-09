@@ -191,9 +191,49 @@ Sprints 2.5 and 3 move from *BUILT, QA pending* to **VERIFIED**, and the CRM Lea
 is now covered too. Three defects found and fixed across the two runs (**#21** bulk status changes
 not logged, **#22** Disqualify button labelled Delete, **#23** doubled plus), all re-verified live.
 
-Two items remain genuinely open, neither a regression:
+---
 
-- **Row 40 — touch/mobile drag.** Needs a real device; already acknowledged in the sprint's own
-  build checklist.
-- **Row 44 — the Contact field.** Never appeared, because the test customer has no contacts. Worth
-  one minute on a customer that does before calling it done.
+## Follow-up pass — 2026-08-09
+
+Closing out the three things left hanging after the runs above.
+
+| Item | Outcome |
+|------|---------|
+| **Row 44 — the Contact field** | ✅ **Not a bug.** Re-tested on *QA Throwaway Co*, which does have a contact on file: the Edit Deal modal renders a **Contact Person** select listing `No contact` and `Ahmed Saeed · PM`. The field is conditional on the customer having contacts — my earlier run simply used a customer with none. Row 44 is fully verified. |
+| **PO currency placeholder** | ✅ **Was a real bug — fixed (BUG #24).** |
+| **`ticketActivity.log` "silent" swallow** | ✅ **Not a bug — my earlier characterisation was wrong.** See the correction below. |
+
+### BUG #24 — the PO currency placeholder promised the wrong currency
+
+The New Purchase Order form's Currency field is free text with placeholder **`USD`**. Leaving it
+blank renders **EGP**, because the document resolves
+`purchaseOrder.currency || layout.currency || 'EGP'`. So the hint promised one currency and the
+printed PO showed another — on money, which is the worst place for a misleading default.
+
+**Fix:** the placeholder now reads `PDF_LAYOUT_DEFAULT.currency` — the exact constant
+`getPdfLayout()` falls back to — instead of a hardcoded literal. Swapping `"USD"` for `"EGP"` would
+have been another guess; this stays correct if the default ever changes. **Verified:** the field
+now shows `EGP`.
+
+### Correction — `ticketActivity.log` is not silent
+
+Earlier in this QA cycle I described `ticketActivity.log()` as *swallowing errors silently*, and
+called it the reason BUG #12 went unnoticed for months. **That was wrong on the facts.**
+
+`captureException()` logs `console.error('[Sentry]', …)` in dev and reports to Sentry in
+production. Every one of those failing `ticket_activity` inserts was recorded in both places the
+whole time — indeed that console line is exactly how BUG #12 was eventually found. The failure
+mode was *nobody read the console*, not *nothing was written down*.
+
+And the swallow itself is correct: `log()` returning `undefined` on failure is deliberate, so a
+broken audit write can never block someone creating a ticket or issuing a credit note. Making it
+throw would trade a silent logging gap for user-facing breakage.
+
+**No change made.** The real lesson is the one already recorded against BUG #12 — the UI showed
+"No activity recorded yet", which reads as *nothing happened* rather than *logging is broken*.
+That ambiguity is worth remembering, but it is not fixed by touching the logger.
+
+### Still genuinely open
+
+- **Row 40 — touch/mobile drag.** Needs a real device; acknowledged in the sprint's own build
+  checklist since it was written.

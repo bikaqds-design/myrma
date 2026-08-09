@@ -5,6 +5,7 @@ import { db } from '../../api/supabaseClient'
 import Modal from '../../components/Modal'
 import { ModalOverlay, ModalCard, Button, Label, Select, Input, Textarea } from '../../components/ui'
 import { ProductSearchInput } from '../Pipeline/_shared'
+import { PDF_LAYOUT_DEFAULT } from '../../lib/documentPdf'
 
 // Shared modal header — mirrors ModalHeader in SalesDocuments/_modals.jsx so
 // every Purchasing modal has the same title bar/close-button chrome.
@@ -349,7 +350,12 @@ export function CreatePurchaseOrderModal({ mode = 'create', initial, onClose, ve
             </div>
             <div>
               <Label>{t('purchasing.currency')}</Label>
-              <Input value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full" placeholder="USD" />
+              {/* Placeholder shows the code actually used when this is left blank.
+                  It read "USD", but the PO renders with
+                  `purchaseOrder.currency || layout.currency || 'EGP'` — so a blank
+                  field produced EGP while the hint promised USD. PDF_LAYOUT_DEFAULT
+                  is the same constant getPdfLayout() falls back to. */}
+              <Input value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full" placeholder={PDF_LAYOUT_DEFAULT.currency} />
             </div>
             <div>
               <Label>{t('purchasing.paymentTerms')}</Label>

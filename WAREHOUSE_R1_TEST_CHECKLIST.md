@@ -685,6 +685,15 @@ PGRST204: Could not find the 'details' column of 'ticket_activity' in the schema
 details text` plus a PostgREST schema reload. **Applied by the user 2026-08-06 and verified
 live** — see row 38 above. Ticket activity logging works for the first time.
 
+> **Correction 2026-08-09.** Above, this write-up says the error was "swallowed" and implies it was
+> invisible. That is wrong on the facts: `captureException()` writes
+> `console.error('[Sentry]', …)` in dev and reports to Sentry in production, so every failed insert
+> *was* recorded in both places — that console line is precisely how this bug was found. The
+> swallow itself is correct by design, keeping a broken audit write from blocking ticket creation.
+> What actually hid the problem was the UI: an empty ACTIVITY TIMELINE reading "No activity
+> recorded yet" looks like *nothing happened* rather than *logging is broken*. No change made to
+> the logger.
+
 #### BUG #13 — a standalone invoice could never be posted (dead end)
 
 `+ New → New Invoice` created a draft that showed *"Awaiting approval in Activities"* — but no
@@ -862,12 +871,12 @@ Captured output for `PO-95980824`, checked field by field against the source doc
 
 `win.print()` was confirmed called. Nothing is missing, mislabelled or mis-totalled.
 
-**Minor observation, not fixed.** The PO form's Currency field is free text with placeholder
-**`USD`**, but leaving it blank renders **EGP** — the fallback chain is
+**Minor observation — ✅ FIXED 2026-08-09 (BUG #24).** The PO form's Currency field is free text
+with placeholder **`USD`**, but leaving it blank renders **EGP** — the fallback chain is
 `purchaseOrder.currency || layout.currency || 'EGP'`. For an Egyptian company invoicing in EGP the
-placeholder actively suggests the wrong default; a user could reasonably assume blank means USD.
-The honest fix is to show the layout's actual currency as the placeholder rather than a hardcoded
-guess, which needs the layout plumbed into the modal. Flagged rather than patched.
+placeholder actively suggested the wrong default. Fixed by pointing the placeholder at
+`PDF_LAYOUT_DEFAULT.currency`, the same constant `getPdfLayout()` falls back to, rather than
+swapping one hardcoded literal for another. Verified: the field now shows `EGP`.
 
 ### BUG #17 — purchase receipts could be sent to protected system warehouses
 
