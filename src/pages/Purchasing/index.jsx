@@ -10,6 +10,8 @@ import { canDo } from '../../lib/permissions'
 import { Button, PageHeader } from '../../components/ui'
 import { safeStorage } from '../../lib/safeStorage'
 import { PageSkeleton } from '../../components/Skeleton'
+import ExportMenu from '../../components/ExportMenu'
+import PurchasingGraphView from './PurchasingGraphView'
 import { CreateVendorModal, VendorEditModal, CreatePurchaseOrderModal, VendorInvoiceFormModal } from './_modals'
 
 // ── Document type badges ─────────────────────────────────────────────────────
@@ -89,6 +91,9 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
   const canCreate = canDo(currentUserRole, currentUserPermissions, 'deals', 'create')
 
   const [tab, setTab] = useURLTab('tab', 'all')
+  // 'list' | 'graph' — URL-persisted so a chart can be shared as a link, the
+  // same convention Pipeline uses for its ?view= switcher.
+  const [view, setView] = useURLTab('view', 'list')
 
   const [newMenuOpen, setNewMenuOpen] = useState(false)
   const [createType, setCreateType] = useState(null)
@@ -318,12 +323,45 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
           )
         ) : (
           <>
-            <Button variant="secondary" onClick={() => exportDocs(filtered)}>
-              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              {t('purchasing.export')}
-            </Button>
+            {/* View switcher — list is the default; graph answers "where is the
+                money going", which the table cannot. Persisted in the URL so a
+                chart can be linked to, matching Pipeline's ?view= convention. */}
+            <div className="flex items-center gap-1 mr-1">
+              <button
+                onClick={() => setView('list')}
+                title={t('purchasing.viewList')}
+                className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors ${
+                  view === 'list'
+                    ? 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-[#a5b4fc]'
+                    : 'text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520]'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setView('graph')}
+                title={t('purchasing.viewGraph')}
+                className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors ${
+                  view === 'graph'
+                    ? 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-[#a5b4fc]'
+                    : 'text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520]'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </button>
+            </div>
+            <ExportMenu
+              allRows={documents}
+              filteredRows={filtered}
+              selectedRows={selectedRows}
+              onExport={(rows) => exportDocs(rows)}
+              label={t('purchasing.export')}
+              ns="purchasing"
+            />
             {canCreate && (
               <div ref={newMenuRef} className="relative">
                 <Button onClick={() => setNewMenuOpen((o) => !o)} aria-haspopup="menu" aria-expanded={newMenuOpen}>
@@ -562,6 +600,18 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
             </div>
           )}
 
+          {/* Graph view replaces the table, but keeps the search/filter bar above
+              it — the chart reads from `filtered`, so narrowing the list narrows
+              the analysis too. */}
+          {view === 'graph' ? (
+            <PurchasingGraphView
+              documents={filtered}
+              vendorName={vendorName}
+              statusLabel={statusLabel}
+              docTypeLabel={(type, tt) => (DOC_TYPE_LABEL_KEY[type] ? tt(DOC_TYPE_LABEL_KEY[type]) : tt('common.unknown'))}
+            />
+          ) : (
+          <>
           {/* Table */}
           <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
             <div className="px-5 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[#e6e9ef] dark:border-[#212a38]">
@@ -740,6 +790,8 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
               </div>
             )}
           </div>
+          </>
+          )}
         </>
       )}
     </div>
