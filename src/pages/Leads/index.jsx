@@ -8,6 +8,7 @@ import { db, supabase } from '../../api/supabaseClient'
 import { PageSkeleton } from '../../components/Skeleton'
 import { PageHeader, Ltr } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
+import ExportMenu from '../../components/ExportMenu'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { leadSchema, getFirstError } from '../../lib/schemas'
 import { LEAD_STATUS_LIST, LEAD_SOURCE_LIST } from '../../lib/constants'
@@ -229,7 +230,6 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   const [showAddLead, setShowAddLead] = useState(false)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
   const [showAddLeadDropdown, setShowAddLeadDropdown] = useState(false)
-  const [showExportDropdown, setShowExportDropdown] = useState(false)
   const [editingLead, setEditingLead] = useState(null)
   const [leadForm, setLeadForm] = useState(EMPTY_FORM)
   const [convertingLead, setConvertingLead] = useState(null)
@@ -276,7 +276,6 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
       if (!e.target.closest('.status-menu')) setStatusMenu({ id: null, anchor: null })
       if (!e.target.closest('.source-menu')) setSourceMenu({ id: null, anchor: null })
       if (!e.target.closest('.add-lead-dropdown')) setShowAddLeadDropdown(false)
-      if (!e.target.closest('.export-dropdown')) setShowExportDropdown(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -798,73 +797,14 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
             </button>
           ))}
         </div>
-        {leads.length > 0 && (
-          <div className="relative export-dropdown">
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowExportDropdown(!showExportDropdown) }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#e6e9ef] dark:border-[#212a38] text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] transition-colors"
-            >
-              <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              {t('leads.export')}
-              <svg className={`w-3.5 h-3.5 transition-transform ${showExportDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {showExportDropdown && (
-              <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] z-20 py-1.5">
-                {/* Export All */}
-                <button
-                  onClick={() => { exportLeadsXlsx(leads, t, 'leads-all'); setShowExportDropdown(false) }}
-                  className="w-full px-4 py-2.5 text-left hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3"
-                >
-                  <svg className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  <div>
-                    <div className="text-sm font-medium text-[#211f1b] dark:text-[#e8ebf0]">{t('leads.exportAll')}</div>
-                    <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('leads.exportAllDesc', { count: leads.length })}</div>
-                  </div>
-                </button>
-                {/* Export Filtered — only when filters/search are active */}
-                {filteredLeads.length !== leads.length && (
-                  <button
-                    onClick={() => { exportLeadsXlsx(filteredLeads, t, 'leads-filtered'); setShowExportDropdown(false) }}
-                    className="w-full px-4 py-2.5 text-left hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3 border-t border-[#f0f2f6] dark:border-[#1a2230]"
-                  >
-                    <svg className="w-4 h-4 text-indigo-500 dark:text-[#a5b4fc] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
-                    </svg>
-                    <div>
-                      <div className="text-sm font-medium text-[#211f1b] dark:text-[#e8ebf0]">{t('leads.exportFiltered')}</div>
-                      <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('leads.exportFilteredDesc', { count: filteredLeads.length })}</div>
-                    </div>
-                  </button>
-                )}
-                {/* Export Selected — only when rows are checked */}
-                {selectedLeads.size > 0 && (
-                  <button
-                    onClick={() => {
-                      const selectedData = leads.filter((l) => selectedLeads.has(l.id))
-                      exportLeadsXlsx(selectedData, t, 'leads-selected')
-                      setShowExportDropdown(false)
-                    }}
-                    className="w-full px-4 py-2.5 text-left hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3 border-t border-[#f0f2f6] dark:border-[#1a2230]"
-                  >
-                    <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                    <div>
-                      <div className="text-sm font-medium text-[#211f1b] dark:text-[#e8ebf0]">{t('leads.exportSelected')}</div>
-                      <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('leads.exportSelectedDesc', { count: selectedLeads.size })}</div>
-                    </div>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+        <ExportMenu
+          allRows={leads}
+          filteredRows={filteredLeads}
+          selectedRows={leads.filter((l) => selectedLeads.has(l.id))}
+          label={t('leads.export')}
+          ns="leads"
+          onExport={(rows, scope) => exportLeadsXlsx(rows, t, `leads-${scope}`)}
+        />
         {canDo('create') && (
           <div className="relative add-lead-dropdown">
             <button

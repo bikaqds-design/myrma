@@ -14,8 +14,8 @@ import { useTranslation } from 'react-i18next'
  * size a third time is exactly how the warehouse-destination filter ended up
  * written four times and wrong in all four. So it lives here once.
  *
- * Leads and Pipeline still carry their own inline copies — migrating them is a
- * separate change against working pages, deliberately not bundled in here.
+ * Leads has since been migrated onto it. Pipeline turned out never to have had
+ * an inline copy, so this is now the only implementation in the app.
  *
  * Callers own the data and the export itself; this component only decides which
  * options make sense and hands back the chosen row set.
