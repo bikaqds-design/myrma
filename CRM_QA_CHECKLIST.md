@@ -133,6 +133,53 @@ component's `'Delete'` default intact for genuine deletions. **Verified:** the b
 
 ---
 
+---
+
+## CRM Leads/Pipeline round (2026-08-04/05) — run 2026-08-09
+
+The round listed in the Track A summary that closes 8 findings from the 2026-07-05 manual test.
+It was left pending after the Sprint 2.5/3 pass because that run only touched two of its items.
+All eight are now covered.
+
+| # | Item | Result |
+|---|------|--------|
+| 41 | Leads Kanban scoped to the All tab | ✅ The Kanban toggle renders **only** on All — on Active/Converted/Disqualified there is a List button and nothing else. The board shows **34 cards across 7 status columns**, matching the "All Leads 34" count exactly. |
+| 42 | Inline full-name edit — the `null` bug | ✅ Fixed. The editor opens pre-filled with the real value (not the string `null`), and saving re-renders immediately with no refresh needed and no disappearing field. |
+| 43 | Deal edit modal restored | ✅ `handleOpenEdit` has a caller again (`DealDetail.jsx:829`) and **Edit Deal** renders on open deals. It is hidden on closed ones, which is why it was absent when this deal was Won — `canEditDeal`, not a missing entry point. |
+| 44 | Customer / contact / pipeline editable + `movePipeline()` | ✅ Modal carries Title, Customer (type-ahead, "Customer selected" confirmation), **Pipeline**, Value, Close Date, Probability slider, Rep and Notes. Switching **B2B → B2C** dynamically revealed a **Stage** select defaulting to B2C's first stage; saving moved the deal off the B2B board and onto B2C at `new_inquiry`. ⚠️ No separate **Contact** field appeared — the customer used has no contacts on file, so the field is presumably conditional. **Not proven either way.** |
+| 45 | A deal holds many quotations, each independent | ✅ `QT-28966054` and `QT-54535244` coexist on one deal and carry **independent statuses** — at one point one was Draft while the other was Approved, and later one Converted while the other stayed Approved. |
+| 46 | Deal value: forecast while open / actual once closed | ✅ **Both halves proven.** Open: value showed **4,250 EGP** labelled *"(Calculated from product lines)"* = 2,750 (accepted) + 1,500 (converted), overriding a manually-typed 4,200. On **Mark Won** it changed to **1,500 EGP** — the accepted-but-never-converted 2,750 correctly dropped out, leaving only what became a Sales Order. Exactly `dealValueFor()`'s contract. |
+| 47 | Quotations lock at `accepted` | ✅ Approved quotation offers Download PDF / Archive / Convert to Sales Order and **no Edit**; the Draft alongside it still has Edit. |
+| 48 | Cancel replaced by Archive | ✅ **Archive** on every quotation card in every state; no Cancel anywhere. |
+
+### Two rules confirmed that are not in the round's list
+
+Both look like bugs until you read the code, so they are recorded here to save the next person the
+detour:
+
+- **`canMarkDealWon()`** — a deal carrying quotations cannot be won until at least one is
+  **converted to a Sales Order**, otherwise its actual value would be 0 and the win would not be
+  backed by a real order. Mark Won sat disabled with two approved quotations and enabled the moment
+  one was converted. Deals with no quotations at all are unaffected, which is why winning worked
+  earlier in the run before any quotation existed.
+- **Free-form line guard** — `handleConvertToSO` refuses a quotation containing lines with no
+  `product_id`. A quotation whose product was typed as free text would not convert (no network call
+  at all); re-pointing the same line at the catalog product `test 3` converted immediately to
+  **`SO-24913679`**. Correct per the Sprint 6 rule that quotations may be free-form but SO/Invoice
+  lines must resolve to a catalog product.
+
+### BUG #23 — "+ + Add Line" rendered a doubled plus
+
+The quotation editor's add-line control read **`+ + Add Line`**. `salesDocs.addLine` already
+contains a `+` (unlike `pipeline.addLine` and `salesDocuments.addLine`, which do not), and
+`DealDetail.jsx:791` prefixed another.
+
+**Fix:** dropped the literal `+` from the JSX, leaving the string's own, so the convention now
+matches the other two namespaces. Single call site, no other consumer. **Verified:** renders
+`+ Add Line`.
+
+---
+
 ## Gate
 
 `npx vitest run` → **392/392 (13 files)** · `npm run lint` → **0 errors** ·
@@ -140,6 +187,13 @@ component's `'Delete'` default intact for genuine deletions. **Verified:** the b
 
 ## Outcome
 
-Both sprints move from *BUILT, QA pending* to **VERIFIED**, with the exception of row 40
-(touch-drag), which was already an acknowledged gap before this run. Two defects found, both in
-Sprint 2.5, both fixed and re-verified live.
+Sprints 2.5 and 3 move from *BUILT, QA pending* to **VERIFIED**, and the CRM Leads/Pipeline round
+is now covered too. Three defects found and fixed across the two runs (**#21** bulk status changes
+not logged, **#22** Disqualify button labelled Delete, **#23** doubled plus), all re-verified live.
+
+Two items remain genuinely open, neither a regression:
+
+- **Row 40 — touch/mobile drag.** Needs a real device; already acknowledged in the sprint's own
+  build checklist.
+- **Row 44 — the Contact field.** Never appeared, because the test customer has no contacts. Worth
+  one minute on a customer that does before calling it done.

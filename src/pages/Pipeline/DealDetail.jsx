@@ -787,8 +787,11 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
 
       <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#e6e9ef] dark:border-[#212a38]">
         <div className="flex items-center gap-3">
+          {/* No literal "+" here: unlike pipeline.addLine / salesDocuments.addLine,
+              the salesDocs.addLine string already carries one, so prefixing a
+              second rendered "+ + Add Line". */}
           <button onClick={addQtLine} className="text-sm text-indigo-600 dark:text-[#a5b4fc] hover:underline">
-            + {t('salesDocs.addLine')}
+            {t('salesDocs.addLine')}
           </button>
           <span className="text-xs text-gray-400 dark:text-[#4a5568]">
             {t('salesDocs.grandTotal')}: {qtEditTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })} {t('pipeline.currency')}
