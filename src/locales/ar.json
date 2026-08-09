@@ -3356,6 +3356,22 @@
     "statDocuments": "المستندات",
     "statTotalSpend": "إجمالي الإنفاق",
     "statVendors": "الموردون",
-    "currencyCode": "ج.م"
+    "currencyCode": "ج.م",
+    "vendorDetails": "تفاصيل المورد",
+    "vendorNotFound": "المورد غير موجود.",
+    "vendorEmail": "البريد الإلكتروني",
+    "vendorPhone": "الهاتف",
+    "vendorTaxId": "الرقم الضريبي",
+    "vendorPaymentTerms": "شروط الدفع",
+    "vendorTotalSpend": "إجمالي الإنفاق",
+    "vendorSpendHint": "باستثناء المستندات الملغاة",
+    "vendorOutstanding": "الرصيد المستحق",
+    "vendorDocumentCount": "المستندات",
+    "vendorDocuments": "مستندات الشراء",
+    "vendorNoDocuments": "لا توجد مستندات شراء لهذا المورد بعد.",
+    "vendorStatement": "كشف الحساب",
+    "vendorNoLedger": "لا توجد فواتير أو مدفوعات مسجلة لهذا المورد بعد.",
+    "ledgerTypeVendorInvoice": "فاتورة مورد",
+    "ledgerTypeVendorPayment": "دفعة"
   }
 }

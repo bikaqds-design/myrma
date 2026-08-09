@@ -125,6 +125,7 @@ const SalesDocumentDetail = lazyWithReload(() => import('./pages/SalesDocuments/
 const Accounting = lazyWithReload(() => import('./pages/Accounting'))
 const Purchasing = lazyWithReload(() => import('./pages/Purchasing'))
 const PurchaseDocumentDetail = lazyWithReload(() => import('./pages/Purchasing/PurchaseDocumentDetail'))
+const VendorDetails = lazyWithReload(() => import('./pages/Purchasing/VendorDetails'))
 const NotFoundPage = lazyWithReload(() => import('./pages/NotFoundPage'))
 import CommandPalette from './components/CommandPalette'
 
@@ -209,6 +210,23 @@ function SalesDocumentDetailRoute({ currentUserRole, currentUserEmail }) {
       currentUserRole={currentUserRole}
       currentUserEmail={currentUserEmail}
       onBack={() => navigate('/sales')}
+    />
+  )
+}
+
+// Declared as a static segment so it out-ranks /purchasing/:type/:id — React
+// Router scores a literal above a dynamic param, so "vendor" never falls through
+// to the document-detail route.
+function VendorDetailsRoute({ currentUserRole, currentUserPermissions }) {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  return (
+    <VendorDetails
+      vendorId={id}
+      canEdit={canDo(currentUserRole, currentUserPermissions, 'deals', 'edit')}
+      onBack={() => navigate('/purchasing?tab=vendors')}
+      onOpenDocument={(doc) => navigate(`/purchasing/${doc.doc_type}/${doc.id}`)}
+      onEditVendor={() => navigate('/purchasing?tab=vendors')}
     />
   )
 }
@@ -864,6 +882,7 @@ export default function App() {
     if (pathname.startsWith('/customers/')) return t('nav.customerDetails')
     if (pathname.startsWith('/leads/')) return t('nav.leadDetails')
     if (pathname.startsWith('/pipeline/')) return t('nav.dealDetails')
+    if (pathname.startsWith('/purchasing/vendor/')) return t('purchasing.vendorDetails')
     const MAP = {
       '/': t('nav.dashboard'),
       '/dashboard': t('nav.dashboard'),
@@ -1440,6 +1459,20 @@ export default function App() {
                     <Purchasing
                       currentUserRole={effectiveUserRole}
                       currentUserEmail={currentUser?.email}
+                      currentUserPermissions={effectiveUserPermissions}
+                    />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                }
+              />
+
+              <Route
+                path="/purchasing/vendor/:id"
+                element={
+                  canDo(effectiveUserRole, effectiveUserPermissions, 'deals', 'view') ? (
+                    <VendorDetailsRoute
+                      currentUserRole={effectiveUserRole}
                       currentUserPermissions={effectiveUserPermissions}
                     />
                   ) : (

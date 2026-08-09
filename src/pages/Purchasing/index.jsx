@@ -12,46 +12,8 @@ import { safeStorage } from '../../lib/safeStorage'
 import { PageSkeleton } from '../../components/Skeleton'
 import ExportMenu from '../../components/ExportMenu'
 import PurchasingGraphView from './PurchasingGraphView'
+import { DOC_TYPE_BADGE, DOC_TYPE_LABEL_KEY, statusLabel, statusPillCls } from './_shared'
 import { CreateVendorModal, VendorEditModal, CreatePurchaseOrderModal, VendorInvoiceFormModal } from './_modals'
-
-// ── Document type badges ─────────────────────────────────────────────────────
-const DOC_TYPE_BADGE = {
-  purchase_order: 'bg-teal-100 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400',
-  vendor_invoice: 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
-}
-
-const DOC_TYPE_LABEL_KEY = {
-  purchase_order: 'purchasing.docType_purchase_order',
-  vendor_invoice: 'purchasing.docType_vendor_invoice',
-}
-
-const STATUS_PILL = {
-  draft: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
-  sent: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
-  pending_confirmation: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
-  pending_approval: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
-  confirmed: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
-  approved: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
-  partially_received: 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
-  partially_completed: 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
-  received: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
-  completed: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
-  paid: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
-  partial: 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
-  unpaid: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
-  reversed: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
-  expired: 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
-  cancelled: 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#4a5568]',
-}
-
-function statusPillCls(status) {
-  return STATUS_PILL[status] ?? STATUS_PILL.draft
-}
-function statusLabel(status, t) {
-  const key = `purchasing.st_${status}`
-  const label = t(key)
-  return label === key ? status : label
-}
 
 function SortableHeader({ label, sortKey, sortConfig, onSort }) {
   const isActive = sortConfig.key === sortKey
@@ -460,7 +422,16 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
                 ) : (
                   vendorList.map((v) => (
                     <tr key={v.id} className="hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230]">
-                      <td className="px-5 py-3 font-medium text-[#211f1b] dark:text-[#e8ebf0]">{v.brand_name}</td>
+                      <td className="px-5 py-3 font-medium">
+                        {/* Name drills into the vendor page; Edit stays a separate
+                            action so a quick field change does not need a round trip. */}
+                        <button
+                          onClick={() => navigate(`/purchasing/vendor/${v.id}`)}
+                          className="text-[#4338ca] dark:text-[#a5b4fc] hover:underline text-left"
+                        >
+                          {v.brand_name}
+                        </button>
+                      </td>
                       <td className="px-5 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{v.contact_person || '—'}</td>
                       <td className="px-5 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{v.email || '—'}</td>
                       <td className="px-5 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{v.phone || '—'}</td>

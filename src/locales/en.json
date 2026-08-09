@@ -3352,6 +3352,22 @@
     "statDocuments": "Documents",
     "statTotalSpend": "Total Spend",
     "statVendors": "Vendors",
-    "currencyCode": "EGP"
+    "currencyCode": "EGP",
+    "vendorDetails": "Vendor Details",
+    "vendorNotFound": "Vendor not found.",
+    "vendorEmail": "Email",
+    "vendorPhone": "Phone",
+    "vendorTaxId": "Tax ID",
+    "vendorPaymentTerms": "Payment Terms",
+    "vendorTotalSpend": "Total Spend",
+    "vendorSpendHint": "Excludes cancelled documents",
+    "vendorOutstanding": "Outstanding Balance",
+    "vendorDocumentCount": "Documents",
+    "vendorDocuments": "Purchase Documents",
+    "vendorNoDocuments": "No purchase documents for this vendor yet.",
+    "vendorStatement": "Statement",
+    "vendorNoLedger": "No invoices or payments recorded for this vendor yet.",
+    "ledgerTypeVendorInvoice": "Vendor Invoice",
+    "ledgerTypeVendorPayment": "Payment"
   }
 }
