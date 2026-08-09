@@ -3372,6 +3372,7 @@
     "vendorStatement": "كشف الحساب",
     "vendorNoLedger": "لا توجد فواتير أو مدفوعات مسجلة لهذا المورد بعد.",
     "ledgerTypeVendorInvoice": "فاتورة مورد",
-    "ledgerTypeVendorPayment": "دفعة"
+    "ledgerTypeVendorPayment": "دفعة",
+    "viewVendor": "عرض المورد"
   }
 }

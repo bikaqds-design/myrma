@@ -3368,6 +3368,7 @@
     "vendorStatement": "Statement",
     "vendorNoLedger": "No invoices or payments recorded for this vendor yet.",
     "ledgerTypeVendorInvoice": "Vendor Invoice",
-    "ledgerTypeVendorPayment": "Payment"
+    "ledgerTypeVendorPayment": "Payment",
+    "viewVendor": "View vendor"
   }
 }

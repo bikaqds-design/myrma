@@ -9,6 +9,7 @@ import EmptyState from '../../components/EmptyState'
 import { ActivityChatter } from '../../components/ActivityChatter'
 import Modal from '../../components/Modal'
 import { downloadPOPDF } from '../../lib/purchaseOrderPdf'
+import { downloadVIPDF } from '../../lib/vendorInvoicePdf'
 import { destinationWarehouses } from '../../lib/warehouseDestinations'
 import { CreatePurchaseOrderModal, VendorInvoiceFormModal, RecordVendorPaymentModal } from './_modals'
 
@@ -182,6 +183,7 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
     navigate(`/purchasing/vendor_invoice/${vi.id}`)
   })
   const handleDownloadPOPDF = () => downloadPOPDF({ purchaseOrder: doc, vendor })
+  const handleDownloadVIPDF = () => downloadVIPDF({ vendorInvoice: doc, vendor, purchaseOrder: linkedPO })
 
   // ── Vendor Invoice actions ─────────────────────────────────────────────────
   const createVIApprovalActivity = () => {
@@ -280,6 +282,11 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
               {['approved', 'partially_received', 'received'].includes(doc.status) && (
                 <Button variant="secondary" size="sm" onClick={() => setShowPayment(true)}>{t('purchasing.recordPayment')}</Button>
               )}
+              {/* Offered from approval onward, matching when a VI becomes a real
+                  payable. A draft has no committed figures worth printing. */}
+              {['approved', 'partially_received', 'received'].includes(doc.status) && (
+                <Button variant="secondary" size="sm" onClick={handleDownloadVIPDF}>{t('purchasing.downloadPDF')}</Button>
+              )}
               {['draft', 'pending_approval', 'approved'].includes(doc.status) && (
                 <Button variant="danger" size="sm" onClick={handleVICancel} loading={busy}>{t('common.cancel')}</Button>
               )}
@@ -374,7 +381,25 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
-          <Field label={t('purchasing.vendor')} value={vendor?.brand_name || '—'} />
+          {/* Vendor drills through to /purchasing/vendor/:id — from a document
+              you usually want the rest of that vendor's history, and this was a
+              dead end until the vendor page existed. */}
+          <Field
+            label={t('purchasing.vendor')}
+            value={
+              vendor?.id ? (
+                <button
+                  onClick={() => navigate(`/purchasing/vendor/${vendor.id}`)}
+                  className="text-[#4338ca] dark:text-[#a5b4fc] hover:underline text-left"
+                  title={t('purchasing.viewVendor')}
+                >
+                  {vendor.brand_name}
+                </button>
+              ) : (
+                '—'
+              )
+            }
+          />
           {vendor?.contact_person && <Field label={t('purchasing.contactPerson')} value={vendor.contact_person} />}
           {isPO && <Field label={t('purchasing.issueDate')} value={fmtDate(doc.issue_date)} />}
           {isPO && <Field label={t('purchasing.expectedDeliveryDate')} value={fmtDate(doc.expected_delivery_date)} />}
