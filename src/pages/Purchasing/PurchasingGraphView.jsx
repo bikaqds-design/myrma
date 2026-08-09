@@ -16,6 +16,7 @@ import {
   Legend,
 } from 'recharts'
 import { useAppearance } from '../../contexts/AppearanceContext'
+import { DIMENSIONS, dimensionKey, isLiveDocument, sortDimensionKeys } from './_shared'
 
 /**
  * PurchasingGraphView — spend analytics over purchase documents.
@@ -36,7 +37,6 @@ import { useAppearance } from '../../contexts/AppearanceContext'
  */
 
 const MEASURES = ['count', 'spend']
-const GROUP_BY = ['vendor', 'status', 'month', 'type']
 const PIE_COLORS = [
   '#4338ca',
   '#10b981',
@@ -47,9 +47,6 @@ const PIE_COLORS = [
   '#ec4899',
   '#14b8a6',
 ]
-
-/** Statuses that mean the money never happened. Kept out of both measures. */
-const DEAD_STATUSES = new Set(['cancelled', 'draft_cancelled', 'void', 'voided'])
 
 function ChartTypeBtn({ active, onClick, children, title }) {
   return (
@@ -67,7 +64,7 @@ function ChartTypeBtn({ active, onClick, children, title }) {
   )
 }
 
-export default function PurchasingGraphView({ documents, vendorName, statusLabel, docTypeLabel }) {
+export default function PurchasingGraphView({ documents, vendorName }) {
   const { t } = useTranslation()
   const { darkMode } = useAppearance()
 
@@ -75,33 +72,20 @@ export default function PurchasingGraphView({ documents, vendorName, statusLabel
   const [groupBy, setGroupBy] = useState('vendor')
   const [chartType, setChartType] = useState('bar')
 
-  const live = useMemo(
-    () => (documents || []).filter((d) => !DEAD_STATUSES.has(String(d.doc_status || '').toLowerCase())),
-    [documents]
-  )
+  const live = useMemo(() => (documents || []).filter(isLiveDocument), [documents])
 
   const chartData = useMemo(() => {
     const groups = {}
     for (const doc of live) {
-      let key
-      if (groupBy === 'vendor') key = vendorName(doc.vendor_id) || t('common.unknown')
-      else if (groupBy === 'status') key = statusLabel(doc.doc_status, t)
-      else if (groupBy === 'type') key = docTypeLabel(doc.doc_type, t)
-      else {
-        // month — bucket on created_at, the one date every document type has.
-        const d = doc.created_at ? new Date(doc.created_at) : null
-        key = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : t('common.unknown')
-      }
+      const key = dimensionKey(doc, groupBy, { vendorName, t })
       if (!groups[key]) groups[key] = { name: key, count: 0, spend: 0 }
       groups[key].count += 1
       groups[key].spend += Number(doc.total) || 0
     }
-    const rows = Object.values(groups)
-    // Months read as a timeline; everything else is a ranking, so sort by size.
-    return groupBy === 'month'
-      ? rows.sort((a, b) => a.name.localeCompare(b.name))
-      : rows.sort((a, b) => b[measure] - a[measure])
-  }, [live, groupBy, measure, vendorName, statusLabel, docTypeLabel, t])
+    return sortDimensionKeys(Object.keys(groups), groupBy, (k) => groups[k][measure]).map(
+      (k) => groups[k]
+    )
+  }, [live, groupBy, measure, vendorName, t])
 
   const totals = useMemo(
     () => ({
@@ -214,7 +198,7 @@ export default function PurchasingGraphView({ documents, vendorName, statusLabel
             </select>
             <label className="text-xs text-[#6c6760] dark:text-[#9aa4b2] ml-2">{t('purchasing.graphGroupBy')}</label>
             <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} className={selectCls}>
-              {GROUP_BY.map((g) => (
+              {DIMENSIONS.map((g) => (
                 <option key={g} value={g}>
                   {t(`purchasing.graphGroup_${g}`)}
                 </option>

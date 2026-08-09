@@ -51,3 +51,43 @@ export function statusLabel(status, t) {
 export function docTypeLabel(docType, t) {
   return DOC_TYPE_LABEL_KEY[docType] ? t(DOC_TYPE_LABEL_KEY[docType]) : docType
 }
+
+// ── Analytics ─────────────────────────────────────────────────────────────────
+
+/**
+ * Statuses that mean the money never happened. Excluded from every analytics
+ * measure: a cancelled PO or a voided vendor invoice was never committed, and
+ * counting it overstates the total. Count excludes them too, so both measures
+ * always describe the same population.
+ */
+export const DEAD_STATUSES = new Set(['cancelled', 'draft_cancelled', 'void', 'voided'])
+
+export function isLiveDocument(doc) {
+  return !DEAD_STATUSES.has(String(doc?.doc_status || '').toLowerCase())
+}
+
+/** The dimensions a purchase document can be sliced by, in both analytics views. */
+export const DIMENSIONS = ['vendor', 'status', 'month', 'type']
+
+/**
+ * The bucket a document falls into along one dimension. Shared by the chart and
+ * the pivot so that "group by vendor" cannot come to mean two different things.
+ */
+export function dimensionKey(doc, dimension, { vendorName, t }) {
+  if (dimension === 'vendor') return vendorName(doc.vendor_id) || t('common.unknown')
+  if (dimension === 'status') return statusLabel(doc.doc_status, t)
+  if (dimension === 'type') return docTypeLabel(doc.doc_type, t)
+  // month — bucket on created_at, the one date every document type has.
+  const d = doc.created_at ? new Date(doc.created_at) : null
+  return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : t('common.unknown')
+}
+
+/**
+ * Months read as a timeline; every other dimension is a ranking. Chart bars and
+ * pivot rows want the same ordering rule.
+ */
+export function sortDimensionKeys(keys, dimension, weightOf) {
+  return dimension === 'month'
+    ? [...keys].sort((a, b) => a.localeCompare(b))
+    : [...keys].sort((a, b) => weightOf(b) - weightOf(a))
+}

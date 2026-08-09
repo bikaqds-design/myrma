@@ -12,6 +12,7 @@ import { safeStorage } from '../../lib/safeStorage'
 import { PageSkeleton } from '../../components/Skeleton'
 import ExportMenu from '../../components/ExportMenu'
 import PurchasingGraphView from './PurchasingGraphView'
+import PurchasingPivotView from './PurchasingPivotView'
 import { DOC_TYPE_BADGE, DOC_TYPE_LABEL_KEY, statusLabel, statusPillCls } from './_shared'
 import { CreateVendorModal, VendorEditModal, CreatePurchaseOrderModal, VendorInvoiceFormModal } from './_modals'
 
@@ -456,6 +457,19 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </button>
+              <button
+                onClick={() => setView('pivot')}
+                title={t('purchasing.viewPivot')}
+                className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors ${
+                  view === 'pivot'
+                    ? 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-[#a5b4fc]'
+                    : 'text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520]'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h18v18H3V3zm0 6h18M9 9v12M3 15h18" />
+                </svg>
+              </button>
             </div>
             <ExportMenu
               allRows={documents}
@@ -736,16 +750,13 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
             </div>
           )}
 
-          {/* Graph view replaces the table, but keeps the search/filter bar above
-              it — the chart reads from `filtered`, so narrowing the list narrows
-              the analysis too. */}
+          {/* The analytics views replace the table but keep the search/filter bar
+              above them — both read from `filtered`, so narrowing the list
+              narrows the analysis too. */}
           {view === 'graph' ? (
-            <PurchasingGraphView
-              documents={filtered}
-              vendorName={vendorName}
-              statusLabel={statusLabel}
-              docTypeLabel={(type, tt) => (DOC_TYPE_LABEL_KEY[type] ? tt(DOC_TYPE_LABEL_KEY[type]) : tt('common.unknown'))}
-            />
+            <PurchasingGraphView documents={filtered} vendorName={vendorName} />
+          ) : view === 'pivot' ? (
+            <PurchasingPivotView documents={filtered} vendorName={vendorName} />
           ) : (
           <>
           {/* Table */}
