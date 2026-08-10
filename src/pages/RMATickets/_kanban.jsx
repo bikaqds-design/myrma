@@ -104,7 +104,27 @@ function KanbanCard({ ticket, onViewDetails, onQuickStatusChange, canQuickEdit, 
 export function KanbanView({ tickets, onViewDetails, onQuickStatusChange, canQuickEdit }) {
   const { t } = useTranslation()
 
-  const columns = TICKET_STATUS_LIST.map((status) => ({
+  // Any status the data actually uses that TICKET_STATUS_LIST does not know
+  // about. Without these, such tickets match no column and the board silently
+  // drops them — they stay visible in the list view, so the two views disagree
+  // with no indication why. Found during QA: two legacy tickets carry 'New',
+  // leaving the board showing 12 of 14.
+  //
+  // Not a hypothetical to guard against, either: 20260531 deliberately removed
+  // the ticket_status CHECK constraint so deployments can configure their own
+  // statuses, which makes unknown values an expected condition rather than
+  // corruption. The board has to show them, and showing them under their own
+  // heading is what makes the drift noticeable enough to clean up.
+  const knownStatuses = new Set(TICKET_STATUS_LIST)
+  const unknownStatuses = [
+    ...new Set(
+      tickets
+        .map((tk) => tk.ticket_status)
+        .filter((s) => s && !knownStatuses.has(s))
+    ),
+  ].sort()
+
+  const columns = [...TICKET_STATUS_LIST, ...unknownStatuses].map((status) => ({
     status,
     tickets: tickets.filter((tk) => tk.ticket_status === status),
   }))
