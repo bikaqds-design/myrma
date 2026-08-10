@@ -13,10 +13,14 @@
 -- #    psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
 -- #      -v ON_ERROR_STOP=1 -f supabase/tests/purchase_status_transitions.sql
 -- #
--- #  NOTE: the db-tests CI job is currently parked (see .github/workflows/ci.yml)
--- #  because 13 Base44-legacy tables are created by no migration, so this file
--- #  has never been executed. It states the intended contract and is ready for
--- #  the run that unblocks the job — it is not evidence the guard works.
+-- #  STATUS: all 12 checks passed when this was run by hand against the live
+-- #  database on 2026-08-10, immediately after 20260773 was applied. The suite
+-- #  is self-seeding and self-cleaning; the run left no rows behind.
+-- #
+-- #  The db-tests CI job that would run this automatically is still parked (see
+-- #  .github/workflows/ci.yml) because 13 Base44-legacy tables are created by no
+-- #  migration. That blocks the job, not this file — nothing here depends on
+-- #  those tables.
 -- #
 -- #  PREREQUISITES: none beyond the migrations. Seeds its own throwaway vendor
 -- #  and documents, and hard-deletes them at the end.
