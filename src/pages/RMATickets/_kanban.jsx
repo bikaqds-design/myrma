@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { TICKET_STATUS, TICKET_STATUS_LIST } from '../../lib/constants'
 import { getStatusColor, getPriorityColor, formatDate } from './_utils'
 
@@ -12,14 +13,19 @@ const NEXT_STATUS = {
 }
 const REVEAL_WIDTH = 92
 
-function KanbanCard({ ticket, onViewDetails, onQuickStatusChange, canQuickEdit, nextStatus }) {
+function KanbanCard({ ticket, onViewDetails, onQuickStatusChange, canQuickEdit, nextStatus, isDragging: isBoardDragging = false }) {
   const { t } = useTranslation()
   const [dragX, setDragX] = useState(0)
   const [revealed, setRevealed] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const touchStartX = useRef(0)
 
-  const canSwipe = Boolean(nextStatus) && Boolean(canQuickEdit?.(ticket))
+  // Swipe-to-reveal and the board's drag both want the touch stream and both
+  // translate the card. The library only starts a touch drag after a long
+  // press, so a quick horizontal swipe still belongs to us — but once it has
+  // taken over, our transform has to stand down or the two fight over the same
+  // element.
+  const canSwipe = Boolean(nextStatus) && Boolean(canQuickEdit?.(ticket)) && !isBoardDragging
 
   const handleTouchStart = (e) => {
     if (!canSwipe) return
@@ -27,7 +33,7 @@ function KanbanCard({ ticket, onViewDetails, onQuickStatusChange, canQuickEdit, 
     setIsDragging(true)
   }
   const handleTouchMove = (e) => {
-    if (!isDragging) return
+    if (!isDragging || !canSwipe) return
     const delta = e.touches[0].clientX - touchStartX.current
     const base = revealed ? -REVEAL_WIDTH : 0
     setDragX(Math.min(0, Math.max(-REVEAL_WIDTH, base + delta)))
@@ -72,8 +78,17 @@ function KanbanCard({ ticket, onViewDetails, onQuickStatusChange, canQuickEdit, 
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        style={{ transform: `translateX(${dragX}px)`, transition: isDragging ? 'none' : 'transform 0.2s ease' }}
-        className="relative w-full text-left bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[10px] p-3 hover:border-[#4338ca] dark:hover:border-[#a5b4fc] transition-colors"
+        style={{
+          // While the board is dragging this card, the library owns its
+          // position — leave the transform alone rather than adding ours to it.
+          transform: isBoardDragging ? undefined : `translateX(${dragX}px)`,
+          transition: isDragging ? 'none' : 'transform 0.2s ease',
+        }}
+        className={`relative w-full text-left bg-white dark:bg-[#121823] border rounded-[10px] p-3 transition-colors ${
+          isBoardDragging
+            ? 'border-[#4338ca] dark:border-[#a5b4fc] shadow-lg'
+            : 'border-[#e6e9ef] dark:border-[#212a38] hover:border-[#4338ca] dark:hover:border-[#a5b4fc]'
+        }`}
       >
         <div className="flex items-center justify-between mb-1.5">
           <span className="font-mono text-xs font-medium text-[#4338ca] dark:text-[#a5b4fc] truncate">
@@ -129,40 +144,81 @@ export function KanbanView({ tickets, onViewDetails, onQuickStatusChange, canQui
     tickets: tickets.filter((tk) => tk.ticket_status === status),
   }))
 
+  // Dropping a card on another column is just a status change, so it reuses the
+  // same handler the swipe quick-action calls. Reordering within a column means
+  // nothing here — the board has no manual ordering — so a same-column drop is
+  // a no-op rather than a write.
+  const handleDragEnd = (result) => {
+    const { source, destination, draggableId } = result
+    if (!destination || destination.droppableId === source.droppableId) return
+    const ticket = tickets.find((tk) => tk.id === draggableId)
+    if (!ticket || !canQuickEdit?.(ticket)) return
+    onQuickStatusChange?.(ticket, destination.droppableId)
+  }
+
   return (
     // flex + min-width per column + overflow-x-auto is CSS-only responsive: columns share
     // space evenly on wide desktop screens, and naturally overflow into horizontal scroll
     // (with snap points, like a swipe-between-statuses mobile board) once the viewport can't
     // fit every column at its minimum width — no JS breakpoint logic needed.
-    <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2" style={{ minHeight: '400px' }}>
-      {columns.map(({ status, tickets: colTickets }) => (
-        <div key={status} className="flex-1 min-w-[200px] flex flex-col snap-start">
-          <div className="flex items-center justify-between px-1 py-2 mb-2">
-            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full truncate ${getStatusColor(status)}`}>
-              {t(`statusValues.${status}`, status)}
-            </span>
-            <span className="text-xs text-[#9aa4b2] font-medium tabular-nums ms-1 flex-shrink-0">{colTickets.length}</span>
+    <DragDropContext onDragEnd={handleDragEnd}>
+      <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2" style={{ minHeight: '400px' }}>
+        {columns.map(({ status, tickets: colTickets }) => (
+          <div key={status} className="flex-1 min-w-[200px] flex flex-col snap-start">
+            <div className="flex items-center justify-between px-1 py-2 mb-2">
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full truncate ${getStatusColor(status)}`}>
+                {t(`statusValues.${status}`, status)}
+              </span>
+              <span className="text-xs text-[#9aa4b2] font-medium tabular-nums ms-1 flex-shrink-0">{colTickets.length}</span>
+            </div>
+            <Droppable droppableId={status}>
+              {(provided, snapshot) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className={`flex-1 space-y-2 overflow-y-auto rounded-lg p-1 transition-colors ${
+                    snapshot.isDraggingOver ? 'bg-indigo-50 dark:bg-indigo-900/10' : ''
+                  }`}
+                  style={{ maxHeight: 'calc(100vh - 340px)' }}
+                >
+                  {colTickets.length === 0 && !snapshot.isDraggingOver ? (
+                    <p className="text-[11px] text-[#a09d99] dark:text-[#4a5568] text-center py-6">
+                      {t('tickets.kanbanNoTickets')}
+                    </p>
+                  ) : (
+                    colTickets.map((tk, index) => (
+                      <Draggable
+                        key={tk.id}
+                        draggableId={tk.id}
+                        index={index}
+                        isDragDisabled={!canQuickEdit?.(tk)}
+                      >
+                        {(dragProvided, dragSnapshot) => (
+                          <div
+                            ref={dragProvided.innerRef}
+                            {...dragProvided.draggableProps}
+                            {...dragProvided.dragHandleProps}
+                          >
+                            <KanbanCard
+                              ticket={tk}
+                              onViewDetails={onViewDetails}
+                              onQuickStatusChange={onQuickStatusChange}
+                              canQuickEdit={canQuickEdit}
+                              nextStatus={NEXT_STATUS[status]}
+                              isDragging={dragSnapshot.isDragging}
+                            />
+                          </div>
+                        )}
+                      </Draggable>
+                    ))
+                  )}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
           </div>
-          <div className="flex-1 space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 340px)' }}>
-            {colTickets.length === 0 ? (
-              <p className="text-[11px] text-[#a09d99] dark:text-[#4a5568] text-center py-6">
-                {t('tickets.kanbanNoTickets')}
-              </p>
-            ) : (
-              colTickets.map((tk) => (
-                <KanbanCard
-                  key={tk.id}
-                  ticket={tk}
-                  onViewDetails={onViewDetails}
-                  onQuickStatusChange={onQuickStatusChange}
-                  canQuickEdit={canQuickEdit}
-                  nextStatus={NEXT_STATUS[status]}
-                />
-              ))
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </DragDropContext>
   )
 }
