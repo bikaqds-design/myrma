@@ -17,42 +17,42 @@ Scope derived from the code, not guessed:
 
 | # | Check | Result |
 |---|-------|--------|
-| 1 | Page loads; ticket count matches the DB | ⬜ |
-| 2 | Search by RMA number returns the right ticket | ⬜ |
-| 3 | Search by customer name | ⬜ |
-| 4 | Search matches product name / serial | ⬜ |
-| 5 | Sort by each sortable column, both directions | ⬜ |
-| 6 | Sort choice persists across reload (localStorage) | ⬜ |
-| 7 | Filter by status | ⬜ |
-| 8 | Filter by priority | ⬜ |
-| 9 | Filter by assigned tech | ⬜ |
-| 10 | Filter by customer (searchable dropdown) | ⬜ |
-| 11 | Overdue filter | ⬜ |
-| 12 | Filters combine (status + priority) | ⬜ |
-| 13 | Clear filters restores full list | ⬜ |
-| 14 | Pagination: page size change, page 2, jump-to-page | ⬜ |
-| 15 | Empty state when nothing matches | ⬜ |
+| 1 | Page loads; ticket count matches the DB | ✅ 14 shown, 14 in DB |
+| 2 | Search by RMA number returns the right ticket | ✅ exact RMA number returns 1 row |
+| 3 | Search by customer name | ✅ "Yoyo" → RMA-29062026-0001 |
+| 4 | Search matches product name / serial | ⚪ **Not supported** — search covers RMA number, customer, status, priority, technician. Placeholder says so honestly. See enhancement note below. |
+| 5 | Sort by each sortable column, both directions | ✅ all 6 columns reverse. "Assigned To" does not visibly reorder because all 14 tickets share one technician — a stable sort on equal keys, not a defect. |
+| 6 | Sort choice persists across reload (localStorage) | ✅ persists via `rmaTicketsSortConfig` |
+| 7 | Filter by status | ✅ Open→4, Closed→2, All→14 |
+| 8 | Filter by priority | ✅ Medium→12, High→0 (DB confirms none), All→14 |
+| 9 | Filter by assigned tech | ✅ 14 (all tickets share one technician) |
+| 10 | Filter by customer (searchable dropdown) | ✅ 4 rows, all Ahmed Saeed. Needed a real mouse click — a synthetic click does not select from this autocomplete. |
+| 11 | Overdue filter | ✅ 8 rows, exactly matching the DB predicate |
+| 12 | Filters combine (status + priority) | ✅ customer + status = 1 row |
+| 13 | Clear filters restores full list | ✅ "Clear all" → 14 |
+| 14 | Pagination: page size change, page 2, jump-to-page | ✅ per=10 → 1–10, page 2 → 11–14, jump-to-page and per=25 all correct |
+| 15 | Empty state when nothing matches | ✅ unmatched term renders the empty-state row |
 
 ## B. Kanban view
 
 | # | Check | Result |
 |---|-------|--------|
-| 16 | Switch list → kanban; columns match the status list | ⬜ |
-| 17 | Card counts per column match the list totals | ⬜ |
-| 18 | Drag a card to another column updates the ticket status | ⬜ |
-| 19 | Status change from kanban writes an activity log | ⬜ |
-| 20 | View choice persists across reload | ⬜ |
+| 16 | Switch list → kanban; columns match the status list | ✅ columns match the status list |
+| 17 | Card counts per column match the list totals | ❌→✅ **BUG #25** — 12 of 14. Fixed; now 14 of 14 |
+| 18 | Drag a card to another column updates the ticket status | ✅ swipe reveals "Mark as In Progress"; the quick action writes the status. (No drag-and-drop exists — the board is touch swipe + tap-to-open by design, so desktop is read-only.) |
+| 19 | Status change from kanban writes an activity log | ✅ `ticket_activity`: `status_changed`, "Open → In Progress", correct user and timestamp |
+| 20 | View choice persists across reload | ✅ persists via `rmaTicketsViewMode` |
 
 ## C. Create a ticket
 
 | # | Check | Result |
 |---|-------|--------|
-| 21 | Required-field validation blocks an empty submit | ⬜ |
+| 21 | Required-field validation blocks an empty submit | ✅ empty submit blocked, "Required" shown, dialog stays open |
 | 22 | Create with customer + one serialized product | ⬜ |
 | 23 | RMA number is generated and unique | ⬜ |
 | 24 | An `inventory_units` row is created per serial | ⬜ |
-| 25 | Duplicate serial *within the same ticket* is rejected by name | ⬜ |
-| 26 | Serial already live in inventory is rejected by name | ⬜ |
+| 25 | Duplicate serial *within the same ticket* is rejected by name | ✅ `findSerialConflicts` returns `duplicate_in_ticket` for a serial repeated across two lines |
+| 26 | Serial already live in inventory is rejected by name | ✅ `findTrackedSerials` finds the live unit; a direct duplicate insert is refused by `inv_units_serial_unique_idx` (23505) — guard plus DB backstop |
 | 27 | Multi-product ticket creates one unit per serial | ⬜ |
 | 28 | Bulk (non-serialized) product ticket creates no orphan units | ⬜ |
 | 29 | Attachment upload succeeds and is listed | ⬜ |
@@ -146,3 +146,41 @@ Ticket search covers RMA number, customer, status, priority and technician
 an `rma_number` link, but nothing — not the ticket list, not the command
 palette — can look a ticket up by serial. For an RMA desk taking a call with the
 device in hand, that is the natural entry point. Missing feature, not a defect.
+
+---
+
+## Run status — 2026-08-10
+
+**23 of 55 rows executed.** Sections A (list) and B (kanban) complete; C partly.
+One bug found and fixed (#25), two findings reported without changing code.
+
+Rows 22–24, 27–29 and sections D–G are **not yet run**. They stalled on a
+tooling limit rather than anything in the app: the create/edit form's customer
+and product fields are autocompletes that only commit a selection on a real
+mouse event, and synthetic clicks silently leave the typed text without setting
+the underlying id. Each field therefore costs a screenshot-and-click round trip,
+and the dialog scrolls between capturing a coordinate and clicking it.
+
+Where that blocked the UI path, the underlying logic was verified directly
+instead — rows 25 and 26 test `findSerialConflicts` and `findTrackedSerials`
+against real data, plus the `inv_units_serial_unique_idx` backstop. That
+establishes the guards are correct; it does **not** establish that the form
+wires them up correctly on submit, which is what rows 22–24 would show.
+
+Two false alarms worth recording, both caused by the test method rather than the
+app:
+
+- The kanban quick action appeared not to save. It was my own out-of-band DB
+  edits desyncing the React Query cache, so `handleInlineUpdate` saw
+  `oldValue === newValue` and correctly early-returned. Instrumenting the
+  Supabase call proved the write happens.
+- A "Maximum update depth exceeded" warning appeared once in the console buffer.
+  Not reproducible across four conditions (desktop table, desktop kanban, mobile
+  kanban switched, mobile kanban fresh load) — almost certainly an HMR artifact
+  from the `_kanban.jsx` edit made moments earlier. Not logged as a bug.
+
+### Test data left behind
+
+None. `RMA-29062026-0001` (Yoyo Corp) was moved Open → In Progress by the row 18
+test and restored to Open; the activity row that test created was deleted. No
+ticket was created by the abandoned row 25 attempt — count is unchanged at 14.
