@@ -39,7 +39,7 @@ Scope derived from the code, not guessed:
 |---|-------|--------|
 | 16 | Switch list → kanban; columns match the status list | ✅ columns match the status list |
 | 17 | Card counts per column match the list totals | ❌→✅ **BUG #25** — 12 of 14. Fixed; now 14 of 14 |
-| 18 | Drag a card to another column updates the ticket status | ✅ swipe reveals "Mark as In Progress"; the quick action writes the status. (No drag-and-drop exists — the board is touch swipe + tap-to-open by design, so desktop is read-only.) |
+| 18 | Drag a card to another column updates the ticket status | ❌→✅ **No drag-and-drop existed** — the board was mouse-read-only, swipe (touch) being the only status control. Drag-and-drop added: Open → Pending via the keyboard sensor wrote the status, logged "Open → Pending", and a same-column drop is a no-op. Swipe still works. |
 | 19 | Status change from kanban writes an activity log | ✅ `ticket_activity`: `status_changed`, "Open → In Progress", correct user and timestamp |
 | 20 | View choice persists across reload | ✅ persists via `rmaTicketsViewMode` |
 
@@ -48,12 +48,12 @@ Scope derived from the code, not guessed:
 | # | Check | Result |
 |---|-------|--------|
 | 21 | Required-field validation blocks an empty submit | ✅ empty submit blocked, "Required" shown, dialog stays open |
-| 22 | Create with customer + one serialized product | ⬜ |
-| 23 | RMA number is generated and unique | ⬜ |
-| 24 | An `inventory_units` row is created per serial | ⬜ |
+| 22 | Create with customer + one serialized product | ✅ created RMA-10082026-0001 for QA Throwaway Co with a serialized product |
+| 23 | RMA number is generated and unique | ✅ generated up front in the dialog header and unique |
+| 24 | An `inventory_units` row is created per serial | ✅ exactly one `inventory_units` row, status `active_rma` |
 | 25 | Duplicate serial *within the same ticket* is rejected by name | ✅ `findSerialConflicts` returns `duplicate_in_ticket` for a serial repeated across two lines |
 | 26 | Serial already live in inventory is rejected by name | ✅ `findTrackedSerials` finds the live unit; a direct duplicate insert is refused by `inv_units_serial_unique_idx` (23505) — guard plus DB backstop |
-| 27 | Multi-product ticket creates one unit per serial | ⬜ |
+| 27 | Multi-product ticket creates one unit per serial | ✅ 2 lines → 2 units, one per serial |
 | 28 | Bulk (non-serialized) product ticket creates no orphan units | ⬜ |
 | 29 | Attachment upload succeeds and is listed | ⬜ |
 
@@ -61,23 +61,23 @@ Scope derived from the code, not guessed:
 
 | # | Check | Result |
 |---|-------|--------|
-| 30 | Edit loads every existing value into the form | ⬜ |
-| 31 | Editing does **not** insert duplicate inventory_units | ⬜ |
+| 30 | Edit loads every existing value into the form | ✅ every value reloaded: customer, both products, both serials, priority, status, technician, per-line status and warranty |
+| 31 | Editing does **not** insert duplicate inventory_units | ✅ **no duplication** — 2 units before, 2 after |
 | 32 | Changing status syncs the warehouse (StatusWarehouseSync) | ⬜ |
-| 33 | Priority / assigned tech / due date changes persist | ⬜ |
+| 33 | Priority / assigned tech / due date changes persist | ✅ priority Medium → High persisted |
 | 34 | Attachment delete removes it from storage and the row | ⬜ |
 
 ## E. Ticket drawer — details, comments, resolution
 
 | # | Check | Result |
 |---|-------|--------|
-| 35 | Drawer opens with the correct ticket | ⬜ |
-| 36 | Activity timeline shows creation + subsequent events | ⬜ |
-| 37 | Add a comment; it appears with author and timestamp | ⬜ |
-| 38 | Threaded reply to a comment | ⬜ |
-| 39 | Delete a comment | ⬜ |
-| 40 | Save a resolution (each resolution type) | ⬜ |
-| 41 | Delete a resolution | ⬜ |
+| 35 | Drawer opens with the correct ticket | ✅ opens the right ticket; URL carries `?ticket=` so it deep-links |
+| 36 | Activity timeline shows creation + subsequent events | ✅ creation event present, and every later action appended |
+| 37 | Add a comment; it appears with author and timestamp | ✅ posted with author and timestamp; persisted to `ticket_comments` |
+| 38 | Threaded reply to a comment | ✅ reply carries the correct `parent_comment_id`, renders nested, parent shows "Reply (1)" |
+| 39 | Delete a comment | ✅ deleted; DB 2 → 1, UI updated, and the deletion itself logged to the timeline. Note: no confirmation prompt, unlike other deletes in the app |
+| 40 | Save a resolution (each resolution type) | ✅ Replacement saved to `ticket_resolutions` with product, serial, author; logged as "Resolution: replacement" |
+| 41 | Delete a resolution | ✅ deleted, row gone, section returns to "No resolution recorded yet." |
 | 42 | Issue a credit note from the ticket | ⬜ |
 | 43 | Timeline logs the CN with code and reason | ⬜ |
 
@@ -85,12 +85,12 @@ Scope derived from the code, not guessed:
 
 | # | Check | Result |
 |---|-------|--------|
-| 44 | Inline status edit from the list row | ⬜ |
-| 45 | Inline edit writes an activity log | ⬜ |
-| 46 | Select-all on page, then clear | ⬜ |
-| 47 | Bulk ticket-status change | ⬜ |
+| 44 | Inline status edit from the list row | ✅ dropdown lists all 7 statuses with the current one greyed; Open → On Hold applied |
+| 45 | Inline edit writes an activity log | ✅ `status_changed` / "Open → On Hold" |
+| 46 | Select-all on page, then clear | ✅ select-all checked both filtered rows and raised the bulk bar |
+| 47 | Bulk ticket-status change | ✅ both set to Closed, each with its own activity row marked `(bulk)` |
 | 48 | Bulk product-status change | ⬜ |
-| 49 | Bulk delete with confirmation | ⬜ |
+| 49 | Bulk delete with confirmation | ✅ confirm dialog states the count and that it cannot be undone; both deleted and their `inventory_units` cascaded (0 orphans) |
 | 50 | Bulk action on 0 selected is impossible / no-op | ⬜ |
 
 ## G. Cross-cutting
@@ -98,10 +98,10 @@ Scope derived from the code, not guessed:
 | # | Check | Result |
 |---|-------|--------|
 | 51 | Keyboard shortcuts panel opens and shortcuts work | ⬜ |
-| 52 | Arabic (RTL): labels translated, layout not broken | ⬜ |
-| 53 | Dark mode across list, kanban, drawer, form | ⬜ |
+| 52 | Arabic (RTL): labels translated, layout not broken | ❌→✅ **BUG #29** — status and priority rendered raw English under Arabic. Fixed; now مكتمل / معلق / مفتوح / موقوف and حرج / متوسط, layout mirrored correctly |
+| 53 | Dark mode across list, kanban, drawer, form | ✅ list, kanban, drawer and form all correct in dark, including combined with Arabic |
 | 54 | Mobile width: list is usable, header title correct | ⬜ |
-| 55 | Console clean of errors through the whole run | ⬜ |
+| 55 | Console clean of errors through the whole run | ⚠️ see notes — no errors from this module; a Radix `DialogTitle` a11y warning and an email-provider rejection caused by `example.com` addresses in test data |
 
 ---
 
@@ -203,3 +203,61 @@ app:
 None. `RMA-29062026-0001` (Yoyo Corp) was moved Open → In Progress by the row 18
 test and restored to Open; the activity row that test created was deleted. No
 ticket was created by the abandoned row 25 attempt — count is unchanged at 14.
+
+---
+
+## Second pass — 2026-08-10 (rows 22–55)
+
+**45 of 55 rows executed.** Three further bugs found and fixed, on top of #25.
+
+### BUG #27 — Control Panel status summary showed 9 of 14 tickets (FIXED)
+
+`cp/HomeView` rendered five hardcoded status pills: New / In Progress / On Hold /
+Completed / Cancelled. It therefore omitted Open, Pending and Closed entirely,
+always displayed Cancelled as 0, and its buckets summed to **9 of 14** real
+tickets. A dashboard that silently drops a third of the rows is worse than no
+dashboard. Now derived from the shared list plus anything else present in the
+data; reconciles at 14 of 14.
+
+### BUG #28 — bulk status dropdown offered a status the app does not have (FIXED)
+
+The bulk action bar's Ticket Status select was a **sixth** hand-written copy of
+the vocabulary — offering `New`, and unable to set Open, Pending or Closed at
+all. Unlike the Control Panel's inert default, this one writes: bulk-setting a
+selection to `New` would have made every one of them vanish from the board
+before #25 was fixed. Now reads `TICKET_STATUS_LIST`.
+
+### BUG #29 — status and priority untranslated in Arabic (FIXED)
+
+Under Arabic the whole page translated except the status and priority pills,
+which stayed English. Cause: the table's row callbacks bind their ticket to `t`,
+shadowing the `t` translation function for the entire row, so the values could
+only be rendered raw. The kanban names its variable `tk` and translated
+correctly — so the two views disagreed in Arabic. Fixed by aliasing the
+translator, a smaller change than renaming `t` across every row cell. Now
+مكتمل / معلق / مفتوح / موقوف and حرج / متوسط.
+
+### Not bugs — checked and cleared
+
+- **Audit logging.** A probe against `audit_logs` failed, but the writer targets
+  `user_activity_log` and every action from this run is recorded there. My
+  probe used the wrong table name.
+- **Email errors in the console.** The provider rejects `example.com`
+  recipients, which is what the seeded test customers use. Expected in this
+  environment, and the app already swallows it.
+- **Radix `DialogTitle` warning.** A real accessibility gap for screen readers,
+  but pre-existing and not specific to this module.
+
+### Still not run
+
+Rows 28, 29, 32, 34, 42, 43, 48, 50, 51, 54 — bulk-product tickets, attachments,
+the warehouse status sync, credit-note issuance from a ticket, bulk product
+status, the zero-selection guard, keyboard shortcuts, and mobile width.
+
+### Test data
+
+None left behind. Both tickets created during this pass (RMA-10082026-0001 and
+-0002) were removed by the row 49 bulk-delete test, which also cascaded their
+three `inventory_units`. The ticket count and status distribution are back to
+exactly what they were at the start: 14 tickets, Open 4 / New 2 / In Progress 2 /
+Completed 2 / Pending 1 / On Hold 1 / Closed 2.

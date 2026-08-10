@@ -95,7 +95,7 @@ function KanbanCard({ ticket, onViewDetails, onQuickStatusChange, canQuickEdit, 
             {ticket.rma_number}
           </span>
           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ms-1 ${getPriorityColor(ticket.priority)}`}>
-            {ticket.priority}
+            {t(`priorityValues.${ticket.priority}`, ticket.priority)}
           </span>
         </div>
         <p className="text-xs font-medium text-[#211f1b] dark:text-[#e8ebf0] truncate">

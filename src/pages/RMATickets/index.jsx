@@ -22,6 +22,12 @@ import { TicketDrawer } from './TicketDrawer'
 
 export default function RMATickets({ userRole, userEmail, userPermissions, initialTicketId }) {
   const { t } = useTranslation()
+  // The table's row callbacks bind their ticket to `t`, shadowing the
+  // translator for the whole row. That is why status and priority rendered as
+  // raw English under Arabic while every label around them translated — the
+  // kanban names its variable `tk` and gets this right. Aliasing is a smaller,
+  // safer change than renaming `t` across every row cell.
+  const tr = t
   const queryClient = useQueryClient()
 
   // P-1: TanStack Query — cached fetch; stale data renders instantly on re-visit
@@ -1294,11 +1300,14 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 className="text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg px-2 py-1.5 bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
               >
                 <option value="">{t('tickets.ticketStatusPlaceholder')}</option>
-                <option>New</option>
-                <option>In Progress</option>
-                <option>On Hold</option>
-                <option>Completed</option>
-                <option>Cancelled</option>
+                {/* Was a sixth hand-written copy of the status list — offering
+                    'New', which this app has never had, while omitting Open,
+                    Pending and Closed. Bulk-setting tickets to a status the
+                    board could not render is how a whole selection disappears
+                    at once. */}
+                {TICKET_STATUS_LIST.map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
               </select>
               <button
                 onClick={handleBulkTicketStatus}
@@ -1468,7 +1477,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                         onClick={(e) => { e.stopPropagation(); setInlineEdit(inlineEdit.ticketId === t.id && inlineEdit.field === 'ticket_status' ? { ticketId: null, field: null } : { ticketId: t.id, field: 'ticket_status' }) }}
                         className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(t.ticket_status)} flex items-center gap-1 hover:opacity-80 transition-opacity`}
                       >
-                        {t.ticket_status}
+                        {tr(`statusValues.${t.ticket_status}`, t.ticket_status)}
                         <svg className="w-2.5 h-2.5 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
                       </button>
                       {inlineEdit.ticketId === t.id && inlineEdit.field === 'ticket_status' && (
@@ -1476,14 +1485,14 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                           {TICKET_STATUS_LIST.map((s) => (
                             <button key={s} onClick={(e) => { e.stopPropagation(); handleInlineUpdate(t, 'ticket_status', s) }}
                               className={`w-full px-3 py-1.5 text-left text-xs font-medium flex items-center gap-2 transition-colors ${t.ticket_status === s ? 'opacity-40 cursor-default' : 'hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]'}`}>
-                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${getStatusColor(s)}`}>{s}</span>
+                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${getStatusColor(s)}`}>{tr(`statusValues.${s}`, s)}</span>
                             </button>
                           ))}
                         </div>
                       )}
                     </div>
                   ) : (
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(t.ticket_status)}`}>{t.ticket_status}</span>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(t.ticket_status)}`}>{tr(`statusValues.${t.ticket_status}`, t.ticket_status)}</span>
                   )}
                 </td>
                 <td className="px-4 py-3">
@@ -1493,7 +1502,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                         onClick={(e) => { e.stopPropagation(); setInlineEdit(inlineEdit.ticketId === t.id && inlineEdit.field === 'priority' ? { ticketId: null, field: null } : { ticketId: t.id, field: 'priority' }) }}
                         className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(t.priority)} flex items-center gap-1 hover:opacity-80 transition-opacity`}
                       >
-                        {t.priority}
+                        {tr(`priorityValues.${t.priority}`, t.priority)}
                         <svg className="w-2.5 h-2.5 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
                       </button>
                       {inlineEdit.ticketId === t.id && inlineEdit.field === 'priority' && (
@@ -1501,14 +1510,14 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                           {PRIORITY_LIST.map((p) => (
                             <button key={p} onClick={(e) => { e.stopPropagation(); handleInlineUpdate(t, 'priority', p) }}
                               className={`w-full px-3 py-1.5 text-left text-xs font-medium flex items-center gap-2 transition-colors ${t.priority === p ? 'opacity-40 cursor-default' : 'hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]'}`}>
-                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${getPriorityColor(p)}`}>{p}</span>
+                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${getPriorityColor(p)}`}>{tr(`priorityValues.${p}`, p)}</span>
                             </button>
                           ))}
                         </div>
                       )}
                     </div>
                   ) : (
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(t.priority)}`}>{t.priority}</span>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(t.priority)}`}>{tr(`priorityValues.${t.priority}`, t.priority)}</span>
                   )}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
