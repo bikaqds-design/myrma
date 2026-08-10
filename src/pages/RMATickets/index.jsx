@@ -274,7 +274,20 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           t.customer_name?.toLowerCase().includes(q) ||
           t.ticket_status?.toLowerCase().includes(q) ||
           t.priority?.toLowerCase().includes(q) ||
-          t.assigned_technician?.toLowerCase().includes(q)
+          t.assigned_technician?.toLowerCase().includes(q) ||
+          // Serial number is how an RMA desk actually identifies a return: the
+          // caller has the device in hand and reads the serial off it, not the
+          // RMA number off an email they cannot find. Product name matters for
+          // the same reason ("the ASRock board I sent back").
+          //
+          // No extra query — rma_tickets.products is jsonb carrying
+          // product_name and serial_number per line, and the full list is
+          // already in memory for the client-side filtering above.
+          (t.products || []).some(
+            (p) =>
+              p?.serial_number?.toLowerCase().includes(q) ||
+              p?.product_name?.toLowerCase().includes(q)
+          )
       )
     }
     if (filterStatus) filtered = filtered.filter((t) => t.ticket_status === filterStatus)

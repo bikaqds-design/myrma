@@ -209,7 +209,7 @@
     "subtitle": "Manage return merchandise authorization",
     "newTicket": "New Ticket",
     "createTicket": "Create Ticket",
-    "searchPlaceholder": "Search by RMA number, customer, status, priority...",
+    "searchPlaceholder": "Search by RMA number, customer, serial, product...",
     "overdueOnly": "Overdue only",
     "rmaNumber": "RMA Number",
     "customer": "Customer",

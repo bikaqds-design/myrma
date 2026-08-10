@@ -20,7 +20,7 @@ Scope derived from the code, not guessed:
 | 1 | Page loads; ticket count matches the DB | ✅ 14 shown, 14 in DB |
 | 2 | Search by RMA number returns the right ticket | ✅ exact RMA number returns 1 row |
 | 3 | Search by customer name | ✅ "Yoyo" → RMA-29062026-0001 |
-| 4 | Search matches product name / serial | ⚪ **Not supported** — search covers RMA number, customer, status, priority, technician. Placeholder says so honestly. See enhancement note below. |
+| 4 | Search matches product name / serial | ❌→✅ **Was not supported.** Now implemented: serial `dasdasdsa` → RMA-31052026-0003, `jhkhk` → RMA-31052026-0002, product `Z490` → 3 tickets, customer search unaffected. |
 | 5 | Sort by each sortable column, both directions | ✅ all 6 columns reverse. "Assigned To" does not visibly reorder because all 14 tickets share one technician — a stable sort on equal keys, not a defect. |
 | 6 | Sort choice persists across reload (localStorage) | ✅ persists via `rmaTicketsSortConfig` |
 | 7 | Filter by status | ✅ Open→4, Closed→2, All→14 |
@@ -139,13 +139,32 @@ nothing, so it did not cause the legacy tickets above. It is a latent trap: if
 anyone wires it into ticket creation, every new ticket gets a status the rest of
 the app does not know. Left for a decision rather than changed unasked.
 
-### Enhancement candidate — no way to find a ticket by serial number
+### Enhancement — find a ticket by serial number (DONE)
 
 Ticket search covers RMA number, customer, status, priority and technician
 (the placeholder says so honestly). Serials are stored on `inventory_units` with
 an `rma_number` link, but nothing — not the ticket list, not the command
 palette — can look a ticket up by serial. For an RMA desk taking a call with the
-device in hand, that is the natural entry point. Missing feature, not a defect.
+device in hand, that is the natural entry point.
+
+**Built.** `rma_tickets.products` is jsonb already carrying `product_name` and
+`serial_number` per line, and the whole list is already in memory for the
+existing client-side filter — so this needed no new query or join, just a wider
+predicate. The placeholder now names serial and product instead of status and
+priority, which it had been listing while the real behaviour went unadvertised.
+
+### BUG #26 — ticket CSV export corrupted rows containing a comma (FIXED)
+
+The export joined each row with `r.join(',')` and escaped nothing. Renaming one
+ticket's customer to `Speed Technology System, Ltd "SPD"` and running the old
+expression yields **8 fields against a 7-column header** — every column after
+Customer shifted, in a file that still opens cleanly.
+
+No customer name in the data contains a comma today, which is why it had never
+surfaced. Fixed by exporting a real xlsx sheet through the shared `ExportMenu`,
+matching Leads and Purchasing: the workbook now reads back with 7 columns and
+the full name, commas and quotes intact, in one cell. Tickets also gain
+All / Filtered / Selected, having previously exported only the filtered set.
 
 ---
 
