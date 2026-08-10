@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
-import { TICKET_STATUS } from '../../lib/constants'
+import { TICKET_STATUS, TICKET_STATUS_LIST } from '../../lib/constants'
+import { getStatusColor } from '../RMATickets/_utils'
 import { GROUPS, COLOR_MAP } from './_registry'
 
 export default function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
@@ -86,16 +87,21 @@ export default function HomeView({ onNavigate, currentUserEmail: _currentUserEma
       {/* Ticket status row */}
       {stats && (
         <div className="flex flex-wrap gap-3">
+          {/* Derived from the shared status list plus whatever the data actually
+              contains, not a hardcoded five. The old list showed 'New' — not a
+              status this app has — and omitted Open, Pending and Closed, so the
+              row summed to 9 of 14 real tickets and always showed Cancelled as
+              0. A summary that silently drops a third of the rows is worse than
+              no summary. Same fix as the kanban board (BUG #25). */}
           {[
-            { label: 'New', color: 'bg-pink-100 text-pink-800' },
-            { label: 'In Progress', color: 'bg-blue-100 text-blue-800' },
-            { label: 'On Hold', color: 'bg-yellow-100 text-yellow-800' },
-            { label: 'Completed', color: 'bg-green-100 text-green-800' },
-            { label: 'Cancelled', color: 'bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#e8ebf0]' },
-          ].map(({ label, color }) => (
+            ...TICKET_STATUS_LIST,
+            ...Object.keys(stats.byStatus)
+              .filter((s) => s && !TICKET_STATUS_LIST.includes(s))
+              .sort(),
+          ].map((label) => (
             <div
               key={label}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${color}`}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${getStatusColor(label)}`}
             >
               <span className="font-medium">{t(`statusValues.${label}`, label)}</span>
               <span className="font-bold">{stats.byStatus[label] || 0}</span>

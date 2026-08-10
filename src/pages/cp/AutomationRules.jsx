@@ -5,6 +5,7 @@ import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../../lib/sentry'
 import { Spinner } from '../../components/ui'
+import { TICKET_STATUS, TICKET_STATUS_LIST, PRIORITY_LIST } from '../../lib/constants'
 
 const TRIGGER_OPTIONS = [
   { value: 'ticket_created', label: 'Ticket Created' },
@@ -31,8 +32,15 @@ const ACTION_TYPES = [
   { value: 'assign_technician', label: 'Assign Technician' },
   { value: 'create_notification', label: 'Send Notification' },
 ]
-const STATUS_OPTIONS = ['New', 'In Progress', 'On Hold', 'Completed', 'Cancelled']
-const PRIORITY_OPTIONS = ['Critical', 'High', 'Medium', 'Low']
+// Read from the shared constants rather than a local copy. The local status
+// list offered 'New' — which is not a status this app has — and omitted 'Open',
+// 'Pending' and 'Closed', which it does. That is not cosmetic here: applyActions
+// in api/db/system.ts writes `ticket_status: a.value` straight to the row with
+// no validation, so a rule built from this dropdown could set tickets to a
+// status nothing downstream can filter, transition or (before BUG #25 was
+// fixed) even display on the board.
+const STATUS_OPTIONS = TICKET_STATUS_LIST
+const PRIORITY_OPTIONS = PRIORITY_LIST
 
 const EMPTY_RULE = () => ({
   id: Date.now(),
@@ -40,7 +48,7 @@ const EMPTY_RULE = () => ({
   enabled: true,
   trigger: 'ticket_created',
   conditions: [],
-  actions: [{ type: 'change_status', value: 'In Progress' }],
+  actions: [{ type: 'change_status', value: TICKET_STATUS.IN_PROGRESS }],
 })
 
 export default function AutomationRules({ currentUserEmail }) {

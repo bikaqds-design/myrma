@@ -5,6 +5,7 @@ import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { MigrationNotice } from './Announcements'
 import { captureException } from '../../lib/sentry'
+import { TICKET_STATUS, TICKET_STATUS_LIST, PRIORITY_LIST } from '../../lib/constants'
 
 const DEFAULT_SLA = {
   Low: { response: 72, resolution: 168 },
@@ -13,7 +14,16 @@ const DEFAULT_SLA = {
   Critical: { response: 1, resolution: 4 },
 }
 const DEFAULT_RULES = []
-const DEFAULT_SETTINGS = { default_priority: 'Medium', default_status: 'New', auto_due_days: 7 }
+// default_status was 'New', which is not one of the app's statuses and never
+// has been — TICKET_STATUS_LIST has no such member, so nothing downstream could
+// render, filter or transition it. The two legacy tickets carrying 'New' were
+// invisible on the kanban board until BUG #25 was fixed. Defaults now come from
+// the same constants every other screen reads.
+const DEFAULT_SETTINGS = {
+  default_priority: 'Medium',
+  default_status: TICKET_STATUS.OPEN,
+  auto_due_days: 7,
+}
 const PRIORITY_COLORS = {
   Low: 'bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#9aa4b2]',
   Medium: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
@@ -47,7 +57,23 @@ export default function RMAConfig({ currentUserEmail }) {
       const byKey = Object.fromEntries(cfgResult.data.map((r) => [r.config_key, r.config_value]))
       if (byKey.sla_rules) setSla(byKey.sla_rules)
       if (byKey.auto_assignment_rules) setRules(byKey.auto_assignment_rules)
-      if (byKey.default_settings) setSettings(byKey.default_settings)
+      if (byKey.default_settings) {
+        // A previously-saved default may name a status or priority this build no
+        // longer has — 'New' is the live example. A <select> whose value is not
+        // among its options renders blank and then silently saves whichever
+        // option the user's next edit lands on, so fall back to a known-good
+        // value rather than showing an empty control.
+        const saved = byKey.default_settings
+        setSettings({
+          ...saved,
+          default_status: TICKET_STATUS_LIST.includes(saved.default_status)
+            ? saved.default_status
+            : DEFAULT_SETTINGS.default_status,
+          default_priority: PRIORITY_LIST.includes(saved.default_priority)
+            ? saved.default_priority
+            : DEFAULT_SETTINGS.default_priority,
+        })
+      }
     } catch (err) {
       captureException(err)
       toast.error(i18next.t('cp.rmaConfig.loadFailed'))
@@ -137,7 +163,7 @@ export default function RMAConfig({ currentUserEmail }) {
               onChange={(e) => setSettings({ ...settings, default_priority: e.target.value })}
               className={sel}
             >
-              {['Low', 'Medium', 'High', 'Critical'].map((p) => (
+              {PRIORITY_LIST.map((p) => (
                 <option key={p}>{p}</option>
               ))}
             </select>
@@ -149,7 +175,7 @@ export default function RMAConfig({ currentUserEmail }) {
               onChange={(e) => setSettings({ ...settings, default_status: e.target.value })}
               className={sel}
             >
-              {['New', 'In Progress', 'On Hold', 'Completed', 'Cancelled'].map((s) => (
+              {TICKET_STATUS_LIST.map((s) => (
                 <option key={s}>{s}</option>
               ))}
             </select>
