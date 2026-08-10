@@ -9,6 +9,8 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import { PageSkeleton } from '../../components/Skeleton'
 import { Button, PageHeader } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
+import ExportMenu from '../../components/ExportMenu'
+import * as XLSX from 'xlsx'
 import { ROLES, TICKET_STATUS_RESOLVED, TICKET_STATUS_LIST, PRIORITY_LIST } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
 import { dispatchRmaStageMoves } from '../../lib/rmaStageMoves'
@@ -841,32 +843,62 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       .catch(() => {})
   }
 
-  const handleExport = () => {
+  /**
+   * Exports to xlsx via the shared sheet builder, matching Leads and Purchasing.
+   *
+   * This replaced a hand-rolled CSV that joined every row with `r.join(',')` and
+   * escaped nothing. One customer named "Acme, Ltd" was enough to shift every
+   * column after it in that row, silently — the file still opened, it was just
+   * wrong. No customer name in the data happens to contain a comma today, so it
+   * had never been noticed. A real sheet writer removes the whole class of
+   * problem rather than adding quoting rules to string concatenation.
+   */
+  const handleExport = (rows, scope) => {
     if (!canDo('export')) {
       toast.error(t('tickets.noPermissionExport'))
       return
     }
-    const csv = [
-      [t('tickets.csvRmaNumber'), t('tickets.csvCustomer'), t('tickets.csvStatus'), t('tickets.csvPriority'), t('tickets.csvAssignedTo'), t('tickets.csvDueDate'), t('tickets.csvCreatedDate')],
-      ...filteredTickets.map((t) => [
-        t.rma_number,
-        t.customer_name,
-        t.ticket_status,
-        t.priority,
-        t.assigned_technician || 'Unassigned',
-        t.due_date || 'N/A',
-        new Date(t.created_date).toLocaleDateString(),
+    if (!rows.length) {
+      toast(t('tickets.exportEmpty'))
+      return
+    }
+    const headers = [
+      t('tickets.csvRmaNumber'),
+      t('tickets.csvCustomer'),
+      t('tickets.csvStatus'),
+      t('tickets.csvPriority'),
+      t('tickets.csvAssignedTo'),
+      t('tickets.csvDueDate'),
+      t('tickets.csvCreatedDate'),
+    ]
+    const aoa = [
+      headers,
+      ...rows.map((tk) => [
+        tk.rma_number || '',
+        tk.customer_name || '',
+        tk.ticket_status || '',
+        tk.priority || '',
+        tk.assigned_technician || t('tickets.unassigned'),
+        tk.due_date ? new Date(tk.due_date).toLocaleDateString() : '',
+        tk.created_date ? new Date(tk.created_date).toLocaleDateString() : '',
       ]),
     ]
-      .map((r) => r.join(','))
-      .join('\n')
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    a.download = `rma-tickets-${Date.now()}.csv`
-    a.click()
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    headers.forEach((_, ci) => {
+      const addr = XLSX.utils.encode_cell({ r: 0, c: ci })
+      if (ws[addr]) ws[addr].s = { font: { bold: true } }
+    })
+    ws['!autofilter'] = { ref: `A1:${XLSX.utils.encode_col(headers.length - 1)}1` }
+    ws['!cols'] = [
+      { wch: 20 }, { wch: 28 }, { wch: 14 }, { wch: 12 },
+      { wch: 28 }, { wch: 14 }, { wch: 14 },
+    ]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'RMA Tickets')
+    XLSX.writeFile(wb, `rma-tickets-${scope}-${new Date().toISOString().slice(0, 10)}.xlsx`)
     toast.success(t('tickets.exportedSuccess'))
     db.auditLog
-      .log(userEmail, 'tickets_exported', `Exported ${filteredTickets.length} tickets to CSV`)
+      .log(userEmail, 'tickets_exported', `Exported ${rows.length} tickets (${scope}) to xlsx`)
       .catch(() => {})
   }
 
@@ -1002,15 +1034,13 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             </button>
           </div>
           {canDo('export') && (
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#e6e9ef] dark:border-[#212a38] text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] transition-colors"
-            >
-              <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              {t('common.export')}
-            </button>
+            <ExportMenu
+              allRows={tickets}
+              filteredRows={filteredTickets}
+              selectedRows={tickets.filter((tk) => selectedTickets.includes(tk.id))}
+              ns="tickets"
+              onExport={handleExport}
+            />
           )}
           {canDo('create') && (
             <Button onClick={handleAddNew}>

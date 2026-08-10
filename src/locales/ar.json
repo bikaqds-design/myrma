@@ -269,7 +269,15 @@
     "csvPriority": "الأولوية",
     "csvAssignedTo": "مسند إلى",
     "csvDueDate": "تاريخ الاستحقاق",
-    "csvCreatedDate": "تاريخ الإنشاء"
+    "csvCreatedDate": "تاريخ الإنشاء",
+    "exportAll": "تصدير الكل",
+    "exportAllDesc": "جميع التذاكر ({{count}})",
+    "exportFiltered": "تصدير المُصفّى",
+    "exportFilteredDesc": "{{count}} تذكرة مطابقة للفلاتر الحالية",
+    "exportSelected": "تصدير المحدد",
+    "exportSelectedDesc": "{{count}} تذكرة محددة",
+    "exportEmpty": "لا يوجد ما يمكن تصديره",
+    "unassigned": "غير مُعيَّن"
   },
   "customers": {
     "title": "العملاء",

@@ -269,7 +269,15 @@
     "csvPriority": "Priority",
     "csvAssignedTo": "Assigned To",
     "csvDueDate": "Due Date",
-    "csvCreatedDate": "Created Date"
+    "csvCreatedDate": "Created Date",
+    "exportAll": "Export All",
+    "exportAllDesc": "All {{count}} tickets",
+    "exportFiltered": "Export Filtered",
+    "exportFilteredDesc": "{{count}} tickets matching current filters",
+    "exportSelected": "Export Selected",
+    "exportSelectedDesc": "{{count}} selected tickets",
+    "exportEmpty": "Nothing to export",
+    "unassigned": "Unassigned"
   },
   "customers": {
     "title": "Customers",
