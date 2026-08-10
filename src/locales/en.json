@@ -3391,5 +3391,24 @@
     "unitsReceived_one": "{{count}} unit received",
     "unitsReceived_other": "{{count}} units received",
     "receivedBy": "by {{name}}"
+  },
+  "resolutionTypeValues": {
+    "replacement": "Replacement",
+    "exchange": "Exchange",
+    "credit_note": "Credit Note",
+    "refund": "Refund"
+  },
+  "productStatusValues": {
+    "Received": "Received",
+    "Under Repair": "Under Repair",
+    "Repaired": "Repaired",
+    "Can't Repair": "Can't Repair",
+    "Replacement": "Replacement",
+    "Credit Note": "Credit Note"
+  },
+  "warrantyValues": {
+    "In Warranty": "In Warranty",
+    "Out of Warranty": "Out of Warranty",
+    "Unknown": "Unknown"
   }
 }

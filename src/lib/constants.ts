@@ -98,6 +98,40 @@ export const PRIORITY_WEIGHT: Record<Priority, number> = {
   [PRIORITY.LOW]: 3,
 }
 
+// ── Product (per-line RMA stage) statuses ────────────────────────────────────
+/**
+ * Where a single returned item is in the repair workflow. Distinct from the
+ * ticket status, which describes the whole RMA.
+ *
+ * This carries more weight than a label: RMA_STAGE_LOCATION (below) maps each
+ * of these to a system warehouse, so the product status is what decides where a
+ * unit physically sits. A value outside this list moves no stock and reports no
+ * error — it simply is not in the map.
+ *
+ * Added during the vocabulary sweep: the six options were previously typed out
+ * by hand in two dropdowns with no canonical list anywhere, which is how the
+ * ticket-status vocabulary ended up written six different ways.
+ */
+export const PRODUCT_STATUS = {
+  RECEIVED: 'Received',
+  UNDER_REPAIR: 'Under Repair',
+  REPAIRED: 'Repaired',
+  CANT_REPAIR: "Can't Repair",
+  REPLACEMENT: 'Replacement',
+  CREDIT_NOTE: 'Credit Note',
+} as const
+
+export type ProductStatus = (typeof PRODUCT_STATUS)[keyof typeof PRODUCT_STATUS]
+
+export const PRODUCT_STATUS_LIST: ProductStatus[] = [
+  PRODUCT_STATUS.RECEIVED,
+  PRODUCT_STATUS.UNDER_REPAIR,
+  PRODUCT_STATUS.REPAIRED,
+  PRODUCT_STATUS.CANT_REPAIR,
+  PRODUCT_STATUS.REPLACEMENT,
+  PRODUCT_STATUS.CREDIT_NOTE,
+]
+
 // ── Inventory unit statuses ──────────────────────────────────────────────────
 export const INVENTORY_STATUS = {
   ACTIVE_RMA: 'active_rma',
@@ -179,6 +213,34 @@ export const RESOLUTION_TYPE = {
   RETURN_TO_CUSTOMER: 'return_to_customer',
   COMPANY_STOCK: 'company_stock',
 } as const
+
+// ── Resolution types (how an RMA was settled with the customer) ──────────────
+/**
+ * Deliberately not RESOLUTION_TYPE above, which answers a different question —
+ * where the physical unit ended up. This one is the commercial outcome, and the
+ * two are easy to confuse by name alone.
+ *
+ * Was typed out identically in TicketForm and TicketDrawer, the second omitting
+ * the empty option. Labels live under `resolutionTypeValues.*` so they
+ * translate; before this they were hardcoded English and stayed English under
+ * Arabic, the same gap as BUG #29.
+ */
+export const TICKET_RESOLUTION_TYPE = {
+  REPLACEMENT: 'replacement',
+  EXCHANGE: 'exchange',
+  CREDIT_NOTE: 'credit_note',
+  REFUND: 'refund',
+} as const
+
+export type TicketResolutionType =
+  (typeof TICKET_RESOLUTION_TYPE)[keyof typeof TICKET_RESOLUTION_TYPE]
+
+export const TICKET_RESOLUTION_TYPE_LIST: TicketResolutionType[] = [
+  TICKET_RESOLUTION_TYPE.REPLACEMENT,
+  TICKET_RESOLUTION_TYPE.EXCHANGE,
+  TICKET_RESOLUTION_TYPE.CREDIT_NOTE,
+  TICKET_RESOLUTION_TYPE.REFUND,
+]
 
 // ── Customer statuses ────────────────────────────────────────────────────────
 export const CUSTOMER_STATUS = {
@@ -521,7 +583,9 @@ export const RMA_STAGE_CODES: SystemWarehouseCode[] = [
  * intent only; the real onward move is driven by the actual CN-issue/
  * replacement-shipment event (R2), not the ticket status itself.
  */
-export const RMA_STAGE_LOCATION: Record<string, SystemWarehouseCode> = {
+// Keyed by ProductStatus rather than string, so adding a product status without
+// giving it a warehouse is a type error instead of a silent no-move.
+export const RMA_STAGE_LOCATION: Record<ProductStatus, SystemWarehouseCode> = {
   Received: SYSTEM_WAREHOUSE_CODES.RMA_RECEIVED,
   'Under Repair': SYSTEM_WAREHOUSE_CODES.RMA_REPAIR,
   Repaired: SYSTEM_WAREHOUSE_CODES.RMA_REPAIRED,

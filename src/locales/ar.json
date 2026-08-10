@@ -3395,5 +3395,24 @@
     "unitsReceived_one": "تم استلام وحدة واحدة",
     "unitsReceived_other": "تم استلام {{count}} وحدة",
     "receivedBy": "بواسطة {{name}}"
+  },
+  "resolutionTypeValues": {
+    "replacement": "استبدال",
+    "exchange": "تبديل",
+    "credit_note": "إشعار دائن",
+    "refund": "استرداد"
+  },
+  "productStatusValues": {
+    "Received": "تم الاستلام",
+    "Under Repair": "قيد الإصلاح",
+    "Repaired": "تم الإصلاح",
+    "Can't Repair": "تعذّر الإصلاح",
+    "Replacement": "استبدال",
+    "Credit Note": "إشعار دائن"
+  },
+  "warrantyValues": {
+    "In Warranty": "داخل الضمان",
+    "Out of Warranty": "خارج الضمان",
+    "Unknown": "غير معروف"
   }
 }

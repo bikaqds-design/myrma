@@ -7,7 +7,7 @@ import ActivityTimeline from './ActivityTimeline'
 import toast from 'react-hot-toast'
 import Modal from '../../components/Modal'
 import { Button, Spinner } from '../../components/ui'
-import { ROLES, TICKET_STATUS, TICKET_STATUS_RESOLVED } from '../../lib/constants'
+import { ROLES, TICKET_STATUS, TICKET_STATUS_RESOLVED, TICKET_RESOLUTION_TYPE_LIST } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
 import { CreateStandaloneCreditNoteModal } from '../SalesDocuments/_modals'
 import {
@@ -849,10 +849,9 @@ export function TicketDrawer({
                     onChange={(e) => setResForm(f => ({ ...f, type: e.target.value }))}
                     className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0]"
                   >
-                    <option value="replacement">Replacement</option>
-                    <option value="exchange">Exchange</option>
-                    <option value="credit_note">Credit Note</option>
-                    <option value="refund">Refund</option>
+                    {TICKET_RESOLUTION_TYPE_LIST.map((r) => (
+                      <option key={r} value={r}>{t(`resolutionTypeValues.${r}`, r)}</option>
+                    ))}
                   </select>
                 </div>
 

@@ -11,7 +11,7 @@ import { Button, PageHeader } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
 import ExportMenu from '../../components/ExportMenu'
 import * as XLSX from 'xlsx'
-import { ROLES, TICKET_STATUS_RESOLVED, TICKET_STATUS_LIST, PRIORITY_LIST } from '../../lib/constants'
+import { ROLES, TICKET_STATUS_RESOLVED, TICKET_STATUS_LIST, PRIORITY_LIST, PRODUCT_STATUS_LIST } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
 import { dispatchRmaStageMoves } from '../../lib/rmaStageMoves'
 import { SortableHeader, ShortcutsHelp } from './_shared'
@@ -1328,12 +1328,9 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 className="text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg px-2 py-1.5 bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
               >
                 <option value="">{t('tickets.productStatusPlaceholder')}</option>
-                <option>Received</option>
-                <option>Under Repair</option>
-                <option>Repaired</option>
-                <option>Can&apos;t Repair</option>
-                <option>Replacement</option>
-                <option>Credit Note</option>
+                {PRODUCT_STATUS_LIST.map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
               </select>
               <button
                 onClick={handleBulkProductStatus}

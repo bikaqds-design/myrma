@@ -13,7 +13,7 @@ import toast from 'react-hot-toast'
 import { notificationEventBus } from '../../lib/events/NotificationEventBus.js'
 import Modal from '../../components/Modal'
 import { Button } from '../../components/ui'
-import { ROLES } from '../../lib/constants'
+import { ROLES, PRODUCT_STATUS_LIST, WARRANTY_STATUS_LIST, PRIORITY_LIST, TICKET_STATUS_LIST, TICKET_RESOLUTION_TYPE_LIST } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
 import { buildRmaMoves, dispatchRmaStageMoves } from '../../lib/rmaStageMoves'
 import { serialsToCheck, findSerialConflicts, describeFailedUnits } from '../../lib/rmaUnitCreate'
@@ -857,10 +857,9 @@ export function TicketForm({
                   onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
                   className={inputClass}
                 >
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
-                  <option value="Critical">Critical</option>
+                  {PRIORITY_LIST.map((p) => (
+                    <option key={p} value={p}>{t(`priorityValues.${p}`, p)}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -874,13 +873,9 @@ export function TicketForm({
                   onChange={(e) => setFormData({ ...formData, ticket_status: e.target.value })}
                   className={inputClass}
                 >
-                  <option value="Open">Open</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Pending">Pending</option>
-                  <option value="On Hold">On Hold</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Closed">Closed</option>
-                  <option value="Cancelled">Cancelled</option>
+                  {TICKET_STATUS_LIST.map((s) => (
+                    <option key={s} value={s}>{t(`statusValues.${s}`, s)}</option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -1050,12 +1045,9 @@ export function TicketForm({
                         onChange={(e) => updateProduct(idx, 'product_status', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm bg-white"
                       >
-                        <option>Received</option>
-                        <option>Under Repair</option>
-                        <option>Repaired</option>
-                        <option>Can&apos;t Repair</option>
-                        <option>Replacement</option>
-                        <option>Credit Note</option>
+                        {PRODUCT_STATUS_LIST.map((s) => (
+                          <option key={s} value={s}>{t(`productStatusValues.${s}`, s)}</option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -1065,9 +1057,9 @@ export function TicketForm({
                         onChange={(e) => updateProduct(idx, 'warranty_status', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm bg-white"
                       >
-                        <option>In Warranty</option>
-                        <option>Out of Warranty</option>
-                        <option>Extended Warranty</option>
+                        {WARRANTY_STATUS_LIST.map((w) => (
+                          <option key={w} value={w}>{t(`warrantyValues.${w}`, w)}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -1364,10 +1356,9 @@ export function TicketForm({
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600"
                 >
                   <option value="">— None —</option>
-                  <option value="replacement">Replacement</option>
-                  <option value="exchange">Exchange</option>
-                  <option value="credit_note">Credit Note</option>
-                  <option value="refund">Refund</option>
+                  {TICKET_RESOLUTION_TYPE_LIST.map((r) => (
+                    <option key={r} value={r}>{t(`resolutionTypeValues.${r}`, r)}</option>
+                  ))}
                 </select>
               </div>
 
