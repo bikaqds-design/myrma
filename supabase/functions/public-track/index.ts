@@ -45,6 +45,60 @@ function getClientIp(req: Request): string {
 const TICKET_PUBLIC_COLUMNS =
   'id, rma_number, ticket_status, priority, created_date, due_date, general_description, customer_name, products, accessories_received'
 
+// The comments query used select('*'), which returned every column of every
+// non-internal comment to an unauthenticated caller — including user_email, the
+// staff address that posted it. 14 public comments in the live data carry one.
+// The drawer's "Internal (staff only)" toggle defaults to off, so an ordinary
+// staff reply is public by default and leaked the responder's address to anyone
+// who looked up that RMA number.
+//
+// Everything the tracker actually renders is kept: author_name is the display
+// name it shows, parent_comment_id drives its reply threading (and doubles as
+// its schema probe), attachments and is_customer_comment drive the file list
+// and the team/customer styling. What goes is user_email, plus is_internal
+// (redundant — the query already filters on it) and updated_date (unused).
+const COMMENT_PUBLIC_COLUMNS =
+  'id, ticket_id, created_date, comment_text, author_name, is_customer_comment, attachments, parent_comment_id'
+
+/**
+ * Dropping user_email from the select is not enough on its own: the ticket
+ * drawer stores the staff member's email address *as* author_name
+ * (TicketDrawer passes `authorName: userEmail`), and the tracker renders
+ * author_name as the visible author. So a customer tracking their repair saw
+ * "bika.qds@gmail.com" above every reply.
+ *
+ * Masking here rather than only in the drawer is deliberate. A client-side fix
+ * would protect comments written from now on and leave the ones already in the
+ * table exposed — 14 of them at the time of writing. Doing it at the boundary
+ * covers the history too, and keeps the rule where it belongs: this function is
+ * the only thing standing between an unauthenticated caller and the table.
+ *
+ * The customer's own name is left alone — it is theirs, they typed it, and the
+ * thread is unreadable without it. Only the team side is collapsed to the label
+ * the UI already shows beside those replies.
+ */
+/**
+ * Neutralises LIKE metacharacters so the lookup matches one RMA number instead
+ * of a pattern.
+ *
+ * ilike is used for case-insensitivity — customers type "rma-…" — but it also
+ * honours % and _, and the input went in raw. That turned the endpoint into an
+ * enumeration tool: "RMA-21052026%" returned a real ticket, customer name
+ * included, without knowing the number. Since the RMA number is the only secret
+ * protecting this data, a date prefix collapsed the guessing space from the full
+ * number to a handful of days.
+ *
+ * Backslash first, or it would double-escape the escapes added after it.
+ */
+function escapeLikePattern(input: string) {
+  return input.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
+}
+
+function maskStaffIdentity(c: Record<string, unknown>) {
+  if (c?.is_customer_comment) return c
+  return { ...c, author_name: 'Support Team' }
+}
+
 // ─── Handler ─────────────────────────────────────────────────────────────────
 // corsHeaders and json() are defined per-request (not module-level) — Deno's
 // request runtime can interleave concurrent requests within one isolate, so a
@@ -99,7 +153,7 @@ Deno.serve(async (req) => {
       const { data, error } = await admin
         .from('rma_tickets')
         .select(TICKET_PUBLIC_COLUMNS)
-        .ilike('rma_number', rmaNumber)
+        .ilike('rma_number', escapeLikePattern(rmaNumber))
         .maybeSingle()
 
       if (error) {
@@ -116,7 +170,7 @@ Deno.serve(async (req) => {
 
       const { data, error } = await admin
         .from('ticket_comments')
-        .select('*')
+        .select(COMMENT_PUBLIC_COLUMNS)
         .eq('ticket_id', ticketId)
         .eq('is_internal', false)
         .order('created_date', { ascending: true })
@@ -127,7 +181,7 @@ Deno.serve(async (req) => {
         console.error('comments error:', error)
         return json({ error: 'Comments fetch failed' }, 500)
       }
-      return json({ comments: data || [] }, 200)
+      return json({ comments: (data || []).map(maskStaffIdentity) }, 200)
     }
 
     case 'addComment': {

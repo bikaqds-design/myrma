@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import Modal from '../../components/Modal'
 import { Button, Spinner } from '../../components/ui'
 import { ROLES, TICKET_STATUS, TICKET_STATUS_RESOLVED, TICKET_RESOLUTION_TYPE_LIST } from '../../lib/constants'
+import { nameFromEmail } from '../../lib/utils'
 import { captureException } from '../../lib/sentry'
 import { CreateStandaloneCreditNoteModal } from '../SalesDocuments/_modals'
 import {
@@ -240,7 +241,11 @@ export function TicketDrawer({
         ticketId: ticket.id,
         commentText: newComment.trim(),
         authorEmail: userEmail,
-        authorName: userEmail,
+        // Not the raw address: author_name is what the public tracker prints
+        // above each reply, so storing an email here published the responder's
+        // address to anyone with the RMA number. The email still goes to
+        // authorEmail for internal attribution.
+        authorName: nameFromEmail(userEmail),
         isInternal: isInternalComment,
         parentCommentId,
         attachments,

@@ -1,18 +1,11 @@
 import { db } from '../api/supabaseClient'
 import { getPdfLayout, buildDocumentHTML, openPrint, formatMoney, escapeHtml as esc } from './documentPdf'
+import { nameFromEmail } from './utils'
 
-// The "who" columns store emails (user_roles has no display name). Derive a
-// readable name from the local-part for documents: sara.mostafa@x → Sara Mostafa.
-export function nameFromEmail(email) {
-  if (!email) return '—'
-  const local = String(email).split('@')[0]
-  const name = local
-    .split(/[._-]+/)
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ')
-  return name || String(email)
-}
+// Re-exported so the PDF modules that have always imported it from here keep
+// working; it lives in utils now because it is a plain string helper.
+export { nameFromEmail }
+
 
 /**
  * downloadQuotationPDF — renders a quotation through the shared document engine
