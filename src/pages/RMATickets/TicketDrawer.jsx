@@ -11,6 +11,7 @@ import { ROLES, TICKET_STATUS, TICKET_STATUS_RESOLVED, TICKET_RESOLUTION_TYPE_LI
 import { nameFromEmail } from '../../lib/utils'
 import { captureException } from '../../lib/sentry'
 import { CreateStandaloneCreditNoteModal } from '../SalesDocuments/_modals'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import {
   getStatusColor,
   getPriorityColor,
@@ -93,8 +94,16 @@ export function TicketDrawer({
     setIssuingCN(true)
     try {
       const cnCode = await db.creditNotes.issue(cn.id, userEmail)
+      const previousStatus = ticket.ticket_status
       await db.rmaTickets.update(ticket.id, { ticket_status: TICKET_STATUS.CLOSED })
       logActivity('credit_note_created', `${cnCode} issued — ${cn.reason}`)
+      // The close was happening without a status_changed row, so the timeline
+      // showed the credit note and then a ticket that had silently become
+      // Closed with nothing accounting for it. Every other status transition in
+      // this module logs one; this is the same event and should read the same.
+      if (previousStatus !== TICKET_STATUS.CLOSED) {
+        logActivity('status_changed', `${previousStatus}|${TICKET_STATUS.CLOSED}`)
+      }
       queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
       queryClient.invalidateQueries({ queryKey: ['rma-tickets-count'] })
       queryClient.invalidateQueries({ queryKey: ['sales-documents'] })
@@ -298,7 +307,13 @@ export function TicketDrawer({
     }
   }
 
+  // Contacts on the customer page confirm before deleting; comments did not,
+  // and a stray click on a small × removed someone's message with no way back.
+  // Same action, same weight — it should ask.
+  const [pendingCommentDelete, setPendingCommentDelete] = useState(null)
+
   const handleDeleteComment = async (commentId) => {
+    setPendingCommentDelete(null)
     try {
       await db.ticketComments.delete(commentId)
       setTicketComments((prev) => prev.filter((c) => c.id !== commentId))
@@ -1135,7 +1150,7 @@ export function TicketDrawer({
                           </div>
                           {(userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN) && (
                             <button
-                              onClick={() => handleDeleteComment(comment.id)}
+                              onClick={() => setPendingCommentDelete(comment.id)}
                               className="text-gray-300 hover:text-red-500 flex-shrink-0 self-start p-1 transition-colors"
                               title="Delete comment"
                               aria-label="Delete comment"
@@ -1234,7 +1249,7 @@ export function TicketDrawer({
                                   {(userRole === ROLES.ADMIN ||
                                     userRole === ROLES.SUPER_ADMIN) && (
                                     <button
-                                      onClick={() => handleDeleteComment(reply.id)}
+                                      onClick={() => setPendingCommentDelete(reply.id)}
                                       className="text-gray-300 hover:text-red-500 flex-shrink-0 self-start p-1 transition-colors"
                                     >
                                       <svg
@@ -1502,6 +1517,14 @@ export function TicketDrawer({
           </Button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(pendingCommentDelete)}
+        title={t('ticketDrawer.deleteCommentTitle')}
+        message={t('ticketDrawer.deleteCommentConfirm')}
+        onConfirm={() => handleDeleteComment(pendingCommentDelete)}
+        onCancel={() => setPendingCommentDelete(null)}
+      />
 
       {showIssueCNModal && (
         <CreateStandaloneCreditNoteModal

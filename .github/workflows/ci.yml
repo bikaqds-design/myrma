@@ -74,10 +74,23 @@ jobs:
     # What unblocks it: a baseline migration that creates those 13 tables,
     # ordered before 20260524_*. Generate with
     #   supabase db dump --linked --schema public -f baseline.sql
-    # (needs Docker), trim to the tables above, make it idempotent, commit as
-    # supabase/migrations/00000000000000_baseline.sql, then
+    # then trim to the tables above, make it idempotent, commit as
+    # supabase/migrations/00000000000000_baseline.sql, and finally
     #   supabase migration repair --status applied 00000000000000
     # so the live project does not try to re-run it.
+    #
+    # The only missing piece is Docker. Re-checked 2026-08-12: the CLI is
+    # authenticated through the linked project (functions deploy works), but
+    # `db dump` runs pg_dump inside a container and fails with "failed to
+    # inspect docker image". Three other routes were tried and are closed —
+    # information_schema is not exposed through PostgREST, there is no
+    # arbitrary-SQL RPC, and a plain select only yields column names, not the
+    # types, defaults, keys, indexes or RLS a baseline needs. A baseline built
+    # from guessed types would be worse than none: `supabase start` would
+    # succeed while quietly diverging from production.
+    #
+    # So this needs Docker Desktop running, then the four commands above. It is
+    # one session's work for someone with Docker, not a research task.
     #
     # NOTE: `npm run test:db` in package.json has the exact same problem for
     # the same reason — it also starts with `npx supabase start`.

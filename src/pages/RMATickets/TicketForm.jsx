@@ -533,6 +533,26 @@ export function TicketForm({
    * the name no longer identifies a catalog row, and keeping a stale id would
    * file the RMA against whatever the user picked before.
    */
+  /**
+   * Whether this line needs a serial number.
+   *
+   * Serialized stock is one row per physical unit in inventory_units, so the
+   * serial is the identity of the thing being returned. Bulk stock is a
+   * quantity in warehouse_stock and has no serials at all — demanding one meant
+   * a bulk product could not be put through an RMA except by inventing a
+   * number, which then sat in inventory_units as a fake unit for a product
+   * whose stock is counted, not enumerated.
+   *
+   * Falls back to requiring it when the product is unknown: a name typed
+   * freehand has no product_id, so there is no tracking mode to read, and the
+   * stricter default is the safe one.
+   */
+  const isSerialRequired = (line) => {
+    if (!line?.product_id) return true
+    const cat = products.find((p) => p.id === line.product_id)
+    return cat?.stock_tracking_mode !== 'bulk'
+  }
+
   const setProductChoice = (i, name, product = null) => {
     const p = [...formData.products]
     p[i] = { ...p[i], product_name: name, product_id: product?.id ?? null }
@@ -1005,7 +1025,14 @@ export function TicketForm({
                     </div>
                     <div>
                       <label className={labelClass}>
-                        {t('ticketForm.serialNumber')} <span className="text-red-500">*</span>
+                        {t('ticketForm.serialNumber')}{' '}
+                        {isSerialRequired(product) ? (
+                          <span className="text-red-500">*</span>
+                        ) : (
+                          <span className="text-xs font-normal text-gray-500">
+                            {t('ticketForm.serialNotTracked')}
+                          </span>
+                        )}
                       </label>
                       <div className="relative">
                         <input
@@ -1014,7 +1041,7 @@ export function TicketForm({
                           value={product.serial_number}
                           onChange={(e) => updateProduct(idx, 'serial_number', e.target.value)}
                           className="w-full pl-3 pr-9 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm bg-white"
-                          required
+                          required={isSerialRequired(product)}
                         />
                         <button
                           type="button"

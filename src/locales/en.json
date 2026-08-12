@@ -1677,7 +1677,8 @@
     "serialDuplicateInTicket": "Serial number {{serials}} appears more than once on this ticket. Each serial can only be listed once.",
     "serialAlreadyTracked": "Serial number {{serials}} is already tracked in inventory. Correct the serial, or resolve the existing unit before opening a new RMA for it.",
     "emailNotifFailed": "Email notification failed: {{error}}",
-    "customerNameRequired": "Customer name is required"
+    "customerNameRequired": "Customer name is required",
+    "serialNotTracked": "(not tracked by serial)"
   },
   "ticketDrawer": {
     "title": "Ticket Details",
@@ -1764,7 +1765,9 @@
     "timelineCommented": "commented",
     "timelineTimeLogged": "logged time",
     "timelineStatusChanged": "changed status",
-    "timelineCreated": "created this ticket"
+    "timelineCreated": "created this ticket",
+    "deleteCommentTitle": "Delete comment",
+    "deleteCommentConfirm": "Delete this comment? This cannot be undone."
   },
   "customerModal": {
     "addTitle": "Add New Customer",
@@ -3184,7 +3187,8 @@
     "cnSelectInvoice": "Select an invoice…",
     "cnRemainingSuffix": "remaining",
     "issueCreditNoteAction": "Issue Credit Note",
-    "cnFromTicketToast": "Credit note issued and ticket closed — {{code}}"
+    "cnFromTicketToast": "Credit note issued and ticket closed — {{code}}",
+    "cnWillCloseTicket": "Issuing this credit note will also close the linked RMA ticket."
   },
   "accounting": {
     "title": "Accounting",

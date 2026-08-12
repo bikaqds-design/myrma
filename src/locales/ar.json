@@ -1677,7 +1677,8 @@
     "serialDuplicateInTicket": "الرقم التسلسلي {{serials}} مُدرج أكثر من مرة في هذه التذكرة. يجب إدراج كل رقم تسلسلي مرة واحدة فقط.",
     "serialAlreadyTracked": "الرقم التسلسلي {{serials}} متتبَّع بالفعل في المخزون. صحّح الرقم التسلسلي، أو أغلق الوحدة الحالية قبل فتح طلب إرجاع جديد لها.",
     "emailNotifFailed": "فشل إشعار البريد الإلكتروني: {{error}}",
-    "customerNameRequired": "اسم العميل مطلوب"
+    "customerNameRequired": "اسم العميل مطلوب",
+    "serialNotTracked": "(لا يُتتبع برقم تسلسلي)"
   },
   "ticketDrawer": {
     "title": "تفاصيل التذكرة",
@@ -1764,7 +1765,9 @@
     "timelineCommented": "علّق",
     "timelineTimeLogged": "سجّل وقتًا",
     "timelineStatusChanged": "غيّر الحالة",
-    "timelineCreated": "أنشأ هذه التذكرة"
+    "timelineCreated": "أنشأ هذه التذكرة",
+    "deleteCommentTitle": "حذف التعليق",
+    "deleteCommentConfirm": "هل تريد حذف هذا التعليق؟ لا يمكن التراجع."
   },
   "customerModal": {
     "addTitle": "إضافة عميل جديد",
@@ -3188,7 +3191,8 @@
     "cnSelectInvoice": "اختر فاتورة…",
     "cnRemainingSuffix": "متبقٍ",
     "issueCreditNoteAction": "إصدار إشعار دائن",
-    "cnFromTicketToast": "تم إصدار الإشعار الدائن وإغلاق التذكرة — {{code}}"
+    "cnFromTicketToast": "تم إصدار الإشعار الدائن وإغلاق التذكرة — {{code}}",
+    "cnWillCloseTicket": "إصدار هذا الإشعار الدائن سيؤدي أيضًا إلى إغلاق تذكرة الإرجاع المرتبطة."
   },
   "accounting": {
     "title": "الحسابات",
