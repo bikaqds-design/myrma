@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, db, storage } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
 import toast from 'react-hot-toast'
+import * as XLSX from 'xlsx'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { PageSkeleton } from '../../components/Skeleton'
 import { PageHeader } from '../../components/ui'
@@ -385,50 +386,66 @@ export default function Products({
     }
   }
 
-  const handleExportProducts = () => {
-    const csv = [
-      [
-        'SKU',
-        'Product Name',
-        'Brand',
-        'Category',
-        'Type',
-        'Status',
-        'Warranty (months)',
-        'Description',
-      ].join(','),
-      ...filteredProducts.map((p) =>
-        [
-          p.sku || '',
-          p.product_name || '',
-          p.brand?.brand_name || '',
-          p.category?.category_name || '',
-          p.product_type || '',
-          p.status || '',
-          p.warranty_months || '',
-          `"${(p.product_description || '').replace(/"/g, '""')}"`,
-        ].join(',')
-      ),
-    ].join('\n')
-
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `products-export-${new Date().toISOString().split('T')[0]}.csv`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-    toast.success(t('products.exported', { count: filteredProducts.length }))
+  /**
+   * Exports to xlsx via the shared sheet builder, matching Customers, Leads,
+   * Purchasing and RMA Tickets.
+   *
+   * The CSV this replaced joined each row with `.join(',')` and quoted only
+   * `product_description`. Unlike the same bug in those other modules, this one
+   * was not latent: 34 of 406 product names contain a comma — the Acer and AOC
+   * monitors carry it inside the model string, e.g.
+   * "VG240YP6BIP (LCD QV0EE.609 60CM 23.8W,VG240YP6BIP null)". Each of those
+   * rows produced 9 fields against an 8-column header, shifting Brand,
+   * Category, Type, Status and Warranty one column right. Any catalog export
+   * taken before this was wrong for 8% of its rows.
+   */
+  const handleExport = (rows, scope) => {
+    if (!rows.length) {
+      toast(t('products.exportEmpty'))
+      return
+    }
+    const headers = [
+      t('products.csvSku'),
+      t('products.csvName'),
+      t('products.csvBrand'),
+      t('products.csvCategory'),
+      t('products.csvType'),
+      t('products.csvStatus'),
+      t('products.csvWarranty'),
+      t('products.csvDescription'),
+    ]
+    const aoa = [
+      headers,
+      ...rows.map((p) => [
+        p.sku || '',
+        p.product_name || '',
+        p.brand?.brand_name || '',
+        p.category?.category_name || '',
+        p.product_type || '',
+        p.status || '',
+        p.warranty_months ?? '',
+        p.product_description || '',
+      ]),
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    headers.forEach((_, ci) => {
+      const addr = XLSX.utils.encode_cell({ r: 0, c: ci })
+      if (ws[addr]) ws[addr].s = { font: { bold: true } }
+    })
+    ws['!autofilter'] = { ref: `A1:${XLSX.utils.encode_col(headers.length - 1)}1` }
+    ws['!cols'] = [
+      { wch: 14 }, { wch: 48 }, { wch: 18 }, { wch: 22 },
+      { wch: 12 }, { wch: 10 }, { wch: 16 }, { wch: 40 },
+    ]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Products')
+    XLSX.writeFile(wb, `products-${scope}-${new Date().toISOString().slice(0, 10)}.xlsx`)
+    toast.success(t('products.exportedProducts', { count: rows.length }))
     db.auditLog
-      .log(
-        currentUserEmail,
-        'products_exported',
-        `Exported ${filteredProducts.length} products to CSV`
-      )
+      .log(currentUserEmail, 'products_exported', `Exported ${rows.length} products (${scope}) to xlsx`)
       .catch(() => {})
   }
+
 
   const handleDownloadTemplate = () => {
     const csv = [
@@ -628,7 +645,11 @@ export default function Products({
         .catch(() => {})
 
       if (errors.length > 0) {
-        toast.error(t('products.importRowErrors', { count: errors.length }))
+        // The count already reaches the user — unlike the customer importer,
+        // which dropped rejections silently until BUG #31. What was missing is
+        // *which* rows, which is the part you can act on.
+        console.warn(['Product CSV import — rejected rows:', ...errors].join('\n'))
+        toast.error(t('products.importRowErrors', { count: errors.length }), { duration: 8000 })
         captureException(new Error('CSV import errors'), { errors })
       }
 
@@ -1147,6 +1168,8 @@ export default function Products({
             <ProductsListTab
               products={paginatedProducts}
               totalProducts={filteredProducts.length}
+              allProducts={products}
+              filteredProducts={filteredProducts}
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
               brands={brands}
@@ -1164,7 +1187,7 @@ export default function Products({
               handleBulkDelete={handleBulkDelete}
               handleBulkStatusChange={handleBulkStatusChange}
               searchRef={searchRef}
-              handleExportProducts={handleExportProducts}
+              handleExport={handleExport}
               setShowAddProduct={setShowAddProduct}
               setShowBulkUpload={setShowBulkUpload}
               handleEditProduct={handleEditProduct}

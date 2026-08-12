@@ -1,9 +1,14 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import ExportMenu from '../../components/ExportMenu'
 import EmptyState from '../../components/EmptyState'
 
 export default function ProductsListTab({
   products,
+  // `products` is only the current page. Export scopes need the whole set and
+  // the filtered set, so those come in separately rather than being inferred.
+  allProducts = [],
+  filteredProducts = [],
   totalProducts,
   searchQuery,
   setSearchQuery,
@@ -22,7 +27,7 @@ export default function ProductsListTab({
   handleSelectAll,
   handleBulkDelete,
   handleBulkStatusChange,
-  handleExportProducts,
+  handleExport,
   setShowAddProduct,
   setShowBulkUpload,
   handleEditProduct,
@@ -213,20 +218,13 @@ export default function ProductsListTab({
         <div className="flex items-center gap-2 flex-wrap">
 
           {canExport && (
-            <button
-              onClick={handleExportProducts}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#e6e9ef] dark:border-[#212a38] text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] transition-colors"
-            >
-              <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              {t('common.export')}
-            </button>
+            <ExportMenu
+              allRows={allProducts}
+              filteredRows={filteredProducts}
+              selectedRows={allProducts.filter((p) => selectedProducts.includes(p.id))}
+              ns="products"
+              onExport={handleExport}
+            />
           )}
 
           {canCreate && (
@@ -342,9 +340,19 @@ export default function ProductsListTab({
                 className="px-3 py-2 text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
               >
                 <option value="">{t('products.allCategories')}</option>
-                {(categories || []).map((c) => (
-                  <option key={c.id} value={c.category_name}>{c.category_name}</option>
-                ))}
+                {/* De-duplicated by name because that is what the filter matches
+                    on. Categories are brand-scoped, so 15 names exist under more
+                    than one brand — "Gaming Monitor" belongs to Acer, AOC and LG
+                    — and the list showed each one once per brand. The three
+                    entries were the same choice: picking any returned all 50
+                    monitors across all three. Harmless but confusing, and it
+                    padded the list from 37 real options to 52. */}
+                {[...new Set((categories || []).map((c) => c.category_name))]
+                  .filter(Boolean)
+                  .sort((a, b) => a.localeCompare(b))
+                  .map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
               </select>
               <select
                 value={filterStatus}
