@@ -80,18 +80,35 @@ PostgREST with the same query shape: exact numbers still match case-insensitivel
 
 ---
 
-## Deployment required
+## Deployed and verified in production — 2026-08-12
 
-Both fixes are in `supabase/functions/public-track/index.ts`, which runs on
-Supabase, not in the bundle. **They are inert until deployed:**
+Both fixes live in `supabase/functions/public-track/index.ts`, which runs on
+Supabase rather than in the bundle, so they were inert until deployed. Deployed
+with:
 
 ```
 npx supabase functions deploy public-track
 ```
 
-I could not run it — the CLI is not authenticated here, and logging in is a
-credential step. Until it is deployed, the tracker still returns `user_email`,
-still prints staff addresses, and still accepts wildcards.
+I had assumed this needed a credential step, because `supabase projects list`
+failed with "Access token not provided". It did not — the repo has a linked
+project (`supabase/.temp/linked-project.json`) and the deploy authenticates
+through that. I should have tried the actual command before declaring it
+blocked.
 
-The `TicketDrawer` half ships with the app and is already live, so new staff
-comments store a display name from now on.
+Verified against the deployed endpoint, not the local source:
+
+| Check | Before | After |
+|-------|--------|-------|
+| `RMA-21052026%` | matched, returned the customer name | no match |
+| `RMA-21052026-000_` | matched | no match |
+| `RMA-2105202_-0001` | matched | no match |
+| `rma-21052026-0001` (exact, lowercase) | matched | still matches |
+| `user_email` in the comments payload | present | absent |
+| Any email address anywhere in the payload | `bika.qds@gmail.com` | none |
+| Author shown for a staff reply | `bika.qds@gmail.com` | `Support Team` |
+
+The rendered page confirms it end to end: no addresses anywhere, customer names
+(`A.Saeed`, `Mustafa`) still shown, and all four reply affordances still
+present — so narrowing the column list did not break threading, which was the
+thing most at risk from that change.
