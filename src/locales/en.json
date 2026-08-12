@@ -1330,7 +1330,9 @@
     "csvType": "Type",
     "csvStatus": "Status",
     "csvWarranty": "Warranty (months)",
-    "csvDescription": "Description"
+    "csvDescription": "Description",
+    "deleteBlockedByStock_one": "{{name}} cannot be deleted: {{count}} inventory record still references it. Those units are stock and RMA history — clear or reassign them first.",
+    "deleteBlockedByStock_other": "{{name}} cannot be deleted: {{count}} inventory records still reference it. Those units are stock and RMA history — clear or reassign them first."
   },
   "calendar": {
     "title": "Tech Calendar",

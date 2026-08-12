@@ -908,7 +908,37 @@ export default function Products({
     }
   }
 
-  const handleDeleteProduct = (product) => {
+  /**
+   * Inventory rows that pin a product in place.
+   *
+   * inventory_units.product_id is a plain foreign key with no cascade, so the
+   * database refuses the delete outright — correctly, since those units are
+   * real stock and RMA history. The UI did not know that: it asked "are you
+   * sure?", accepted, then showed a flat "failed to delete product" with no
+   * reason. Checking first turns a dead end into an explanation.
+   */
+  const countProductStock = async (productId) => {
+    try {
+      const [units, bulk] = await Promise.all([
+        supabase.from('inventory_units').select('id', { count: 'exact', head: true }).eq('product_id', productId),
+        supabase.from('warehouse_stock').select('id', { count: 'exact', head: true }).eq('product_id', productId),
+      ])
+      if (units.error) throw units.error
+      return (units.count ?? 0) + (bulk.error ? 0 : bulk.count ?? 0)
+    } catch {
+      return null
+    }
+  }
+
+  const handleDeleteProduct = async (product) => {
+    const stockCount = await countProductStock(product.id)
+    if (stockCount) {
+      toast.error(
+        t('products.deleteBlockedByStock', { name: product.product_name, count: stockCount }),
+        { duration: 8000 }
+      )
+      return
+    }
     openConfirm(
       t('products.deleteTitle'),
       t('products.deleteMsg', { name: product.product_name }),
@@ -946,7 +976,15 @@ export default function Products({
           queryClient.invalidateQueries({ queryKey: ['products-page'] })
         } catch (error) {
           captureException(error)
-          toast.error(t('products.errorDeleteProduct'))
+          // 23503 is the foreign key refusing because stock or history still
+          // points at this product. Say so rather than "failed to delete".
+          const blocked = error?.code === '23503'
+          toast.error(
+            blocked
+              ? t('products.deleteBlockedByStock', { name: product.product_name, count: stockCount ?? 0 })
+              : t('products.errorDeleteProduct'),
+            { duration: blocked ? 8000 : 4000 }
+          )
         }
       }
     )
