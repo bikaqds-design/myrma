@@ -791,8 +791,25 @@ export default function Customers({
       }
 
       await db.customers.bulkCreate(toImport)
-      if (skippedCount > 0) {
-        toast.success(t('customers.importedWithSkipped', { count: toImport.length, skipped: skippedCount }))
+      // Rows rejected by validation used to vanish here: the toast reported
+      // `skippedCount` (duplicates) but never `errors`, so a 500-row file with
+      // 40 missing company names reported "460 imported" and the operator had
+      // no way to learn the 40 existed. Both counts are now surfaced, and the
+      // per-row reasons go to the console so they can be acted on rather than
+      // guessed at.
+      if (errors.length > 0) {
+        console.warn(['Customer CSV import — rejected rows:', ...errors].join('\n'))
+        captureException(new Error('CSV import errors'), { errors })
+      }
+      if (skippedCount > 0 || errors.length > 0) {
+        toast.success(
+          t('customers.importedWithIssues', {
+            count: toImport.length,
+            skipped: skippedCount,
+            rejected: errors.length,
+          }),
+          { duration: 8000 }
+        )
       } else {
         toast.success(t('customers.importedSuccess', { count: toImport.length }))
       }
@@ -826,7 +843,9 @@ export default function Customers({
       <span
         className={`px-2 py-0.5 text-xs rounded-full font-medium ${map[status] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'}`}
       >
-        {status || '—'}
+        {/* Rendered raw, so the badge stayed English under Arabic while every
+            header around it translated — same gap as BUG #29 on tickets. */}
+        {status ? t(`customerStatusValues.${status}`, status) : '—'}
       </span>
     )
   }
@@ -1095,9 +1114,9 @@ export default function Customers({
                   className="px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm"
                 >
                   <option value="">{t('common.all')}</option>
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                  <option value="Suspended">Suspended</option>
+                  {['Active', 'Inactive', 'Suspended'].map((st) => (
+                    <option key={st} value={st}>{t(`customerStatusValues.${st}`, st)}</option>
+                  ))}
                 </select>
               </div>
               <div className="flex items-center gap-2">

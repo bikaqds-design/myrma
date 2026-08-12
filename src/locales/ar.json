@@ -354,7 +354,8 @@
     "deleteCustomerWithTickets_one": "هل تريد حذف {{name}}؟ سيؤدي هذا أيضًا إلى حذف {{count}} تذكرة إرجاع نهائيًا، مع وحداتها المخزنية وتعليقاتها وسجلها. لا يمكن التراجع.",
     "deleteCustomerWithTickets_other": "هل تريد حذف {{name}}؟ سيؤدي هذا أيضًا إلى حذف {{count}} تذكرة إرجاع نهائيًا، مع وحداتها المخزنية وتعليقاتها وسجلها. لا يمكن التراجع.",
     "deleteCustomersWithTickets_one": "هل تريد حذف {{count}} عميل؟ سيؤدي هذا أيضًا إلى حذف {{tickets}} تذكرة إرجاع مرتبطة نهائيًا، مع وحداتها وتعليقاتها وسجلها. لا يمكن التراجع.",
-    "deleteCustomersWithTickets_other": "هل تريد حذف {{count}} عملاء؟ سيؤدي هذا أيضًا إلى حذف {{tickets}} تذكرة إرجاع مرتبطة نهائيًا، مع وحداتها وتعليقاتها وسجلها. لا يمكن التراجع."
+    "deleteCustomersWithTickets_other": "هل تريد حذف {{count}} عملاء؟ سيؤدي هذا أيضًا إلى حذف {{tickets}} تذكرة إرجاع مرتبطة نهائيًا، مع وحداتها وتعليقاتها وسجلها. لا يمكن التراجع.",
+    "importedWithIssues": "تم استيراد {{count}} عميل — تم تخطي {{skipped}} كمكرر، ورُفض {{rejected}} (راجع وحدة التحكم للأسباب)"
   },
   "leads": {
     "title": "العملاء المحتملون",
@@ -1800,7 +1801,7 @@
     "bulkInst4": "company_name مطلوب عند تحديد نوع العميل B2B",
     "bulkInst5": "قيم customer_type الصحيحة: B2B, B2C",
     "bulkInst6": "قيم customer_status الصحيحة: Active, Inactive",
-    "bulkInst7": "تجنب الفواصل داخل حقل العنوان — استخدم شرطة بدلاً منها",
+    "bulkInst7": "الفواصل مقبولة داخل الحقل طالما كان الحقل محاطًا بعلامتَي اقتباس \"\" — وهذا ما تفعله Excel وGoogle Sheets تلقائيًا عند التصدير",
     "downloadTemplate": "تنزيل قالب CSV",
     "uploadCSVLabel": "رفع ملف CSV",
     "uploadBtn": "رفع واستيراد",
@@ -1853,7 +1854,7 @@
     "bulkInst4": "قيم source الصالحة: walk-in, phone, referral, exhibition, website, whatsapp",
     "bulkInst5": "قيم status الصالحة: new, contacted, qualified, nurturing, inactive, disqualified (تُعيَّن 'new' تلقائياً إن تُرك فارغاً)",
     "bulkInst6": "الحقول الاختيارية: email, notes",
-    "bulkInst7": "تجنب الفواصل داخل حقول النص — استخدم شرطة بدلاً منها",
+    "bulkInst7": "الفواصل مقبولة داخل الحقل طالما كان الحقل محاطًا بعلامتَي اقتباس \"\" — وهذا ما تفعله Excel وGoogle Sheets تلقائيًا عند التصدير",
     "downloadTemplate": "تنزيل قالب CSV",
     "uploadCSVLabel": "رفع ملف CSV",
     "uploadBtn": "رفع واستيراد",
@@ -3427,5 +3428,11 @@
     "In Warranty": "داخل الضمان",
     "Out of Warranty": "خارج الضمان",
     "Unknown": "غير معروف"
+  },
+  "customerStatusValues": {
+    "Active": "نشط",
+    "Inactive": "غير نشط",
+    "Suspended": "موقوف",
+    "VIP": "مميز"
   }
 }

@@ -354,7 +354,8 @@
     "deleteCustomerWithTickets_one": "Delete {{name}}? This also permanently deletes {{count}} RMA ticket, along with its inventory units, comments and history. This cannot be undone.",
     "deleteCustomerWithTickets_other": "Delete {{name}}? This also permanently deletes {{count}} RMA tickets, along with their inventory units, comments and history. This cannot be undone.",
     "deleteCustomersWithTickets_one": "Delete {{count}} customer? This also permanently deletes {{tickets}} linked RMA ticket(s), along with their inventory units, comments and history. This cannot be undone.",
-    "deleteCustomersWithTickets_other": "Delete {{count}} customers? This also permanently deletes {{tickets}} linked RMA ticket(s), along with their inventory units, comments and history. This cannot be undone."
+    "deleteCustomersWithTickets_other": "Delete {{count}} customers? This also permanently deletes {{tickets}} linked RMA ticket(s), along with their inventory units, comments and history. This cannot be undone.",
+    "importedWithIssues": "Imported {{count}} customers — {{skipped}} skipped as duplicates, {{rejected}} rejected (see console for the reasons)"
   },
   "leads": {
     "title": "Leads",
@@ -1800,7 +1801,7 @@
     "bulkInst4": "company_name is required when customer_type is B2B",
     "bulkInst5": "Valid customer_type values: B2B, B2C",
     "bulkInst6": "Valid customer_status values: Active, Inactive",
-    "bulkInst7": "Avoid commas inside the address field — use a dash instead",
+    "bulkInst7": "Commas are fine inside a field as long as the field is wrapped in \"quotes\" — Excel and Google Sheets do this automatically when you export",
     "downloadTemplate": "Download CSV Template",
     "uploadCSVLabel": "Upload CSV File",
     "uploadBtn": "Upload & Import",
@@ -1853,7 +1854,7 @@
     "bulkInst4": "Valid source values: walk-in, phone, referral, exhibition, website, whatsapp",
     "bulkInst5": "Valid status values: new, contacted, qualified, nurturing, inactive, disqualified (defaults to 'new' if left blank)",
     "bulkInst6": "Optional fields: email, notes",
-    "bulkInst7": "Avoid commas inside text fields — use a dash instead",
+    "bulkInst7": "Commas are fine inside a field as long as the field is wrapped in \"quotes\" — Excel and Google Sheets do this automatically when you export",
     "downloadTemplate": "Download CSV Template",
     "uploadCSVLabel": "Upload CSV File",
     "uploadBtn": "Upload & Import",
@@ -3423,5 +3424,11 @@
     "In Warranty": "In Warranty",
     "Out of Warranty": "Out of Warranty",
     "Unknown": "Unknown"
+  },
+  "customerStatusValues": {
+    "Active": "Active",
+    "Inactive": "Inactive",
+    "Suspended": "Suspended",
+    "VIP": "VIP"
   }
 }
