@@ -341,7 +341,20 @@
     "csvAccountManager": "Account Manager",
     "csvCreated": "Created",
     "selectCsvFile": "Please select a CSV file",
-    "selectFileFirst": "Please select a file first"
+    "selectFileFirst": "Please select a file first",
+    "exportAll": "Export All",
+    "exportAllDesc": "All {{count}} customers",
+    "exportFiltered": "Export Filtered",
+    "exportFilteredDesc": "{{count}} customers matching current filters",
+    "exportSelected": "Export Selected",
+    "exportSelectedDesc": "{{count}} selected customers",
+    "exportEmpty": "Nothing to export",
+    "deleteCustomerTitle": "Delete Customer",
+    "deleteCustomerConfirm": "Delete {{name}}? This cannot be undone.",
+    "deleteCustomerWithTickets_one": "Delete {{name}}? This also permanently deletes {{count}} RMA ticket, along with its inventory units, comments and history. This cannot be undone.",
+    "deleteCustomerWithTickets_other": "Delete {{name}}? This also permanently deletes {{count}} RMA tickets, along with their inventory units, comments and history. This cannot be undone.",
+    "deleteCustomersWithTickets_one": "Delete {{count}} customer? This also permanently deletes {{tickets}} linked RMA ticket(s), along with their inventory units, comments and history. This cannot be undone.",
+    "deleteCustomersWithTickets_other": "Delete {{count}} customers? This also permanently deletes {{tickets}} linked RMA ticket(s), along with their inventory units, comments and history. This cannot be undone."
   },
   "leads": {
     "title": "Leads",

@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, db, storage } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
 import toast from 'react-hot-toast'
+import * as XLSX from 'xlsx'
+import ExportMenu from '../../components/ExportMenu'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { PageSkeleton } from '../../components/Skeleton'
 import { PageHeader } from '../../components/ui'
@@ -83,6 +85,36 @@ export default function Customers({
   const openConfirm = (title, message, onConfirm) =>
     setConfirmDialog({ open: true, title, message, onConfirm })
   const closeConfirm = () => setConfirmDialog((d) => ({ ...d, open: false }))
+
+  /**
+   * How many RMA tickets these customers own.
+   *
+   * Deleting a customer takes their tickets with them, along with those
+   * tickets' inventory units, comments and activity — that is deliberate
+   * (delete_customer_cascade, migration 20260524), but the confirmation never
+   * said so. It read "Delete {contact_person}? This action cannot be undone",
+   * which is true and tells you nothing about the scale: a customer with ten
+   * years of returns looked exactly like one with none.
+   *
+   * Counting first costs one query on a destructive action nobody performs in
+   * a hurry. A failed count returns null and the dialog falls back to the plain
+   * wording rather than blocking the delete on a number it could not fetch.
+   */
+  const countLinkedTickets = async (customerIds) => {
+    try {
+      const { count, error } = await supabase
+        .from('rma_tickets')
+        .select('id', { count: 'exact', head: true })
+        .in('customer_id', customerIds)
+      if (error) throw error
+      return count ?? 0
+    } catch {
+      return null
+    }
+  }
+
+  /** Companies are known by their company name; only a B2C walk-in is not. */
+  const customerLabel = (c) => c.company_name || c.contact_person || t('common.unknown')
 
   const canDo = (action) => {
     if (currentUserRole === ROLES.SUPER_ADMIN || currentUserRole === ROLES.ADMIN) return true
@@ -245,10 +277,18 @@ export default function Customers({
         : paginatedCustomers.map((c) => c.id)
     )
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
+    // Matters more here than on a single delete: selecting a page of 25 and
+    // pressing delete can take hundreds of tickets with it.
+    const ticketCount = await countLinkedTickets(selectedCustomers)
     openConfirm(
       t('customers.deleteCustomersTitle'),
-      t('customers.deleteCustomersConfirm', { count: selectedCustomers.length }),
+      ticketCount
+        ? t('customers.deleteCustomersWithTickets', {
+            count: selectedCustomers.length,
+            tickets: ticketCount,
+          })
+        : t('customers.deleteCustomersConfirm', { count: selectedCustomers.length }),
       async () => {
         closeConfirm()
         try {
@@ -437,10 +477,16 @@ export default function Customers({
     setShowAddCustomer(true)
   }
 
-  const handleDeleteCustomer = (customer) => {
+  const handleDeleteCustomer = async (customer) => {
+    const ticketCount = await countLinkedTickets([customer.id])
     openConfirm(
-      'Delete Customer',
-      `Delete ${customer.contact_person}? This action cannot be undone.`,
+      t('customers.deleteCustomerTitle'),
+      ticketCount
+        ? t('customers.deleteCustomerWithTickets', {
+            name: customerLabel(customer),
+            count: ticketCount,
+          })
+        : t('customers.deleteCustomerConfirm', { name: customerLabel(customer) }),
       async () => {
         closeConfirm()
         // UX-6 optimistic: remove from list immediately; rollback if server call fails
@@ -494,55 +540,72 @@ export default function Customers({
     setPendingFiles([])
   }
 
-  const handleExportCSV = () => {
-    const csv = [
-      [
-        t('customers.csvCode'),
-        t('customers.csvType'),
-        t('customers.csvStatus'),
-        t('customers.csvCompany'),
-        t('customers.csvContactPerson'),
-        t('customers.csvMobile'),
-        t('customers.csvLandline'),
-        t('customers.csvEmail'),
-        t('customers.csvAddress'),
-        t('customers.csvAccountManager'),
-        t('customers.csvCreated'),
-      ].join(','),
-      ...filteredCustomers.map((c) =>
-        [
-          c.customer_code || '',
-          c.customer_type || '',
-          c.customer_status || '',
-          c.company_name || '',
-          c.contact_person || '',
-          c.mobile || '',
-          c.landline || '',
-          c.email || '',
-          `"${(c.address || '').replace(/"/g, '""')}"`,
-          c.account_manager || '',
-          c.created_date ? new Date(c.created_date).toLocaleDateString() : '',
-        ].join(',')
-      ),
-    ].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `customers-${new Date().toISOString().split('T')[0]}.csv`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    toast.success(t('customers.exportedCustomers', { count: filteredCustomers.length }))
+  /**
+   * Exports to xlsx via the shared sheet builder, matching Leads, Purchasing and
+   * RMA Tickets.
+   *
+   * This replaced a hand-rolled CSV that joined each row with `.join(',')`. Only
+   * `address` was quoted — someone hit the comma problem on the one field where
+   * commas are unavoidable and patched that field rather than the mechanism, so
+   * a company named "Acme, Ltd" still shifted every column after it. Verified
+   * before changing: renaming one customer to
+   * 'Metra Computer Group, Egypt "MCG"' produced 12 fields against an 11-column
+   * header. No customer name in the 888 rows contains a comma today, which is
+   * why it had gone unseen.
+   */
+  const handleExport = (rows, scope) => {
+    if (!rows.length) {
+      toast(t('customers.exportEmpty'))
+      return
+    }
+    const headers = [
+      t('customers.csvCode'),
+      t('customers.csvType'),
+      t('customers.csvStatus'),
+      t('customers.csvCompany'),
+      t('customers.csvContactPerson'),
+      t('customers.csvMobile'),
+      t('customers.csvLandline'),
+      t('customers.csvEmail'),
+      t('customers.csvAddress'),
+      t('customers.csvAccountManager'),
+      t('customers.csvCreated'),
+    ]
+    const aoa = [
+      headers,
+      ...rows.map((c) => [
+        c.customer_code || '',
+        c.customer_type || '',
+        c.customer_status || '',
+        c.company_name || '',
+        c.contact_person || '',
+        c.mobile || '',
+        c.landline || '',
+        c.email || '',
+        c.address || '',
+        c.account_manager || '',
+        c.created_date ? new Date(c.created_date).toLocaleDateString() : '',
+      ]),
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    headers.forEach((_, ci) => {
+      const addr = XLSX.utils.encode_cell({ r: 0, c: ci })
+      if (ws[addr]) ws[addr].s = { font: { bold: true } }
+    })
+    ws['!autofilter'] = { ref: `A1:${XLSX.utils.encode_col(headers.length - 1)}1` }
+    ws['!cols'] = [
+      { wch: 16 }, { wch: 8 }, { wch: 10 }, { wch: 30 }, { wch: 24 },
+      { wch: 16 }, { wch: 16 }, { wch: 28 }, { wch: 40 }, { wch: 22 }, { wch: 14 },
+    ]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Customers')
+    XLSX.writeFile(wb, `customers-${scope}-${new Date().toISOString().slice(0, 10)}.xlsx`)
+    toast.success(t('customers.exportedCustomers', { count: rows.length }))
     db.auditLog
-      .log(
-        currentUserEmail,
-        'customers_exported',
-        `Exported ${filteredCustomers.length} customers to CSV`
-      )
+      .log(currentUserEmail, 'customers_exported', `Exported ${rows.length} customers (${scope}) to xlsx`)
       .catch(() => {})
   }
+
 
   const handleDownloadTemplate = () => {
     const csv = [
@@ -919,20 +982,13 @@ export default function Customers({
 
             <div className="flex items-center gap-2 flex-wrap">
               {canDo('export') && (
-                <button
-                  onClick={handleExportCSV}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#e6e9ef] dark:border-[#212a38] text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] transition-colors"
-                >
-                  <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  {t('common.export')}
-                </button>
+                <ExportMenu
+                  allRows={customers}
+                  filteredRows={filteredCustomers}
+                  selectedRows={customers.filter((c) => selectedCustomers.includes(c.id))}
+                  ns="customers"
+                  onExport={handleExport}
+                />
               )}
               {canDo('create') && (
                 <div className="relative add-customer-dropdown">

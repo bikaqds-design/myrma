@@ -341,7 +341,20 @@
     "csvAccountManager": "مدير الحساب",
     "csvCreated": "تاريخ الإنشاء",
     "selectCsvFile": "يرجى اختيار ملف CSV",
-    "selectFileFirst": "يرجى اختيار ملف أولاً"
+    "selectFileFirst": "يرجى اختيار ملف أولاً",
+    "exportAll": "تصدير الكل",
+    "exportAllDesc": "جميع العملاء ({{count}})",
+    "exportFiltered": "تصدير المُصفّى",
+    "exportFilteredDesc": "{{count}} عميل مطابق للفلاتر الحالية",
+    "exportSelected": "تصدير المحدد",
+    "exportSelectedDesc": "{{count}} عميل محدد",
+    "exportEmpty": "لا يوجد ما يمكن تصديره",
+    "deleteCustomerTitle": "حذف العميل",
+    "deleteCustomerConfirm": "هل تريد حذف {{name}}؟ لا يمكن التراجع.",
+    "deleteCustomerWithTickets_one": "هل تريد حذف {{name}}؟ سيؤدي هذا أيضًا إلى حذف {{count}} تذكرة إرجاع نهائيًا، مع وحداتها المخزنية وتعليقاتها وسجلها. لا يمكن التراجع.",
+    "deleteCustomerWithTickets_other": "هل تريد حذف {{name}}؟ سيؤدي هذا أيضًا إلى حذف {{count}} تذكرة إرجاع نهائيًا، مع وحداتها المخزنية وتعليقاتها وسجلها. لا يمكن التراجع.",
+    "deleteCustomersWithTickets_one": "هل تريد حذف {{count}} عميل؟ سيؤدي هذا أيضًا إلى حذف {{tickets}} تذكرة إرجاع مرتبطة نهائيًا، مع وحداتها وتعليقاتها وسجلها. لا يمكن التراجع.",
+    "deleteCustomersWithTickets_other": "هل تريد حذف {{count}} عملاء؟ سيؤدي هذا أيضًا إلى حذف {{tickets}} تذكرة إرجاع مرتبطة نهائيًا، مع وحداتها وتعليقاتها وسجلها. لا يمكن التراجع."
   },
   "leads": {
     "title": "العملاء المحتملون",
