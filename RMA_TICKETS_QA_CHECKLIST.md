@@ -54,8 +54,8 @@ Scope derived from the code, not guessed:
 | 25 | Duplicate serial *within the same ticket* is rejected by name | ✅ `findSerialConflicts` returns `duplicate_in_ticket` for a serial repeated across two lines |
 | 26 | Serial already live in inventory is rejected by name | ✅ `findTrackedSerials` finds the live unit; a direct duplicate insert is refused by `inv_units_serial_unique_idx` (23505) — guard plus DB backstop |
 | 27 | Multi-product ticket creates one unit per serial | ✅ 2 lines → 2 units, one per serial |
-| 28 | Bulk (non-serialized) product ticket creates no orphan units | ⬜ |
-| 29 | Attachment upload succeeds and is listed | ⬜ |
+| 28 | Bulk (non-serialized) product ticket creates no orphan units | ⚠️ **Blocked by design** — Serial Number stays required after picking a bulk product, so a bulk item cannot be RMA'd at all. No orphan units result, but only because no ticket can be created. See the gap note below. |
+| 29 | Attachment upload succeeds and is listed | ✅ upload round-trip against the real `rma-attachments` bucket: file stored, public URL returns 200 |
 
 ## D. Edit a ticket
 
@@ -63,9 +63,9 @@ Scope derived from the code, not guessed:
 |---|-------|--------|
 | 30 | Edit loads every existing value into the form | ✅ every value reloaded: customer, both products, both serials, priority, status, technician, per-line status and warranty |
 | 31 | Editing does **not** insert duplicate inventory_units | ✅ **no duplication** — 2 units before, 2 after |
-| 32 | Changing status syncs the warehouse (StatusWarehouseSync) | ⬜ |
+| 32 | Changing status syncs the warehouse (StatusWarehouseSync) | ✅ product status Received → Under Repair moved the unit `RMA-RECEIVED` → `RMA-REPAIR` and wrote a `stock_moves` transfer |
 | 33 | Priority / assigned tech / due date changes persist | ✅ priority Medium → High persisted |
-| 34 | Attachment delete removes it from storage and the row | ⬜ |
+| 34 | Attachment delete removes it from storage and the row | ✅ delete removed it from storage; the URL returns 400 afterwards |
 
 ## E. Ticket drawer — details, comments, resolution
 
@@ -78,8 +78,8 @@ Scope derived from the code, not guessed:
 | 39 | Delete a comment | ✅ deleted; DB 2 → 1, UI updated, and the deletion itself logged to the timeline. Note: no confirmation prompt, unlike other deletes in the app |
 | 40 | Save a resolution (each resolution type) | ✅ Replacement saved to `ticket_resolutions` with product, serial, author; logged as "Resolution: replacement" |
 | 41 | Delete a resolution | ✅ deleted, row gone, section returns to "No resolution recorded yet." |
-| 42 | Issue a credit note from the ticket | ⬜ |
-| 43 | Timeline logs the CN with code and reason | ⬜ |
+| 42 | Issue a credit note from the ticket | ✅ `CN-2026-00006` issued from the drawer, total 150, customer and type pre-filled |
+| 43 | Timeline logs the CN with code and reason | ✅ `credit_note_created` / "CN-2026-00006 issued — <reason>" — code **and** reason, as required |
 
 ## F. Inline edit and bulk actions
 
@@ -89,18 +89,18 @@ Scope derived from the code, not guessed:
 | 45 | Inline edit writes an activity log | ✅ `status_changed` / "Open → On Hold" |
 | 46 | Select-all on page, then clear | ✅ select-all checked both filtered rows and raised the bulk bar |
 | 47 | Bulk ticket-status change | ✅ both set to Closed, each with its own activity row marked `(bulk)` |
-| 48 | Bulk product-status change | ⬜ |
+| 48 | Bulk product-status change | ✅ applied to the selection and triggered the warehouse sync above |
 | 49 | Bulk delete with confirmation | ✅ confirm dialog states the count and that it cannot be undone; both deleted and their `inventory_units` cascaded (0 orphans) |
-| 50 | Bulk action on 0 selected is impossible / no-op | ⬜ |
+| 50 | Bulk action on 0 selected is impossible / no-op | ✅ nothing selected renders no bulk bar at all |
 
 ## G. Cross-cutting
 
 | # | Check | Result |
 |---|-------|--------|
-| 51 | Keyboard shortcuts panel opens and shortcuts work | ⬜ |
+| 51 | Keyboard shortcuts panel opens and shortcuts work | ✅ panel opens; `/` focuses search, `?` toggles help, `n` opens create, `Esc` closes |
 | 52 | Arabic (RTL): labels translated, layout not broken | ❌→✅ **BUG #29** — status and priority rendered raw English under Arabic. Fixed; now مكتمل / معلق / مفتوح / موقوف and حرج / متوسط, layout mirrored correctly |
 | 53 | Dark mode across list, kanban, drawer, form | ✅ list, kanban, drawer and form all correct in dark, including combined with Arabic |
-| 54 | Mobile width: list is usable, header title correct | ⬜ |
+| 54 | Mobile width: list is usable, header title correct | ✅ header reads "RMA Tickets", list usable, table scrolls horizontally, controls wrap |
 | 55 | Console clean of errors through the whole run | ⚠️ see notes — no errors from this module; a Radix `DialogTitle` a11y warning and an email-provider rejection caused by `example.com` addresses in test data |
 
 ---
@@ -261,3 +261,40 @@ None left behind. Both tickets created during this pass (RMA-10082026-0001 and
 three `inventory_units`. The ticket count and status distribution are back to
 exactly what they were at the start: 14 tickets, Open 4 / New 2 / In Progress 2 /
 Completed 2 / Pending 1 / On Hold 1 / Closed 2.
+
+---
+
+## Third pass — 2026-08-12 (final 10 rows)
+
+**55 of 55 rows now executed.** No new defects. One design gap and one side
+effect worth recording.
+
+### Gap — a bulk-tracked product cannot be put through an RMA
+
+Serial Number keeps its required marker after a bulk (non-serialized) product is
+chosen, and submitting without one is blocked. So the only way to RMA a bulk
+item is to invent a serial, which would create an `inventory_units` row for a
+product whose stock lives in `warehouse_stock` — mixing the two tracking models
+for one product, which is exactly what migration `20260772` exists to prevent.
+`buildTicketUnits` is equally unaware of the mode: it would create a null-serial
+unit if the form let it.
+
+Not fixed, because the fix is a product decision rather than a defect: either
+bulk products are out of scope for RMA, or a bulk RMA records a quantity and
+creates no unit. Worth noting it is not urgent — exactly 1 of 406 products is
+bulk-tracked, and that one was created for this QA. Five null-serial RMA units
+already exist in the data from before the field became required.
+
+### Side effect — issuing a credit note closes the ticket
+
+`RMA-06082026-0003` went In Progress → Closed when the credit note was issued.
+Sensible (the RMA is settled), but it is not announced anywhere in the dialog,
+and it was not in the checklist's expectations. Flagging rather than changing.
+
+### Test data
+
+None left behind. The credit note was deleted while `restock_status` was still
+`pending`, so no inventory had moved; the ticket was returned to In Progress and
+its QA activity rows removed. The product status was restored through the UI
+rather than the database so the warehouse sync reversed with it — the unit is
+back in `RMA-RECEIVED`. The attachment test cleaned up after itself.
