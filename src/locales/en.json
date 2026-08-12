@@ -1332,7 +1332,14 @@
     "csvWarranty": "Warranty (months)",
     "csvDescription": "Description",
     "deleteBlockedByStock_one": "{{name}} cannot be deleted: {{count}} inventory record still references it. Those units are stock and RMA history — clear or reassign them first.",
-    "deleteBlockedByStock_other": "{{name}} cannot be deleted: {{count}} inventory records still reference it. Those units are stock and RMA history — clear or reassign them first."
+    "deleteBlockedByStock_other": "{{name}} cannot be deleted: {{count}} inventory records still reference it. Those units are stock and RMA history — clear or reassign them first.",
+    "deleteBrandTitle": "Delete Brand",
+    "deleteBrandConfirm": "Delete brand \"{{name}}\"? This cannot be undone.",
+    "deleteBrandWithContents": "Delete brand \"{{name}}\"? Its {{categories}} categor(y/ies) will be deleted, and {{products}} product(s) will be left with no brand and no category — they stay in the catalog but disappear from every brand view. Reassign them first if you want to keep the structure.",
+    "deleteCategoryTitle": "Delete Category",
+    "deleteCategoryConfirm": "Delete category \"{{name}}\"? This cannot be undone.",
+    "deleteCategoryWithProducts_one": "Delete category \"{{name}}\"? {{count}} product will be left with no category. It stays in the catalog but disappears from category views.",
+    "deleteCategoryWithProducts_other": "Delete category \"{{name}}\"? {{count}} products will be left with no category. They stay in the catalog but disappear from category views."
   },
   "calendar": {
     "title": "Tech Calendar",

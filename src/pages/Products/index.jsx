@@ -990,10 +990,43 @@ export default function Products({
     )
   }
 
-  const handleDeleteBrand = (brand) => {
+  /**
+   * Counts what a brand or category delete will actually strand.
+   *
+   * Neither is protected: categories.brand_id cascades from brands, and
+   * products.brand_id / category_id are ON DELETE SET NULL. So deleting a brand
+   * removes its categories and leaves its products alive with no brand and no
+   * category — orphans that vanish from every brand-filtered view while still
+   * counting in the catalog total.
+   */
+  const countBrandContents = async (brandId) => {
+    try {
+      const [cats, prods] = await Promise.all([
+        supabase.from('categories').select('id', { count: 'exact', head: true }).eq('brand_id', brandId),
+        supabase.from('products').select('id', { count: 'exact', head: true }).eq('brand_id', brandId),
+      ])
+      return { categories: cats.count ?? 0, products: prods.count ?? 0 }
+    } catch {
+      return null
+    }
+  }
+
+  const handleDeleteBrand = async (brand) => {
+    const contents = await countBrandContents(brand.id)
     openConfirm(
-      'Delete Brand',
-      `Delete brand "${brand.brand_name}"? This will also delete all associated categories and products.`,
+      t('products.deleteBrandTitle'),
+      // The old message promised "this will also delete all associated
+      // categories and products". Half true and misleading in the dangerous
+      // direction: the categories go, the products do not — they are left
+      // without a brand or a category, which is quieter and harder to notice
+      // than a deletion would be.
+      contents && (contents.categories || contents.products)
+        ? t('products.deleteBrandWithContents', {
+            name: brand.brand_name,
+            categories: contents.categories,
+            products: contents.products,
+          })
+        : t('products.deleteBrandConfirm', { name: brand.brand_name }),
       async () => {
         closeConfirm()
         try {
@@ -1012,10 +1045,23 @@ export default function Products({
     )
   }
 
-  const handleDeleteCategory = (category) => {
+  const handleDeleteCategory = async (category) => {
+    let productCount = 0
+    try {
+      const r = await supabase
+        .from('products')
+        .select('id', { count: 'exact', head: true })
+        .eq('category_id', category.id)
+      productCount = r.count ?? 0
+    } catch {
+      // Leave the count at 0 and fall through to the plain wording — a failed
+      // count should not stop the user deleting an empty category.
+    }
     openConfirm(
-      'Delete Category',
-      `Delete category "${category.category_name}"? This cannot be undone.`,
+      t('products.deleteCategoryTitle'),
+      productCount
+        ? t('products.deleteCategoryWithProducts', { name: category.category_name, count: productCount })
+        : t('products.deleteCategoryConfirm', { name: category.category_name }),
       async () => {
         closeConfirm()
         try {
