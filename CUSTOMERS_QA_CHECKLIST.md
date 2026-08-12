@@ -31,7 +31,7 @@ Run date: 2026-08-12. 888 customers in the database.
 | 13 | Edit loads all values and persists changes | ✅ inline edit on the detail page loads every value; Tax ID change persisted with `updated_by` |
 | 14 | Duplicate customer code is prevented | ✅ a duplicate code is refused by `customers_customer_code_key` (23505) |
 | 15 | Delete asks for confirmation | ✅ confirms before deleting |
-| 16 | Delete is blocked or warns when the customer has tickets | ❌→✅ **BUG #32** — the confirmation never mentioned that RMA tickets are destroyed with the customer. Fixed: it now counts them and says so. |
+| 16 | Delete is blocked or warns when the customer has tickets | ❌→✅ **BUG #32** — the confirmation never mentioned the RMA tickets it destroyed. First fixed by counting and warning; then **migration `20260774` was applied**, so deletion is now refused outright and the UI says why instead of asking. |
 
 ## C. Bulk actions and upload
 
@@ -116,3 +116,33 @@ Google Sheets produce anyway.
 None left behind. Every customer created during this run (1 single, 3 bulk
 targets, 3 imported) was deleted. The count is 887 — the original 888 minus the
 one customer lost to the delete probe, which is documented separately.
+
+---
+
+## After migration 20260774 (applied 2026-08-12)
+
+The migration turned this from a warning into a block, so the UI had to change
+with it. My own warning text — *"this also permanently deletes 4 RMA tickets"* —
+became false the moment it was applied: those tickets are no longer deleted, the
+delete is refused.
+
+Verified end to end against the live guard:
+
+| Path | Result |
+|------|--------|
+| Raw `DELETE` on a customer with tickets | Refused, `23503` foreign key violation |
+| `delete_customer_cascade` | Refused, `P0001`, naming the customer and count |
+| `delete_customers_cascade` on a mixed batch | Refused, and the ticket-free customer in that batch survived — all-or-nothing |
+| Ticket-free single delete | Still works, and its `customer_notes` still cascade |
+| Ticket-free bulk delete | Still works |
+| UI, customer with tickets | No confirm dialog; an explanatory message naming the customer and count |
+| UI, ticket-free customer | Normal confirm, deletes cleanly |
+
+Three UI changes went with it: the destructive confirm is no longer offered when
+it cannot succeed, the `catch` now surfaces the database's `P0001` message
+instead of a flat "failed to delete", and the two now-false warning strings were
+deleted from both locales rather than left to mislead.
+
+One process note worth recording: the new strings resolved as raw keys until the
+dev server was restarted. Vite caches the locale JSON and a hard reload does not
+clear it — the same trap that cost time earlier in this project.

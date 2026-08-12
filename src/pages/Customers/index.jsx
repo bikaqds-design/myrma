@@ -89,16 +89,17 @@ export default function Customers({
   /**
    * How many RMA tickets these customers own.
    *
-   * Deleting a customer takes their tickets with them, along with those
-   * tickets' inventory units, comments and activity — that is deliberate
-   * (delete_customer_cascade, migration 20260524), but the confirmation never
-   * said so. It read "Delete {contact_person}? This action cannot be undone",
-   * which is true and tells you nothing about the scale: a customer with ten
-   * years of returns looked exactly like one with none.
+   * Deleting a customer used to take their tickets with them — units, comments,
+   * activity and all — while the confirmation said only "this action cannot be
+   * undone". Migration 20260774 changed that: rma_tickets.customer_id is now
+   * ON DELETE RESTRICT, matching the sales documents, so the database refuses
+   * instead of cascading.
    *
-   * Counting first costs one query on a destructive action nobody performs in
-   * a hurry. A failed count returns null and the dialog falls back to the plain
-   * wording rather than blocking the delete on a number it could not fetch.
+   * The count is therefore no longer a warning about what will be destroyed but
+   * a check for what will be refused, asked before the dialog opens so the user
+   * gets the reason rather than a confirm-then-fail. A failed count returns
+   * null, which reads as "no known blocker" and lets the attempt proceed — the
+   * database is the real guard, and the catch surfaces its message.
    */
   const countLinkedTickets = async (customerIds) => {
     try {
@@ -278,17 +279,23 @@ export default function Customers({
     )
 
   const handleBulkDelete = async () => {
-    // Matters more here than on a single delete: selecting a page of 25 and
-    // pressing delete can take hundreds of tickets with it.
+    // delete_customers_cascade is all-or-nothing: one selected customer with a
+    // ticket refuses the whole batch. Better to say so up front than to let the
+    // user confirm a delete of 25 and have none of them go.
     const ticketCount = await countLinkedTickets(selectedCustomers)
+    if (ticketCount) {
+      toast.error(
+        t('customers.bulkDeleteBlockedByTickets', {
+          count: selectedCustomers.length,
+          tickets: ticketCount,
+        }),
+        { duration: 8000 }
+      )
+      return
+    }
     openConfirm(
       t('customers.deleteCustomersTitle'),
-      ticketCount
-        ? t('customers.deleteCustomersWithTickets', {
-            count: selectedCustomers.length,
-            tickets: ticketCount,
-          })
-        : t('customers.deleteCustomersConfirm', { count: selectedCustomers.length }),
+      t('customers.deleteCustomersConfirm', { count: selectedCustomers.length }),
       async () => {
         closeConfirm()
         try {
@@ -304,8 +311,11 @@ export default function Customers({
           setSelectedCustomers([])
           queryClient.invalidateQueries({ queryKey: ['customers'] })
           queryClient.invalidateQueries({ queryKey: ['customers-count'] })
-        } catch {
-          toast.error(t('customers.failedDeleteCustomers'))
+        } catch (err) {
+          const guarded = err?.code === 'P0001' || /RMA ticket/i.test(err?.message || '')
+          toast.error(guarded ? err.message : t('customers.failedDeleteCustomers'), {
+            duration: guarded ? 8000 : 4000,
+          })
         }
       }
     )
@@ -479,14 +489,23 @@ export default function Customers({
 
   const handleDeleteCustomer = async (customer) => {
     const ticketCount = await countLinkedTickets([customer.id])
+    // Since 20260774 the database refuses this outright rather than cascading,
+    // so there is nothing to confirm — asking "are you sure?" about an action
+    // that cannot happen just invites the user to click through to an error.
+    // Say why, and what would unblock it.
+    if (ticketCount) {
+      toast.error(
+        t('customers.deleteBlockedByTickets', {
+          name: customerLabel(customer),
+          count: ticketCount,
+        }),
+        { duration: 8000 }
+      )
+      return
+    }
     openConfirm(
       t('customers.deleteCustomerTitle'),
-      ticketCount
-        ? t('customers.deleteCustomerWithTickets', {
-            name: customerLabel(customer),
-            count: ticketCount,
-          })
-        : t('customers.deleteCustomerConfirm', { name: customerLabel(customer) }),
+      t('customers.deleteCustomerConfirm', { name: customerLabel(customer) }),
       async () => {
         closeConfirm()
         // UX-6 optimistic: remove from list immediately; rollback if server call fails
@@ -526,9 +545,15 @@ export default function Customers({
             .catch(() => {})
           queryClient.invalidateQueries({ queryKey: ['customers'] })
           queryClient.invalidateQueries({ queryKey: ['customers-count'] })
-        } catch {
+        } catch (err) {
           queryClient.setQueryData(['customers'], previousCustomers) // rollback on error
-          toast.error(t('customers.failedDeleteCustomer'))
+          // The guard raises P0001 with a message that names the customer and
+          // the count and says what to do about it. Replacing that with a flat
+          // "failed to delete" throws away the only useful part.
+          const guarded = err?.code === 'P0001' || /RMA ticket/i.test(err?.message || '')
+          toast.error(guarded ? err.message : t('customers.failedDeleteCustomer'), {
+            duration: guarded ? 8000 : 4000,
+          })
         }
       }
     )

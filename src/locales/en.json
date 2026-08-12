@@ -351,11 +351,11 @@
     "exportEmpty": "Nothing to export",
     "deleteCustomerTitle": "Delete Customer",
     "deleteCustomerConfirm": "Delete {{name}}? This cannot be undone.",
-    "deleteCustomerWithTickets_one": "Delete {{name}}? This also permanently deletes {{count}} RMA ticket, along with its inventory units, comments and history. This cannot be undone.",
-    "deleteCustomerWithTickets_other": "Delete {{name}}? This also permanently deletes {{count}} RMA tickets, along with their inventory units, comments and history. This cannot be undone.",
-    "deleteCustomersWithTickets_one": "Delete {{count}} customer? This also permanently deletes {{tickets}} linked RMA ticket(s), along with their inventory units, comments and history. This cannot be undone.",
-    "deleteCustomersWithTickets_other": "Delete {{count}} customers? This also permanently deletes {{tickets}} linked RMA ticket(s), along with their inventory units, comments and history. This cannot be undone.",
-    "importedWithIssues": "Imported {{count}} customers — {{skipped}} skipped as duplicates, {{rejected}} rejected (see console for the reasons)"
+    "importedWithIssues": "Imported {{count}} customers — {{skipped}} skipped as duplicates, {{rejected}} rejected (see console for the reasons)",
+    "deleteBlockedByTickets_one": "{{name}} cannot be deleted: {{count}} RMA ticket references this customer. Delete or reassign the ticket first — its serials, repair outcome and stock history would go with it.",
+    "deleteBlockedByTickets_other": "{{name}} cannot be deleted: {{count}} RMA tickets reference this customer. Delete or reassign them first — their serials, repair outcomes and stock history would go with them.",
+    "bulkDeleteBlockedByTickets_one": "Cannot delete these {{count}} customers: {{tickets}} RMA ticket references one of them. The delete is all-or-nothing, so deselect that customer or clear the ticket first.",
+    "bulkDeleteBlockedByTickets_other": "Cannot delete these {{count}} customers: {{tickets}} RMA tickets reference them. The delete is all-or-nothing, so deselect those customers or clear the tickets first."
   },
   "leads": {
     "title": "Leads",
