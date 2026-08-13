@@ -293,11 +293,36 @@ export const products = {
     if (error) throw error
     return data || []
   },
+  /**
+   * Tickets that returned this product.
+   *
+   * This used to filter `rma_tickets.product_id`. The column exists, so the
+   * query succeeded and returned nothing — every time, for every product,
+   * because nothing writes it: all 13 tickets in the live data have it null.
+   * The product page's RMA History tab therefore always read (0), while 11
+   * products actually had history.
+   *
+   * A ticket carries its items in the `products` jsonb array, so there is no
+   * single column to join on. The real link is inventory_units, which holds
+   * both product_id and rma_ticket_id — one row per returned unit. Reading the
+   * ticket ids from there and fetching those tickets follows the association
+   * that the RMA flow genuinely creates.
+   */
   async getRelatedTickets(productId: string): Promise<unknown[]> {
+    const { data: units, error: unitErr } = await supabase
+      .from('inventory_units')
+      .select('rma_ticket_id')
+      .eq('product_id', productId)
+      .not('rma_ticket_id', 'is', null)
+    if (unitErr) throw unitErr
+
+    const ticketIds = [...new Set((units || []).map((u) => u.rma_ticket_id))]
+    if (!ticketIds.length) return []
+
     const { data, error } = await supabase
       .from('rma_tickets')
       .select('*')
-      .eq('product_id', productId)
+      .in('id', ticketIds)
       .order('created_date', { ascending: false })
     if (error) throw error
     return data || []

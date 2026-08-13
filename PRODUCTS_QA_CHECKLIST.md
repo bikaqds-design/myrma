@@ -41,7 +41,7 @@ what to run:
 | 13 | Duplicate SKU is prevented | ✅ duplicate SKU refused by `products_sku_key` (23505) |
 | 14 | Edit loads all values and persists | ✅ edit loaded every value; changes persisted |
 | 15 | Stock tracking mode is settable and guarded when stock exists | ✅ settable on a stock-free product (serialized → bulk saved). On a stocked product the `20260772` trigger refuses it by name: *"Cannot change stock tracking mode for … 6 serialized unit(s)"*. The UI also pre-locks the selector. |
-| 16 | Product image upload / replace | ⬜ |
+| 16 | Product image upload / replace | ✅ upload round-trip against the real bucket: stored, URL 200, delete leaves 400 |
 | 17 | Delete asks for confirmation | ✅ confirms before deleting a stock-free product |
 | 18 | Delete is blocked or warns when the product has stock or RMA history | ❌→✅ **BUG #38** — the DB refuses (23503) but the UI showed a generic "failed to delete". Now counts first and explains: *"…11 inventory records still reference it."* |
 
@@ -50,10 +50,10 @@ what to run:
 | # | Check | Result |
 |---|-------|--------|
 | 19 | Brand list shows counts (categories, products) | ✅ header counts match the DB exactly (14 / 51 / 407 at the time) |
-| 20 | Create / edit a brand, including the vendor fields | ⬜ |
-| 21 | Brand logo upload | ⬜ |
+| 20 | Create / edit a brand, including the vendor fields | ✅ modal exposes the vendor fields; contact, email, phone, tax id and payment terms all persisted |
+| 21 | Brand logo upload | ✅ logo uploaded and fetched 200 |
 | 22 | Delete a brand that has products | ❌→✅ **BUG #37** — deleting a brand with products was allowed and the warning was wrong. See below. |
-| 23 | Create / edit a category under a brand | ⬜ |
+| 23 | Create / edit a category under a brand | ✅ added "QA Second Category" under the QA brand; both listed |
 | 24 | Delete a category that has products | ❌→✅ **BUG #37** — same for categories; products were silently orphaned. |
 | 25 | Brand ↔ vendor stay one record (already proven, re-confirm) | ✅ re-confirmed — restoring Acer restored its vendor fields (contact, email, phone, payment terms) on the same record |
 
@@ -61,11 +61,11 @@ what to run:
 
 | # | Check | Result |
 |---|-------|--------|
-| 26 | Select all, bulk status change, clear | ⬜ |
-| 27 | Bulk delete with confirmation | ⬜ |
-| 28 | CSV template downloads | ⬜ |
-| 29 | Bulk upload imports valid rows | ⬜ |
-| 30 | Bulk upload reports rejected rows | ⬜ |
+| 26 | Select all, bulk status change, clear | ✅ select-all raised the bar for 3; bulk status set all three to inactive |
+| 27 | Bulk delete with confirmation | ✅ "Delete 3 selected products? This cannot be undone." — deleted, catalog back to 406. Dialog title reads "Delete Product" (singular) for a bulk action; cosmetic. |
+| 28 | CSV template downloads | ✅ `products-template.csv`, 10 columns, two sample rows |
+| 29 | Bulk upload imports valid rows | ✅ valid row imported with quoted commas intact in **both** name and description: `QA Imported, Comma Product` / `Desc, with comma` |
+| 30 | Bulk upload reports rejected rows | ✅ 2 bad rows rejected; toast reports the count and the console now lists each: *"Row 3: Missing required fields"*, *"Row 4: Brand \"NoSuchBrandXYZ\" not found"* |
 | 31 | Export produces a correct file | ❌→✅ **BUG #39** — see below. Now xlsx via the shared ExportMenu; 406 rows, 8 columns. |
 | 32 | A comma in a product name does not shift columns | ❌→✅ **BUG #39** — 34 of 406 names contain a comma. Zero misaligned rows after the fix. |
 
@@ -73,23 +73,23 @@ what to run:
 
 | # | Check | Result |
 |---|-------|--------|
-| 33 | Opens the right product with all fields | ⬜ |
-| 34 | Stock summary reflects real inventory | ⬜ |
-| 35 | Edit and save from the detail page | ⬜ |
-| 36 | Delete from the detail page | ⬜ |
+| 33 | Opens the right product with all fields | ✅ right product, all fields, comma-bearing name and description intact |
+| 34 | Stock summary reflects real inventory | ❌→✅ **BUG #40** — the RMA History tab read (0) for every product. See below. Now (1) for PRD-069, listing the real ticket. No stock summary exists on this page — see the note. |
+| 35 | Edit and save from the detail page | ✅ warranty 12 → 36 saved with `updated_by` |
+| 36 | Delete from the detail page | ✅ confirms, deletes, returns to the list |
 
 ## F. Cross-cutting
 
 | # | Check | Result |
 |---|-------|--------|
-| 37 | Arabic (RTL): labels and values translated | ⬜ |
-| 38 | Dark mode | ⬜ |
-| 39 | Mobile width | ⬜ |
-| 40 | Console clean | ⬜ |
+| 37 | Arabic (RTL): labels and values translated | ❌→✅ **BUG #41** — type and status rendered raw English under Arabic. Now عتاد / نشط. |
+| 38 | Dark mode | ✅ list, hierarchy and detail all correct in dark mode |
+| 39 | Mobile width | ✅ usable at 375px; header correct, table scrolls |
+| 40 | Console clean | ✅ clean load, 6s idle: no errors, no render-loop warnings |
 
 ---
 
-## Bugs found — 4, all fixed
+## Bugs found — 6, all fixed
 
 ### BUG #39 — the catalog export was corrupting 8% of its rows, live
 
@@ -133,6 +133,29 @@ showed "Failed to delete product". It now counts the linked inventory first and
 explains instead of asking, and the catch handles 23503 for anything that slips
 between the count and the confirm.
 
+### BUG #40 — the product's RMA History tab was empty for every product
+
+`getRelatedTickets` filtered `rma_tickets.product_id`. That column exists, so
+the query succeeded and returned nothing — every time, for every product,
+because **nothing writes it**: all 13 tickets in the live data have it null. The
+tab therefore always read (0) while 11 products genuinely had RMA history.
+
+A ticket carries its items in a `products` jsonb array, so there is no column to
+join on. The real link is `inventory_units`, which holds both `product_id` and
+`rma_ticket_id` — one row per returned unit. The query now reads ticket ids from
+there. Spot-checked against five products including a three-ticket case, plus
+one with no history that still returns 0.
+
+Worth noting the failure mode: because the column existed, this never threw. A
+missing column would have errored loudly and been fixed years ago.
+
+### BUG #41 — product type and status untranslated in Arabic
+
+Rendered raw, so they stayed English while every header around them translated.
+Third instance of the same pattern after BUG #29 (tickets) and BUG #33
+(customers). The `typeHardware` / `statusActive` keys already existed and were
+simply not used.
+
 ### BUG #36 — duplicate options in the category filter
 
 52 options for 37 distinct names, because categories are brand-scoped and 15
@@ -166,6 +189,18 @@ This is the second time in this project I destroyed live data with an unguarded
 probe. The rule from here is that delete tests run against records created for
 the purpose, or not at all.
 
+### Note — there is no stock summary on the product detail page
+
+Row 34 expected one. The page shows brand, category, type, status, warranty,
+description and audit fields, plus the RMA History tab — but nothing about how
+many units exist or where they are, even though `getStockSummary` powers exactly
+that on the Inventory dashboard. Not a defect, since nothing claims to show it;
+recorded because a product page without stock is a surprising place to land when
+the question is "how many do we have".
+
 ### Test data
-None left behind. `QA-PROD-QA40` was created for rows 12–15 and deleted; the
-catalog is back to 406 / 14 / 51.
+None left behind. Everything created for this run was removed: `QA-PROD-QA40`
+(rows 12–15), three `QA-BULKTGT-*` products (rows 26–27), `QA-IMP-1` (rows
+29–36), the QA hierarchy brand and its two categories, and the uploaded test
+image and logo. Final state 406 products / 14 brands / 51 categories, matching
+the baseline exactly.

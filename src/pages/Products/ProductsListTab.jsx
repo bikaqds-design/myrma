@@ -3,6 +3,9 @@ import { useTranslation } from 'react-i18next'
 import ExportMenu from '../../components/ExportMenu'
 import EmptyState from '../../components/EmptyState'
 
+/** hardware -> Hardware, so the value maps onto the typeHardware / statusActive keys. */
+const cap = (v) => (v ? String(v).charAt(0).toUpperCase() + String(v).slice(1) : '')
+
 export default function ProductsListTab({
   products,
   // `products` is only the current page. Export scopes need the whole set and
@@ -550,7 +553,12 @@ export default function ProductsListTab({
                     {product.category?.category_name || '-'}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="capitalize text-sm text-gray-600">{product.product_type}</span>
+                    {/* Rendered raw, so it stayed English under Arabic while every
+                        header around it translated — same gap as BUG #29 and #33.
+                        The typeHardware / statusActive keys already existed. */}
+                    <span className="capitalize text-sm text-gray-600">
+                      {t(`products.type${cap(product.product_type)}`, product.product_type)}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <span
@@ -563,7 +571,7 @@ export default function ProductsListTab({
                             : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400')
                       }
                     >
-                      {product.status}
+                      {t(`products.status${cap(product.status)}`, product.status)}
                     </span>
                   </td>
                   <td className="px-4 py-3 relative action-menu">
