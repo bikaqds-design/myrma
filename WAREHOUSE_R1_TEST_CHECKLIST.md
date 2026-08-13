@@ -49,8 +49,19 @@ placeholder promising `USD` while the effective default is `EGP`, turned out to 
 already in commit `d9e1564`; this note was stale.
 
 Chasing those two turned up **BUG #42** — a render loop firing "Maximum update depth exceeded" on
-every Products page load, present at HEAD and long predating the QA runs. Row 40 of
+every page load, present at HEAD and long predating the QA runs. Row 40 of
 `PRODUCTS_QA_CHECKLIST.md` had passed it; see the write-up there for why.
+
+A follow-up sweep found it on **three** pages, not one. Products used `?? []`; **Customers** and
+**RMA Tickets** used the React Query destructuring default `const { data: x = [] } = useQuery(…)`,
+which has the same effect and is the more common spelling. Both comment panels shared it. All
+five sites now use one shared frozen `EMPTY_ARRAY` (`src/lib/stableEmpty.ts`), which documents the
+trap. Re-verified by loading all nine finished modules in separate fresh tabs against a restarted
+server: zero occurrences.
+
+~28 `useMemo`/`useCallback` deps on the same unstable bindings were left alone on purpose — they
+defeat memoisation during the loading window only, then go stable, so there is no loop and no
+warning.
 
 Two product decisions are logged rather than fixed, both in `RMA_TICKETS_QA_CHECKLIST.md`: there is
 no stock summary on the product detail page, and a credit note closes its RMA ticket (now warned

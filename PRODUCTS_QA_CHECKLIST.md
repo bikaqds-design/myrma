@@ -129,6 +129,27 @@ Worth noting the failure mode, because it is the mirror of BUG #40: that one
 never threw because the column existed. This one *did* throw, every time, and I
 explained it away.
 
+**Sweep, 2026-08-13 — it was on three pages.** Products used `?? []`. Customers
+and RMA Tickets used the React Query destructuring default:
+
+```js
+const { data: customers = [] } = useQuery({ ... })
+```
+
+Same mechanism — a default is re-evaluated every render — and the more common
+spelling of the two. Both comment panels shared it. Fixed at all five sites with
+one shared frozen `EMPTY_ARRAY` in `src/lib/stableEmpty.ts`. Re-verified across
+all nine finished modules, each in its own fresh tab against a restarted server:
+zero occurrences.
+
+The first two detectors I wrote for the sweep returned zero, and I nearly
+reported the codebase clean on that basis. Both were broken: one misclassified
+even the known Products case (the `setState` sits inside the helper the effect
+calls, not in the effect body), and neither looked for destructuring defaults.
+What caught it was requiring the detector to find the pre-fix Products file
+before trusting its verdict on anything else. A sweep that cannot rediscover a
+known instance is not evidence of absence.
+
 ### BUG #39 — the catalog export was corrupting 8% of its rows, live
 
 The `.join(',')` CSV bug again, but unlike Customers and RMA Tickets this one was
