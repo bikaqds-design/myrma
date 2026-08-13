@@ -13,6 +13,45 @@
 
 ---
 
+## Current status — 2026-08-13
+
+**Every module on the finished list now has a completed QA run.** The dated run logs below are
+historical: read them for what was found, not for what is outstanding. A statement like "43 rows
+remain ⬜" was true on the day it was written and has since been overtaken.
+
+| Module | Where it was run | State |
+|---|---|---|
+| Inventory / Warehouse R1 | this file, §0–§9 | ✅ closed 2026-08-05/06 |
+| Sales, Accounting, Leads, Deals, Activities (funnel) | this file, "Sales-Funnel 52-Item Checklist" | ✅ 52/52 closed 2026-08-06/07 |
+| Purchasing | this file, "Purchase Module (Sprint 9R)" | ✅ closed 2026-08-07 |
+| Leads / Pipeline (Sprints 2.5 + 3) | `CRM_QA_CHECKLIST.md` | ✅ closed 2026-08-08, bar row 40 |
+| RMA Tickets | `RMA_TICKETS_QA_CHECKLIST.md` | ✅ 55/55 closed 2026-08-12 |
+| Customers | `CUSTOMERS_QA_CHECKLIST.md` | ✅ 36/36 closed 2026-08-12 |
+| Public Tracker | `PUBLIC_TRACKER_QA_CHECKLIST.md` | ✅ 15/15 closed 2026-08-12 |
+| Products | `PRODUCTS_QA_CHECKLIST.md` | ✅ 40/40 closed 2026-08-13 |
+
+Not run, deliberately: **Dashboard, Calendar, Control Panel and Reports** are being rebuilt for the
+CRM direction, and **permissions/roles**, which the user parked until the project is finalised.
+
+**What is genuinely still open** — three items, none of them a code defect:
+
+1. **Touch/mobile drag** (`CRM_QA_CHECKLIST.md` row 40) — needs a real touch device; no emulator
+   substitute. Open since the sprint that built it.
+2. **`db-tests` CI job** — blocked on Docker Desktop, not on knowledge. `.github/workflows/ci.yml`
+   carries the four commands to run once Docker is installed.
+3. **Speed Technology System** — contact fields blank after the delete incident of 2026-08-12;
+   needs the user's original import source. The record and its code `CB-50916011` exist.
+
+Plus two cosmetic snags recorded and not fixed (`PRODUCTS_QA_CHECKLIST.md`): the products empty
+state reads "Showing 1-0 of 0", and the bulk-delete dialog is titled "Delete Product" (singular).
+And one on the PO form: the Currency placeholder says `USD` while the effective default is `EGP`.
+
+Two product decisions are logged rather than fixed, both in `RMA_TICKETS_QA_CHECKLIST.md`: there is
+no stock summary on the product detail page, and a credit note closes its RMA ticket (now warned
+about and logged, but still an implicit rule).
+
+---
+
 ### Run log — 2026-08-05
 
 Ran against the **live** project (`ohkynosgscfygtjxbpxq`) via a local dev server, signed in as
@@ -330,9 +369,9 @@ These "BUILT ≠ VERIFIED" items are still open from earlier work — listed her
 
 | Status | Area | What still needs a manual click-through | Reference |
 |--------|------|------------------------------------------|-----------|
-| ⏸️ | Purchase Module redesign (2026-07-05) | **DEFERRED 2026-08-06 — further Purchase Module work begins once this checklist is closed.** QA-ing the current build now would be re-done as soon as that work lands, so this is parked rather than pending. **Re-scope it when the new work is specified**: the current wording ("full click-through" of the PO → Vendor Invoice funnel, approval pool, PO PDF export, Vendor Payments ledger and AP aging, in both languages and themes) is a multi-day programme, not a checklist row, and should be broken into checkable items alongside the build. | migrations `20260756`–`20260763`; CLAUDE.md Purchase Module section |
+| ✅ | Purchase Module redesign (2026-07-05) | **RUN AND CLOSED 2026-08-07** — this row's "DEFERRED 2026-08-06" note was overtaken the next day. See **"Purchase Module (Sprint 9R) — manual QA click-through (2026-08-07)"** at the end of this file: the full PO → approval → Vendor Invoice → partial receipt → full receipt → inventory + audit → AP payment → aging → void chain was click-tested end to end, and the verdict records *"Nothing in the Purchase Module is left unverified."* Four defects found and fixed (**#17** functional, **#18**/**#19** copy, **#20** the bulk-tracking gap with its `20260772` database guard applied and verified against a deliberate bypass). One unfixed cosmetic observation: the PO Currency placeholder says `USD` while the effective default is `EGP`. | migrations `20260756`–`20260763`; CLAUDE.md Purchase Module section |
 | ✅ | Sprint 8 Inventory UI | **Superseded by the R1 rows — all six surfaces were click-tested during this pass, against the same code.** <br>• **Dashboard** → §6 (all 8 columns, scrap excluded from Available/Physical, Branches drawer showing Main 21 / Branch – Cairo 27) and §7 (non-catalog badge) <br>• **Stock Breakdown** → §8 (Product Info, Warehouse Distribution, Available Units, Reserved, RMA Distribution populated) <br>• **Receive** → §9, 2026-08-06 (unit received into Main, counts moved 433→434) <br>• **Transfer** → §9 (27-unit Main → Branch – Cairo, plus the system-location regression found and fixed) <br>• **Adjust** → §9, 2026-08-06 (status change off stock and back, plus the one-way-door bug found and fixed) <br>• **Warehouses** → §1 (grouping, system-row protection, metadata edit) and §9 (CRUD) <br><br>Four defects were found and fixed across those surfaces, so this is stronger coverage than the original row asked for. Nothing here is untested. | CLAUDE.md active-sprint note |
-| ⬜ | Sales-funnel 52-item checklist | The deferred 52-row Lead→Deal→QT→SO→Invoice→CN + Accounting v1 checklist. — **LOCATED 2026-08-06. It was never missing; the pointer was wrong.** It lives in **`MASTER_UPGRADE_PLAN.md` → "Sales Funnel Test Checklist (Sprint 6 round-2 fixes + Sprint 7 Accounting v1)"**, a markdown table of **exactly 52 numbered rows** (#1 Activities search → #52 build gate), covering Activities, Leads, Deals, Quotations, Sales Orders, Invoices, Credit Notes, Payments, Accounting and i18n. Prerequisite migrations `20260726`–`20260730` are already applied (confirmed 2026-06-30). **Still unrun** — it is a separate 52-row programme, not a single row, and should be tracked in its own right rather than as one line here. | **`MASTER_UPGRADE_PLAN.md`, section "Sales Funnel Test Checklist"** (was wrongly cited as Claude memory `project-sales-funnel-test-checklist.md`, which never existed) |
+| ✅ | Sales-funnel 52-item checklist | **ALL 52 ROWS RUN, ALL 52 PASS — closed 2026-08-06/07.** The "Still unrun" wording below was written while the checklist was being located and was never updated once it ran; the run log lives in this file under **"Sales-Funnel 52-Item Checklist — run log (2026-08-06)"**, ending in "Funnel checklist — final state". Five defects found and fixed (**#12** via migration `20260771`, **#13**, **#14**, **#15**, **#16**), each confirmed live after the fix and #16 in both locales. Row 46 passed against the code while its written expectation was stale; `MASTER_UPGRADE_PLAN.md` row 46 was reworded 2026-08-07 with a note explaining why the behaviour must not be changed back. <br><br>*Original locating note, kept for the record:* the 52 rows live in **`MASTER_UPGRADE_PLAN.md` → "Sales Funnel Test Checklist (Sprint 6 round-2 fixes + Sprint 7 Accounting v1)"** (#1 Activities search → #52 build gate), covering Activities, Leads, Deals, Quotations, Sales Orders, Invoices, Credit Notes, Payments, Accounting and i18n. Prerequisite migrations `20260726`–`20260730` were already applied. | **`MASTER_UPGRADE_PLAN.md`, section "Sales Funnel Test Checklist"** (was wrongly cited as Claude memory `project-sales-funnel-test-checklist.md`, which never existed) |
 | ✅ | Credit-limit enforcement policy | **DECIDED 2026-08-06: no credit-limit policy will be enforced at this time.** Not block, not warn, not advisory — the feature stays unenforced. Nothing to test, so this row is closed rather than deferred. **If a policy is adopted later**, re-open it with the chosen mode and test the enforcement point in the sales funnel (order/invoice creation against an over-limit customer). | CLAUDE.md Accounting section |
 
 ---
