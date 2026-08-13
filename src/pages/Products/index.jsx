@@ -14,21 +14,8 @@ import { captureException } from '../../lib/sentry'
 import { productSchema, getFirstError } from '../../lib/schemas'
 import ProductsListTab from './ProductsListTab'
 import HierarchyTab from './HierarchyTab'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { AddProductModal, AddBrandModal, AddCategoryModal, BulkUploadModal } from './_modals'
-
-/**
- * One shared empty array for the "query hasn't resolved yet" case.
- *
- * `productsPageData?.productsData ?? []` looks harmless but mints a new array
- * on every render while the query is in flight, and `products` is a dependency
- * of the effect that calls setFilteredProducts. New identity → effect fires →
- * setState → render → new identity, until the data lands and React Query starts
- * handing back one stable reference. React caps it at 50 nested updates and logs
- * "Maximum update depth exceeded", which is what the Products page did on every
- * single load. Freezing it makes accidental mutation of the placeholder loud
- * rather than silent.
- */
-const EMPTY = Object.freeze([])
 
 export default function Products({
   currentUserRole,
@@ -53,7 +40,9 @@ export default function Products({
     },
   })
 
-  const products = productsPageData?.productsData ?? EMPTY
+  // `?? EMPTY_ARRAY`, not `?? []`: `products` is a dependency of the filter
+  // effect below, and a fresh `[]` each render looped it until data arrived.
+  const products = productsPageData?.productsData ?? EMPTY_ARRAY
   const [filteredProducts, setFilteredProducts] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [filterBrand, setFilterBrand] = useState('')
@@ -75,9 +64,9 @@ export default function Products({
 
   // Same stable placeholder — these are not effect dependencies today, but the
   // next hook that lists one would reintroduce the loop above.
-  const brands = productsPageData?.brandsData ?? EMPTY
-  const categories = productsPageData?.categoriesData ?? EMPTY
-  const subcategories = productsPageData?.subcategoriesData ?? EMPTY
+  const brands = productsPageData?.brandsData ?? EMPTY_ARRAY
+  const categories = productsPageData?.categoriesData ?? EMPTY_ARRAY
+  const subcategories = productsPageData?.subcategoriesData ?? EMPTY_ARRAY
   const [expandedBrands, setExpandedBrands] = useState({})
   const [expandedCategories, setExpandedCategories] = useState({})
   const [openBrandMenu, setOpenBrandMenu] = useState(null)

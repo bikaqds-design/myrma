@@ -16,6 +16,7 @@ import { captureException } from '../../lib/sentry'
 import { dispatchRmaStageMoves } from '../../lib/rmaStageMoves'
 import { SortableHeader, ShortcutsHelp } from './_shared'
 import { getStatusColor, getPriorityColor, formatDate } from './_utils'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { KanbanView } from './_kanban'
 import { TicketForm } from './TicketForm'
 import { TicketDrawer } from './TicketDrawer'
@@ -31,22 +32,24 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const queryClient = useQueryClient()
 
   // P-1: TanStack Query — cached fetch; stale data renders instantly on re-visit
-  const { data: tickets = [], isLoading: loading } = useQuery({
+  // `= EMPTY_ARRAY`, not `= []`: `tickets` is listed in two effect dependency
+  // arrays below, and a fresh `[]` each render looped both until data arrived.
+  const { data: tickets = EMPTY_ARRAY, isLoading: loading } = useQuery({
     queryKey: ['rma-tickets'],
     queryFn: () => db.rmaTickets.list(),
     staleTime: 60_000,
   })
-  const { data: customers = [] } = useQuery({
+  const { data: customers = EMPTY_ARRAY } = useQuery({
     queryKey: ['customers'],
     queryFn: () => db.customers.list(),
     staleTime: 60_000,
   })
-  const { data: products = [] } = useQuery({
+  const { data: products = EMPTY_ARRAY } = useQuery({
     queryKey: ['products'],
     queryFn: () => db.products.list(),
     staleTime: 5 * 60_000,
   })
-  const { data: users = [] } = useQuery({
+  const { data: users = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
     queryFn: () => db.userRoles.listAllRoles(),
     staleTime: 5 * 60_000,

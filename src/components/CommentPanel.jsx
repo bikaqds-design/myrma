@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, storage, supabase } from '../api/supabaseClient'
+import { EMPTY_ARRAY } from '../lib/stableEmpty'
 import { Button, Spinner } from './ui'
 import toast from 'react-hot-toast'
 
@@ -44,7 +45,8 @@ export function CommentPanel({ relatedType, relatedId, currentUserEmail, canEdit
 
   const queryKey = ['activities', relatedType, relatedId]
 
-  const { data: activities = [], isLoading } = useQuery({
+  // `= EMPTY_ARRAY`, not `= []`: `activities` is an effect dependency below.
+  const { data: activities = EMPTY_ARRAY, isLoading } = useQuery({
     queryKey,
     queryFn: () => db.activities.list(relatedType, relatedId),
     enabled: !!relatedId,

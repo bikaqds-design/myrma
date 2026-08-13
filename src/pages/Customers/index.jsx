@@ -13,6 +13,7 @@ import EmptyState from '../../components/EmptyState'
 import { customerSchema, getFirstError } from '../../lib/schemas'
 import { ROLES } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { EMPTY_FORM } from './_constants'
 import { AddCustomerModal, BulkUploadCustomersModal } from './_modals'
 
@@ -29,12 +30,14 @@ export default function Customers({
   const queryClient = useQueryClient()
 
   // P-1: TanStack Query — cached fetch; returning to this page shows stale data instantly
-  const { data: customers = [], isLoading: loading } = useQuery({
+  // `= EMPTY_ARRAY`, not `= []`: `customers` is a dependency of the filter effect
+  // below, and a fresh `[]` each render looped it until the data landed.
+  const { data: customers = EMPTY_ARRAY, isLoading: loading } = useQuery({
     queryKey: ['customers'],
     queryFn: () => db.customers.list(),
     staleTime: 60_000,
   })
-  const { data: usersList = [] } = useQuery({
+  const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
     queryFn: () => db.userRoles.listAllRoles(),
     staleTime: 5 * 60_000,
