@@ -383,7 +383,13 @@ export default function ProductsListTab({
       {/* Pagination Top Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-gray-600">
         <div>
-          {t('products.showingRange', { from: startIndex + 1, to: endIndex, total: totalProducts })}
+          {/* `from` is 0, not startIndex + 1, when nothing matched — otherwise an
+              empty result reads "Showing 1-0 of 0". Same guard as Customers. */}
+          {t('products.showingRange', {
+            from: totalProducts === 0 ? 0 : startIndex + 1,
+            to: endIndex,
+            total: totalProducts,
+          })}
         </div>
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-600">{t('common.itemsPerPage')}:</label>

@@ -30,7 +30,7 @@ what to run:
 | 7 | Filter by type / status | ✅ status and type filters apply |
 | 8 | Filters combine, then clear | ✅ combine and clear correctly |
 | 9 | Pagination: page size, page 2, jump | ✅ per=10 → 1-10, page 2 → 11-20, per=25 restores |
-| 10 | Empty state when nothing matches | ⚠️ works, but reads "Showing 1-0 of 0" where Customers reads "0–0". Cosmetic. |
+| 10 | Empty state when nothing matches | ❌→✅ read "Showing 1-0 of 0" where Customers reads "0–0". Fixed: `from` is 0 when nothing matched, same guard Customers already had. Now "Showing 0–0 of 0 products". |
 
 ## B. Product CRUD
 
@@ -62,7 +62,7 @@ what to run:
 | # | Check | Result |
 |---|-------|--------|
 | 26 | Select all, bulk status change, clear | ✅ select-all raised the bar for 3; bulk status set all three to inactive |
-| 27 | Bulk delete with confirmation | ✅ "Delete 3 selected products? This cannot be undone." — deleted, catalog back to 406. Dialog title reads "Delete Product" (singular) for a bulk action; cosmetic. |
+| 27 | Bulk delete with confirmation | ❌→✅ deleted correctly, catalog back to 406, but the dialog was titled "Delete Product" (singular) for a bulk action and its message was hardcoded English. Both keyed and pluralised — verified at 1/2/3/11 selected in English and Arabic. |
 | 28 | CSV template downloads | ✅ `products-template.csv`, 10 columns, two sample rows |
 | 29 | Bulk upload imports valid rows | ✅ valid row imported with quoted commas intact in **both** name and description: `QA Imported, Comma Product` / `Desc, with comma` |
 | 30 | Bulk upload reports rejected rows | ✅ 2 bad rows rejected; toast reports the count and the console now lists each: *"Row 3: Missing required fields"*, *"Row 4: Brand \"NoSuchBrandXYZ\" not found"* |
@@ -85,11 +85,49 @@ what to run:
 | 37 | Arabic (RTL): labels and values translated | ❌→✅ **BUG #41** — type and status rendered raw English under Arabic. Now عتاد / نشط. |
 | 38 | Dark mode | ✅ list, hierarchy and detail all correct in dark mode |
 | 39 | Mobile width | ✅ usable at 375px; header correct, table scrolls |
-| 40 | Console clean | ✅ clean load, 6s idle: no errors, no render-loop warnings |
+| 40 | Console clean | ❌→✅ **BUG #42 — I got this row wrong the first time.** The page logged "Maximum update depth exceeded" on *every* load. See below. Now genuinely clean. |
 
 ---
 
-## Bugs found — 6, all fixed
+## Bugs found — 7, all fixed
+
+### BUG #42 — a render loop on every page load, and I passed the row that should have caught it
+
+The Products page fired React's "Maximum update depth exceeded" warning on every
+single load. I marked row 40 ✅ *"clean load, 6s idle: no errors, no render-loop
+warnings"*. That was wrong, and it was wrong for a reason worth recording: I had
+twice before seen this warning, twice concluded it was an artifact of my own HMR
+edits, and by the third time I was treating "render-loop warning on a page I've
+been editing" as a known non-finding rather than as something to test. It
+reproduced on a cold server, in a fresh tab, with no edits applied — and it
+reproduced identically at HEAD, so it long predates this QA run.
+
+The cause is one character of convenience:
+
+```js
+const products = productsPageData?.productsData ?? []
+```
+
+While the query is in flight `productsPageData` is undefined, so `?? []` mints a
+**new array identity on every render**. `products` is a dependency of the effect
+that calls `handleSearchAndSort()` → `setFilteredProducts()`. New identity →
+effect fires → setState → render → new identity, round and round until the data
+lands and React Query starts returning one stable reference. React gives up at 50
+nested updates and logs the warning.
+
+So it was self-limiting — the page always rendered correctly, which is exactly
+why it survived this long — but every load burned dozens of wasted render passes
+before painting.
+
+Fixed with a single frozen module-level `EMPTY` array used for all four
+placeholders. Frozen so that mutating the placeholder is loud rather than silent;
+`handleSearchAndSort` copies with `[...products]` before sorting, so nothing
+mutates it today. Verified: cold server, fresh tab, zero console output, and
+search/filter still re-run correctly (10 hits → 0 hits → 406 restored).
+
+Worth noting the failure mode, because it is the mirror of BUG #40: that one
+never threw because the column existed. This one *did* throw, every time, and I
+explained it away.
 
 ### BUG #39 — the catalog export was corrupting 8% of its rows, live
 

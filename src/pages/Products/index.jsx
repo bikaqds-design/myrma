@@ -16,6 +16,20 @@ import ProductsListTab from './ProductsListTab'
 import HierarchyTab from './HierarchyTab'
 import { AddProductModal, AddBrandModal, AddCategoryModal, BulkUploadModal } from './_modals'
 
+/**
+ * One shared empty array for the "query hasn't resolved yet" case.
+ *
+ * `productsPageData?.productsData ?? []` looks harmless but mints a new array
+ * on every render while the query is in flight, and `products` is a dependency
+ * of the effect that calls setFilteredProducts. New identity → effect fires →
+ * setState → render → new identity, until the data lands and React Query starts
+ * handing back one stable reference. React caps it at 50 nested updates and logs
+ * "Maximum update depth exceeded", which is what the Products page did on every
+ * single load. Freezing it makes accidental mutation of the placeholder loud
+ * rather than silent.
+ */
+const EMPTY = Object.freeze([])
+
 export default function Products({
   currentUserRole,
   currentUserEmail,
@@ -39,7 +53,7 @@ export default function Products({
     },
   })
 
-  const products = productsPageData?.productsData ?? []
+  const products = productsPageData?.productsData ?? EMPTY
   const [filteredProducts, setFilteredProducts] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [filterBrand, setFilterBrand] = useState('')
@@ -59,9 +73,11 @@ export default function Products({
     safeStorage.get('productsSortConfig', { key: 'created_date', direction: 'desc' })
   )
 
-  const brands = productsPageData?.brandsData ?? []
-  const categories = productsPageData?.categoriesData ?? []
-  const subcategories = productsPageData?.subcategoriesData ?? []
+  // Same stable placeholder — these are not effect dependencies today, but the
+  // next hook that lists one would reintroduce the loop above.
+  const brands = productsPageData?.brandsData ?? EMPTY
+  const categories = productsPageData?.categoriesData ?? EMPTY
+  const subcategories = productsPageData?.subcategoriesData ?? EMPTY
   const [expandedBrands, setExpandedBrands] = useState({})
   const [expandedCategories, setExpandedCategories] = useState({})
   const [openBrandMenu, setOpenBrandMenu] = useState(null)
@@ -338,8 +354,8 @@ export default function Products({
       return
     }
     openConfirm(
-      t('products.deleteTitle'),
-      `Delete ${selectedProducts.length} selected product${selectedProducts.length !== 1 ? 's' : ''}? This cannot be undone.`,
+      t('products.bulkDeleteTitle', { count: selectedProducts.length }),
+      t('products.bulkDeleteMsg', { count: selectedProducts.length }),
       async () => {
         closeConfirm()
         try {

@@ -42,9 +42,15 @@ CRM direction, and **permissions/roles**, which the user parked until the projec
 3. **Speed Technology System** — contact fields blank after the delete incident of 2026-08-12;
    needs the user's original import source. The record and its code `CB-50916011` exist.
 
-Plus two cosmetic snags recorded and not fixed (`PRODUCTS_QA_CHECKLIST.md`): the products empty
-state reads "Showing 1-0 of 0", and the bulk-delete dialog is titled "Delete Product" (singular).
-And one on the PO form: the Currency placeholder says `USD` while the effective default is `EGP`.
+The three cosmetic snags listed here previously are now closed (2026-08-13). Two were real and
+fixed — the products empty state reading "Showing 1-0 of 0", and the bulk-delete dialog titled
+"Delete Product" (singular) with a hardcoded English message. The third, the PO Currency
+placeholder promising `USD` while the effective default is `EGP`, turned out to have been fixed
+already in commit `d9e1564`; this note was stale.
+
+Chasing those two turned up **BUG #42** — a render loop firing "Maximum update depth exceeded" on
+every Products page load, present at HEAD and long predating the QA runs. Row 40 of
+`PRODUCTS_QA_CHECKLIST.md` had passed it; see the write-up there for why.
 
 Two product decisions are logged rather than fixed, both in `RMA_TICKETS_QA_CHECKLIST.md`: there is
 no stock summary on the product detail page, and a credit note closes its RMA ticket (now warned
