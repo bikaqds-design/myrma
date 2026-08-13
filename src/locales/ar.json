@@ -2032,7 +2032,6 @@
     "enabledCount": "{{count}}/{{total}} مفعّل",
     "noPermsDefined": "لا توجد صلاحيات محددة",
     "moduleTimeTracking": "تتبع الوقت",
-    "moduleSettings": "الإعدادات",
     "moduleUserManagement": "إدارة المستخدمين",
     "statusActive": "🟢 نشط",
     "statusSuspended": "⏸️ موقوف",

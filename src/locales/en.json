@@ -2032,7 +2032,6 @@
     "enabledCount": "{{count}}/{{total}} enabled",
     "noPermsDefined": "No permissions defined",
     "moduleTimeTracking": "Time Tracking",
-    "moduleSettings": "Settings",
     "moduleUserManagement": "User Management",
     "statusActive": "🟢 Active",
     "statusSuspended": "⏸️ Suspended",

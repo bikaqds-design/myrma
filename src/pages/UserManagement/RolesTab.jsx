@@ -385,7 +385,14 @@ export function PermissionMatrix({ permissions, onToggle }) {
     { key: 'reports', label: t('nav.reports') },
     { key: 'dashboard', label: t('nav.dashboard') },
     { key: 'user_management', label: t('userManagement.moduleUserManagement') },
-    { key: 'settings', label: t('userManagement.moduleSettings') },
+    // 'settings' was here and could never affect anything. The Control Panel
+    // is gated by role in App.jsx (admin or super admin only), and canDo()
+    // returns true unconditionally for those two roles — so the roles these
+    // toggles applied to could not reach the pages, and the roles that could
+    // reach them bypassed the toggles. Eight switches that always did nothing.
+    // Removing the module rather than wiring it: MANAGER defaulted to
+    // view_settings: true, so honouring the permission in the route would have
+    // handed every manager the Control Panel. See permissions.ts.
   ]
 
   return (

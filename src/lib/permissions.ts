@@ -14,6 +14,34 @@ type SectionPermissions = Record<string, boolean>
 /** The full permissions object stored in user_roles.permissions */
 export type UserPermissions = Record<string, SectionPermissions>
 
+/**
+ * No `settings` section here, deliberately.
+ *
+ * There used to be one — view_settings, edit_company_info, edit_branding,
+ * manage_email_templates, manage_statuses, manage_priorities, manage_categories,
+ * view_audit_logs — surfaced as eight switches in the role editor. Not one was
+ * read anywhere in the app, and the architecture meant none of them could
+ * matter even if they had been: `/control-panel` is gated in App.jsx on
+ * `role === ADMIN || SUPER_ADMIN`, and canDo() below returns true
+ * unconditionally for exactly those two roles. So the roles the toggles applied
+ * to could never reach the pages, and the roles that could reach them ignored
+ * the toggles. An admin could switch "manage_branding" off, see it go off, and
+ * change nothing.
+ *
+ * They were removed rather than wired up, because wiring them was the more
+ * dangerous option: MANAGER defaulted to `view_settings: true`, so making the
+ * route honour the permission would have handed every manager the Control Panel
+ * the moment it shipped.
+ *
+ * If delegated settings access is wanted later it is a feature, not a
+ * reinstatement: the route guard has to move from role to permission, each
+ * Control Panel section needs its own check, and the defaults need setting
+ * deliberately rather than inheriting the `true` that was sitting there.
+ *
+ * Note `user_management` is a different case and stays: create_users and
+ * manage_permissions are genuinely read, even though six of its eight keys are
+ * not.
+ */
 export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = {
   [ROLES.MANAGER]: {
     products: { view: true, create: true, edit: true, delete: false, export: true, import: false },
@@ -69,16 +97,6 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
       manage_permissions: false,
       create_roles: false,
       delete_roles: false,
-    },
-    settings: {
-      view_settings: true,
-      edit_company_info: false,
-      edit_branding: false,
-      manage_email_templates: false,
-      manage_statuses: false,
-      manage_priorities: false,
-      manage_categories: false,
-      view_audit_logs: false,
     },
     invoices: { view: true, create: true, edit: true, delete: false },
     time_tracking: { log: true, view_all: true, delete: false },
@@ -157,16 +175,6 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
       create_roles: false,
       delete_roles: false,
     },
-    settings: {
-      view_settings: false,
-      edit_company_info: false,
-      edit_branding: false,
-      manage_email_templates: false,
-      manage_statuses: false,
-      manage_priorities: false,
-      manage_categories: false,
-      view_audit_logs: false,
-    },
     invoices: { view: true, create: false, edit: false, delete: false },
     time_tracking: { log: true, view_all: false, delete: false },
     parts: { view: true, create: false, edit: false, delete: false, adjust_stock: true },
@@ -234,16 +242,6 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
       manage_permissions: false,
       create_roles: false,
       delete_roles: false,
-    },
-    settings: {
-      view_settings: false,
-      edit_company_info: false,
-      edit_branding: false,
-      manage_email_templates: false,
-      manage_statuses: false,
-      manage_priorities: false,
-      manage_categories: false,
-      view_audit_logs: false,
     },
     invoices: { view: true, create: false, edit: false, delete: false },
     time_tracking: { log: false, view_all: false, delete: false },
