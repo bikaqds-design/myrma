@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../../lib/sentry'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 
 export default function AuditLog() {
   const { t } = useTranslation()
@@ -15,7 +16,7 @@ export default function AuditLog() {
   const [filterTo, setFilterTo] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
-  const { data: logs = [], isLoading: loading, isError, error } = useQuery({
+  const { data: logs = EMPTY_ARRAY, isLoading: loading, isError, error } = useQuery({
     queryKey: ['audit-log'],
     queryFn: () => db.auditLog.listAll(500),
   })

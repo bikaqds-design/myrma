@@ -11,6 +11,7 @@ import { Button, PageHeader } from '../../components/ui'
 import { safeStorage } from '../../lib/safeStorage'
 import { PageSkeleton } from '../../components/Skeleton'
 import { CreateDocumentModal, CreateStandaloneCreditNoteModal } from './_modals'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 
 // ── Document type badges ─────────────────────────────────────────────────────
 const DOC_TYPE_BADGE = {
@@ -120,23 +121,23 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
   const [jumpToPage, setJumpToPage] = useState('')
 
   // ── Data ────────────────────────────────────────────────────────────────────
-  const { data: documents = [], isLoading } = useQuery({
+  const { data: documents = EMPTY_ARRAY, isLoading } = useQuery({
     queryKey: ['sales-documents'],
     queryFn: () => db.salesDocuments.listAll(),
     staleTime: 30_000,
   })
-  const { data: customers = [] } = useQuery({
+  const { data: customers = EMPTY_ARRAY } = useQuery({
     queryKey: ['customers'],
     queryFn: () => db.customers.list(),
     staleTime: 60_000,
   })
-  const { data: products = [] } = useQuery({
+  const { data: products = EMPTY_ARRAY } = useQuery({
     queryKey: ['products'],
     queryFn: () => db.products.list(),
     staleTime: 60_000,
     enabled: canCreate,
   })
-  const { data: usersList = [] } = useQuery({
+  const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
     queryFn: () => db.userRoles.listAllRoles(),
     staleTime: 5 * 60_000,

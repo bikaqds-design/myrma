@@ -15,6 +15,7 @@ import { ProductSearchInput } from './_shared'
 import { useURLTab } from '../../hooks/useURLTab'
 import { downloadQuotationPDF } from '../../lib/quotationPdf'
 import { dealValueFor, canMarkDealWon } from '../../lib/dealValue'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 
 const CARD = 'bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-[18px]'
 
@@ -84,29 +85,29 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     queryFn: () => db.deals.get(dealId),
     enabled: !!dealId,
   })
-  const { data: pipelines = [] } = useQuery({
+  const { data: pipelines = EMPTY_ARRAY } = useQuery({
     queryKey: ['pipelines'],
     queryFn: () => db.pipelines.list(),
     staleTime: 5 * 60_000,
   })
-  const { data: customers = [] } = useQuery({
+  const { data: customers = EMPTY_ARRAY } = useQuery({
     queryKey: ['customers'],
     queryFn: () => db.customers.list(),
     staleTime: 60_000,
   })
-  const { data: usersList = [] } = useQuery({
+  const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
     queryFn: () => db.userRoles.listAllRoles(),
     staleTime: 5 * 60_000,
   })
-  const { data: products = [] } = useQuery({
+  const { data: products = EMPTY_ARRAY } = useQuery({
     queryKey: ['products'],
     queryFn: () => db.products.list(),
     staleTime: 60_000,
   })
   // A deal can hold any number of quotations, each independent: each converts to
   // its own SO, and approving one does not affect the others.
-  const { data: quotations = [], isLoading: quotationLoading } = useQuery({
+  const { data: quotations = EMPTY_ARRAY, isLoading: quotationLoading } = useQuery({
     queryKey: ['quotations', 'deal', dealId],
     queryFn: () => db.quotations.list({ dealId }),
     enabled: !!dealId,
@@ -116,7 +117,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     [quotations]
   )
   // One lookup for every converted QT, keyed back to its quotation for navigation.
-  const { data: convertedSOs = [] } = useQuery({
+  const { data: convertedSOs = EMPTY_ARRAY } = useQuery({
     queryKey: ['sos-by-quotations', convertedQtIds],
     queryFn: () => db.salesOrders.list({ quotationIds: convertedQtIds }),
     enabled: convertedQtIds.length > 0,
@@ -143,7 +144,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
 
   // Contacts are customer-scoped, so this follows the customer currently chosen in
   // the edit form (which can now be changed) rather than the deal's saved customer.
-  const { data: dealContacts = [] } = useQuery({
+  const { data: dealContacts = EMPTY_ARRAY } = useQuery({
     queryKey: ['contacts', dealForm.customer_id],
     queryFn: () => db.contacts.list(dealForm.customer_id),
     enabled: showEdit && !!dealForm.customer_id,

@@ -20,6 +20,7 @@ import { SortableHeader } from './_shared'
 import * as XLSX from 'xlsx'
 import { useURLTab } from '../../hooks/useURLTab'
 import LeadsKanbanView from './LeadsKanbanView'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 
 const STATUS_BADGE = {
   new:          'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
@@ -196,17 +197,17 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   const searchRef = useRef(null)
   const queryClient = useQueryClient()
 
-  const { data: leads = [], isLoading: loading } = useQuery({
+  const { data: leads = EMPTY_ARRAY, isLoading: loading } = useQuery({
     queryKey: ['leads'],
     queryFn: () => db.leads.list(),
     staleTime: 60_000,
   })
-  const { data: pipelines = [] } = useQuery({
+  const { data: pipelines = EMPTY_ARRAY } = useQuery({
     queryKey: ['pipelines'],
     queryFn: () => db.pipelines.list(),
     staleTime: 5 * 60_000,
   })
-  const { data: usersList = [] } = useQuery({
+  const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
     queryFn: () => db.userRoles.listAllRoles(),
     staleTime: 5 * 60_000,

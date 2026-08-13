@@ -12,6 +12,7 @@ import { nameFromEmail } from '../../lib/utils'
 import { captureException } from '../../lib/sentry'
 import { CreateStandaloneCreditNoteModal } from '../SalesDocuments/_modals'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import {
   getStatusColor,
   getPriorityColor,
@@ -83,7 +84,7 @@ export function TicketDrawer({
   // Credit note (RMA return) state
   const [showIssueCNModal, setShowIssueCNModal] = useState(false)
   const [issuingCN, setIssuingCN] = useState(false)
-  const { data: cnCustomers = [] } = useQuery({
+  const { data: cnCustomers = EMPTY_ARRAY } = useQuery({
     queryKey: ['customers'],
     queryFn: () => db.customers.list(),
     enabled: showIssueCNModal,

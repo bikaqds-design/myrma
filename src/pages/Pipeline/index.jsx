@@ -17,6 +17,7 @@ import PipelineListView from './PipelineListView'
 import PipelineGraphView from './PipelineGraphView'
 import PipelinePivotView from './PipelinePivotView'
 import PipelineActivityView from './PipelineActivityView'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 
 // ─── XLSX Export ──────────────────────────────────────────────────────────────
 
@@ -255,17 +256,17 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
 
   const [activeView, setActiveView] = useURLTab('view', 'list')
 
-  const { data: pipelines = [], isLoading: pipelinesLoading } = useQuery({
+  const { data: pipelines = EMPTY_ARRAY, isLoading: pipelinesLoading } = useQuery({
     queryKey: ['pipelines'],
     queryFn: () => db.pipelines.list(),
     staleTime: 5 * 60_000,
   })
-  const { data: customers = [] } = useQuery({
+  const { data: customers = EMPTY_ARRAY } = useQuery({
     queryKey: ['customers'],
     queryFn: () => db.customers.list(),
     staleTime: 60_000,
   })
-  const { data: usersList = [] } = useQuery({
+  const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
     queryFn: () => db.userRoles.listAllRoles(),
     staleTime: 5 * 60_000,
@@ -293,14 +294,14 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
   // Deliberately not filtered to status:'open' — Won/Lost deals must still
   // render in their own terminal columns (the Won/Lost columns exist
   // specifically to hold them), not vanish from the board.
-  const { data: deals = [], isLoading: dealsLoading } = useQuery({
+  const { data: deals = EMPTY_ARRAY, isLoading: dealsLoading } = useQuery({
     queryKey: ['deals', pipelineId],
     queryFn: () => db.deals.list({ pipelineId }),
     enabled: !!pipelineId,
   })
 
   const dealIds = useMemo(() => deals.map((d) => d.id), [deals])
-  const { data: openActivities = [] } = useQuery({
+  const { data: openActivities = EMPTY_ARRAY } = useQuery({
     queryKey: ['activities', 'deal', 'bulk', dealIds],
     queryFn: () => db.activities.listForRelated('deal', dealIds),
     enabled: dealIds.length > 0,

@@ -15,6 +15,7 @@ import PurchasingGraphView from './PurchasingGraphView'
 import PurchasingPivotView from './PurchasingPivotView'
 import { DOC_TYPE_BADGE, DOC_TYPE_LABEL_KEY, statusLabel, statusPillCls } from './_shared'
 import { CreateVendorModal, VendorEditModal, CreatePurchaseOrderModal, VendorInvoiceFormModal } from './_modals'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 
 function SortableHeader({ label, sortKey, sortConfig, onSort }) {
   const isActive = sortConfig.key === sortKey
@@ -190,7 +191,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
   })
   const documents = useMemo(() => (docsRes?.missing ? [] : (docsRes?.data ?? [])), [docsRes])
 
-  const { data: vendorList = [] } = useQuery({
+  const { data: vendorList = EMPTY_ARRAY } = useQuery({
     queryKey: ['brands-as-vendors'],
     queryFn: () => db.brands.list(),
     staleTime: 60_000,

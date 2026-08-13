@@ -9,6 +9,7 @@ import { PageHeader, Spinner, Button } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
 import { downloadQuotationPDF } from '../../lib/quotationPdf'
 import { downloadSOPDF } from '../../lib/salesOrderPdf'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import {
   DocumentFormModal,
   RecordPaymentModal,
@@ -123,18 +124,18 @@ export default function SalesDocumentDetail({ docType, docId, currentUserRole: _
     queryFn: () => adapter.fetch(docId),
     enabled: !!adapter && !!docId,
   })
-  const { data: customers = [] } = useQuery({
+  const { data: customers = EMPTY_ARRAY } = useQuery({
     queryKey: ['customers'],
     queryFn: () => db.customers.list(),
     staleTime: 60_000,
   })
-  const { data: products = [] } = useQuery({
+  const { data: products = EMPTY_ARRAY } = useQuery({
     queryKey: ['products'],
     queryFn: () => db.products.list(),
     staleTime: 60_000,
     enabled: isQuotation || isSO || isInvoice,
   })
-  const { data: usersList = [] } = useQuery({
+  const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
     queryFn: () => db.userRoles.listAllRoles(),
     staleTime: 5 * 60_000,
@@ -160,7 +161,7 @@ export default function SalesDocumentDetail({ docType, docId, currentUserRole: _
     staleTime: 5 * 60_000,
   })
   // For SO detail: check if an invoice has already been created from this SO.
-  const { data: linkedInvoices = [] } = useQuery({
+  const { data: linkedInvoices = EMPTY_ARRAY } = useQuery({
     queryKey: ['invoices-by-so', doc?.id],
     queryFn: () => db.crmInvoices.list({ soId: doc.id }),
     enabled: isSO && !!doc?.id,

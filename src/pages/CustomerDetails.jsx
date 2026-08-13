@@ -12,6 +12,7 @@ import { Button, Spinner, Ltr } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
 import { ROLES, TICKET_STATUS } from '../lib/constants'
 import { captureException } from '../lib/sentry'
+import { EMPTY_ARRAY } from '../lib/stableEmpty'
 
 export default function CustomerDetails({
   customerId,
@@ -43,14 +44,14 @@ export default function CustomerDetails({
     enabled: !!customerId,
   })
 
-  const { data: contacts = [] } = useQuery({
+  const { data: contacts = EMPTY_ARRAY } = useQuery({
     queryKey: ['contacts', customerId],
     queryFn: () => db.contacts.list(customerId),
     staleTime: 60_000,
     enabled: !!customerId,
   })
 
-  const { data: customerDeals = [] } = useQuery({
+  const { data: customerDeals = EMPTY_ARRAY } = useQuery({
     queryKey: ['customer-deals', customerId],
     queryFn: () => db.deals.listForCustomer(customerId),
     staleTime: 60_000,
@@ -64,7 +65,7 @@ export default function CustomerDetails({
   const [isEditing, setIsEditing] = useState(false)
   const [editForm, setEditForm] = useState({})
 
-  const { data: ledger = [] } = useQuery({
+  const { data: ledger = EMPTY_ARRAY } = useQuery({
     queryKey: ['customer-ledger', customerId],
     queryFn: () => db.customerLedger.list(customerId),
     staleTime: 30_000,

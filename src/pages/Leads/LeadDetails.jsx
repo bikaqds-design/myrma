@@ -13,6 +13,7 @@ import { CommentPanel } from '../../components/CommentPanel'
 import { LEAD_STATUS_LIST } from '../../lib/constants'
 import { EMPTY_CONVERT_FORM } from './_constants'
 import { ConvertLeadModal } from './_modals'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 
 const STATUS_BADGE = {
   new:          'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
@@ -60,12 +61,12 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
     queryFn: () => db.leads.get(leadId),
     enabled: !!leadId,
   })
-  const { data: pipelines = [] } = useQuery({
+  const { data: pipelines = EMPTY_ARRAY } = useQuery({
     queryKey: ['pipelines'],
     queryFn: () => db.pipelines.list(),
     staleTime: 5 * 60_000,
   })
-  const { data: usersList = [] } = useQuery({
+  const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
     queryFn: () => db.userRoles.listAllRoles(),
     staleTime: 5 * 60_000,

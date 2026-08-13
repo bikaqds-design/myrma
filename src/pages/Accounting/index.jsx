@@ -9,6 +9,7 @@ import { PageSkeleton } from '../../components/Skeleton'
 import { RecordPaymentModal } from './_modals'
 import { VoidModal } from '../SalesDocuments/_modals'
 import { RecordVendorPaymentModal } from '../Purchasing/_modals'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 
 const METHOD_LABEL_KEY = {
   cash: 'accounting.methodCash',
@@ -44,35 +45,35 @@ export default function Accounting({ currentUserEmail }) {
   const [search, setSearch] = useState('')
   const [vendorSearch, setVendorSearch] = useState('')
 
-  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
+  const { data: payments = EMPTY_ARRAY, isLoading: paymentsLoading } = useQuery({
     queryKey: ['payments'],
     queryFn: () => db.payments.list(),
     staleTime: 30_000,
   })
-  const { data: aging = [], isLoading: agingLoading } = useQuery({
+  const { data: aging = EMPTY_ARRAY, isLoading: agingLoading } = useQuery({
     queryKey: ['ar-aging'],
     queryFn: () => db.customerLedger.agingReport(),
     staleTime: 30_000,
     enabled: tab === 'aging',
   })
-  const { data: customers = [] } = useQuery({
+  const { data: customers = EMPTY_ARRAY } = useQuery({
     queryKey: ['customers'],
     queryFn: () => db.customers.list(),
     staleTime: 60_000,
   })
-  const { data: vendorPayments = [], isLoading: vendorPaymentsLoading } = useQuery({
+  const { data: vendorPayments = EMPTY_ARRAY, isLoading: vendorPaymentsLoading } = useQuery({
     queryKey: ['vendor-payments'],
     queryFn: () => db.vendorPayments.list(),
     staleTime: 30_000,
     enabled: tab === 'vendor_payments',
   })
-  const { data: apAging = [], isLoading: apAgingLoading } = useQuery({
+  const { data: apAging = EMPTY_ARRAY, isLoading: apAgingLoading } = useQuery({
     queryKey: ['ap-aging'],
     queryFn: () => db.vendorLedger.apAgingReport(),
     staleTime: 30_000,
     enabled: tab === 'ap_aging',
   })
-  const { data: vendors = [] } = useQuery({
+  const { data: vendors = EMPTY_ARRAY } = useQuery({
     queryKey: ['brands-as-vendors'],
     queryFn: () => db.brands.list(),
     staleTime: 60_000,

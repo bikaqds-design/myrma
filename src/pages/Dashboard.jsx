@@ -6,6 +6,7 @@ import { useAppearance } from '../contexts/AppearanceContext'
 import { Spinner } from '../components/ui'
 import { TICKET_STATUS, TICKET_STATUS_LIST, TICKET_STATUS_RESOLVED, ROLES } from '../lib/constants'
 import { useTranslation } from 'react-i18next'
+import { EMPTY_ARRAY } from '../lib/stableEmpty'
 
 const DashboardCharts = lazy(() => import('./DashboardCharts'))
 
@@ -219,7 +220,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
   const [range, setRange] = useState('30d')
 
   const queryClient = useQueryClient()
-  const { data: tickets = [], isLoading: loading } = useQuery({
+  const { data: tickets = EMPTY_ARRAY, isLoading: loading } = useQuery({
     queryKey: ['rma-tickets'],
     queryFn: () => db.rmaTickets.list(),
     staleTime: 60_000,
@@ -259,7 +260,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
   const on = (id) => enabledWidgets.includes(id)
   const nav = (page) => () => onNavigate?.(page)
 
-  const { data: overdueFollowups = [] } = useQuery({
+  const { data: overdueFollowups = EMPTY_ARRAY } = useQuery({
     queryKey: ['activities', 'overdue-count'],
     queryFn: () => db.activities.listOverdue(),
     staleTime: 60_000,
@@ -267,19 +268,19 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
   })
 
   const crmDataEnabled = on('crm_kpi') || on('pipeline_by_stage') || on('rep_leaderboard')
-  const { data: crmDeals = [] } = useQuery({
+  const { data: crmDeals = EMPTY_ARRAY } = useQuery({
     queryKey: ['crm-deals'],
     queryFn: () => db.deals.list(),
     staleTime: 60_000,
     enabled: crmDataEnabled,
   })
-  const { data: crmLeads = [] } = useQuery({
+  const { data: crmLeads = EMPTY_ARRAY } = useQuery({
     queryKey: ['crm-leads'],
     queryFn: () => db.leads.list(),
     staleTime: 60_000,
     enabled: on('crm_kpi'),
   })
-  const { data: crmPipelines = [] } = useQuery({
+  const { data: crmPipelines = EMPTY_ARRAY } = useQuery({
     queryKey: ['crm-pipelines'],
     queryFn: () => db.pipelines.list(),
     staleTime: 5 * 60_000,

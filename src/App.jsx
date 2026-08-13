@@ -128,6 +128,7 @@ const PurchaseDocumentDetail = lazyWithReload(() => import('./pages/Purchasing/P
 const VendorDetails = lazyWithReload(() => import('./pages/Purchasing/VendorDetails'))
 const NotFoundPage = lazyWithReload(() => import('./pages/NotFoundPage'))
 import CommandPalette from './components/CommandPalette'
+import { EMPTY_ARRAY } from './lib/stableEmpty'
 
 const PageSpinner = () => <RouteSkeleton />
 
@@ -680,7 +681,7 @@ export default function App() {
   }
 
   // ── Overdue activities count — drives the sidebar badge ──────────────────
-  const { data: overdueActivities = [] } = useQuery({
+  const { data: overdueActivities = EMPTY_ARRAY } = useQuery({
     queryKey: ['activities', 'overdue-count'],
     queryFn: () => db.activities.listOverdue(),
     staleTime: 60_000,

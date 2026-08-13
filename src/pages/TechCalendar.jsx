@@ -8,6 +8,7 @@ import { Button, Spinner, PageHeader } from '../components/ui'
 import EmptyState from '../components/EmptyState'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { captureException } from '../lib/sentry'
+import { EMPTY_ARRAY } from '../lib/stableEmpty'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -116,7 +117,7 @@ export default function TechCalendar({
   const [selectedTech, setSelectedTech] = useState('')
 
   // ─── Load data ──────────────────────────────────────────────────────────────
-  const { data: tickets = [], isLoading: loading, isError, error, refetch } = useQuery({
+  const { data: tickets = EMPTY_ARRAY, isLoading: loading, isError, error, refetch } = useQuery({
     queryKey: ['tech-calendar-tickets'],
     queryFn: () => db.rmaTickets.list(),
   })

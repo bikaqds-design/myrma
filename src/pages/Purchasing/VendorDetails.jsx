@@ -6,6 +6,7 @@ import { PageSkeleton } from '../../components/Skeleton'
 import EmptyState from '../../components/EmptyState'
 import { Button, Ltr } from '../../components/ui'
 import { DOC_TYPE_BADGE, docTypeLabel, statusLabel, statusPillCls } from './_shared'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 
 /**
  * VendorDetails — the AP counterpart to CustomerDetails.
@@ -69,7 +70,7 @@ function Field({ label, children, autoDir = false }) {
 export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEditVendor, canEdit = false }) {
   const { t } = useTranslation()
 
-  const { data: vendorList = [], isLoading: loadingVendor } = useQuery({
+  const { data: vendorList = EMPTY_ARRAY, isLoading: loadingVendor } = useQuery({
     queryKey: ['brands'],
     queryFn: () => db.brands.list(),
     staleTime: 60_000,
@@ -87,7 +88,7 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   }, [docsRes, vendorId])
 
-  const { data: ledger = [], isLoading: loadingLedger } = useQuery({
+  const { data: ledger = EMPTY_ARRAY, isLoading: loadingLedger } = useQuery({
     queryKey: ['vendor-ledger', vendorId],
     queryFn: () => db.vendorLedger.list(vendorId),
     enabled: !!vendorId,

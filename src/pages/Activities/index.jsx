@@ -10,6 +10,7 @@ import { PageHeader } from '../../components/ui'
 import { safeStorage } from '../../lib/safeStorage'
 import { PageSkeleton } from '../../components/Skeleton'
 import { APPROVAL_DOC_TYPE_LABEL_KEY, approvalRequestLabel } from '../../lib/approvalLabels'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 
 // ── Type icons + colors ────────────────────────────────────────────────────
 const TYPE_ICON_PATHS = {
@@ -156,27 +157,27 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
   const today = new Date().toISOString().split('T')[0]
 
   // ── Data queries ──────────────────────────────────────────────────────────
-  const { data: activities = [], isLoading } = useQuery({
+  const { data: activities = EMPTY_ARRAY, isLoading } = useQuery({
     queryKey: ['activities', 'planned'],
     queryFn: () => db.activities.listAllPlanned(),
     staleTime: 30_000,
   })
-  const { data: completedActivities = [] } = useQuery({
+  const { data: completedActivities = EMPTY_ARRAY } = useQuery({
     queryKey: ['activities', 'completed'],
     queryFn: () => db.activities.listCompleted(),
     staleTime: 30_000,
   })
-  const { data: leads = [] } = useQuery({
+  const { data: leads = EMPTY_ARRAY } = useQuery({
     queryKey: ['leads'],
     queryFn: () => db.leads.list(),
     staleTime: 60_000,
   })
-  const { data: deals = [] } = useQuery({
+  const { data: deals = EMPTY_ARRAY } = useQuery({
     queryKey: ['deals'],
     queryFn: () => db.deals.list(),
     staleTime: 60_000,
   })
-  const { data: customers = [] } = useQuery({
+  const { data: customers = EMPTY_ARRAY } = useQuery({
     queryKey: ['customers'],
     queryFn: () => db.customers.list(),
     staleTime: 60_000,

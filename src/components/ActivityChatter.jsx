@@ -6,6 +6,7 @@ import { db, storage, supabase } from '../api/supabaseClient'
 import { Button, Textarea, Input, Select, Spinner } from './ui'
 import { ACTIVITY_TYPE_SCHEDULABLE } from '../lib/constants'
 import { approvalRequestLabel } from '../lib/approvalLabels'
+import { EMPTY_ARRAY } from '../lib/stableEmpty'
 
 const TYPE_ICON = {
   call: '📞',
@@ -99,7 +100,7 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
   const [rescheduleDue, setRescheduleDue] = useState('')
 
   const queryKey = ['activities', relatedType, relatedId]
-  const { data: activities = [], isLoading } = useQuery({
+  const { data: activities = EMPTY_ARRAY, isLoading } = useQuery({
     queryKey,
     queryFn: () => db.activities.list(relatedType, relatedId),
     enabled: !!relatedId,

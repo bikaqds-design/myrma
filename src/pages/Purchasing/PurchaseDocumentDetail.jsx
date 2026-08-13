@@ -12,6 +12,7 @@ import { downloadPOPDF } from '../../lib/purchaseOrderPdf'
 import { downloadVIPDF } from '../../lib/vendorInvoicePdf'
 import { destinationWarehouses } from '../../lib/warehouseDestinations'
 import { CreatePurchaseOrderModal, VendorInvoiceFormModal, RecordVendorPaymentModal } from './_modals'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 
 const STATUS_PILL = {
   draft: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
@@ -111,7 +112,7 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
   // A PO converts to exactly one VI — once that exists, "Create Vendor
   // Invoice" must not be offered again (mirrors the SO -> Invoice lock in
   // SalesDocumentDetail.jsx).
-  const { data: visFromPO = [] } = useQuery({
+  const { data: visFromPO = EMPTY_ARRAY } = useQuery({
     queryKey: ['vendor-invoices-by-po', doc?.id],
     queryFn: () => db.vendorInvoices.list({ purchaseOrderId: doc.id }),
     enabled: isPO && !!doc?.id,
@@ -120,12 +121,12 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
   const linkedVIFromPO = visFromPO.find((vi) => vi.status !== 'cancelled') ?? null
   const poIsConverted = isPO && !!linkedVIFromPO
 
-  const { data: warehouses = [] } = useQuery({
+  const { data: warehouses = EMPTY_ARRAY } = useQuery({
     queryKey: ['warehouses'],
     queryFn: () => db.warehouses.list().then((r) => (r.missing ? [] : r.data)),
     enabled: isVI,
   })
-  const { data: products = [] } = useQuery({
+  const { data: products = EMPTY_ARRAY } = useQuery({
     queryKey: ['products'],
     queryFn: () => db.products.list(),
     staleTime: 60_000,
@@ -134,7 +135,7 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
 
   // The movement ledger this invoice wrote. Only receipts are read, so a PO —
   // which never moves stock itself — does not query at all.
-  const { data: receiptMoves = [] } = useQuery({
+  const { data: receiptMoves = EMPTY_ARRAY } = useQuery({
     queryKey: ['purchase-receipts', docId],
     queryFn: () => db.stockMoves.receiptsForDocument('vendor_invoice', docId).then((r) => r.data),
     enabled: isVI && !!docId,
