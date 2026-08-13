@@ -68,6 +68,23 @@ export default function Modal({
             .join(' ')}
           aria-describedby={description ? 'modal-description' : undefined}
         >
+          {/*
+            `hideHeader` used to skip the Dialog.Title entirely. Radix warns
+            about that on every open — "DialogContent requires a DialogTitle" —
+            and the warning is right: without one the dialog has no accessible
+            name, so a screen reader announces it as just "dialog". 13 modals
+            across Products, RMA Tickets and User Management set hideHeader
+            because they draw their own header, and every one of them was
+            unnamed. The docstring above promised aria-labelledby regardless.
+
+            The title is still rendered, just visually hidden — sr-only rather
+            than `display: none`, which would hide it from assistive tech too
+            and defeat the point.
+          */}
+          {hideHeader && title && (
+            <Dialog.Title className="sr-only">{title}</Dialog.Title>
+          )}
+
           {!hideHeader && (
             <div className="flex items-start justify-between gap-4 mb-5">
               <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white leading-snug">

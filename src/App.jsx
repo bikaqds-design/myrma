@@ -1309,8 +1309,13 @@ export default function App() {
         {/* ── Breadcrumb — only renders when there's a trail ───────────────── */}
         <Breadcrumb />
 
-        {/* ── Page content — React Router <Routes> ────────────────────────── */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 main-scroll">
+        {/* ── Page content — React Router <Routes> ─────────────────────────
+            <main>, not <div>: every routed page lived outside any landmark, so
+            axe reported "Some page content is not contained by landmarks" on
+            every load and screen-reader users had no main-content region to
+            jump to. The two <nav>s already existed; this was the missing one.
+            Block-level either way, so the flex/scroll layout is unchanged. */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 main-scroll">
           <Suspense fallback={<PageSpinner />}>
             <Routes>
               <Route
@@ -1588,7 +1593,7 @@ export default function App() {
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </Suspense>
-        </div>
+        </main>
       </div>
     </div>
   )

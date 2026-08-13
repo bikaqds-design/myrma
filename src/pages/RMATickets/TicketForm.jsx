@@ -732,6 +732,7 @@ export function TicketForm({
     <Modal
       open={true}
       onClose={onClose}
+      title={editingTicket ? t('ticketForm.editTitle') : t('ticketForm.createTitle')}
       className="max-w-4xl"
       noPadding
       hideHeader
