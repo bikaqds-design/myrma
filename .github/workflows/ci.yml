@@ -92,6 +92,13 @@ jobs:
     # So this needs Docker Desktop running, then the four commands above. It is
     # one session's work for someone with Docker, not a research task.
     #
+    # SUPERSEDED 2026-08-16 — the owner has ruled out Docker entirely, so this
+    # job is not coming back and should be deleted once its SQL assertions have
+    # been ported. The `integration` job below covers the same ground without a
+    # container: it runs against the *hosted* project, which already has the
+    # real schema, so it needs neither Docker nor the baseline dump described
+    # above. `supabase/tests/*.sql` remain the reference for what to port.
+    #
     # NOTE: `npm run test:db` in package.json has the exact same problem for
     # the same reason — it also starts with `npx supabase start`.
     #
@@ -146,3 +153,48 @@ jobs:
       - name: Stop Supabase
         if: always()
         run: supabase stop
+
+  # ───────────────────────────────────────────────────────────────────────────
+  integration:
+    name: DB · Integration (RLS / RPC / schema drift)
+    runs-on: ubuntu-latest
+
+    # The Docker-free replacement for db-tests above.
+    #
+    # Runs against the HOSTED Supabase project rather than a container. That
+    # sidesteps both of the things that kept db-tests red: no container runtime
+    # is needed, and no baseline migration is needed either, because the target
+    # already has the schema Base44 created.
+    #
+    # Scope, honestly: this asserts that RLS refuses an anonymous caller, that
+    # SECURITY DEFINER RPCs reject unauthorized callers, and that every column
+    # the app selects still exists. It does NOT exercise the write paths those
+    # RPCs guard — doing that against the live project would create real
+    # records, which is why tests/integration gates any writing suite behind
+    # SUPABASE_TEST_ALLOW_WRITES. Closing that last gap needs a second hosted
+    # project to point at, not a change here.
+    #
+    # Reuses the same VITE_SUPABASE_* secrets the build job already reads, so
+    # there is nothing new to configure. Both are public-by-design values (the
+    # anon key ships in the browser bundle), but keeping them in secrets means a
+    # fork cannot aim CI at this project. Without them the suite skips itself
+    # and the job stays green rather than failing on a fork — note the build
+    # job's placeholder fallback is deliberately NOT used here, because a
+    # placeholder URL would make every refusal-based assertion pass for the
+    # wrong reason. Skipping is honest; a false green is not.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Run integration tier
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: npm run test:integration

@@ -40,8 +40,12 @@ BUG #44, written and reviewed but not applied.
 
 1. **Touch/mobile drag** (`CRM_QA_CHECKLIST.md` row 40) — needs a real touch device; no emulator
    substitute. Open since the sprint that built it.
-2. **`db-tests` CI job** — blocked on Docker Desktop, not on knowledge. `.github/workflows/ci.yml`
-   carries the four commands to run once Docker is installed.
+2. **`db-tests` CI job** — **superseded 2026-08-16, not pending.** Docker is ruled out, and that
+   job could never have passed anyway: it applies migrations to an empty Postgres, but 13 core
+   tables were created by Base44 and no migration creates them. Replaced by the `DB · Integration`
+   job, which runs `npm run test:integration` against the hosted project — no container, no
+   baseline dump. The old job should be deleted once its `supabase/tests/*.sql` assertions are
+   ported.
 3. **Speed Technology System** — contact fields blank after the delete incident of 2026-08-12;
    needs the user's original import source. The record and its code `CB-50916011` exist.
 
