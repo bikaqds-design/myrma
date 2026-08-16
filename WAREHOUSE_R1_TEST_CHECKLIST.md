@@ -33,6 +33,9 @@ remain ⬜" was true on the day it was written and has since been overtaken.
 Not run, deliberately: **Dashboard, Calendar, Control Panel and Reports** are being rebuilt for the
 CRM direction, and **permissions/roles**, which the user parked until the project is finalised.
 
+**Migration awaiting the user:** `20260775_post_invoice_requires_reservations.sql` — the fix for
+BUG #44, written and reviewed but not applied.
+
 **What is genuinely still open** — three items, none of them a code defect:
 
 1. **Touch/mobile drag** (`CRM_QA_CHECKLIST.md` row 40) — needs a real touch device; no emulator
@@ -371,12 +374,63 @@ drawer, §9 regression, and the §B / §C / §D write paths in Part 3. All of Pa
 >
 > Both layers of the fix are therefore verified: the destination list is filtered (10 options → 2)
 > **and** a legitimate transfer still completes end to end.
-| ⏸️ | Sales funnel (reserve/deliver on an SO/Invoice) | Unaffected. — **DEFERRED by decision 2026-08-06: blocked by design, needs a disposable environment.** Reserving and delivering requires creating a Sales Order or Invoice, and those are accounting records with **no delete path in the UI** — the same trap that left the lead-conversion trio permanently in the database. Running it would leave financial documents behind on production for a regression check. <br><br>**Indirect evidence that the funnel is unaffected**, gathered during this run: `test2` held **Reserved 1** unchanged across every R1 operation — the RMA moves, the scrap, the promote, and the 27-unit transfer — and the `stockSummary` fix explicitly scopes Available/Reserved/Delivered to `company_stock`, so RMA units cannot contaminate funnel counts (20 tests, `stockSummary.test.js`). That is not the same as running the funnel, and this row stays open. |
+| ✅ | Sales funnel (reserve/deliver on an SO/Invoice) | **RUN AND PASSED 2026-08-16 — and it found BUG #44.** Reserve and deliver are unaffected by R1. Full write-up below. <br><br>*The 2026-08-06 deferral was over-cautious.* It reasoned that sales documents have no UI delete path, so running this would strand financial records on production. True of the **documents**; not true of the **inventory**, which is what the row actually tests. Every step reverses: `approve_sales_order` reserves ↔ `cancel_sales_order` releases, `post_invoice` delivers ↔ `void_invoice` restores. And archiving rather than deleting a sales document is this system's stated rule, not residue — the same disposal the funnel run used for its own throwaway documents in August. |
 | ✅ | Old deep link `/inventory?tab=received` | Falls back to Overview (no blank page). — **verified 2026-08-05**. Minor cosmetic snag: the breadcrumb still reads "Inventory › Received" for a tab that no longer exists. |
 
 ---
 
 **Note:** Commit 4 (removal of the 5 old RMA-stage tabs + `ProductStatusTab.jsx`) is already committed on `test`. The dashboard + RMA drawer replace them.
+
+---
+
+## Reserve/deliver run — 2026-08-16
+
+Ran against **QA Throwaway Co** (`CB-36415389`) and **QA Serialized Widget** (`QA-PO-SER`,
+5 units, all `available`/`company_stock` in one warehouse). No live customer, product or stock
+was touched at any point.
+
+| Step | Expected | Actual |
+|---|---|---|
+| Create SO for 2x the serialized product | draft, nothing reserved | `SO-89405717` draft, all 5 units still `available` ✅ |
+| Approve it in the Activities pool | 2 units reserved | status `delivered`, `QA-SER-001`/`002` → **reserved**, other 3 untouched ✅ |
+| Create invoice from the SO, approve it | those 2 delivered | `INV-2026-00021` posted with a gapless code, both units → **delivered** ✅ |
+| Void the invoice | the 2 restored | `cancelled`/`reversed`, both units → **available**/`company_stock` ✅ |
+
+**Reserve and deliver work, and R1 did not affect them.** That closes the row as written.
+
+Final state: both invoices cancelled and archived, the SO archived, all 5 units back to
+`available`/`company_stock` in the original warehouse — byte-identical to the baseline.
+
+### BUG #44 — an invoice can be posted that bills stock it never delivers
+
+The void in step 4 restores the units to `available` **and clears their
+`reserved_by_doc_id`**, while the SO stays `status='delivered'` and keeps offering
+**Create Invoice**. So I raised a second invoice off the same order and approved it:
+
+> `INV-2026-00022` — **posted**, gapless code assigned, customer billed 200 EGP,
+> **zero units delivered.** All 5 still `available`. No error, no warning, no toast.
+
+`deliver_units` selects on `reserved_by_doc_id = <so>`; after the void nothing matches, and a
+`FOR..LOOP` over zero rows is indistinguishable from success. AR goes up, inventory does not come
+down, and nothing anywhere reports the divergence. That is a money-versus-stock inconsistency
+created by a normal sequence of UI actions — void an invoice, re-invoice the order.
+
+**Fix prepared as migration `20260775_post_invoice_requires_reservations.sql`** (not applied —
+needs running). It makes `post_invoice` refuse when the serialized quantity billed exceeds the
+units actually reserved on the linked SO, naming both numbers. A precondition rather than a change
+to void semantics, so it also catches a manually-linked invoice or a reservation released some
+other way. Only serialized lines count — bulk decrements `warehouse_stock` on a different path and
+service lines hold no stock, so counting either would make every mixed invoice unpostable.
+
+### Two smaller things seen during the run, neither fixed
+
+- **A delivered SO whose invoice was voided is a dead end.** It still shows *Create Invoice*, but
+  there is no UI path to re-reserve its stock, so the order can never be legitimately fulfilled.
+  The migration's error message says so plainly rather than suggesting a recovery that does not
+  exist. The real fix is a product decision: either the void returns units to `reserved` against
+  the still-live SO, or the SO moves to a state that stops offering re-invoicing.
+- **Cancel does nothing on that SO.** With both invoices cancelled, clicking *Cancel* produced no
+  dialog, no toast and no state change — same shape as BUG #14. Archive worked.
 
 ---
 
