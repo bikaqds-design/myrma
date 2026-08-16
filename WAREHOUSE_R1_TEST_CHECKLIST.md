@@ -433,8 +433,16 @@ service lines hold no stock, so counting either would make every mixed invoice u
   The migration's error message says so plainly rather than suggesting a recovery that does not
   exist. The real fix is a product decision: either the void returns units to `reserved` against
   the still-live SO, or the SO moves to a state that stops offering re-invoicing.
-- **Cancel does nothing on that SO.** With both invoices cancelled, clicking *Cancel* produced no
-  dialog, no toast and no state change — same shape as BUG #14. Archive worked.
+- ~~**Cancel does nothing on that SO.**~~ **WRONG — corrected 2026-08-16.** I reported this as a
+  silent no-op in the same shape as BUG #14. It is not. `handleCancelSO` opens a native
+  `window.confirm`, which the browser automation auto-dismisses, so the handler returned early
+  exactly as it should have. `cancel_sales_order` is correct and would have run. The bug was in my
+  test, not the code.
+
+  It did surface a real one, though: **10 native `window.confirm` calls across 7 files** in an app
+  that has its own `ConfirmDialog`. Native confirms ignore the theme, block the main thread, and
+  take their OK/Cancel labels from the browser locale — English buttons in an otherwise
+  right-to-left Arabic UI. Tracked as BUG #45.
 
 ---
 
