@@ -12,6 +12,7 @@ import { safeStorage } from '../../lib/safeStorage'
 import { PageSkeleton } from '../../components/Skeleton'
 import { CreateDocumentModal, CreateStandaloneCreditNoteModal } from './_modals'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
+import { useConfirm } from '../../hooks/useConfirm'
 
 // ── Document type badges ─────────────────────────────────────────────────────
 const DOC_TYPE_BADGE = {
@@ -91,6 +92,7 @@ function SortableHeader({ label, sortKey, sortConfig, onSort }) {
 // ── Main component ───────────────────────────────────────────────────────────
 export default function SalesDocuments({ currentUserRole, currentUserEmail, currentUserPermissions }) {
   const { t } = useTranslation()
+  const { confirm, confirmDialog } = useConfirm()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const canCreate = canDo(currentUserRole, currentUserPermissions, 'deals', 'create')
@@ -335,7 +337,17 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
   const handleBulkArchive = async (archived) => {
     if (selectedRows.length === 0) return
     const confirmKey = archived ? 'salesDocuments.bulkArchiveConfirm' : 'salesDocuments.bulkRestoreConfirm'
-    if (!window.confirm(t(confirmKey, { count: selectedRows.length }))) return
+    const titleKey = archived ? 'salesDocuments.bulkArchiveTitle' : 'salesDocuments.bulkRestoreTitle'
+    const count = selectedRows.length
+    confirm({
+      title: t(titleKey, { count }),
+      message: t(confirmKey, { count }),
+      confirmLabel: archived ? t('common.archive') : t('common.restore'),
+      onConfirm: () => void runBulkArchive(archived),
+    })
+  }
+
+  const runBulkArchive = async (archived) => {
     setBulkBusy(true)
     let done = 0, failed = 0
     for (const d of selectedRows) {
@@ -754,6 +766,7 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
           </div>
         )}
       </div>
+      {confirmDialog}
     </div>
   )
 }

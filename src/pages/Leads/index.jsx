@@ -648,17 +648,26 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   const nonConvertedSelected = () =>
     [...selectedLeads].filter((id) => leads.find((l) => l.id === id)?.status !== 'converted')
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     const ids = nonConvertedSelected()
-    if (!window.confirm(t('leads.bulkDeleteConfirm', { count: ids.length }))) return
-    try {
-      await db.leads.bulkDelete(ids)
-      toast.success(t('leads.bulkDeleted', { count: ids.length }))
-      setSelectedLeads(new Set())
-      queryClient.invalidateQueries({ queryKey: ['leads'] })
-    } catch (err) {
-      toast.error(err.message)
-    }
+    // Uses this page's existing openConfirm rather than the useConfirm hook —
+    // Leads already owns a confirmDialog for the single-lead delete, and two
+    // dialogs in one component is one too many.
+    openConfirm(
+      t('leads.bulkDeleteTitle', { count: ids.length }),
+      t('leads.bulkDeleteConfirm', { count: ids.length }),
+      async () => {
+        closeConfirm()
+        try {
+          await db.leads.bulkDelete(ids)
+          toast.success(t('leads.bulkDeleted', { count: ids.length }))
+          setSelectedLeads(new Set())
+          queryClient.invalidateQueries({ queryKey: ['leads'] })
+        } catch (err) {
+          toast.error(err.message)
+        }
+      }
+    )
   }
 
   const handleBulkStatusChange = async (status) => {

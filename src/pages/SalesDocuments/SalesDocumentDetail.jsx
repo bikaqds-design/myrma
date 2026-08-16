@@ -10,6 +10,7 @@ import EmptyState from '../../components/EmptyState'
 import { downloadQuotationPDF } from '../../lib/quotationPdf'
 import { downloadSOPDF } from '../../lib/salesOrderPdf'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
+import { useConfirm } from '../../hooks/useConfirm'
 import {
   DocumentFormModal,
   RecordPaymentModal,
@@ -103,6 +104,7 @@ const ADAPTERS = {
 
 export default function SalesDocumentDetail({ docType, docId, currentUserRole: _currentUserRole, currentUserEmail, onBack }) {
   const { t } = useTranslation()
+  const { confirm, confirmDialog } = useConfirm()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const adapter = ADAPTERS[docType]
@@ -276,10 +278,15 @@ export default function SalesDocumentDetail({ docType, docId, currentUserRole: _
   })
 
   const handleCancelSO = () => {
-    if (!window.confirm(t('salesDocuments.cancelSOConfirm'))) return
-    runAction(async () => {
-      await db.salesOrders.cancel(doc.id, currentUserEmail)
-      toast.success(t('salesDocuments.st_cancelled'))
+    confirm({
+      title: t('salesDocuments.cancelSOTitle'),
+      message: t('salesDocuments.cancelSOConfirm'),
+      confirmLabel: t('common.confirm'),
+      onConfirm: () =>
+        runAction(async () => {
+          await db.salesOrders.cancel(doc.id, currentUserEmail)
+          toast.success(t('salesDocuments.st_cancelled'))
+        }),
     })
   }
   // Invoice approval mirrors the QT/SO approval pattern — raised the moment a
@@ -723,6 +730,7 @@ export default function SalesDocumentDetail({ docType, docId, currentUserRole: _
           <p className="text-sm text-[#211f1b] dark:text-[#e8ebf0] whitespace-pre-wrap leading-relaxed">{doc.notes}</p>
         </div>
       )}
+      {confirmDialog}
     </div>
   )
 }

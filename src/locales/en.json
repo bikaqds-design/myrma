@@ -93,7 +93,10 @@
     "noDate": "No date",
     "selectRow": "Select {{name}}",
     "selected": "selected",
-    "selectAll": "Select all"
+    "selectAll": "Select all",
+    "archive": "Archive",
+    "restore": "Restore",
+    "confirm": "Confirm"
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",
@@ -433,7 +436,8 @@
     "tabAll": "All Leads",
     "tabDisqualified": "Disqualified",
     "reopenLead": "Reopen Lead",
-    "leadReopened": "Lead reopened"
+    "leadReopened": "Lead reopened",
+    "bulkDeleteTitle": "Delete Leads"
   },
   "activityType": {
     "call": "Call",
@@ -668,7 +672,8 @@
     "noContact": "No contact",
     "pipelineLabel": "Pipeline",
     "pipelineChangeStageHint": "Changing pipeline moves this deal to a new stage — pick the stage it should land on.",
-    "wonNeedsConvertedQuotation": "Convert at least one quotation to a Sales Order before marking this deal won."
+    "wonNeedsConvertedQuotation": "Convert at least one quotation to a Sales Order before marking this deal won.",
+    "bulkDeleteTitle": "Delete Deals"
   },
   "inventory": {
     "title": "Inventory",
@@ -2954,7 +2959,11 @@
     "sourceInvoice": "Invoice",
     "sourceCreditNote": "Credit Note",
     "sourcePurchaseOrder": "Purchase Order",
-    "sourceVendorInvoice": "Vendor Invoice"
+    "sourceVendorInvoice": "Vendor Invoice",
+    "deleteTitle": "Cancel Activity",
+    "bulkDoneTitle": "Mark Activities Done",
+    "bulkCancelTitle": "Cancel Activities",
+    "markDone": "Mark Done"
   },
   "salesDocs": {
     "title": "Invoicing",
@@ -3216,7 +3225,10 @@
     "cnRemainingSuffix": "remaining",
     "issueCreditNoteAction": "Issue Credit Note",
     "cnFromTicketToast": "Credit note issued and ticket closed — {{code}}",
-    "cnWillCloseTicket": "Issuing this credit note will also close the linked RMA ticket."
+    "cnWillCloseTicket": "Issuing this credit note will also close the linked RMA ticket.",
+    "bulkArchiveTitle": "Archive Documents",
+    "bulkRestoreTitle": "Restore Documents",
+    "cancelSOTitle": "Cancel Sales Order"
   },
   "accounting": {
     "title": "Accounting",
@@ -3436,7 +3448,10 @@
     "receiptCount_other": "{{count}} receipts",
     "unitsReceived_one": "{{count}} unit received",
     "unitsReceived_other": "{{count}} units received",
-    "receivedBy": "by {{name}}"
+    "receivedBy": "by {{name}}",
+    "bulkArchiveTitle": "Archive Documents",
+    "bulkRestoreTitle": "Restore Documents",
+    "cancelTitle": "Cancel Document"
   },
   "resolutionTypeValues": {
     "replacement": "Replacement",

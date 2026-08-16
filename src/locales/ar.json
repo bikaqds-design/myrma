@@ -93,7 +93,10 @@
     "noDate": "لا يوجد تاريخ",
     "selectRow": "تحديد {{name}}",
     "selected": "محدد",
-    "selectAll": "تحديد الكل"
+    "selectAll": "تحديد الكل",
+    "archive": "أرشفة",
+    "restore": "استعادة",
+    "confirm": "تأكيد"
   },
   "shortcuts": {
     "title": "اختصارات لوحة المفاتيح",
@@ -433,7 +436,8 @@
     "tabAll": "كل العملاء المحتملين",
     "tabDisqualified": "المستبعدون",
     "reopenLead": "إعادة فتح العميل المحتمل",
-    "leadReopened": "تمت إعادة فتح العميل المحتمل"
+    "leadReopened": "تمت إعادة فتح العميل المحتمل",
+    "bulkDeleteTitle": "حذف العملاء المحتملين"
   },
   "activityType": {
     "call": "اتصال",
@@ -668,7 +672,8 @@
     "noContact": "بدون جهة اتصال",
     "pipelineLabel": "مسار المبيعات",
     "pipelineChangeStageHint": "تغيير مسار المبيعات ينقل هذه الصفقة إلى مرحلة جديدة — اختر المرحلة التي ستنتقل إليها.",
-    "wonNeedsConvertedQuotation": "حوّل عرض سعر واحدًا على الأقل إلى أمر بيع قبل تعيين الصفقة كرابحة."
+    "wonNeedsConvertedQuotation": "حوّل عرض سعر واحدًا على الأقل إلى أمر بيع قبل تعيين الصفقة كرابحة.",
+    "bulkDeleteTitle": "حذف الصفقات"
   },
   "inventory": {
     "title": "المخزون",
@@ -2962,7 +2967,11 @@
     "sourceInvoice": "فاتورة",
     "sourceCreditNote": "إشعار دائن",
     "sourcePurchaseOrder": "أمر شراء",
-    "sourceVendorInvoice": "فاتورة مورد"
+    "sourceVendorInvoice": "فاتورة مورد",
+    "deleteTitle": "إلغاء النشاط",
+    "bulkDoneTitle": "إتمام الأنشطة",
+    "bulkCancelTitle": "إلغاء الأنشطة",
+    "markDone": "تحديد كمنجز"
   },
   "salesDocs": {
     "title": "الفواتير",
@@ -3228,7 +3237,10 @@
     "cnRemainingSuffix": "متبقٍ",
     "issueCreditNoteAction": "إصدار إشعار دائن",
     "cnFromTicketToast": "تم إصدار الإشعار الدائن وإغلاق التذكرة — {{code}}",
-    "cnWillCloseTicket": "إصدار هذا الإشعار الدائن سيؤدي أيضًا إلى إغلاق تذكرة الإرجاع المرتبطة."
+    "cnWillCloseTicket": "إصدار هذا الإشعار الدائن سيؤدي أيضًا إلى إغلاق تذكرة الإرجاع المرتبطة.",
+    "bulkArchiveTitle": "أرشفة المستندات",
+    "bulkRestoreTitle": "استعادة المستندات",
+    "cancelSOTitle": "إلغاء أمر البيع"
   },
   "accounting": {
     "title": "الحسابات",
@@ -3448,7 +3460,10 @@
     "receiptCount_other": "{{count}} عمليات استلام",
     "unitsReceived_one": "تم استلام وحدة واحدة",
     "unitsReceived_other": "تم استلام {{count}} وحدة",
-    "receivedBy": "بواسطة {{name}}"
+    "receivedBy": "بواسطة {{name}}",
+    "bulkArchiveTitle": "أرشفة المستندات",
+    "bulkRestoreTitle": "استعادة المستندات",
+    "cancelTitle": "إلغاء المستند"
   },
   "resolutionTypeValues": {
     "replacement": "استبدال",

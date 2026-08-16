@@ -13,6 +13,7 @@ import { downloadVIPDF } from '../../lib/vendorInvoicePdf'
 import { destinationWarehouses } from '../../lib/warehouseDestinations'
 import { CreatePurchaseOrderModal, VendorInvoiceFormModal, RecordVendorPaymentModal } from './_modals'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
+import { useConfirm } from '../../hooks/useConfirm'
 
 const STATUS_PILL = {
   draft: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
@@ -78,6 +79,7 @@ function TotalRow({ label, value, muted }) {
 // ─── Purchase Document Detail — PO / Vendor Invoice lifecycle ──────────────────
 export default function PurchaseDocumentDetail({ docType, docId, currentUserEmail, currentUserRole, onBack }) {
   const { t } = useTranslation()
+  const { confirm, confirmDialog } = useConfirm()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const adapter = ADAPTERS[docType]
@@ -182,8 +184,13 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
     toast.success(t('purchasing.statusUpdated'))
   })
   const handlePOCancel = () => {
-    if (!window.confirm(t('purchasing.cancelConfirm'))) return
-    runAction(async () => { await db.purchaseOrders.cancel(doc.id); logPO('po_cancelled'); toast.success(t('purchasing.statusUpdated')) })
+    confirm({
+      title: t('purchasing.cancelTitle'),
+      message: t('purchasing.cancelConfirm'),
+      confirmLabel: t('common.confirm'),
+      onConfirm: () =>
+        runAction(async () => { await db.purchaseOrders.cancel(doc.id); logPO('po_cancelled'); toast.success(t('purchasing.statusUpdated')) }),
+    })
   }
   const handleConvertToVI = () => runAction(async () => {
     const vi = await db.purchaseOrders.convertToVendorInvoice(doc.id, currentUserEmail)
@@ -217,8 +224,13 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
     toast.success(t('purchasing.statusUpdated'))
   })
   const handleVICancel = () => {
-    if (!window.confirm(t('purchasing.cancelConfirm'))) return
-    runAction(async () => { await db.vendorInvoices.cancel(doc.id); logVI('vi_cancelled'); toast.success(t('purchasing.statusUpdated')) })
+    confirm({
+      title: t('purchasing.cancelTitle'),
+      message: t('purchasing.cancelConfirm'),
+      confirmLabel: t('common.confirm'),
+      onConfirm: () =>
+        runAction(async () => { await db.vendorInvoices.cancel(doc.id); logVI('vi_cancelled'); toast.success(t('purchasing.statusUpdated')) }),
+    })
   }
 
   // ── Archive / restore ─────────────────────────────────────────────────────
@@ -503,6 +515,7 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
       <div className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] overflow-hidden">
         <ActivityChatter relatedType={docType} relatedId={doc.id} currentUserEmail={currentUserEmail} canEdit currentUserRole={currentUserRole} />
       </div>
+      {confirmDialog}
     </div>
   )
 }

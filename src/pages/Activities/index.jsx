@@ -11,6 +11,7 @@ import { safeStorage } from '../../lib/safeStorage'
 import { PageSkeleton } from '../../components/Skeleton'
 import { APPROVAL_DOC_TYPE_LABEL_KEY, approvalRequestLabel } from '../../lib/approvalLabels'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
+import { useConfirm } from '../../hooks/useConfirm'
 
 // ── Type icons + colors ────────────────────────────────────────────────────
 const TYPE_ICON_PATHS = {
@@ -123,6 +124,7 @@ function SortableHeader({ label, sortKey, sortConfig, onSort }) {
 
 // ── Main component ─────────────────────────────────────────────────────────
 export default function Activities({ currentUserRole, currentUserEmail, currentUserPermissions }) {
+  const { confirm, confirmDialog } = useConfirm()
   const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -386,10 +388,19 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
     catch { toast.error(t('common.error')) }
   }
 
-  const handleCancel = async (id) => {
-    if (!window.confirm(t('activities.deleteConfirm'))) return
-    try { await db.activities.delete(id); invalidateAll(); toast.success(t('activities.deletedToast')) }
-    catch { toast.error(t('common.error')) }
+  const handleCancel = (id) => {
+    confirm({
+      title: t('activities.deleteTitle'),
+      message: t('activities.deleteConfirm'),
+      // Not the default "Delete": this dialog asks "Cancel this activity?" and
+      // its dismiss button already reads Cancel. [Cancel][Delete] would be two
+      // different meanings of the same word sitting next to each other.
+      confirmLabel: t('common.confirm'),
+      onConfirm: async () => {
+        try { await db.activities.delete(id); invalidateAll(); toast.success(t('activities.deletedToast')) }
+        catch { toast.error(t('common.error')) }
+      },
+    })
   }
 
   const handleReschedule = async () => {
@@ -489,26 +500,40 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
     }
   }
 
-  const handleBulkMarkDone = async () => {
+  const handleBulkMarkDone = () => {
     if (!selectedActivities.size) return
-    if (!window.confirm(t('activities.bulkDoneConfirm', { count: selectedActivities.size }))) return
-    try {
-      await Promise.all([...selectedActivities].map((id) => db.activities.complete(id)))
-      invalidateAll()
-      toast.success(t('activities.bulkDoneToast', { count: selectedActivities.size }))
-      setSelectedActivities(new Set())
-    } catch { toast.error(t('common.error')) }
+    const count = selectedActivities.size
+    confirm({
+      title: t('activities.bulkDoneTitle', { count }),
+      message: t('activities.bulkDoneConfirm', { count }),
+      confirmLabel: t('activities.markDone'),
+      onConfirm: async () => {
+        try {
+          await Promise.all([...selectedActivities].map((id) => db.activities.complete(id)))
+          invalidateAll()
+          toast.success(t('activities.bulkDoneToast', { count }))
+          setSelectedActivities(new Set())
+        } catch { toast.error(t('common.error')) }
+      },
+    })
   }
 
-  const handleBulkCancel = async () => {
+  const handleBulkCancel = () => {
     if (!selectedActivities.size) return
-    if (!window.confirm(t('activities.bulkCancelConfirm', { count: selectedActivities.size }))) return
-    try {
-      await Promise.all([...selectedActivities].map((id) => db.activities.delete(id)))
-      invalidateAll()
-      toast.success(t('activities.bulkCancelToast', { count: selectedActivities.size }))
-      setSelectedActivities(new Set())
-    } catch { toast.error(t('common.error')) }
+    const count = selectedActivities.size
+    confirm({
+      title: t('activities.bulkCancelTitle', { count }),
+      message: t('activities.bulkCancelConfirm', { count }),
+      confirmLabel: t('common.confirm'),
+      onConfirm: async () => {
+        try {
+          await Promise.all([...selectedActivities].map((id) => db.activities.delete(id)))
+          invalidateAll()
+          toast.success(t('activities.bulkCancelToast', { count }))
+          setSelectedActivities(new Set())
+        } catch { toast.error(t('common.error')) }
+      },
+    })
   }
 
   // ── Tab config ─────────────────────────────────────────────────────────────
@@ -1026,6 +1051,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
           </div>
         )}
       </div>
+      {confirmDialog}
     </div>
   )
 }

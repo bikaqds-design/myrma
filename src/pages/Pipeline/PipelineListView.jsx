@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { safeStorage } from '../../lib/safeStorage'
+import { useConfirm } from '../../hooks/useConfirm'
 
 const SURFACE = 'bg-white dark:bg-[#121823]'
 const BORDER = 'border-[#e6e9ef] dark:border-[#212a38]'
@@ -90,6 +91,7 @@ export default function PipelineListView({
   isAdmin,
 }) {
   const { t } = useTranslation()
+  const { confirm, confirmDialog } = useConfirm()
   const navigate = useNavigate()
 
   const [sortCol, setSortCol] = useState('created_at')
@@ -223,10 +225,16 @@ export default function PipelineListView({
     setBulkStage('')
   }
 
-  const handleBulkDelete = async () => {
-    if (!window.confirm(t('pipeline.bulkDeleteConfirm', { count: selectedDeals.size }))) return
-    await onBulkDelete([...selectedDeals])
-    onSelectedChange(new Set())
+  const handleBulkDelete = () => {
+    const count = selectedDeals.size
+    confirm({
+      title: t('pipeline.bulkDeleteTitle', { count }),
+      message: t('pipeline.bulkDeleteConfirm', { count }),
+      onConfirm: async () => {
+        await onBulkDelete([...selectedDeals])
+        onSelectedChange(new Set())
+      },
+    })
   }
 
   const COLS = [
@@ -490,6 +498,7 @@ export default function PipelineListView({
           </div>
         )}
       </div>
+      {confirmDialog}
     </div>
   )
 }
