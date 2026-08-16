@@ -111,7 +111,7 @@ component's `'Delete'` default intact for genuine deletions. **Verified:** the b
 | 37 | Deal tabs | ✅ Deal Log · Schedule Activity · Quotation · Deal Notes. |
 | 38 | Deal Comment Panel ↔ Deal Log sync | ✅ One posted comment renders in both, confirming the shared query key. |
 | 39 | Search + filters | ✅ Persistent search bar and Filters panel present on every view. |
-| 40 | Touch/mobile drag | ⬜ **Not tested** — needs a real touch device. Still open, as the sprint's own build checklist already states. |
+| 40 | Touch/mobile drag | 🟡 **Partly closed 2026-08-16 — and it found BUG #43.** Attempting it revealed the board was unusable at phone width regardless of drag: 7 columns crushed to 34px each. Fixed and verified. The drag gesture itself still cannot be driven by this harness — see below. |
 
 **No functional defects found in Sprint 3.** Everything the sprint claims to have built, it built.
 
@@ -233,7 +233,46 @@ throw would trade a silent logging gap for user-facing breakage.
 "No activity recorded yet", which reads as *nothing happened* rather than *logging is broken*.
 That ambiguity is worth remembering, but it is not fixed by touching the logger.
 
+### BUG #43 — the kanban board was unusable on a phone (found 2026-08-16, fixed)
+
+Row 40 sat open for months labelled "needs a real touch device". Going to actually run it turned
+up something that needed no device at all: **at 375px the board was not a board.**
+
+The columns were laid out `repeat(n, minmax(0, 1fr))`, a deliberate choice with a comment
+explaining it — every stage visible at once, no horizontal scrollbar. That is a good decision at
+desktop width. It had no lower bound. Seven stages in a 375px viewport came out at **34px per
+column**: headers truncated to a single letter (`N +`, `C +`, `Q +`), deal titles rendered as
+vertical slivers, and card content spilled across neighbouring columns. Measured, screenshotted,
+and not a subtle degradation — the board was illegible.
+
+It also explains why row 40 was never closeable on its own terms. There was nothing
+finger-sized to drag.
+
+Fixed by keeping the shared-width grid from `md` up and giving columns a 16rem floor below it, so
+the row scrolls horizontally on a phone instead of crushing. `grid-flow-col` + `auto-cols` gives
+the identical desktop result without threading the stage count through an inline style.
+
+Verified at 375px: columns 256px, board scrolls (scrollWidth 1864 vs client 311), headers and card
+content legible. Verified at 1440px: seven equal 143px columns, no board scroll, no page overflow,
+`overflow-x: visible` — indistinguishable from before.
+
 ### Still genuinely open
 
-- **Row 40 — touch/mobile drag.** Needs a real device; acknowledged in the sprint's own build
-  checklist since it was written.
+- **Row 40 — the touch drag gesture itself.** Still unverified, but the reason is now precise
+  rather than "needs a real device".
+
+  `@hello-pangea/dnd`'s touch sensor wants press → hold ~120ms → move. Neither input path
+  available here produces that. Real input (`left_click_drag` under mobile emulation) presses and
+  moves in one go, which the sensor correctly reads as a scroll and cancels — the aria-live region
+  says *"Movement cancelled. The item has returned to its starting position"*, which is the
+  library behaving properly. Synthetic `TouchEvent`s dispatched with matching identifiers and
+  `cancelable: true` do not drive it at all on a clean load: no lift, no `defaultPrevented`,
+  nothing in the live region.
+
+  **This is a harness limit, not a finding about the product.** Control experiment: the same
+  `left_click_drag` fails identically on the RMA Tickets kanban, which this change never touched
+  and which was manually confirmed working when its drag was built (`cb34aa7`). Whatever is
+  blocking automation blocks it everywhere, so it says nothing about either board.
+
+  Closing this properly needs a human with a phone, and now that BUG #43 is fixed there is finally
+  a board worth testing on.

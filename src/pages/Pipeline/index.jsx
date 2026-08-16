@@ -706,10 +706,21 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
         <EmptyState title={t('pipeline.noStages')} description={t('pipeline.noStagesHint')} />
       ) : (
         <DragDropContext onDragEnd={handleDragEnd}>
-          {/* Grid, not flex+overflow-x-auto: columns share the available width and
-              shrink to fit (minmax(0, 1fr)) so every stage is visible on one screen
-              with no horizontal scrollbar, instead of fixed-width scrolling columns. */}
-          <div className="grid gap-3 pb-4" style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(0, 1fr))` }}>
+          {/* Columns share the available width and shrink to fit so every stage is
+              visible at once with no horizontal scrollbar — but only from md up.
+
+              That rule used to apply at every width, and below about 700px it
+              stopped being a layout and became a crush: seven stages in a 375px
+              viewport are 34px each, headers truncate to a single letter, and card
+              content spills across its neighbours. The board was unusable on a
+              phone, which is also why the touch-drag row of the QA checklist could
+              never be run — there was nothing draggable-sized to drag.
+
+              Below md the columns take a 16rem floor and the row scrolls instead.
+              auto-cols with grid-flow-col gives the same result as the explicit
+              repeat(n, …) this replaces, without threading the stage count through
+              an inline style. */}
+          <div className="grid grid-flow-col auto-cols-[minmax(16rem,1fr)] md:auto-cols-[minmax(0,1fr)] overflow-x-auto md:overflow-x-visible gap-3 pb-4">
             {stages.map((stage) => {
               const stageDeals = dealsByStage[stage.id] || []
               const totalValue = stageDeals.reduce((sum, d) => sum + (Number(d.value) || 0), 0)
