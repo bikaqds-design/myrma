@@ -225,6 +225,7 @@ export function ByProductTab({
                             e.target.checked ? paginated.map((g) => g.product_name) : []
                           )
                         }
+                        aria-label={t('common.selectAll')}
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                       />
                     </th>
@@ -279,6 +280,7 @@ export function ByProductTab({
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => {}}
+                            aria-label={t('common.selectRow', { name: g.product_name })}
                             className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                           />
                         </td>

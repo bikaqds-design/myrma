@@ -81,6 +81,7 @@ export default function KnowledgeBasePublic() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('kb.searchPlaceholder')}
+            aria-label={t('kb.searchPlaceholder')}
             className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent shadow-sm"
           />
         </div>

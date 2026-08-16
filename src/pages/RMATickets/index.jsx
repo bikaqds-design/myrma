@@ -982,6 +982,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder={t('tickets.searchPlaceholder')}
+              aria-label={t('tickets.searchPlaceholder')}
               className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
             />
             <svg
@@ -1271,6 +1272,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-600">{t('common.itemsPerPage')}:</label>
           <select
+            aria-label={t('common.itemsPerPage')}
             value={itemsPerPage}
             onChange={(e) => {
               setItemsPerPage(parseInt(e.target.value))
@@ -1385,6 +1387,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                     selectedTickets.length === paginatedTickets.length
                   }
                   onChange={toggleSelectAll}
+                  aria-label={t('common.selectAll')}
                   className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                 />
               </th>
@@ -1455,6 +1458,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                     type="checkbox"
                     checked={selectedTickets.includes(t.id)}
                     onChange={() => toggleSelectTicket(t.id)}
+                    aria-label={tr('common.selectRow', { name: t.rma_number })}
                     className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                   />
                 </td>
@@ -1699,6 +1703,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               type="number"
               min="1"
               max={totalPages}
+              aria-label={t('common.jumpToPage')}
               value={jumpToPage}
               onChange={(e) => setJumpToPage(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleJumpToPage()}

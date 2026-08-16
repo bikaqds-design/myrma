@@ -136,6 +136,10 @@ export default function CommandPalette({ onSelectTicket, onSelectProduct, inputR
           onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
           placeholder={t('commandPalette.searchPlaceholder')}
+          // A placeholder is not an accessible name — it is not exposed as one
+          // and it disappears the moment anything is typed. This input sits in
+          // the app header on every page, so it was one violation everywhere.
+          aria-label={t('commandPalette.searchPlaceholder')}
           className="flex-1 text-xs outline-none bg-transparent text-[#211f1b] dark:text-[#e8ebf0] placeholder-[#a09d99] dark:placeholder-[#4a5568] min-w-0"
         />
         {loading ? (

@@ -202,6 +202,7 @@ export function CompanyStockTab({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('inventory.searchByProductBrand')}
+              aria-label={t('inventory.searchByProductBrand')}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
             />
             <svg
@@ -409,6 +410,7 @@ export function CompanyStockTab({
                             e.target.checked ? paginated.map((g) => g.product_name) : []
                           )
                         }
+                        aria-label={t('common.selectAll')}
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                       />
                     </th>
@@ -457,6 +459,7 @@ export function CompanyStockTab({
                             type="checkbox"
                             checked={selectedRows.includes(g.product_name)}
                             onChange={() => {}}
+                            aria-label={t('common.selectRow', { name: g.product_name })}
                             className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                           />
                         </td>

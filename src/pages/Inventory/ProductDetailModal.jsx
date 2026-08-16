@@ -320,6 +320,7 @@ export function ProductDetailModal({
                 type="checkbox"
                 checked={stockUnits.length > 0 && selected.length === stockUnits.length}
                 onChange={toggleAll}
+                aria-label={t('common.selectAll')}
                 className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
               />
               <span className="text-sm text-gray-600">
@@ -408,6 +409,7 @@ export function ProductDetailModal({
                             type="checkbox"
                             checked={selected.includes(u.id)}
                             onChange={() => toggleUnit(u.id)}
+                            aria-label={t('common.selectRow', { name: u.serial_number || u.id })}
                             className="rounded border-gray-300 text-indigo-600"
                           />
                         </td>

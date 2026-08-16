@@ -839,6 +839,7 @@ function WarehouseDetailModal({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('inventory.searchUnitPlaceholder')}
+              aria-label={t('inventory.searchUnitPlaceholder')}
               className="w-full pl-9 pr-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
             />
             <svg

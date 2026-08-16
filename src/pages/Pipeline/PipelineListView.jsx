@@ -299,6 +299,7 @@ export default function PipelineListView({
           <div className="flex items-center gap-2">
             <label className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('common.itemsPerPage')}:</label>
             <select
+              aria-label={t('common.itemsPerPage')}
               value={itemsPerPage}
               onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
               className={`px-3 py-1 border ${BORDER} rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent`}
@@ -472,6 +473,7 @@ export default function PipelineListView({
                 type="number"
                 min="1"
                 max={totalPages}
+                aria-label={t('common.jumpToPage')}
                 value={jumpToPage}
                 onChange={(e) => setJumpToPage(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleJumpToPage()}

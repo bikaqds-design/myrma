@@ -184,6 +184,7 @@ export default function ProductsListTab({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t('products.searchPlaceholder')}
+                  aria-label={t('products.searchPlaceholder')}
                   className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
                 />
                 <svg
@@ -394,6 +395,7 @@ export default function ProductsListTab({
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-600">{t('common.itemsPerPage')}:</label>
           <select
+            aria-label={t('common.itemsPerPage')}
             value={itemsPerPage}
             onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
             className="px-3 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600"
@@ -453,6 +455,7 @@ export default function ProductsListTab({
                   type="checkbox"
                   checked={selectedProducts.length === products.length && products.length > 0}
                   onChange={handleSelectAll}
+                  aria-label={t('common.selectAll')}
                   className="w-4 h-4 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-600"
                 />
               </th>
@@ -505,6 +508,7 @@ export default function ProductsListTab({
                       type="checkbox"
                       checked={selectedProducts.includes(product.id)}
                       onChange={() => handleSelectProduct(product.id)}
+                      aria-label={t('common.selectRow', { name: product.product_name || product.sku })}
                       className="w-4 h-4 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-600"
                     />
                   </td>
@@ -719,6 +723,7 @@ export default function ProductsListTab({
               type="number"
               min="1"
               max={totalPages}
+              aria-label={t('common.jumpToPage')}
               value={jumpToPage}
               onChange={(e) => setJumpToPage(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleJumpToPage()}

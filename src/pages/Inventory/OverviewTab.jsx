@@ -267,7 +267,12 @@ export function OverviewTab({
               <thead className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38] sticky top-0 z-10">
                 <tr>
                   <th className="px-5 py-3 w-8">
-                    <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                      aria-label={t('common.selectAll')}
+                    />
                   </th>
                   {[
                     t('inventory.colProduct'),
@@ -300,6 +305,7 @@ export function OverviewTab({
                             type="checkbox"
                             checked={selected.has(row.product_id)}
                             onChange={() => toggleRow(row.product_id)}
+                            aria-label={t('common.selectRow', { name: row.product_name })}
                           />
                         )}
                       </td>

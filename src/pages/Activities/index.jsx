@@ -573,6 +573,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={t('activities.searchPlaceholder')}
+                  aria-label={t('activities.searchPlaceholder')}
                   className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
                 />
                 <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -701,6 +702,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
           <div className="flex items-center gap-2">
             <label className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('common.itemsPerPage')}:</label>
             <select
+              aria-label={t('common.itemsPerPage')}
               value={itemsPerPage}
               onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
               className="px-3 py-1 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
@@ -1007,6 +1009,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
                 type="number"
                 min="1"
                 max={totalPages}
+                aria-label={t('common.jumpToPage')}
                 value={jumpToPage}
                 onChange={(e) => setJumpToPage(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleJumpToPage()}

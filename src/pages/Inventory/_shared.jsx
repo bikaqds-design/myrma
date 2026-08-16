@@ -174,6 +174,7 @@ export function Pagination({ total, page, itemsPerPage, setItemsPerPage, onPage 
       <div className="flex items-center gap-2">
         <label className="text-sm text-gray-600">{t('inventory.perPage')}</label>
         <select
+          aria-label={t('common.itemsPerPage')}
           value={itemsPerPage}
           onChange={(e) => {
             setItemsPerPage(parseInt(e.target.value))
@@ -258,6 +259,10 @@ export function InvToolbar({
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={placeholder}
+            // Named from the placeholder every caller already passes. A
+            // placeholder is not an accessible name, so without this the search
+            // box on every Inventory tab was an unlabelled text field.
+            aria-label={placeholder}
             className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
           />
           <svg

@@ -988,6 +988,7 @@ export default function Customers({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t('customers.searchPlaceholder')}
+                  aria-label={t('customers.searchPlaceholder')}
                   className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
                 />
                 <svg
@@ -1166,6 +1167,7 @@ export default function Customers({
                   value={filterCompany}
                   onChange={(e) => setFilterCompany(e.target.value)}
                   placeholder={t('customers.filterPlaceholder')}
+                  aria-label={t('customers.filterPlaceholder')}
                   className="px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm w-44 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </div>
@@ -1239,6 +1241,7 @@ export default function Customers({
             <div className="flex items-center gap-2">
               <label className="text-sm text-gray-600 dark:text-[#9aa4b2]">{t('common.itemsPerPage')}:</label>
               <select
+                aria-label={t('common.itemsPerPage')}
                 value={itemsPerPage}
                 onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
                 className="px-3 py-1 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
@@ -1264,6 +1267,7 @@ export default function Customers({
                         selectedCustomers.length === paginatedCustomers.length
                       }
                       onChange={handleSelectAll}
+                      aria-label={t('common.selectAll')}
                       className="w-4 h-4 text-indigo-600 rounded"
                     />
                   </th>
@@ -1321,6 +1325,7 @@ export default function Customers({
                           type="checkbox"
                           checked={selectedCustomers.includes(c.id)}
                           onChange={() => handleSelectCustomer(c.id)}
+                          aria-label={t('common.selectRow', { name: customerLabel(c) })}
                           className="w-4 h-4 text-indigo-600 rounded"
                         />
                       </td>
@@ -1508,6 +1513,7 @@ export default function Customers({
                   type="number"
                   min="1"
                   max={totalPages}
+                  aria-label={t('common.jumpToPage')}
                   value={jumpToPage}
                   onChange={(e) => setJumpToPage(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleJumpToPage()}

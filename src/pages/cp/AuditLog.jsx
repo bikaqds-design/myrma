@@ -125,6 +125,7 @@ export default function AuditLog() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('cp.auditLog.searchPlaceholder')}
+            aria-label={t('cp.auditLog.searchPlaceholder')}
             className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
           />
           <svg
