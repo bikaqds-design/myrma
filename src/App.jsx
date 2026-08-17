@@ -1031,7 +1031,10 @@ export default function App() {
                   </svg>
                 </div>
                 <div className="text-left">
-                  <h1 className="text-[15px] font-[750] tracking-tight text-[#211f1b] dark:text-[#e8ebf0] leading-none">myRMA</h1>
+                  {/* A brand mark, not a heading. As an <h1> it was a second
+                      first-level heading on every page, sitting above the real
+                      page title and outside any landmark. */}
+                  <span className="block text-[15px] font-[750] tracking-tight text-[#211f1b] dark:text-[#e8ebf0] leading-none">myRMA</span>
                   <p className="text-[12px] text-[#6c6760] dark:text-[#9aa4b2] mt-0.5">{companyName || 'RMA Management'}</p>
                 </div>
               </button>
@@ -1139,7 +1142,13 @@ export default function App() {
               />
             </svg>
           </button>
-          <h2 className="text-[15px] font-[700] text-[#211f1b] dark:text-[#e8ebf0] capitalize">{mobileTitle}</h2>
+          {/* The mobile bar repeats the page title for visual orientation. It
+              was an <h2> before the page's own <h1>, which is what made the
+              heading order invalid — a level 2 cannot precede the level 1 it
+              belongs to. Announcing it twice helps nobody, so it is presentational
+              and hidden from the accessibility tree; PageHeader's h1 is the real
+              one. */}
+          <span aria-hidden="true" className="text-[15px] font-[700] text-[#211f1b] dark:text-[#e8ebf0] capitalize">{mobileTitle}</span>
           <div className="flex items-center gap-1.5">
             <NotificationBell
               notifications={notifications}

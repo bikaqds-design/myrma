@@ -155,15 +155,87 @@ function Sparkline({ data, color, width = 76, height = 30 }) {
   )
 }
 
-function StatusPill({ status }) {
+
+/**
+ * Text ink for a pill whose background is a 12% tint of its own colour.
+ *
+ * STATUS_COLOR and PRIORITY_COLOR are chart colours: vivid, tuned to be legible
+ * as fills and strokes, and shared by the donuts and sparklines. Used directly
+ * as *text* on `color + '1e'` they mostly fail AA — the whole palette does in
+ * light mode, where mid-bright hues on near-white have nowhere to go, and half
+ * of it does in dark. Measured worst case was "On Hold" at 1.78:1.
+ *
+ * Changing the palette would drag the charts with it, so the swatch, the dot and
+ * the tint keep the original colour and only the glyphs move: lightened in dark,
+ * darkened in light, just until the text clears 4.5:1 against the tint the
+ * original colour produces. Hue and saturation are untouched, so a pill still
+ * reads as the same colour.
+ *
+ * Memoised because it runs per pill per render and the inputs are a tiny set.
+ */
+const inkCache = new Map()
+function pillInk(hex, dark) {
+  const key = hex + (dark ? 'd' : 'l')
+  const hit = inkCache.get(key)
+  if (hit) return hit
+
+  const toRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
+  const lin = (c) => (c /= 255) <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  const lum = ([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+  const contrast = (a, b) => {
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
+    return (hi + 0.05) / (lo + 0.05)
+  }
+
+  const rgb = toRgb(hex)
+  const card = dark ? [18, 24, 35] : [255, 255, 255]
+  const alpha = 0x1e / 255
+  const bg = rgb.map((c, i) => c * alpha + card[i] * (1 - alpha))
+
+  // HSL round-trip so only lightness moves.
+  const [r, g, b] = rgb.map((c) => c / 255)
+  const max = Math.max(r, g, b), min = Math.min(r, g, b)
+  const l0 = (max + min) / 2
+  const d = max - min
+  const sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l0 - 1))
+  let hue = 0
+  if (d !== 0) {
+    hue = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+    hue *= 60
+    if (hue < 0) hue += 360
+  }
+  const fromHsl = (l) => {
+    const c = (1 - Math.abs(2 * l - 1)) * sat
+    const x = c * (1 - Math.abs(((hue / 60) % 2) - 1))
+    const m = l - c / 2
+    const t = hue < 60 ? [c, x, 0] : hue < 120 ? [x, c, 0] : hue < 180 ? [0, c, x]
+            : hue < 240 ? [0, x, c] : hue < 300 ? [x, 0, c] : [c, 0, x]
+    return t.map((v) => Math.round((v + m) * 255))
+  }
+
+  let out = hex
+  for (let i = 0; i <= 200; i++) {
+    const l = Math.min(Math.max(l0 + (dark ? 0.004 : -0.004) * i, 0), 1)
+    const cand = fromHsl(l)
+    if (contrast(cand, bg) >= 4.5) {
+      out = '#' + cand.map((v) => v.toString(16).padStart(2, '0')).join('')
+      break
+    }
+  }
+  inkCache.set(key, out)
+  return out
+}
+
+function StatusPill({ status, dark }) {
   const color = STATUS_COLOR[status] || '#94a3b8'
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 5,
       padding: '3px 10px', borderRadius: 999,
       fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap',
-      color, background: color + '1e', flexShrink: 0,
+      color: pillInk(color, dark), background: color + '1e', flexShrink: 0,
     }}>
+      {/* the dot keeps the original vivid colour — it is a swatch, not text */}
       <span style={{ width: 6, height: 6, borderRadius: 3, background: color, display: 'inline-block' }} />
       {status}
     </span>
@@ -179,12 +251,16 @@ function CardHead({ title, action, tk }) {
   )
 }
 
+// The section rules ("CRM", "TRENDS", "ACTIVITY") are real headings, so they are
+// marked up as the h2 between the page h1 and the h3 on each card. They used to
+// be a bare <span>, which left the cards jumping h1 -> h3 with nothing in
+// between — a skipped level, and no way to navigate the page by section.
 function SectionLabel({ children, tk }) {
   return (
     <div className="col-span-12" style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '6px 0 -4px' }}>
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '1.2px', color: tk.textFaint, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+      <h2 style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '1.2px', color: tk.textFaint, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
         {children}
-      </span>
+      </h2>
       <span style={{ flex: 1, height: 1, background: tk.border }} />
     </div>
   )
@@ -582,7 +658,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
                     borderRadius: 10, background: tk.surfaceInset, cursor: 'pointer',
                     border: `1px solid ${tk.borderSoft}`,
                   }}>
-                  <StatusPill status={ticket.ticket_status} />
+                  <StatusPill status={ticket.ticket_status} dark={darkMode} />
                   <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: tk.text, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {ticket.rma_number} · {ticket.customer_name}
                   </span>
@@ -720,6 +796,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
             account, because it is a viewing preference rather than a setting. */}
         {rmaWidgetsPresent && (
           <div className="col-span-12" style={{ display: "flex", alignItems: "center", gap: 12, margin: "10px 0 -4px" }}>
+            <h2 style={{ margin: 0 }}>
             <button
               onClick={() => setRmaOpen((o) => { safeStorage.set("dashboard_rma_open", !o); return !o })}
               aria-expanded={rmaOpen}
@@ -729,6 +806,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
               <span style={{ display: "inline-block", transition: "transform .18s", transform: rmaOpen ? "rotate(90deg)" : "none" }}>▸</span>
               {t("dashboard.rmaSection")}
             </button>
+            </h2>
             <span style={{ flex: 1, height: 1, background: tk.border }} />
           </div>
         )}
@@ -883,7 +961,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
                     <span style={{ fontSize: 12.5, fontWeight: 650, color: tk.text, width: 84, flexShrink: 0 }}>{t.rma_number || '—'}</span>
                     <span style={{ fontSize: 12.5, color: tk.textMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.customer_name || '—'}</span>
                   </div>
-                  <StatusPill status={t.ticket_status} />
+                  <StatusPill status={t.ticket_status} dark={darkMode} />
                 </div>
               ))}
           </div>
