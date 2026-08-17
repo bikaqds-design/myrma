@@ -179,7 +179,7 @@ export function DealCommentPanel({ dealId, currentUserEmail, canEdit }) {
             <svg className="w-8 h-8 text-gray-300 dark:text-[#212a38]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            <p className="text-sm text-gray-400 dark:text-[#4a5568]">{t('pipeline.noComments')}</p>
+            <p className="text-sm text-gray-400 dark:text-[#768292]">{t('pipeline.noComments')}</p>
           </div>
         ) : (
           comments.map((a) => {
@@ -194,7 +194,7 @@ export function DealCommentPanel({ dealId, currentUserEmail, canEdit }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2 flex-wrap">
                       <span className="text-xs font-semibold text-gray-900 dark:text-[#e8ebf0] truncate max-w-[120px]">{a.created_by}</span>
-                      <span className="text-[11px] text-gray-400 dark:text-[#4a5568] whitespace-nowrap">{fmtTime(a.created_at)}</span>
+                      <span className="text-[11px] text-gray-400 dark:text-[#768292] whitespace-nowrap">{fmtTime(a.created_at)}</span>
                     </div>
 
                     {/* Comment bubble */}
@@ -235,7 +235,7 @@ export function DealCommentPanel({ dealId, currentUserEmail, canEdit }) {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-baseline gap-1.5 flex-wrap">
                                 <span className="text-[11px] font-semibold text-gray-900 dark:text-[#e8ebf0] truncate max-w-[100px]">{r.created_by}</span>
-                                <span className="text-[11px] text-gray-400 dark:text-[#4a5568]">{fmtTime(r.created_at)}</span>
+                                <span className="text-[11px] text-gray-400 dark:text-[#768292]">{fmtTime(r.created_at)}</span>
                               </div>
                               <div className="mt-0.5 px-2.5 py-1.5 bg-[#f8f9fb] dark:bg-[#0f1520] rounded-xl rounded-tl-sm border border-[#e6e9ef] dark:border-[#1a2230]">
                                 <p className="text-xs text-gray-800 dark:text-[#e8ebf0] whitespace-pre-wrap break-words">{r.title}</p>
@@ -254,7 +254,7 @@ export function DealCommentPanel({ dealId, currentUserEmail, canEdit }) {
                           onChange={(e) => setReplyText(e.target.value)}
                           placeholder={t('activityChatter.replyPlaceholder')}
                           autoFocus
-                          className="flex-1 text-sm px-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg dark:bg-[#0f1520] dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568] focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="flex-1 text-sm px-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg dark:bg-[#0f1520] dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#768292] focus:outline-none focus:ring-2 focus:ring-indigo-500"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePostReply(a) }
                             if (e.key === 'Escape') { setReplyingTo(null); setReplyText('') }
@@ -291,7 +291,7 @@ export function DealCommentPanel({ dealId, currentUserEmail, canEdit }) {
             onChange={(e) => setNoteText(e.target.value.slice(0, NOTE_MAX))}
             placeholder={t('pipeline.commentPlaceholder')}
             rows={2}
-            className="w-full px-3 py-2 text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-xl dark:bg-[#0f1520] dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
+            className="w-full px-3 py-2 text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-xl dark:bg-[#0f1520] dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#768292] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
             onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) handlePost() }}
           />
           <div className="flex items-center justify-between">
@@ -309,7 +309,7 @@ export function DealCommentPanel({ dealId, currentUserEmail, canEdit }) {
                 {t('activityChatter.attach')}
               </button>
               <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleSelectFiles} />
-              <span className="text-xs text-gray-400 dark:text-[#4a5568]">{noteText.length}/{NOTE_MAX}</span>
+              <span className="text-xs text-gray-400 dark:text-[#768292]">{noteText.length}/{NOTE_MAX}</span>
             </div>
             <Button size="sm" onClick={handlePost} loading={submitting} disabled={!noteText.trim() && files.length === 0}>
               {t('activityChatter.postComment')}

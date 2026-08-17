@@ -817,7 +817,7 @@ export function TicketDrawer({
               )}
             </div>
 
-            {resolutionLoading && <p className="text-xs text-gray-400 dark:text-[#4a5568] italic">Loading…</p>}
+            {resolutionLoading && <p className="text-xs text-gray-400 dark:text-[#768292] italic">Loading…</p>}
 
             {/* View mode */}
             {!resolutionLoading && resolution && !resolutionEditing && (
@@ -851,13 +851,13 @@ export function TicketDrawer({
                 {resolution.reference_number && (
                   <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">Ref: <span className="font-mono">{resolution.reference_number}</span></p>
                 )}
-                <p className="text-[10px] text-gray-400 dark:text-[#4a5568]">By {resolution.created_by} · {new Date(resolution.created_at).toLocaleDateString()}</p>
+                <p className="text-[10px] text-gray-400 dark:text-[#768292]">By {resolution.created_by} · {new Date(resolution.created_at).toLocaleDateString()}</p>
               </div>
             )}
 
             {/* Empty state */}
             {!resolutionLoading && !resolution && !resolutionEditing && (
-              <p className="text-xs text-gray-400 dark:text-[#4a5568] italic">{t('ticketDrawer.noResolution')}</p>
+              <p className="text-xs text-gray-400 dark:text-[#768292] italic">{t('ticketDrawer.noResolution')}</p>
             )}
 
             {/* Edit / Add form */}
@@ -885,7 +885,7 @@ export function TicketDrawer({
                         onChange={(v) => setResForm(f => ({ ...f, replacement_product_name: v }))}
                         products={products}
                         placeholder="Search or type product name…"
-                        inputClassName="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568] outline-none focus:border-indigo-400"
+                        inputClassName="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#768292] outline-none focus:border-indigo-400"
                       />
                     </div>
                     <div>
@@ -894,7 +894,7 @@ export function TicketDrawer({
                         value={resForm.replacement_serial}
                         onChange={(e) => setResForm(f => ({ ...f, replacement_serial: e.target.value }))}
                         placeholder="Replacement unit serial"
-                        className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568] font-mono"
+                        className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#768292] font-mono"
                       />
                     </div>
                   </>
@@ -930,7 +930,7 @@ export function TicketDrawer({
                         value={resForm.reference_number}
                         onChange={(e) => setResForm(f => ({ ...f, reference_number: e.target.value }))}
                         placeholder="Invoice / credit note number"
-                        className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568]"
+                        className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#768292]"
                       />
                     </div>
                   </>
@@ -943,7 +943,7 @@ export function TicketDrawer({
                     value={resForm.reason}
                     onChange={(e) => setResForm(f => ({ ...f, reason: e.target.value }))}
                     placeholder="Optional notes"
-                    className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568] resize-none"
+                    className="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#768292] resize-none"
                   />
                 </div>
 

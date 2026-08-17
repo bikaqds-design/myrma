@@ -35,7 +35,7 @@ const STATUS_PILL = {
   declined:  'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
   voided:    'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
   reversed:  'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
-  cancelled: 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#4a5568]',
+  cancelled: 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#768292]',
   unpaid:    'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
 }
 const statusPillCls = (s) => STATUS_PILL[s] ?? STATUS_PILL.draft

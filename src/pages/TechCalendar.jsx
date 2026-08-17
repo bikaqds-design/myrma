@@ -323,7 +323,7 @@ export default function TechCalendar({
                 }`}
               >
                 {dayTickets.length === 0 && (
-                  <p className="text-[10px] text-gray-300 dark:text-[#4a5568] text-center mt-4">—</p>
+                  <p className="text-[10px] text-gray-300 dark:text-[#768292] text-center mt-4">—</p>
                 )}
                 {dayTickets.map((ticket) => {
                   const dueDate = ticket.due_date ? new Date(ticket.due_date) : null

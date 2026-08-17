@@ -905,7 +905,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t('leads.searchPlaceholder')}
                   aria-label={t('leads.searchPlaceholder')}
-                  className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
+                  className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#777268] dark:placeholder:text-[#768292]"
                 />
                 <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1106,7 +1106,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                           aria-label={t('common.selectRow', { name: l.full_name })}
                         />
                       </td>
-                      <td className="px-2 py-3 text-xs text-[#a09d99] dark:text-[#4a5568] font-mono">{startIndex + idx + 1}</td>
+                      <td className="px-2 py-3 text-xs text-[#777268] dark:text-[#768292] font-mono">{startIndex + idx + 1}</td>
                       <td className="px-2 py-3">
                         <button
                           onClick={() => navigate(`/leads/${l.id}`)}

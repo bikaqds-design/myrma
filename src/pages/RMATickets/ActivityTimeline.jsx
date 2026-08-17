@@ -112,7 +112,7 @@ export default function ActivityTimeline({ ticketComments, timeEntries, activity
                     {entry._type === 'activity' && entry.details && (
                       <p className="mt-1 text-xs text-[#6c6760] dark:text-[#9aa4b2] italic truncate">{translateDetail(entry.action_type, entry.details)}</p>
                     )}
-                    <p className="mt-1 text-[11px] text-[#a09d99] dark:text-[#4a5568]">{dateStr} · {timeStr}</p>
+                    <p className="mt-1 text-[11px] text-[#777268] dark:text-[#768292]">{dateStr} · {timeStr}</p>
                   </div>
                 </div>
               )

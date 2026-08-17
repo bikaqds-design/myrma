@@ -803,7 +803,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                         <span className={`w-1.5 h-1.5 rounded-full ${a.action === 'login' ? 'bg-green-500' : 'bg-gray-300 dark:bg-[#4a5568]'}`} />
                         <span className="text-xs text-gray-600 dark:text-[#9aa4b2] capitalize">{a.action}</span>
                       </div>
-                      <span className="text-xs text-gray-400 dark:text-[#4a5568]">{new Date(a.created_at).toLocaleString()}</span>
+                      <span className="text-xs text-gray-400 dark:text-[#768292]">{new Date(a.created_at).toLocaleString()}</span>
                     </div>
                   ))}
                 </div>

@@ -384,7 +384,7 @@ export default function PipelineListView({
                         />
                       </td>
                       {/* Row number */}
-                      <td className="px-2 py-3 text-xs text-[#a09d99] dark:text-[#4a5568] font-mono">{startIndex + ri + 1}</td>
+                      <td className="px-2 py-3 text-xs text-[#777268] dark:text-[#768292] font-mono">{startIndex + ri + 1}</td>
                       {/* Deal code */}
                       <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                         <button

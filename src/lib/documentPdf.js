@@ -131,7 +131,7 @@ export function buildDocumentHTML({
   .stamp{position:absolute;right:8px;top:-18px;transform:rotate(-13deg);border:3px double #16a34a;color:#16a34a;padding:6px 16px;border-radius:8px;text-align:center;opacity:.9}
   .stamp .st{font-size:${fs + 12}px;font-weight:800;letter-spacing:3px;line-height:1}
   .stamp .ss{font-size:${fs - 4}px;font-weight:600;letter-spacing:.4px;margin-top:3px}
-  .foot{margin-top:36px;text-align:center;font-size:${fs - 2}px;color:#a09d99}
+  .foot{margin-top:36px;text-align:center;font-size:${fs - 2}px;color:#777268}
   @media print{body{padding:20px}}
 </style></head><body>
 <div class="head">

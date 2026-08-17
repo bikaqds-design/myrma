@@ -617,7 +617,7 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('pipeline.searchPlaceholder')}
             aria-label={t('pipeline.searchPlaceholder')}
-            className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
+            className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#777268] dark:placeholder:text-[#768292]"
           />
         </div>
         <button
@@ -739,14 +739,14 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-semibold text-gray-700 dark:text-[#e8ebf0] truncate" title={stage.name}>
                         {stage.name}{' '}
-                        <span className="text-gray-400 dark:text-[#4a5568] font-normal">
+                        <span className="text-gray-400 dark:text-[#768292] font-normal">
                           ({stageDeals.length})
                         </span>
                       </h3>
                       {!stage.is_won && !stage.is_lost && canDo('create') && (
                         <button
                           onClick={() => handleOpenCreate(stage.id)}
-                          className="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded text-gray-400 dark:text-[#4a5568] hover:text-indigo-600 dark:hover:text-[#a5b4fc] hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                          className="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded text-gray-400 dark:text-[#768292] hover:text-indigo-600 dark:hover:text-[#a5b4fc] hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
                           title={t('pipeline.createDeal')}
                         >
                           +
@@ -818,7 +818,7 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
                                     </p>
                                   )}
                                   <div className="flex items-center justify-between mt-2">
-                                    <span className="text-[10px] text-gray-400 dark:text-[#4a5568]">
+                                    <span className="text-[10px] text-gray-400 dark:text-[#768292]">
                                       {deal.created_at ? new Date(deal.created_at).toLocaleDateString() : ''}
                                     </span>
                                     {deal.assigned_rep && (

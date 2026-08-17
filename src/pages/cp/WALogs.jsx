@@ -12,7 +12,7 @@ const STATUS_STYLES = {
   delivered: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
   read:      'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
   failed:    'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  cancelled: 'bg-gray-100 text-gray-500 dark:bg-[#1a2230] dark:text-[#4a5568]',
+  cancelled: 'bg-gray-100 text-gray-500 dark:bg-[#1a2230] dark:text-[#768292]',
 }
 
 const PAGE_SIZE = 25
@@ -130,7 +130,7 @@ export default function WALogs() {
           <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(0) }}
             placeholder={t('cp.waLogs.searchPlaceholder')}
             aria-label={t('cp.waLogs.searchPlaceholder')}
-            className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]" />
+            className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#777268] dark:placeholder:text-[#768292]" />
           <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
@@ -245,7 +245,7 @@ export default function WALogs() {
                             {log.error_message}
                           </p>
                         )}
-                        {log.delivered_at && <p className="text-[10px] text-gray-400 dark:text-[#4a5568]">✓ {fmt(log.delivered_at)}</p>}
+                        {log.delivered_at && <p className="text-[10px] text-gray-400 dark:text-[#768292]">✓ {fmt(log.delivered_at)}</p>}
                         {log.read_at      && <p className="text-[10px] text-emerald-500">👁 {fmt(log.read_at)}</p>}
                       </div>
                     </td>

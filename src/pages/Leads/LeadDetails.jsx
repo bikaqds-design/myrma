@@ -623,7 +623,7 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
                   onChange={(e) => setNotesInput(e.target.value)}
                   placeholder={t('leads.leadNotesPlaceholder')}
                   rows={10}
-                  className="w-full px-3 py-2.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-xl text-sm bg-[#f8f9fb] dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#4a5568] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
+                  className="w-full px-3 py-2.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-xl text-sm bg-[#f8f9fb] dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#768292] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
                 />
                 <div className="flex justify-end">
                   <Button size="sm" onClick={handleSaveNotes} loading={savingNotes} disabled={!canEdit}>

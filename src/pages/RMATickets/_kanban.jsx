@@ -107,7 +107,7 @@ function KanbanCard({ ticket, onViewDetails, onQuickStatusChange, canQuickEdit, 
           </p>
         )}
         {ticket.due_date && (
-          <p className="text-[10px] text-[#a09d99] dark:text-[#4a5568] mt-1">
+          <p className="text-[10px] text-[#777268] dark:text-[#768292] mt-1">
             {formatDate(ticket.due_date)}
           </p>
         )}
@@ -182,7 +182,7 @@ export function KanbanView({ tickets, onViewDetails, onQuickStatusChange, canQui
                   style={{ maxHeight: 'calc(100vh - 340px)' }}
                 >
                   {colTickets.length === 0 && !snapshot.isDraggingOver ? (
-                    <p className="text-[11px] text-[#a09d99] dark:text-[#4a5568] text-center py-6">
+                    <p className="text-[11px] text-[#777268] dark:text-[#768292] text-center py-6">
                       {t('tickets.kanbanNoTickets')}
                     </p>
                   ) : (

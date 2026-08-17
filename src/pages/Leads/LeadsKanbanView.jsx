@@ -94,7 +94,7 @@ export default function LeadsKanbanView({ leads, onStatusChange, canEdit }) {
                   <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${STATUS_BADGE[status]}`}>
                     {t(`leadStatus.${status}`)}
                   </span>
-                  <span className="text-xs font-semibold text-gray-400 dark:text-[#4a5568]">
+                  <span className="text-xs font-semibold text-gray-400 dark:text-[#768292]">
                     {statusLeads.length}
                   </span>
                 </div>
@@ -142,7 +142,7 @@ export default function LeadsKanbanView({ leads, onStatusChange, canEdit }) {
                                     {lead.company_name || lead.full_name}
                                   </p>
                                   {lead.company_name && (
-                                    <p className="text-[11px] text-gray-400 dark:text-[#4a5568] truncate">{lead.full_name}</p>
+                                    <p className="text-[11px] text-gray-400 dark:text-[#768292] truncate">{lead.full_name}</p>
                                   )}
                                 </div>
                               </div>
@@ -187,7 +187,7 @@ export default function LeadsKanbanView({ leads, onStatusChange, canEdit }) {
                                 )}
                               </div>
                               {lead.created_at && (
-                                <p className="text-[10px] text-gray-400 dark:text-[#4a5568] mt-1.5">
+                                <p className="text-[10px] text-gray-400 dark:text-[#768292] mt-1.5">
                                   {new Date(lead.created_at).toLocaleDateString()}
                                 </p>
                               )}
@@ -200,7 +200,7 @@ export default function LeadsKanbanView({ leads, onStatusChange, canEdit }) {
                     {provided.placeholder}
 
                     {statusLeads.length === 0 && !snapshot.isDraggingOver && (
-                      <div className="py-6 text-center text-xs text-gray-400 dark:text-[#4a5568]">
+                      <div className="py-6 text-center text-xs text-gray-400 dark:text-[#768292]">
                         {isTerminal ? '—' : t('leads.dropHere')}
                       </div>
                     )}

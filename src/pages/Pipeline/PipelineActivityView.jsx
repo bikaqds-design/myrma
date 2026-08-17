@@ -122,7 +122,7 @@ export default function PipelineActivityView({ deals, stages, customerMap, activ
                             </div>
                           </div>
                         ) : (
-                          <span className="text-[10px] text-[#6c6760] dark:text-[#4a5568]">—</span>
+                          <span className="text-[10px] text-[#6c6760] dark:text-[#768292]">—</span>
                         )}
                       </div>
                     </th>
@@ -196,7 +196,7 @@ export default function PipelineActivityView({ deals, stages, customerMap, activ
                                 )}
                               </div>
                             ) : (
-                              <span className="text-[#6c6760] dark:text-[#4a5568] text-xs">—</span>
+                              <span className="text-[#6c6760] dark:text-[#768292] text-xs">—</span>
                             )}
                           </td>
                         )

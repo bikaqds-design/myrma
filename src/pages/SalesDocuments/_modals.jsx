@@ -188,7 +188,7 @@ export function VoidModal({ requireReason = true, onClose, onConfirm }) {
               onChange={(e) => setReason(e.target.value)}
               placeholder={t('salesDocuments.voidReasonPlaceholder')}
               rows={3}
-              className="w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none resize-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
+              className="w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none resize-none placeholder:text-[#777268] dark:placeholder:text-[#768292]"
               autoFocus
             />
           </div>
@@ -283,7 +283,7 @@ export function CreateCreditNoteModal({ invoice, onClose, onConfirm }) {
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder={t('salesDocuments.cnReasonPlaceholder')}
-                className="w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#a09d99] dark:placeholder:text-[#4a5568]"
+                className="w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#777268] dark:placeholder:text-[#768292]"
                 autoFocus
               />
             </div>
@@ -335,7 +335,7 @@ export function CreateCreditNoteModal({ invoice, onClose, onConfirm }) {
                           step={1}
                           className="w-full px-2 py-1 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded text-sm text-center focus:ring-1 focus:ring-[#4338ca] outline-none disabled:opacity-40"
                         />
-                        <div className="text-[10px] text-center text-[#a09d99] dark:text-[#4a5568] mt-0.5">
+                        <div className="text-[10px] text-center text-[#777268] dark:text-[#768292] mt-0.5">
                           max {l.qty}
                         </div>
                       </td>

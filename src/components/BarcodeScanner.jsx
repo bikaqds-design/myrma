@@ -133,7 +133,7 @@ export default function BarcodeScanner({ onScan, onClose }) {
               onChange={(e) => setManualValue(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') submitManual() }}
               placeholder="Scan or type barcode value…"
-              className="w-full px-3 py-2 rounded-lg bg-[#0f1520] border border-[#212a38] focus:border-[#a5b4fc] text-sm text-[#e8ebf0] placeholder-[#4a5568] outline-none transition-colors font-mono tracking-wider"
+              className="w-full px-3 py-2 rounded-lg bg-[#0f1520] border border-[#212a38] focus:border-[#a5b4fc] text-sm text-[#e8ebf0] placeholder-[#768292] outline-none transition-colors font-mono tracking-wider"
             />
             <button
               onClick={submitManual}

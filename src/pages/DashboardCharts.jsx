@@ -27,7 +27,7 @@ export default function DashboardCharts({ on, nav, weeklyTrend, monthlyTrend, ch
         >
           <h3 style={headStyle}>
             {t('dashboard.weeklyTrend')}
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: tk?.textFaint || '#a39e95' }}>{t('dashboard.last7Days')}</span>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: tk?.textFaint || '#777268' }}>{t('dashboard.last7Days')}</span>
           </h3>
           <ResponsiveContainer width="100%" height={196}>
             <AreaChart data={weeklyTrend}>
@@ -60,7 +60,7 @@ export default function DashboardCharts({ on, nav, weeklyTrend, monthlyTrend, ch
         >
           <h3 style={headStyle}>
             {t('dashboard.monthlyTrend')}
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: tk?.textFaint || '#a39e95' }}>{t('dashboard.last30Days')}</span>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: tk?.textFaint || '#777268' }}>{t('dashboard.last30Days')}</span>
           </h3>
           <ResponsiveContainer width="100%" height={196}>
             <BarChart data={monthlyTrend}>

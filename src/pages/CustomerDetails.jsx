@@ -1242,7 +1242,7 @@ export default function CustomerDetails({
                                 </span>
                               )}
                             </div>
-                            {c.notes && <p className="text-xs text-gray-400 dark:text-[#4a5568] mt-0.5 truncate max-w-[180px]">{c.notes}</p>}
+                            {c.notes && <p className="text-xs text-gray-400 dark:text-[#768292] mt-0.5 truncate max-w-[180px]">{c.notes}</p>}
                           </td>
                           <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{c.title || '—'}</td>
                           <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{c.phone ? <Ltr>{c.phone}</Ltr> : '—'}</td>
@@ -1305,7 +1305,7 @@ export default function CustomerDetails({
                             onClick={() => navigate(`/pipeline/${deal.id}`)}>
                             <td className="px-4 py-3">
                               <div className="font-medium text-gray-900 dark:text-[#e8ebf0]">{deal.title}</div>
-                              {deal.deal_code && <div className="text-xs font-mono text-gray-400 dark:text-[#4a5568]">{deal.deal_code}</div>}
+                              {deal.deal_code && <div className="text-xs font-mono text-gray-400 dark:text-[#768292]">{deal.deal_code}</div>}
                             </td>
                             <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{deal.stage || '—'}</td>
                             <td className="px-4 py-3 font-medium text-gray-900 dark:text-[#e8ebf0]">
@@ -1882,7 +1882,7 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
                 <div className="animate-spin w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full" />
               </div>
             ) : comments.length === 0 ? (
-              <p className="text-sm text-gray-400 dark:text-[#4a5568] text-center py-4">{t('customerDetails.drawerNoComments')}</p>
+              <p className="text-sm text-gray-400 dark:text-[#768292] text-center py-4">{t('customerDetails.drawerNoComments')}</p>
             ) : (
               <div className="space-y-3">
                 {comments.map((c) => {
@@ -1897,7 +1897,7 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="font-semibold text-gray-900 dark:text-[#e8ebf0] text-xs">{name}</span>
                           {isTeam && <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-700 rounded-full">{t('customerDetails.staffBadge')}</span>}
-                          <span className="text-xs text-gray-400 dark:text-[#4a5568] ml-auto">{formatDateTime(c.created_date)}</span>
+                          <span className="text-xs text-gray-400 dark:text-[#768292] ml-auto">{formatDateTime(c.created_date)}</span>
                         </div>
                         <p className="text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap leading-relaxed">{c.comment_text}</p>
                       </div>

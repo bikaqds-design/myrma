@@ -34,17 +34,38 @@ const PRIORITY_COLOR = {
 function tokens(dark) {
   return {
     accent:      dark ? '#a5b4fc' : '#4338ca',
+    // Ink for text sitting *on* the accent. The dark-mode accent is light, so
+    // white fails on it; the light-mode accent is deep indigo, where white is
+    // the only thing that works.
+    onAccent:    dark ? '#0b0f17' : '#ffffff',
     surface:     dark ? '#121823' : '#ffffff',
     surfaceInset:dark ? '#0e131c' : '#f7f8fb',
     border:      dark ? '#212a38' : '#e6e9ef',
     borderSoft:  dark ? '#1a2230' : '#eef0f4',
     text:        dark ? '#e8ebf0' : '#211f1b',
     textMuted:   dark ? '#9aa4b2' : '#6c6760',
-    textFaint:   dark ? '#646f7e' : '#a39e95',
+    // textFaint at #646f7e / #a39e95 failed WCAG AA against every surface it is
+    // used on — 3.49:1 on the dark card, 2.66:1 on the light one, against a 4.5:1
+    // requirement for body text. These are the smallest type on the page (11px
+    // captions, axis ticks, "this month" subtitles), so they were the hardest to
+    // read and the least legible. Nudged until the worst pairing clears 4.5:1
+    // (dark 4.56, light 4.61 against the page background) while staying visibly
+    // dimmer than textMuted, which
+    // already passes at 7.05 / 5.61 and is unchanged.
+    textFaint:   dark ? '#768292' : '#746f66',
     track:       dark ? '#212a38' : '#eaedf2',
     grid:        dark ? '#1a2230' : '#eef1f5',
-    good:        dark ? '#34d399' : '#10b981',
-    bad:         dark ? '#f87171' : '#ef4444',
+    // The light-mode semantic pair failed too, and by more than textFaint did:
+    // #10b981 measured 2.54:1 and #ef4444 3.30:1 against the page. They carry the
+    // numbers people actually read — "2 deals won", "43d overdue" — so they were
+    // the worst offenders on the page rather than incidental. Darkened until the
+    // page background, the dimmest of the three light surfaces, clears 4.5:1 —
+    // and specifically against the 12%-alpha tint of themselves that the pills
+    // use as a background ('1e' suffix), which is darker than the plain card and
+    // was why a first pass at 4.54 still measured 4.16 in the browser.
+    // The dark-mode pair already passes at 9.25 and 6.43 and is untouched.
+    good:        dark ? '#34d399' : '#0a7451',
+    bad:         dark ? '#f87171' : '#c61111',
     warn:        dark ? '#fbbf24' : '#f59e0b',
   }
 }
@@ -521,7 +542,11 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
               style={{
                 padding: '7px 14px', borderRadius: 9, fontSize: 12.5, fontWeight: 650,
                 background: range === seg ? tk.accent : tk.surface,
-                color:      range === seg ? '#fff'     : tk.textMuted,
+                // Not always '#fff': in dark mode the accent is a light lavender
+                // (#a5b4fc) and white on it measures 1.99:1. The selected pill was
+                // the least readable control on the page. tk.onAccent flips to the
+                // page ink for that case and stays white on the light-mode indigo.
+                color:      range === seg ? tk.onAccent : tk.textMuted,
                 border:     `1px solid ${range === seg ? tk.accent : tk.border}`,
                 cursor: 'pointer', transition: 'all .15s',
               }}>
@@ -642,7 +667,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {repLeaderboard.map((r, i) => (
                   <div key={r.rep} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: i ? `1px solid ${tk.borderSoft}` : 'none' }}>
-                    <span style={{ width: 24, height: 24, borderRadius: '50%', background: i < 3 ? RANK_COLORS[i] : tk.track, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                    <span style={{ width: 24, height: 24, borderRadius: '50%', background: i < 3 ? RANK_COLORS[i] : tk.track, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: i < 3 ? '#1b1205' : tk.text, flexShrink: 0 }}>
                       {i + 1}
                     </span>
                     <div style={{ flex: 1, minWidth: 0 }}>

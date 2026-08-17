@@ -84,7 +84,7 @@ export default function PipelineGraphView({ deals, stages }) {
     return Object.values(groups).sort((a, b) => b[measure] - a[measure])
   }, [deals, groupBy, stageMap, stages, measure, t])
 
-  const axisColor = darkMode ? '#4a5568' : '#9aa4b2'
+  const axisColor = darkMode ? '#768292' : '#9aa4b2'
   const gridColor = darkMode ? '#212a38' : '#e6e9ef'
   const barColor = darkMode ? '#a5b4fc' : '#4338ca'
   const tooltipBg = darkMode ? '#121823' : '#fff'
