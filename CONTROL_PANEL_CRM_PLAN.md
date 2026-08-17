@@ -254,7 +254,35 @@ It is half of a pair. Deleting it failed on `fk_leads_converted_deal`: the lead
 
 Its 3 log activities had already been deleted at that point, since
 `activities.related_id` is polymorphic and has no cascade. They were restored
-with their original ids and timestamps rather than left dangling, so the deal is
-intact and consistent. Removing the artifact means removing the lead too, which
-is a row outside what was agreed — pending a decision.
+with their original ids and timestamps rather than left dangling.
+
+**Resolved:** with the lead approved for deletion too, all six rows went in
+FK-safe order — 4 activities, then the lead (which holds
+`leads.converted_deal_id`), then the deal. Leads 34 → 33, deals 57 → 56,
+activities 176 → 172. No lead points at a deleted deal.
+
+Still present and deliberately untouched: customer
+`d1575976` "QA Throwaway Co", which the lead's `converted_customer_id`
+referenced. Outside the agreed scope.
+
+## Final state
+
+| | |
+|---|---|
+| Deals on undefined stages | **0**, both pipelines |
+| Probability drift | **1**, and it is the deliberate one (OPP-73068304 at 33) |
+| B2C | 51 deals — new_inquiry 13, contacted 12, quote_sent 12, won 11, lost 3 |
+| B2B | 5 deals — new_lead 2, contacted 1, quote_sent 1, won 1 |
+| Dangling activities | **1, pre-existing** |
+
+That last row is worth naming rather than rounding to zero. A `won` log written
+at 19:32 on 2026-08-05 points at deal `049ddeee-2581-4fe2-84bc-a0a282666e86`,
+which no longer exists — deleted at some point during the same QA session,
+twelve minutes before the pair removed here. It is the same class of leftover
+and was not caused by this work. Left alone as out of scope.
+
+It does point at something structural, though: `activities.related_id` is
+polymorphic, so no foreign key protects it and deleting any lead or deal
+silently strands its history. That is what nearly happened here, and it is worth
+either a cleanup pass or a delete path that takes the activities with it.
 

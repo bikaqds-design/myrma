@@ -102,3 +102,31 @@ FROM (VALUES
 ) AS v(code, prob)
 WHERE d.deal_code = v.code;
 
+
+-- == 4. The QA Convert Throwaway artifact ================================
+--
+-- A lead/deal pair created during a QA session on 2026-08-05 and left behind:
+-- lead LD-82701445 "QA Convert Throwaway" (QA Throwaway Co,
+-- qa-throwaway@example.com, phone 01000000000), converted two minutes later
+-- into deal OPP-97835765 at 777 EGP. Six rows in total, with the deal's
+-- probability of 100 on a new_lead stage being what drew attention to it.
+--
+-- Deleted in FK-safe order: activities, then the lead (which holds
+-- leads.converted_deal_id -> deals), then the deal. Restoring runs the reverse:
+-- the deal must exist before the lead can point at it.
+--
+-- NOT deleted, and still present: customer d1575976-ec0b-491e-b3fb-1362f1b9c92f
+-- ("QA Throwaway Co"), which the lead's converted_customer_id referenced. It was
+-- outside the agreed scope. Worth a look if you are clearing QA data.
+
+INSERT INTO deals (id, title, customer_id, contact_id, pipeline_id, stage, value, probability, expected_close_date, assigned_rep, product_lines, status, lost_reason, won_at, lost_at, notes, created_at, created_by, updated_at, deal_code) VALUES
+  ('65dd6769-11a9-4e63-86cc-b77d84dfdc8a', 'QA Convert Throwaway — Deal Title', 'd1575976-ec0b-491e-b3fb-1362f1b9c92f', NULL, '0ed85350-a90b-40e0-9d7e-fda8c9eb70d5', 'new_lead', 777, 100, NULL, NULL, '[]'::jsonb, 'open', NULL, NULL, NULL, NULL, '2026-08-05T19:44:49.066092+00:00', 'bika.qds@gmail.com', '2026-08-12T15:28:57.212+00:00', 'OPP-97835765');
+
+INSERT INTO leads (id, full_name, company_name, phone, email, source, status, assigned_rep, notes, converted_at, converted_customer_id, converted_deal_id, created_at, created_by, updated_at, lead_code) VALUES
+  ('943631d2-c3df-42c0-b32d-cf568aff656b', 'QA Convert Throwaway', 'QA Throwaway Co', '01000000000', 'qa-throwaway@example.com', 'walk-in', 'converted', NULL, NULL, '2026-08-05T19:44:49.066092+00:00', 'd1575976-ec0b-491e-b3fb-1362f1b9c92f', '65dd6769-11a9-4e63-86cc-b77d84dfdc8a', '2026-08-05T19:42:45.66397+00:00', 'bika.qds@gmail.com', '2026-08-05T19:44:49.066092+00:00', 'LD-82701445');
+
+INSERT INTO activities (id, related_type, related_id, type, title, due_date, completed_at, assigned_rep, outcome_notes, created_at, created_by, attachments, parent_id) VALUES
+  ('d3af4b43-95e0-4490-9dc5-1b6fe8004a10', 'deal', '65dd6769-11a9-4e63-86cc-b77d84dfdc8a', 'log', 'lost|QA sprint 3 check - lost reason required', NULL, NULL, NULL, NULL, '2026-08-08T12:53:04.702287+00:00', 'bika.qds@gmail.com', '""'::jsonb, NULL),
+  ('36de9382-481b-4c9d-859e-e23a9b0c6f43', 'deal', '65dd6769-11a9-4e63-86cc-b77d84dfdc8a', 'log', 'reopened|lost|New Deals', NULL, NULL, NULL, NULL, '2026-08-09T09:26:24.97043+00:00', 'bika.qds@gmail.com', '""'::jsonb, NULL),
+  ('fa4b09c4-1e44-452e-84f3-5c5a702c3827', 'deal', '65dd6769-11a9-4e63-86cc-b77d84dfdc8a', 'log', 'won', NULL, NULL, NULL, NULL, '2026-08-12T15:28:57.939094+00:00', 'bika.qds@gmail.com', '""'::jsonb, NULL),
+  ('72d0db8f-e455-4b73-a431-1b5729e0c088', 'lead', '943631d2-c3df-42c0-b32d-cf568aff656b', 'log', 'converted', NULL, NULL, NULL, NULL, '2026-08-05T19:44:50.308334+00:00', 'bika.qds@gmail.com', '[]'::jsonb, NULL);
