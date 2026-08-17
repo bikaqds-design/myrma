@@ -115,3 +115,71 @@ pipelines, stages defined, and deals sitting in undefined stages.
   constants that other code switches on, so making them admin-editable needs a
   migration and a data-integrity story of its own. Out of scope here; worth
   raising separately.
+
+---
+
+## The 24 mis-staged deals: remapped 2026-08-17
+
+Done through the repair tool itself rather than SQL, so the moves went through
+`bulkMoveStage()`'s validation and landed in the audit log.
+
+| From (undefined on B2C) | Deals | To | Probability |
+|---|---|---|---|
+| `new_lead` | 13 | `new_inquiry` | 10 → 10 (unchanged) |
+| `needs_assessment` | 5 | `contacted` | 40 → 30 |
+| `negotiation` | 6 | `quote_sent` | 75 → 60 |
+
+`new_lead` → `new_inquiry` was forced: same funnel position, same default
+probability. `negotiation` was also forced, since `quote_sent` is B2C's last
+open stage. Only `needs_assessment` was a real choice, and it went to
+`contacted` — its probability of 40 is nearer B2C's contacted (30) than
+quote_sent (60), and "needs assessment" describes qualifying, not quoting.
+
+**An evidence angle that did not work.** The obvious way to decide was to check
+which deals had quotations attached — a deal in `negotiation` with a real quote
+belongs in `quote_sent`. All 24 had none, which looked decisive until the
+self-test: only 11 of 38 quotations link to a deal at all, and of B2C's 51
+deals exactly **one** has a quotation, a won deal. Even the 6 deals legitimately
+sitting in `quote_sent` have none. Quotation linkage is simply not populated in
+this dataset, so "no quotation" was evidence of nothing and the mapping was
+made on funnel semantics alone.
+
+**Checked before running.** `bulkMoveStage()` reopens anything won or lost,
+nulling `won_at` / `lost_at` / `lost_reason`. All 24 were `status = 'open'`, so
+that path never fired — confirmed afterwards: B2C still holds 11 won and 3 lost,
+untouched.
+
+**Probability had to be handled separately.** Every one of the 24 carried its
+old B2B stage default exactly (10 / 40 / 75), which is further evidence these
+rows were seeded by SQL rather than filed by a person. `bulkMoveStage()` moves
+the stage and nothing else, so without a second pass a deal in `contacted`
+would have kept a weight of 40 while the column's default is 30.
+
+### After
+
+| Stage | Deals |
+|---|---|
+| `new_inquiry` | 13 |
+| `contacted` | 12 |
+| `quote_sent` | 12 |
+| `won` | 11 |
+| `lost` | 3 |
+
+51 total, **0 deals on undefined stages across either pipeline**. Confirmed in
+three places that read this independently: the Control Panel health row now
+reads 0, the B2C board renders all five columns, and the Reports Pipeline tab
+reports 37 open as 13 + 12 + 12.
+
+Rollback lives in `supabase/manual/20260817_b2c_stage_remap_rollback.sql` —
+per-deal stage and probability as they were, deliberately outside
+`supabase/migrations` so it can never replay elsewhere.
+
+### One thing left alone, deliberately
+
+The 7 deals that were *already* in `contacted` carry probability **20**, while
+the B2C pipeline's default for that stage is **30**. So that column now holds
+7 at 20 and 5 at 30. Those 7 were never mis-staged and were outside the scope of
+this remap, so they were not touched — but the same seeding that produced the 24
+looks to have set their weight from the B2B stage too. Worth normalising as its
+own small fix.
+
