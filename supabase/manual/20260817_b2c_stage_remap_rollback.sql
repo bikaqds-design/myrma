@@ -77,3 +77,28 @@ FROM (VALUES
   ('ac937b40-e964-480a-9d8f-e70ec9203cee'::uuid, 20)
 ) AS v(id, prob)
 WHERE d.id = v.id;
+
+-- == 3. B2B probability normalisation ====================================
+--
+-- Three B2B deals sat at probability 0 against stage defaults of 10, 10 and 60.
+-- Root cause was a code defect, not a decision: the Pipeline create modal
+-- rendered a probability slider but handleSaveDeal sent the literal
+-- `probability: 0`, discarding it, so every deal created through the app was
+-- born at 0% regardless of the slider or the stage. Two of the three had
+-- updated_at IS NULL — never edited after creation — which is what proved the
+-- value was never anybody's judgement.
+--
+-- Deliberately NOT included: OPP-73068304 at 33 against a default of 20. The
+-- create slider has step="5", so 33 is unreachable through it; it can only have
+-- come from the free-text probability field on the deal detail page. Someone
+-- typed it, so it stands.
+
+UPDATE deals AS d
+SET probability = v.prob, updated_at = now()
+FROM (VALUES
+  ('OPP-44352268', 0),
+  ('OPP-78540434', 0),
+  ('OPP-96369062', 0)
+) AS v(code, prob)
+WHERE d.deal_code = v.code;
+

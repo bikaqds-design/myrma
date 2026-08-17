@@ -413,7 +413,16 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
     const id = typeof stageId === 'string' ? stageId : null
     const targetStage = id || stages.find((s) => !s.is_won && !s.is_lost)?.id || ''
     setPendingDealCode(`OPP-${Math.floor(10000000 + Math.random() * 90000000)}`)
-    setDealForm({ ...EMPTY_DEAL_FORM, pipeline_id: pipelineId, stage: targetStage })
+    // Open on the stage's own default rather than a flat 0. Each stage carries a
+    // probability_default that nothing was reading, so every deal created in the
+    // app started at 0% no matter which column it was created in.
+    const stageDefault = stages.find((s) => s.id === targetStage)?.probability_default
+    setDealForm({
+      ...EMPTY_DEAL_FORM,
+      pipeline_id: pipelineId,
+      stage: targetStage,
+      probability: stageDefault ?? 0,
+    })
     setShowCreate(true)
   }
 
@@ -431,7 +440,9 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
         pipeline_id: dealForm.pipeline_id,
         stage: dealForm.stage,
         value: dealForm.value ? Number(dealForm.value) : null,
-        probability: 0,
+        // Was the literal 0, which discarded the slider the modal renders above
+        // it — whatever the user set, the deal was created at 0%.
+        probability: Number(dealForm.probability) || 0,
         expected_close_date: dealForm.expected_close_date || null,
         assigned_rep: dealForm.assigned_rep || null,
         product_lines: [],

@@ -193,3 +193,68 @@ hand-set per deal rather than inherited from a stage. Normalising them would
 flatten a judgement somebody may have made, so they stand. That distinction —
 uniform and matching another pipeline's default, versus varied — is what made
 the 7 safe to change and these 5 not.
+
+---
+
+## The 5 drifting B2B deals: a code defect, not a data question
+
+Checking them corrected something I had written a section earlier. I had
+classified all five as "varied, therefore hand-set". That holds for exactly one
+of them.
+
+**Two had `updated_at IS NULL`** — never edited after creation. Their 0% was not
+a judgement, it was whatever the app wrote at birth. That pointed at the code.
+
+### Defect 1: the create modal's probability slider did nothing
+
+`CreateDealModal` renders a slider bound to `dealForm.probability`, and
+`handleSaveDeal` sent the literal `probability: 0`:
+
+```js
+value: dealForm.value ? Number(dealForm.value) : null,
+probability: 0,
+```
+
+Every deal ever created through the UI was born at 0% no matter where the slider
+was left. `EMPTY_DEAL_FORM` also seeded the slider at a flat 0 rather than the
+chosen stage's `probability_default`, a field nothing was reading.
+
+Both fixed: the modal opens on the stage default, and the saved value is the
+one on the slider. Verified live — slider set to 45, deal saved at 45, on a
+throwaway that was deleted afterwards.
+
+Corroboration from the data: of the 21 deals never edited since creation, 10 sit
+at 100 and 6 at 60, values the create path could not produce. Those were seeded
+by SQL, not created in the app.
+
+### Defect 2: `moveStage` changes the stage and nothing else
+
+Dragging a card to another column never touches its probability, so drift
+accumulates through ordinary use. **Left as is, deliberately** — re-applying the
+destination default on every move would silently overwrite a hand-set weight
+like OPP-73068304's 33 the first time somebody dragged the card. With creation
+fixed, deals now start correct, and probability stays a per-deal judgement the
+board does not overwrite.
+
+### The five, resolved
+
+| Deal | Stage | Was | Now | Why |
+|---|---|---|---|---|
+| OPP-44352268 "Test Lead 15" | new_lead | 0 | **10** | never edited — defect 1 |
+| OPP-78540434 "testing archive" | new_lead | 0 | **10** | never edited — defect 1 |
+| OPP-96369062 "Test Lead 3" | quote_sent | 0 | **60** | born at 0, later moved — defects 1 + 2 |
+| OPP-73068304 "Ahmed.S — MyAppzs" | contacted | 33 | **33, kept** | the create slider is `step="5"`, so 33 is unreachable through it — it can only have been typed into the deal detail page's free-text field |
+| OPP-97835765 "QA Convert Throwaway" | new_lead | 100 | **still present** | see below |
+
+### The QA leftover could not be deleted
+
+It is half of a pair. Deleting it failed on `fk_leads_converted_deal`: the lead
+"QA Convert Throwaway", created two minutes earlier in the same QA session, has
+`converted_deal_id` pointing at it.
+
+Its 3 log activities had already been deleted at that point, since
+`activities.related_id` is polymorphic and has no cascade. They were restored
+with their original ids and timestamps rather than left dangling, so the deal is
+intact and consistent. Removing the artifact means removing the lead too, which
+is a row outside what was agreed — pending a decision.
+
