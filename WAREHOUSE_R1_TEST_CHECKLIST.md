@@ -33,8 +33,9 @@ remain ⬜" was true on the day it was written and has since been overtaken.
 Not run, deliberately: **Dashboard, Calendar, Control Panel and Reports** are being rebuilt for the
 CRM direction, and **permissions/roles**, which the user parked until the project is finalised.
 
-**Migration awaiting the user:** `20260775_post_invoice_requires_reservations.sql` — the fix for
-BUG #44, written and reviewed but not applied.
+**Migration `20260775_post_invoice_requires_reservations.sql` — APPLIED AND VERIFIED 2026-08-16.**
+The BUG #44 fix is live. Verified against the exact record that exposed the bug; see the write-up
+under BUG #44.
 
 **What is genuinely still open** — three items, none of them a code defect:
 
@@ -419,12 +420,29 @@ The void in step 4 restores the units to `available` **and clears their
 down, and nothing anywhere reports the divergence. That is a money-versus-stock inconsistency
 created by a normal sequence of UI actions — void an invoice, re-invoice the order.
 
-**Fix prepared as migration `20260775_post_invoice_requires_reservations.sql`** (not applied —
-needs running). It makes `post_invoice` refuse when the serialized quantity billed exceeds the
+**Fixed by migration `20260775_post_invoice_requires_reservations.sql` — applied by the user and
+verified 2026-08-16.** It makes `post_invoice` refuse when the serialized quantity billed exceeds the
 units actually reserved on the linked SO, naming both numbers. A precondition rather than a change
 to void semantics, so it also catches a manually-linked invoice or a reservation released some
 other way. Only serialized lines count — bulk decrements `warehouse_stock` on a different path and
 service lines hold no stock, so counting either would make every mixed invoice unpostable.
+
+**Verification, 2026-08-16.** Run against `SO-89405717` — the delivered order that produced the
+bug, still holding 2 serialized units billed and 0 reserved after its two invoices were voided.
+A third invoice was raised from it and posting attempted at three reservation levels:
+
+| Reserved | Result |
+|---|---|
+| 0 of 2 | **Refused.** `P0001` — *"it bills 2 serialized unit(s) but only 0 are reserved … Posting would charge the customer for stock the system never hands over."* Invoice stayed `draft`, **no gapless code burned**. |
+| 1 of 2 | **Refused**, and the message now reads **1**, not 0 — the count is read live, so this is a real comparison and not a blanket refusal. |
+| 2 of 2 | **Posted.** `INV-2026-00023`, and `QA-SER-001`/`002` moved available → **delivered**. The guard does not over-fire on the legitimate path. |
+
+That third row is the one that mattered: a precondition that refused everything would have been
+worse than the bug it replaced.
+
+Cleaned up — `INV-2026-00023` voided (`204`), and all five units of QA Serialized Widget are back
+to `available`. The voided invoice remains on QA Throwaway Co, as sales documents are never
+deleted.
 
 ### Two smaller things seen during the run, neither fixed
 
