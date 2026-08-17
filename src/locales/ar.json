@@ -205,7 +205,8 @@
     "noOpenDeals": "لا توجد صفقات مفتوحة حالياً",
     "repLeaderboard": "لوحة الشرف للممثلين",
     "dealsWonThisMonthLabel": "الصفقات المكتسبة هذا الشهر",
-    "noDealsWonYet": "لم تُكتسب أي صفقات هذا الشهر بعد"
+    "noDealsWonYet": "لم تُكتسب أي صفقات هذا الشهر بعد",
+    "rmaSection": "الصيانة والخدمة"
   },
   "tickets": {
     "title": "تذاكر الإرجاع",

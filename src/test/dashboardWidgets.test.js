@@ -1,10 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import {
   ALL_WIDGET_IDS,
+  DEFAULT_ENABLED_IDS,
   WIDGET_CATALOG,
   resolveEnabledWidgets,
   toStoredWidgetPrefs,
 } from '../lib/dashboardWidgets'
+
+// The two ticket donuts, off by default since the CRM layout landed.
+const DEFAULT_OFF = ['status_distribution', 'priority_distribution']
 
 // The four CRM widgets that the old ten-id default silently hid, plus the two
 // other latecomers. These are the ids the bug made unreachable.
@@ -50,15 +54,23 @@ describe('dashboard widget catalog', () => {
 })
 
 describe('resolveEnabledWidgets', () => {
-  it('with no stored preference, enables the whole catalog', () => {
-    expect(resolveEnabledWidgets(null)).toEqual(ALL_WIDGET_IDS)
-    expect(resolveEnabledWidgets(undefined)).toEqual(ALL_WIDGET_IDS)
+  it('with no stored preference, enables everything except the defaultOff widgets', () => {
+    expect(resolveEnabledWidgets(null)).toEqual(DEFAULT_ENABLED_IDS)
+    expect(resolveEnabledWidgets(undefined)).toEqual(DEFAULT_ENABLED_IDS)
+    for (const id of DEFAULT_OFF) expect(resolveEnabledWidgets(null)).not.toContain(id)
   })
 
   it('ignores junk rather than blanking the dashboard', () => {
-    expect(resolveEnabledWidgets('nonsense')).toEqual(ALL_WIDGET_IDS)
-    expect(resolveEnabledWidgets(42)).toEqual(ALL_WIDGET_IDS)
-    expect(resolveEnabledWidgets({})).toEqual(ALL_WIDGET_IDS)
+    expect(resolveEnabledWidgets('nonsense')).toEqual(DEFAULT_ENABLED_IDS)
+    expect(resolveEnabledWidgets(42)).toEqual(DEFAULT_ENABLED_IDS)
+    expect(resolveEnabledWidgets({})).toEqual(DEFAULT_ENABLED_IDS)
+  })
+
+  it('an explicit v2 preference outranks defaultOff in both directions', () => {
+    // asked for -> shown, even though it is off by default
+    expect(resolveEnabledWidgets({ v: 2, off: [] })).toEqual(ALL_WIDGET_IDS)
+    // switched off -> hidden, even though it is on by default
+    expect(resolveEnabledWidgets({ v: 2, off: ['crm_kpi'] })).not.toContain('crm_kpi')
   })
 
   it('honours the v2 off-list', () => {
@@ -76,6 +88,11 @@ describe('resolveEnabledWidgets', () => {
   it('returns ids in catalog order, not stored order', () => {
     const out = resolveEnabledWidgets({ v: 2, off: [] })
     expect(out).toEqual(ALL_WIDGET_IDS)
+  })
+
+  it('never hides a defaultOff widget from someone who explicitly kept it', () => {
+    const legacyWithDonuts = ['stat_tickets', 'status_distribution']
+    expect(resolveEnabledWidgets(legacyWithDonuts)).toContain('status_distribution')
   })
 
   // ── the regression this module exists for ────────────────────────────────

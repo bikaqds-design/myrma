@@ -206,6 +206,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
     resolveEnabledWidgets(safeStorage.get(storageKey, null))
   )
   const [range, setRange] = useState('30d')
+  const [rmaOpen, setRmaOpen] = useState(() => safeStorage.get('dashboard_rma_open', false))
 
   const queryClient = useQueryClient()
   const { data: tickets = EMPTY_ARRAY, isLoading: loading } = useQuery({
@@ -252,6 +253,11 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
   }, [storageKey])
 
   const on = (id) => enabledWidgets.includes(id)
+  // Which widgets live under the collapsed RMA heading — everything that is not
+  // one of the four CRM ones. Used to hide the disclosure entirely when a user
+  // has switched all of them off, rather than leave an empty toggle.
+  const CRM_WIDGET_IDS = ['crm_kpi', 'pipeline_by_stage', 'rep_leaderboard', 'overdue_followups']
+  const rmaWidgetsPresent = WIDGET_CATALOG.some((w) => !CRM_WIDGET_IDS.includes(w.id) && on(w.id))
   const nav = (page) => () => onNavigate?.(page)
 
   const { data: overdueFollowups = EMPTY_ARRAY } = useQuery({
@@ -506,7 +512,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
       {/* ── Page header ── */}
       <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h1 style={{ margin: 0, fontSize: 25, fontWeight: 750, letterSpacing: -0.5, color: tk.text }}>{t('dashboard.rmaOperations')}</h1>
+          <h1 style={{ margin: 0, fontSize: 25, fontWeight: 750, letterSpacing: -0.5, color: tk.text }}>{t('dashboard.title')}</h1>
           <p style={{ margin: '4px 0 0', fontSize: 13.5, color: tk.textMuted }}>{t('dashboard.systemOverview')} · {t('dashboard.updatedJustNow')}</p>
         </div>
         <div className="flex gap-2">
@@ -569,6 +575,140 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
 
       <div className="grid grid-cols-12 gap-4">
 
+        {/* ── Section: CRM ── */}
+        {(on('crm_kpi') || on('pipeline_by_stage') || on('rep_leaderboard') || on('overdue_followups')) && (
+          <SectionLabel tk={tk}>{t('dashboard.crmSection')}</SectionLabel>
+        )}
+
+        {/* CRM KPI tiles */}
+        {on('crm_kpi') && (
+          <>
+            {[
+              { label: t('dashboard.openPipelineValue'), value: fmtCurrency(crmStats.openPipelineValue), color: tk.accent,  caption: t('dashboard.openDealsCaption') },
+              { label: t('dashboard.dealsWonThisMonth'), value: crmStats.dealsWonThisMonth,              color: tk.good,    caption: t('dashboard.thisMonth') },
+              { label: t('dashboard.leadsThisMonth'),   value: crmStats.leadsThisMonth,                 color: '#6366f1',  caption: t('dashboard.thisMonth') },
+              { label: t('dashboard.overdueFollowupsKpi'), value: overdueFollowups.length,              color: tk.bad,     caption: t('dashboard.needsAttention') },
+            ].map(({ label, value, color, caption }) => (
+              <div key={label} className="col-span-12 sm:col-span-6 lg:col-span-3"
+                style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', gap: 0 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: tk.textMuted, letterSpacing: 0.1 }}>{label}</span>
+                <div style={{ display: 'flex', alignItems: 'flex-end', marginTop: 8 }}>
+                  <span style={{ fontSize: 40, fontWeight: 780, color, letterSpacing: -1.4, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <span style={{ fontSize: 12, color: tk.textMuted }}>{caption}</span>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* Pipeline by Stage */}
+        {on('pipeline_by_stage') && (
+          <div className="col-span-12 lg:col-span-6"
+            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18 }}>
+            <CardHead title={t('dashboard.pipelineByStage')} action={t('dashboard.openDealsOnly')} tk={tk} />
+            {pipelineByStage.length === 0 ? (
+              <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', padding: '24px 0' }}>{t('dashboard.noOpenDeals')}</p>
+            ) : (() => {
+              const maxCount = Math.max(...pipelineByStage.map((s) => s.count), 1)
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {pipelineByStage.map((s) => (
+                    <div key={s.name}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: tk.text }}>{s.name}</span>
+                        <span style={{ fontSize: 12, color: tk.textMuted }}>{s.count} · {fmtCurrency(s.value)}</span>
+                      </div>
+                      <div style={{ height: 6, borderRadius: 3, background: tk.track }}>
+                        <div style={{ height: 6, borderRadius: 3, background: tk.accent, width: `${(s.count / maxCount) * 100}%`, transition: 'width 0.5s ease' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+          </div>
+        )}
+
+        {/* Rep Leaderboard */}
+        {on('rep_leaderboard') && (
+          <div className="col-span-12 lg:col-span-6"
+            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18 }}>
+            <CardHead title={t('dashboard.repLeaderboard')} action={t('dashboard.dealsWonThisMonthLabel')} tk={tk} />
+            {repLeaderboard.length === 0 ? (
+              <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', padding: '24px 0' }}>{t('dashboard.noDealsWonYet')}</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {repLeaderboard.map((r, i) => (
+                  <div key={r.rep} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: i ? `1px solid ${tk.borderSoft}` : 'none' }}>
+                    <span style={{ width: 24, height: 24, borderRadius: '50%', background: i < 3 ? RANK_COLORS[i] : tk.track, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                      {i + 1}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: tk.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.rep}</div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: tk.good }}>{r.count}</div>
+                      <div style={{ fontSize: 11, color: tk.textMuted }}>{fmtCurrency(r.value)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {on('overdue_followups') && (
+          <div
+            className="col-span-12 sm:col-span-6 lg:col-span-3"
+            onClick={nav('/activities?tab=overdue')}
+            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
+          >
+            <CardHead title={t('dashboard.overdueFollowups')} action={String(overdueFollowups.length)} tk={tk} />
+            {overdueFollowups.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <svg className="mx-auto mb-2" width="32" height="32" fill="none" stroke={tk.good} strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p style={{ color: tk.good, fontSize: 13, fontWeight: 600, margin: 0 }}>{t('dashboard.allClear')}</p>
+              </div>
+            ) : overdueFollowups.slice(0, 8).map((a, i) => (
+              <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderTop: i ? `1px solid ${tk.borderSoft}` : 'none' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: tk.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.title}</div>
+                  <div style={{ fontSize: 11.5, color: tk.textMuted }}>{a.assigned_rep ?? '—'}</div>
+                </div>
+                <span style={{ flexShrink: 0, marginLeft: 8, padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, color: tk.bad, background: tk.bad + '1a' }}>
+                  {Math.ceil((new Date() - new Date(a.due_date)) / 86400000)}d
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── RMA block ────────────────────────────────────────────────────
+            Collapsed by default. Twelve of the sixteen widgets describe RMA
+            tickets, of which this database has 13, against 888 customers and
+            57 deals. The tickets still matter, so nothing is removed — the
+            page just no longer opens on them. State is per browser, not per
+            account, because it is a viewing preference rather than a setting. */}
+        {rmaWidgetsPresent && (
+          <div className="col-span-12" style={{ display: "flex", alignItems: "center", gap: 12, margin: "10px 0 -4px" }}>
+            <button
+              onClick={() => setRmaOpen((o) => { safeStorage.set("dashboard_rma_open", !o); return !o })}
+              aria-expanded={rmaOpen}
+              style={{ display: "flex", alignItems: "center", gap: 7, background: "none", border: "none", padding: 0, cursor: "pointer",
+                       fontSize: 11, fontWeight: 700, letterSpacing: "1.2px", color: tk.textFaint, textTransform: "uppercase", whiteSpace: "nowrap" }}
+            >
+              <span style={{ display: "inline-block", transition: "transform .18s", transform: rmaOpen ? "rotate(90deg)" : "none" }}>▸</span>
+              {t("dashboard.rmaSection")}
+            </button>
+            <span style={{ flex: 1, height: 1, background: tk.border }} />
+          </div>
+        )}
+
+        {rmaOpen && (<>
         {/* ── Hero KPI tiles ── */}
         {on('stat_tickets') && (
           <>
@@ -775,118 +915,6 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
           </div>
         )}
 
-        {/* ── Section: CRM ── */}
-        {(on('crm_kpi') || on('pipeline_by_stage') || on('rep_leaderboard') || on('overdue_followups')) && (
-          <SectionLabel tk={tk}>{t('dashboard.crmSection')}</SectionLabel>
-        )}
-
-        {/* CRM KPI tiles */}
-        {on('crm_kpi') && (
-          <>
-            {[
-              { label: t('dashboard.openPipelineValue'), value: fmtCurrency(crmStats.openPipelineValue), color: tk.accent,  caption: t('dashboard.openDealsCaption') },
-              { label: t('dashboard.dealsWonThisMonth'), value: crmStats.dealsWonThisMonth,              color: tk.good,    caption: t('dashboard.thisMonth') },
-              { label: t('dashboard.leadsThisMonth'),   value: crmStats.leadsThisMonth,                 color: '#6366f1',  caption: t('dashboard.thisMonth') },
-              { label: t('dashboard.overdueFollowupsKpi'), value: overdueFollowups.length,              color: tk.bad,     caption: t('dashboard.needsAttention') },
-            ].map(({ label, value, color, caption }) => (
-              <div key={label} className="col-span-12 sm:col-span-6 lg:col-span-3"
-                style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', gap: 0 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: tk.textMuted, letterSpacing: 0.1 }}>{label}</span>
-                <div style={{ display: 'flex', alignItems: 'flex-end', marginTop: 8 }}>
-                  <span style={{ fontSize: 40, fontWeight: 780, color, letterSpacing: -1.4, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
-                </div>
-                <div style={{ marginTop: 10 }}>
-                  <span style={{ fontSize: 12, color: tk.textMuted }}>{caption}</span>
-                </div>
-              </div>
-            ))}
-          </>
-        )}
-
-        {/* Pipeline by Stage */}
-        {on('pipeline_by_stage') && (
-          <div className="col-span-12 lg:col-span-6"
-            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18 }}>
-            <CardHead title={t('dashboard.pipelineByStage')} action={t('dashboard.openDealsOnly')} tk={tk} />
-            {pipelineByStage.length === 0 ? (
-              <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', padding: '24px 0' }}>{t('dashboard.noOpenDeals')}</p>
-            ) : (() => {
-              const maxCount = Math.max(...pipelineByStage.map((s) => s.count), 1)
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {pipelineByStage.map((s) => (
-                    <div key={s.name}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                        <span style={{ fontSize: 12.5, fontWeight: 600, color: tk.text }}>{s.name}</span>
-                        <span style={{ fontSize: 12, color: tk.textMuted }}>{s.count} · {fmtCurrency(s.value)}</span>
-                      </div>
-                      <div style={{ height: 6, borderRadius: 3, background: tk.track }}>
-                        <div style={{ height: 6, borderRadius: 3, background: tk.accent, width: `${(s.count / maxCount) * 100}%`, transition: 'width 0.5s ease' }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )
-            })()}
-          </div>
-        )}
-
-        {/* Rep Leaderboard */}
-        {on('rep_leaderboard') && (
-          <div className="col-span-12 lg:col-span-6"
-            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18 }}>
-            <CardHead title={t('dashboard.repLeaderboard')} action={t('dashboard.dealsWonThisMonthLabel')} tk={tk} />
-            {repLeaderboard.length === 0 ? (
-              <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', padding: '24px 0' }}>{t('dashboard.noDealsWonYet')}</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {repLeaderboard.map((r, i) => (
-                  <div key={r.rep} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: i ? `1px solid ${tk.borderSoft}` : 'none' }}>
-                    <span style={{ width: 24, height: 24, borderRadius: '50%', background: i < 3 ? RANK_COLORS[i] : tk.track, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
-                      {i + 1}
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: tk.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.rep}</div>
-                    </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: tk.good }}>{r.count}</div>
-                      <div style={{ fontSize: 11, color: tk.textMuted }}>{fmtCurrency(r.value)}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {on('overdue_followups') && (
-          <div
-            className="col-span-12 sm:col-span-6 lg:col-span-3"
-            onClick={nav('/activities?tab=overdue')}
-            style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18, display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
-          >
-            <CardHead title={t('dashboard.overdueFollowups')} action={String(overdueFollowups.length)} tk={tk} />
-            {overdueFollowups.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                <svg className="mx-auto mb-2" width="32" height="32" fill="none" stroke={tk.good} strokeWidth="1.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p style={{ color: tk.good, fontSize: 13, fontWeight: 600, margin: 0 }}>{t('dashboard.allClear')}</p>
-              </div>
-            ) : overdueFollowups.slice(0, 8).map((a, i) => (
-              <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderTop: i ? `1px solid ${tk.borderSoft}` : 'none' }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: tk.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.title}</div>
-                  <div style={{ fontSize: 11.5, color: tk.textMuted }}>{a.assigned_rep ?? '—'}</div>
-                </div>
-                <span style={{ flexShrink: 0, marginLeft: 8, padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, color: tk.bad, background: tk.bad + '1a' }}>
-                  {Math.ceil((new Date() - new Date(a.due_date)) / 86400000)}d
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* ── Section: Team & Inventory ── */}
         {(on('technician_performance') || on('stat_inventory')) && (
           <SectionLabel tk={tk}>{t('dashboard.teamInventory')}</SectionLabel>
@@ -943,6 +971,8 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
             </div>
           </div>
         )}
+
+        </>)}
 
       </div>
     </div>

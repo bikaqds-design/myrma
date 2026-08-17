@@ -205,7 +205,8 @@
     "noOpenDeals": "No open deals right now",
     "repLeaderboard": "Rep Leaderboard",
     "dealsWonThisMonthLabel": "Deals won this month",
-    "noDealsWonYet": "No deals won this month yet"
+    "noDealsWonYet": "No deals won this month yet",
+    "rmaSection": "RMA & Service"
   },
   "tickets": {
     "title": "RMA Tickets",

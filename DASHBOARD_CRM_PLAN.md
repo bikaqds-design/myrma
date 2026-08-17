@@ -3,7 +3,8 @@
 Audit 2026-08-16, ahead of the rebuild. `src/pages/Dashboard.jsx`, 956 lines,
 plus `DashboardCharts.jsx` lazy-loaded.
 
-**Nothing has been changed yet.** This is the proposal to sign off before building.
+**Status: the default-merge fix and the layout reorder have shipped** (2026-08-16).
+What remains is listed under "Still to do" at the bottom.
 
 ---
 
@@ -135,3 +136,56 @@ which is most of the perceived improvement before any rebuild lands.
    more honest measure — switch it, or show both?
 4. Once Dashboard lands, the same treatment is owed to **Reports, Calendar and
    Control Panel**. Reports is the biggest of the three.
+
+---
+
+## Shipped 2026-08-16
+
+**Default-merge fix.** Preferences now store what is *off*, so anything the
+catalog gains is visible by default and the class of bug cannot recur. The
+catalog moved to `src/lib/dashboardWidgets.js`; 16 unit tests cover the resolver.
+The six hidden widgets — the whole CRM section among them — appear for the first
+time.
+
+**Layout reorder.** CRM now opens the page: the four KPI tiles, pipeline by
+stage, rep leaderboard and overdue follow-ups. Everything RMA sits below a
+collapsed **RMA & Service** disclosure, remembered per browser. The two ticket
+donuts default off via a new `defaultOff` flag rather than being deleted —
+someone with real ticket volume can switch them back on, and an explicit
+preference outranks the default in both directions.
+
+The page heading was still `dashboard.rmaOperations` ("RMA Operations"), which
+contradicted the whole change. It reads `dashboard.title` now.
+
+### Decisions taken without sign-off
+
+Asked, not answered, so these were called rather than left blocking. Each is
+cheap to reverse:
+
+- **RMA collapsed by default.** The stronger statement about direction, and the
+  disclosure makes it one click. Flip by changing the `dashboard_rma_open`
+  default in `Dashboard.jsx`.
+- **Donuts off, not deleted.** Deleting a widget people may be using is not a
+  layout call to make for them.
+- **Rep leaderboard left ranking by deals won.** It already shows won value
+  beneath the count, so the honest measure is on screen either way. Changing the
+  *sort* is a one-line change if wanted.
+- **Sales & AR strip not built.** It is new content rather than layout, and it
+  is the one item that needs a real answer — see below.
+
+## Still to do
+
+1. **Sales & AR strip** — quotations outstanding, invoices unpaid, AR total. The
+   data exists (`crm_invoices`, plus the AR aging RPC Accounting already calls).
+   Needs a decision on whether it belongs here or stays in Accounting.
+2. **Trend chart** — still plots ticket creation. The plan called for merging the
+   weekly and monthly charts into one range-aware chart showing deals created and
+   won, driven by the existing Today/7d/30d/All selector.
+3. **Reports, Calendar, Control Panel** — the same CRM treatment. Reports is the
+   largest.
+
+Pre-existing accessibility advisories on this page, unrelated to the rebuild and
+not addressed: muted-token contrast at 3.48:1 and 3.75:1 against the dark
+surfaces, and an invalid heading order (the sidebar brand `h1` above the page
+`h1`).
+

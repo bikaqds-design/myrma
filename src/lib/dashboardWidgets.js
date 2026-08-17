@@ -44,8 +44,8 @@ export const WIDGET_CATALOG = [
   { id: 'overdue_tickets',        label: 'Overdue Tickets',            desc: 'All tickets past their due date',               size: 'half' },
   { id: 'weekly_trend',           label: 'Weekly Trend',               desc: '7-day ticket creation line chart',              size: 'half' },
   { id: 'monthly_trend',          label: 'Monthly Trend (30d)',         desc: '30-day ticket creation bar chart',              size: 'half' },
-  { id: 'status_distribution',    label: 'Status Distribution',        desc: 'Donut chart of ticket statuses',                size: 'half' },
-  { id: 'priority_distribution',  label: 'Priority Distribution',      desc: 'Donut chart of ticket priorities',              size: 'half' },
+  { id: 'status_distribution',    label: 'Status Distribution',        desc: 'Donut chart of ticket statuses',                size: 'half', defaultOff: true },
+  { id: 'priority_distribution',  label: 'Priority Distribution',      desc: 'Donut chart of ticket priorities',              size: 'half', defaultOff: true },
   { id: 'technician_performance', label: 'Technician Performance',     desc: 'Top 5 technicians by close rate',               size: 'full' },
   { id: 'top_issues',             label: 'Top Issues',                 desc: 'Ranked list of most common product issues',     size: 'full' },
   { id: 'overdue_followups',      label: 'Overdue Follow-Ups',         desc: 'CRM activities past their due date',            size: 'half' },
@@ -55,6 +55,20 @@ export const WIDGET_CATALOG = [
 ]
 
 export const ALL_WIDGET_IDS = WIDGET_CATALOG.map((w) => w.id)
+
+/**
+ * Widgets that start switched off.
+ *
+ * The two ticket donuts. With 13 tickets across three statuses they are a
+ * donut of three slices, which says less than the status strip directly above
+ * them already does. Off rather than deleted — someone running a real ticket
+ * volume can turn them back on in settings, and deleting a widget people may be
+ * using is not a layout decision to make on their behalf.
+ */
+const DEFAULT_OFF_IDS = WIDGET_CATALOG.filter((w) => w.defaultOff).map((w) => w.id)
+
+/** The ids enabled when a user has expressed no preference at all. */
+export const DEFAULT_ENABLED_IDS = ALL_WIDGET_IDS.filter((id) => !DEFAULT_OFF_IDS.includes(id))
 
 /**
  * The widget ids the legacy enabled-array could ever have contained.
@@ -90,18 +104,21 @@ export function toStoredWidgetPrefs(enabledIds) {
  * stored (any shape, including null) -> the ids to render, in catalog order.
  *
  * Accepts three inputs so an existing install keeps working:
- *   - null / undefined / junk -> everything on
- *   - { v: 2, off: [...] }    -> catalog minus off
+ *   - null / undefined / junk -> DEFAULT_ENABLED_IDS (catalog minus defaultOff)
+ *   - { v: 2, off: [...] }    -> catalog minus off, honoured exactly; an explicit
+ *                                preference outranks defaultOff in both directions
  *   - [ ...enabled ids ]      -> legacy; see LEGACY_OFFERED_IDS
  */
 export function resolveEnabledWidgets(stored) {
   if (Array.isArray(stored)) {
     const enabled = new Set(stored)
-    return ALL_WIDGET_IDS.filter((id) => enabled.has(id) || !LEGACY_OFFERED_IDS.includes(id))
+    return ALL_WIDGET_IDS.filter(
+      (id) => enabled.has(id) || (!LEGACY_OFFERED_IDS.includes(id) && !DEFAULT_OFF_IDS.includes(id))
+    )
   }
   if (stored && typeof stored === 'object' && Array.isArray(stored.off)) {
     const off = new Set(stored.off)
     return ALL_WIDGET_IDS.filter((id) => !off.has(id))
   }
-  return [...ALL_WIDGET_IDS]
+  return [...DEFAULT_ENABLED_IDS]
 }
