@@ -1171,7 +1171,13 @@
     "noInvoicesInRange": "No invoices in the selected date range",
     "colType": "Type",
     "colTotal": "Total",
-    "colDueDate": "Due Date"
+    "colDueDate": "Due Date",
+    "kpiOutstanding": "Outstanding",
+    "colDocStatus": "Document",
+    "colPaymentStatus": "Payment",
+    "colPaid": "Paid",
+    "dateFrom": "From date",
+    "dateTo": "To date"
   },
   "products": {
     "title": "Products",

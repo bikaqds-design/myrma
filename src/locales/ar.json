@@ -1171,7 +1171,13 @@
     "noInvoicesInRange": "لا توجد فواتير في النطاق الزمني المحدد",
     "colType": "النوع",
     "colTotal": "الإجمالي",
-    "colDueDate": "تاريخ الاستحقاق"
+    "colDueDate": "تاريخ الاستحقاق",
+    "kpiOutstanding": "المبالغ المستحقة",
+    "colDocStatus": "المستند",
+    "colPaymentStatus": "الدفع",
+    "colPaid": "المدفوع",
+    "dateFrom": "من تاريخ",
+    "dateTo": "إلى تاريخ"
   },
   "products": {
     "title": "المنتجات",

@@ -9,7 +9,7 @@ import toast from 'react-hot-toast'
 import { captureException } from '../lib/sentry'
 import { Spinner, PageHeader } from '../components/ui'
 import { useAppearance } from '../contexts/AppearanceContext'
-import { ROLES, INVOICE_STATUS } from '../lib/constants'
+import { ROLES } from '../lib/constants'
 
 // ─── CSV Utility ──────────────────────────────────────────────────────────────
 function downloadCSV(rows, columns, filename, t) {
@@ -101,13 +101,16 @@ function inRange(dateStr, from, to) {
 
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
 function KpiCard({ label, value, icon, color = 'indigo', sub }) {
+  // The value colours had no dark: variant, so the -700 shades stayed on the
+  // dark card and measured 2.25–3.55:1 — the largest number on the card was the
+  // least readable thing on it. The -300 shades clear 4.5:1 comfortably.
   const colors = {
-    indigo: { bg: 'bg-indigo-50', icon: 'text-indigo-600', val: 'text-indigo-700' },
-    green: { bg: 'bg-green-50', icon: 'text-green-600', val: 'text-green-700' },
-    amber: { bg: 'bg-amber-50', icon: 'text-amber-600', val: 'text-amber-700' },
-    red: { bg: 'bg-red-50', icon: 'text-red-600', val: 'text-red-700' },
-    blue: { bg: 'bg-blue-50', icon: 'text-blue-600', val: 'text-blue-700' },
-    purple: { bg: 'bg-purple-50', icon: 'text-purple-600', val: 'text-purple-700' },
+    indigo: { bg: 'bg-indigo-50', icon: 'text-indigo-600', val: 'text-indigo-700 dark:text-indigo-300' },
+    green: { bg: 'bg-green-50', icon: 'text-green-600', val: 'text-green-700 dark:text-green-300' },
+    amber: { bg: 'bg-amber-50', icon: 'text-amber-600', val: 'text-amber-700 dark:text-amber-300' },
+    red: { bg: 'bg-red-50', icon: 'text-red-600', val: 'text-red-700 dark:text-red-300' },
+    blue: { bg: 'bg-blue-50', icon: 'text-blue-600', val: 'text-blue-700 dark:text-blue-300' },
+    purple: { bg: 'bg-purple-50', icon: 'text-purple-600', val: 'text-purple-700 dark:text-purple-300' },
   }
   const c = colors[color] || colors.indigo
   return (
@@ -817,35 +820,56 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
 }
 
 // ─── Financial Tab ────────────────────────────────────────────────────────────
-function FinancialTab({ invoices, invoicesMissing, formatDate }) {
+/**
+ * Financial reporting over the CRM tables.
+ *
+ * This used to read the pre-CRM `invoices` table, which has 0 rows — the Sprint
+ * 6/7 funnel work moved invoicing to `crm_invoices` and Reports was never
+ * repointed. Every tile showed $0.00 and the table said "no invoices in range",
+ * which reads as an empty business rather than a broken query.
+ *
+ * The two schemas do not line up, so this is a rewire rather than a rename:
+ * `total` not `total_amount`, and status splits into `doc_status` (draft /
+ * posted / cancelled) and `payment_status` (unpaid / partial / paid / reversed).
+ * Quotes come from their own table now; the old "Quotes Value" filtered
+ * `invoices` for `type === 'quote'`, a column that exists on neither schema and
+ * so could never have returned anything.
+ */
+function FinancialTab({ invoices, quotations, customers, formatDate }) {
   const { t } = useTranslation()
-  if (invoicesMissing)
-    return (
-      <div className="space-y-4">
-        <MigrationBanner table="invoices">
-          {t('reports.invoiceDataUnavailable')}
-        </MigrationBanner>
-      </div>
-    )
 
-  const INV_STATUS_CLS = {
-    paid:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
-    pending: 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
-    overdue: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
-    draft:   'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
-    voided:  'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
+  const DOC_STATUS_CLS = {
+    posted:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+    draft:     'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
+    cancelled: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
+  }
+  const PAY_STATUS_CLS = {
+    paid:     'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+    partial:  'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
+    unpaid:   'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
+    reversed: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
   }
 
-  const totalInvoiced = invoices.reduce((s, i) => s + (i.total_amount || i.amount || 0), 0)
-  const totalPaid = invoices
-    .filter((i) => i.status === INVOICE_STATUS.PAID)
-    .reduce((s, i) => s + (i.total_amount || i.amount || 0), 0)
-  const totalPending = invoices
-    .filter((i) => i.status === INVOICE_STATUS.PENDING || i.status === INVOICE_STATUS.OVERDUE)
-    .reduce((s, i) => s + (i.total_amount || i.amount || 0), 0)
-  const quotesVal = invoices
-    .filter((i) => i.type === 'quote' || i.invoice_type === 'quote')
-    .reduce((s, i) => s + (i.total_amount || i.amount || 0), 0)
+  const customerName = (id) => {
+    const c = customers.find((x) => x.id === id)
+    return c ? c.company_name || c.contact_person || '—' : '—'
+  }
+
+  // Cancelled invoices are excluded from every money total — counting them
+  // would overstate revenue — but they stay in the table below, because "three
+  // were voided" is itself worth seeing.
+  const live = invoices.filter((i) => i.doc_status !== 'cancelled')
+  const num = (v) => Number(v) || 0
+
+  const totalInvoiced = live.reduce((s, i) => s + num(i.total), 0)
+  const totalPaid = live.reduce((s, i) => s + num(i.amount_paid), 0)
+  // "Outstanding", not the old "Pending / Overdue": the CRM has no overdue
+  // status. Overdue is a due date in the past on an unpaid invoice, which is a
+  // different question and is shown per-row instead of folded into a tile.
+  const outstanding = live.reduce((s, i) => s + Math.max(num(i.total) - num(i.amount_paid), 0), 0)
+  const quotesVal = quotations
+    .filter((q) => !['cancelled', 'declined', 'expired'].includes(q.status))
+    .reduce((s, q) => s + num(q.total), 0)
 
   const fmt$ = (v) =>
     `$${Number(v)
@@ -856,17 +880,19 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
     const columns = [
       { key: 'invoice_number', label: 'Invoice #' },
       { key: 'customer_name', label: 'Customer' },
-      { key: 'type', label: 'Type' },
-      { key: 'status', label: 'Status' },
+      { key: 'doc_status', label: 'Document' },
+      { key: 'payment_status', label: 'Payment' },
       { key: 'amount', label: 'Total' },
+      { key: 'paid', label: 'Paid' },
       { key: 'due_date', label: 'Due Date' },
     ]
     const rows = invoices.map((i) => ({
-      invoice_number: i.invoice_number || '',
-      customer_name: i.customer_name || '',
-      type: i.type || i.invoice_type || '',
-      status: i.status || '',
-      amount: i.total_amount || i.amount || 0,
+      invoice_number: i.inv_code || '',
+      customer_name: customerName(i.customer_id),
+      doc_status: i.doc_status || '',
+      payment_status: i.payment_status || '',
+      amount: Number(i.total) || 0,
+      paid: Number(i.amount_paid) || 0,
       due_date: formatDate(i.due_date),
     }))
     downloadCSV(rows, columns, `financial-report-${toYMD(new Date())}.csv`, t)
@@ -875,17 +901,19 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
     const columns = [
       { key: 'invoice_number', label: 'Invoice #' },
       { key: 'customer_name', label: 'Customer' },
-      { key: 'type', label: 'Type' },
-      { key: 'status', label: 'Status' },
+      { key: 'doc_status', label: 'Document' },
+      { key: 'payment_status', label: 'Payment' },
       { key: 'amount', label: 'Total' },
+      { key: 'paid', label: 'Paid' },
       { key: 'due_date', label: 'Due Date' },
     ]
     const rows = invoices.map((i) => ({
-      invoice_number: i.invoice_number || '',
-      customer_name: i.customer_name || '',
-      type: i.type || i.invoice_type || '',
-      status: i.status || '',
-      amount: i.total_amount || i.amount || 0,
+      invoice_number: i.inv_code || '',
+      customer_name: customerName(i.customer_id),
+      doc_status: i.doc_status || '',
+      payment_status: i.payment_status || '',
+      amount: Number(i.total) || 0,
+      paid: Number(i.amount_paid) || 0,
       due_date: formatDate(i.due_date),
     }))
     downloadExcel(rows, columns, `financial-report-${toYMD(new Date())}.xlsx`, t)
@@ -907,8 +935,8 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
           icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
         />
         <KpiCard
-          label={t('reports.kpiPendingOverdue')}
-          value={fmt$(totalPending)}
+          label={t('reports.kpiOutstanding')}
+          value={fmt$(outstanding)}
           color="amber"
           icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
         />
@@ -937,9 +965,10 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
                   {[
                     t('invoices.colInvoiceNum'),
                     t('reports.colCustomer'),
-                    t('reports.colType'),
-                    t('reports.colStatus'),
+                    t('reports.colDocStatus'),
+                    t('reports.colPaymentStatus'),
                     t('reports.colTotal'),
+                    t('reports.colPaid'),
                     t('reports.colDueDate'),
                   ].map((h, i) => (
                     <th
@@ -955,29 +984,36 @@ function FinancialTab({ invoices, invoicesMissing, formatDate }) {
                 {invoices.map((inv) => (
                   <tr key={inv.id} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors">
                     <td className="px-4 py-3 font-mono text-xs font-medium text-gray-900 dark:text-[#e8ebf0]">
-                      {inv.invoice_number || '—'}
+                      {inv.inv_code || '—'}
                     </td>
                     <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] max-w-[150px] truncate">
-                      {inv.customer_name || '—'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] capitalize text-xs">
-                      {inv.type || inv.invoice_type || '—'}
+                      {customerName(inv.customer_id)}
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${INV_STATUS_CLS[inv.status] || 'bg-gray-100 text-gray-600'}`}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${DOC_STATUS_CLS[inv.doc_status] || 'bg-gray-100 text-gray-600'}`}
                       >
-                        {inv.status || '—'}
+                        {inv.doc_status || '—'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${PAY_STATUS_CLS[inv.payment_status] || 'bg-gray-100 text-gray-600'}`}
+                      >
+                        {inv.payment_status || '—'}
                       </span>
                     </td>
                     <td className="px-4 py-3 font-semibold text-gray-900 dark:text-[#e8ebf0] tabular-nums">
-                      {fmt$(inv.total_amount || inv.amount || 0)}
+                      {fmt$(inv.total)}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] tabular-nums">
+                      {fmt$(inv.amount_paid)}
                     </td>
                     <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs whitespace-nowrap">
                       {inv.due_date ? (
                         <span
                           className={
-                            new Date(inv.due_date) < new Date() && inv.status !== 'paid'
+                            new Date(inv.due_date) < new Date() && inv.payment_status !== 'paid'
                               ? 'text-red-600 font-medium'
                               : ''
                           }
@@ -1046,13 +1082,19 @@ export default function Reports({
   const { data: reportData, isLoading: loading, isError, error, refetch } = useQuery({
     queryKey: ['reports', isAdminOrManager],
     queryFn: async () => {
-      const [tkRes, custRes, teRes, invRes] = await Promise.all([
+      // crmInvoices + quotations, not db.invoices. The legacy `invoices` table
+      // this used to read holds 0 rows — every invoice the business has raised
+      // is in `crm_invoices`, and quotations are their own table. The old query
+      // succeeded and returned nothing, so the Financial tab reported $0.00
+      // across the board instead of erroring.
+      const [tkRes, custRes, teRes, invRes, qtRes] = await Promise.all([
         db.rmaTickets.list(),
         db.customers.list(),
         isAdminOrManager ? db.timeEntries.listAll() : { missing: false, data: [] },
-        isAdminOrManager ? db.invoices.list() : { missing: false, data: [] },
+        isAdminOrManager ? db.crmInvoices.list() : [],
+        isAdminOrManager ? db.quotations.list() : [],
       ])
-      return { tkRes, custRes, teRes, invRes }
+      return { tkRes, custRes, teRes, invRes, qtRes }
     },
   })
 
@@ -1068,8 +1110,8 @@ export default function Reports({
   const customers = useMemo(() => reportData?.custRes || [], [reportData])
   const timeEntriesMissing = reportData?.teRes?.missing ?? false
   const timeEntries = useMemo(() => reportData?.teRes?.data ?? [], [reportData])
-  const invoicesMissing = reportData?.invRes?.missing ?? false
-  const invoices = useMemo(() => reportData?.invRes?.data ?? [], [reportData])
+  const invoices = useMemo(() => reportData?.invRes ?? [], [reportData])
+  const quotations = useMemo(() => reportData?.qtRes ?? [], [reportData])
 
   // Apply date range filter
   const filteredTickets = useMemo(
@@ -1080,9 +1122,17 @@ export default function Reports({
     () => customers.filter((c) => inRange(c.created_date, fromDate, toDate)),
     [customers, fromDate, toDate]
   )
+  // `created_at`, not `created_date`. The CRM tables use the former; the legacy
+  // `invoices` table used the latter. Filtering on the wrong key would have left
+  // this tab empty even after repointing it at the right table — the same
+  // silent-empty failure, one layer down.
   const filteredInvoices = useMemo(
-    () => invoices.filter((i) => inRange(i.created_date, fromDate, toDate)),
+    () => invoices.filter((i) => inRange(i.created_at, fromDate, toDate)),
     [invoices, fromDate, toDate]
+  )
+  const filteredQuotations = useMemo(
+    () => quotations.filter((q) => inRange(q.created_at, fromDate, toDate)),
+    [quotations, fromDate, toDate]
   )
 
   // Display formatter passed to the tab sub-components (was referenced but never defined).
@@ -1175,6 +1225,7 @@ export default function Reports({
         </svg>
         <input
           type="date"
+          aria-label={t('reports.dateFrom')}
           value={fromDate}
           onChange={(e) => setFromDate(e.target.value)}
           max={toDate}
@@ -1183,6 +1234,7 @@ export default function Reports({
         <span className="text-gray-500 dark:text-[#9aa4b2] text-sm">{t('reports.to')}</span>
         <input
           type="date"
+          aria-label={t('reports.dateTo')}
           value={toDate}
           onChange={(e) => setToDate(e.target.value)}
           min={fromDate}
@@ -1261,7 +1313,8 @@ export default function Reports({
           {activeTab === 'financial' && isAdminOrManager && (
             <FinancialTab
               invoices={filteredInvoices}
-              invoicesMissing={invoicesMissing}
+              quotations={filteredQuotations}
+              customers={customers}
               formatDate={formatDate}
             />
           )}
