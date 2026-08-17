@@ -174,12 +174,22 @@ Rollback lives in `supabase/manual/20260817_b2c_stage_remap_rollback.sql` —
 per-deal stage and probability as they were, deliberately outside
 `supabase/migrations` so it can never replay elsewhere.
 
-### One thing left alone, deliberately
+### Follow-up: the 7 incumbent `contacted` deals, normalised
 
-The 7 deals that were *already* in `contacted` carry probability **20**, while
-the B2C pipeline's default for that stage is **30**. So that column now holds
-7 at 20 and 5 at 30. Those 7 were never mis-staged and were outside the scope of
-this remap, so they were not touched — but the same seeding that produced the 24
-looks to have set their weight from the B2B stage too. Worth normalising as its
-own small fix.
+The 7 deals already sitting in `contacted` carried probability **20** against
+that stage's default of **30**, leaving the column holding 7 at 20 and 5 at 30.
+They were never mis-staged and so fell outside the remap, but 20 is the *B2B*
+pipeline's contacted default — the same seeding fingerprint as the 24. All seven
+were uniformly at 20 and all `open`, so they were set to 30.
 
+**B2C now has zero probability drift**: every deal's weight equals its stage
+default — new_inquiry 13 at 10, contacted 12 at 30, quote_sent 12 at 60, won 11
+at 100, lost 3 at 0. Statuses untouched at 11 won / 37 open / 3 lost.
+
+**Left alone, deliberately.** A full sweep across both pipelines found 5 more
+drifting deals, all on B2B: `contacted` at 33, `new_lead` at 0 (twice) and 100,
+`quote_sent` at 0. Those values are *varied* rather than uniform, which reads as
+hand-set per deal rather than inherited from a stage. Normalising them would
+flatten a judgement somebody may have made, so they stand. That distinction —
+uniform and matching another pipeline's default, versus varied — is what made
+the 7 safe to change and these 5 not.

@@ -1,4 +1,10 @@
--- Rollback for the B2C stage remap of 2026-08-17.
+-- Rollback for the B2C pipeline normalisation of 2026-08-17.
+--
+-- Two changes were made that day, in order. Running this whole file undoes
+-- both and returns the B2C Retail Pipeline to its prior state; run only the
+-- first statement to undo the stage remap alone.
+--
+-- == 1. The stage remap ==================================================
 --
 -- On that date 24 deals on the B2C Retail Pipeline were sitting in stages the
 -- pipeline does not define — new_lead (13), negotiation (6) and
@@ -43,4 +49,31 @@ FROM (VALUES
   ('efc1c5c5-80fd-4c5e-8100-e8f780dcf2da'::uuid, 'new_lead', 10),
   ('f9ec5644-b023-48bc-ace7-d9f34d331cdb'::uuid, 'new_lead', 10)
 ) AS v(id, stage, prob)
+WHERE d.id = v.id;
+
+-- == 2. The probability normalisation ====================================
+--
+-- Seven deals that were already sitting in `contacted` — never mis-staged, and
+-- outside the remap above — carried probability 20 while that stage's default
+-- on this pipeline is 30. All seven were uniformly at 20 and all were
+-- status = 'open', consistent with the same SQL seeding that produced the 24:
+-- 20 is the B2B pipeline's contacted default, not the B2C one. They were set
+-- to 30 so the column no longer weights identical deals differently.
+--
+-- Deliberately NOT included: five B2B deals whose probabilities also differ
+-- from their stage defaults (0, 33, 100). Those values are varied rather than
+-- uniform, so they look hand-set rather than inherited, and flattening them
+-- would destroy a judgement somebody may have made.
+
+UPDATE deals AS d
+SET probability = v.prob, updated_at = now()
+FROM (VALUES
+  ('fbc3cab0-76d2-452e-828c-f4ef1ba42f11'::uuid, 20),
+  ('295df6d9-5fd3-4966-8d94-b89495d52653'::uuid, 20),
+  ('59ad2584-971e-476b-bc8f-eeaee4a47e8a'::uuid, 20),
+  ('b1f9d38b-ae81-4960-ac85-866dd6c4b799'::uuid, 20),
+  ('ded3d721-e5ef-44f3-a1c7-caf902587313'::uuid, 20),
+  ('e91a3d9b-9c2e-4b31-abae-c5d42d1770e1'::uuid, 20),
+  ('ac937b40-e964-480a-9d8f-e70ec9203cee'::uuid, 20)
+) AS v(id, prob)
 WHERE d.id = v.id;
