@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { ModalOverlay, ModalCard, Input, Select, Textarea, Label, Button } from '../../components/ui'
+import { associateFieldId } from '../../lib/fieldAssociation'
 import { LEAD_SOURCE_LIST, LEAD_STATUS_LIST } from '../../lib/constants'
 
 const CARD = 'bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38]'
@@ -10,13 +11,28 @@ const TITLE = 'text-[#211f1b] dark:text-[#e8ebf0]'
 const CLOSE_BTN =
   'w-8 h-8 flex items-center justify-center rounded-full text-[#6c6760] dark:text-[#9aa4b2] hover:bg-gray-100 dark:hover:bg-[#1a2230] transition-colors'
 
+/**
+ * A labelled form field.
+ *
+ * The <label> and the control are siblings, not nested, so there was no
+ * implicit association and no htmlFor either: a screen reader announced an
+ * unlabelled textbox sitting next to some loose text. The visible label was
+ * right there, which is why this survived a long time.
+ *
+ * The id is generated with useId() and cloned onto the child, so callers get
+ * the association for free and cannot forget it. A caller that sets its own id
+ * keeps it. htmlFor is only emitted when there is a single element child to
+ * carry the id — a label pointing at an id that does not exist is worse than
+ * no label at all.
+ */
 function Field({ label, required, children }) {
+  const { htmlFor, children: kids } = associateFieldId(children, React.useId())
   return (
     <div>
-      <Label required={required} className="dark:text-[#e8ebf0]">
+      <Label htmlFor={htmlFor} required={required} className="dark:text-[#e8ebf0]">
         {label}
       </Label>
-      {children}
+      {kids}
     </div>
   )
 }

@@ -175,6 +175,7 @@ export default function SalesDocumentForm({ docType, initial = null, customers =
         <div ref={customerRef} className="relative">
           <Label required>{t('salesDocuments.fCustomer')}</Label>
           <input
+            aria-label={t('salesDocuments.fCustomer')}
             value={customerId ? (selectedCustomer?.company_name || selectedCustomer?.contact_person || '') : customerQuery}
             onChange={(e) => { if (isEdit) return; setCustomerId(''); setCustomerQuery(e.target.value); setCustomerOpen(true) }}
             onFocus={() => { if (!isEdit && !customerId && customerQuery.trim()) setCustomerOpen(true) }}
@@ -204,7 +205,7 @@ export default function SalesDocumentForm({ docType, initial = null, customers =
         {/* Assigned rep */}
         <div>
           <Label>{t('salesDocuments.fRep')}</Label>
-          <Select value={assignedRep} onChange={(e) => setAssignedRep(e.target.value)}>
+          <Select aria-label={t('salesDocuments.fRep')} value={assignedRep} onChange={(e) => setAssignedRep(e.target.value)}>
             <option value="">{t('salesDocuments.assignToMe')}</option>
             {salesReps.map((r) => <option key={r.user_email} value={r.user_email}>{r.user_email}</option>)}
           </Select>
@@ -213,19 +214,19 @@ export default function SalesDocumentForm({ docType, initial = null, customers =
         {/* Type-specific date */}
         <div>
           <Label>{t(dateField.labelKey)}</Label>
-          <Input type="date" value={typeDate} onChange={(e) => setTypeDate(e.target.value)} />
+          <Input aria-label={t(dateField.labelKey)} type="date" value={typeDate} onChange={(e) => setTypeDate(e.target.value)} />
         </div>
 
         {/* Reference / PO */}
         <div>
           <Label>{t('salesDocuments.fReference')}</Label>
-          <Input value={referencePo} onChange={(e) => setReferencePo(e.target.value)} />
+          <Input aria-label={t('salesDocuments.fReference')} value={referencePo} onChange={(e) => setReferencePo(e.target.value)} />
         </div>
 
         {/* Payment terms */}
         <div className="sm:col-span-2">
           <Label>{t('salesDocuments.fPaymentTerms')}</Label>
-          <Input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} />
+          <Input aria-label={t('salesDocuments.fPaymentTerms')} value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} />
         </div>
       </div>
 
@@ -247,6 +248,7 @@ export default function SalesDocumentForm({ docType, initial = null, customers =
                   onSelectProduct={(p) => selectProduct(i, p)}
                   products={products}
                   placeholder={t('salesDocuments.productPlaceholder')}
+                  aria-label={t('salesDocuments.fProduct')}
                   className="flex-1"
                   inputClassName={inputCls}
                 />
@@ -261,6 +263,7 @@ export default function SalesDocumentForm({ docType, initial = null, customers =
                 </button>
               </div>
               <Input
+                aria-label={t('salesDocuments.fDescription')}
                 value={l.description || ''}
                 onChange={(e) => updateLine(i, { description: e.target.value })}
                 placeholder={t('salesDocuments.fDescription')}
@@ -301,7 +304,7 @@ export default function SalesDocumentForm({ docType, initial = null, customers =
       {/* Notes */}
       <div>
         <Label>{t('salesDocuments.fNotes')}</Label>
-        <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <Textarea aria-label={t('salesDocuments.fNotes')} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
 
       {/* Actions */}
@@ -314,10 +317,13 @@ export default function SalesDocumentForm({ docType, initial = null, customers =
 }
 
 function NumCell({ label, value, onChange }) {
+  // The column heading is a <div>, not a <label>, and this renders once per
+  // line item — so an id would collide across rows. aria-label carries the
+  // column name onto every cell instead.
   return (
     <div>
       <div className="text-[10px] uppercase text-[#6c6760] dark:text-[#9aa4b2] mb-1">{label}</div>
-      <Input type="number" value={value} onChange={(e) => onChange(e.target.value)} className="text-sm" />
+      <Input aria-label={label} type="number" value={value} onChange={(e) => onChange(e.target.value)} className="text-sm" />
     </div>
   )
 }

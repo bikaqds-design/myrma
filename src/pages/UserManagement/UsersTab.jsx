@@ -504,7 +504,7 @@ export function UserControlModal({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">{t('userManagement.actionLabel')}</label>
-          <select
+          <select aria-label={t('userManagement.actionLabel')}
             value={action}
             onChange={(e) => onActionChange(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600"
@@ -523,7 +523,7 @@ export function UserControlModal({
         {(action === 'suspend' || action === 'lock' || action === 'deactivate') && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('userManagement.reasonLabel')}</label>
-            <textarea
+            <textarea aria-label={t('userManagement.reasonLabel')}
               value={reason}
               onChange={(e) => onReasonChange(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600"
@@ -537,7 +537,7 @@ export function UserControlModal({
         {action === 'update_notes' && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('userManagement.notesLabel')}</label>
-            <textarea
+            <textarea aria-label={t('userManagement.notesLabel')}
               value={notes}
               onChange={(e) => onNotesChange(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600"
@@ -550,7 +550,7 @@ export function UserControlModal({
         {action === 'set_expiration' && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('userManagement.expirationLabel')}</label>
-            <input
+            <input aria-label={t('userManagement.expirationLabel')}
               type="datetime-local"
               value={expiration}
               onChange={(e) => onExpirationChange(e.target.value)}

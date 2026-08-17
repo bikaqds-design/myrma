@@ -798,6 +798,7 @@ export function TicketForm({
                     }}
                     onFocus={() => setShowCustomerDropdown(true)}
                     placeholder={t('ticketForm.searchCustomer')}
+                    aria-label={t('ticketForm.customerName')}
                     className={inputClass}
                     required
                   />
@@ -873,7 +874,7 @@ export function TicketForm({
                 <label className={labelClass}>
                   {t('ticketForm.priority')} <span className="text-red-500">*</span>
                 </label>
-                <select
+                <select aria-label={t('ticketForm.priority')}
                   value={formData.priority}
                   onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
                   className={inputClass}
@@ -889,7 +890,7 @@ export function TicketForm({
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className={labelClass}>{t('ticketForm.ticketStatus')}</label>
-                <select
+                <select aria-label={t('ticketForm.ticketStatus')}
                   value={formData.ticket_status}
                   onChange={(e) => setFormData({ ...formData, ticket_status: e.target.value })}
                   className={inputClass}
@@ -903,6 +904,7 @@ export function TicketForm({
                 <label className={labelClass}>{t('ticketForm.assignedTo')}</label>
                 {userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN ? (
                   <select
+                    aria-label={t('ticketForm.assignedTo')}
                     value={formData.assigned_technician}
                     onChange={(e) =>
                       setFormData({ ...formData, assigned_technician: e.target.value })
@@ -928,6 +930,7 @@ export function TicketForm({
                 </label>
                 <input
                   type="date"
+                  aria-label={t('ticketForm.dueDate')}
                   value={formData.due_date}
                   onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
                   className={inputClass}
@@ -989,6 +992,7 @@ export function TicketForm({
                             setShowProductDropdowns(d)
                           }}
                           placeholder={t('ticketForm.searchProduct')}
+                          aria-label={t('ticketForm.productName')}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-sm bg-white"
                           required
                         />
@@ -1038,6 +1042,7 @@ export function TicketForm({
                       <div className="relative">
                         <input
                           type="text"
+                          aria-label={t('ticketForm.serialNumber')}
                           data-serial-idx={idx}
                           value={product.serial_number}
                           onChange={(e) => updateProduct(idx, 'serial_number', e.target.value)}
@@ -1068,7 +1073,7 @@ export function TicketForm({
                     </div>
                     <div>
                       <label className={labelClass}>{t('ticketForm.productStatus')}</label>
-                      <select
+                      <select aria-label={t('ticketForm.productStatus')}
                         value={product.product_status}
                         onChange={(e) => updateProduct(idx, 'product_status', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm bg-white"
@@ -1080,7 +1085,7 @@ export function TicketForm({
                     </div>
                     <div>
                       <label className={labelClass}>{t('ticketForm.warrantyStatus')}</label>
-                      <select
+                      <select aria-label={t('ticketForm.warrantyStatus')}
                         value={product.warranty_status}
                         onChange={(e) => updateProduct(idx, 'warranty_status', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm bg-white"
@@ -1095,7 +1100,7 @@ export function TicketForm({
                     <label className={labelClass}>
                       {t('ticketForm.issueDescription')} <span className="text-red-500">*</span>
                     </label>
-                    <textarea
+                    <textarea aria-label={t('ticketForm.issueDescription')}
                       value={product.issue_description}
                       onChange={(e) => updateProduct(idx, 'issue_description', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm bg-white"
@@ -1110,7 +1115,7 @@ export function TicketForm({
             {/* General RMA Description */}
             <div>
               <label className={labelClass}>{t('ticketForm.generalDescription')}</label>
-              <textarea
+              <textarea aria-label={t('ticketForm.generalDescription')}
                 value={formData.general_description}
                 onChange={(e) =>
                   setFormData({ ...formData, general_description: e.target.value })
@@ -1124,7 +1129,7 @@ export function TicketForm({
             {/* Accessories Received */}
             <div>
               <label className={labelClass}>{t('ticketForm.accessories')}</label>
-              <textarea
+              <textarea aria-label={t('ticketForm.accessories')}
                 value={formData.accessories_received}
                 onChange={(e) =>
                   setFormData({ ...formData, accessories_received: e.target.value })
@@ -1143,7 +1148,7 @@ export function TicketForm({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>{t('ticketForm.carrier')}</label>
-                  <select
+                  <select aria-label={t('ticketForm.carrier')}
                     value={formData.carrier}
                     onChange={(e) => setFormData((f) => ({ ...f, carrier: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm bg-white"
@@ -1157,7 +1162,7 @@ export function TicketForm({
                 </div>
                 <div>
                   <label className={labelClass}>{t('ticketForm.trackingNumber')}</label>
-                  <input
+                  <input aria-label={t('ticketForm.trackingNumber')}
                     type="text"
                     value={formData.tracking_number}
                     onChange={(e) =>
@@ -1181,6 +1186,7 @@ export function TicketForm({
                   }
                   className={inputClass}
                   placeholder="https://..."
+                  aria-label={t('ticketForm.shippingLabel')}
                 />
               </div>
               {formData.tracking_number && formData.carrier && (
@@ -1378,7 +1384,7 @@ export function TicketForm({
             <div className="grid grid-cols-1 gap-3">
               <div>
                 <label className={labelClass}>{t('ticketForm.resolutionType')}</label>
-                <select
+                <select aria-label={t('ticketForm.resolutionType')}
                   value={resForm.type}
                   onChange={(e) => setResForm(f => ({ ...f, type: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600"
@@ -1404,7 +1410,7 @@ export function TicketForm({
                   </div>
                   <div>
                     <label className={labelClass}>{t('ticketForm.replacementSerial')}</label>
-                    <input
+                    <input aria-label={t('ticketForm.replacementSerial')}
                       value={resForm.replacement_serial}
                       onChange={(e) => setResForm(f => ({ ...f, replacement_serial: e.target.value }))}
                       placeholder="Serial number"
@@ -1437,7 +1443,7 @@ export function TicketForm({
                   </div>
                   <div>
                     <label className={labelClass}>{t('ticketForm.referenceNumber')}</label>
-                    <input
+                    <input aria-label={t('ticketForm.referenceNumber')}
                       value={resForm.reference_number}
                       onChange={(e) => setResForm(f => ({ ...f, reference_number: e.target.value }))}
                       placeholder="Invoice / credit note #"
@@ -1450,7 +1456,7 @@ export function TicketForm({
               {resForm.type && (
                 <div>
                   <label className={labelClass}>{t('ticketForm.reason')}</label>
-                  <textarea
+                  <textarea aria-label={t('ticketForm.reason')}
                     rows={2}
                     value={resForm.reason}
                     onChange={(e) => setResForm(f => ({ ...f, reason: e.target.value }))}

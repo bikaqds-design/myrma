@@ -585,7 +585,7 @@ export default function CustomerDetails({
                         <label className={labelClass}>
                           {t('customerModal.customerType')} <span className="text-red-500">*</span>
                         </label>
-                        <select
+                        <select aria-label={t('customerModal.customerType')}
                           value={editForm.customer_type || 'B2B'}
                           onChange={(e) =>
                             setEditForm({ ...editForm, customer_type: e.target.value })
@@ -600,7 +600,7 @@ export default function CustomerDetails({
                         <label className={labelClass}>
                           {t('common.status')} <span className="text-red-500">*</span>
                         </label>
-                        <select
+                        <select aria-label={t('common.status')}
                           value={editForm.customer_status || 'Active'}
                           onChange={(e) =>
                             setEditForm({ ...editForm, customer_status: e.target.value })
@@ -625,7 +625,7 @@ export default function CustomerDetails({
                           <label className={labelClass}>
                             {t('customerModal.companyName')} <span className="text-red-500">*</span>
                           </label>
-                          <input
+                          <input aria-label={t('customerModal.companyName')}
                             type="text"
                             value={editForm.company_name || ''}
                             onChange={(e) =>
@@ -668,7 +668,7 @@ export default function CustomerDetails({
                         <label className={labelClass}>
                           {t('customerModal.contactPerson')} <span className="text-red-500">*</span>
                         </label>
-                        <input
+                        <input aria-label={t('customerModal.contactPerson')}
                           type="text"
                           value={editForm.contact_person || ''}
                           onChange={(e) =>
@@ -681,7 +681,7 @@ export default function CustomerDetails({
                         <label className={labelClass}>
                           {t('customerModal.mobile')} <span className="text-red-500">*</span>
                         </label>
-                        <input
+                        <input aria-label={t('customerModal.mobile')}
                           type="tel"
                           value={editForm.mobile || ''}
                           onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })}

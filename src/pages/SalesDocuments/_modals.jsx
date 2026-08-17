@@ -117,7 +117,7 @@ export function RecordPaymentModal({ invoice, onClose, onConfirm }) {
             <label className="block text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase mb-1.5">
               {t('salesDocuments.paymentAmount')}
             </label>
-            <input
+            <input aria-label={t('salesDocuments.paymentAmount')}
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
@@ -134,7 +134,7 @@ export function RecordPaymentModal({ invoice, onClose, onConfirm }) {
             <label className="block text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase mb-1.5">
               {t('accounting.method')}
             </label>
-            <select
+            <select aria-label={t('accounting.method')}
               value={method}
               onChange={(e) => setMethod(e.target.value)}
               className="w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none"
@@ -264,7 +264,7 @@ export function CreateCreditNoteModal({ invoice, onClose, onConfirm }) {
               <label className="block text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase mb-1.5">
                 {t('salesDocuments.cnType')}
               </label>
-              <select
+              <select aria-label={t('salesDocuments.cnType')}
                 value={cnType}
                 onChange={(e) => setCnType(e.target.value)}
                 className="w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none"
@@ -497,7 +497,7 @@ export function CreateStandaloneCreditNoteModal({
           <div className="grid sm:grid-cols-2 gap-4">
             <div ref={customerRef} className="relative">
               <Label required>{t('salesDocuments.fCustomer')}</Label>
-              <input
+              <input aria-label={t('salesDocuments.fCustomer')}
                 value={customerId ? (selectedCustomer?.company_name || selectedCustomer?.contact_person || '') : customerQuery}
                 onChange={(e) => { if (lockCustomer) return; setCustomerId(''); setCustomerQuery(e.target.value); setCustomerOpen(true) }}
                 onFocus={() => { if (!lockCustomer && !customerId && customerQuery.trim()) setCustomerOpen(true) }}
@@ -526,7 +526,7 @@ export function CreateStandaloneCreditNoteModal({
 
             <div>
               <Label>{t('salesDocuments.cnType')}</Label>
-              <select
+              <select aria-label={t('salesDocuments.cnType')}
                 value={cnType}
                 onChange={(e) => setCnType(e.target.value)}
                 className={inputCls}
@@ -539,7 +539,7 @@ export function CreateStandaloneCreditNoteModal({
 
             <div className="sm:col-span-2">
               <Label required>{t('salesDocuments.cnReason')}</Label>
-              <Input
+              <Input aria-label={t('salesDocuments.cnReason')}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder={t('salesDocuments.cnReasonPlaceholder')}
@@ -565,6 +565,7 @@ export function CreateStandaloneCreditNoteModal({
                       onSelectProduct={(p) => selectProduct(i, p)}
                       products={products}
                       placeholder={t('salesDocuments.productPlaceholder')}
+                  aria-label={t('salesDocuments.fProduct')}
                       className="flex-1"
                       inputClassName={inputCls}
                     />

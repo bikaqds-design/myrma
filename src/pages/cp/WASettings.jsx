@@ -259,12 +259,15 @@ function Toggle({ value, onChange, size = 'md' }) {
 }
 
 function Field({ label, value, onChange, type = 'text', placeholder = '', min, max, step }) {
+  // Renders its own input, so the association is unconditional here.
+  const id = React.useId()
   return (
     <div>
-      <label className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
+      <label htmlFor={id} className="block text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider mb-1.5">
         {label}
       </label>
       <input
+        id={id}
         type={type}
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}

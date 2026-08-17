@@ -61,7 +61,7 @@ export function AddProductModal({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('products.brand')} <span className="text-red-500">*</span>
             </label>
-            <select
+            <select aria-label={t('products.brand')}
               value={productForm.brand_id}
               onChange={(e) =>
                 setProductForm({
@@ -85,7 +85,7 @@ export function AddProductModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('products.category')}</label>
-            <select
+            <select aria-label={t('products.category')}
               value={productForm.category_id}
               onChange={(e) =>
                 setProductForm({ ...productForm, category_id: e.target.value, subcategory_id: '' })
@@ -104,7 +104,7 @@ export function AddProductModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('products.subcategory')}</label>
-            <select
+            <select aria-label={t('products.subcategory')}
               value={productForm.subcategory_id}
               onChange={(e) => setProductForm({ ...productForm, subcategory_id: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
@@ -123,7 +123,7 @@ export function AddProductModal({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('products.sku')} <span className="text-red-500">*</span>
             </label>
-            <input
+            <input aria-label={t('products.sku')}
               type="text"
               value={productForm.sku}
               onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
@@ -137,7 +137,7 @@ export function AddProductModal({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('products.productName')} <span className="text-red-500">*</span>
             </label>
-            <input
+            <input aria-label={t('products.productName')}
               type="text"
               value={productForm.product_name}
               onChange={(e) => setProductForm({ ...productForm, product_name: e.target.value })}
@@ -149,7 +149,7 @@ export function AddProductModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">{t('products.productType')}</label>
-              <select
+              <select aria-label={t('products.productType')}
                 value={productForm.product_type}
                 onChange={(e) => setProductForm({ ...productForm, product_type: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
@@ -163,7 +163,7 @@ export function AddProductModal({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.status')}</label>
-              <select
+              <select aria-label={t('common.status')}
                 value={productForm.status}
                 onChange={(e) => setProductForm({ ...productForm, status: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
@@ -185,7 +185,7 @@ export function AddProductModal({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {t('products.stockTrackingMode')}
               </label>
-              <select
+              <select aria-label={t('products.stockTrackingMode')}
                 value={productForm.stock_tracking_mode}
                 onChange={(e) =>
                   setProductForm({ ...productForm, stock_tracking_mode: e.target.value })
@@ -210,7 +210,7 @@ export function AddProductModal({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('products.warrantyMonths')}
             </label>
-            <input
+            <input aria-label={t('products.warrantyMonths')}
               type="number"
               value={productForm.warranty_months}
               onChange={(e) =>
@@ -223,7 +223,7 @@ export function AddProductModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.description')}</label>
-            <textarea
+            <textarea aria-label={t('common.description')}
               value={productForm.product_description}
               onChange={(e) =>
                 setProductForm({ ...productForm, product_description: e.target.value })
@@ -235,7 +235,7 @@ export function AddProductModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('products.productLink')}</label>
-            <input
+            <input aria-label={t('products.productLink')}
               type="url"
               value={productForm.product_link}
               onChange={(e) => setProductForm({ ...productForm, product_link: e.target.value })}
@@ -355,7 +355,7 @@ export function AddBrandModal({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('products.brandName')} <span className="text-red-500">*</span>
             </label>
-            <input
+            <input aria-label={t('products.brandName')}
               type="text"
               value={brandForm.brand_name}
               onChange={(e) => setBrandForm({ ...brandForm, brand_name: e.target.value })}
@@ -366,7 +366,7 @@ export function AddBrandModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.description')}</label>
-            <textarea
+            <textarea aria-label={t('common.description')}
               value={brandForm.brand_description}
               onChange={(e) => setBrandForm({ ...brandForm, brand_description: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
@@ -376,7 +376,7 @@ export function AddBrandModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.status')}</label>
-            <select
+            <select aria-label={t('common.status')}
               value={brandForm.status}
               onChange={(e) => setBrandForm({ ...brandForm, status: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
@@ -507,7 +507,7 @@ export function AddCategoryModal({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('products.brand')} <span className="text-red-500">*</span>
             </label>
-            <select
+            <select aria-label={t('products.brand')}
               value={categoryForm.brand_id}
               onChange={(e) => setCategoryForm({ ...categoryForm, brand_id: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
@@ -526,7 +526,7 @@ export function AddCategoryModal({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {t('products.categoryName')} <span className="text-red-500">*</span>
             </label>
-            <input
+            <input aria-label={t('products.categoryName')}
               type="text"
               value={categoryForm.category_name}
               onChange={(e) => setCategoryForm({ ...categoryForm, category_name: e.target.value })}
@@ -537,7 +537,7 @@ export function AddCategoryModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.description')}</label>
-            <textarea
+            <textarea aria-label={t('common.description')}
               value={categoryForm.category_description}
               onChange={(e) =>
                 setCategoryForm({ ...categoryForm, category_description: e.target.value })
@@ -549,7 +549,7 @@ export function AddCategoryModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.status')}</label>
-            <select
+            <select aria-label={t('common.status')}
               value={categoryForm.status}
               onChange={(e) => setCategoryForm({ ...categoryForm, status: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"

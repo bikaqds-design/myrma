@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import AttachmentsField from '../../components/AttachmentsField'
 import { Button } from '../../components/ui'
+import { associateFieldId } from '../../lib/fieldAssociation'
 
 // ─── SHARED HELPERS ────────────────────────────────────────────────────────────
 
@@ -12,14 +13,29 @@ const inp =
 const sel =
   'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white'
 
+/**
+ * A labelled form field.
+ *
+ * The <label> and the control are siblings, not nested, so there was no
+ * implicit association and no htmlFor either: a screen reader announced an
+ * unlabelled textbox sitting next to some loose text. The visible label was
+ * right there, which is why this survived a long time.
+ *
+ * The id is generated with useId() and cloned onto the child, so callers get
+ * the association for free and cannot forget it. A caller that sets its own id
+ * keeps it. htmlFor is only emitted when there is a single element child to
+ * carry the id — a label pointing at an id that does not exist is worse than
+ * no label at all.
+ */
 export function Field({ label, required, children }) {
+  const { htmlFor, children: kids } = associateFieldId(children, React.useId())
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+      <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 mb-1.5">
         {label}
         {required && <Req />}
       </label>
-      {children}
+      {kids}
     </div>
   )
 }

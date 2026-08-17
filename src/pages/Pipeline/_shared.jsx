@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 
-export function ProductSearchInput({ value, onChange, onSelectProduct, products = [], placeholder = '', className = '', inputClassName = '' }) {
+export function ProductSearchInput({ value, onChange, onSelectProduct, products = [], placeholder = '', className = '', inputClassName = '', 'aria-label': ariaLabel }) {
   const [query, setQuery] = useState(value || '')
   const [open, setOpen] = useState(false)
   const containerRef = useRef(null)
@@ -28,6 +28,7 @@ export function ProductSearchInput({ value, onChange, onSelectProduct, products 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <input
+        aria-label={ariaLabel}
         value={query}
         onChange={(e) => {
           setQuery(e.target.value)

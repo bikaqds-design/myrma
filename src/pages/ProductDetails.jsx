@@ -424,7 +424,7 @@ export default function ProductDetails({
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         {t('products.sku')} <span className="text-red-500">*</span>
                       </label>
-                      <input
+                      <input aria-label={t('products.sku')}
                         type="text"
                         value={editForm.sku}
                         onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })}
@@ -436,7 +436,7 @@ export default function ProductDetails({
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         {t('products.productName')} <span className="text-red-500">*</span>
                       </label>
-                      <input
+                      <input aria-label={t('products.productName')}
                         type="text"
                         value={editForm.product_name}
                         onChange={(e) => setEditForm({ ...editForm, product_name: e.target.value })}
@@ -449,7 +449,7 @@ export default function ProductDetails({
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           {t('products.brand')} <span className="text-red-500">*</span>
                         </label>
-                        <select
+                        <select aria-label={t('products.brand')}
                           value={editForm.brand_id}
                           onChange={(e) =>
                             setEditForm({

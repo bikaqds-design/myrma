@@ -142,23 +142,23 @@ export function VendorFieldsSection({ values, onChange, t }) {
     <div className="grid grid-cols-2 gap-3">
       <div className="col-span-2">
         <Label>{t('purchasing.contactPerson')}</Label>
-        <Input value={values.contact_person || ''} onChange={(e) => onChange({ contact_person: e.target.value })} className="w-full" />
+        <Input aria-label={t('purchasing.contactPerson')} value={values.contact_person || ''} onChange={(e) => onChange({ contact_person: e.target.value })} className="w-full" />
       </div>
       <div>
         <Label>{t('common.email')}</Label>
-        <Input type="email" value={values.email || ''} onChange={(e) => onChange({ email: e.target.value })} className="w-full" />
+        <Input aria-label={t('common.email')} type="email" value={values.email || ''} onChange={(e) => onChange({ email: e.target.value })} className="w-full" />
       </div>
       <div>
         <Label>{t('purchasing.phone')}</Label>
-        <Input value={values.phone || ''} onChange={(e) => onChange({ phone: e.target.value })} className="w-full" />
+        <Input aria-label={t('purchasing.phone')} value={values.phone || ''} onChange={(e) => onChange({ phone: e.target.value })} className="w-full" />
       </div>
       <div>
         <Label>{t('purchasing.taxId')}</Label>
-        <Input value={values.tax_id || ''} onChange={(e) => onChange({ tax_id: e.target.value })} className="w-full" />
+        <Input aria-label={t('purchasing.taxId')} value={values.tax_id || ''} onChange={(e) => onChange({ tax_id: e.target.value })} className="w-full" />
       </div>
       <div>
         <Label>{t('purchasing.paymentTerms')}</Label>
-        <Input value={values.payment_terms || ''} onChange={(e) => onChange({ payment_terms: e.target.value })} className="w-full" />
+        <Input aria-label={t('purchasing.paymentTerms')} value={values.payment_terms || ''} onChange={(e) => onChange({ payment_terms: e.target.value })} className="w-full" />
       </div>
     </div>
   )
@@ -199,7 +199,7 @@ export function CreateVendorModal({ onClose, userEmail, onSuccess }) {
       <div className="space-y-3">
         <div>
           <Label required>{t('purchasing.vendorName')}</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} className="w-full" autoFocus />
+          <Input aria-label={t('purchasing.vendorName')} value={name} onChange={(e) => setName(e.target.value)} className="w-full" autoFocus />
         </div>
         <VendorFieldsSection values={vendorFields} onChange={(patch) => setVendorFields((v) => ({ ...v, ...patch }))} t={t} />
         <div className="flex justify-end gap-2 pt-2">
@@ -244,7 +244,7 @@ export function VendorEditModal({ vendor, onClose, userEmail, onSuccess }) {
       <div className="space-y-3">
         <div>
           <Label required>{t('purchasing.vendorName')}</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} className="w-full" autoFocus />
+          <Input aria-label={t('purchasing.vendorName')} value={name} onChange={(e) => setName(e.target.value)} className="w-full" autoFocus />
         </div>
         <VendorFieldsSection values={vendorFields} onChange={(patch) => setVendorFields((v) => ({ ...v, ...patch }))} t={t} />
         <div className="flex justify-end gap-2 pt-2">
@@ -332,9 +332,9 @@ export function CreatePurchaseOrderModal({ mode = 'create', initial, onClose, ve
             <div className="sm:col-span-2">
               <Label required>{t('purchasing.vendor')}</Label>
               {mode === 'edit' ? (
-                <Input value={vendorName || ''} disabled className="w-full opacity-70" />
+                <Input aria-label={t('purchasing.vendor')} value={vendorName || ''} disabled className="w-full opacity-70" />
               ) : (
-                <Select value={vendorId} onChange={(e) => setVendorId(e.target.value)} className="w-full">
+                <Select aria-label={t('purchasing.vendor')} value={vendorId} onChange={(e) => setVendorId(e.target.value)} className="w-full">
                   <option value="">{t('common.select')}</option>
                   {vendors.map((v) => <option key={v.id} value={v.id}>{v.brand_name}</option>)}
                 </Select>
@@ -342,11 +342,11 @@ export function CreatePurchaseOrderModal({ mode = 'create', initial, onClose, ve
             </div>
             <div>
               <Label>{t('purchasing.issueDate')}</Label>
-              <Input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} className="w-full" />
+              <Input aria-label={t('purchasing.issueDate')} type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} className="w-full" />
             </div>
             <div>
               <Label>{t('purchasing.expectedDeliveryDate')}</Label>
-              <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="w-full" />
+              <Input aria-label={t('purchasing.expectedDeliveryDate')} type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="w-full" />
             </div>
             <div>
               <Label>{t('purchasing.currency')}</Label>
@@ -355,15 +355,15 @@ export function CreatePurchaseOrderModal({ mode = 'create', initial, onClose, ve
                   `purchaseOrder.currency || layout.currency || 'EGP'` — so a blank
                   field produced EGP while the hint promised USD. PDF_LAYOUT_DEFAULT
                   is the same constant getPdfLayout() falls back to. */}
-              <Input value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full" placeholder={PDF_LAYOUT_DEFAULT.currency} />
+              <Input aria-label={t('purchasing.currency')} value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full" placeholder={PDF_LAYOUT_DEFAULT.currency} />
             </div>
             <div>
               <Label>{t('purchasing.paymentTerms')}</Label>
-              <Input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} className="w-full" />
+              <Input aria-label={t('purchasing.paymentTerms')} value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} className="w-full" />
             </div>
             <div className="sm:col-span-2">
               <Label>{t('purchasing.deliveryTerms')}</Label>
-              <Input value={deliveryTerms} onChange={(e) => setDeliveryTerms(e.target.value)} className="w-full" />
+              <Input aria-label={t('purchasing.deliveryTerms')} value={deliveryTerms} onChange={(e) => setDeliveryTerms(e.target.value)} className="w-full" />
             </div>
           </div>
 
@@ -389,22 +389,22 @@ export function CreatePurchaseOrderModal({ mode = 'create', initial, onClose, ve
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>{t('purchasing.shippingAddress')}</Label>
-              <Textarea value={shippingAddress} onChange={(e) => setShippingAddress(e.target.value)} rows={2} className="w-full" />
+              <Textarea aria-label={t('purchasing.shippingAddress')} value={shippingAddress} onChange={(e) => setShippingAddress(e.target.value)} rows={2} className="w-full" />
             </div>
             <div>
               <Label>{t('purchasing.billingAddress')}</Label>
-              <Textarea value={billingAddress} onChange={(e) => setBillingAddress(e.target.value)} rows={2} className="w-full" />
+              <Textarea aria-label={t('purchasing.billingAddress')} value={billingAddress} onChange={(e) => setBillingAddress(e.target.value)} rows={2} className="w-full" />
             </div>
           </div>
 
           {/* Terms & notes */}
           <div>
             <Label>{t('purchasing.termsConditions')}</Label>
-            <Textarea value={termsConditions} onChange={(e) => setTermsConditions(e.target.value)} rows={2} className="w-full" />
+            <Textarea aria-label={t('purchasing.termsConditions')} value={termsConditions} onChange={(e) => setTermsConditions(e.target.value)} rows={2} className="w-full" />
           </div>
           <div>
             <Label>{t('purchasing.notes')}</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full" />
+            <Textarea aria-label={t('purchasing.notes')} value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full" />
           </div>
 
           {/* Actions */}
@@ -483,16 +483,16 @@ export function VendorInvoiceFormModal({ mode, initial, vendors, userEmail, onCl
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>{t('purchasing.invoiceDate')}</Label>
-            <Input type="date" value={invoiceDate || ''} onChange={(e) => setInvoiceDate(e.target.value)} className="w-full" />
+            <Input aria-label={t('purchasing.invoiceDate')} type="date" value={invoiceDate || ''} onChange={(e) => setInvoiceDate(e.target.value)} className="w-full" />
           </div>
           <div>
             <Label>{t('purchasing.dueDate')}</Label>
-            <Input type="date" value={dueDate || ''} onChange={(e) => setDueDate(e.target.value)} className="w-full" />
+            <Input aria-label={t('purchasing.dueDate')} type="date" value={dueDate || ''} onChange={(e) => setDueDate(e.target.value)} className="w-full" />
           </div>
         </div>
         <div>
           <Label>{t('purchasing.notes')}</Label>
-          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full" />
+          <Textarea aria-label={t('purchasing.notes')} value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full" />
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
@@ -622,25 +622,25 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
             </div>
             <div>
               <Label required>{t('accounting.amount')}</Label>
-              <Input type="number" min={0.01} step={0.01} value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <Input aria-label={t('accounting.amount')} type="number" min={0.01} step={0.01} value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
             <div>
               <Label>{t('accounting.method')}</Label>
-              <Select value={method} onChange={(e) => setMethod(e.target.value)}>
+              <Select aria-label={t('accounting.method')} value={method} onChange={(e) => setMethod(e.target.value)}>
                 {METHODS.map((m) => <option key={m} value={m}>{t(METHOD_LABEL_KEY[m])}</option>)}
               </Select>
             </div>
             <div>
               <Label>{t('accounting.reference')}</Label>
-              <Input value={referenceNumber} onChange={(e) => setReferenceNumber(e.target.value)} />
+              <Input aria-label={t('accounting.reference')} value={referenceNumber} onChange={(e) => setReferenceNumber(e.target.value)} />
             </div>
             <div>
               <Label>{t('accounting.colDate')}</Label>
-              <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
+              <Input aria-label={t('accounting.colDate')} type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
             </div>
             <div className="sm:col-span-2">
               <Label>{t('salesDocuments.fNotes')}</Label>
-              <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <Textarea aria-label={t('salesDocuments.fNotes')} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
           </div>
 

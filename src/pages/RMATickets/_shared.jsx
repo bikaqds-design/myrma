@@ -59,7 +59,7 @@ export function ShortcutsHelp({ onClose }) {
 // and carries the whole product so the caller can keep its id. Typing instead
 // fires onChange alone — the caller treats that as "no longer a catalog
 // product" and clears any id it was holding.
-export function ProductSearchInput({ value, onChange, onSelectProduct, products = [], placeholder = 'Search or type product name…', className = '', inputClassName = '' }) {
+export function ProductSearchInput({ value, onChange, onSelectProduct, products = [], placeholder = 'Search or type product name…', className = '', inputClassName = '', 'aria-label': ariaLabel }) {
   const [query, setQuery] = useState(value || '')
   const [open, setOpen] = useState(false)
   const containerRef = useRef(null)
@@ -80,6 +80,7 @@ export function ProductSearchInput({ value, onChange, onSelectProduct, products 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <input
+        aria-label={ariaLabel}
         value={query}
         onChange={(e) => { setQuery(e.target.value); onChange(e.target.value); setOpen(true) }}
         onFocus={() => { if (query.trim()) setOpen(true) }}

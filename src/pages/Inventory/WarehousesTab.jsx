@@ -1102,7 +1102,7 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
             <label className="block text-xs font-semibold text-gray-700 mb-1.5">
               {t('inventory.warehouseNameRequired')}
             </label>
-            <input
+            <input aria-label={t('inventory.warehouseNameRequired')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t('inventory.warehouseNamePlaceholder')}
@@ -1116,7 +1116,7 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                 {t('inventory.warehouseCodeLabel')}
               </label>
-              <input
+              <input aria-label={t('inventory.warehouseCodeLabel')}
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 disabled={isSystem}
@@ -1127,7 +1127,7 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                 {t('inventory.warehouseLocationLabel')}
               </label>
-              <input
+              <input aria-label={t('inventory.warehouseLocationLabel')}
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder={t('inventory.locationPlaceholder')}
@@ -1139,7 +1139,7 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
             <label className="block text-xs font-semibold text-gray-700 mb-1.5">
               {t('inventory.warehouseDescLabel')}
             </label>
-            <textarea
+            <textarea aria-label={t('inventory.warehouseDescLabel')}
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               rows={2}
@@ -1152,7 +1152,7 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                 {t('inventory.warehouseTypeLabel')}
               </label>
-              <select
+              <select aria-label={t('inventory.warehouseTypeLabel')}
                 value={warehouseType}
                 onChange={(e) => setWarehouseType(e.target.value)}
                 disabled={isSystem}
@@ -1170,7 +1170,7 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                 {t('inventory.warehouseManagerLabel')}
               </label>
-              <input
+              <input aria-label={t('inventory.warehouseManagerLabel')}
                 value={manager}
                 onChange={(e) => setManager(e.target.value)}
                 placeholder={t('inventory.warehouseManagerPlaceholder')}
@@ -1182,7 +1182,7 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
             <label className="block text-xs font-semibold text-gray-700 mb-1.5">
               {t('inventory.warehouseNotesLabel')}
             </label>
-            <textarea
+            <textarea aria-label={t('inventory.warehouseNotesLabel')}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
