@@ -324,5 +324,18 @@ The orphan row itself was deleted, after re-confirming immediately beforehand
 that its parent really was gone. Activities 172 → 171. Row-level rollback is
 section 5 of the manual file.
 
-**Not applied yet:** migration `20260776` needs pasting into Supabase.
+**Applied 2026-08-17 and verified against the live database**, on throwaway
+records rather than real ones:
 
+- A customer with one activity and one note, deleted through
+  `db.customers.delete()`: activity 1 → 0, note 1 → 0, customer gone. Before the
+  migration the activity would have survived.
+- The guard the migration had to preserve, tested by giving a throwaway customer
+  a throwaway RMA ticket: the delete was refused with the ticket message, and
+  **nothing was removed before the refusal** — the customer and its activity were
+  both still there afterwards. That ordering matters now that the activity delete
+  runs inside the same function; a guard that fired after the deletes would be
+  worse than no guard.
+
+Table-wide orphaned customer activities: 0. Totals back to 888 customers, 13
+tickets, 171 activities, with no fixture residue.
