@@ -315,7 +315,7 @@ export function OverviewTab({
                       >
                         {row.product_name}
                         {!row.in_catalog && (
-                          <span className="ml-2 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2] align-middle">
+                          <span className="ml-2 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2] align-middle">
                             {t('inventory.notInCatalog')}
                           </span>
                         )}

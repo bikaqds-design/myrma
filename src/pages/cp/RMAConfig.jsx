@@ -27,8 +27,8 @@ const DEFAULT_SETTINGS = {
 const PRIORITY_COLORS = {
   Low: 'bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#9aa4b2]',
   Medium: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
-  High: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
-  Critical: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
+  High: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300',
+  Critical: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
 }
 
 export default function RMAConfig({ currentUserEmail }) {

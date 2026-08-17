@@ -864,8 +864,8 @@ export default function Customers({
     const map = {
       Active:    'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400',
       Inactive:  'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
-      Suspended: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
-      VIP:       'bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-400',
+      Suspended: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
+      VIP:       'bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-300',
     }
     return (
       <span
@@ -989,7 +989,7 @@ export default function Customers({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t('customers.searchPlaceholder')}
                   aria-label={t('customers.searchPlaceholder')}
-                  className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#777268] dark:placeholder:text-[#768292]"
+                  className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
                 />
                 <svg
                   className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"

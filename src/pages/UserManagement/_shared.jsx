@@ -18,7 +18,7 @@ export function StatusBadge({ status }) {
   const badges = {
     active:      'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400',
     suspended:   'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400',
-    locked:      'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400',
+    locked:      'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300',
     deactivated: 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]',
     pending:     'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400',
   }
@@ -42,8 +42,8 @@ export function StatusBadge({ status }) {
 
 export function RoleBadge({ role }) {
   const badges = {
-    super_admin: 'bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-400',
-    admin:       'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-800 dark:text-indigo-400',
+    super_admin: 'bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-300',
+    admin:       'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-800 dark:text-indigo-300',
     manager:     'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400',
     technician:  'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400',
     viewer:      'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]',

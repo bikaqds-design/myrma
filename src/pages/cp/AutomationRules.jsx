@@ -424,7 +424,7 @@ export default function AutomationRules({ currentUserEmail }) {
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-sm text-gray-900 dark:text-[#e8ebf0]">{rule.name}</span>
                     <span
-                      className={`px-2 py-0.5 text-xs rounded-full font-medium ${rule.enabled ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'}`}
+                      className={`px-2 py-0.5 text-xs rounded-full font-medium ${rule.enabled ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'}`}
                     >
                       {rule.enabled ? t('cp.active') : t('cp.disabled')}
                     </span>

@@ -7,9 +7,9 @@ import { LEAD_STATUS_LIST } from '../../lib/constants'
 const STATUS_BADGE = {
   new:          'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
   contacted:    'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
-  qualified:    'bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400',
+  qualified:    'bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300',
   nurturing:    'bg-teal-100 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400',
-  inactive:     'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
+  inactive:     'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300',
   converted:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
   disqualified: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
 }
@@ -94,7 +94,7 @@ export default function LeadsKanbanView({ leads, onStatusChange, canEdit }) {
                   <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${STATUS_BADGE[status]}`}>
                     {t(`leadStatus.${status}`)}
                   </span>
-                  <span className="text-xs font-semibold text-gray-400 dark:text-[#768292]">
+                  <span className="text-xs font-semibold text-gray-400 dark:text-[#a4acb7]">
                     {statusLeads.length}
                   </span>
                 </div>
@@ -142,7 +142,7 @@ export default function LeadsKanbanView({ leads, onStatusChange, canEdit }) {
                                     {lead.company_name || lead.full_name}
                                   </p>
                                   {lead.company_name && (
-                                    <p className="text-[11px] text-gray-400 dark:text-[#768292] truncate">{lead.full_name}</p>
+                                    <p className="text-[11px] text-gray-400 dark:text-[#a4acb7] truncate">{lead.full_name}</p>
                                   )}
                                 </div>
                               </div>
@@ -187,7 +187,7 @@ export default function LeadsKanbanView({ leads, onStatusChange, canEdit }) {
                                 )}
                               </div>
                               {lead.created_at && (
-                                <p className="text-[10px] text-gray-400 dark:text-[#768292] mt-1.5">
+                                <p className="text-[10px] text-gray-400 dark:text-[#a4acb7] mt-1.5">
                                   {new Date(lead.created_at).toLocaleDateString()}
                                 </p>
                               )}
@@ -200,7 +200,7 @@ export default function LeadsKanbanView({ leads, onStatusChange, canEdit }) {
                     {provided.placeholder}
 
                     {statusLeads.length === 0 && !snapshot.isDraggingOver && (
-                      <div className="py-6 text-center text-xs text-gray-400 dark:text-[#768292]">
+                      <div className="py-6 text-center text-xs text-gray-400 dark:text-[#a4acb7]">
                         {isTerminal ? '—' : t('leads.dropHere')}
                       </div>
                     )}

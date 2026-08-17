@@ -87,7 +87,7 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
   }
 
   const lbl = 'block text-xs font-medium text-[#6c6760] dark:text-[#9aa4b2] mb-1'
-  const inp = 'w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] placeholder-[#777268] dark:placeholder-[#768292] focus:outline-none focus:border-[#4338ca] dark:focus:border-[#a5b4fc] transition-colors'
+  const inp = 'w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] placeholder-[#746f65] dark:placeholder-[#a4acb7] focus:outline-none focus:border-[#4338ca] dark:focus:border-[#a5b4fc] transition-colors'
 
   return (
     <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
@@ -139,7 +139,7 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
               <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2] mb-4">This appears on emails and PDF reports sent to customers.</p>
               <label className={lbl}>Company Name</label>
               <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="e.g. Acme Repairs Ltd." className={inp} autoFocus />
-              <p className="text-xs text-[#777268] dark:text-[#768292] mt-2">You can set a logo and full branding later in <strong>Control Panel → Branding</strong>.</p>
+              <p className="text-xs text-[#746f65] dark:text-[#a4acb7] mt-2">You can set a logo and full branding later in <strong>Control Panel → Branding</strong>.</p>
             </div>
           )}
 
@@ -221,7 +221,7 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
             )}
             {step < TOTAL && step !== 4 && (
               <div className="flex items-center gap-2 ml-auto">
-                <button onClick={next} className="text-xs text-[#777268] dark:text-[#768292] hover:underline">Skip</button>
+                <button onClick={next} className="text-xs text-[#746f65] dark:text-[#a4acb7] hover:underline">Skip</button>
                 <button
                   onClick={step === 2 ? saveBranding : step === 3 ? saveCustomer : next}
                   disabled={savingBranding || savingCust}
@@ -232,7 +232,7 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
               </div>
             )}
             {step === 4 && (
-              <button onClick={next} className="text-xs text-[#777268] dark:text-[#768292] hover:underline ml-auto">Skip for now</button>
+              <button onClick={next} className="text-xs text-[#746f65] dark:text-[#a4acb7] hover:underline ml-auto">Skip for now</button>
             )}
             {step === TOTAL && (
               <button onClick={finish}

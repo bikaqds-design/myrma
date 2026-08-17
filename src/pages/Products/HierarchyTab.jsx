@@ -42,7 +42,7 @@ export default function HierarchyTab({
 
   const statusPill = (status) => (
     <span
-      className={`px-2 py-0.5 text-xs rounded-full font-medium ${status === 'active' ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'}`}
+      className={`px-2 py-0.5 text-xs rounded-full font-medium ${status === 'active' ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'}`}
     >
       {status}
     </span>
@@ -551,7 +551,7 @@ export default function HierarchyTab({
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span
-                      className={`px-2 py-0.5 text-xs rounded-full font-medium ${product.status === 'active' ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' : product.status === 'discontinued' ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'}`}
+                      className={`px-2 py-0.5 text-xs rounded-full font-medium ${product.status === 'active' ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' : product.status === 'discontinued' ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'}`}
                     >
                       {product.status}
                     </span>

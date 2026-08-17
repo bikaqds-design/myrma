@@ -153,7 +153,7 @@ export default function Breadcrumb() {
           <span key={i} className="flex items-center gap-1">
             {i > 0 && (
               <svg
-                className={`w-3 h-3 text-[#777268] dark:text-[#768292] flex-shrink-0 ${isRtl ? 'rotate-180' : ''}`}
+                className={`w-3 h-3 text-[#746f65] dark:text-[#a4acb7] flex-shrink-0 ${isRtl ? 'rotate-180' : ''}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"

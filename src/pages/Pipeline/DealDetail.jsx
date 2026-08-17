@@ -31,7 +31,7 @@ const STAGE_COLORS = [
 function probColor(prob) {
   if (prob >= 75) return 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
   if (prob >= 50) return 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400'
-  if (prob >= 25) return 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
+  if (prob >= 25) return 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300'
   return 'bg-gray-100 text-gray-600 dark:bg-[#1a2230] dark:text-[#9aa4b2]'
 }
 
@@ -51,10 +51,10 @@ function qtStatusCls(status) {
     draft:     'bg-gray-100 text-gray-600 dark:bg-[#1a2230] dark:text-[#9aa4b2]',
     sent:      'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
     accepted:  'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400',
-    declined:  'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400',
+    declined:  'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300',
     expired:   'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
-    cancelled: 'bg-gray-100 text-gray-500 dark:bg-[#1a2230] dark:text-[#768292]',
-    converted: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400',
+    cancelled: 'bg-gray-100 text-gray-600 dark:bg-[#1a2230] dark:text-[#a4acb7]',
+    converted: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300',
   }
   return map[status] ?? map.draft
 }
@@ -782,7 +782,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
           onChange={(e) => setQtNotes(e.target.value)}
           placeholder={t('pipeline.quotationNotesPlaceholder')}
           rows={4}
-          className="w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-xl text-sm bg-[#f8f9fb] dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#768292] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
+          className="w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-xl text-sm bg-[#f8f9fb] dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#a4acb7] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
         />
       </div>
 
@@ -794,7 +794,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
           <button onClick={addQtLine} className="text-sm text-indigo-600 dark:text-[#a5b4fc] hover:underline">
             {t('salesDocs.addLine')}
           </button>
-          <span className="text-xs text-gray-400 dark:text-[#768292]">
+          <span className="text-xs text-gray-400 dark:text-[#a4acb7]">
             {t('salesDocs.grandTotal')}: {qtEditTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })} {t('pipeline.currency')}
           </span>
         </div>
@@ -899,7 +899,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
                   >
                     {c.company_name || c.contact_person}
                     {c.company_name && c.contact_person && (
-                      <span className="text-xs text-gray-400 dark:text-[#768292] ml-1">· {c.contact_person}</span>
+                      <span className="text-xs text-gray-400 dark:text-[#a4acb7] ml-1">· {c.contact_person}</span>
                     )}
                   </button>
                 ))}
@@ -944,7 +944,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
                   {displayValue > 0 ? `${displayValue.toLocaleString()} ${t('pipeline.currency')}` : `— ${t('pipeline.currency')}`}
                 </span>
                 {hasQuotation && (
-                  <span className="text-xs text-gray-400 dark:text-[#768292]">({t('pipeline.valueLocked')})</span>
+                  <span className="text-xs text-gray-400 dark:text-[#a4acb7]">({t('pipeline.valueLocked')})</span>
                 )}
               </>
             )}
@@ -1016,7 +1016,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
             </span>
           )}
           {deal.status === 'lost' && (
-            <span className="px-3 py-0.5 text-sm rounded-full font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400">
+            <span className="px-3 py-0.5 text-sm rounded-full font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
               ✗ {t('pipeline.lost')}
             </span>
           )}
@@ -1053,7 +1053,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
               {canDo('edit') && (
                 <button
                   onClick={() => setShowLost(true)}
-                  className="px-3 py-1 text-xs rounded-full font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors"
+                  className="px-3 py-1 text-xs rounded-full font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors"
                 >
                   ✗ {t('pipeline.markLost')}
                 </button>
@@ -1066,7 +1066,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
                   className={`px-3 py-1 text-xs rounded-full font-medium transition-colors ${
                     canMarkWon
                       ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/40'
-                      : 'bg-gray-100 dark:bg-[#1a2230] text-gray-400 dark:text-[#768292] cursor-not-allowed'
+                      : 'bg-gray-100 dark:bg-[#1a2230] text-gray-400 dark:text-[#a4acb7] cursor-not-allowed'
                   }`}
                 >
                   ✓ {t('pipeline.markWon')}
@@ -1202,7 +1202,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
 
                     {quotations.length === 0 && editingQtId === null && (
                       <div className="py-6 text-center">
-                        <p className="text-sm text-gray-400 dark:text-[#768292]">{t('pipeline.noQuotation')}</p>
+                        <p className="text-sm text-gray-400 dark:text-[#a4acb7]">{t('pipeline.noQuotation')}</p>
                       </div>
                     )}
 
@@ -1262,7 +1262,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
                           )}
 
                           {qt.line_items.length === 0 ? (
-                            <p className="text-sm text-gray-400 dark:text-[#768292]">{t('pipeline.noProductLines')}</p>
+                            <p className="text-sm text-gray-400 dark:text-[#a4acb7]">{t('pipeline.noProductLines')}</p>
                           ) : (
                             <>
                               <div className="grid grid-cols-[1fr_40px_80px_50px_50px_70px] gap-1.5 text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase mb-1.5 px-1">
@@ -1284,8 +1284,8 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
                                       <span className="truncate">{l.product_name}</span>
                                       <span className="text-center text-gray-500 dark:text-[#9aa4b2]">{l.qty}</span>
                                       <span className="text-right text-gray-500 dark:text-[#9aa4b2]">{Number(l.unit_price).toLocaleString()}</span>
-                                      <span className="text-center text-gray-400 dark:text-[#768292] text-xs">{l.discount_pct ? `${l.discount_pct}%` : '—'}</span>
-                                      <span className="text-center text-gray-400 dark:text-[#768292] text-xs">{l.tax_pct ? `${l.tax_pct}%` : '—'}</span>
+                                      <span className="text-center text-gray-400 dark:text-[#a4acb7] text-xs">{l.discount_pct ? `${l.discount_pct}%` : '—'}</span>
+                                      <span className="text-center text-gray-400 dark:text-[#a4acb7] text-xs">{l.tax_pct ? `${l.tax_pct}%` : '—'}</span>
                                       <span className="text-right font-medium">{(net + tax).toLocaleString()}</span>
                                     </div>
                                   )
@@ -1390,7 +1390,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
                   onChange={(e) => setNotesInput(e.target.value)}
                   placeholder={t('pipeline.dealNotesPlaceholder')}
                   rows={10}
-                  className="w-full px-3 py-2.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-xl text-sm bg-[#f8f9fb] dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#768292] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
+                  className="w-full px-3 py-2.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-xl text-sm bg-[#f8f9fb] dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#a4acb7] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
                 />
                 <div className="flex justify-end">
                   <Button size="sm" onClick={handleSaveNotes} loading={savingNotes} disabled={!canEditDeal}>

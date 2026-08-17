@@ -20,7 +20,7 @@ import {
 // ── Status pill ───────────────────────────────────────────────────────────────
 
 const STATUS_PILL = {
-  converted: 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400',
+  converted: 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300',
   draft:     'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
   sent:      'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
   accepted:  'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
@@ -32,10 +32,10 @@ const STATUS_PILL = {
   paid:      'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
   partial:   'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
   expired:   'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
-  declined:  'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
-  voided:    'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
-  reversed:  'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
-  cancelled: 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#768292]',
+  declined:  'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
+  voided:    'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
+  reversed:  'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
+  cancelled: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#a4acb7]',
   unpaid:    'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
 }
 const statusPillCls = (s) => STATUS_PILL[s] ?? STATUS_PILL.draft

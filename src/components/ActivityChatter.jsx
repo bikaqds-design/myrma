@@ -338,7 +338,7 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                       {uploading ? <Spinner size="sm" /> : '📎'} {t('activityChatter.attach')}
                     </button>
                     <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleSelectFiles} />
-                    <span className="text-xs text-gray-400 dark:text-[#768292]">{noteText.length}/{NOTE_MAX_LENGTH}</span>
+                    <span className="text-xs text-gray-400 dark:text-[#a4acb7]">{noteText.length}/{NOTE_MAX_LENGTH}</span>
                   </div>
                   <Button size="sm" onClick={handlePostNote} loading={submitting} disabled={!noteText.trim() && files.length === 0}>
                     {t('activityChatter.postComment')}
@@ -442,7 +442,7 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                             </button>
                           </div>
                         )}
-                        <p className="text-xs text-gray-400 dark:text-[#768292] mt-2 ml-8">
+                        <p className="text-xs text-gray-400 dark:text-[#a4acb7] mt-2 ml-8">
                           {a.created_by || '—'} · {fmtTime(a.created_at)}
                         </p>
                       </div>
@@ -544,7 +544,7 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                               ))}
                             </div>
                           )}
-                          <div className="text-xs text-gray-400 dark:text-[#768292] mt-1 flex items-center gap-2 flex-wrap">
+                          <div className="text-xs text-gray-400 dark:text-[#a4acb7] mt-1 flex items-center gap-2 flex-wrap">
                             <span>
                               {a.created_by || '—'} · {fmtTime(a.created_at)}
                               {isCompletedActivity && ` · ✓ ${t('activityChatter.completed')}`}
@@ -570,7 +570,7 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                               {replies.map((r) => (
                                 <li key={r.id}>
                                   <p className="text-sm text-gray-800 dark:text-[#e8ebf0] whitespace-pre-wrap">{r.title}</p>
-                                  <div className="text-xs text-gray-400 dark:text-[#768292] mt-0.5">
+                                  <div className="text-xs text-gray-400 dark:text-[#a4acb7] mt-0.5">
                                     {r.created_by || '—'} · {fmtTime(r.created_at)}
                                   </div>
                                 </li>

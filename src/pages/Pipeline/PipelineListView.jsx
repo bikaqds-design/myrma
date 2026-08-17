@@ -8,11 +8,15 @@ import { useConfirm } from '../../hooks/useConfirm'
 const SURFACE = 'bg-white dark:bg-[#121823]'
 const BORDER = 'border-[#e6e9ef] dark:border-[#212a38]'
 
+// The arrows are the only signal that a column is sortable, so they are treated
+// as content rather than decoration. text-gray-400 measured 2.41:1 in light and
+// the unsorted arrow was #2a3441 in dark, 1.45:1 — effectively invisible against
+// the header it sits in. indigo-500 for the active arrow was 4.24, also short.
 function SortIcon({ col, sortCol, sortDir }) {
   if (col !== sortCol)
-    return <span className="text-gray-300 dark:text-[#2a3441] ml-1 text-[10px]">↕</span>
+    return <span className="text-gray-600 dark:text-[#7c8ba5] ml-1 text-[10px]">↕</span>
   return (
-    <span className="text-indigo-500 dark:text-[#a5b4fc] ml-1 text-[10px]">
+    <span className="text-indigo-600 dark:text-[#a5b4fc] ml-1 text-[10px]">
       {sortDir === 'asc' ? '↑' : '↓'}
     </span>
   )
@@ -23,10 +27,10 @@ const OPEN_STAGE_COLORS = [
   'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/40',
   'bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400 hover:bg-cyan-200 dark:hover:bg-cyan-900/40',
   'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/40',
-  'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/40',
-  'bg-pink-100 dark:bg-pink-900/20 text-pink-700 dark:text-pink-400 hover:bg-pink-200 dark:hover:bg-pink-900/40',
+  'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-900/40',
+  'bg-pink-100 dark:bg-pink-900/20 text-pink-700 dark:text-pink-300 hover:bg-pink-200 dark:hover:bg-pink-900/40',
   'bg-teal-100 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-900/40',
-  'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-900/40',
+  'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/40',
 ]
 
 const OPEN_STAGE_DOTS = [
@@ -42,7 +46,7 @@ function StagePin({ deal, stages, stageMap, open, onToggle, onMove }) {
     stage?.is_won
       ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400'
       : stage?.is_lost
-        ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+        ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300'
         : OPEN_STAGE_COLORS[stageIndex >= 0 ? stageIndex % OPEN_STAGE_COLORS.length : 0]
 
   return (
@@ -384,7 +388,7 @@ export default function PipelineListView({
                         />
                       </td>
                       {/* Row number */}
-                      <td className="px-2 py-3 text-xs text-[#777268] dark:text-[#768292] font-mono">{startIndex + ri + 1}</td>
+                      <td className="px-2 py-3 text-xs text-[#746f65] dark:text-[#a4acb7] font-mono">{startIndex + ri + 1}</td>
                       {/* Deal code */}
                       <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                         <button

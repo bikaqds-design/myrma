@@ -60,7 +60,7 @@ export default function AIAssist({ contextType, data, className = '' }) {
         </div>
         <button
           onClick={run}
-          className="text-[11px] text-[#777268] dark:text-[#768292] hover:text-[#4338ca] dark:hover:text-[#a5b4fc] transition-colors"
+          className="text-[11px] text-[#746f65] dark:text-[#a4acb7] hover:text-[#4338ca] dark:hover:text-[#a5b4fc] transition-colors"
         >
           Regenerate
         </button>

@@ -57,7 +57,25 @@ html.dark .bg-pink-50 {
   background-color: #2d0a1a !important;
 }
 
-/* Text */
+/* Text
+ *
+ * These !important overrides beat any dark: utility on the same element, which
+ * is why the status pills stayed unreadable however their classes were written:
+ * a pill marked `text-gray-500 dark:text-[#768292]` still rendered #64748b.
+ *
+ * The old ladder mirrored the light palette by getting darker as the number
+ * fell, but on dark surfaces darker means less contrast, not more subtlety.
+ * Against .bg-gray-100 (#334155 here) that gave 500 -> 2.18:1 and 400 -> 1.37:1,
+ * with 400 nearly invisible.
+ *
+ * The ordering is preserved but compressed upward so the faintest still clears
+ * 4.5:1. Four clearly distinct greys are not available above the AA floor on
+ * this background, so the steps are close together; separation between levels of
+ * emphasis has to come from weight and size, not colour alone.
+ *
+ * Ratios below are against #334155, the lightest surface these appear on; both
+ * darker surfaces score higher.
+ */
 html.dark .text-gray-900 {
   color: #f1f5f9 !important;
 }
@@ -65,16 +83,34 @@ html.dark .text-gray-800 {
   color: #e2e8f0 !important;
 }
 html.dark .text-gray-700 {
-  color: #cbd5e1 !important;
+  color: #cbd5e1 !important; /* 6.97 */
 }
 html.dark .text-gray-600 {
-  color: #94a3b8 !important;
+  color: #bcc5d2 !important; /* 5.94 — was #94a3b8, 4.04 */
 }
 html.dark .text-gray-500 {
-  color: #64748b !important;
+  color: #aeb9c9 !important; /* 5.22 — was #64748b, 2.18 */
 }
 html.dark .text-gray-400 {
-  color: #475569 !important;
+  color: #a1aec1 !important; /* 4.61 — was #475569, 1.37 */
+}
+
+/* Accent text
+ *
+ * text-indigo-600 is the link and accent colour and was written without a dark:
+ * variant, so it stayed #4f46e5 on dark surfaces — 1.82:1 on a table row. The
+ * clickable RMA numbers and customer emails were the least readable text in the
+ * app while also being the things you are meant to click.
+ *
+ * indigo-300 clears 4.5:1 on every dark surface here (5.19 on the lightest,
+ * .bg-gray-100). It also tints checkbox accents, which use text-* for the check
+ * mark; lighter is correct there too.
+ */
+html.dark .text-indigo-600 {
+  color: #a5b4fc !important; /* 5.19 on #334155, 7.34 on #1e293b */
+}
+html.dark .hover\:text-indigo-800:hover {
+  color: #c7d2fe !important;
 }
 
 /* Borders */

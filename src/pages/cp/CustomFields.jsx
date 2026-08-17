@@ -245,7 +245,7 @@ export default function CustomFields({ currentUserEmail }) {
                 </td>
                 <td className="px-4 py-3">
                   <span
-                    className={`px-2 py-0.5 rounded text-xs font-medium ${f.applies_to === 'ticket' ? 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400' : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'}`}
+                    className={`px-2 py-0.5 rounded text-xs font-medium ${f.applies_to === 'ticket' ? 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'}`}
                   >
                     {f.applies_to}
                   </span>

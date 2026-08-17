@@ -48,9 +48,9 @@ const PRODUCT_STATUS_COLORS = {
   Received:      'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
   'Under Repair':'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
   Repaired:      'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
-  "Can't Repair":'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
-  Replacement:   'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400',
-  'Credit Note': 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
+  "Can't Repair":'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
+  Replacement:   'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300',
+  'Credit Note': 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300',
 }
 
 // All 7 ticket statuses shown in the progress bar in order.

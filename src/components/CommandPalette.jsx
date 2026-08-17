@@ -140,7 +140,7 @@ export default function CommandPalette({ onSelectTicket, onSelectProduct, inputR
           // and it disappears the moment anything is typed. This input sits in
           // the app header on every page, so it was one violation everywhere.
           aria-label={t('commandPalette.searchPlaceholder')}
-          className="flex-1 text-xs outline-none bg-transparent text-[#211f1b] dark:text-[#e8ebf0] placeholder-[#777268] dark:placeholder-[#768292] min-w-0"
+          className="flex-1 text-xs outline-none bg-transparent text-[#211f1b] dark:text-[#e8ebf0] placeholder-[#746f65] dark:placeholder-[#a4acb7] min-w-0"
         />
         {loading ? (
           <svg className="w-3 h-3 text-[#6c6760] dark:text-[#9aa4b2] animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
@@ -160,7 +160,7 @@ export default function CommandPalette({ onSelectTicket, onSelectProduct, inputR
               {ticketResults.length > 0 && (
                 <>
                   <li className="px-4 pt-2 pb-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[#777268] dark:text-[#768292]">{t('commandPalette.ticketsSection')}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[#746f65] dark:text-[#a4acb7]">{t('commandPalette.ticketsSection')}</span>
                   </li>
                   {ticketResults.map((item) => {
                     const idx = results.indexOf(item)
@@ -187,7 +187,7 @@ export default function CommandPalette({ onSelectTicket, onSelectProduct, inputR
               {productResults.length > 0 && (
                 <>
                   <li className={`px-4 pb-1 ${ticketResults.length > 0 ? 'pt-3 mt-1 border-t border-[#f0f2f6] dark:border-[#1a2230]' : 'pt-2'}`}>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[#777268] dark:text-[#768292]">{t('commandPalette.productsSection')}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[#746f65] dark:text-[#a4acb7]">{t('commandPalette.productsSection')}</span>
                   </li>
                   {productResults.map((item) => {
                     const idx = results.indexOf(item)

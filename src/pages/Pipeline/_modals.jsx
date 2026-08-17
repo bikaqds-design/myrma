@@ -247,7 +247,7 @@ export function CreateDealModal({ form, setForm, dealCode, customers, contacts =
               onChange={(e) => set('probability', Number(e.target.value))}
               className="w-full accent-indigo-600 dark:accent-[#a5b4fc] h-2 cursor-pointer"
             />
-            <div className="flex justify-between text-xs text-gray-400 dark:text-[#768292] mt-0.5">
+            <div className="flex justify-between text-xs text-gray-400 dark:text-[#a4acb7] mt-0.5">
               <span>0%</span><span>50%</span><span>100%</span>
             </div>
           </Field>

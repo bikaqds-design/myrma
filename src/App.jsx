@@ -295,7 +295,7 @@ function MfaChallenge({ onVerify, onCancel }) {
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
             placeholder="000000"
             autoFocus
-            className={`w-full text-center text-2xl font-mono tracking-[0.5em] rounded-lg border px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-[#0f1520] border-[#212a38] text-[#e8ebf0] placeholder-[#768292]' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'}`}
+            className={`w-full text-center text-2xl font-mono tracking-[0.5em] rounded-lg border px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-[#0f1520] border-[#212a38] text-[#e8ebf0] placeholder-[#a4acb7]' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'}`}
           />
           {error && <p className="text-xs text-red-500 text-center">{error}</p>}
           <button
@@ -1010,7 +1010,7 @@ export default function App() {
                 onClick={() => updateAppearance({ sidebarCompact: false }, currentUser?.email)}
                 title="Expand sidebar"
                 aria-label="Expand sidebar"
-                className="w-10 h-10 flex items-center justify-center rounded-lg text-[#777268] dark:text-[#768292] hover:text-[#211f1b] dark:hover:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
+                className="w-10 h-10 flex items-center justify-center rounded-lg text-[#746f65] dark:text-[#a4acb7] hover:text-[#211f1b] dark:hover:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
@@ -1043,7 +1043,7 @@ export default function App() {
                   onClick={() => updateAppearance({ sidebarCompact: true }, currentUser?.email)}
                   title="Collapse sidebar"
                   aria-label="Collapse sidebar"
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-[#777268] dark:text-[#768292] hover:text-[#211f1b] dark:hover:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors lg:flex hidden"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-[#746f65] dark:text-[#a4acb7] hover:text-[#211f1b] dark:hover:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors lg:flex hidden"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
@@ -1052,7 +1052,7 @@ export default function App() {
                 <button
                   onClick={() => setSidebarOpen(false)}
                   aria-label="Close navigation"
-                  className="lg:hidden w-8 h-8 flex items-center justify-center text-[#777268] dark:text-[#768292] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
+                  className="lg:hidden w-8 h-8 flex items-center justify-center text-[#746f65] dark:text-[#a4acb7] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1107,7 +1107,7 @@ export default function App() {
             {!sidebarCompact && (
               <span className="flex items-center gap-1.5">
                 {t('nav.customerTracker')}
-                <svg className="w-3 h-3 text-[#777268] dark:text-[#768292]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3 text-[#746f65] dark:text-[#a4acb7]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
               </span>
@@ -1242,7 +1242,7 @@ export default function App() {
                 <div className="text-[11px] text-[#6c6760] dark:text-[#9aa4b2] capitalize mt-0.5">{currentUserRole}</div>
               </div>
               <svg
-                className="w-4 h-4 text-[#777268] dark:text-[#768292] flex-shrink-0"
+                className="w-4 h-4 text-[#746f65] dark:text-[#a4acb7] flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"

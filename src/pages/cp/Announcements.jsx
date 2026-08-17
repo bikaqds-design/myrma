@@ -30,7 +30,7 @@ const TYPE_STYLES = {
     icon: '✅',
   },
   error: {
-    badge: 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400',
+    badge: 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300',
     bar: 'bg-red-50 border-red-200 text-red-900',
     icon: '🚨',
   },

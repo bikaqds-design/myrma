@@ -18,9 +18,9 @@ import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 const STATUS_BADGE = {
   new:          'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
   contacted:    'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
-  qualified:    'bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400',
+  qualified:    'bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300',
   nurturing:    'bg-teal-100 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400',
-  inactive:     'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
+  inactive:     'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300',
   converted:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
   disqualified: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
 }
@@ -37,7 +37,7 @@ const SOURCE_BADGE = {
 const DEAL_STATUS_BADGE = {
   open: 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-[#a5b4fc]',
   won:  'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
-  lost: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
+  lost: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
 }
 
 const CARD = 'bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-[18px]'
@@ -623,7 +623,7 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
                   onChange={(e) => setNotesInput(e.target.value)}
                   placeholder={t('leads.leadNotesPlaceholder')}
                   rows={10}
-                  className="w-full px-3 py-2.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-xl text-sm bg-[#f8f9fb] dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#768292] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
+                  className="w-full px-3 py-2.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-xl text-sm bg-[#f8f9fb] dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#a4acb7] focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
                 />
                 <div className="flex justify-end">
                   <Button size="sm" onClick={handleSaveNotes} loading={savingNotes} disabled={!canEdit}>

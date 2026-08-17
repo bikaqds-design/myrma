@@ -290,12 +290,12 @@ export default function NotificationBell({
                   </svg>
                 </div>
                 <p className="text-sm font-medium text-gray-500 dark:text-[#9aa4b2]">{t('notifications.noNotificationsYet')}</p>
-                <p className="text-xs text-gray-500 dark:text-[#768292] mt-1">{t('notifications.noNotificationsHint')}</p>
+                <p className="text-xs text-gray-500 dark:text-[#a4acb7] mt-1">{t('notifications.noNotificationsHint')}</p>
               </div>
             ) : (
               grouped.map(([category, items]) => (
                 <div key={category}>
-                  <p className="sticky top-0 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-[#768292] bg-gray-50/90 dark:bg-[#0f1520]/90 backdrop-blur-sm">
+                  <p className="sticky top-0 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-[#a4acb7] bg-gray-50/90 dark:bg-[#0f1520]/90 backdrop-blur-sm">
                     {t(CATEGORY_LABEL_KEYS[category])}
                   </p>
                   {items.map((n) => {
@@ -326,7 +326,7 @@ export default function NotificationBell({
                           </div>
                           <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5 line-clamp-2">{n.message}</p>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs text-gray-500 dark:text-[#768292]">{timeAgo(n.created_date, t, i18n.language)}</span>
+                            <span className="text-xs text-gray-500 dark:text-[#a4acb7]">{timeAgo(n.created_date, t, i18n.language)}</span>
                             {n.entity_ref && (
                               <>
                                 <span className="text-gray-300 dark:text-[#212a38]">·</span>

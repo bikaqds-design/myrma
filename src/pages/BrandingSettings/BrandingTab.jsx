@@ -362,7 +362,7 @@ export default function BrandingTab({
         </div>
 
         <BRow label="Sidebar Position" desc="Coming soon — left or right sidebar" border={false}>
-          <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2] rounded-full font-medium">
+          <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2] rounded-full font-medium">
             Soon
           </span>
         </BRow>

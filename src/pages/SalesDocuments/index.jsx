@@ -16,7 +16,7 @@ import { useConfirm } from '../../hooks/useConfirm'
 
 // ── Document type badges ─────────────────────────────────────────────────────
 const DOC_TYPE_BADGE = {
-  quotation:   'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400',
+  quotation:   'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300',
   sales_order: 'bg-teal-100 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400',
   invoice:     'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
   credit_note: 'bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400',
@@ -43,10 +43,10 @@ const STATUS_PILL = {
   paid:      'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
   partial:   'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
   expired:   'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
-  declined:  'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
-  voided:    'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
-  reversed:  'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
-  cancelled: 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#768292]',
+  declined:  'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
+  voided:    'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
+  reversed:  'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
+  cancelled: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#a4acb7]',
   unpaid:    'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
 }
 
@@ -81,7 +81,7 @@ function SortableHeader({ label, sortKey, sortConfig, onSort }) {
           </svg>
         )
       ) : (
-        <svg className="w-3.5 h-3.5 text-gray-300 dark:text-[#768292] ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-3.5 h-3.5 text-gray-300 dark:text-[#a4acb7] ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
         </svg>
       )}
@@ -459,7 +459,7 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={t('salesDocuments.searchPlaceholder')}
                   aria-label={t('salesDocuments.searchPlaceholder')}
-                  className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#777268] dark:placeholder:text-[#768292]"
+                  className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
                 />
                 <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -642,7 +642,7 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
                 <tr>
                   <td colSpan={showTypeCol ? 10 : 9}>
                     <div className="py-16 flex flex-col items-center text-center">
-                      <svg className="w-12 h-12 text-[#777268] dark:text-[#768292] mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-12 h-12 text-[#746f65] dark:text-[#a4acb7] mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.4} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                       <p className="text-sm font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{t(isArchiveTab ? 'salesDocuments.noArchive' : 'salesDocuments.noDocuments')}</p>
@@ -665,7 +665,7 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
                         aria-label={t('common.selectRow', { name: doc.doc_code || doc.doc_type })}
                       />
                     </td>
-                    <td className="px-2 py-3 text-xs text-[#777268] dark:text-[#768292] font-mono">{startIndex + idx + 1}</td>
+                    <td className="px-2 py-3 text-xs text-[#746f65] dark:text-[#a4acb7] font-mono">{startIndex + idx + 1}</td>
                     {showTypeCol && (
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${DOC_TYPE_BADGE[doc.doc_type]}`}>

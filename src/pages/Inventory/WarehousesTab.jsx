@@ -499,14 +499,14 @@ export function WarehousesTab({
                       </td>
                       <td className="px-4 py-2.5 border-r border-gray-100 text-center">
                         <span
-                          className={`px-2 py-0.5 rounded text-xs font-semibold ${cnt > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}
+                          className={`px-2 py-0.5 rounded text-xs font-semibold ${cnt > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'}`}
                         >
                           {cnt}
                         </span>
                       </td>
                       <td className="px-4 py-2.5 border-r border-gray-100 text-center">
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-medium ${wh.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+                          className={`px-2 py-0.5 rounded text-[10px] font-medium ${wh.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}
                         >
                           {wh.is_active ? t('inventory.statusActive') : t('inventory.statusInactive')}
                         </span>
@@ -744,7 +744,7 @@ function WarehouseDetailModal({
               )}
               <h3 className="text-lg font-bold text-gray-900">{wh.name}</h3>
               {!wh.isSystem && wh.is_active === false && (
-                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
+                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
                   {t('inventory.statusInactive')}
                 </span>
               )}
@@ -959,7 +959,7 @@ function WarehouseDetailModal({
                       <td className="px-3 py-1.5 text-center border-r border-gray-100">
                         {tk?.ticket_status ? (
                           <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${TICKET_STATUS_CLS[tk.ticket_status] || 'bg-gray-100 text-gray-500'}`}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${TICKET_STATUS_CLS[tk.ticket_status] || 'bg-gray-100 text-gray-600'}`}
                           >
                             {tk.ticket_status}
                           </span>
@@ -1107,7 +1107,7 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
               onChange={(e) => setName(e.target.value)}
               placeholder={t('inventory.warehouseNamePlaceholder')}
               disabled={isSystem}
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               autoFocus={!isSystem}
             />
           </div>
@@ -1120,7 +1120,7 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 disabled={isSystem}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent font-mono disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent font-mono disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               />
             </div>
             <div>
@@ -1156,7 +1156,7 @@ function CreateWarehouseModal({ initialData, warehouses = [], onSave, onClose })
                 value={warehouseType}
                 onChange={(e) => setWarehouseType(e.target.value)}
                 disabled={isSystem}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               >
                 <option value="">{t('common.select')}</option>
                 {['main', 'branch', 'service_center', 'rma', 'transit', 'virtual'].map((wt) => (

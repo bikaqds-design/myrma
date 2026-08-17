@@ -5,7 +5,7 @@ const PRESETS = {
   tickets: {
     icon: (
       <svg
-        className="w-10 h-10 text-[#777268] dark:text-[#768292]"
+        className="w-10 h-10 text-[#746f65] dark:text-[#a4acb7]"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -24,7 +24,7 @@ const PRESETS = {
   customers: {
     icon: (
       <svg
-        className="w-10 h-10 text-[#777268] dark:text-[#768292]"
+        className="w-10 h-10 text-[#746f65] dark:text-[#a4acb7]"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -43,7 +43,7 @@ const PRESETS = {
   products: {
     icon: (
       <svg
-        className="w-10 h-10 text-[#777268] dark:text-[#768292]"
+        className="w-10 h-10 text-[#746f65] dark:text-[#a4acb7]"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -62,7 +62,7 @@ const PRESETS = {
   inventory: {
     icon: (
       <svg
-        className="w-10 h-10 text-[#777268] dark:text-[#768292]"
+        className="w-10 h-10 text-[#746f65] dark:text-[#a4acb7]"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -81,7 +81,7 @@ const PRESETS = {
   search: {
     icon: (
       <svg
-        className="w-10 h-10 text-[#777268] dark:text-[#768292]"
+        className="w-10 h-10 text-[#746f65] dark:text-[#a4acb7]"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -118,7 +118,7 @@ export default function EmptyState({
       className={`flex flex-col items-center justify-center py-16 px-6 text-center ${className}`}
     >
       {resolvedIcon && (
-        <div className="w-16 h-16 rounded-2xl bg-[#f8f9fb] dark:bg-[#0f1520] flex items-center justify-center mb-4 [&_svg]:text-[#777268] [&_svg]:dark:text-[#768292]">
+        <div className="w-16 h-16 rounded-2xl bg-[#f8f9fb] dark:bg-[#0f1520] flex items-center justify-center mb-4 [&_svg]:text-[#746f65] [&_svg]:dark:text-[#a4acb7]">
           {resolvedIcon}
         </div>
       )}

@@ -191,7 +191,7 @@ export function AddProductModal({
                   setProductForm({ ...productForm, stock_tracking_mode: e.target.value })
                 }
                 disabled={trackingModeLocked}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
               >
                 {/* Reuses the inventory namespace so the words here match the
                     TRACKING column on Inventory → Overview exactly. */}

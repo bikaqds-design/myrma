@@ -343,7 +343,7 @@ export default function CustomerDetails({
     const styles = {
       New: 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400',
       'In Progress': 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400',
-      'On Hold': 'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-400',
+      'On Hold': 'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300',
       Completed: 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400',
       Cancelled: 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]',
     }
@@ -1242,7 +1242,7 @@ export default function CustomerDetails({
                                 </span>
                               )}
                             </div>
-                            {c.notes && <p className="text-xs text-gray-400 dark:text-[#768292] mt-0.5 truncate max-w-[180px]">{c.notes}</p>}
+                            {c.notes && <p className="text-xs text-gray-400 dark:text-[#a4acb7] mt-0.5 truncate max-w-[180px]">{c.notes}</p>}
                           </td>
                           <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{c.title || '—'}</td>
                           <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{c.phone ? <Ltr>{c.phone}</Ltr> : '—'}</td>
@@ -1297,7 +1297,7 @@ export default function CustomerDetails({
                     <tbody className="divide-y divide-gray-100 dark:divide-[#1a2230]">
                       {customerDeals.map((deal) => {
                         const statusColor = deal.status === 'won' ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'
-                          : deal.status === 'lost' ? 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'
+                          : deal.status === 'lost' ? 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'
                           : 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-[#a5b4fc]'
                         return (
                           <tr key={deal.id}
@@ -1305,7 +1305,7 @@ export default function CustomerDetails({
                             onClick={() => navigate(`/pipeline/${deal.id}`)}>
                             <td className="px-4 py-3">
                               <div className="font-medium text-gray-900 dark:text-[#e8ebf0]">{deal.title}</div>
-                              {deal.deal_code && <div className="text-xs font-mono text-gray-400 dark:text-[#768292]">{deal.deal_code}</div>}
+                              {deal.deal_code && <div className="text-xs font-mono text-gray-400 dark:text-[#a4acb7]">{deal.deal_code}</div>}
                             </td>
                             <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{deal.stage || '—'}</td>
                             <td className="px-4 py-3 font-medium text-gray-900 dark:text-[#e8ebf0]">
@@ -1882,7 +1882,7 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
                 <div className="animate-spin w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full" />
               </div>
             ) : comments.length === 0 ? (
-              <p className="text-sm text-gray-400 dark:text-[#768292] text-center py-4">{t('customerDetails.drawerNoComments')}</p>
+              <p className="text-sm text-gray-400 dark:text-[#a4acb7] text-center py-4">{t('customerDetails.drawerNoComments')}</p>
             ) : (
               <div className="space-y-3">
                 {comments.map((c) => {
@@ -1897,7 +1897,7 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="font-semibold text-gray-900 dark:text-[#e8ebf0] text-xs">{name}</span>
                           {isTeam && <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-700 rounded-full">{t('customerDetails.staffBadge')}</span>}
-                          <span className="text-xs text-gray-400 dark:text-[#768292] ml-auto">{formatDateTime(c.created_date)}</span>
+                          <span className="text-xs text-gray-400 dark:text-[#a4acb7] ml-auto">{formatDateTime(c.created_date)}</span>
                         </div>
                         <p className="text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap leading-relaxed">{c.comment_text}</p>
                       </div>

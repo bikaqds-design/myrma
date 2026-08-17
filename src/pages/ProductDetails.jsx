@@ -749,7 +749,7 @@ export default function ProductDetails({
                                   : ticket.ticket_status === TICKET_STATUS.IN_PROGRESS
                                     ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
                                     : ticket.ticket_status === TICKET_STATUS.ON_HOLD
-                                      ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-400'
+                                      ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300'
                                       : ticket.ticket_status === TICKET_STATUS.COMPLETED
                                         ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400'
                                         : 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]')
@@ -765,7 +765,7 @@ export default function ProductDetails({
                                 (ticket.priority === 'Critical'
                                   ? 'bg-red-200 text-red-900'
                                   : ticket.priority === 'High'
-                                    ? 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
+                                    ? 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300'
                                     : ticket.priority === 'Medium'
                                       ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
                                       : 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]')
@@ -811,7 +811,7 @@ function DetailField({ label, value, capitalize, badge, badgeColor }) {
             (badgeColor === 'green'
               ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400'
               : badgeColor === 'red'
-                ? 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
+                ? 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300'
                 : 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]')
           }
         >

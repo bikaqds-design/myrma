@@ -31,14 +31,14 @@ export function TicketPreviewModal({ rmaNumber, onClose, onOpenFull }) {
     Critical: 'bg-red-100 text-red-700',
     High: 'bg-orange-100 text-orange-700',
     Medium: 'bg-blue-100 text-blue-700',
-    Low: 'bg-gray-100 text-gray-500',
+    Low: 'bg-gray-100 text-gray-600',
   }
   const statusColor = {
     New: 'bg-blue-100 text-blue-700',
     'In Progress': 'bg-yellow-100 text-yellow-700',
     'On Hold': 'bg-orange-100 text-orange-700',
     Completed: 'bg-green-100 text-green-700',
-    Cancelled: 'bg-gray-100 text-gray-500',
+    Cancelled: 'bg-gray-100 text-gray-600',
   }
   const fmt = (d) => (d ? new Date(d).toLocaleDateString() : '—')
 
@@ -86,14 +86,14 @@ export function TicketPreviewModal({ rmaNumber, onClose, onOpenFull }) {
               <div className="flex items-center gap-2 flex-wrap">
                 {ticket.ticket_status && (
                   <span
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColor[ticket.ticket_status] || 'bg-gray-100 text-gray-500'}`}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColor[ticket.ticket_status] || 'bg-gray-100 text-gray-600'}`}
                   >
                     {ticket.ticket_status}
                   </span>
                 )}
                 {ticket.priority && (
                   <span
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold ${priorityColor[ticket.priority] || 'bg-gray-100 text-gray-500'}`}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold ${priorityColor[ticket.priority] || 'bg-gray-100 text-gray-600'}`}
                   >
                     {ticket.priority}
                   </span>
@@ -240,7 +240,7 @@ export function ProductDetailModal({
     'In Progress': 'bg-yellow-100 text-yellow-700',
     'On Hold': 'bg-orange-100 text-orange-700',
     Completed: 'bg-green-100 text-green-700',
-    Cancelled: 'bg-gray-100 text-gray-500',
+    Cancelled: 'bg-gray-100 text-gray-600',
   }
   const wName = (id) => warehouses.find((w) => w.id === id)?.name
 
@@ -445,7 +445,7 @@ export function ProductDetailModal({
                       <td className="px-4 py-3">
                         {tk ? (
                           <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${tsCls[tk.ticket_status] || 'bg-gray-100 text-gray-500'}`}
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${tsCls[tk.ticket_status] || 'bg-gray-100 text-gray-600'}`}
                           >
                             {tk.ticket_status}
                           </span>

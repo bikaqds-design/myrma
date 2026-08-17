@@ -42,12 +42,12 @@ export const CARRIERS = ['', 'FedEx', 'UPS', 'DHL', 'USPS', 'Australia Post', 'R
 export const getStatusColor = (s) =>
   ({
     Open:         'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400',
-    'In Progress':'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-800 dark:text-indigo-400',
-    Pending:      'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-400',
+    'In Progress':'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-800 dark:text-indigo-300',
+    Pending:      'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300',
     'On Hold':    'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400',
     Completed:    'bg-teal-100 dark:bg-teal-900/20 text-teal-800 dark:text-teal-400',
     Closed:       'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400',
-    Cancelled:    'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400',
+    Cancelled:    'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300',
     New:          'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400',
   })[s] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]'
 
@@ -55,8 +55,8 @@ export const getPriorityColor = (p) =>
   ({
     Low:      'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]',
     Medium:   'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400',
-    High:     'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-400',
-    Critical: 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400',
+    High:     'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300',
+    Critical: 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300',
   })[p] || 'bg-gray-100 dark:bg-[#1a2230] text-gray-800 dark:text-[#9aa4b2]'
 
 export const formatDate = (d) => (d ? new Date(d).toLocaleDateString() : 'N/A')

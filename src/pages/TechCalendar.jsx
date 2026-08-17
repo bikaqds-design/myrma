@@ -13,14 +13,14 @@ import { EMPTY_ARRAY } from '../lib/stableEmpty'
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PRIORITY_CLS = {
-  Critical: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-900/30',
-  High:     'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400',
+  Critical: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/30',
+  High:     'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300',
   Medium:   'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
   Low:      'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
 }
 
 const STATUS_CLS = {
-  New:          'bg-pink-100 dark:bg-pink-900/20 text-pink-700 dark:text-pink-400',
+  New:          'bg-pink-100 dark:bg-pink-900/20 text-pink-700 dark:text-pink-300',
   'In Progress':'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
   'On Hold':    'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400',
   Completed:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
@@ -323,7 +323,7 @@ export default function TechCalendar({
                 }`}
               >
                 {dayTickets.length === 0 && (
-                  <p className="text-[10px] text-gray-300 dark:text-[#768292] text-center mt-4">—</p>
+                  <p className="text-[10px] text-gray-300 dark:text-[#a4acb7] text-center mt-4">—</p>
                 )}
                 {dayTickets.map((ticket) => {
                   const dueDate = ticket.due_date ? new Date(ticket.due_date) : null

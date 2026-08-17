@@ -503,8 +503,8 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
   const initials = (displayName || currentUser?.email || '?')[0].toUpperCase()
 
   const roleColors = {
-    super_admin: 'bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800',
-    admin: 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
+    super_admin: 'bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+    admin: 'bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
     technician: 'bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#9aa4b2] border-gray-200 dark:border-[#212a38]',
   }
 
@@ -779,7 +779,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                           <span className="text-sm font-medium text-gray-800 dark:text-[#e8ebf0]">{t('accountSettings.currentSession')}</span>
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">{t('accountSettings.thisDevice')}</span>
                           {session.factor_id && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">2FA</span>
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">2FA</span>
                           )}
                         </div>
                         <p className="text-xs text-gray-400 dark:text-[#9aa4b2] mt-0.5">
@@ -803,7 +803,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                         <span className={`w-1.5 h-1.5 rounded-full ${a.action === 'login' ? 'bg-green-500' : 'bg-gray-300 dark:bg-[#4a5568]'}`} />
                         <span className="text-xs text-gray-600 dark:text-[#9aa4b2] capitalize">{a.action}</span>
                       </div>
-                      <span className="text-xs text-gray-400 dark:text-[#768292]">{new Date(a.created_at).toLocaleString()}</span>
+                      <span className="text-xs text-gray-400 dark:text-[#a4acb7]">{new Date(a.created_at).toLocaleString()}</span>
                     </div>
                   ))}
                 </div>
@@ -1135,7 +1135,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium text-gray-800">{w.label}</p>
                         <span
-                          className={`text-xs px-1.5 py-0.5 rounded font-medium ${w.size === 'full' ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#9aa4b2]'}`}
+                          className={`text-xs px-1.5 py-0.5 rounded font-medium ${w.size === 'full' ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'}`}
                         >
                           {w.size === 'full' ? t('accountSettings.widgetFullWidth') : t('accountSettings.widgetHalfWidth')}
                         </span>
