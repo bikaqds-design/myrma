@@ -1224,7 +1224,8 @@
     "colRate": "المعدل",
     "colOpen": "مفتوحة",
     "colLost": "خاسرة",
-    "colOpenValue": "قيمة المفتوحة"
+    "colOpenValue": "قيمة المفتوحة",
+    "kpiCustomersWithTickets": "عملاء لديهم تذاكر"
   },
   "products": {
     "title": "المنتجات",

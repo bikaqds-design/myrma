@@ -97,7 +97,7 @@ direction actually implies and none of it exists today.
 **Step 3 — a Pipeline tab. SHIPPED 2026-08-17.** Deals by stage and by rep, win rate, average age,
 and leads by source and status. 57 deals and 34 leads with no reporting.
 
-**Step 4 — demote the RMA tabs.** Tickets and Technicians stay, but behind the
+**Step 4 — demote the RMA tabs. SHIPPED 2026-08-17.** Tickets and Technicians stay, but behind the
 CRM tabs rather than in front of them, mirroring what the Dashboard now does.
 Technicians is worth keeping despite the thin data — it fills up as time entries
 get logged, and an empty report is not the same as a wrong one.
@@ -199,10 +199,31 @@ live board, and worth a migration to remap the stages if real deals are affected
 The report itself is safe either way: those deals are counted and called out
 beneath the funnel rather than silently omitted.
 
+**Step 4 — RMA tabs demoted.** Order is now Pipeline · Sales · Financial │
+Tickets · Customers · Technicians, with a divider marking the split, and the
+page opens on Pipeline instead of Tickets.
+
+Two things that needed care rather than a reorder:
+
+Non-admins only ever get the Tickets tab, so the default is
+`isAdminOrManager ? 'pipeline' : 'tickets'` — defaulting everyone to Pipeline
+would have handed them a page with no visible tab and no content.
+
+The tab id comes from the URL, so it can name a tab the viewer cannot see: a
+manager sharing a `?tab=financial` link with a technician. Every CRM tab is
+admin-gated, so an unrecognised or unauthorised id rendered a bare page with no
+content and no explanation. It falls back to the first tab the viewer does have.
+That was true before this change too — `?tab=financial` has always been
+shareable — so it is a pre-existing hole closed in passing, not one introduced
+here.
+
+**"Active Customers" relabelled** to "Customers with Tickets". It counts
+customers with an RMA ticket in the selected range — 3 of 888 — and the old
+label read as though the company had three customers.
+
 ## Still to do
 
-- **Step 4 — demote the RMA tabs** behind the CRM ones.
-- **Relabel "Active Customers"**, which counts customers with an RMA ticket in
-  range — 3 of 888.
-- **Investigate the 24 mis-staged deals** above, and remap if they are real.
+- **Investigate the 24 mis-staged deals**, and remap if they are real.
+- The Tickets and Technicians tabs still describe 13 tickets and 1 time entry.
+  They are honest, just thin; nothing to fix until the data grows.
 

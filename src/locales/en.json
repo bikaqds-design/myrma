@@ -1224,7 +1224,8 @@
     "colRate": "Rate",
     "colOpen": "Open",
     "colLost": "Lost",
-    "colOpenValue": "Open Value"
+    "colOpenValue": "Open Value",
+    "kpiCustomersWithTickets": "Customers with Tickets"
   },
   "products": {
     "title": "Products",

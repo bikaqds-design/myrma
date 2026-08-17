@@ -561,8 +561,11 @@ function CustomersTab({ customers, tickets, formatDate }) {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {/* Not "Active Customers": this counts customers with an RMA ticket in
+            the selected range — 3 of 888 on the current data. The old label
+            implied the company had three customers. */}
         <KpiCard
-          label={t('reports.kpiActiveCustomers')}
+          label={t('reports.kpiCustomersWithTickets')}
           value={totalActive}
           color="indigo"
           icon="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
@@ -1641,18 +1644,35 @@ export default function Reports({
 
   // Tab state — viewers/technicians can only see Tickets
   const allTabs = [
-    { id: 'tickets', label: t('reports.tabTickets') },
+    // CRM first, RMA behind it, mirroring what the Dashboard now does. The
+    // ordering is the whole point of the demotion: three of these tabs describe
+    // 13 tickets while the CRM ones cover 57 deals, 38 quotations and 27
+    // invoices. `startsRmaGroup` draws a divider so the split is visible rather
+    // than just implied by position.
     ...(isAdminOrManager
       ? [
-          { id: 'customers', label: t('reports.tabCustomers') },
-          { id: 'technicians', label: t('reports.tabTechnicians') },
           { id: 'pipeline', label: t('reports.tabPipeline') },
           { id: 'sales', label: t('reports.tabSales') },
           { id: 'financial', label: t('reports.tabFinancial') },
         ]
       : []),
+    { id: 'tickets', label: t('reports.tabTickets'), startsRmaGroup: isAdminOrManager },
+    ...(isAdminOrManager
+      ? [
+          { id: 'customers', label: t('reports.tabCustomers') },
+          { id: 'technicians', label: t('reports.tabTechnicians') },
+        ]
+      : []),
   ]
-  const [activeTab, setActiveTab] = useURLTab('tab', 'tickets')
+  // Non-admins only ever get the Tickets tab, so they must not default to a tab
+  // that renders nothing for them — every CRM tab is admin-gated below.
+  const [activeTab, setActiveTab] = useURLTab('tab', isAdminOrManager ? 'pipeline' : 'tickets')
+
+  // The tab id comes from the URL, so it can name a tab this user cannot see —
+  // a manager sharing a ?tab=financial link with a technician, say. Every CRM
+  // tab is admin-gated below, so an unrecognised id would render a bare page
+  // with no content and no explanation. Fall back to the first tab they do have.
+  const visibleTab = allTabs.some((x) => x.id === activeTab) ? activeTab : allTabs[0]?.id
 
   const { data: reportData, isLoading: loading, isError, error, refetch } = useQuery({
     queryKey: ['reports', isAdminOrManager],
@@ -1874,13 +1894,20 @@ export default function Reports({
       <div className="border-b border-[#e6e9ef] dark:border-[#212a38]">
         <div className="flex gap-1 overflow-x-auto">
           {allTabs.map((tab) => (
+            <React.Fragment key={tab.id}>
+              {tab.startsRmaGroup && (
+                <span
+                  aria-hidden="true"
+                  className="self-center mx-2 h-5 w-px bg-[#e6e9ef] dark:bg-[#212a38] flex-shrink-0"
+                />
+              )}
             <button
-              key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === tab.id ? 'border-indigo-600 text-indigo-600 dark:text-[#a5b4fc]' : 'border-transparent text-gray-500 dark:text-[#9aa4b2] hover:text-gray-700 dark:hover:text-[#e8ebf0]'}`}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${visibleTab === tab.id ? 'border-indigo-600 text-indigo-600 dark:text-[#a5b4fc]' : 'border-transparent text-gray-500 dark:text-[#9aa4b2] hover:text-gray-700 dark:hover:text-[#e8ebf0]'}`}
             >
               {tab.label}
             </button>
+            </React.Fragment>
           ))}
         </div>
       </div>
@@ -1892,21 +1919,21 @@ export default function Reports({
         </div>
       ) : (
         <>
-          {activeTab === 'tickets' && (
+          {visibleTab === 'tickets' && (
             <TicketsTab
               tickets={filteredTickets}
               onNavigateToTicket={onNavigateToTicket}
               formatDate={formatDate}
             />
           )}
-          {activeTab === 'customers' && isAdminOrManager && (
+          {visibleTab === 'customers' && isAdminOrManager && (
             <CustomersTab
               customers={filteredCustomers}
               tickets={filteredTickets}
               formatDate={formatDate}
             />
           )}
-          {activeTab === 'technicians' && isAdminOrManager && (
+          {visibleTab === 'technicians' && isAdminOrManager && (
             <TechniciansTab
               tickets={filteredTickets}
               timeEntries={timeEntries}
@@ -1914,10 +1941,10 @@ export default function Reports({
               formatDate={formatDate}
             />
           )}
-          {activeTab === 'pipeline' && isAdminOrManager && (
+          {visibleTab === 'pipeline' && isAdminOrManager && (
             <PipelineTab deals={filteredDeals} leads={filteredLeads} pipelines={pipelines} />
           )}
-          {activeTab === 'sales' && isAdminOrManager && (
+          {visibleTab === 'sales' && isAdminOrManager && (
             <SalesTab
               quotations={filteredQuotations}
               salesOrders={filteredSalesOrders}
@@ -1927,7 +1954,7 @@ export default function Reports({
               allInvoices={invoices}
             />
           )}
-          {activeTab === 'financial' && isAdminOrManager && (
+          {visibleTab === 'financial' && isAdminOrManager && (
             <FinancialTab
               invoices={filteredInvoices}
               quotations={filteredQuotations}
