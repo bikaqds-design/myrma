@@ -1,3 +1,56 @@
+/* ─── LIGHT MODE TEXT FLOOR ──────────────────────────────────────────────
+ *
+ * Tailwind's grey scale is tuned for pure white. This app's surfaces run down to
+ * #f3f4f6 (bg-gray-100) and #f4f6f9 (the page), where the muted greys stop
+ * meeting AA: text-gray-500 measured 4.39:1 and text-gray-400 just 2.31:1
+ * against a 4.5:1 requirement. gray-500 in particular reads as "secondary text"
+ * and is used everywhere, so it failed quietly on a lot of pages.
+ *
+ * The two faint steps are darkened until the *dimmest* surface clears 4.5:1.
+ * The ordering survives — 4.61 / 5.65 / 6.87 / 9.37 on #f3f4f6 — but the gap
+ * between 400 and 500 is necessarily narrow, because there is not much room
+ * between "as light as AA permits" and "clearly darker" on a near-white page.
+ * Where two levels need to look genuinely different, weight and size will carry
+ * more of it than colour now does.
+ *
+ * 600 and 700 already pass and are left exactly as Tailwind ships them. Only
+ * text is touched; bg-gray-* and border-gray-* are unaffected.
+ */
+html:not(.dark) .text-gray-400 {
+  color: #666f7e !important; /* 4.61 on #f3f4f6 — was #9ca3af, 2.31 */
+}
+html:not(.dark) .text-gray-500 {
+  color: #5b616d !important; /* 5.65 on #f3f4f6 — was #6b7280, 4.39 */
+}
+
+/* Semantic text, same problem as the greys.
+ *
+ * Tailwind's mid-tone semantics are below AA on white before any tint is
+ * involved: red-500 3.76, emerald-600 3.77, green-600 3.30, amber-600 3.19.
+ * These are the Approve / Reject actions, "Overdue" labels and count badges —
+ * the words that carry urgency, rendered in the least readable colour on the
+ * page. Darkened until the dimmest surface each appears on clears 4.5:1,
+ * including the -100 tints they sit inside as badges.
+ *
+ * Hue is preserved, so red still reads as red; these are a shade or so deeper.
+ * Dark mode uses the -400 variants and is handled separately.
+ */
+html:not(.dark) .text-red-500 {
+  color: #df1313 !important; /* 4.96 on white — was #ef4444, 3.76 */
+}
+html:not(.dark) .text-red-600 {
+  color: #cc2121 !important; /* 4.53 on the red-100 badge — was #dc2626, 3.95 */
+}
+html:not(.dark) .text-emerald-600 {
+  color: #047d58 !important; /* 5.13 on white — was #059669, 3.77 */
+}
+html:not(.dark) .text-green-600 {
+  color: #11813a !important; /* 4.98 on white — was #16a34a, 3.30 */
+}
+html:not(.dark) .text-amber-600 {
+  color: #a75c05 !important; /* 5.03 on white — was #d97706, 3.19 */
+}
+
 /* ─── DARK MODE ──────────────────────────────────────────────────────────── */
 
 html.dark {
