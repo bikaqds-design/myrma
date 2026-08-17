@@ -281,8 +281,48 @@ which no longer exists — deleted at some point during the same QA session,
 twelve minutes before the pair removed here. It is the same class of leftover
 and was not caused by this work. Left alone as out of scope.
 
-It does point at something structural, though: `activities.related_id` is
-polymorphic, so no foreign key protects it and deleting any lead or deal
-silently strands its history. That is what nearly happened here, and it is worth
-either a cleanup pass or a delete path that takes the activities with it.
+It pointed at something structural, and that has now been closed — see below.
+
+---
+
+## The orphaned activity, and the gap that produced it
+
+`activities.related_id` is polymorphic: it points at a deal, lead, customer,
+purchase order or vendor invoice depending on `related_type`. Postgres cannot
+put a foreign key on a column like that, so nothing stopped a parent being
+deleted out from under its own history. That is exactly what happened mid-task
+in section 4, when the deal's activities were removed and the delete then failed
+on an unrelated FK.
+
+**The sweep first.** The earlier count of "1 orphan" only validated `deal` and
+`lead`. Re-running it across all five types against their tables — including
+`purchase_order` (12 activities, 5 rows) and `vendor_invoice` (8 activities, 4
+rows) — confirmed the number holds: **exactly 1 orphan in 172 activities**, and
+purchasing has no delete path at all, only cancel and archive, so it cannot
+produce one.
+
+**Three delete paths could strand history. All three are now closed.**
+
+| Path | Fix |
+|---|---|
+| `deals.bulkDelete` | calls `activities.deleteForRelated('deal', ids)` first |
+| `leads.bulkDelete` | calls `activities.deleteForRelated('lead', ids)` first |
+| `customers.delete` / `bulkDelete` | migration `20260776`, since these go through `SECURITY DEFINER` RPCs |
+
+The customer path was the one worth catching. `delete_customer_cascade` removed
+`customer_notes` and the customer row and left every activity behind — 38
+customer-related activities exist today. The migration adds the delete while
+preserving the RMA-ticket guard from `20260774` exactly, so deleting a customer
+with tickets still fails, and still fails before anything is removed.
+
+Both application fixes were tested end to end on throwaway records: create a
+deal (and separately a lead), attach a log activity, delete through the real
+path, confirm the activity went with it and the totals returned to where they
+started.
+
+The orphan row itself was deleted, after re-confirming immediately beforehand
+that its parent really was gone. Activities 172 → 171. Row-level rollback is
+section 5 of the manual file.
+
+**Not applied yet:** migration `20260776` needs pasting into Supabase.
 

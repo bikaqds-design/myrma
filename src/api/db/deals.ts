@@ -240,6 +240,10 @@ export const deals = {
   },
   async bulkDelete(ids: string[]): Promise<void> {
     if (!ids.length) return
+    // Take the history with them. activities.related_id is polymorphic, so no
+    // foreign key protects it and the logs would otherwise survive as rows
+    // pointing at a deal that no longer exists.
+    await activities.deleteForRelated('deal', ids)
     const { error } = await supabase.from('deals').delete().in('id', ids)
     if (error) throw error
   },

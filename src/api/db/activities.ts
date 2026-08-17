@@ -150,6 +150,28 @@ export const activities = {
     const { error } = await supabase.from('activities').delete().eq('id', id)
     if (error) throw error
   },
+  /**
+   * deleteForRelated — remove every activity belonging to deleted parents.
+   *
+   * `related_id` is polymorphic (it points at a deal, lead, customer, purchase
+   * order or vendor invoice depending on `related_type`), so Postgres cannot
+   * put a foreign key on it and nothing stops a parent being deleted out from
+   * under its own history. Deleting a deal used to leave its stage-change and
+   * won/lost logs behind as rows pointing at nothing: invisible in the UI,
+   * counted by every `select * from activities`, and impossible to attribute.
+   *
+   * Callers must invoke this *before* deleting the parents, while the ids are
+   * still known.
+   */
+  async deleteForRelated(relatedType: ActivityRow['related_type'], ids: string[]): Promise<void> {
+    if (!ids.length) return
+    const { error } = await supabase
+      .from('activities')
+      .delete()
+      .eq('related_type', relatedType)
+      .in('related_id', ids)
+    if (error) throw error
+  },
   // RLS already scopes results to what the caller can see (manager+ sees
   // all, sales_rep sees only their own assigned_rep rows).
   async listOverdue(): Promise<ActivityRow[]> {

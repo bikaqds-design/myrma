@@ -92,6 +92,9 @@ export const leads = {
   },
   async bulkDelete(ids: string[]): Promise<void> {
     if (!ids.length) return
+    // Same polymorphic-parent problem as deals.bulkDelete: no foreign key
+    // protects activities.related_id, so the logs have to go explicitly.
+    await activities.deleteForRelated('lead', ids)
     const { error } = await supabase.from('leads').delete().in('id', ids)
     if (error) throw error
   },

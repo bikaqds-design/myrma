@@ -130,3 +130,18 @@ INSERT INTO activities (id, related_type, related_id, type, title, due_date, com
   ('36de9382-481b-4c9d-859e-e23a9b0c6f43', 'deal', '65dd6769-11a9-4e63-86cc-b77d84dfdc8a', 'log', 'reopened|lost|New Deals', NULL, NULL, NULL, NULL, '2026-08-09T09:26:24.97043+00:00', 'bika.qds@gmail.com', '""'::jsonb, NULL),
   ('fa4b09c4-1e44-452e-84f3-5c5a702c3827', 'deal', '65dd6769-11a9-4e63-86cc-b77d84dfdc8a', 'log', 'won', NULL, NULL, NULL, NULL, '2026-08-12T15:28:57.939094+00:00', 'bika.qds@gmail.com', '""'::jsonb, NULL),
   ('72d0db8f-e455-4b73-a431-1b5729e0c088', 'lead', '943631d2-c3df-42c0-b32d-cf568aff656b', 'log', 'converted', NULL, NULL, NULL, NULL, '2026-08-05T19:44:50.308334+00:00', 'bika.qds@gmail.com', '[]'::jsonb, NULL);
+
+-- == 5. The pre-existing orphaned activity ===============================
+--
+-- A 'won' log written at 19:32 on 2026-08-05 pointing at deal
+-- 049ddeee-2581-4fe2-84bc-a0a282666e86, which no longer exists — deleted during
+-- that same QA session, before the pair removed in section 4. Not caused by any
+-- of the work above; found by sweeping all five related_type values against
+-- their tables (deal, lead, customer, purchase_order, vendor_invoice), which
+-- turned up exactly this one across 172 activities.
+--
+-- Restoring it puts back a row that points at nothing, so this is here for
+-- completeness rather than because you would want to run it.
+
+INSERT INTO activities (id, related_type, related_id, type, title, due_date, completed_at, assigned_rep, outcome_notes, created_at, created_by, attachments, parent_id) VALUES
+  ('61d0a7d5-8e81-4cac-b91d-f5632152933e', 'deal', '049ddeee-2581-4fe2-84bc-a0a282666e86', 'log', 'won', NULL, NULL, NULL, NULL, '2026-08-05T19:32:29.851459+00:00', 'bika.qds@gmail.com', '[]'::jsonb, NULL);
