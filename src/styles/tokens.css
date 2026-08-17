@@ -1,0 +1,174 @@
+/* ─── COLOUR TOKENS ────────────────────────────────────────────────────────
+ *
+ * One place where every themed colour in the app is decided.
+ *
+ * What this replaces: appearance.css used to carry ~60 `!important` rules that
+ * repainted Tailwind utilities in dark mode, and a second block that did the
+ * same for light. They worked, but they beat every `dark:` class a component
+ * wrote, so the rendered colour of an element had nothing to do with its
+ * classes. That is how the status pills stayed unreadable through several
+ * attempts to fix them in the components — a pill marked
+ * `bg-gray-100 dark:bg-[#1a2230] text-gray-500 dark:text-[#768292]` rendered as
+ * none of those four values.
+ *
+ * These variables are wired into tailwind.config.js against `backgroundColor`,
+ * `textColor`, `borderColor` and `divideColor`, so `bg-gray-100` resolves to the
+ * right fill per theme with no `!important` and no specificity fight. A
+ * component that sets `dark:bg-something` now wins, because it is more specific
+ * than the token default — which is what anyone reading the markup would expect.
+ *
+ * Why the same step maps to different values per property: in light,
+ * `gray-100` is a pale fill and also a faint rule. Inverted for dark those want
+ * different colours — a fill wants #334155, a border wants #1e293b. Tailwind
+ * keeps backgroundColor / textColor / borderColor as separate theme keys, so
+ * each role gets its own token rather than being forced to share one.
+ *
+ * Channels are stored space-separated, not as hex, so Tailwind's alpha
+ * modifiers (`bg-surface/50`) keep working through `rgb(... / <alpha-value>)`.
+ *
+ * Contrast: every text token clears WCAG AA (4.5:1) against the surfaces it is
+ * used on, measured with the ancestor alpha stack composited. Ratios are noted
+ * per line for the dimmest surface each appears on. Do not darken a text token
+ * in dark, or lighten one in light, without re-measuring.
+ */
+
+:root {
+  /* Surfaces */
+  --c-bg-white: 255 255 255;
+  --c-bg-gray-50: 249 250 251;
+  --c-bg-gray-100: 243 244 246;
+  --c-bg-gray-200: 229 231 235;
+
+  /* Text — light. 400 and 500 are darkened from Tailwind's scale, which is
+     tuned for pure white and falls under AA on this app's #f3f4f6/#f4f6f9. */
+  --c-text-gray-900: 17 24 39;
+  --c-text-gray-800: 31 41 55;
+  --c-text-gray-700: 55 65 81;
+  --c-text-gray-600: 75 85 99;   /* 6.87 */
+  --c-text-gray-500: 91 97 109;  /* 5.65 — Tailwind's #6b7280 was 4.39 */
+  --c-text-gray-400: 102 111 126;/* 4.61 — Tailwind's #9ca3af was 2.31 */
+
+  /* Accent + semantics — light. Tailwind's mid-tones sit below AA on white. */
+  --c-text-indigo-600: 79 70 229;
+  --c-text-indigo-800: 55 48 163;
+  --c-text-red-500: 223 19 19;    /* 4.96 — was #ef4444, 3.76 */
+  --c-text-red-600: 204 33 33;    /* 4.53 on red-100 — was #dc2626, 3.95 */
+  --c-text-emerald-600: 4 125 88; /* 5.13 — was #059669, 3.77 */
+  --c-text-green-600: 17 129 58;  /* 4.98 — was #16a34a, 3.30 */
+  --c-text-amber-600: 167 92 5;   /* 5.03 — was #d97706, 3.19 */
+
+  /* Borders */
+  --c-border-default: 229 231 235;
+  --c-border-gray-100: 243 244 246;
+  --c-border-gray-200: 229 231 235;
+  --c-border-gray-300: 209 213 219;
+  --c-border-blue-200: 191 219 254;
+  --c-border-amber-200: 253 230 138;
+  --c-border-green-200: 187 247 208;
+  --c-border-red-200: 254 202 202;
+  --c-border-indigo-200: 199 210 254;
+
+  /* Tint fills (badges, callouts) */
+  --c-bg-indigo-50: 238 242 255;
+  --c-bg-blue-50: 239 246 255;
+  --c-bg-amber-50: 255 251 235;
+  --c-bg-yellow-50: 254 252 232;
+  --c-bg-green-50: 240 253 244;
+  --c-bg-emerald-50: 236 253 245;
+  --c-bg-red-50: 254 242 242;
+  --c-bg-orange-50: 255 247 237;
+  --c-bg-teal-50: 240 253 250;
+  --c-bg-purple-50: 250 245 255;
+  --c-bg-pink-50: 253 242 248;
+
+  --c-bg-indigo-100: 224 231 255;
+  --c-bg-blue-100: 219 234 254;
+  --c-bg-green-100: 220 252 231;
+  --c-bg-emerald-100: 209 250 229;
+  --c-bg-red-100: 254 226 226;
+  --c-bg-amber-100: 254 243 199;
+  --c-bg-yellow-100: 254 249 195;
+  --c-bg-orange-100: 255 237 213;
+  --c-bg-pink-100: 252 231 243;
+  --c-bg-purple-100: 243 232 255;
+  --c-bg-teal-100: 204 251 241;
+
+  /* Solid action fills */
+  --c-bg-blue-600: 37 99 235;
+  --c-bg-green-600: 22 163 74;
+  --c-bg-red-600: 220 38 38;
+  --c-bg-yellow-500: 234 179 8;
+}
+
+html.dark {
+  /* Surfaces — the scale inverts: a pale fill becomes a raised dark panel. */
+  --c-bg-white: 30 41 59;
+  --c-bg-gray-50: 30 41 59;
+  --c-bg-gray-100: 51 65 85;
+  --c-bg-gray-200: 71 85 105;
+
+  /* Text — dark. The ladder is compressed upward: on dark surfaces "fainter"
+     means darker, and darker means less contrast, so the faintest step sits
+     just above the AA floor. Ratios are against #334155, the lightest surface
+     these land on; darker surfaces score higher. Four clearly distinct greys
+     are not available above the floor, so weight and size carry some of the
+     hierarchy that colour used to. */
+  --c-text-gray-900: 241 245 249;
+  --c-text-gray-800: 226 232 240;
+  --c-text-gray-700: 203 213 225; /* 6.97 */
+  --c-text-gray-600: 188 197 210; /* 5.94 — was #94a3b8, 4.04 */
+  --c-text-gray-500: 174 185 201; /* 5.22 — was #64748b, 2.18 */
+  --c-text-gray-400: 161 174 193; /* 4.61 — was #475569, 1.37 */
+
+  /* Accent — indigo-600 had no dark variant anywhere and stayed #4f46e5,
+     1.82:1 on a table row, on the clickable RMA numbers and customer emails. */
+  --c-text-indigo-600: 165 180 252; /* 5.19 */
+  --c-text-indigo-800: 199 210 254;
+  --c-text-red-500: 248 113 113;
+  --c-text-red-600: 248 113 113;
+  --c-text-emerald-600: 52 211 153;
+  --c-text-green-600: 74 222 128;
+  --c-text-amber-600: 251 191 36;
+
+  /* Borders */
+  --c-border-default: 51 65 85;
+  --c-border-gray-100: 30 41 59;
+  --c-border-gray-200: 51 65 85;
+  --c-border-gray-300: 71 85 105;
+  --c-border-blue-200: 30 58 95;
+  --c-border-amber-200: 120 53 15;
+  --c-border-green-200: 6 78 59;
+  --c-border-red-200: 127 29 29;
+  --c-border-indigo-200: 49 46 129;
+
+  /* Tint fills */
+  --c-bg-indigo-50: 30 27 75;
+  --c-bg-blue-50: 12 26 51;
+  --c-bg-amber-50: 39 32 10;
+  --c-bg-yellow-50: 39 32 10;
+  --c-bg-green-50: 5 46 22;
+  --c-bg-emerald-50: 5 46 22;
+  --c-bg-red-50: 45 10 10;
+  --c-bg-orange-50: 42 18 0;
+  --c-bg-teal-50: 4 47 46;
+  --c-bg-purple-50: 30 16 64;
+  --c-bg-pink-50: 45 10 26;
+
+  --c-bg-indigo-100: 49 46 129;
+  --c-bg-blue-100: 30 58 95;
+  --c-bg-green-100: 6 78 59;
+  --c-bg-emerald-100: 6 78 59;
+  --c-bg-red-100: 127 29 29;
+  --c-bg-amber-100: 120 53 15;
+  --c-bg-yellow-100: 120 53 15;
+  --c-bg-orange-100: 124 45 18;
+  --c-bg-pink-100: 131 24 67;
+  --c-bg-purple-100: 76 29 149;
+  --c-bg-teal-100: 19 78 74;
+
+  /* Solid action fills, muted for dark */
+  --c-bg-blue-600: 30 58 95;
+  --c-bg-green-600: 6 78 59;
+  --c-bg-red-600: 127 29 29;
+  --c-bg-yellow-500: 120 53 15;
+}

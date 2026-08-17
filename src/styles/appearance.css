@@ -1,222 +1,30 @@
-/* ─── LIGHT MODE TEXT FLOOR ──────────────────────────────────────────────
+/* ─── APPEARANCE ───────────────────────────────────────────────────────────
  *
- * Tailwind's grey scale is tuned for pure white. This app's surfaces run down to
- * #f3f4f6 (bg-gray-100) and #f4f6f9 (the page), where the muted greys stop
- * meeting AA: text-gray-500 measured 4.39:1 and text-gray-400 just 2.31:1
- * against a 4.5:1 requirement. gray-500 in particular reads as "secondary text"
- * and is used everywhere, so it failed quietly on a lot of pages.
+ * What is left here after the colour tokens landed: the things that are not a
+ * palette entry and so cannot be expressed as one.
  *
- * The two faint steps are darkened until the *dimmest* surface clears 4.5:1.
- * The ordering survives — 4.61 / 5.65 / 6.87 / 9.37 on #f3f4f6 — but the gap
- * between 400 and 500 is necessarily narrow, because there is not much room
- * between "as light as AA permits" and "clearly darker" on a near-white page.
- * Where two levels need to look genuinely different, weight and size will carry
- * more of it than colour now does.
+ * Every themed colour now lives in tokens.css and is wired into Tailwind's
+ * backgroundColor / textColor / borderColor / divideColor in tailwind.config.js.
+ * This file used to hold ~60 `!important` colour rules that repainted utilities
+ * per theme; because they were `!important` they beat any `dark:` class a
+ * component wrote, so an element's classes did not predict its colour. That is
+ * what made the status-pill contrast bug so hard to find, and it is gone.
  *
- * 600 and 700 already pass and are left exactly as Tailwind ships them. Only
- * text is touched; bg-gray-* and border-gray-* are unaffected.
+ * Three things genuinely belong here:
+ *   - dark-mode shadows, which are opacity curves rather than colours
+ *   - the modal overlay, an alpha change on black
+ *   - table density, which is a user setting (data-density) and not a theme
  */
-html:not(.dark) .text-gray-400 {
-  color: #666f7e !important; /* 4.61 on #f3f4f6 — was #9ca3af, 2.31 */
-}
-html:not(.dark) .text-gray-500 {
-  color: #5b616d !important; /* 5.65 on #f3f4f6 — was #6b7280, 4.39 */
-}
-
-/* Semantic text, same problem as the greys.
- *
- * Tailwind's mid-tone semantics are below AA on white before any tint is
- * involved: red-500 3.76, emerald-600 3.77, green-600 3.30, amber-600 3.19.
- * These are the Approve / Reject actions, "Overdue" labels and count badges —
- * the words that carry urgency, rendered in the least readable colour on the
- * page. Darkened until the dimmest surface each appears on clears 4.5:1,
- * including the -100 tints they sit inside as badges.
- *
- * Hue is preserved, so red still reads as red; these are a shade or so deeper.
- * Dark mode uses the -400 variants and is handled separately.
- */
-html:not(.dark) .text-red-500 {
-  color: #df1313 !important; /* 4.96 on white — was #ef4444, 3.76 */
-}
-html:not(.dark) .text-red-600 {
-  color: #cc2121 !important; /* 4.53 on the red-100 badge — was #dc2626, 3.95 */
-}
-html:not(.dark) .text-emerald-600 {
-  color: #047d58 !important; /* 5.13 on white — was #059669, 3.77 */
-}
-html:not(.dark) .text-green-600 {
-  color: #11813a !important; /* 4.98 on white — was #16a34a, 3.30 */
-}
-html:not(.dark) .text-amber-600 {
-  color: #a75c05 !important; /* 5.03 on white — was #d97706, 3.19 */
-}
-
-/* ─── DARK MODE ──────────────────────────────────────────────────────────── */
 
 html.dark {
   color-scheme: dark;
 }
-html.dark body {
-  background-color: #0f172a;
-  color: #e2e8f0;
-}
 
-/* Backgrounds */
-html.dark .bg-white {
-  background-color: #1e293b !important;
-}
-html.dark .bg-gray-50 {
-  background-color: #0f172a !important;
-}
-html.dark .bg-gray-100 {
-  background-color: #334155 !important;
-}
-html.dark .bg-gray-200 {
-  background-color: #475569 !important;
-}
-
-/* Coloured tint backgrounds */
-html.dark .bg-indigo-50 {
-  background-color: #1e1b4b !important;
-}
-html.dark .bg-blue-50 {
-  background-color: #0c1a33 !important;
-}
-html.dark .bg-amber-50 {
-  background-color: #27200a !important;
-}
-html.dark .bg-yellow-50 {
-  background-color: #27200a !important;
-}
-html.dark .bg-green-50 {
-  background-color: #052e16 !important;
-}
-html.dark .bg-emerald-50 {
-  background-color: #052e16 !important;
-}
-html.dark .bg-red-50 {
-  background-color: #2d0a0a !important;
-}
-html.dark .bg-orange-50 {
-  background-color: #2a1200 !important;
-}
-html.dark .bg-teal-50 {
-  background-color: #042f2e !important;
-}
-html.dark .bg-purple-50 {
-  background-color: #1e1040 !important;
-}
-html.dark .bg-pink-50 {
-  background-color: #2d0a1a !important;
-}
-
-/* Text
- *
- * These !important overrides beat any dark: utility on the same element, which
- * is why the status pills stayed unreadable however their classes were written:
- * a pill marked `text-gray-500 dark:text-[#768292]` still rendered #64748b.
- *
- * The old ladder mirrored the light palette by getting darker as the number
- * fell, but on dark surfaces darker means less contrast, not more subtlety.
- * Against .bg-gray-100 (#334155 here) that gave 500 -> 2.18:1 and 400 -> 1.37:1,
- * with 400 nearly invisible.
- *
- * The ordering is preserved but compressed upward so the faintest still clears
- * 4.5:1. Four clearly distinct greys are not available above the AA floor on
- * this background, so the steps are close together; separation between levels of
- * emphasis has to come from weight and size, not colour alone.
- *
- * Ratios below are against #334155, the lightest surface these appear on; both
- * darker surfaces score higher.
+/* ─── SHADOWS ───────────────────────────────────────────────────────────────
+ * Tailwind's shadows are tuned for light surfaces and all but vanish on dark
+ * ones, so dark mode deepens them. Not a colour token: the change is in the
+ * alpha ramp, not the hue.
  */
-html.dark .text-gray-900 {
-  color: #f1f5f9 !important;
-}
-html.dark .text-gray-800 {
-  color: #e2e8f0 !important;
-}
-html.dark .text-gray-700 {
-  color: #cbd5e1 !important; /* 6.97 */
-}
-html.dark .text-gray-600 {
-  color: #bcc5d2 !important; /* 5.94 — was #94a3b8, 4.04 */
-}
-html.dark .text-gray-500 {
-  color: #aeb9c9 !important; /* 5.22 — was #64748b, 2.18 */
-}
-html.dark .text-gray-400 {
-  color: #a1aec1 !important; /* 4.61 — was #475569, 1.37 */
-}
-
-/* Accent text
- *
- * text-indigo-600 is the link and accent colour and was written without a dark:
- * variant, so it stayed #4f46e5 on dark surfaces — 1.82:1 on a table row. The
- * clickable RMA numbers and customer emails were the least readable text in the
- * app while also being the things you are meant to click.
- *
- * indigo-300 clears 4.5:1 on every dark surface here (5.19 on the lightest,
- * .bg-gray-100). It also tints checkbox accents, which use text-* for the check
- * mark; lighter is correct there too.
- */
-html.dark .text-indigo-600 {
-  color: #a5b4fc !important; /* 5.19 on #334155, 7.34 on #1e293b */
-}
-html.dark .hover\:text-indigo-800:hover {
-  color: #c7d2fe !important;
-}
-
-/* Borders */
-html.dark .border-gray-100 {
-  border-color: #1e293b !important;
-}
-html.dark .border-gray-200 {
-  border-color: #334155 !important;
-}
-html.dark .border-gray-300 {
-  border-color: #475569 !important;
-}
-html.dark .border-dashed {
-  border-color: #334155 !important;
-}
-
-/* Table dividers */
-html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
-  border-color: #334155 !important;
-}
-html.dark .divide-y > :not([hidden]) ~ :not([hidden]) {
-  border-color: #334155 !important;
-}
-
-/* Hover states */
-html.dark .hover\:bg-gray-50:hover {
-  background-color: #1e293b !important;
-}
-html.dark .hover\:bg-gray-100:hover {
-  background-color: #334155 !important;
-}
-html.dark .hover\:bg-gray-200:hover {
-  background-color: #475569 !important;
-}
-
-/* Form inputs */
-html.dark input:not([type='color']):not([type='checkbox']):not([type='radio']):not([type='range']),
-html.dark select,
-html.dark textarea {
-  background-color: #1e293b !important;
-  border-color: #475569 !important;
-  color: #e2e8f0 !important;
-}
-html.dark input::placeholder,
-html.dark textarea::placeholder {
-  color: #64748b !important;
-}
-html.dark select option {
-  background-color: #1e293b;
-  color: #e2e8f0;
-}
-
-/* Shadows */
 html.dark .shadow-sm {
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.5) !important;
 }
@@ -233,92 +41,10 @@ html.dark .shadow-2xl {
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8) !important;
 }
 
-/* Modal overlay */
+/* Modal overlay — a darker scrim, because 50% black over an already-dark page
+   does not read as a dimmed background. */
 html.dark .bg-black\/50 {
   background-color: rgba(0, 0, 0, 0.75) !important;
-}
-
-/* Sticky table header */
-html.dark thead {
-  background-color: #1e293b !important;
-}
-html.dark thead.bg-gray-50 {
-  background-color: #1e293b !important;
-}
-
-/* Colored badge backgrounds — lighten slightly so text stays readable */
-html.dark .bg-indigo-100 {
-  background-color: #312e81 !important;
-}
-html.dark .bg-blue-100 {
-  background-color: #1e3a5f !important;
-}
-html.dark .bg-green-100 {
-  background-color: #064e3b !important;
-}
-html.dark .bg-emerald-100 {
-  background-color: #064e3b !important;
-}
-html.dark .bg-red-100 {
-  background-color: #7f1d1d !important;
-}
-html.dark .bg-amber-100 {
-  background-color: #78350f !important;
-}
-html.dark .bg-yellow-100 {
-  background-color: #78350f !important;
-}
-html.dark .bg-orange-100 {
-  background-color: #7c2d12 !important;
-}
-html.dark .bg-pink-100 {
-  background-color: #831843 !important;
-}
-html.dark .bg-purple-100 {
-  background-color: #4c1d95 !important;
-}
-html.dark .bg-teal-100 {
-  background-color: #134e4a !important;
-}
-
-/* Border colors for colored panels */
-html.dark .border-blue-200 {
-  border-color: #1e3a5f !important;
-}
-html.dark .border-amber-200 {
-  border-color: #78350f !important;
-}
-html.dark .border-green-200 {
-  border-color: #064e3b !important;
-}
-html.dark .border-red-200 {
-  border-color: #7f1d1d !important;
-}
-html.dark .border-indigo-200 {
-  border-color: #312e81 !important;
-}
-
-/* Code snippets / mono backgrounds */
-html.dark code {
-  background-color: #334155 !important;
-}
-html.dark pre {
-  background-color: #1e293b !important;
-}
-
-/* ─── ANNOUNCEMENT BANNER DARK MODE ────────────────────────────────────── */
-/* Saturated coloured banners need a muted dark-mode equivalent            */
-html.dark .bg-blue-600 {
-  background-color: #1e3a5f !important;
-}
-html.dark .bg-green-600 {
-  background-color: #064e3b !important;
-}
-html.dark .bg-yellow-500 {
-  background-color: #78350f !important;
-}
-html.dark .bg-red-600 {
-  background-color: #7f1d1d !important;
 }
 
 /* ─── MODAL SCROLL LOCK ─────────────────────────────────────────────────── */
@@ -333,7 +59,10 @@ body:has(.modal-overlay-bg) .main-scroll {
   overscroll-behavior: contain;
 }
 
-/* ─── TABLE DENSITY ─────────────────────────────────────────────────────── */
+/* ─── TABLE DENSITY ─────────────────────────────────────────────────────────
+ * A user preference from Account Settings, not a theme. Stays as overrides
+ * because it deliberately contradicts the padding a component asked for.
+ */
 
 html[data-density='compact'] table td,
 html[data-density='compact'] table th {
