@@ -3,6 +3,34 @@
 
 export const GROUPS = [
   {
+    // First, because the app leads with CRM everywhere else now and this group
+    // was entirely absent: twenty admin features and not one of them configured
+    // a deal, a lead or a pipeline.
+    id: 'crm',
+    label: 'CRM',
+    labelKey: 'cp.groupCrm',
+    color: 'sky',
+    features: [
+      {
+        id: 'pipelines',
+        label: 'Pipelines & Stages',
+        labelKey: 'cp.pipelineStagesLabel',
+        desc: 'Rename and reorder deal stages, set win probability, repair mis-staged deals',
+        descKey: 'cp.pipelineStagesDesc',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 6h18M6 12h12M10 18h4"
+            />
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
     id: 'tickets',
     label: 'Ticket Management',
     labelKey: 'cp.groupTickets',
@@ -419,6 +447,13 @@ export const COLOR_MAP = {
     icon: 'bg-rose-100 text-rose-600',
     label: 'text-rose-900',
     hover: 'hover:border-rose-300 hover:bg-rose-50/80',
+  },
+  sky: {
+    bg: 'bg-sky-50',
+    border: 'border-sky-100',
+    icon: 'bg-sky-100 text-sky-600',
+    label: 'text-sky-900',
+    hover: 'hover:border-sky-300 hover:bg-sky-50/80',
   },
   teal: {
     bg: 'bg-teal-50',

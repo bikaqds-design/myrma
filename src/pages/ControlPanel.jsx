@@ -17,6 +17,7 @@ import WALogs from './cp/WALogs'
 import WATestCenter from './cp/WATestCenter'
 import SendAlert from './cp/SendAlert'
 import HomeView from './cp/HomeView'
+import PipelineStages from './cp/PipelineStages'
 import SLAPolicies from './cp/SLAPolicies'
 import AutomationRules from './cp/AutomationRules'
 import WebhooksConfig from './cp/WebhooksConfig'
@@ -79,7 +80,11 @@ export default function ControlPanel({ currentUserRole, currentUserEmail, curren
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-          <span className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{activeFeature?.labelKey ? t(activeFeature.labelKey) : activeFeature?.label}</span>
+          {/* An h1, not a span. Opening any of the twenty features replaced the
+              page heading with a breadcrumb crumb, so every feature view had no
+              h1 at all and the first heading on the page was an h3 nested inside
+              a card. Styled to look exactly as it did. */}
+          <h1 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{activeFeature?.labelKey ? t(activeFeature.labelKey) : activeFeature?.label}</h1>
         </div>
       ) : (
         <div>
@@ -125,6 +130,7 @@ export default function ControlPanel({ currentUserRole, currentUserEmail, curren
       {section === 'kb' && <KnowledgeBase currentUserEmail={currentUserEmail} />}
       {section === 'broadcast' && <SendAlert currentUserEmail={currentUserEmail} />}
       {section === 'audit' && <AuditLog />}
+      {section === 'pipelines' && <PipelineStages currentUserEmail={currentUserEmail} />}
       {section === 'rmaconfig' && <RMAConfig currentUserEmail={currentUserEmail} />}
       {section === 'cleanup' && <DataCleanup />}
       {section === 'integrations' && <Integrations currentUserEmail={currentUserEmail} />}
