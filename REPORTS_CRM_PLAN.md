@@ -94,7 +94,7 @@ information.
 funnel with conversion rates, plus won/lost. This is the reporting the CRM
 direction actually implies and none of it exists today.
 
-**Step 3 — a Pipeline tab.** Deals by stage and by rep, win rate, average age,
+**Step 3 — a Pipeline tab. SHIPPED 2026-08-17.** Deals by stage and by rep, win rate, average age,
 and leads by source and status. 57 deals and 34 leads with no reporting.
 
 **Step 4 — demote the RMA tabs.** Tickets and Technicians stay, but behind the
@@ -163,10 +163,46 @@ The standalone counts were computed as (period total − cohort), which mixes a
 filtered set with an unfiltered one and goes negative as soon as a cohort
 document falls outside the range. They are counted directly.
 
+**Step 3 — Pipeline tab.** Open deals by stage per pipeline, deal win rate,
+average age and cycle time, lead conversion by source, lost reasons, and a
+per-rep table.
+
+Stages are read from each pipeline's own `stages` array rather than a fixed
+list, because the two pipelines genuinely differ — B2C runs new_inquiry →
+contacted → quote_sent, B2B adds needs_assessment and negotiation. Merging them
+would invent a funnel nobody runs.
+
+Everything is scoped to deals and leads *created* in the period, the same rule
+the Sales tab uses, so the date picker means one thing across the page. That
+makes the stage breakdown a cohort rather than a live snapshot; the Pipeline
+page itself remains the place to see the board as it stands.
+
+### It immediately found a data problem
+
+The tab counts deals whose stage does not exist in their own pipeline rather
+than dropping them, and on the full-year range it reports **24 of 42 open deals**
+in that state. All 24 are on the **B2C Retail Pipeline** carrying **B2B-only
+stages**:
+
+| Stage | Deals | Exists in B2C? |
+|---|---|---|
+| `new_lead` | 13 | no — B2C starts at `new_inquiry` |
+| `negotiation` | 6 | no |
+| `needs_assessment` | 5 | no |
+
+51 of 57 deals sit on B2C, so this is 47% of that pipeline. Any view keyed on a
+pipeline's own stages has nowhere to put them. Much of this looks like seeded
+test data (`nour.ali@test.com`, "Test Lead 17"), so it may be a fixture problem
+rather than something users created — but it is worth confirming against the
+live board, and worth a migration to remap the stages if real deals are affected.
+
+The report itself is safe either way: those deals are counted and called out
+beneath the funnel rather than silently omitted.
+
 ## Still to do
 
-- **Step 3 — Pipeline tab.** 57 deals and 34 leads still have no reporting.
 - **Step 4 — demote the RMA tabs** behind the CRM ones.
 - **Relabel "Active Customers"**, which counts customers with an RMA ticket in
   range — 3 of 888.
+- **Investigate the 24 mis-staged deals** above, and remap if they are real.
 

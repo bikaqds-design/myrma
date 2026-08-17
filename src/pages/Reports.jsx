@@ -821,6 +821,323 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
 
 // ─── Financial Tab ────────────────────────────────────────────────────────────
 
+
+/**
+ * Pipeline reporting: deals by stage, win/loss, and lead conversion.
+ *
+ * New. 57 deals and 34 leads had no reporting at all.
+ *
+ * Stages are read from each pipeline's own `stages` array rather than from a
+ * fixed list, because the two pipelines genuinely differ — B2C runs
+ * new_inquiry -> contacted -> quote_sent, B2B adds needs_assessment and
+ * negotiation. Merging them into one column of stage names would invent a
+ * funnel nobody runs, and would silently break the day someone edits a pipeline.
+ *
+ * Everything is scoped to deals and leads *created* in the selected period, the
+ * same rule the Sales tab uses, so the date picker means one thing across the
+ * page. That makes the stage breakdown a cohort rather than a live snapshot of
+ * the board — the Pipeline page itself is the place to see the board as it
+ * stands now.
+ */
+function PipelineTab({ deals, leads, pipelines }) {
+  const { t } = useTranslation()
+
+  const num = (v) => Number(v) || 0
+  const fmt$ = (v) =>
+    `$${num(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`
+  const pct = (a, b) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '—')
+
+  const open = deals.filter((d) => d.status === 'open')
+  const won = deals.filter((d) => d.status === 'won')
+  const lost = deals.filter((d) => d.status === 'lost')
+  const openValue = open.reduce((a, d) => a + num(d.value), 0)
+
+  // Age is only meaningful for deals still open — a closed deal's age is its
+  // cycle time, which is a different measure and is reported separately.
+  const days = (from, to) => Math.max(0, Math.round((new Date(to) - new Date(from)) / 86400000))
+  const avgOpenAge = open.length
+    ? Math.round(open.reduce((a, d) => a + days(d.created_at, Date.now()), 0) / open.length)
+    : 0
+  const closedWithDates = won.filter((d) => d.won_at && d.created_at)
+  const avgCycle = closedWithDates.length
+    ? Math.round(
+        closedWithDates.reduce((a, d) => a + days(d.created_at, d.won_at), 0) / closedWithDates.length
+      )
+    : null
+
+  // Per pipeline, open deals in that pipeline's own stage order. Terminal
+  // won/lost stages are skipped: those deals are counted in the win rate above
+  // and listing them as "in stage" would double-count them as pipeline.
+  const byPipeline = pipelines
+    .map((pl) => {
+      const stages = (pl.stages || [])
+        .filter((st) => !st.is_won && !st.is_lost)
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        .map((st) => {
+          const inStage = open.filter((d) => d.pipeline_id === pl.id && d.stage === st.id)
+          return { id: st.id, name: st.name, count: inStage.length, value: inStage.reduce((a, d) => a + num(d.value), 0) }
+        })
+      return { id: pl.id, name: pl.name, stages, total: stages.reduce((a, x) => a + x.count, 0) }
+    })
+    .filter((pl) => pl.total > 0)
+
+  // Deals whose stage is not in their pipeline's stage list, or which point at a
+  // pipeline that no longer exists. Surfaced rather than dropped, because a deal
+  // that renders nowhere is how a board quietly loses rows.
+  const knownStage = new Set(
+    pipelines.flatMap((pl) => (pl.stages || []).map((st) => `${pl.id}|${st.id}`))
+  )
+  const orphaned = open.filter((d) => !knownStage.has(`${d.pipeline_id}|${d.stage}`)).length
+
+  const lostReasons = Object.entries(
+    lost.reduce((acc, d) => {
+      const r = d.lost_reason || t('reports.noReasonGiven')
+      acc[r] = (acc[r] || 0) + 1
+      return acc
+    }, {})
+  ).sort((a, b) => b[1] - a[1])
+
+  // Leads by source, with the conversion rate for each. "Which source actually
+  // turns into business" is the question a source breakdown is usually asked to
+  // answer, and a bare count cannot answer it.
+  const bySource = Object.values(
+    leads.reduce((acc, l) => {
+      const src = l.source || t('reports.unknownSource')
+      acc[src] = acc[src] || { source: src, total: 0, converted: 0 }
+      acc[src].total += 1
+      if (l.status === 'converted' || l.converted_at) acc[src].converted += 1
+      return acc
+    }, {})
+  ).sort((a, b) => b.total - a.total)
+
+  const leadsConverted = leads.filter((l) => l.status === 'converted' || l.converted_at).length
+
+  const byRep = Object.values(
+    deals.reduce((acc, d) => {
+      const rep = d.assigned_rep || t('reports.unassigned')
+      acc[rep] = acc[rep] || { rep, open: 0, won: 0, lost: 0, openValue: 0, wonValue: 0 }
+      if (d.status === 'open') {
+        acc[rep].open += 1
+        acc[rep].openValue += num(d.value)
+      } else if (d.status === 'won') {
+        acc[rep].won += 1
+        acc[rep].wonValue += num(d.value)
+      } else if (d.status === 'lost') acc[rep].lost += 1
+      return acc
+    }, {})
+  ).sort((a, b) => b.wonValue - a.wonValue)
+
+  const exportCols = [
+    { key: 'rep', label: 'Rep' },
+    { key: 'open', label: 'Open' },
+    { key: 'won', label: 'Won' },
+    { key: 'lost', label: 'Lost' },
+    { key: 'rate', label: 'Win rate' },
+    { key: 'openValue', label: 'Open value' },
+    { key: 'wonValue', label: 'Won value' },
+  ]
+  const exportRows = () =>
+    byRep.map((r) => ({
+      rep: r.rep,
+      open: r.open,
+      won: r.won,
+      lost: r.lost,
+      rate: pct(r.won, r.won + r.lost),
+      openValue: r.openValue,
+      wonValue: r.wonValue,
+    }))
+
+  const widest = Math.max(...byPipeline.flatMap((pl) => pl.stages.map((x) => x.count)), 1)
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <KpiCard
+          label={t('reports.kpiOpenDeals')}
+          value={String(open.length)}
+          sub={fmt$(openValue)}
+          color="indigo"
+          icon="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+        />
+        <KpiCard
+          label={t('reports.kpiDealWinRate')}
+          value={pct(won.length, won.length + lost.length)}
+          sub={t('reports.wonLostSub', { won: won.length, lost: lost.length, open: open.length })}
+          color="green"
+          icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+        <KpiCard
+          label={t('reports.kpiAvgDealAge')}
+          value={t('reports.daysValue', { count: avgOpenAge })}
+          sub={avgCycle !== null ? t('reports.avgCycleSub', { count: avgCycle }) : t('reports.openDealsOnly')}
+          color="amber"
+          icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+        <KpiCard
+          label={t('reports.kpiLeadsConverted')}
+          value={`${leadsConverted} / ${leads.length}`}
+          sub={pct(leadsConverted, leads.length)}
+          color="purple"
+          icon="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+        />
+      </div>
+
+      {/* Open deals by stage, per pipeline */}
+      {byPipeline.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {byPipeline.map((pl) => (
+            <div
+              key={pl.id}
+              className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] p-5"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{pl.name}</h3>
+                <span className="text-xs text-gray-600 dark:text-[#9aa4b2]">
+                  {t('reports.openDealCount', { count: pl.total })}
+                </span>
+              </div>
+              <div className="space-y-3">
+                {pl.stages.map((st) => (
+                  <div key={st.id}>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-gray-700 dark:text-[#e8ebf0]">{st.name}</span>
+                      <span className="text-gray-600 dark:text-[#9aa4b2] tabular-nums">
+                        {st.count} · {fmt$(st.value)}
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-gray-100 dark:bg-[#1a2230] overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-indigo-500 dark:bg-indigo-400 transition-all"
+                        style={{ width: `${Math.max((st.count / widest) * 100, st.count > 0 ? 3 : 0)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {orphaned > 0 && (
+        <p className="text-xs text-gray-600 dark:text-[#9aa4b2]">
+          {t('reports.orphanedDeals', { count: orphaned })}
+        </p>
+      )}
+
+      {/* Leads by source + lost reasons */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] p-5">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0] mb-4">
+            {t('reports.leadsBySource')}
+          </h3>
+          {bySource.length === 0 ? (
+            <p className="text-sm text-gray-600 dark:text-[#9aa4b2]">{t('reports.noLeadsInRange')}</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-gray-600 dark:text-[#9aa4b2] uppercase tracking-wider">
+                  <th className="text-left font-semibold pb-2">{t('reports.colSource')}</th>
+                  <th className="text-right font-semibold pb-2">{t('reports.colLeads')}</th>
+                  <th className="text-right font-semibold pb-2">{t('reports.colConverted')}</th>
+                  <th className="text-right font-semibold pb-2">{t('reports.colRate')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
+                {bySource.map((r) => (
+                  <tr key={r.source}>
+                    <td className="py-2 text-gray-700 dark:text-[#e8ebf0] capitalize">{r.source}</td>
+                    <td className="py-2 text-right text-gray-700 dark:text-[#e8ebf0] tabular-nums">{r.total}</td>
+                    <td className="py-2 text-right text-gray-700 dark:text-[#e8ebf0] tabular-nums">{r.converted}</td>
+                    <td className="py-2 text-right font-medium text-gray-900 dark:text-[#e8ebf0] tabular-nums">
+                      {pct(r.converted, r.total)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] p-5">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0] mb-4">
+            {t('reports.whyDealsLost')}
+          </h3>
+          {lostReasons.length === 0 ? (
+            <p className="text-sm text-gray-600 dark:text-[#9aa4b2]">{t('reports.noLostDeals')}</p>
+          ) : (
+            <ul className="space-y-2">
+              {lostReasons.map(([reason, count]) => (
+                <li key={reason} className="flex items-start justify-between gap-3 text-sm">
+                  <span className="text-gray-700 dark:text-[#e8ebf0]">{reason}</span>
+                  <span className="text-gray-600 dark:text-[#9aa4b2] tabular-nums flex-shrink-0">{count}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <ExportButtons
+          onCSV={() => downloadCSV(exportRows(), exportCols, `pipeline-by-rep-${toYMD(new Date())}.csv`, t)}
+          onExcel={() => downloadExcel(exportRows(), exportCols, `pipeline-by-rep-${toYMD(new Date())}.xlsx`, t)}
+        />
+      </div>
+
+      {byRep.length === 0 ? (
+        <div className="text-center py-12 bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
+          <p className="text-sm text-gray-600 dark:text-[#9aa4b2]">{t('reports.noDealsInRange')}</p>
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
+                <tr>
+                  {[
+                    t('reports.colRep'),
+                    t('reports.colOpen'),
+                    t('reports.colWon'),
+                    t('reports.colLost'),
+                    t('reports.colWinRate'),
+                    t('reports.colOpenValue'),
+                    t('reports.colWonValue'),
+                  ].map((h, i) => (
+                    <th
+                      key={i}
+                      className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
+                {byRep.map((r) => (
+                  <tr key={r.rep} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors">
+                    <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] max-w-[220px] truncate">{r.rep}</td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] tabular-nums">{r.open}</td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] tabular-nums">{r.won}</td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] tabular-nums">{r.lost}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-[#e8ebf0] tabular-nums">
+                      {pct(r.won, r.won + r.lost)}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] tabular-nums">{fmt$(r.openValue)}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-900 dark:text-[#e8ebf0] tabular-nums">
+                      {fmt$(r.wonValue)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /**
  * Sales funnel: quotation -> order -> invoice -> cash.
  *
@@ -1329,6 +1646,7 @@ export default function Reports({
       ? [
           { id: 'customers', label: t('reports.tabCustomers') },
           { id: 'technicians', label: t('reports.tabTechnicians') },
+          { id: 'pipeline', label: t('reports.tabPipeline') },
           { id: 'sales', label: t('reports.tabSales') },
           { id: 'financial', label: t('reports.tabFinancial') },
         ]
@@ -1344,7 +1662,8 @@ export default function Reports({
       // is in `crm_invoices`, and quotations are their own table. The old query
       // succeeded and returned nothing, so the Financial tab reported $0.00
       // across the board instead of erroring.
-      const [tkRes, custRes, teRes, invRes, qtRes, soRes, payRes] = await Promise.all([
+      const [tkRes, custRes, teRes, invRes, qtRes, soRes, payRes, dealRes, leadRes, pipeRes] =
+        await Promise.all([
         db.rmaTickets.list(),
         db.customers.list(),
         isAdminOrManager ? db.timeEntries.listAll() : { missing: false, data: [] },
@@ -1352,8 +1671,11 @@ export default function Reports({
         isAdminOrManager ? db.quotations.list() : [],
         isAdminOrManager ? db.salesOrders.list() : [],
         isAdminOrManager ? db.payments.list() : [],
+        isAdminOrManager ? db.deals.list() : [],
+        isAdminOrManager ? db.leads.list() : [],
+        isAdminOrManager ? db.pipelines.list() : [],
       ])
-      return { tkRes, custRes, teRes, invRes, qtRes, soRes, payRes }
+      return { tkRes, custRes, teRes, invRes, qtRes, soRes, payRes, dealRes, leadRes, pipeRes }
     },
   })
 
@@ -1373,6 +1695,9 @@ export default function Reports({
   const quotations = useMemo(() => reportData?.qtRes ?? [], [reportData])
   const salesOrders = useMemo(() => reportData?.soRes ?? [], [reportData])
   const payments = useMemo(() => reportData?.payRes ?? [], [reportData])
+  const deals = useMemo(() => reportData?.dealRes ?? [], [reportData])
+  const leads = useMemo(() => reportData?.leadRes ?? [], [reportData])
+  const pipelines = useMemo(() => reportData?.pipeRes ?? [], [reportData])
 
   // Apply date range filter
   const filteredTickets = useMemo(
@@ -1401,6 +1726,14 @@ export default function Reports({
   )
   // Payments carry their own payment_date, which is the date that matters for
   // "collected in this period" — created_at is when the row was typed.
+  const filteredDeals = useMemo(
+    () => deals.filter((d) => inRange(d.created_at, fromDate, toDate)),
+    [deals, fromDate, toDate]
+  )
+  const filteredLeads = useMemo(
+    () => leads.filter((l) => inRange(l.created_at, fromDate, toDate)),
+    [leads, fromDate, toDate]
+  )
   const filteredPayments = useMemo(
     () => payments.filter((p) => inRange(p.payment_date || p.created_at, fromDate, toDate)),
     [payments, fromDate, toDate]
@@ -1580,6 +1913,9 @@ export default function Reports({
               timeEntriesMissing={timeEntriesMissing}
               formatDate={formatDate}
             />
+          )}
+          {activeTab === 'pipeline' && isAdminOrManager && (
+            <PipelineTab deals={filteredDeals} leads={filteredLeads} pipelines={pipelines} />
           )}
           {activeTab === 'sales' && isAdminOrManager && (
             <SalesTab
