@@ -90,7 +90,7 @@ The table below the tiles moves to `inv_code`, customer, `doc_status`,
 excluded from the money totals but stay listed, since "we voided 3" is
 information.
 
-**Step 2 — a Sales tab.** Quotations → sales orders → invoices → payments as a
+**Step 2 — a Sales tab. SHIPPED 2026-08-17.** Quotations → sales orders → invoices → payments as a
 funnel with conversion rates, plus won/lost. This is the reporting the CRM
 direction actually implies and none of it exists today.
 
@@ -119,3 +119,54 @@ and blocking would have stalled the work. Each is cheap to reverse:
   KPI label.
 - **Step 1 ships alone.** The Financial tab is actively wrong in production, and
   it should not wait behind two new tabs.
+
+---
+
+## Shipped 2026-08-17
+
+**Step 1 — Financial repointed.** Reads `crm_invoices` and `quotations` instead
+of the empty `invoices` table. Verified against the database: over the default
+30-day range the page and a direct query agree to the cent, and the same holds
+for "This year".
+
+**Step 2 — Sales tab.** Quotation → order → invoice funnel, win rate, collected
+cash, and a per-rep table with CSV/Excel export.
+
+### The funnel is a cohort, and getting that wrong was nearly shipped
+
+The first version counted documents *raised in the period* at each stage. It
+looked plausible and was not: it reported **"Invoices 140% of previous"**, which
+is the tell — the stages were never the same documents, so the percentages were
+not conversion at all.
+
+It now starts from the quotations raised in the period and follows
+`quotation_id` to their orders and `so_id` to their invoices. Crucially the
+descendants are taken from the *unfiltered* sets: a quote raised in the last
+week of a range whose order lands the following week still converted, and
+date-filtering the children would score it as a loss.
+
+That distinction is not theoretical here. For May, **all 11 orders and all 7
+invoices descended from May's quotations were raised outside May**. The
+date-filtered version would have reported 13 → 0 → 0 — "nothing converted" —
+when 11 of 13 quotes did.
+
+Orders and invoices with no originating quotation are real and are counted
+separately beneath the funnel rather than folded in.
+
+### Two other things caught in review
+
+The headline win rate used won/(won+lost) while the per-rep column used
+won/raised, so the page showed "100%" above a column of "50%"s. Both use the
+decided-only denominator now; quotes still out for answer dilute neither.
+
+The standalone counts were computed as (period total − cohort), which mixes a
+filtered set with an unfiltered one and goes negative as soon as a cohort
+document falls outside the range. They are counted directly.
+
+## Still to do
+
+- **Step 3 — Pipeline tab.** 57 deals and 34 leads still have no reporting.
+- **Step 4 — demote the RMA tabs** behind the CRM ones.
+- **Relabel "Active Customers"**, which counts customers with an RMA ticket in
+  range — 3 of 888.
+

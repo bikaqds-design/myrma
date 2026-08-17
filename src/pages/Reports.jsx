@@ -820,6 +820,262 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
 }
 
 // ─── Financial Tab ────────────────────────────────────────────────────────────
+
+/**
+ * Sales funnel: quotation -> order -> invoice -> cash.
+ *
+ * New. Nothing in Reports covered the sales side at all — three of the four
+ * tabs described 13 RMA tickets while 38 quotations, 31 orders and 27 invoices
+ * went unreported.
+ *
+ * Two deliberate choices about what the numbers mean:
+ *
+ * Conversion is measured on *documents raised in the period*, not on documents
+ * that happen to exist. A quotation raised in June and converted in August
+ * counts against June, which is the honest way to read "how many of the quotes
+ * we sent turned into orders" — the alternative flatters recent months.
+ *
+ * "Collected" comes from payments by `payment_date` and excludes voided ones.
+ * It is deliberately not the sum of `amount_paid` on invoices: that figure is
+ * the invoice's view of its own settlement, and reconciling the two is the
+ * Accounting page's job, not a report's.
+ */
+function SalesTab({ quotations, salesOrders, invoices, payments, allSalesOrders, allInvoices }) {
+  const { t } = useTranslation()
+
+  const num = (v) => Number(v) || 0
+  const fmt$ = (v) =>
+    `$${num(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`
+  const pct = (a, b) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '—')
+
+  // A quotation is "won" once it has been converted or accepted; declined and
+  // expired are the losses. draft/sent are still in play and count as neither,
+  // so the win rate is not diluted by quotes nobody has answered yet.
+  const WON = ['converted', 'accepted']
+  const LOST = ['declined', 'expired']
+  const qtWon = quotations.filter((q) => WON.includes(q.status))
+  const qtLost = quotations.filter((q) => LOST.includes(q.status))
+  const qtOpen = quotations.filter((q) => !WON.includes(q.status) && !LOST.includes(q.status))
+
+  const liveOrders = salesOrders.filter((o) => o.status !== 'cancelled')
+  const liveInvoices = invoices.filter((i) => i.doc_status !== 'cancelled')
+  const livePayments = payments.filter((p) => p.status !== 'voided')
+
+  const qtValue = quotations.reduce((a, q) => a + num(q.total), 0)
+  const invValue = liveInvoices.reduce((a, i) => a + num(i.total), 0)
+  const collected = livePayments.reduce((a, p) => a + num(p.amount), 0)
+
+  // The funnel follows document lineage rather than counting what exists at each
+  // stage. Counting per stage looked right and was not: it reported "Invoices
+  // 140% of previous", because invoices raised this period mostly descend from
+  // orders raised last period. A percentage above 100 is the tell that the
+  // stages were never the same documents.
+  //
+  // So: start from the quotations raised in this period, follow quotation_id to
+  // their orders and so_id to their invoices, and report how far that cohort
+  // travelled. Orders and invoices with no ancestor quotation are real and are
+  // reported separately below, not folded in.
+  // Lineage walks the *unfiltered* orders and invoices on purpose. A quotation
+  // raised on the last day of the range whose order lands the following week
+  // still converted; filtering its descendants by the same dates would report it
+  // as lost. On today's data both readings give 3 and 1, so this is not a fix
+  // for a visible error — it is making the claim in the note below true for any
+  // range rather than only for this one.
+  const qtIds = new Set(quotations.map((q) => q.id))
+  const ordersFromQt = allSalesOrders.filter(
+    (o) => o.status !== 'cancelled' && o.quotation_id && qtIds.has(o.quotation_id)
+  )
+  const orderIds = new Set(ordersFromQt.map((o) => o.id))
+  const invoicesFromQt = allInvoices.filter(
+    (i) => i.doc_status !== 'cancelled' && i.so_id && orderIds.has(i.so_id)
+  )
+
+  const stages = [
+    { key: 'qt', label: t('reports.funnelQuotations'), count: quotations.length, value: qtValue, color: '#6366f1' },
+    { key: 'so', label: t('reports.funnelOrders'), count: ordersFromQt.length, value: ordersFromQt.reduce((a, o) => a + num(o.total), 0), color: '#0ea5e9' },
+    { key: 'inv', label: t('reports.funnelInvoices'), count: invoicesFromQt.length, value: invoicesFromQt.reduce((a, i) => a + num(i.total), 0), color: '#14b8a6' },
+  ]
+  const widest = Math.max(...stages.map((x) => x.value), 1)
+
+  // Documents raised in the period with no originating quotation, so the reader
+  // knows what the funnel above leaves out.
+  //
+  // Counted directly rather than as (period total - cohort). That subtraction
+  // mixes a date-filtered set with an unfiltered one and can go negative the
+  // moment a quote's order lands in a later period — a number that would be
+  // quietly wrong rather than obviously broken.
+  const standalone = {
+    orders: liveOrders.filter((o) => !o.quotation_id || !qtIds.has(o.quotation_id)).length,
+    invoices: liveInvoices.filter((i) => !i.so_id || !orderIds.has(i.so_id)).length,
+  }
+
+  // Per rep, on quotations raised in the period.
+  const byRep = Object.values(
+    quotations.reduce((acc, q) => {
+      const rep = q.assigned_rep || t('reports.unassigned')
+      acc[rep] = acc[rep] || { rep, raised: 0, won: 0, lost: 0, value: 0, wonValue: 0 }
+      acc[rep].raised += 1
+      acc[rep].value += num(q.total)
+      if (WON.includes(q.status)) {
+        acc[rep].won += 1
+        acc[rep].wonValue += num(q.total)
+      }
+      if (LOST.includes(q.status)) acc[rep].lost += 1
+      return acc
+    }, {})
+  ).sort((a, b) => b.wonValue - a.wonValue)
+
+  const exportCols = [
+    { key: 'rep', label: 'Rep' },
+    { key: 'raised', label: 'Quotations' },
+    { key: 'won', label: 'Won' },
+    { key: 'rate', label: 'Win rate' },
+    { key: 'value', label: 'Quoted value' },
+    { key: 'wonValue', label: 'Won value' },
+  ]
+  const exportRows = () =>
+    byRep.map((r) => ({
+      rep: r.rep,
+      raised: r.raised,
+      won: r.won,
+      rate: pct(r.won, r.won + r.lost),
+      value: r.value,
+      wonValue: r.wonValue,
+    }))
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <KpiCard
+          label={t('reports.kpiQuotationsRaised')}
+          value={String(quotations.length)}
+          sub={fmt$(qtValue)}
+          color="indigo"
+          icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+        />
+        <KpiCard
+          label={t('reports.kpiWinRate')}
+          value={pct(qtWon.length, qtWon.length + qtLost.length)}
+          sub={t('reports.wonLostSub', { won: qtWon.length, lost: qtLost.length, open: qtOpen.length })}
+          color="green"
+          icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+        <KpiCard
+          label={t('reports.kpiInvoiced')}
+          value={fmt$(invValue)}
+          sub={t('reports.docCount', { count: liveInvoices.length })}
+          color="blue"
+          icon="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+        />
+        <KpiCard
+          label={t('reports.kpiCollected')}
+          value={fmt$(collected)}
+          sub={t('reports.docCount', { count: livePayments.length })}
+          color="purple"
+          icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 9v1"
+        />
+      </div>
+
+      {/* Funnel */}
+      <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] p-5">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0] mb-4">
+          {t('reports.salesFunnel')}
+        </h3>
+        <div className="space-y-3">
+          {stages.map((st, i) => {
+            const prev = i > 0 ? stages[i - 1] : null
+            return (
+              <div key={st.key}>
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="font-medium text-gray-700 dark:text-[#e8ebf0]">{st.label}</span>
+                  <span className="text-gray-600 dark:text-[#9aa4b2] tabular-nums">
+                    {st.count} · {fmt$(st.value)}
+                    {prev && (
+                      <span className="ml-2 text-gray-500 dark:text-[#9aa4b2]">
+                        ({pct(st.count, prev.count)} {t('reports.ofPrevious')})
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="h-2.5 rounded-full bg-gray-100 dark:bg-[#1a2230] overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${Math.max((st.value / widest) * 100, st.value > 0 ? 2 : 0)}%`, background: st.color }}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-4">
+          {t('reports.funnelNote')}
+        </p>
+        {(standalone.orders > 0 || standalone.invoices > 0) && (
+          <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-1">
+            {t('reports.funnelStandalone', standalone)}
+          </p>
+        )}
+      </div>
+
+      <div className="flex justify-end">
+        <ExportButtons
+          onCSV={() => downloadCSV(exportRows(), exportCols, `sales-by-rep-${toYMD(new Date())}.csv`, t)}
+          onExcel={() => downloadExcel(exportRows(), exportCols, `sales-by-rep-${toYMD(new Date())}.xlsx`, t)}
+        />
+      </div>
+
+      {/* By rep */}
+      {byRep.length === 0 ? (
+        <div className="text-center py-12 bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('reports.noSalesInRange')}</p>
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
+                <tr>
+                  {[
+                    t('reports.colRep'),
+                    t('reports.colQuotations'),
+                    t('reports.colWon'),
+                    t('reports.colWinRate'),
+                    t('reports.colQuotedValue'),
+                    t('reports.colWonValue'),
+                  ].map((h, i) => (
+                    <th
+                      key={i}
+                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
+                {byRep.map((r) => (
+                  <tr key={r.rep} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors">
+                    <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] max-w-[220px] truncate">{r.rep}</td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] tabular-nums">{r.raised}</td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] tabular-nums">{r.won}</td>
+                    <td className="px-4 py-3 tabular-nums font-medium text-gray-900 dark:text-[#e8ebf0]">
+                      {pct(r.won, r.won + r.lost)}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] tabular-nums">{fmt$(r.value)}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-900 dark:text-[#e8ebf0] tabular-nums">
+                      {fmt$(r.wonValue)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /**
  * Financial reporting over the CRM tables.
  *
@@ -1073,6 +1329,7 @@ export default function Reports({
       ? [
           { id: 'customers', label: t('reports.tabCustomers') },
           { id: 'technicians', label: t('reports.tabTechnicians') },
+          { id: 'sales', label: t('reports.tabSales') },
           { id: 'financial', label: t('reports.tabFinancial') },
         ]
       : []),
@@ -1087,14 +1344,16 @@ export default function Reports({
       // is in `crm_invoices`, and quotations are their own table. The old query
       // succeeded and returned nothing, so the Financial tab reported $0.00
       // across the board instead of erroring.
-      const [tkRes, custRes, teRes, invRes, qtRes] = await Promise.all([
+      const [tkRes, custRes, teRes, invRes, qtRes, soRes, payRes] = await Promise.all([
         db.rmaTickets.list(),
         db.customers.list(),
         isAdminOrManager ? db.timeEntries.listAll() : { missing: false, data: [] },
         isAdminOrManager ? db.crmInvoices.list() : [],
         isAdminOrManager ? db.quotations.list() : [],
+        isAdminOrManager ? db.salesOrders.list() : [],
+        isAdminOrManager ? db.payments.list() : [],
       ])
-      return { tkRes, custRes, teRes, invRes, qtRes }
+      return { tkRes, custRes, teRes, invRes, qtRes, soRes, payRes }
     },
   })
 
@@ -1112,6 +1371,8 @@ export default function Reports({
   const timeEntries = useMemo(() => reportData?.teRes?.data ?? [], [reportData])
   const invoices = useMemo(() => reportData?.invRes ?? [], [reportData])
   const quotations = useMemo(() => reportData?.qtRes ?? [], [reportData])
+  const salesOrders = useMemo(() => reportData?.soRes ?? [], [reportData])
+  const payments = useMemo(() => reportData?.payRes ?? [], [reportData])
 
   // Apply date range filter
   const filteredTickets = useMemo(
@@ -1133,6 +1394,16 @@ export default function Reports({
   const filteredQuotations = useMemo(
     () => quotations.filter((q) => inRange(q.created_at, fromDate, toDate)),
     [quotations, fromDate, toDate]
+  )
+  const filteredSalesOrders = useMemo(
+    () => salesOrders.filter((o) => inRange(o.created_at, fromDate, toDate)),
+    [salesOrders, fromDate, toDate]
+  )
+  // Payments carry their own payment_date, which is the date that matters for
+  // "collected in this period" — created_at is when the row was typed.
+  const filteredPayments = useMemo(
+    () => payments.filter((p) => inRange(p.payment_date || p.created_at, fromDate, toDate)),
+    [payments, fromDate, toDate]
   )
 
   // Display formatter passed to the tab sub-components (was referenced but never defined).
@@ -1308,6 +1579,16 @@ export default function Reports({
               timeEntries={timeEntries}
               timeEntriesMissing={timeEntriesMissing}
               formatDate={formatDate}
+            />
+          )}
+          {activeTab === 'sales' && isAdminOrManager && (
+            <SalesTab
+              quotations={filteredQuotations}
+              salesOrders={filteredSalesOrders}
+              invoices={filteredInvoices}
+              payments={filteredPayments}
+              allSalesOrders={salesOrders}
+              allInvoices={invoices}
             />
           )}
           {activeTab === 'financial' && isAdminOrManager && (
