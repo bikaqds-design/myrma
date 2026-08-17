@@ -1579,9 +1579,16 @@ export default function App() {
                 path="/calendar"
                 element={
                   <TechCalendar
-                    userRole={effectiveUserRole}
-                    userEmail={currentUser?.email}
-                    userPermissions={effectiveUserPermissions}
+                    /* currentUser* names, not user*: the component destructures
+                       currentUserRole / currentUserEmail / currentUserPermissions,
+                       so the short names arrived as undefined. isAdminOrManager was
+                       therefore always false — the assignee filter never rendered for
+                       anyone — and effectiveTech fell back to an undefined email,
+                       which the filter treats as "no filter", so every user saw every
+                       technician's work rather than their own. */
+                    currentUserRole={effectiveUserRole}
+                    currentUserEmail={currentUser?.email}
+                    currentUserPermissions={effectiveUserPermissions}
                     onNavigateToTicket={handleNavigateToTicket}
                   />
                 }

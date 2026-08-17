@@ -1414,16 +1414,22 @@
     "deleteCategoryWithProducts_other": "هل تريد حذف الفئة \"{{name}}\"؟ سيبقى {{count}} منتج بلا فئة. تظل في الكتالوج لكنها تختفي من عروض الفئات."
   },
   "calendar": {
-    "title": "تقويم الفنيين",
-    "subtitle": "عرض أسبوعي للتذاكر حسب الفني وتاريخ الاستحقاق",
+    "title": "التقويم",
+    "subtitle": "عرض أسبوعي للتذاكر والمتابعات المخططة حسب تاريخ الاستحقاق",
     "today": "اليوم",
-    "allTechnicians": "جميع الفنيين",
-    "technician": "الفني",
+    "allTechnicians": "كل المسؤولين",
+    "technician": "المسؤول",
     "errorLoadTickets": "فشل تحميل التذاكر",
     "errorLoadCalendar": "فشل تحميل بيانات التقويم.",
     "unscheduledTickets": "تذاكر غير مجدولة",
     "noUnscheduled": "لا توجد تذاكر غير مجدولة",
-    "noUnscheduledDesc": "جميع التذاكر النشطة لها تاريخ استحقاق محدد."
+    "noUnscheduledDesc": "جميع التذاكر النشطة لها تاريخ استحقاق محدد.",
+    "overdue": "متأخر",
+    "activityType_approval": "اعتماد",
+    "activityType_call": "مكالمة",
+    "activityType_meeting": "اجتماع",
+    "activityType_note": "ملاحظة",
+    "activityType_task": "مهمة"
   },
   "invoices": {
     "title": "الفواتير والعروض",

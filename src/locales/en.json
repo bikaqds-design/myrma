@@ -1406,16 +1406,22 @@
     "deleteCategoryWithProducts_other": "Delete category \"{{name}}\"? {{count}} products will be left with no category. They stay in the catalog but disappear from category views."
   },
   "calendar": {
-    "title": "Tech Calendar",
-    "subtitle": "Weekly view of tickets by technician and due date",
+    "title": "Calendar",
+    "subtitle": "Weekly view of tickets and planned follow-ups by due date",
     "today": "Today",
-    "allTechnicians": "All Technicians",
-    "technician": "Technician",
+    "allTechnicians": "All assignees",
+    "technician": "Assignee",
     "errorLoadTickets": "Failed to load tickets",
     "errorLoadCalendar": "Failed to load calendar data.",
     "unscheduledTickets": "Unscheduled Tickets",
     "noUnscheduled": "No unscheduled tickets",
-    "noUnscheduledDesc": "All active tickets have a due date assigned."
+    "noUnscheduledDesc": "All active tickets have a due date assigned.",
+    "overdue": "Overdue",
+    "activityType_approval": "Approval",
+    "activityType_call": "Call",
+    "activityType_meeting": "Meeting",
+    "activityType_note": "Note",
+    "activityType_task": "Task"
   },
   "invoices": {
     "title": "Invoices & Quotes",
