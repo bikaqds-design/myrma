@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, supabase } from '../api/supabaseClient'
 import { safeStorage } from '../lib/safeStorage'
+import { WIDGET_CATALOG, resolveEnabledWidgets } from '../lib/dashboardWidgets'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { Spinner } from '../components/ui'
 import { TICKET_STATUS, TICKET_STATUS_LIST, TICKET_STATUS_RESOLVED, ROLES } from '../lib/constants'
@@ -10,26 +11,9 @@ import { EMPTY_ARRAY } from '../lib/stableEmpty'
 
 const DashboardCharts = lazy(() => import('./DashboardCharts'))
 
-// eslint-disable-next-line react-refresh/only-export-components
-export const WIDGET_CATALOG = [
-  { id: 'stat_tickets',           label: 'Ticket KPIs',               desc: 'Hero tiles + status strip',                     size: 'full' },
-  { id: 'stat_inventory',         label: 'Inventory Snapshot',         desc: '5 inventory status categories',                 size: 'full' },
-  { id: 'sla_health',             label: 'SLA Health',                 desc: 'On-time ticket completion rate gauge',           size: 'half' },
-  { id: 'resolution_rate',        label: 'Resolution Rate',            desc: 'Percentage of closed tickets gauge',             size: 'half' },
-  { id: 'recent_tickets',         label: 'Recent Tickets',             desc: 'Last 10 RMA tickets with status',               size: 'half' },
-  { id: 'overdue_tickets',        label: 'Overdue Tickets',            desc: 'All tickets past their due date',               size: 'half' },
-  { id: 'weekly_trend',           label: 'Weekly Trend',               desc: '7-day ticket creation line chart',              size: 'half' },
-  { id: 'monthly_trend',          label: 'Monthly Trend (30d)',         desc: '30-day ticket creation bar chart',              size: 'half' },
-  { id: 'status_distribution',    label: 'Status Distribution',        desc: 'Donut chart of ticket statuses',                size: 'half' },
-  { id: 'priority_distribution',  label: 'Priority Distribution',      desc: 'Donut chart of ticket priorities',              size: 'half' },
-  { id: 'technician_performance', label: 'Technician Performance',     desc: 'Top 5 technicians by close rate',               size: 'full' },
-  { id: 'top_issues',             label: 'Top Issues',                 desc: 'Ranked list of most common product issues',     size: 'full' },
-  { id: 'overdue_followups',      label: 'Overdue Follow-Ups',         desc: 'CRM activities past their due date',            size: 'half' },
-  { id: 'crm_kpi',               label: 'CRM KPIs',                   desc: 'Open pipeline value, deals won & leads this month', size: 'full' },
-  { id: 'pipeline_by_stage',     label: 'Pipeline by Stage',          desc: 'Open deal count & value per stage bar chart',    size: 'half' },
-  { id: 'rep_leaderboard',       label: 'Rep Leaderboard',            desc: 'Top 5 reps by deals won this month',             size: 'half' },
-]
-
+// Catalog moved to lib/dashboardWidgets so AccountSettings can read it without
+// importing this page. Re-exported because existing imports point here.
+export { WIDGET_CATALOG }
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const STATUS_COLOR = {
   Open:          '#3b82f6',
@@ -204,7 +188,7 @@ function DonutWithLegend({ segments, tk }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Dashboard({ currentUserEmail, currentUserRole, onNavigate }) {
-  const { dashboardWidgets, darkMode } = useAppearance()
+  const { darkMode } = useAppearance()
   const { t } = useTranslation()
   const tk = tokens(darkMode)
   const chartTickStyle  = { fontSize: 10, fill: tk.textFaint }
@@ -214,8 +198,12 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
     : { backgroundColor: '#fff',    border: `1px solid ${tk.border}`, borderRadius: 8 }
   const storageKey = `dashboard_widgets_${currentUserEmail}`
 
+  // resolveEnabledWidgets, not a fallback list: a stored preference records what
+  // is switched *off*, so widgets added to the catalog since it was saved are on
+  // rather than invisible. The old fallback was AppearanceContext's ten-id array,
+  // which predated the CRM widgets and hid all four of them.
   const [enabledWidgets, setEnabledWidgets] = useState(() =>
-    safeStorage.get(storageKey, dashboardWidgets || WIDGET_CATALOG.map((w) => w.id))
+    resolveEnabledWidgets(safeStorage.get(storageKey, null))
   )
   const [range, setRange] = useState('30d')
 
@@ -243,15 +231,21 @@ export default function Dashboard({ currentUserEmail, currentUserRole, onNavigat
     return () => supabase.removeChannel(channel)
   }, [queryClient])
 
+  // Re-read when the account changes. Must resolve, like the initial state and
+  // the change listener below — assigning the raw stored value here is what
+  // crashed the page with "enabledWidgets.includes is not a function" once the
+  // stored shape became { v, off }.
   useEffect(() => {
-    const stored = safeStorage.get(storageKey, null)
-    if (stored) setEnabledWidgets(stored)
+    setEnabledWidgets(resolveEnabledWidgets(safeStorage.get(storageKey, null)))
   }, [storageKey])
 
   useEffect(() => {
     const handler = () => {
-      const stored = safeStorage.get(storageKey, null)
-      if (stored) setEnabledWidgets(stored)
+      // Resolve rather than assigning the raw value: the stored shape is
+      // { v, off } now, and setting that directly would leave enabledWidgets an
+      // object whose .includes() is not a function. Resolving null too, so
+      // clearing the preference falls back to the whole catalog.
+      setEnabledWidgets(resolveEnabledWidgets(safeStorage.get(storageKey, null)))
     }
     window.addEventListener('dashboard-widgets-changed', handler)
     return () => window.removeEventListener('dashboard-widgets-changed', handler)

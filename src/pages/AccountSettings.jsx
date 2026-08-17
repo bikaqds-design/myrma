@@ -4,7 +4,7 @@ import { auth, db, storage, notifications } from '../api/supabaseClient'
 import { captureException } from '../lib/sentry'
 import { resetPasswordSchema, getFirstError } from '../lib/schemas'
 import { safeStorage } from '../lib/safeStorage'
-import { WIDGET_CATALOG } from './Dashboard'
+import { WIDGET_CATALOG, ALL_WIDGET_IDS, resolveEnabledWidgets, toStoredWidgetPrefs } from '../lib/dashboardWidgets'
 import toast from 'react-hot-toast'
 import { Spinner, PageHeader, Button, Input } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
@@ -180,30 +180,39 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
 
   // Appearance — widget prefs
   const widgetStorageKey = `dashboard_widgets_${currentUser?.email}`
+  // Same resolver the Dashboard uses. These two used to read the same key with
+  // different fallbacks — all sixteen here, AppearanceContext's ten there — so
+  // with no saved preference this page showed every widget ticked while the
+  // dashboard rendered ten.
   const [widgetPrefs, setWidgetPrefs] = useState(() =>
-    safeStorage.get(`dashboard_widgets_${currentUser?.email}`, WIDGET_CATALOG.map((w) => w.id))
+    resolveEnabledWidgets(safeStorage.get(`dashboard_widgets_${currentUser?.email}`, null))
   )
+
+  const persistWidgets = (next) => {
+    safeStorage.set(widgetStorageKey, toStoredWidgetPrefs(next))
+    window.dispatchEvent(new Event('dashboard-widgets-changed'))
+  }
 
   const toggleWidget = (id) => {
     setWidgetPrefs((prev) => {
       const next = prev.includes(id) ? prev.filter((w) => w !== id) : [...prev, id]
-      safeStorage.set(widgetStorageKey, next)
-      window.dispatchEvent(new Event('dashboard-widgets-changed'))
+      persistWidgets(next)
       return next
     })
   }
 
   const enableAllWidgets = () => {
-    const all = WIDGET_CATALOG.map((w) => w.id)
-    setWidgetPrefs(all)
-    safeStorage.set(widgetStorageKey, all)
-    window.dispatchEvent(new Event('dashboard-widgets-changed'))
+    setWidgetPrefs([...ALL_WIDGET_IDS])
+    persistWidgets(ALL_WIDGET_IDS)
   }
 
   const disableAllWidgets = () => {
+    // persistWidgets, not a bare []: an empty array is the legacy shape, and the
+    // resolver reads that as "nothing was switched off among the ids that
+    // existed back then", which would leave the six newer widgets on. The v2
+    // shape says explicitly that all sixteen are off.
     setWidgetPrefs([])
-    safeStorage.set(widgetStorageKey, [])
-    window.dispatchEvent(new Event('dashboard-widgets-changed'))
+    persistWidgets([])
   }
 
   // Profile

@@ -13,18 +13,11 @@ const DEFAULT = {
   timeFormat: '24h',
   faviconUrl: '',
   tabTitle: 'myRMA',
-  dashboardWidgets: [
-    'stat_tickets',
-    'stat_inventory',
-    'sla_health',
-    'resolution_rate',
-    'recent_tickets',
-    'overdue_tickets',
-    'weekly_trend',
-    'status_distribution',
-    'priority_distribution',
-    'top_issues',
-  ],
+  // No dashboardWidgets default here any more. It was a hardcoded ten-id array
+  // used as the Dashboard's fallback, and because nothing ever wrote to it, it
+  // silently capped every account at the ten widgets that existed when it was
+  // typed — hiding the entire CRM section. Widget visibility is a per-user
+  // preference resolved in lib/dashboardWidgets against the live catalog.
 }
 
 const FONT_STACKS = {
