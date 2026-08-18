@@ -201,7 +201,7 @@ function DealDetailsRoute({ currentUserRole, currentUserEmail, currentUserPermis
   )
 }
 
-function SalesDocumentDetailRoute({ currentUserRole, currentUserEmail }) {
+function SalesDocumentDetailRoute({ currentUserRole, currentUserEmail, currentUserPermissions }) {
   const { type, id } = useParams()
   const navigate = useNavigate()
   return (
@@ -210,6 +210,7 @@ function SalesDocumentDetailRoute({ currentUserRole, currentUserEmail }) {
       docId={id}
       currentUserRole={currentUserRole}
       currentUserEmail={currentUserEmail}
+      currentUserPermissions={currentUserPermissions}
       onBack={() => navigate('/sales')}
     />
   )
@@ -1559,7 +1560,7 @@ export default function App() {
               <Route
                 path="/purchasing/vendor/:id"
                 element={
-                  canDo(effectiveUserRole, effectiveUserPermissions, 'deals', 'view') ? (
+                  canDo(effectiveUserRole, effectiveUserPermissions, 'purchasing', 'view') ? (
                     <VendorDetailsRoute
                       currentUserRole={effectiveUserRole}
                       currentUserPermissions={effectiveUserPermissions}
@@ -1573,7 +1574,7 @@ export default function App() {
               <Route
                 path="/purchasing/:type/:id"
                 element={
-                  canDo(effectiveUserRole, effectiveUserPermissions, 'deals', 'view') ? (
+                  canDo(effectiveUserRole, effectiveUserPermissions, 'purchasing', 'view') ? (
                     <PurchaseDocumentDetailRoute
                       currentUserRole={effectiveUserRole}
                       currentUserEmail={currentUser?.email}
@@ -1587,10 +1588,11 @@ export default function App() {
               <Route
                 path="/sales/:type/:id"
                 element={
-                  canDo(effectiveUserRole, effectiveUserPermissions, 'deals', 'view') ? (
+                  canDo(effectiveUserRole, effectiveUserPermissions, 'sales', 'view') ? (
                     <SalesDocumentDetailRoute
                       currentUserRole={effectiveUserRole}
                       currentUserEmail={currentUser?.email}
+                      currentUserPermissions={effectiveUserPermissions}
                     />
                   ) : (
                     <Navigate to="/" replace />

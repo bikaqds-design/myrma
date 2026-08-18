@@ -617,3 +617,64 @@ Verification is two steps, and the second is the one that matters: confirm the
 gates read correctly, then actually record a small payment as an accountant and
 void it, because reading the gate is what I did last time.
 
+---
+
+## Three more found reviewing this section (2026-08-18)
+
+Asked whether anything was still pending here. There was, and all three are the
+same shape as the RLS holes: the interface and the database disagreeing about
+who may do what.
+
+**1. A sales rep could not edit their own quotation.** Every UPDATE policy on
+the four sales-document tables required `manager_or_above`, and
+`quotations.update()` / `markSent()` are direct table updates rather than RPCs.
+A rep has `sales.edit: true` and owns the document; the database refused the
+save. They could raise a quotation and then not correct a typo in it.
+
+**2. A technician or viewer could create sales documents.** Every INSERT policy
+was `WITH CHECK (rma_is_staff())` — every internal role. Neither has a Sales
+page, so it was invisible and reachable only through the API. Same shape as the
+read holes in 20260779.
+
+**3. The document detail page ignored permissions entirely.** It took
+`currentUserRole` and never used it — the prop had been renamed
+`_currentUserRole` to silence the linter — and every action was gated on
+document status alone. So anyone who could open a document was offered Edit,
+Send for Approval, Convert, Cancel, Void, Issue Credit Note, Record Payment and
+Archive. For an accountant that is eight buttons the database will refuse.
+
+`20260781_sales_write_matches_matrix.sql` fixes 1 and 2 straight from the
+matrix: INSERT to manager+ and sales_rep; UPDATE to manager+ for anything and
+sales_rep for what they own, with the ownership test in both `USING` and
+`WITH CHECK` so a rep cannot reassign a document away from themselves.
+`crm_invoices` and `credit_notes` keep manager-only UPDATE — a rep may raise an
+invoice but not alter one afterwards, or the manager-gated post and void would
+mean nothing.
+
+For 3, all thirteen actions now carry the verb they actually perform:
+`sales.edit` for edit/send/convert-to-SO/reopen/archive, `sales.cancel` for
+cancel and void, `sales.post` for convert-to-invoice and issue-credit-note, and
+`accounting.record_payment` for taking a payment — because settling cash is the
+accountant's job, not a rep's, and it follows the accounting module rather than
+sales.
+
+### A fourth, found while wiring that up
+
+Three detail routes were still gated on the borrowed `deals.view`:
+`/sales/:type/:id`, `/purchasing/:type/:id` and `/purchasing/vendor/:id`. The
+list routes were repointed to their own modules; these were missed. Effect: an
+accountant could see the Sales list and was **bounced to the dashboard on
+clicking any row**, because they have no `deals` module at all.
+
+### Verified in the browser
+
+Previewing an accountant on a live draft quotation: the document opens rather
+than redirecting, and Edit, Send for Approval, Cancel and Archive are all
+disabled. The same document as a manager: all four enabled. Two earlier attempts
+at this proved nothing and are worth recording — the first document was
+`converted` and the second `archived`, both of which hide the actions by
+pre-existing status rules, so the permission gate was never exercised. Only a
+live draft tests it.
+
+Gate: lint clean, 457 tests, build ✓.
+

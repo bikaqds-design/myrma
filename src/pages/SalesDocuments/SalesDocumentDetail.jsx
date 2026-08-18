@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { canDo } from '../../lib/permissions'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
@@ -102,7 +103,32 @@ const ADAPTERS = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function SalesDocumentDetail({ docType, docId, currentUserRole: _currentUserRole, currentUserEmail, onBack }) {
+export default function SalesDocumentDetail({
+  docType,
+  docId,
+  currentUserRole,
+  currentUserEmail,
+  currentUserPermissions,
+  onBack,
+}) {
+  /**
+   * Who may change a document, as opposed to which states are changeable.
+   *
+   * This page took currentUserRole and never used it — the prop was renamed to
+   * `_currentUserRole` to silence the linter. Every Edit and action button was
+   * gated on document status alone, so anyone who could open a document was
+   * offered Edit, including an accountant, whose whole point is that they
+   * settle cash without touching the paperwork. The database refuses them, so
+   * the button was an error waiting to be clicked.
+   */
+  const canEditDoc   = canDo(currentUserRole, currentUserPermissions, 'sales', 'edit')
+  const canCancelDoc = canDo(currentUserRole, currentUserPermissions, 'sales', 'cancel')
+  const canPostDoc   = canDo(currentUserRole, currentUserPermissions, 'sales', 'post')
+  // Recording a payment against an invoice is a cash action, not a sales one —
+  // it is the accountant's job and not a rep's, so it follows the accounting
+  // module rather than `sales`.
+  const canTakePayment = canDo(currentUserRole, currentUserPermissions, 'accounting', 'record_payment')
+
   const { t } = useTranslation()
   const { confirm, confirmDialog } = useConfirm()
   const navigate = useNavigate()
@@ -449,12 +475,12 @@ export default function SalesDocumentDetail({ docType, docId, currentUserRole: _
               {/* 'accepted' locks the QT: once approved it must not change, or the
                   approved figures and the resulting SO could diverge. */}
               {!qtIsConverted && !['cancelled', 'expired', 'declined', 'accepted'].includes(n.status) && (
-                <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+                <Button variant="secondary" size="sm" disabled={!canEditDoc} onClick={() => setEditing(true)}>
                   {t('salesDocuments.edit')}
                 </Button>
               )}
               {!qtIsConverted && n.status === 'draft' && (
-                <Button variant="secondary" size="sm" onClick={handleSendForApproval} loading={busy}>
+                <Button disabled={!canEditDoc} variant="secondary" size="sm" onClick={handleSendForApproval} loading={busy}>
                   {t('pipeline.sendForApproval')}
                 </Button>
               )}
@@ -464,7 +490,7 @@ export default function SalesDocumentDetail({ docType, docId, currentUserRole: _
                 </span>
               )}
               {!qtIsConverted && n.status === 'accepted' && (
-                <Button size="sm" onClick={handleConvertToSO} loading={busy}>
+                <Button disabled={!canEditDoc} size="sm" onClick={handleConvertToSO} loading={busy}>
                   {t('salesDocuments.convertToSO')}
                 </Button>
               )}
@@ -475,12 +501,12 @@ export default function SalesDocumentDetail({ docType, docId, currentUserRole: _
                 </Button>
               )}
               {!qtIsConverted && ['cancelled', 'declined'].includes(n.status) && (
-                <Button variant="secondary" size="sm" onClick={handleReopenForApproval} loading={busy}>
+                <Button disabled={!canEditDoc} variant="secondary" size="sm" onClick={handleReopenForApproval} loading={busy}>
                   {t('pipeline.reopenForApproval')}
                 </Button>
               )}
               {!qtIsConverted && ['draft', 'sent', 'accepted'].includes(n.status) && (
-                <Button variant="danger" size="sm" onClick={handleCancelQt} loading={busy}>
+                <Button disabled={!canCancelDoc} variant="danger" size="sm" onClick={handleCancelQt} loading={busy}>
                   {t('common.cancel')}
                 </Button>
               )}
@@ -491,12 +517,12 @@ export default function SalesDocumentDetail({ docType, docId, currentUserRole: _
           {isSO && !doc.archived && (
             <>
               {!soIsInvoiced && n.status === 'draft' && (
-                <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+                <Button variant="secondary" size="sm" disabled={!canEditDoc} onClick={() => setEditing(true)}>
                   {t('salesDocuments.edit')}
                 </Button>
               )}
               {!soIsInvoiced && n.status === 'draft' && (
-                <Button variant="secondary" size="sm" onClick={handleSOSendForApproval} loading={busy}>
+                <Button disabled={!canEditDoc} variant="secondary" size="sm" onClick={handleSOSendForApproval} loading={busy}>
                   {t('pipeline.sendForApproval')}
                 </Button>
               )}
@@ -512,17 +538,17 @@ export default function SalesDocumentDetail({ docType, docId, currentUserRole: _
                 </Button>
               )}
               {!soIsInvoiced && ['confirmed', 'delivered'].includes(n.status) && (
-                <Button size="sm" onClick={handleConvertToInvoice} loading={busy}>
+                <Button disabled={!canPostDoc} size="sm" onClick={handleConvertToInvoice} loading={busy}>
                   {t('salesDocuments.convertToInvoice')}
                 </Button>
               )}
               {!soIsInvoiced && ['declined', 'cancelled'].includes(n.status) && (
-                <Button variant="secondary" size="sm" onClick={handleSOReopen} loading={busy}>
+                <Button disabled={!canEditDoc} variant="secondary" size="sm" onClick={handleSOReopen} loading={busy}>
                   {t('pipeline.reopenForApproval')}
                 </Button>
               )}
               {!soIsInvoiced && ['draft', 'sent', 'accepted', 'confirmed', 'delivered'].includes(n.status) && (
-                <Button variant="danger" size="sm" onClick={handleCancelSO} loading={busy}>
+                <Button disabled={!canCancelDoc} variant="danger" size="sm" onClick={handleCancelSO} loading={busy}>
                   {t('common.cancel')}
                 </Button>
               )}
@@ -538,12 +564,12 @@ export default function SalesDocumentDetail({ docType, docId, currentUserRole: _
                 </span>
               )}
               {n.status === 'posted' && (
-                <Button variant="secondary" size="sm" onClick={() => setShowPaymentModal(true)}>
+                <Button disabled={!canTakePayment} variant="secondary" size="sm" onClick={() => setShowPaymentModal(true)}>
                   {t('salesDocuments.recordPayment')}
                 </Button>
               )}
               {n.status === 'posted' && (
-                <Button variant="danger" size="sm" onClick={() => setShowVoidModal(true)}>
+                <Button disabled={!canCancelDoc} variant="danger" size="sm" onClick={() => setShowVoidModal(true)}>
                   {t('salesDocuments.voidInvoice')}
                 </Button>
               )}
@@ -554,12 +580,12 @@ export default function SalesDocumentDetail({ docType, docId, currentUserRole: _
           {isCreditNote && !doc.archived && (
             <>
               {n.status === 'draft' && (
-                <Button size="sm" onClick={handleIssueCN} loading={busy}>
+                <Button disabled={!canPostDoc} size="sm" onClick={handleIssueCN} loading={busy}>
                   {t('salesDocuments.issueCN')}
                 </Button>
               )}
               {['draft', 'issued'].includes(n.status) && (
-                <Button variant="danger" size="sm" onClick={() => setShowVoidModal(true)}>
+                <Button disabled={!canCancelDoc} variant="danger" size="sm" onClick={() => setShowVoidModal(true)}>
                   {t('salesDocuments.voidCN')}
                 </Button>
               )}
@@ -568,7 +594,7 @@ export default function SalesDocumentDetail({ docType, docId, currentUserRole: _
 
           {/* Archive / restore — hidden for locked (converted/invoiced) documents */}
           {!qtIsConverted && !soIsInvoiced && (
-            <Button variant="secondary" size="sm" onClick={handleArchiveToggle} loading={busy}>
+            <Button disabled={!canEditDoc} variant="secondary" size="sm" onClick={handleArchiveToggle} loading={busy}>
               {doc.archived ? t('salesDocuments.restore') : t('salesDocuments.archive')}
             </Button>
           )}
