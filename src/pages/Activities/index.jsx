@@ -70,6 +70,10 @@ const DOC_SOURCES = Object.keys(APPROVAL_DOC_TYPE_LABEL_KEY)
 const PURCHASE_DOC_TYPES = new Set(['purchase_order', 'vendor_invoice'])
 
 // Approval pool format: approval|docType|docId|code|total|customer
+// Approval requests raised by the purchasing side. Everything else in
+// APPROVAL_DOC_TYPE_LABEL_KEY is a sales document.
+const PURCHASE_APPROVAL_DOC_TYPES = new Set(['purchase_order', 'vendor_invoice'])
+
 function parseApprovalTitle(title) {
   const parts = (title || '').split('|')
   return {
@@ -319,8 +323,24 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
     canDo(currentUserRole, currentUserPermissions, 'deals', 'edit') ||
     canDo(currentUserRole, currentUserPermissions, 'leads', 'edit')
 
-  // Only managers and admins may approve/reject a quotation approval request.
-  const canApprove = ['manager', 'admin', 'super_admin'].includes(currentUserRole)
+  /**
+   * Who may approve depends on what is being approved.
+   *
+   * This used to be one hardcoded role list — ['manager','admin','super_admin']
+   * — covering quotations, sales orders, invoices, credit notes, purchase
+   * orders and vendor invoices alike. A manager approving their own purchase
+   * order is the separation-of-duties problem that list could not express.
+   *
+   * Sales documents route to `sales.post`; purchase documents route to
+   * `purchasing.approve`, which no role default grants, so approval of spend
+   * lands with admin/super_admin (who bypass canDo).
+   */
+  const canApproveDoc = (activity) => {
+    const { docType } = parseApprovalTitle(activity.title)
+    return PURCHASE_APPROVAL_DOC_TYPES.has(docType)
+      ? canDo(currentUserRole, currentUserPermissions, 'purchasing', 'approve')
+      : canDo(currentUserRole, currentUserPermissions, 'sales', 'post')
+  }
 
   // ── Pagination ────────────────────────────────────────────────────────────
   const totalPages  = Math.ceil(filtered.length / itemsPerPage)
@@ -923,7 +943,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
                                 ? `✓ ${t('activityChatter.approvalApprove')}`
                                 : `✗ ${t('activityChatter.approvalReject')}`}
                             </span>
-                          ) : canApprove ? (
+                          ) : canApproveDoc(activity) ? (
                             <div className="flex items-center gap-3 flex-wrap">
                               <button
                                 onClick={() => handleApproveActivity(activity)}

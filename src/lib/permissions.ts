@@ -98,7 +98,6 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
       create_roles: false,
       delete_roles: false,
     },
-    invoices: { view: true, create: true, edit: true, delete: false },
     time_tracking: { log: true, view_all: true, delete: false },
     parts: { view: true, create: true, edit: true, delete: false, adjust_stock: true },
     calendar: { view: true },
@@ -111,7 +110,23 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
     deals: { view: true, create: true, edit: true, delete: false },
     activities: { view: true, create: true, edit: true, delete: false },
     contacts: { view: true, create: true, edit: true, delete: false },
-    pipelines: { view: true },
+    pipelines: { view: true, manage: false },
+    // ── Money modules ───────────────────────────────────────────────────────
+    // These three had no permission of their own: Sales, Accounting and
+    // Purchasing were all gated on `deals.view`, so a single CRM toggle decided
+    // who could raise a purchase order or reverse a payment.
+    sales: {
+      view: true, create: true, edit: true, delete: false,
+      post: true, cancel: true, export: true,
+    },
+    accounting: { view: true, record_payment: true, reverse_payment: true, export: true },
+    // No `approve`: a manager can raise and receive a purchase order but not
+    // approve their own spend. admin/super_admin bypass canDo, so approval
+    // lands with them.
+    purchasing: {
+      view: true, create: true, edit: true, approve: false, receive: true,
+      cancel: true, manage_vendors: true, export: true,
+    },
   },
   [ROLES.TECHNICIAN]: {
     products: {
@@ -175,11 +190,16 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
       create_roles: false,
       delete_roles: false,
     },
-    invoices: { view: true, create: false, edit: false, delete: false },
     time_tracking: { log: true, view_all: false, delete: false },
     parts: { view: true, create: false, edit: false, delete: false, adjust_stock: true },
     calendar: { view: true },
     reports: { view: false, export: false },
+    sales: { view: false, create: false, edit: false, delete: false, post: false, cancel: false, export: false },
+    accounting: { view: false, record_payment: false, reverse_payment: false, export: false },
+    purchasing: {
+      view: false, create: false, edit: false, approve: false, receive: false,
+      cancel: false, manage_vendors: false, export: false,
+    },
   },
   [ROLES.VIEWER]: {
     products: {
@@ -243,11 +263,16 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
       create_roles: false,
       delete_roles: false,
     },
-    invoices: { view: true, create: false, edit: false, delete: false },
     time_tracking: { log: false, view_all: false, delete: false },
     parts: { view: true, create: false, edit: false, delete: false },
     calendar: { view: true },
     reports: { view: false, export: false },
+    sales: { view: false, create: false, edit: false, delete: false, post: false, cancel: false, export: false },
+    accounting: { view: false, record_payment: false, reverse_payment: false, export: false },
+    purchasing: {
+      view: false, create: false, edit: false, approve: false, receive: false,
+      cancel: false, manage_vendors: false, export: false,
+    },
   },
   // sales_rep: CRM-focused role, RLS-scoped to "own" rows on leads/deals/
   // activities (see 20260621/22/23_crm_*.sql), read-only on customers except
@@ -268,7 +293,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
     // read-only here, matching the actual DB grant (Step 2 migration).
     contacts: { view: true, create: false, edit: false, delete: false },
     // pipelines write is admin-only at the RLS layer (Step 3 migration).
-    pipelines: { view: true },
+    pipelines: { view: true, manage: false },
     customers: {
       view: true,
       create: false,
@@ -282,7 +307,15 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
     // unchanged by this CRM migration set) — create stays false here so the
     // UI never offers an action that would fail at the RLS layer. Revisit if
     // sales_rep invoice creation is wanted later (needs its own RLS change).
-    invoices: { view: true, create: false, edit: false, delete: false },
+    // Can raise and edit a quotation, but posting and cancelling an invoice are
+    // manager actions — a rep should not be able to finalise revenue.
+    sales: {
+      view: true, create: true, edit: true, delete: false,
+      post: false, cancel: false, export: true,
+    },
+    // Deliberately absent: accounting and purchasing. A sales_rep can reach
+    // both today only because they borrow deals.view, which was never an
+    // intentional grant. Removing it is the point of this change.
   },
 }
 

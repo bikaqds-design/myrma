@@ -156,7 +156,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
   const { confirm, confirmDialog } = useConfirm()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const canCreate = canDo(currentUserRole, currentUserPermissions, 'deals', 'create')
+  const canCreate = canDo(currentUserRole, currentUserPermissions, 'purchasing', 'create')
 
   const [tab, setTab] = useURLTab('tab', 'all')
   // 'list' | 'graph' — URL-persisted so a chart can be shared as a link, the

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { canDo } from '../../lib/permissions'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
@@ -34,8 +35,13 @@ const BUCKET_LABEL_KEY = {
 
 const fmtMoney = (n) => (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export default function Accounting({ currentUserEmail }) {
+export default function Accounting({ currentUserEmail, currentUserRole, currentUserPermissions }) {
   const { t } = useTranslation()
+  // This page had no permission checks at all — anyone who could reach it could
+  // record and reverse payments. Reaching it was itself gated on `deals.view`,
+  // so a sales rep had the ledger.
+  const canRecord = canDo(currentUserRole, currentUserPermissions, 'accounting', 'record_payment')
+  const canReverse = canDo(currentUserRole, currentUserPermissions, 'accounting', 'reverse_payment')
   const queryClient = useQueryClient()
   const [tab, setTab] = useURLTab('tab', 'payments')
   const [showRecordModal, setShowRecordModal] = useState(false)
@@ -236,9 +242,13 @@ export default function Accounting({ currentUserEmail }) {
     <div className="p-4 sm:p-6 space-y-4">
       <PageHeader title={t('accounting.title')} subtitle={t('accounting.subtitle')}>
         {tab === 'vendor_payments' ? (
-          <Button onClick={() => setShowRecordVendorModal(true)}>+ {t('purchasing.recordPayment')}</Button>
+          canRecord ? (
+            <Button onClick={() => setShowRecordVendorModal(true)}>+ {t('purchasing.recordPayment')}</Button>
+          ) : null
         ) : tab !== 'ap_aging' ? (
-          <Button onClick={() => setShowRecordModal(true)}>+ {t('accounting.recordPayment')}</Button>
+          canRecord ? (
+            <Button onClick={() => setShowRecordModal(true)}>+ {t('accounting.recordPayment')}</Button>
+          ) : null
         ) : null}
       </PageHeader>
 
@@ -354,7 +364,7 @@ export default function Accounting({ currentUserEmail }) {
                       </td>
                       <td className="px-4 py-3 text-right">
                         {p.status === 'active' && (
-                          <Button variant="danger" size="sm" onClick={() => setVoidingPaymentId(p.id)}>
+                          <Button disabled={!canReverse} variant="danger" size="sm" onClick={() => setVoidingPaymentId(p.id)}>
                             {t('accounting.voidBtn')}
                           </Button>
                         )}
@@ -482,7 +492,7 @@ export default function Accounting({ currentUserEmail }) {
                       </td>
                       <td className="px-4 py-3 text-right">
                         {p.status === 'active' && (
-                          <Button variant="danger" size="sm" onClick={() => setVoidingVendorPaymentId(p.id)}>
+                          <Button disabled={!canReverse} variant="danger" size="sm" onClick={() => setVoidingVendorPaymentId(p.id)}>
                             {t('accounting.voidBtn')}
                           </Button>
                         )}

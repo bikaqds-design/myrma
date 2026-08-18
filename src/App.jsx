@@ -318,6 +318,58 @@ function MfaChallenge({ onVerify, onCancel }) {
 }
 
 // ── Main app ──────────────────────────────────────────────────────────────────
+/**
+ * Route-level permission gate.
+ *
+ * Until this existed, only five of fifteen routes checked anything: the rest
+ * were protected by the nav filter alone, so the link was hidden but the URL
+ * still worked. Hiding a link is a courtesy, not a guard.
+ *
+ * The map is deliberately the single source of truth shared with the nav
+ * items below — if a route and its nav entry ever disagreed about who may see
+ * a page, the disagreement would be invisible until someone typed a URL. Prefix
+ * matching covers the detail routes (/sales/:type/:id and friends) without
+ * needing an entry each, and the longest match wins so /purchasing/vendor/:id
+ * cannot accidentally resolve against a shorter, laxer prefix.
+ *
+ * Not listed = no permission required. That is only `/` and `/account`: the
+ * dashboard is the universal landing page, and account settings are the user's
+ * own. `/control-panel` keeps its own role check at the route.
+ */
+const ROUTE_PERMISSIONS = [
+  ['/products', ['products', 'view']],
+  ['/customers', ['customers', 'view']],
+  ['/leads', ['leads', 'view']],
+  ['/pipeline', ['deals', 'view']],
+  ['/activities', ['deals', 'view']],
+  ['/sales', ['sales', 'view']],
+  ['/accounting', ['accounting', 'view']],
+  ['/purchasing', ['purchasing', 'view']],
+  ['/rma-tickets', ['rma_tickets', 'view_all']],
+  ['/inventory', ['inventory', 'view']],
+  ['/calendar', ['calendar', 'view']],
+  ['/reports', ['reports', 'view']],
+]
+
+function requiredPermissionFor(pathname) {
+  let best = null
+  for (const [prefix, perm] of ROUTE_PERMISSIONS) {
+    if (pathname === prefix || pathname.startsWith(prefix + '/')) {
+      if (!best || prefix.length > best[0].length) best = [prefix, perm]
+    }
+  }
+  return best?.[1] ?? null
+}
+
+function RouteGuard({ role, permissions, children }) {
+  const { pathname } = useLocation()
+  const required = requiredPermissionFor(pathname)
+  if (required && !canDo(role, permissions, ...required)) {
+    return <Navigate to="/" replace />
+  }
+  return children
+}
+
 export default function App() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -754,21 +806,21 @@ export default function App() {
       label: t('nav.sales'),
       active: pathname === '/sales',
       icon: 'M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z',
-      requiredPermission: ['deals', 'view'],
+      requiredPermission: ['sales', 'view'],
     },
     {
       path: '/accounting',
       label: t('nav.accounting'),
       active: pathname === '/accounting',
       icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 10v2m9-8a9 9 0 11-18 0 9 9 0 0118 0z',
-      requiredPermission: ['deals', 'view'],
+      requiredPermission: ['accounting', 'view'],
     },
     {
       path: '/purchasing',
       label: t('nav.purchasing'),
       active: pathname === '/purchasing',
       icon: 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z',
-      requiredPermission: ['deals', 'view'],
+      requiredPermission: ['purchasing', 'view'],
     },
     {
       path: '/rma-tickets',
@@ -1326,6 +1378,7 @@ export default function App() {
             Block-level either way, so the flex/scroll layout is unchanged. */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8 main-scroll">
           <Suspense fallback={<PageSpinner />}>
+            <RouteGuard role={effectiveUserRole} permissions={effectiveUserPermissions}>
             <Routes>
               <Route
                 path="/"
@@ -1444,7 +1497,7 @@ export default function App() {
               <Route
                 path="/sales"
                 element={
-                  canDo(effectiveUserRole, effectiveUserPermissions, 'deals', 'view') ? (
+                  canDo(effectiveUserRole, effectiveUserPermissions, 'sales', 'view') ? (
                     <SalesDocuments
                       currentUserRole={effectiveUserRole}
                       currentUserEmail={currentUser?.email}
@@ -1459,8 +1512,12 @@ export default function App() {
               <Route
                 path="/accounting"
                 element={
-                  canDo(effectiveUserRole, effectiveUserPermissions, 'deals', 'view') ? (
-                    <Accounting currentUserEmail={currentUser?.email} />
+                  canDo(effectiveUserRole, effectiveUserPermissions, 'accounting', 'view') ? (
+                    <Accounting
+                      currentUserEmail={currentUser?.email}
+                      currentUserRole={effectiveUserRole}
+                      currentUserPermissions={effectiveUserPermissions}
+                    />
                   ) : (
                     <Navigate to="/" replace />
                   )
@@ -1470,7 +1527,7 @@ export default function App() {
               <Route
                 path="/purchasing"
                 element={
-                  canDo(effectiveUserRole, effectiveUserPermissions, 'deals', 'view') ? (
+                  canDo(effectiveUserRole, effectiveUserPermissions, 'purchasing', 'view') ? (
                     <Purchasing
                       currentUserRole={effectiveUserRole}
                       currentUserEmail={currentUser?.email}
@@ -1608,6 +1665,7 @@ export default function App() {
               {/* A-1: catch-all 404 — previously typo URLs silently landed on Dashboard */}
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
+            </RouteGuard>
           </Suspense>
         </main>
       </div>

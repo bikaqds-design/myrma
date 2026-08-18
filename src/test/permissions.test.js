@@ -41,7 +41,7 @@ describe('canDo — permission object lookup', () => {
   })
 
   it('returns false for unknown section', () => {
-    expect(canDo(ROLES.TECHNICIAN, perms, 'invoices', 'delete')).toBe(false)
+    expect(canDo(ROLES.TECHNICIAN, perms, 'no_such_module', 'delete')).toBe(false)
   })
 
   it('returns false for unknown action within known section', () => {
@@ -197,8 +197,17 @@ describe('ROLE_DEFAULT_PERMISSIONS — sales_rep', () => {
     ['customers', 'create', false],
     ['customers', 'edit', true],
     ['customers', 'delete', false],
-    ['invoices', 'view', true],
-    ['invoices', 'create', false],
+    // `invoices` used to sit here. It was the pre-CRM table that holds 0 rows,
+    // retired when sales/accounting/purchasing got real modules.
+    ['sales', 'view', true],
+    ['sales', 'create', true],
+    ['sales', 'edit', true],
+    // a rep raises the quotation; finalising revenue is a manager action
+    ['sales', 'post', false],
+    ['sales', 'cancel', false],
+    // reachable today only by borrowing deals.view — deliberately gone
+    ['accounting', 'view', false],
+    ['purchasing', 'view', false],
   ])('sales_rep canDo %s.%s → %s', (section, action, expected) => {
     expect(canDo(ROLES.SALES_REP, ROLE_DEFAULT_PERMISSIONS[ROLES.SALES_REP], section, action)).toBe(
       expected
@@ -220,5 +229,73 @@ describe('ROLE_DEFAULT_PERMISSIONS — manager CRM access', () => {
     expect(canDo(ROLES.MANAGER, ROLE_DEFAULT_PERMISSIONS[ROLES.MANAGER], section, action)).toBe(
       expected
     )
+  })
+})
+
+// ── The money modules ────────────────────────────────────────────────────────
+// Sales, Accounting and Purchasing were all gated on `deals.view` until this
+// matrix existed: one CRM toggle decided who could raise a purchase order or
+// reverse a payment. These lock in who got what.
+
+describe('ROLE_DEFAULT_PERMISSIONS — money modules', () => {
+  const perms = (role) => ROLE_DEFAULT_PERMISSIONS[role]
+
+  it.each([
+    ['manager posts and cancels invoices', ROLES.MANAGER, 'sales', 'post', true],
+    ['manager reaches the ledger', ROLES.MANAGER, 'accounting', 'record_payment', true],
+    ['manager reverses a payment', ROLES.MANAGER, 'accounting', 'reverse_payment', true],
+    ['manager raises a PO', ROLES.MANAGER, 'purchasing', 'create', true],
+    ['manager receives stock', ROLES.MANAGER, 'purchasing', 'receive', true],
+    // separation of duties: a manager may raise spend but not approve it
+    ['manager does NOT approve spend', ROLES.MANAGER, 'purchasing', 'approve', false],
+
+    ['sales_rep raises a quotation', ROLES.SALES_REP, 'sales', 'create', true],
+    ['sales_rep does NOT post', ROLES.SALES_REP, 'sales', 'post', false],
+    ['sales_rep has no ledger', ROLES.SALES_REP, 'accounting', 'view', false],
+    ['sales_rep has no purchasing', ROLES.SALES_REP, 'purchasing', 'view', false],
+
+    ['technician has no sales', ROLES.TECHNICIAN, 'sales', 'view', false],
+    ['technician has no ledger', ROLES.TECHNICIAN, 'accounting', 'view', false],
+    ['technician has no purchasing', ROLES.TECHNICIAN, 'purchasing', 'view', false],
+
+    ['viewer has no sales', ROLES.VIEWER, 'sales', 'view', false],
+    ['viewer has no ledger', ROLES.VIEWER, 'accounting', 'view', false],
+    ['viewer has no purchasing', ROLES.VIEWER, 'purchasing', 'view', false],
+  ])('%s', (_label, role, section, action, expected) => {
+    expect(canDo(role, perms(role), section, action)).toBe(expected)
+  })
+
+  it('admin and super_admin bypass, so they hold the approval nobody defaults to', () => {
+    for (const role of [ROLES.ADMIN, ROLES.SUPER_ADMIN]) {
+      expect(canDo(role, null, 'purchasing', 'approve')).toBe(true)
+      expect(canDo(role, null, 'pipelines', 'manage')).toBe(true)
+    }
+  })
+
+  it('no role default grants purchasing.approve — it is admin-only by omission', () => {
+    for (const role of [ROLES.MANAGER, ROLES.SALES_REP, ROLES.TECHNICIAN, ROLES.VIEWER]) {
+      expect(canDo(role, perms(role), 'purchasing', 'approve')).toBe(false)
+    }
+  })
+
+  it('no role default grants pipelines.manage', () => {
+    for (const role of [ROLES.MANAGER, ROLES.SALES_REP, ROLES.TECHNICIAN, ROLES.VIEWER]) {
+      expect(canDo(role, perms(role), 'pipelines', 'manage')).toBe(false)
+    }
+  })
+
+  it('the retired invoices module is gone from every role', () => {
+    for (const role of [ROLES.MANAGER, ROLES.SALES_REP, ROLES.TECHNICIAN, ROLES.VIEWER]) {
+      expect(perms(role)).not.toHaveProperty('invoices')
+    }
+  })
+
+  // resolvePermissions preserves unknown stored sections, so an existing
+  // user_roles row still carrying `invoices` is harmless rather than a crash.
+  it('a stored row carrying the retired module still resolves', () => {
+    const stored = { invoices: { view: true }, sales: { post: true } }
+    const merged = resolvePermissions(ROLES.SALES_REP, stored)
+    expect(merged.invoices).toEqual({ view: true })
+    expect(canDo(ROLES.SALES_REP, merged, 'sales', 'post')).toBe(true)
   })
 })

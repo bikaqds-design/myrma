@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { canDo } from '../lib/permissions'
 import { useURLTab } from '../hooks/useURLTab'
 import UserManagement from './UserManagement'
 import BrandingSettings from './BrandingSettings'
@@ -130,7 +131,17 @@ export default function ControlPanel({ currentUserRole, currentUserEmail, curren
       {section === 'kb' && <KnowledgeBase currentUserEmail={currentUserEmail} />}
       {section === 'broadcast' && <SendAlert currentUserEmail={currentUserEmail} />}
       {section === 'audit' && <AuditLog />}
-      {section === 'pipelines' && <PipelineStages currentUserEmail={currentUserEmail} />}
+      {/* The only Control Panel feature with its own permission. The page is
+          already admin-gated above, so this changes nothing today — it gives
+          the model a word for "may reshape the pipelines", which is a heavier
+          action than the rest of the console and worth being able to delegate
+          (or withhold) on its own later. */}
+      {section === 'pipelines' &&
+        (canDo(currentUserRole, currentUserPermissions, 'pipelines', 'manage') ? (
+          <PipelineStages currentUserEmail={currentUserEmail} />
+        ) : (
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('cp.accessRestrictedDesc')}</p>
+        ))}
       {section === 'rmaconfig' && <RMAConfig currentUserEmail={currentUserEmail} />}
       {section === 'cleanup' && <DataCleanup />}
       {section === 'integrations' && <Integrations currentUserEmail={currentUserEmail} />}

@@ -95,7 +95,7 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
   const { confirm, confirmDialog } = useConfirm()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const canCreate = canDo(currentUserRole, currentUserPermissions, 'deals', 'create')
+  const canCreate = canDo(currentUserRole, currentUserPermissions, 'sales', 'create')
 
   const [tab, setTab] = useURLTab('tab', 'all')
 
