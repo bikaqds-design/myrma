@@ -816,3 +816,73 @@ database will refuse it, and the fix is to base it on `accountant`.
 
 478 tests. Fixtures removed — user_roles back to 16, custom_roles back to 0.
 
+---
+
+## Self-lockout closed (2026-08-18)
+
+Controls was offered on your own row and served Suspend, Lock, Deactivate, Set
+Expiration and Delete. The role dropdown was already hidden for self, which made
+the gap look closed when it was not. Applied to yourself, any of those five ends
+your access; applied to the last active super admin, they end everyone's —
+`rma_user_role()` resolves to NULL, every policy closes, and the role cannot be
+granted back from inside the app.
+
+Guarded at both layers, because a UI check is not a boundary:
+
+- **App** — refuses destructive self-actions and refuses to remove or demote the
+  last active super admin.
+- **Database** — `20260783` adds a trigger refusing the same, covering direct
+  API calls, bulk updates, and any future screen that forgets the rule.
+
+Deliberately narrow: the trigger fires only when a change would take the count
+of *active* super admins to zero.
+
+### Verified
+
+App layer, in the browser: Controls → Deactivate on my own row is refused with
+*"You cannot suspend, lock, deactivate, expire or delete your own account"*, and
+the account is still active afterwards.
+
+Database layer, in SQL: demoting one super admin while another remains
+**succeeded** — the guard is narrow — and removing the last one raised
+
+```
+ERROR: 23514: Refusing to remove the last active Super Admin (bika.qds@gmail.com)
+```
+
+`23514` is check_violation, which is the code the trigger raises. The failed
+transaction rolled back cleanly: both super admins still active, 16 users.
+
+**The last-admin path cannot be reached from the UI at all** — it needs a
+session that is not the last admin, and the only signed-in admin cannot demote
+themselves because the self-guard fires first. That is the whole argument for
+the trigger: the state it prevents is one the interface can never test.
+
+### Two verification scripts failed on their own scaffolding first
+
+Worth recording, because the pattern repeated. The first used a temp table, a
+`DO` block and exception handling, and died with *relation "_lastadmin" does not
+exist* — most likely something raising outside the handlers, aborting the
+transaction, after which the closing `SELECT` ran in a fresh one where the temp
+table was gone. The rewrite dropped all three: the outcome is now each
+statement's own result or its own error.
+
+The replacement then hit an error I had already met and fixed once this session
+— the Supabase editor returns only the last statement's result set, so a
+two-query file silently drops the first answer. Splitting the RLS diagnostic for
+exactly that reason was two hours earlier in the same session.
+
+## Custom roles: correcting the record
+
+`ENABLE_CUSTOM_ROLES` existed as a flag set to `false`, with a comment naming
+three conditions: *"not assignable in the role dropdown, not loaded by
+getUserRole, not enforced by canDo"*.
+
+So the earlier claim here that custom roles "can be created, listed and deleted,
+and never used" was wrong in its detail. The tab was hidden; they could not be
+created through the UI either. Those were created through the API directly. The
+substance — that custom roles were unusable — held, and someone had already
+diagnosed it precisely.
+
+All three conditions are now satisfied, and the flag is on.
+
