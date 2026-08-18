@@ -14,9 +14,20 @@ import { validatePasswordStrength, getDefaultPermissions } from './_utils'
 import { UsersTab, AddUserModal, PasswordResetModal, UserControlModal, ActivityModal } from './UsersTab'
 import { RoleTemplatesTab, CustomRolesTab, CreateRoleModal, PermissionsModal } from './RolesTab'
 
-// Custom Roles are not yet wired end-to-end (not assignable in the role dropdown,
-// not loaded by getUserRole, not enforced by canDo). Hidden until fully supported (UM-3).
-const ENABLE_CUSTOM_ROLES = false
+// Custom Roles were hidden because they were not wired end-to-end: "not
+// assignable in the role dropdown, not loaded by getUserRole, not enforced by
+// canDo" (UM-3). All three now hold:
+//
+//   assignable   UsersTab merges custom_roles into the role dropdown, and
+//                user_roles.role accepts them (trigger, migration 20260782)
+//   loaded       roleDefaults() supplies the role's permission map at session
+//                load, in preview-as-user, and in the permission editor
+//   enforced     canDo reads that map; RLS resolves the role to its base_role
+//                via rma_user_role(), so the server ceiling is the base role's
+//
+// The flag stays as a named constant rather than being deleted, so turning the
+// feature off again is one line if the base-role model turns out to be wrong.
+const ENABLE_CUSTOM_ROLES = true
 
 export default function UserManagement({ currentUserRole, currentUserEmail, currentUserPermissions, onPreviewUser }) {
   const { t } = useTranslation()
@@ -143,6 +154,19 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
   }
 
   const handleUpdateRole = (email, newRole) => {
+    // Demotion is the other way to reach zero admins. The dropdown is already
+    // hidden on your own row, so this covers demoting somebody else who happens
+    // to be the last one active.
+    const target = (users || []).find((u) => u.user_email === email)
+    if (
+      target?.role === ROLES.SUPER_ADMIN &&
+      newRole !== ROLES.SUPER_ADMIN &&
+      activeSuperAdmins.length <= 1 &&
+      activeSuperAdmins.some((u) => u.user_email === email)
+    ) {
+      toast.error(t('userManagement.cannotRemoveLastSuperAdmin'))
+      return
+    }
     openConfirm(
       t('userManagement.changeRoleTitle'),
       t('userManagement.changeRoleMsg', { email, role: newRole }),
@@ -254,10 +278,44 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
     setShowUserControlModal(true)
   }
 
+  /**
+   * Actions that can end someone's access. Applied to yourself, any of them
+   * locks you out of the app; applied to the last active super_admin, they lock
+   * everyone out, because rma_user_role() then resolves to NULL and every
+   * policy closes. Neither had a guard: the role dropdown is hidden on your own
+   * row, but Controls was not, so Suspend, Lock, Deactivate, Set Expiration and
+   * Delete were all reachable against yourself.
+   *
+   * 'activate' and 'update_notes' are absent on purpose — neither removes
+   * access, and locking an admin out of their own notes would be silly.
+   */
+  const LOCKOUT_ACTIONS = ['suspend', 'lock', 'deactivate', 'set_expiration', 'delete']
+
+  const activeSuperAdmins = (users || []).filter(
+    (u) => u.role === ROLES.SUPER_ADMIN && u.status === 'active'
+  )
+
   const handleUserControlAction = async () => {
     if (!controlAction) {
       toast.error(t('userManagement.pleaseSelectAction'))
       return
+    }
+
+    if (LOCKOUT_ACTIONS.includes(controlAction)) {
+      if (selectedUser?.user_email === currentUserEmail) {
+        toast.error(t('userManagement.cannotLockOutSelf'))
+        return
+      }
+      // The last one standing. Checked against active super admins rather than
+      // all of them, because a suspended admin cannot sign in to undo this.
+      const isLastSuperAdmin =
+        selectedUser?.role === ROLES.SUPER_ADMIN &&
+        activeSuperAdmins.length <= 1 &&
+        activeSuperAdmins.some((u) => u.user_email === selectedUser.user_email)
+      if (isLastSuperAdmin) {
+        toast.error(t('userManagement.cannotRemoveLastSuperAdmin'))
+        return
+      }
     }
 
     try {

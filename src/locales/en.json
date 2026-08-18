@@ -2139,7 +2139,9 @@
     "action_manage": "Manage",
     "action_view_history": "View history",
     "baseRoleLabel": "Base role (what the database enforces)",
-    "baseRoleHint": "Row-level security treats this role's holders as the base role. The permissions below can only narrow that further, never widen it."
+    "baseRoleHint": "Row-level security treats this role's holders as the base role. The permissions below can only narrow that further, never widen it.",
+    "cannotLockOutSelf": "You cannot suspend, lock, deactivate, expire or delete your own account.",
+    "cannotRemoveLastSuperAdmin": "This is the last active Super Admin. Promote another one first, or nobody will be able to administer the system."
   },
   "customerDetails": {
     "title": "Customer Details",
