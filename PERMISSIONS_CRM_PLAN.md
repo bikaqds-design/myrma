@@ -566,3 +566,54 @@ the counts stopped matching, which is what prompted looking underneath.
 
 The protection is `20260778` and `20260779`.
 
+---
+
+## Pending bug found in review: the accountant could not move money
+
+Asked whether anything was still outstanding in this area, and there was —
+introduced by me in 20260777.
+
+Every RPC on the cash path gates on `rma_is_manager_or_above()`, and an
+accountant is not manager or above:
+
+| RPC | gate |
+|---|---|
+| `record_payment` | `manager_or_above` |
+| `void_payment` | `manager_or_above` |
+| `record_vendor_payment` | `manager_or_above` |
+| `void_vendor_payment` | `manager_or_above` |
+| `apply_payment_to_invoice` | `manager_or_above` |
+| `reverse_payment_application` | `manager_or_above` |
+| `apply_credit_note_to_invoice` | `manager_or_above` |
+| `issue_credit_note` | `manager_or_above` |
+
+So the role could read the entire ledger — 101 documents, both sides, verified —
+and would have been refused by the database the moment it tried to record or
+reverse anything. Every core action of the role.
+
+**How it got past verification.** I checked that the controls rendered enabled
+for an accountant and reported `recordEnabled: true`, `voidButtons: 2,
+allEnabled: true`. That confirms the app's permission gate, which was correct.
+It says nothing about whether the action succeeds, and I treated it as though it
+did. A button that renders enabled and then raises is worse than one that is
+hidden.
+
+`20260780_accountant_can_move_cash.sql` adds `rma_can_handle_cash()` —
+manager_or_above **or** accountant — and re-gates seven of the eight.
+
+**`issue_credit_note` is deliberately left at manager only.** Issuing a credit
+note creates a sales document and reduces revenue: that is origination, and the
+whole point of the role is that whoever settles money does not also raise the
+paperwork behind it. Applying an already-issued credit note to an invoice is
+settlement, so that one is included. `post_invoice` stays manager-only for the
+same reason.
+
+The migration rewrites the live definitions via `pg_get_functiondef` rather than
+restating each body, so it cannot drift from what is deployed, touches only the
+gate line, and raises if the expected gate is missing rather than silently
+leaving the old rule in place.
+
+Verification is two steps, and the second is the one that matters: confirm the
+gates read correctly, then actually record a small payment as an accountant and
+void it, because reading the gate is what I did last time.
+
