@@ -49,11 +49,16 @@ describe('ROLES', () => {
     expect(ROLES[key]).toBe(value)
   })
 
-  it('ROLE_LIST stays in sync with ROLES', () => {
-    expect(ROLE_LIST).toHaveLength(6)
-    expect(ROLE_LIST).toContain(ROLES.SUPER_ADMIN)
-    expect(ROLE_LIST).toContain(ROLES.VIEWER)
-    expect(ROLE_LIST).toContain(ROLES.SALES_REP)
+  // Derived, not counted. This asserted a hardcoded length of 6 and broke the
+  // moment a seventh role was added — which is the right failure, but it says
+  // "the number changed" rather than "you forgot to list it". Comparing the two
+  // sets says the second thing, and cannot go stale.
+  it('ROLE_LIST contains exactly the roles in ROLES', () => {
+    expect([...ROLE_LIST].sort()).toEqual(Object.values(ROLES).sort())
+  })
+
+  it('has no duplicate entries', () => {
+    expect(new Set(ROLE_LIST).size).toBe(ROLE_LIST.length)
   })
 })
 

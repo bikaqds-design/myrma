@@ -15,6 +15,7 @@ export const ROLES = {
   TECHNICIAN: 'technician',
   VIEWER: 'viewer',
   SALES_REP: 'sales_rep',
+  ACCOUNTANT: 'accountant',
 } as const
 
 export type Role = (typeof ROLES)[keyof typeof ROLES]
@@ -26,6 +27,7 @@ export const ROLE_LIST: Role[] = [
   ROLES.TECHNICIAN,
   ROLES.VIEWER,
   ROLES.SALES_REP,
+  ROLES.ACCOUNTANT,
 ]
 
 // ── User account statuses ────────────────────────────────────────────────────

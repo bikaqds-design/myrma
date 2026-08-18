@@ -257,3 +257,76 @@ rows themselves rather than assumed.
 
 439 tests, up from 434.
 
+---
+
+## User Management rebuild (2026-08-18)
+
+### The editor was showing eleven modules while the runtime enforced eighteen
+
+`PermissionMatrix` rendered a hardcoded list written when this was an RMA tool.
+It still listed `invoices` — the table with zero rows, since retired — and
+listed none of deals, leads, activities, contacts, pipelines, sales, accounting
+or purchasing. Those permissions were stored and enforced the whole time. There
+was simply no way to see or change eight of them.
+
+Third instance of the same shape this month, after the dashboard widget list and
+the Reports tabs: a snapshot standing in for a live set. So the fix is
+structural rather than "add the missing eight". `src/lib/permissionCatalog.js`
+derives the module and action list from `ROLE_DEFAULT_PERMISSIONS` at runtime
+and holds only presentation — grouping, order, labels. A module added to
+`permissions.ts` now appears in the editor by itself, and anything without a
+declared group lands in an "Other" section rather than vanishing.
+
+**Now: 18 modules, 101 actions, in four groups** — CRM, Sales & Finance,
+Operations, System — with search, per-module select/clear, and a marker on the
+actions that move money, delete data or widen access, so fifty checkboxes are
+not all weighted the same.
+
+A test asserts the rendered set equals the runtime set. That is the part that
+stops this recurring.
+
+### The accountant role
+
+Built to the segregation-of-duties rule rather than to convenience: no one
+person should authorise, execute and record a payment.
+
+| | |
+|---|---|
+| **Records** | customer and vendor payments, and reverses them |
+| **Reads** | all sales and purchase documents (`view_all`), customers + history, products, reports |
+| **Cannot** | create, edit, post, cancel or delete a sales document |
+| **Cannot** | raise, approve, receive or cancel a purchase, or manage vendors |
+| **Has no** | deals, leads, activities, pipelines, contacts, tickets, inventory, user management |
+
+A manager raises the invoice, an admin approves the spend, the accountant
+settles and reconciles. The absent modules are absent rather than present and
+switched off — least privilege means the surface is not there.
+
+### Also fixed
+
+`RLS_CEILING`, which warns when a grant exceeds what the database will allow,
+still named the retired `invoices` module and knew nothing of the money modules.
+Refreshed for both viewer and technician.
+
+The role-list test asserted a hardcoded length of six and broke on the seventh
+role. It now compares `ROLE_LIST` against `Object.values(ROLES)`, so it says
+"you forgot to list it" instead of "the number changed", and cannot go stale.
+
+457 tests, up from 439.
+
+### Needs applying
+
+`supabase/migrations/20260777_accountant_role.sql`. Until it runs, the role is
+selectable in the UI but **saving it will fail** — `chk_user_role` rejects any
+value not in its list. The migration widens that constraint, adds the role to
+`rma_is_staff()` (omitting it would let an accountant sign in and see nothing,
+the same trap `sales_rep` hit before 20260618), and grants read on the four
+sales-document tables, since the staff policies scope non-managers to their own
+rows and an accountant is assigned to none.
+
+### Best practice this follows
+
+Least privilege and roles defined by job function rather than by person; a small
+role set with per-user overrides instead of role explosion; and separation of
+duties on the money path. Sources consulted are listed in the session notes.
+

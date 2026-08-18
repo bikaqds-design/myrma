@@ -129,6 +129,47 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
       cancel: true, manage_vendors: true, export: true,
     },
   },
+  /**
+   * accountant — owns cash, owns nothing that creates it.
+   *
+   * Records and reverses customer and vendor payments, and can see the
+   * documents behind them, but cannot raise an invoice, post one, or approve a
+   * purchase order. That split is the point: standard AR/AP segregation of
+   * duties says no single person should be able to authorise, execute and
+   * record a payment, because that is the combination that lets money move
+   * unnoticed.
+   *
+   * So: sales and purchasing are read-only here. A manager raises the invoice,
+   * an admin approves the spend, the accountant settles and reconciles it.
+   */
+  [ROLES.ACCOUNTANT]: {
+    accounting: { view: true, record_payment: true, reverse_payment: true, export: true },
+    // Read-only on both document sides — needed to reconcile, not to originate.
+    sales: {
+      view: true, view_all: true, create: false, edit: false, delete: false,
+      post: false, cancel: false, export: true,
+    },
+    purchasing: {
+      view: true, create: false, edit: false, approve: false, receive: false,
+      cancel: false, manage_vendors: false, export: true,
+    },
+    // Chasing collections needs the customer record and its history.
+    customers: {
+      view: true, create: false, edit: false, delete: false,
+      export: true, import: false, view_history: true,
+    },
+    products: { view: true, create: false, edit: false, delete: false, export: true, import: false },
+    reports: { view: true, export: true },
+    dashboard: {
+      view_dashboard: true, view_analytics: true, view_reports: true,
+      export_reports: true, customize_dashboard: false,
+    },
+    // Deliberately absent: deals, leads, activities, pipelines, contacts,
+    // rma_tickets, inventory, parts, time_tracking, calendar, user_management.
+    // An accountant has no reason to work the sales pipeline or the repair
+    // bench, and least privilege means the module is not there at all rather
+    // than present and switched off.
+  },
   [ROLES.TECHNICIAN]: {
     products: {
       view: true,

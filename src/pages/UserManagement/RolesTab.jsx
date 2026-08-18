@@ -1,10 +1,15 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import Modal from '../../components/Modal'
 import { ROLES } from '../../lib/constants'
 import { ROLE_DEFAULT_PERMISSIONS } from '../../lib/permissions'
 import { RoleBadge } from './_shared'
 import { getDefaultPermissions, getRoleTemplates } from './_utils'
+import {
+  permissionGroups,
+  MODULE_LABEL_KEYS,
+  SENSITIVE_ACTIONS,
+} from '../../lib/permissionCatalog'
 
 // Permissions that the DB (RLS) cannot enforce for a given role — granting them shows
 // the UI button but the server will reject the write. Used to surface a warning.
@@ -14,7 +19,9 @@ const RLS_CEILING = {
     customers: ['create', 'edit', 'delete', 'import'],
     rma_tickets: ['create', 'edit_all', 'edit_assigned', 'delete', 'bulk_actions'],
     inventory: ['create', 'edit', 'delete', 'transfer'],
-    invoices: ['create', 'edit', 'delete'],
+    sales: ['create', 'edit', 'delete', 'post', 'cancel'],
+    accounting: ['record_payment', 'reverse_payment'],
+    purchasing: ['create', 'edit', 'approve', 'receive', 'cancel', 'manage_vendors'],
     parts: ['create', 'edit', 'delete', 'adjust'],
     reports: ['export'],
     calendar: ['create', 'edit', 'delete'],
@@ -24,7 +31,9 @@ const RLS_CEILING = {
   [ROLES.TECHNICIAN]: {
     products: ['create', 'edit_all', 'delete', 'import'],
     customers: ['create', 'edit', 'delete', 'import'],
-    invoices: ['create', 'edit', 'delete'],
+    sales: ['create', 'edit', 'delete', 'post', 'cancel'],
+    accounting: ['record_payment', 'reverse_payment'],
+    purchasing: ['create', 'edit', 'approve', 'receive', 'cancel', 'manage_vendors'],
     user_management: ['view', 'create', 'edit', 'delete', 'manage_permissions'],
   },
 }
@@ -371,66 +380,128 @@ export function PermissionsModal({ user, onSave, onClose }) {
   )
 }
 
-export function PermissionMatrix({ permissions, onToggle }) {
+/**
+ * PermissionMatrix — every module the runtime knows about, grouped.
+ *
+ * This used to render a hardcoded list of eleven modules, written when the app
+ * was an RMA tool. After the CRM work it still listed `invoices` — a table with
+ * zero rows, since retired — and listed none of deals, leads, activities,
+ * contacts, pipelines, sales, accounting or purchasing. Those permissions were
+ * stored and enforced the whole time; there was simply no way to see or change
+ * eight of them.
+ *
+ * It now renders from permissionCatalog, which derives the module and action
+ * list from ROLE_DEFAULT_PERMISSIONS at runtime. Adding a module to
+ * permissions.ts makes it appear here on its own.
+ */
+export function PermissionMatrix({ permissions, onToggle, onToggleModule }) {
   const { t } = useTranslation()
-  const modules = [
-    { key: 'products', label: t('nav.products') },
-    { key: 'customers', label: t('nav.customers') },
-    { key: 'rma_tickets', label: t('nav.rmaTickets') },
-    { key: 'inventory', label: t('nav.inventory') },
-    { key: 'invoices', label: t('nav.invoices') },
-    { key: 'parts', label: t('nav.parts') },
-    { key: 'time_tracking', label: t('userManagement.moduleTimeTracking') },
-    { key: 'calendar', label: t('nav.calendar') },
-    { key: 'reports', label: t('nav.reports') },
-    { key: 'dashboard', label: t('nav.dashboard') },
-    { key: 'user_management', label: t('userManagement.moduleUserManagement') },
-    // 'settings' was here and could never affect anything. The Control Panel
-    // is gated by role in App.jsx (admin or super admin only), and canDo()
-    // returns true unconditionally for those two roles — so the roles these
-    // toggles applied to could not reach the pages, and the roles that could
-    // reach them bypassed the toggles. Eight switches that always did nothing.
-    // Removing the module rather than wiring it: MANAGER defaulted to
-    // view_settings: true, so honouring the permission in the route would have
-    // handed every manager the Control Panel. See permissions.ts.
-  ]
+  const [query, setQuery] = useState('')
+  const groups = useMemo(() => permissionGroups(), [])
+  const needle = query.trim().toLowerCase()
+
+  const labelFor = (key) => {
+    const k = MODULE_LABEL_KEYS[key]
+    const translated = k ? t(k) : null
+    if (translated && translated !== k) return translated
+    return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  }
+  const actionLabel = (a) => t(`userManagement.action_${a}`, a.replace(/_/g, ' '))
+
+  const matches = (key) =>
+    !needle || key.includes(needle) || labelFor(key).toLowerCase().includes(needle)
+
+  const visibleGroups = groups
+    .map((g) => ({ ...g, modules: g.modules.filter((m) => matches(m.key)) }))
+    .filter((g) => g.modules.length > 0)
 
   return (
-    <div className="space-y-3">
-      {modules.map((module) => {
-        const modulePerms = permissions[module.key] || {}
-        const entries = Object.entries(modulePerms)
-        const enabledCount = entries.filter(([, v]) => v).length
-        return (
-          <div key={module.key} className="border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="font-medium text-gray-900">{module.label}</h4>
-              <span className="text-xs text-gray-400">
-                {t('userManagement.enabledCount', { count: enabledCount, total: entries.length })}
-              </span>
-            </div>
-            {entries.length === 0 ? (
-              <p className="text-sm text-gray-400 italic">{t('userManagement.noPermsDefined')}</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                {entries.map(([perm, enabled]) => (
-                  <label key={perm} className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={!!enabled}
-                      onChange={() => onToggle(module.key, perm)}
-                      className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
-                    />
-                    <span className="text-sm text-gray-700 capitalize">
-                      {perm.replace(/_/g, ' ')}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
+    <div className="space-y-5">
+      <div className="flex items-center gap-2 flex-wrap">
+        <label htmlFor="perm-search" className="sr-only">
+          {t('userManagement.searchModules')}
+        </label>
+        <input
+          id="perm-search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t('userManagement.searchModules')}
+          className="w-full sm:w-72 px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0]"
+        />
+        <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">
+          {t('userManagement.moduleCount', {
+            count: visibleGroups.reduce((n, g) => n + g.modules.length, 0),
+          })}
+        </span>
+      </div>
+
+      {visibleGroups.map((group) => (
+        <div key={group.id}>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-[#9aa4b2] mb-2">
+            {t(group.labelKey, group.fallback)}
+          </h3>
+          <div className="space-y-3">
+            {group.modules.map((module) => {
+              const modulePerms = permissions[module.key] || {}
+              const enabledCount = module.actions.filter((a) => modulePerms[a]).length
+              const allOn = enabledCount === module.actions.length
+              return (
+                <div
+                  key={module.key}
+                  className="border border-gray-200 dark:border-[#212a38] rounded-lg p-4"
+                >
+                  <div className="flex items-center justify-between mb-3 gap-3">
+                    <h4 className="font-medium text-gray-900 dark:text-[#e8ebf0]">
+                      {labelFor(module.key)}
+                    </h4>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">
+                        {t('userManagement.enabledCount', {
+                          count: enabledCount,
+                          total: module.actions.length,
+                        })}
+                      </span>
+                      {onToggleModule && (
+                        <button
+                          type="button"
+                          onClick={() => onToggleModule(module.key, module.actions, !allOn)}
+                          className="text-xs font-medium text-indigo-600 dark:text-indigo-300 hover:underline"
+                        >
+                          {allOn ? t('userManagement.clearAll') : t('userManagement.selectAll')}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {module.actions.map((perm) => (
+                      <label key={perm} className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={!!modulePerms[perm]}
+                          onChange={() => onToggle(module.key, perm)}
+                          className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-[#e8ebf0]">
+                          {actionLabel(perm)}
+                          {SENSITIVE_ACTIONS.has(perm) && (
+                            <span
+                              title={t('userManagement.sensitiveAction')}
+                              className="ml-1 text-amber-600 dark:text-amber-400"
+                              aria-label={t('userManagement.sensitiveAction')}
+                            >
+                              ●
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
-        )
-      })}
+        </div>
+      ))}
     </div>
   )
 }

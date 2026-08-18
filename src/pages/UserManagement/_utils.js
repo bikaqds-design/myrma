@@ -70,6 +70,13 @@ const ROLE_META = [
     icon: '🤝',
     description: 'CRM-focused: leads, deals, and activities scoped to their own records; no RMA-internal access',
   },
+  {
+    key: ROLES.ACCOUNTANT,
+    name: 'Accountant',
+    icon: '🧾',
+    description:
+      'Owns cashflow: records and reverses customer and vendor payments, and reads the documents behind them. Cannot raise or post an invoice, or approve a purchase order — the standard split that stops one person authorising, executing and recording a payment.',
+  },
 ]
 
 export function getRoleTemplates() {
