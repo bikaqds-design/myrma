@@ -7,6 +7,7 @@ import { StatusBadge, RoleBadge, ASSIGNABLE_ROLES } from './_shared'
 
 export function UsersTab({
   users,
+  customRoles,
   currentUserRole,
   currentUserEmail,
   onUpdateRole,
@@ -27,7 +28,14 @@ export function UsersTab({
   // An empty {} is not a real override — only treat a non-empty object as "Custom" (UM-4)
   const hasCustomPerms = (u) =>
     !!u.permissions && typeof u.permissions === 'object' && Object.keys(u.permissions).length > 0
-  const roleOptions = ASSIGNABLE_ROLES.filter((r) => !r.superAdminOnly || isSuperAdmin)
+  // Built-ins plus whatever custom roles exist. This was the seven built-ins
+  // only, so a custom role could be created in the Custom Roles tab and then
+  // never assigned to anybody — the dropdown simply did not offer it, and
+  // chk_user_role would have rejected the value even if it had.
+  const roleOptions = [
+    ...ASSIGNABLE_ROLES.filter((r) => !r.superAdminOnly || isSuperAdmin),
+    ...(customRoles || []).map((r) => ({ value: r.role_name, label: `🎛️ ${r.role_name}` })),
+  ]
   // FT-09: only non-admin targets can be previewed — previewing an admin/super_admin
   // would let the acting admin grant themselves elevated UI access, defeating the point.
   const canPreview = (u) =>

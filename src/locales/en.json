@@ -2137,7 +2137,9 @@
     "action_reverse_payment": "Reverse payment",
     "action_manage_vendors": "Manage vendors",
     "action_manage": "Manage",
-    "action_view_history": "View history"
+    "action_view_history": "View history",
+    "baseRoleLabel": "Base role (what the database enforces)",
+    "baseRoleHint": "Row-level security treats this role's holders as the base role. The permissions below can only narrow that further, never widen it."
   },
   "customerDetails": {
     "title": "Customer Details",

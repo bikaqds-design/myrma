@@ -377,9 +377,19 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
  */
 export function resolvePermissions(
   role: string,
-  stored: UserPermissions | null | undefined
+  stored: UserPermissions | null | undefined,
+  customRoleDefaults?: UserPermissions | null
 ): UserPermissions | null {
-  const defaults = ROLE_DEFAULT_PERMISSIONS[role as Role] ?? null
+  // A custom role has no entry in ROLE_DEFAULT_PERMISSIONS; its defaults are
+  // the permission map stored on the custom_roles row. Without this a user on a
+  // custom role resolves to null and canDo() denies everything, so the role
+  // would be assignable and useless — the failure this change exists to fix,
+  // moved one layer down.
+  //
+  // It only ever narrows: RLS resolves a custom role to its base_role, so the
+  // server ceiling is the base role's regardless of what this map claims.
+  const defaults =
+    ROLE_DEFAULT_PERMISSIONS[role as Role] ?? customRoleDefaults ?? null
   const hasStored =
     !!stored && typeof stored === 'object' && Object.keys(stored).length > 0
 

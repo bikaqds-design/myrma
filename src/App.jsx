@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { auth, db, branding as brandingAPI, supabase } from './api/supabaseClient'
 import { useAppearance } from './contexts/AppearanceContext'
 import { resolvePermissions, canDo } from './lib/permissions'
-import { ROLES } from './lib/constants'
+import { ROLES, ROLE_LIST } from './lib/constants'
 import { safeStorage } from './lib/safeStorage'
 import { registerTicketEventHandlers } from './lib/events/ticketEventHandlers'
 import { registerCrmEventHandlers } from './lib/events/crmEventHandlers'
@@ -474,7 +474,20 @@ export default function App() {
     queryClient.setQueryData(['user-role', user.email], roleData)
     const role = roleData?.role || 'technician'
     setCurrentUserRole(role)
-    setCurrentUserPermissions(resolvePermissions(role, roleData?.permissions))
+    // A custom role carries its own permission map on the custom_roles row.
+    // Only fetched when the role is not a built-in, so the common path costs
+    // nothing. A failure here must not deny a legitimate built-in user, so it
+    // degrades to no custom defaults rather than throwing.
+    let customDefaults = null
+    if (role && !ROLE_LIST.includes(role)) {
+      try {
+        const rows = await db.userRoles.getCustomRoles()
+        customDefaults = rows?.find((r) => r.role_name === role)?.permissions ?? null
+      } catch {
+        customDefaults = null
+      }
+    }
+    setCurrentUserPermissions(resolvePermissions(role, roleData?.permissions, customDefaults))
     // Show onboarding wizard for admins who haven't completed it yet
     if (role === ROLES.ADMIN || role === ROLES.SUPER_ADMIN) {
       const done = safeStorage.get(`mrma_onboarding_v1_${user.email}`, null)

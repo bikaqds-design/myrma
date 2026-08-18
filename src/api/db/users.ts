@@ -136,15 +136,22 @@ export const userRoles = {
     }
     return data || []
   },
+  /**
+   * baseRole is what row-level security treats holders of this role as. RLS
+   * matches a fixed list of role names, so a custom name resolves to nothing on
+   * its own; rma_user_role() maps it to base_role (migration 20260782). The
+   * permission map only narrows what that base already allows.
+   */
   async createCustomRole(
     roleName: string,
     roleDescription: string,
     permissions: Record<string, Record<string, boolean>>,
-    createdBy: string
+    createdBy: string,
+    baseRole = 'viewer'
   ): Promise<unknown> {
     const { data, error } = await supabase
       .from('custom_roles')
-      .insert([{ role_name: roleName, role_description: roleDescription, permissions, created_by: createdBy }])
+      .insert([{ role_name: roleName, role_description: roleDescription, permissions, created_by: createdBy, base_role: baseRole }])
       .select()
     if (error) throw error
     return data?.[0]

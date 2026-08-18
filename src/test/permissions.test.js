@@ -350,3 +350,57 @@ describe('ownershipScope', () => {
     expect(ownershipScope(ROLES.SALES_REP, merged, 'deals', REP)).toBe(REP)
   })
 })
+
+// ── Custom roles ─────────────────────────────────────────────────────────────
+// They could be created and never assigned: the dropdown offered only built-ins
+// and chk_user_role rejected anything else. Now assignable (20260782), which
+// puts weight on resolvePermissions — a custom role has no entry in
+// ROLE_DEFAULT_PERMISSIONS, so without its stored map it resolves to null and
+// canDo denies everything. Assignable and useless is not an improvement.
+
+describe('resolvePermissions — custom roles', () => {
+  const CUSTOM = {
+    accounting: { view: true, record_payment: true, reverse_payment: false, export: true },
+    customers: { view: true, create: false, edit: false, delete: false, export: true, import: false, view_history: true },
+  }
+
+  it('falls back to the custom role map when the role is not built-in', () => {
+    const merged = resolvePermissions('bookkeeper', null, CUSTOM)
+    expect(canDo('bookkeeper', merged, 'accounting', 'record_payment')).toBe(true)
+    expect(canDo('bookkeeper', merged, 'accounting', 'reverse_payment')).toBe(false)
+    expect(canDo('bookkeeper', merged, 'customers', 'view')).toBe(true)
+  })
+
+  it('a custom role with no map and no override denies everything', () => {
+    const merged = resolvePermissions('bookkeeper', null, null)
+    expect(canDo('bookkeeper', merged, 'accounting', 'view')).toBe(false)
+    expect(canDo('bookkeeper', merged, 'customers', 'view')).toBe(false)
+  })
+
+  it('a per-user override still wins over the custom role map', () => {
+    const merged = resolvePermissions('bookkeeper', { accounting: { reverse_payment: true } }, CUSTOM)
+    expect(canDo('bookkeeper', merged, 'accounting', 'reverse_payment')).toBe(true)
+    // and the rest of the custom map survives the merge
+    expect(canDo('bookkeeper', merged, 'accounting', 'record_payment')).toBe(true)
+    expect(canDo('bookkeeper', merged, 'customers', 'view_history')).toBe(true)
+  })
+
+  it('a built-in role ignores a custom map passed alongside it', () => {
+    const merged = resolvePermissions(ROLES.VIEWER, null, CUSTOM)
+    expect(canDo(ROLES.VIEWER, merged, 'accounting', 'record_payment')).toBe(false)
+  })
+
+  // The safety property the whole design rests on: RLS resolves a custom role
+  // to its base_role, so the app map can only narrow. Nothing in the client can
+  // widen server access — asserted here as documentation of the contract, since
+  // the enforcement lives in rma_user_role().
+  it('a custom map claiming more than its base cannot widen the server', () => {
+    const greedy = { purchasing: { approve: true }, sales: { post: true } }
+    const merged = resolvePermissions('bookkeeper', null, greedy)
+    // the client will happily say yes...
+    expect(canDo('bookkeeper', merged, 'purchasing', 'approve')).toBe(true)
+    // ...which is exactly why the database gates these on rma_is_manager_or_above
+    // and rma_can_handle_cash rather than trusting the permission map.
+    expect(merged.purchasing.approve).toBe(true)
+  })
+})

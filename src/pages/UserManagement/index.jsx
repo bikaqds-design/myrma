@@ -60,6 +60,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
 
   const [newRoleName, setNewRoleName] = useState('')
   const [newRoleDescription, setNewRoleDescription] = useState('')
+  const [newRoleBase, setNewRoleBase] = useState('viewer')
   const [newRolePermissions, setNewRolePermissions] = useState(getDefaultPermissions())
 
   const [controlAction, setControlAction] = useState('')
@@ -183,7 +184,8 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
         newRoleName,
         newRoleDescription,
         newRolePermissions,
-        currentUserEmail
+        currentUserEmail,
+        newRoleBase
       )
       toast.success(t('userManagement.customRoleCreatedToast'))
       db.auditLog
@@ -566,6 +568,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
           {activeTab === 'users' && (
             <UsersTab
               users={users}
+              customRoles={customRoles}
               currentUserRole={currentUserRole}
               currentUserEmail={currentUserEmail}
               onUpdateRole={handleUpdateRole}
@@ -611,6 +614,8 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
 
       {showCreateRoleModal && (
         <CreateRoleModal
+          baseRole={newRoleBase}
+          onBaseRoleChange={setNewRoleBase}
           roleName={newRoleName}
           roleDescription={newRoleDescription}
           permissions={newRolePermissions}

@@ -2149,7 +2149,9 @@
     "action_reverse_payment": "عكس دفعة",
     "action_manage_vendors": "إدارة المورّدين",
     "action_manage": "إدارة",
-    "action_view_history": "عرض السجل"
+    "action_view_history": "عرض السجل",
+    "baseRoleLabel": "الدور الأساسي (ما يفرضه قاعدة البيانات)",
+    "baseRoleHint": "يتعامل أمان الصفوف مع من يحمل هذا الدور على أنه الدور الأساسي. الصلاحيات أدناه تضيّق هذا النطاق فقط ولا توسّعه أبدًا."
   },
   "customerDetails": {
     "title": "تفاصيل العميل",

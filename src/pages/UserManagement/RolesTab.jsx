@@ -249,9 +249,11 @@ export function CustomRolesTab({ customRoles, onCreateRole, onDeleteRole }) {
 export function CreateRoleModal({
   roleName,
   roleDescription,
+  baseRole,
   permissions,
   onRoleNameChange,
   onRoleDescriptionChange,
+  onBaseRoleChange,
   onPermissionsChange,
   onSubmit,
   onClose,
@@ -283,6 +285,32 @@ export function CreateRoleModal({
             placeholder={t('userManagement.roleNamePlaceholder')}
             required
           />
+        </div>
+
+        {/* The base role is not cosmetic. Row-level security matches on a fixed
+            list of role names, so a custom name is in none of them — without an
+            inherited base the database would serve this role almost nothing
+            while the checkboxes below promised otherwise. RLS treats the user
+            as their base role; the checkboxes can only narrow it further.
+            admin and super_admin are absent on purpose: canDo() returns true
+            unconditionally for those two, which would make the whole matrix
+            below meaningless. */}
+        <div>
+          <label htmlFor="cr-base" className="block text-sm font-medium text-gray-700 mb-2">
+            {t('userManagement.baseRoleLabel')}
+          </label>
+          <select
+            id="cr-base"
+            value={baseRole}
+            onChange={(e) => onBaseRoleChange(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600"
+            required
+          >
+            {[ROLES.VIEWER, ROLES.TECHNICIAN, ROLES.SALES_REP, ROLES.ACCOUNTANT, ROLES.MANAGER].map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-500">{t('userManagement.baseRoleHint')}</p>
         </div>
 
         <div>
