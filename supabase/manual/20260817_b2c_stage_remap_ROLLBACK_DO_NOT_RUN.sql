@@ -1,3 +1,27 @@
+-- ############################################################################
+-- ##  STOP. This file UNDOES the data fixes of 2026-08-17.                  ##
+-- ##                                                                        ##
+-- ##  Running it re-creates 24 mis-staged deals, restores 12 wrong          ##
+-- ##  probabilities, and re-inserts the QA throwaway lead/deal and an       ##
+-- ##  orphaned activity. It is here only so those changes are reversible.   ##
+-- ##                                                                        ##
+-- ##  It was run by accident once, because it sat in the same folder as a   ##
+-- ##  diagnostic and both paths were handed over together. Hence the guard  ##
+-- ##  below: the file now refuses to run unless you opt in explicitly.      ##
+-- ##                                                                        ##
+-- ##  To actually roll back, run this first, in the same session:           ##
+-- ##      SET myrma.confirm_rollback = 'yes';                               ##
+-- ############################################################################
+
+DO $guard$
+BEGIN
+  IF current_setting('myrma.confirm_rollback', true) IS DISTINCT FROM 'yes' THEN
+    RAISE EXCEPTION
+      'Refusing to run: this file UNDOES the 2026-08-17 data fixes. If that is genuinely what you want, run  SET myrma.confirm_rollback = ''yes'';  first, in the same session.';
+  END IF;
+END
+$guard$;
+
 -- Rollback for the B2C pipeline normalisation of 2026-08-17.
 --
 -- Two changes were made that day, in order. Running this whole file undoes

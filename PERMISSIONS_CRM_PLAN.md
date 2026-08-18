@@ -348,3 +348,49 @@ Which is the separation of duties stated as behaviour: reads the whole money
 path, originates none of it, holds the settlement controls. The throwaway user
 was deleted afterwards — `user_roles` back to 16.
 
+---
+
+## The rollback file was run by accident (2026-08-18)
+
+`20260817_b2c_stage_remap_rollback.sql` was executed, which undid every data fix
+from the day before: 24 deals back on undefined stages, 12 probabilities back to
+wrong, the QA throwaway lead/deal pair and the orphaned activity re-inserted.
+Totals went back to 57 / 34 / 176.
+
+That is on the handover, not the operator. The rollback lived in the same folder
+as a diagnostic and both paths were given out together, one line apart, with
+nothing in the file itself objecting.
+
+**Re-applied and re-verified:** 0 deals on undefined stages, 0 dangling
+activities, B2C at 13 / 12 / 12 / 11 / 3, totals back to 56 / 33 / 171. The only
+probability differing from its stage default is `OPP-73068304` at 33 — the
+deliberate hand-typed one.
+
+**Prevented properly.** The file is renamed
+`20260817_b2c_stage_remap_ROLLBACK_DO_NOT_RUN.sql` and now opens with a guard
+that aborts unless the operator opts in explicitly:
+
+```sql
+SET myrma.confirm_rollback = 'yes';
+```
+
+A warning comment would not have helped — the previous version had one. The
+guard makes the accident impossible rather than discouraged.
+
+## The RLS diagnostic came back partial
+
+Only the third query returned, because the Supabase SQL editor shows the last
+statement's result set and the file held three. Split into
+`20260818_rls_check_1_enabled.sql` and `20260818_rls_check_2_policies.sql`, to be
+run separately.
+
+What the third query did establish: **all four helper functions are correct and
+current.** `rma_is_staff()` includes both `sales_rep` and `accountant`, so
+migration 20260777 landed and the pre-20260618 form is not in play;
+`rma_current_user_email()` reads the JWT email; `rma_is_manager_or_above()` is
+the expected three roles. So the leak is not in the helpers.
+
+That leaves two candidates, which parts 1 and 2 separate: RLS switched off on
+some tables (policies present but inert — fits the symptom exactly), or live
+policies that differ from the repo.
+
