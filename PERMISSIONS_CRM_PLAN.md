@@ -968,3 +968,49 @@ viewer with no override reads zero and keeps `products.view` on.
 
 478 tests, lint clean, build ✓. Fixtures removed: 16 users, 0 custom roles.
 
+---
+
+## ActivityChatter, the last gap (2026-08-18)
+
+Two problems, and the first was not what I had described.
+
+**I had said every detail page passed `canEdit` as a bare prop.** Wrong: only
+Purchasing did. Leads and Deals both gate it properly with
+`canDo('edit') || canDo('create')` against their own module. One outlier, not
+three — Purchasing now follows the same pattern with `purchasing.edit`.
+
+Effect of the outlier: anyone who could open a purchase document could log
+notes, schedule activities, attach files, reply and reopen threads on it,
+including an accountant whose matrix has no `activities` module at all.
+
+**The second was a duplicate of a bug already fixed.** Inside the component:
+
+```js
+const canApprove = ['manager', 'admin', 'super_admin'].includes(currentUserRole)
+```
+
+The same hardcoded list corrected in the Activities approval inbox earlier —
+this second copy, on the document pages, was missed. It carried both faults of
+the original and one more:
+
+- a manager could approve their own purchase order here, which is exactly the
+  separation of duties 20260780 enforces everywhere else
+- a **custom role could never approve anything**, however it was based, because
+  the check compares the literal role string: `bookkeeper` is not in the list
+  even when its `base_role` is manager
+
+Now per document type, like the inbox: sales documents route to `sales.post`,
+purchase documents to `purchasing.approve`.
+
+### Verified
+
+On a live purchase order, previewing an accountant: **no chatter controls and
+no composer at all**, where previously all five were enabled. The same document
+as a manager: Log Note, Schedule Activity, Attach, Reply and Reopen all enabled,
+composer present.
+
+478 tests, lint clean, build ✓. Fixtures removed: 16 users, 0 custom roles.
+
+That closes the last known place where the interface offered something the
+permission matrix denies.
+

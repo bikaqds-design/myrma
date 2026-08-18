@@ -1167,6 +1167,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
                 currentUserEmail={currentUserEmail}
                 salesReps={salesReps}
                 canEdit={canDo('edit') || canDo('create')}
+                currentUserPermissions={currentUserPermissions}
                 controlledTab={tab}
                 onControlledTabChange={setTab}
                 hideNoteComposer

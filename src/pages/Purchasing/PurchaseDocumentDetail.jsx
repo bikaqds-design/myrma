@@ -534,7 +534,19 @@ export default function PurchaseDocumentDetail({
       )}
 
       <div className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] overflow-hidden">
-        <ActivityChatter relatedType={docType} relatedId={doc.id} currentUserEmail={currentUserEmail} canEdit currentUserRole={currentUserRole} />
+        {/* canEdit was a bare prop — always true — so anyone who could open a
+            purchase document could log notes, schedule activities and attach
+            files on it, including roles with no activities access at all. Now
+            follows the document's own module, matching how the Leads and Deal
+            pages gate the same component. */}
+        <ActivityChatter
+          relatedType={docType}
+          relatedId={doc.id}
+          currentUserEmail={currentUserEmail}
+          canEdit={canEditPurchase}
+          currentUserRole={currentUserRole}
+          currentUserPermissions={currentUserPermissions}
+        />
       </div>
       {confirmDialog}
     </div>

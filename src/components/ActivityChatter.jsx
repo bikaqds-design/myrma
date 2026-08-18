@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { canDo } from '../lib/permissions'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db, storage, supabase } from '../api/supabaseClient'
@@ -20,6 +21,10 @@ const TYPE_ICON = {
 }
 
 // Approval pool format: approval|docType|docId|code|total|customer
+// Purchase-side approvals. Everything else in the approval pool is a sales
+// document — see APPROVAL_DOC_TYPE_LABEL_KEY.
+const PURCHASE_APPROVAL_DOC_TYPES = new Set(['purchase_order', 'vendor_invoice'])
+
 function parseApprovalTitle(title) {
   const parts = (title || '').split('|')
   return {
@@ -75,11 +80,28 @@ function isOverdue(activity) {
   return !activity.completed_at && activity.due_date && new Date(activity.due_date) < new Date()
 }
 
-export function ActivityChatter({ relatedType, relatedId, currentUserEmail, salesReps, canEdit, controlledTab, onControlledTabChange, hideNoteComposer, hideHistory, currentUserRole, onApproveActivity, onRejectActivity }) {
+export function ActivityChatter({ relatedType, relatedId, currentUserEmail, salesReps, canEdit, controlledTab, onControlledTabChange, hideNoteComposer, hideHistory, currentUserRole, currentUserPermissions, onApproveActivity, onRejectActivity }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const fileInputRef = useRef(null)
-  const canApprove = ['manager', 'admin', 'super_admin'].includes(currentUserRole)
+  /**
+   * Who may approve, per document type — the second copy of a hardcoded role
+   * list that read ['manager','admin','super_admin'] and covered quotations,
+   * invoices and purchase orders alike. The approval inbox in Activities was
+   * fixed earlier; this one, on the document pages, was missed.
+   *
+   * Two consequences of the list. A manager could approve their own purchase
+   * order here, which is exactly the separation of duties 20260780 exists to
+   * enforce. And a custom role could never approve anything, however it was
+   * based, because the check compared the literal role string — 'bookkeeper' is
+   * not in the list even when its base_role is manager.
+   */
+  const canApproveDoc = (activity) => {
+    const { docType } = parseApprovalTitle(activity.title)
+    return PURCHASE_APPROVAL_DOC_TYPES.has(docType)
+      ? canDo(currentUserRole, currentUserPermissions, 'purchasing', 'approve')
+      : canDo(currentUserRole, currentUserPermissions, 'sales', 'post')
+  }
 
   const [internalTab, setInternalTab] = useState('note')
   const tab = controlledTab ?? internalTab
@@ -423,7 +445,7 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                             </p>
                           </div>
                         </div>
-                        {canApprove && onApproveActivity && onRejectActivity && (
+                        {canApproveDoc(a) && onApproveActivity && onRejectActivity && (
                           <div className="flex gap-2 mt-2 ml-8">
                             {/* The activity is passed alongside its id because its title
                                 encodes which document the approval targets — a parent may
