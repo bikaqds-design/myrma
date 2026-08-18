@@ -72,6 +72,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
   const [newRoleName, setNewRoleName] = useState('')
   const [newRoleDescription, setNewRoleDescription] = useState('')
   const [newRoleBase, setNewRoleBase] = useState('viewer')
+  const [editingRoleId, setEditingRoleId] = useState(null)
   const [newRolePermissions, setNewRolePermissions] = useState(getDefaultPermissions())
 
   const [controlAction, setControlAction] = useState('')
@@ -201,16 +202,36 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
     )
   }
 
+  const handleEditCustomRole = (role) => {
+    setEditingRoleId(role.id)
+    setNewRoleName(role.role_name)
+    setNewRoleDescription(role.role_description || '')
+    setNewRoleBase(role.base_role || 'viewer')
+    setNewRolePermissions(role.permissions || getDefaultPermissions())
+    setShowCreateRoleModal(true)
+  }
+
   const handleCreateCustomRole = async (e) => {
     e.preventDefault()
     try {
-      await db.userRoles.createCustomRole(
-        newRoleName,
-        newRoleDescription,
-        newRolePermissions,
-        currentUserEmail,
-        newRoleBase
-      )
+      if (editingRoleId) {
+        // role_name is intentionally not editable: it is the value stored in
+        // user_roles.role, so renaming it would strand every holder on a role
+        // that no longer exists.
+        await db.userRoles.updateCustomRole(editingRoleId, {
+          role_description: newRoleDescription,
+          permissions: newRolePermissions,
+          base_role: newRoleBase,
+        })
+      } else {
+        await db.userRoles.createCustomRole(
+          newRoleName,
+          newRoleDescription,
+          newRolePermissions,
+          currentUserEmail,
+          newRoleBase
+        )
+      }
       toast.success(t('userManagement.customRoleCreatedToast'))
       db.auditLog
         .log(currentUserEmail, 'custom_role_created', `Created custom role ${newRoleName}`)
@@ -219,6 +240,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
       setNewRoleDescription('')
       setNewRolePermissions(getDefaultPermissions())
       setShowCreateRoleModal(false)
+      setEditingRoleId(null)
       invalidate()
     } catch (error) {
       captureException(error)
@@ -645,7 +667,17 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
           {ENABLE_CUSTOM_ROLES && activeTab === 'custom' && (
             <CustomRolesTab
               customRoles={customRoles}
-              onCreateRole={() => setShowCreateRoleModal(true)}
+              onCreateRole={() => {
+                // clear any leftover edit target, or "Create" would silently
+                // overwrite the role that was last edited
+                setEditingRoleId(null)
+                setNewRoleName('')
+                setNewRoleDescription('')
+                setNewRoleBase('viewer')
+                setNewRolePermissions(getDefaultPermissions())
+                setShowCreateRoleModal(true)
+              }}
+              onEditRole={handleEditCustomRole}
               onDeleteRole={handleDeleteCustomRole}
             />
           )}
@@ -672,6 +704,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
 
       {showCreateRoleModal && (
         <CreateRoleModal
+          editing={!!editingRoleId}
           baseRole={newRoleBase}
           onBaseRoleChange={setNewRoleBase}
           roleName={newRoleName}
@@ -681,7 +714,10 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
           onRoleDescriptionChange={setNewRoleDescription}
           onPermissionsChange={setNewRolePermissions}
           onSubmit={handleCreateCustomRole}
-          onClose={() => setShowCreateRoleModal(false)}
+          onClose={() => {
+            setShowCreateRoleModal(false)
+            setEditingRoleId(null)
+          }}
         />
       )}
 

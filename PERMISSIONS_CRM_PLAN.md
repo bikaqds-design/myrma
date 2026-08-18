@@ -886,3 +886,36 @@ diagnosed it precisely.
 
 All three conditions are now satisfied, and the flag is on.
 
+## Custom roles could not be corrected once created
+
+Found by exercising the Custom Roles tab through the UI rather than the API —
+which had not been done: the tab was enabled and its modal gained a base-role
+picker, and every test role until now was created through `db.userRoles`
+directly.
+
+Two gaps, and they compounded:
+
+- **The card never showed the base role.** The single property that decides
+  what the database will serve a holder was invisible in the list.
+- **There was no edit action at all** — create and delete only. Combined with
+  the trigger refusing to delete a role somebody still holds, a role created
+  with the wrong base was *stuck*: unfixable and unremovable until every holder
+  was reassigned. My own delete guard made that worse.
+
+Both fixed. The card carries a "based on <role>" badge, and Edit reopens the
+modal pre-filled. `role_name` is locked while editing, for the same reason a
+pipeline stage id is: it is the value stored on every holder, so renaming it
+would strand them all.
+
+Verified through the UI end to end: created `zz_ui_bookkeeper` on base
+`accountant` with `record_payment`, saw it saved with 18 sections; reopened it,
+changed the base to `manager` and added `reverse_payment`; confirmed both landed
+and the table still held **one** role rather than a duplicate.
+
+Two mistakes of mine on the way, both from replacing the first match rather than
+the right one: `onEditRole` was attached to `UsersTab`, which ignores it, so the
+Edit button threw instead of opening anything; and a blanket replace turned
+`onClose={() => setShowCreateRoleModal(false)}` into two statements in an arrow
+body, which does not parse. Lint caught the second immediately; the first only
+showed up on clicking the button.
+

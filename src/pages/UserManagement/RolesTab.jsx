@@ -196,7 +196,7 @@ export function RoleTemplatesTab() {
   )
 }
 
-export function CustomRolesTab({ customRoles, onCreateRole, onDeleteRole }) {
+export function CustomRolesTab({ customRoles, onCreateRole, onEditRole, onDeleteRole }) {
   const { t } = useTranslation()
   return (
     <div className="space-y-4">
@@ -220,10 +220,24 @@ export function CustomRolesTab({ customRoles, onCreateRole, onDeleteRole }) {
             <div key={role.id} className="border border-gray-200 rounded-lg p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900">{role.role_name}</h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-lg font-semibold text-gray-900">{role.role_name}</h3>
+                    {/* The base role decides what the database will serve anyone
+                        holding this role, so it belongs on the card rather than
+                        buried in a form nobody reopens. */}
+                    <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-xs font-medium">
+                      {t('userManagement.basedOn', { role: role.base_role || 'viewer' })}
+                    </span>
+                  </div>
                   <p className="text-sm text-gray-600 mt-1">{role.role_description}</p>
                   <p className="text-xs text-gray-500 mt-2">{t('userManagement.customCreatedBy', { by: role.created_by })}</p>
                 </div>
+                <button
+                  onClick={() => onEditRole(role)}
+                  className="text-indigo-600 hover:text-indigo-800 mr-3 text-sm font-medium"
+                >
+                  {t('common.edit')}
+                </button>
                 <button
                   onClick={() => onDeleteRole(role.id)}
                   className="text-red-600 hover:text-red-800"
@@ -247,6 +261,7 @@ export function CustomRolesTab({ customRoles, onCreateRole, onDeleteRole }) {
 }
 
 export function CreateRoleModal({
+  editing,
   roleName,
   roleDescription,
   baseRole,
@@ -273,18 +288,28 @@ export function CreateRoleModal({
       className="max-w-4xl"
       hideHeader
     >
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">{t('userManagement.createCustomRole')}</h2>
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+        {editing ? t('userManagement.editCustomRole') : t('userManagement.createCustomRole')}
+      </h2>
       <form onSubmit={onSubmit} className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">{t('userManagement.roleNameLabel')}</label>
+          {/* Immutable once created. role_name is the value stored in
+              user_roles.role, so renaming it would strand every holder on a
+              role that no longer exists — the same reason a pipeline stage id
+              cannot be edited. */}
           <input
             type="text"
             value={roleName}
             onChange={(e) => onRoleNameChange(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600"
+            disabled={editing}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 disabled:bg-gray-100 disabled:text-gray-500"
             placeholder={t('userManagement.roleNamePlaceholder')}
             required
           />
+          {editing && (
+            <p className="mt-1 text-xs text-gray-500">{t('userManagement.roleNameLocked')}</p>
+          )}
         </div>
 
         {/* The base role is not cosmetic. Row-level security matches on a fixed
@@ -341,7 +366,7 @@ export function CreateRoleModal({
             type="submit"
             className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
           >
-            {t('userManagement.createRoleBtn')}
+            {editing ? t('userManagement.saveRoleBtn') : t('userManagement.createRoleBtn')}
           </button>
         </div>
       </form>

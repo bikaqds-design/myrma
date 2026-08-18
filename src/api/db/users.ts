@@ -156,6 +156,28 @@ export const userRoles = {
     if (error) throw error
     return data?.[0]
   },
+  /**
+   * A custom role had no way to be corrected: create and delete only. Combined
+   * with the trigger that refuses to delete a role somebody still holds
+   * (20260782), a role created with the wrong base_role was stuck — unfixable
+   * and unremovable until every holder was reassigned.
+   */
+  async updateCustomRole(
+    roleId: string,
+    fields: {
+      role_description?: string
+      permissions?: Record<string, Record<string, boolean>>
+      base_role?: string
+    }
+  ): Promise<unknown> {
+    const { data, error } = await supabase
+      .from('custom_roles')
+      .update(fields)
+      .eq('id', roleId)
+      .select()
+    if (error) throw error
+    return data?.[0]
+  },
   async deleteCustomRole(roleId: string): Promise<void> {
     const { error } = await supabase.from('custom_roles').delete().eq('id', roleId)
     if (error) throw error

@@ -2141,7 +2141,11 @@
     "baseRoleLabel": "Base role (what the database enforces)",
     "baseRoleHint": "Row-level security treats this role's holders as the base role. The permissions below can only narrow that further, never widen it.",
     "cannotLockOutSelf": "You cannot suspend, lock, deactivate, expire or delete your own account.",
-    "cannotRemoveLastSuperAdmin": "This is the last active Super Admin. Promote another one first, or nobody will be able to administer the system."
+    "cannotRemoveLastSuperAdmin": "This is the last active Super Admin. Promote another one first, or nobody will be able to administer the system.",
+    "editCustomRole": "Edit Custom Role",
+    "roleNameLocked": "The name cannot be changed — it is the value stored on every user who holds this role.",
+    "basedOn": "based on {{role}}",
+    "saveRoleBtn": "Save Changes"
   },
   "customerDetails": {
     "title": "Customer Details",
