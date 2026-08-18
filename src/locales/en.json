@@ -2145,7 +2145,10 @@
     "editCustomRole": "Edit Custom Role",
     "roleNameLocked": "The name cannot be changed — it is the value stored on every user who holds this role.",
     "basedOn": "based on {{role}}",
-    "saveRoleBtn": "Save Changes"
+    "saveRoleBtn": "Save Changes",
+    "overriddenHint": "Differs from this role's default",
+    "overriddenCount": "{{count}} override",
+    "overriddenCount_other": "{{count}} overrides"
   },
   "customerDetails": {
     "title": "Customer Details",

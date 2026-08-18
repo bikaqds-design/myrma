@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import Modal from '../../components/Modal'
 import { ROLES } from '../../lib/constants'
-import { ROLE_DEFAULT_PERMISSIONS, roleDefaults } from '../../lib/permissions'
+import { ROLE_DEFAULT_PERMISSIONS, roleDefaults, resolvePermissions } from '../../lib/permissions'
 import { RoleBadge } from './_shared'
 import { getDefaultPermissions, getRoleTemplates } from './_utils'
 import {
@@ -16,94 +16,118 @@ import {
 // Granting a permission the server refuses produces a button that appears and
 // then fails. This warns at the point of granting.
 //
-// Two tables, deliberately, because they are two different kinds of knowledge.
+// One table now, keyed by module.action, listing the roles the DATABASE
+// permits. There were two: this plus a per-role LEGACY_CEILING carrying the
+// older RMA-side entries in a different shape. Unifying them meant reading the
+// actual policies rather than trusting the old list, which turned up a claim
+// that was simply wrong — it said a viewer could not create a time entry, while
+// `user_insert_own` allows `user_email = me AND rma_is_staff()`, and a viewer
+// is staff. A viewer logging their own time is permitted and was being warned
+// about.
 //
-// SERVER_ALLOWS is keyed by module.action and lists the roles the DATABASE
-// permits, transcribed from the RLS policies and RPC gates. It covers the money
-// modules, whose rules changed several times in August 2026 (20260778-20260781)
-// and are the ones worth keeping honest. Derived this way, adding a role means
-// adding it to one set rather than to every per-role block.
-//
-// LEGACY_CEILING keeps the older per-role RMA-side entries as they were. They
-// are accurate and were not re-derived: transcribing a dozen more policies from
-// memory to make the shape uniform would risk being confidently wrong about
-// rules nobody has complained about. Worth unifying when someone next touches
-// those policies for a real reason.
-//
-// This was blind to sales, accounting and purchasing entirely, so an admin
-// could grant a viewer `accounting.record_payment`, watch it save, and get no
-// hint that record_payment() raises for anyone below manager.
+// Every entry below is transcribed from a policy in supabase/migrations, named
+// in the comment beside it. Anything not listed is not server-gated and is not
+// warned about: `reports.export` and the calendar actions were in the old list
+// with no RLS behind them, so they are gone rather than silently kept.
 
+const ALL_STAFF = [
+  ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER,
+  ROLES.TECHNICIAN, ROLES.VIEWER, ROLES.SALES_REP, ROLES.ACCOUNTANT,
+]
+const STAFF_NOT_VIEWER = ALL_STAFF.filter((r) => r !== ROLES.VIEWER)
 const MGR_PLUS   = [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER]
 const ADMIN_ONLY = [ROLES.SUPER_ADMIN, ROLES.ADMIN]
 
 const SERVER_ALLOWS = {
-  // sales_insert_* / sales_update_* (20260781)
+  // ── products / customers: staff_read, manager_insert, manager_update,
+  //    admin_delete (20260526 section 4)
+  'products.create':   MGR_PLUS,
+  'products.edit_all': MGR_PLUS,
+  'products.import':   MGR_PLUS,
+  'products.delete':   ADMIN_ONLY,
+  'customers.create':  MGR_PLUS,
+  'customers.import':  MGR_PLUS,
+  'customers.delete':  ADMIN_ONLY,
+  // customers.edit also has sales_rep_update_assigned for their own rows, so a
+  // rep is not warned — the grant is partially honoured rather than refused.
+  'customers.edit':    [...MGR_PLUS, ROLES.SALES_REP],
+
+  // ── rma_tickets (20260526 section 5). staff_update additionally allows a
+  //    technician on tickets assigned to them, hence edit_assigned.
+  'rma_tickets.create':        MGR_PLUS,
+  'rma_tickets.edit_all':      MGR_PLUS,
+  'rma_tickets.edit_assigned': [...MGR_PLUS, ROLES.TECHNICIAN],
+  'rma_tickets.bulk_actions':  MGR_PLUS,
+  'rma_tickets.delete':        ADMIN_ONLY,
+
+  // ── inventory_units / manufacturer_batches / parts / ticket_parts
+  //    (20260526 section 7): write is staff except viewer, delete is admin.
+  'inventory.create':       STAFF_NOT_VIEWER,
+  'inventory.edit':         STAFF_NOT_VIEWER,
+  'inventory.transfer':     STAFF_NOT_VIEWER,
+  'inventory.delete':       ADMIN_ONLY,
+  'parts.create':           STAFF_NOT_VIEWER,
+  'parts.edit':             STAFF_NOT_VIEWER,
+  'parts.adjust_stock':     STAFF_NOT_VIEWER,
+  'parts.delete':           ADMIN_ONLY,
+
+  // ── time_entries (20260526 section 8). Logging your own is open to all
+  //    staff; seeing everyone's is manager and above.
+  'time_tracking.view_all': MGR_PLUS,
+
+  // ── user_roles and the other admin tables carry a single admin_all policy.
+  'user_management.view':               ADMIN_ONLY,
+  'user_management.create':             ADMIN_ONLY,
+  'user_management.edit':               ADMIN_ONLY,
+  'user_management.delete':             ADMIN_ONLY,
+  'user_management.manage_permissions': ADMIN_ONLY,
+
+  // ── sales documents: sales_insert_* / sales_update_* (20260781),
+  //    admin_delete_* , and post/cancel gated inside post_invoice/void_invoice
   'sales.create': [...MGR_PLUS, ROLES.SALES_REP],
   'sales.edit':   [...MGR_PLUS, ROLES.SALES_REP],
-  // admin_delete_* is rma_is_admin()
   'sales.delete': ADMIN_ONLY,
-  // post_invoice() / void_invoice() gate on rma_is_manager_or_above()
   'sales.post':   MGR_PLUS,
   'sales.cancel': MGR_PLUS,
 
-  // rma_can_handle_cash() = manager_or_above OR accountant (20260780)
+  // ── rma_can_handle_cash() = manager_or_above OR accountant (20260780)
   'accounting.record_payment':  [...MGR_PLUS, ROLES.ACCOUNTANT],
   'accounting.reverse_payment': [...MGR_PLUS, ROLES.ACCOUNTANT],
 
-  // manager_write_purchase_orders / manager_write_vendor_invoices
+  // ── manager_write_purchase_orders / manager_write_vendor_invoices
   'purchasing.create':         MGR_PLUS,
   'purchasing.edit':           MGR_PLUS,
   'purchasing.receive':        MGR_PLUS,
   'purchasing.cancel':         MGR_PLUS,
   'purchasing.manage_vendors': MGR_PLUS,
-  // no role default grants approve; it lands with admin via the canDo bypass
   'purchasing.approve':        ADMIN_ONLY,
+
+  // ── pipelines write is admin-only at the RLS layer
+  'pipelines.manage': ADMIN_ONLY,
 }
 
-const LEGACY_CEILING = {
-  [ROLES.VIEWER]: {
-    products: ['create', 'edit_all', 'delete', 'import'],
-    customers: ['create', 'edit', 'delete', 'import'],
-    rma_tickets: ['create', 'edit_all', 'edit_assigned', 'delete', 'bulk_actions'],
-    inventory: ['create', 'edit', 'delete', 'transfer'],
-    parts: ['create', 'edit', 'delete', 'adjust'],
-    reports: ['export'],
-    calendar: ['create', 'edit', 'delete'],
-    time_tracking: ['create', 'edit', 'delete'],
-    user_management: ['view', 'create', 'edit', 'delete', 'manage_permissions'],
-  },
-  [ROLES.TECHNICIAN]: {
-    products: ['create', 'edit_all', 'delete', 'import'],
-    customers: ['create', 'edit', 'delete', 'import'],
-    user_management: ['view', 'create', 'edit', 'delete', 'manage_permissions'],
-  },
-}
-
+/**
+ * Which granted permissions the database would refuse for this role.
+ *
+ * `role` must be the role RLS will see — for a custom role that is its
+ * base_role, since rma_user_role() resolves it (20260782). Callers pass the
+ * resolved value.
+ */
 function getCrossTierPermissions(role, perms) {
   const violations = []
-
   for (const [key, allowed] of Object.entries(SERVER_ALLOWS)) {
     const [section, action] = key.split('.')
     if (perms?.[section]?.[action] === true && !allowed.includes(role)) {
       violations.push(key)
     }
   }
-
-  const legacy = LEGACY_CEILING[role]
-  if (legacy) {
-    for (const [section, actions] of Object.entries(legacy)) {
-      for (const action of actions) {
-        if (perms?.[section]?.[action] === true) violations.push(`${section}.${action}`)
-      }
-    }
-  }
-
-  return [...new Set(violations)].sort()
+  return violations.sort()
 }
 
-
-// Merges stored permissions on top of the full defaults so all keys are always present
+/**
+ * Fill in every section and action the runtime knows about, so a partially
+ * stored permissions object still renders a complete matrix.
+ */
 function mergeWithDefaults(permissions) {
   const defaults = getDefaultPermissions()
   return Object.fromEntries(
@@ -114,9 +138,6 @@ function mergeWithDefaults(permissions) {
   )
 }
 
-// Read-only reference of the built-in role defaults that the app actually enforces
-// at runtime (ROLE_DEFAULT_PERMISSIONS). admin / super_admin bypass all checks, so
-// they're shown as full access. Per-user overrides live on the Users tab → Edit Permissions.
 export function RoleTemplatesTab() {
   const { t } = useTranslation()
   const roles = getRoleTemplates()
@@ -380,22 +401,39 @@ export function PermissionsModal({ user, customRoles, onSave, onClose }) {
 
   // Seed: use stored custom permissions if present, otherwise role template defaults.
   // mergeWithDefaults ensures all sections/keys exist even for partial stored objects.
-  const [perms, setPerms] = useState(() => {
-    const stored = user.permissions
-    const hasStored = stored && typeof stored === 'object' && Object.keys(stored).length > 0
-    // roleDefaults covers custom roles too. This read ROLE_DEFAULT_PERMISSIONS
-    // directly, which is undefined for a custom role, so the editor fell through
-    // to an all-false template: it showed the wrong state, suppressed the
-    // cross-tier warning, and would have written an all-false override on save.
-    const base = hasStored ? stored : (roleDefaults(user.role, customRoles) || getDefaultPermissions())
-    return mergeWithDefaults(base)
-  })
+  const [perms, setPerms] = useState(() =>
+    /**
+     * Show what the app actually enforces for this user.
+     *
+     * This used to seed from the stored override *instead of* the role
+     * defaults when one existed, and mergeWithDefaults fills gaps with
+     * all-false — so opening the editor on a user with a PARTIAL override
+     * displayed every role-granted permission as off, and Save wrote that,
+     * silently stripping their access. A viewer with one extra grant showed
+     * eleven differences instead of one.
+     *
+     * resolvePermissions is the same function the session uses to decide what
+     * canDo sees, so the editor now shows the effective permissions rather
+     * than a reconstruction of them. mergeWithDefaults only fills sections the
+     * runtime does not mention, so the matrix still renders complete.
+     */
+    mergeWithDefaults(
+      resolvePermissions(user.role, user.permissions, roleDefaults(user.role, customRoles)) ||
+        getDefaultPermissions()
+    )
+  )
 
   // A custom role is not in SERVER_ALLOWS — the database resolves it to its
   // base_role (rma_user_role, migration 20260782), so the ceiling has to be
   // evaluated against that base. Without this a custom role based on accountant
   // would be warned about record_payment it can perfectly well do, and one
   // based on viewer would not be warned about the same grant it cannot.
+  // What this user's role grants before any per-user override — the thing the
+  // ◆ markers are measured against.
+  const roleBaseline = mergeWithDefaults(
+    roleDefaults(user.role, customRoles) || getDefaultPermissions()
+  )
+
   const effectiveRoleForCeiling =
     (customRoles || []).find((r) => r.role_name === user.role)?.base_role ?? user.role
   const crossTierViolations = getCrossTierPermissions(effectiveRoleForCeiling, perms)
@@ -464,7 +502,11 @@ export function PermissionsModal({ user, customRoles, onSave, onClose }) {
         )}
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          <PermissionMatrix permissions={perms} onToggle={togglePermission} />
+          <PermissionMatrix
+            permissions={perms}
+            baseline={roleBaseline}
+            onToggle={togglePermission}
+          />
         </div>
 
         <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
@@ -509,7 +551,7 @@ export function PermissionsModal({ user, customRoles, onSave, onClose }) {
  * list from ROLE_DEFAULT_PERMISSIONS at runtime. Adding a module to
  * permissions.ts makes it appear here on its own.
  */
-export function PermissionMatrix({ permissions, onToggle, onToggleModule }) {
+export function PermissionMatrix({ permissions, baseline, onToggle, onToggleModule }) {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const groups = useMemo(() => permissionGroups(), [])
@@ -525,6 +567,29 @@ export function PermissionMatrix({ permissions, onToggle, onToggleModule }) {
 
   const matches = (key) =>
     !needle || key.includes(needle) || labelFor(key).toLowerCase().includes(needle)
+
+  /**
+   * Marks a toggle that has been moved away from the role's own default.
+   *
+   * With 101 checkboxes and three possible sources — a built-in role default, a
+   * custom role's map, or a per-user override — an override was invisible once
+   * the modal was open. The user list showed a "Custom" badge and then told you
+   * nothing about which of the hundred differed.
+   *
+   * No baseline supplied means nothing is marked, which is right for the
+   * create-a-role form: there is nothing to differ from yet.
+   */
+  const differsFromBaseline = (section, action) => {
+    if (!baseline) return false
+    return !!permissions?.[section]?.[action] !== !!baseline?.[section]?.[action]
+  }
+
+  const overriddenCount = groups
+    .flatMap((g) => g.modules)
+    .reduce(
+      (n, m) => n + m.actions.filter((a) => differsFromBaseline(m.key, a)).length,
+      0
+    )
 
   const visibleGroups = groups
     .map((g) => ({ ...g, modules: g.modules.filter((m) => matches(m.key)) }))
@@ -548,6 +613,11 @@ export function PermissionMatrix({ permissions, onToggle, onToggleModule }) {
             count: visibleGroups.reduce((n, g) => n + g.modules.length, 0),
           })}
         </span>
+        {baseline && overriddenCount > 0 && (
+          <span className="text-xs font-medium text-indigo-600 dark:text-indigo-300">
+            ◆ {t('userManagement.overriddenCount', { count: overriddenCount })}
+          </span>
+        )}
       </div>
 
       {visibleGroups.map((group) => (
@@ -589,7 +659,14 @@ export function PermissionMatrix({ permissions, onToggle, onToggleModule }) {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                     {module.actions.map((perm) => (
-                      <label key={perm} className="flex items-center gap-2 cursor-pointer select-none">
+                      <label
+                        key={perm}
+                        className={`flex items-center gap-2 cursor-pointer select-none ${
+                          differsFromBaseline(module.key, perm)
+                            ? '-mx-1 px-1 rounded bg-indigo-50 dark:bg-indigo-500/10'
+                            : ''
+                        }`}
+                      >
                         <input
                           type="checkbox"
                           checked={!!modulePerms[perm]}
@@ -598,6 +675,15 @@ export function PermissionMatrix({ permissions, onToggle, onToggleModule }) {
                         />
                         <span className="text-sm text-gray-700 dark:text-[#e8ebf0]">
                           {actionLabel(perm)}
+                          {differsFromBaseline(module.key, perm) && (
+                            <span
+                              title={t('userManagement.overriddenHint')}
+                              aria-label={t('userManagement.overriddenHint')}
+                              className="ml-1 text-indigo-600 dark:text-indigo-300 font-semibold"
+                            >
+                              ◆
+                            </span>
+                          )}
                           {SENSITIVE_ACTIONS.has(perm) && (
                             <span
                               title={t('userManagement.sensitiveAction')}

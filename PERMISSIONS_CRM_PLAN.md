@@ -919,3 +919,52 @@ Edit button threw instead of opening anything; and a blanket replace turned
 body, which does not parse. Lint caught the second immediately; the first only
 showed up on clicking the button.
 
+---
+
+## The three leftovers, cleared (2026-08-18)
+
+**One ceiling table.** `LEGACY_CEILING` is gone; everything lives in
+`SERVER_ALLOWS`, keyed by `module.action`, with each entry naming the migration
+whose policy it transcribes. Doing it properly meant reading those policies
+rather than trusting the old list — and the old list was wrong in at least one
+place: it claimed a viewer could not create a time entry, while `user_insert_own`
+allows `user_email = me AND rma_is_staff()` and a viewer *is* staff. That warning
+was firing on something the database permits.
+
+Two entries were dropped rather than carried over: `reports.export` and the
+calendar actions had no RLS behind them at all. A ceiling that warns about
+things the server never checks teaches people to ignore it.
+
+**One schema.** `_utils.js` derived the blank template from
+`ROLE_DEFAULT_PERMISSIONS[MANAGER]`. True today, since manager is a superset,
+but nothing enforces that — a future role with a module manager lacks would drop
+silently out of the blank template and the role reference. It now uses
+`permissionSchema()`, the same union the editor renders from, so the three
+cannot disagree about which permissions exist.
+
+**Override markers.** Each toggle differing from the role's own default is
+marked ◆ and tinted, with a count in the header. With 101 checkboxes and three
+possible sources — a built-in default, a custom role's map, a per-user override
+— an override was invisible once the modal was open.
+
+### The markers immediately found a real bug
+
+A viewer given exactly two overrides showed **eleven**.
+
+The editor seeded from the stored override *instead of* the role defaults
+whenever one existed, and `mergeWithDefaults` fills gaps with all-false. So
+opening the editor on a user with a **partial** override displayed every
+role-granted permission as switched off — and Save would have written that,
+stripping their access. Any user with a partial override was one click from
+losing everything their role gave them.
+
+It now seeds from `resolvePermissions()`, the same function the session uses to
+decide what `canDo` sees, so the editor shows the effective permissions rather
+than a reconstruction of them.
+
+Verified: the two-override fixture reads ◆ 2, marking exactly
+`accounting.record_payment` (granted) and `products.view` (revoked); a plain
+viewer with no override reads zero and keeps `products.view` on.
+
+478 tests, lint clean, build ✓. Fixtures removed: 16 users, 0 custom roles.
+

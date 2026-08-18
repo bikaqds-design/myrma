@@ -1,5 +1,6 @@
 import { ROLE_DEFAULT_PERMISSIONS } from '../../lib/permissions'
 import { ROLES } from '../../lib/constants'
+import { permissionSchema } from '../../lib/permissionCatalog'
 
 export function validatePasswordStrength(pw) {
   if (!pw || pw.length < 8) return 'Password must be at least 8 characters'
@@ -10,16 +11,22 @@ export function validatePasswordStrength(pw) {
 }
 
 // ── Single source of truth for permission shape ──────────────────────────────
-// The manager default carries every section + action, so it defines the canonical
-// schema. getDefaultPermissions() (all-false) and the role-template displays are
-// DERIVED from ROLE_DEFAULT_PERMISSIONS so they can never drift from runtime (UM-2).
-const PERMISSION_SCHEMA = ROLE_DEFAULT_PERMISSIONS[ROLES.MANAGER]
-
+// This used to read ROLE_DEFAULT_PERMISSIONS[MANAGER] on the grounds that the
+// manager default carries every section and action. That was true, and it was
+// still the wrong source: it holds only while manager remains a superset of
+// every other role, which nothing enforces. A future role with a module manager
+// lacks would silently drop out of the blank template and out of the role
+// reference display.
+//
+// permissionSchema() unions across every role, which is what "the canonical
+// schema" actually means, and is the same source the permission editor renders
+// from — so the editor, the blank template and the role reference cannot
+// disagree about which permissions exist.
 function buildUniform(value) {
   return Object.fromEntries(
-    Object.entries(PERMISSION_SCHEMA).map(([section, actions]) => [
+    Object.entries(permissionSchema()).map(([section, actions]) => [
       section,
-      Object.fromEntries(Object.keys(actions).map((a) => [a, value])),
+      Object.fromEntries(actions.map((a) => [a, value])),
     ])
   )
 }

@@ -2157,7 +2157,14 @@
     "editCustomRole": "تعديل دور مخصص",
     "roleNameLocked": "لا يمكن تغيير الاسم — فهو القيمة المخزّنة لدى كل مستخدم يحمل هذا الدور.",
     "basedOn": "مبني على {{role}}",
-    "saveRoleBtn": "حفظ التغييرات"
+    "saveRoleBtn": "حفظ التغييرات",
+    "overriddenHint": "يختلف عن الإعداد الافتراضي لهذا الدور",
+    "overriddenCount_zero": "لا توجد تغييرات",
+    "overriddenCount_one": "تغيير واحد",
+    "overriddenCount_two": "تغييران",
+    "overriddenCount_few": "{{count}} تغييرات",
+    "overriddenCount_many": "{{count}} تغييرًا",
+    "overriddenCount_other": "{{count}} تغيير"
   },
   "customerDetails": {
     "title": "تفاصيل العميل",
