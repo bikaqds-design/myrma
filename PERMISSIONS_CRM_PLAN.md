@@ -714,3 +714,49 @@ commenting on a record you can already read is a different question from
 changing that record. It wants its own pass rather than being folded into this
 one.
 
+---
+
+## User Management review (2026-08-18)
+
+### The cross-tier warning was blind to every money module
+
+`RLS_CEILING` — the table behind "these permissions exceed what the database
+enforces" — listed only `viewer` and `technician`, and knew nothing of `sales`,
+`accounting` or `purchasing`, nor of the `sales_rep` and `accountant` roles.
+
+Since the rebuilt editor renders all 18 modules for every user, an admin can
+grant anyone anything. Demonstrated rather than reasoned about: granted a
+**viewer** `accounting.record_payment`, it saved cleanly, all 18 sections
+persisted, and **no warning appeared**. `record_payment()` raises for anyone
+below manager, so that grant produces a button that appears and then fails.
+
+Rebuilt as `SERVER_ALLOWS`, keyed by `module.action` and listing the roles the
+database actually permits, transcribed from the RLS policies and RPC gates of
+20260778–20260781. Adding a role now means adding it to one set rather than
+editing every per-role block — which is precisely how the old shape went stale.
+
+The older per-role RMA-side entries are kept verbatim as `LEGACY_CEILING`.
+They are accurate and were deliberately not re-derived: transcribing a dozen
+more policies to make the shape uniform would risk being confidently wrong about
+rules nobody has complained about. Two mechanisms is a smell, and the comment
+says so and says when to unify them.
+
+Re-tested live: the same grant now raises *"Cross-tier permissions detected"*
+naming `accounting.record_payment`.
+
+### Also confirmed working
+
+The rebuilt editor persists correctly — 18 sections, 101 actions, and a toggled
+`accounting.record_payment` landed in `user_roles.permissions`.
+
+### One latent issue, not a bug today
+
+`_utils.js` derives the blank template for custom roles from
+`ROLE_DEFAULT_PERMISSIONS[MANAGER]`, while `permissionCatalog.permissionSchema()`
+unions across all roles. Two definitions of the same thing. Checked rather than
+assumed: manager is still a complete superset — 18 sections, no missing actions
+— so they agree today. It only bites if a future role gains a module manager
+lacks, which is exactly the drift that produced the other bugs in this section.
+
+473 tests, up from 457.
+

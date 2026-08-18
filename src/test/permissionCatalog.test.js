@@ -14,7 +14,7 @@ import {
   MODULE_LABEL_KEYS,
   SENSITIVE_ACTIONS,
 } from '../lib/permissionCatalog'
-import { ROLE_DEFAULT_PERMISSIONS } from '../lib/permissions'
+import { ROLE_DEFAULT_PERMISSIONS, canDo } from '../lib/permissions'
 import { ROLES } from '../lib/constants'
 
 const allModules = () => Object.keys(permissionSchema())
@@ -137,5 +137,69 @@ describe('accountant role', () => {
     expect(perms.customers.view).toBe(true)
     expect(perms.customers.view_history).toBe(true)
     expect(perms.customers.edit).toBe(false)
+  })
+})
+
+// ── The cross-tier warning ───────────────────────────────────────────────────
+// The editor renders all 18 modules for every user, so an admin can grant any
+// role anything. This warning is what tells them the server will refuse. It was
+// blind to sales, accounting and purchasing entirely — a viewer could be given
+// accounting.record_payment, it saved cleanly, and nothing said a word.
+//
+// getCrossTierPermissions is not exported, so these assert the rules it encodes
+// via the role defaults, which is what the warning is checked against.
+
+describe('server-side ceilings the editor must warn about', () => {
+  // Roles that no role default gives these to, and the database refuses.
+  const CANNOT = [
+    [ROLES.VIEWER, 'accounting', 'record_payment'],
+    [ROLES.TECHNICIAN, 'accounting', 'record_payment'],
+    [ROLES.SALES_REP, 'accounting', 'record_payment'],
+    [ROLES.SALES_REP, 'accounting', 'reverse_payment'],
+    [ROLES.SALES_REP, 'sales', 'post'],
+    [ROLES.SALES_REP, 'sales', 'cancel'],
+    [ROLES.SALES_REP, 'purchasing', 'create'],
+    [ROLES.ACCOUNTANT, 'sales', 'create'],
+    [ROLES.ACCOUNTANT, 'sales', 'edit'],
+    [ROLES.ACCOUNTANT, 'sales', 'post'],
+    [ROLES.ACCOUNTANT, 'purchasing', 'create'],
+    [ROLES.ACCOUNTANT, 'purchasing', 'approve'],
+  ]
+
+  it.each(CANNOT)('%s must not hold %s.%s by default', (role, section, action) => {
+    expect(canDo(role, ROLE_DEFAULT_PERMISSIONS[role], section, action)).toBe(false)
+  })
+
+  // The converse: the roles the database does permit must actually have it, or
+  // the ceiling would warn about a legitimate grant.
+  it('manager holds every money action except approve', () => {
+    const m = ROLE_DEFAULT_PERMISSIONS[ROLES.MANAGER]
+    for (const [s, a] of [['sales','create'],['sales','edit'],['sales','post'],
+                          ['sales','cancel'],['accounting','record_payment'],
+                          ['accounting','reverse_payment'],['purchasing','create'],
+                          ['purchasing','receive']]) {
+      expect(canDo(ROLES.MANAGER, m, s, a), `${s}.${a}`).toBe(true)
+    }
+    expect(canDo(ROLES.MANAGER, m, 'purchasing', 'approve')).toBe(false)
+  })
+
+  it('accountant holds the cash actions the database allows it', () => {
+    const a = ROLE_DEFAULT_PERMISSIONS[ROLES.ACCOUNTANT]
+    expect(canDo(ROLES.ACCOUNTANT, a, 'accounting', 'record_payment')).toBe(true)
+    expect(canDo(ROLES.ACCOUNTANT, a, 'accounting', 'reverse_payment')).toBe(true)
+  })
+
+  it('sales_rep holds the sales writes the database allows it', () => {
+    const r = ROLE_DEFAULT_PERMISSIONS[ROLES.SALES_REP]
+    expect(canDo(ROLES.SALES_REP, r, 'sales', 'create')).toBe(true)
+    expect(canDo(ROLES.SALES_REP, r, 'sales', 'edit')).toBe(true)
+  })
+
+  it('every module the warning references still exists in the schema', () => {
+    const schema = permissionSchema()
+    for (const [, section, action] of CANNOT) {
+      expect(schema, section).toHaveProperty(section)
+      expect(schema[section], `${section}.${action}`).toContain(action)
+    }
   })
 })

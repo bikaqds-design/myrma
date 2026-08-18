@@ -11,17 +11,62 @@ import {
   SENSITIVE_ACTIONS,
 } from '../../lib/permissionCatalog'
 
-// Permissions that the DB (RLS) cannot enforce for a given role — granting them shows
-// the UI button but the server will reject the write. Used to surface a warning.
-const RLS_CEILING = {
+// ── What the database will actually honour ───────────────────────────────────
+//
+// Granting a permission the server refuses produces a button that appears and
+// then fails. This warns at the point of granting.
+//
+// Two tables, deliberately, because they are two different kinds of knowledge.
+//
+// SERVER_ALLOWS is keyed by module.action and lists the roles the DATABASE
+// permits, transcribed from the RLS policies and RPC gates. It covers the money
+// modules, whose rules changed several times in August 2026 (20260778-20260781)
+// and are the ones worth keeping honest. Derived this way, adding a role means
+// adding it to one set rather than to every per-role block.
+//
+// LEGACY_CEILING keeps the older per-role RMA-side entries as they were. They
+// are accurate and were not re-derived: transcribing a dozen more policies from
+// memory to make the shape uniform would risk being confidently wrong about
+// rules nobody has complained about. Worth unifying when someone next touches
+// those policies for a real reason.
+//
+// This was blind to sales, accounting and purchasing entirely, so an admin
+// could grant a viewer `accounting.record_payment`, watch it save, and get no
+// hint that record_payment() raises for anyone below manager.
+
+const MGR_PLUS   = [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER]
+const ADMIN_ONLY = [ROLES.SUPER_ADMIN, ROLES.ADMIN]
+
+const SERVER_ALLOWS = {
+  // sales_insert_* / sales_update_* (20260781)
+  'sales.create': [...MGR_PLUS, ROLES.SALES_REP],
+  'sales.edit':   [...MGR_PLUS, ROLES.SALES_REP],
+  // admin_delete_* is rma_is_admin()
+  'sales.delete': ADMIN_ONLY,
+  // post_invoice() / void_invoice() gate on rma_is_manager_or_above()
+  'sales.post':   MGR_PLUS,
+  'sales.cancel': MGR_PLUS,
+
+  // rma_can_handle_cash() = manager_or_above OR accountant (20260780)
+  'accounting.record_payment':  [...MGR_PLUS, ROLES.ACCOUNTANT],
+  'accounting.reverse_payment': [...MGR_PLUS, ROLES.ACCOUNTANT],
+
+  // manager_write_purchase_orders / manager_write_vendor_invoices
+  'purchasing.create':         MGR_PLUS,
+  'purchasing.edit':           MGR_PLUS,
+  'purchasing.receive':        MGR_PLUS,
+  'purchasing.cancel':         MGR_PLUS,
+  'purchasing.manage_vendors': MGR_PLUS,
+  // no role default grants approve; it lands with admin via the canDo bypass
+  'purchasing.approve':        ADMIN_ONLY,
+}
+
+const LEGACY_CEILING = {
   [ROLES.VIEWER]: {
     products: ['create', 'edit_all', 'delete', 'import'],
     customers: ['create', 'edit', 'delete', 'import'],
     rma_tickets: ['create', 'edit_all', 'edit_assigned', 'delete', 'bulk_actions'],
     inventory: ['create', 'edit', 'delete', 'transfer'],
-    sales: ['create', 'edit', 'delete', 'post', 'cancel'],
-    accounting: ['record_payment', 'reverse_payment'],
-    purchasing: ['create', 'edit', 'approve', 'receive', 'cancel', 'manage_vendors'],
     parts: ['create', 'edit', 'delete', 'adjust'],
     reports: ['export'],
     calendar: ['create', 'edit', 'delete'],
@@ -31,26 +76,32 @@ const RLS_CEILING = {
   [ROLES.TECHNICIAN]: {
     products: ['create', 'edit_all', 'delete', 'import'],
     customers: ['create', 'edit', 'delete', 'import'],
-    sales: ['create', 'edit', 'delete', 'post', 'cancel'],
-    accounting: ['record_payment', 'reverse_payment'],
-    purchasing: ['create', 'edit', 'approve', 'receive', 'cancel', 'manage_vendors'],
     user_management: ['view', 'create', 'edit', 'delete', 'manage_permissions'],
   },
 }
 
 function getCrossTierPermissions(role, perms) {
-  const ceiling = RLS_CEILING[role]
-  if (!ceiling) return []
   const violations = []
-  for (const [section, actions] of Object.entries(ceiling)) {
-    for (const action of actions) {
-      if (perms?.[section]?.[action] === true) {
-        violations.push(`${section}.${action}`)
+
+  for (const [key, allowed] of Object.entries(SERVER_ALLOWS)) {
+    const [section, action] = key.split('.')
+    if (perms?.[section]?.[action] === true && !allowed.includes(role)) {
+      violations.push(key)
+    }
+  }
+
+  const legacy = LEGACY_CEILING[role]
+  if (legacy) {
+    for (const [section, actions] of Object.entries(legacy)) {
+      for (const action of actions) {
+        if (perms?.[section]?.[action] === true) violations.push(`${section}.${action}`)
       }
     }
   }
-  return violations
+
+  return [...new Set(violations)].sort()
 }
+
 
 // Merges stored permissions on top of the full defaults so all keys are always present
 function mergeWithDefaults(permissions) {
