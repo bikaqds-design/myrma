@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import Modal from '../../components/Modal'
 import { ROLES } from '../../lib/constants'
-import { ROLE_DEFAULT_PERMISSIONS } from '../../lib/permissions'
+import { ROLE_DEFAULT_PERMISSIONS, roleDefaults } from '../../lib/permissions'
 import { RoleBadge } from './_shared'
 import { getDefaultPermissions, getRoleTemplates } from './_utils'
 import {
@@ -349,7 +349,7 @@ export function CreateRoleModal({
   )
 }
 
-export function PermissionsModal({ user, onSave, onClose }) {
+export function PermissionsModal({ user, customRoles, onSave, onClose }) {
   const { t } = useTranslation()
   const [saving, setSaving] = useState(false)
 
@@ -358,11 +358,22 @@ export function PermissionsModal({ user, onSave, onClose }) {
   const [perms, setPerms] = useState(() => {
     const stored = user.permissions
     const hasStored = stored && typeof stored === 'object' && Object.keys(stored).length > 0
-    const base = hasStored ? stored : (ROLE_DEFAULT_PERMISSIONS[user.role] || getDefaultPermissions())
+    // roleDefaults covers custom roles too. This read ROLE_DEFAULT_PERMISSIONS
+    // directly, which is undefined for a custom role, so the editor fell through
+    // to an all-false template: it showed the wrong state, suppressed the
+    // cross-tier warning, and would have written an all-false override on save.
+    const base = hasStored ? stored : (roleDefaults(user.role, customRoles) || getDefaultPermissions())
     return mergeWithDefaults(base)
   })
 
-  const crossTierViolations = getCrossTierPermissions(user.role, perms)
+  // A custom role is not in SERVER_ALLOWS — the database resolves it to its
+  // base_role (rma_user_role, migration 20260782), so the ceiling has to be
+  // evaluated against that base. Without this a custom role based on accountant
+  // would be warned about record_payment it can perfectly well do, and one
+  // based on viewer would not be warned about the same grant it cannot.
+  const effectiveRoleForCeiling =
+    (customRoles || []).find((r) => r.role_name === user.role)?.base_role ?? user.role
+  const crossTierViolations = getCrossTierPermissions(effectiveRoleForCeiling, perms)
 
   const hasCustomPerms =
     user.permissions && typeof user.permissions === 'object' && Object.keys(user.permissions).length > 0

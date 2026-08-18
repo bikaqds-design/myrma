@@ -375,6 +375,27 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
  * strip a user (e.g. a manager) of every permission. Call this once when
  * loading the session; pass the result to canDo().
  */
+/**
+ * roleDefaults — the permission map a role starts from.
+ *
+ * Built-ins come from ROLE_DEFAULT_PERMISSIONS; a custom role's defaults are
+ * the map stored on its custom_roles row. Needed in three places — session
+ * load, preview-as-user, and the permission editor — and the editor is the one
+ * that bites: falling back to an all-false template there shows the wrong
+ * state, hides the cross-tier warning, and writes an all-false override the
+ * moment someone saves, stripping a user's access while they still hold the
+ * role. Two of the three had already been written separately before this was
+ * pulled out.
+ */
+export function roleDefaults(
+  role: string,
+  customRoles?: Array<{ role_name: string; permissions?: UserPermissions }> | null
+): UserPermissions | null {
+  const builtIn = ROLE_DEFAULT_PERMISSIONS[role as Role]
+  if (builtIn) return builtIn
+  return (customRoles || []).find((r) => r.role_name === role)?.permissions ?? null
+}
+
 export function resolvePermissions(
   role: string,
   stored: UserPermissions | null | undefined,

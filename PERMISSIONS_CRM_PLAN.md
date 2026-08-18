@@ -760,3 +760,59 @@ lacks, which is exactly the drift that produced the other bugs in this section.
 
 473 tests, up from 457.
 
+---
+
+## Custom roles: applied and verified (2026-08-18)
+
+20260782 applied. No regression on the built-in path, which was the risk worth
+checking first — the migration rewrote `rma_user_role()`, and every policy in
+the database depends on it. All four helpers return correctly and every count is
+unchanged: quotations 38, deals 56, customers 888, invoices 27, POs 5,
+v_sales_documents 101.
+
+Guards, each exercised rather than read:
+
+| | |
+|---|---|
+| create with a base role | works |
+| `base_role = 'super_admin'` | rejected — it would make the permission map meaningless |
+| `role_name = 'manager'` | rejected — names must be disjoint from the built-ins |
+| assign a custom role to a user | accepted |
+| assign `'not_a_role'` | refused: *Unknown role … not a built-in and not defined in custom_roles* |
+| delete a role someone holds | refused: *1 user(s) still hold it. Reassign them first* |
+
+End to end, previewing a `zz_bookkeeper` on base `viewer` whose map grants
+`accounting` view + record but not reverse: nav shows Dashboard, **Accounting**,
+Customer Tracker; `/accounting` opens; **Record Payment enabled, Void disabled**.
+The per-action distinction in a custom map is honoured exactly.
+
+### Two bugs in my own change, found by testing it
+
+**Preview ignored custom roles.** I wired the custom-role lookup into session
+load and not into `startPreview`, so previewing a custom role resolved to null
+permissions and showed a two-item nav. That reads as "this role has no access"
+when the truth is the preview never looked its permissions up.
+
+**The editor was worse.** It seeded from `ROLE_DEFAULT_PERMISSIONS[user.role]`,
+undefined for a custom role, falling through to an all-false template. So it
+displayed the wrong state, suppressed the cross-tier warning, and **would have
+written an all-false override the moment anyone pressed Save** — stripping a
+user's access while they still held the role.
+
+Three call sites needed the same lookup and two had already been written
+separately, so it is now one function, `roleDefaults(role, customRoles)`.
+
+### The cross-tier warning had to learn about base roles
+
+A custom role is not in `SERVER_ALLOWS`, so the ceiling now resolves it to its
+`base_role` first. Demonstrated in both directions with identical permission
+maps:
+
+- `zz_bookkeeper`, base **viewer** → warns, naming `accounting.record_payment`
+- `zz_cashier`, base **accountant** → no warning
+
+Which is the point. An admin building a bookkeeper on `viewer` is told the
+database will refuse it, and the fix is to base it on `accountant`.
+
+478 tests. Fixtures removed — user_roles back to 16, custom_roles back to 0.
+

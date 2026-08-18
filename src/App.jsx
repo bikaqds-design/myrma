@@ -5,7 +5,7 @@ import { Toaster, toast } from 'react-hot-toast'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { auth, db, branding as brandingAPI, supabase } from './api/supabaseClient'
 import { useAppearance } from './contexts/AppearanceContext'
-import { resolvePermissions, canDo } from './lib/permissions'
+import { resolvePermissions, canDo, roleDefaults } from './lib/permissions'
 import { ROLES, ROLE_LIST } from './lib/constants'
 import { safeStorage } from './lib/safeStorage'
 import { registerTicketEventHandlers } from './lib/events/ticketEventHandlers'
@@ -481,8 +481,7 @@ export default function App() {
     let customDefaults = null
     if (role && !ROLE_LIST.includes(role)) {
       try {
-        const rows = await db.userRoles.getCustomRoles()
-        customDefaults = rows?.find((r) => r.role_name === role)?.permissions ?? null
+        customDefaults = roleDefaults(role, await db.userRoles.getCustomRoles())
       } catch {
         customDefaults = null
       }
@@ -514,11 +513,25 @@ export default function App() {
     }
   }
 
-  const startPreview = (user) => {
+  const startPreview = async (user) => {
+    // A custom role's defaults live on its custom_roles row, exactly as in the
+    // session load above. Without this, previewing a custom role resolved to
+    // null permissions and showed an almost empty app — which reads as "this
+    // role has no access" when in fact the preview simply never looked its
+    // permissions up. Found by previewing a custom role and seeing a nav of two
+    // items where its map grants accounting.
+    let customDefaults = null
+    if (user.role && !ROLE_LIST.includes(user.role)) {
+      try {
+        customDefaults = roleDefaults(user.role, await db.userRoles.getCustomRoles())
+      } catch {
+        customDefaults = null
+      }
+    }
     setPreviewUser({
       email: user.user_email,
       role: user.role,
-      permissions: resolvePermissions(user.role, user.permissions),
+      permissions: resolvePermissions(user.role, user.permissions, customDefaults),
     })
     db.auditLog
       .log(

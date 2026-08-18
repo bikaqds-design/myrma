@@ -629,6 +629,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
 
       {showPermissionsModal && selectedUser && (
         <PermissionsModal
+          customRoles={customRoles}
           user={selectedUser}
           onSave={handleSavePermissions}
           onClose={() => {
