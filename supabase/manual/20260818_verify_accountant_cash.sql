@@ -3,11 +3,18 @@
 -- Everything runs inside a transaction that is rolled back — the payment, the
 -- void and the throwaway accountant row all disappear.
 --
--- Why the second half exists: last time this role was "verified" by checking
--- that the Record Payment and Void buttons rendered enabled. They did. The
--- database refused the action anyway, because the app's permission gate and the
--- RPC's role gate are different things. Reading a gate is not exercising it, so
--- this calls the functions for real.
+-- Why this exercises the functions instead of reading their gates: the role was
+-- previously "verified" by checking that the Record Payment and Void buttons
+-- rendered enabled. They did. The database refused the action anyway, because
+-- the app's permission gate and the RPC's role gate are different things.
+--
+-- v2. The first attempt failed on its own scaffolding: after SET LOCAL ROLE
+-- authenticated, the temp results table (owned by postgres) was not writable,
+-- so even the error handler errored. Outcomes are now held in variables and
+-- written after RESET ROLE. The full message is reported, so a gate refusal is
+-- distinguishable from an argument or constraint error — the earlier version
+-- would have read any failure as "refused", which is the same mistake in a
+-- different costume.
 
 -- ── 1. Which functions now admit the accountant ─────────────────────────────
 SELECT p.proname,
@@ -23,11 +30,11 @@ WHERE n.nspname = 'public'
                     'apply_credit_note_to_invoice',
                     'issue_credit_note','post_invoice')
 ORDER BY gate, p.proname;
--- Expect: seven "accountant allowed"; issue_credit_note and post_invoice
--- "manager only" — origination stays away from whoever settles the cash.
+-- Expect seven "accountant allowed"; issue_credit_note and post_invoice stay
+-- "manager only" — origination is kept away from whoever settles the cash.
 
 
--- ── 2. Exercise it for real, as an accountant ───────────────────────────────
+-- ── 2. Exercise it, as an accountant ────────────────────────────────────────
 BEGIN;
 
 INSERT INTO public.user_roles (user_email, role, status)
@@ -39,56 +46,68 @@ CREATE TEMP TABLE _cash_result(step text, outcome text) ON COMMIT DROP;
 DO $$
 DECLARE
   v_customer uuid;
+  v_cn       uuid;
   v_payment  uuid;
+  r_role     text;
+  r_pred     text;
+  r_record   text;
+  r_void     text;
+  r_issue    text;
 BEGIN
   SELECT id INTO v_customer FROM public.customers ORDER BY created_date LIMIT 1;
+  SELECT id INTO v_cn       FROM public.credit_notes LIMIT 1;
 
   PERFORM set_config('request.jwt.claims',
-    json_build_object('email','zz-verify-accountant@example.com','role','authenticated')::text, true);
+    json_build_object('email','zz-verify-accountant@example.com',
+                      'role','authenticated')::text, true);
   SET LOCAL ROLE authenticated;
 
-  -- record
+  -- what the database thinks we are, and whether the new predicate passes.
+  -- Isolates a failed role lookup from a gate that was never re-written.
+  BEGIN r_role := coalesce(public.rma_user_role(), '(null)');
+  EXCEPTION WHEN OTHERS THEN r_role := 'ERROR: ' || SQLERRM; END;
+  BEGIN r_pred := public.rma_can_handle_cash()::text;
+  EXCEPTION WHEN OTHERS THEN r_pred := 'ERROR: ' || SQLERRM; END;
+
   BEGIN
     v_payment := public.record_payment(
-      p_customer_id     => v_customer,
-      p_amount          => 1.00,
-      p_method          => 'cash',
-      p_reference_number=> 'ZZ-VERIFY',
-      p_payment_date    => CURRENT_DATE,
-      p_notes           => 'rollback verification',
-      p_actor_email     => 'zz-verify-accountant@example.com',
-      p_allocations     => '[]'::jsonb
-    );
-    INSERT INTO _cash_result VALUES ('record_payment', 'ALLOWED (id ' || v_payment || ')');
-  EXCEPTION WHEN OTHERS THEN
-    INSERT INTO _cash_result VALUES ('record_payment', 'REFUSED: ' || SQLERRM);
-  END;
+      p_customer_id      => v_customer,
+      p_amount           => 1.00,
+      p_method           => 'bank_transfer',
+      p_reference_number => 'ZZ-VERIFY',
+      p_payment_date     => CURRENT_DATE,
+      p_notes            => 'rollback verification',
+      p_actor_email      => 'zz-verify-accountant@example.com',
+      p_allocations      => '[]'::jsonb);
+    r_record := 'ALLOWED';
+  EXCEPTION WHEN OTHERS THEN r_record := 'FAILED: ' || SQLERRM; END;
 
-  -- void the one just recorded
   IF v_payment IS NOT NULL THEN
     BEGIN
       PERFORM public.void_payment(
         p_payment_id  => v_payment,
         p_reason      => 'rollback verification',
         p_actor_email => 'zz-verify-accountant@example.com');
-      INSERT INTO _cash_result VALUES ('void_payment', 'ALLOWED');
-    EXCEPTION WHEN OTHERS THEN
-      INSERT INTO _cash_result VALUES ('void_payment', 'REFUSED: ' || SQLERRM);
-    END;
+      r_void := 'ALLOWED';
+    EXCEPTION WHEN OTHERS THEN r_void := 'FAILED: ' || SQLERRM; END;
+  ELSE
+    r_void := 'skipped — nothing was recorded to void';
   END IF;
 
-  -- negative control: origination must still be refused
+  -- Negative control. Correct signature this time: (p_cn_id, p_actor_email).
   BEGIN
-    PERFORM public.issue_credit_note(
-      (SELECT id FROM public.crm_invoices LIMIT 1),
-      'rma_return', 1.00, 'rollback verification',
-      'zz-verify-accountant@example.com');
-    INSERT INTO _cash_result VALUES ('issue_credit_note', 'ALLOWED — SEGREGATION BROKEN');
-  EXCEPTION WHEN OTHERS THEN
-    INSERT INTO _cash_result VALUES ('issue_credit_note', 'refused (correct): ' || left(SQLERRM, 60));
-  END;
+    PERFORM public.issue_credit_note(v_cn, 'zz-verify-accountant@example.com');
+    r_issue := 'ALLOWED — SEGREGATION BROKEN';
+  EXCEPTION WHEN OTHERS THEN r_issue := 'refused: ' || SQLERRM; END;
 
   RESET ROLE;
+
+  INSERT INTO _cash_result VALUES
+    ('0. role seen by db',   r_role),
+    ('1. can_handle_cash',   r_pred),
+    ('2. record_payment',    r_record),
+    ('3. void_payment',      r_void),
+    ('4. issue_credit_note', r_issue);
 END
 $$;
 
@@ -98,13 +117,15 @@ SELECT * FROM _cash_result ORDER BY step;
 ROLLBACK;
 
 -- ── Reading the result ───────────────────────────────────────────────────────
---   record_payment     ALLOWED                  <- the fix works
---   void_payment       ALLOWED                  <- the fix works
---   issue_credit_note  refused (correct)        <- segregation of duties held
+--   0. accountant
+--   1. true
+--   2. ALLOWED
+--   3. ALLOWED
+--   4. refused: Not authorized ...      <- segregation of duties held
 --
--- A REFUSED on either of the first two means the gate did not take. ALLOWED on
--- the third means the accountant can originate revenue documents, which is the
--- one thing the role must not do — tell me and I will re-gate it.
---
--- If issue_credit_note errors for an unrelated reason (no invoices, a bad
--- argument type) it will still read as "refused"; the message shows which.
+-- 0 not 'accountant'      -> the role lookup failed, nothing below is meaningful
+-- 1 false                 -> rma_can_handle_cash did not take
+-- 2/3 FAILED: Not authorized -> the re-gate did not apply to that function
+-- 2/3 FAILED: anything else  -> not a permissions problem; read the message
+-- 4 ALLOWED               -> the accountant can originate revenue documents,
+--                            the one thing the role must not do
