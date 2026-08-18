@@ -476,3 +476,41 @@ Everything runs inside a transaction that is rolled back, so nothing persists.
 The number that matters is the sales_rep row. If it is small, the leak is
 closed. **If it matches the manager count, the views are still bypassing RLS.**
 
+### Result: the view leak is closed, and it exposed two more
+
+Role simulation through the views after 20260778:
+
+| role | sales_docs | purchase_docs | cust_ledger | vend_ledger |
+|---|---|---|---|---|
+| manager | 101 | 9 | 21 | 4 |
+| accountant | 101 | 9 | 21 | 4 |
+| **sales_rep** | **5** | 9 | **1** | 4 |
+| **technician** | **3** | 9 | 0 | 4 |
+
+**The reported bug is fixed.** A sales rep went from 101 sales documents to 5 —
+exactly the 2 quotations, 2 orders and 1 invoice they own — and the customer
+ledger from 21 to 1. Accountant and manager still see everything, so 20260778's
+accountant grants did their job.
+
+The two columns that did not move are the same class of hole, and the
+simulation is the only reason they are visible at all:
+
+- **`purchase_orders` and `vendor_invoices` carry no ownership condition.**
+  `USING (public.rma_is_staff())` is every internal role, so a sales rep and a
+  technician can read every purchase order and vendor invoice. Adding
+  `accountant` to `rma_is_staff()` in 20260777 widened it further.
+  `v_vendor_ledger` reads `vendor_invoices`, which is why the vendor ledger is
+  fully visible too.
+- **The sales-document tables scope ownership to `rma_is_staff()`**, not to
+  sales reps, so a technician sees the 3 documents they created. The app gives
+  technicians and viewers no Sales page at all.
+
+Neither is visible in the UI — Purchasing is hidden from both roles — but the
+API serves it, which is the same "the interface hides it, the database doesn't"
+gap the whole exercise started from.
+
+`20260779_tighten_purchasing_and_sales_reads.sql` aligns both with the matrix:
+purchasing to manager+ and accountant only, sales-document ownership to
+sales_rep only. Re-running the verification afterwards should show sales_rep at
+5 / 0 / 1 / 0 and technician at 0 / 0 / 0 / 0.
+
