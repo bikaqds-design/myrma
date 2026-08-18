@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
 import { useURLTab } from '../../hooks/useURLTab'
-import { canDo } from '../../lib/permissions'
+import { canDo, ownershipScope } from '../../lib/permissions'
 import { Button, PageHeader } from '../../components/ui'
 import { safeStorage } from '../../lib/safeStorage'
 import { PageSkeleton } from '../../components/Skeleton'
@@ -90,7 +90,7 @@ function SortableHeader({ label, sortKey, sortConfig, onSort }) {
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
-export default function SalesDocuments({ currentUserRole, currentUserEmail, currentUserPermissions }) {
+export default function SalesDocuments({ currentUserRole, currentUserEmail, currentUserPermissions , scopeEmail}) {
   const { t } = useTranslation()
   const { confirm, confirmDialog } = useConfirm()
   const navigate = useNavigate()
@@ -123,11 +123,25 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
   const [jumpToPage, setJumpToPage] = useState('')
 
   // ── Data ────────────────────────────────────────────────────────────────────
-  const { data: documents = EMPTY_ARRAY, isLoading } = useQuery({
+  const { data: allDocuments = EMPTY_ARRAY, isLoading } = useQuery({
     queryKey: ['sales-documents'],
     queryFn: () => db.salesDocuments.listAll(),
     staleTime: 30_000,
   })
+
+  // A sales rep sees their own documents only. RLS already refuses to serve
+  // anyone else's, so this normally filters nothing — it keeps the counts, tab
+  // badges and rep dropdown built from the same set the server would return,
+  // instead of implying a company-wide view. Owning it means either being the
+  // assigned rep or having raised it, which is the same test the policy uses.
+  const ownScope = ownershipScope(currentUserRole, currentUserPermissions, 'sales', scopeEmail ?? currentUserEmail)
+  const documents = useMemo(
+    () =>
+      ownScope
+        ? allDocuments.filter((d) => d.assigned_rep === ownScope || d.created_by === ownScope)
+        : allDocuments,
+    [allDocuments, ownScope]
+  )
   const { data: customers = EMPTY_ARRAY } = useQuery({
     queryKey: ['customers'],
     queryFn: () => db.customers.list(),

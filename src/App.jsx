@@ -392,6 +392,19 @@ export default function App() {
   const [previewUser, setPreviewUser] = useState(null) // { email, role, permissions } | null
   const effectiveUserRole = previewUser ? previewUser.role : currentUserRole
   const effectiveUserPermissions = previewUser ? previewUser.permissions : currentUserPermissions
+  /**
+   * Who the app treats as "me" when deciding which records are mine.
+   *
+   * Deliberately separate from currentUserEmail, which stays the real signed-in
+   * user so that writes, created_by and the audit log keep telling the truth
+   * during a preview. Only the read-side ownership filter follows the previewed
+   * identity — without it, previewing a sales rep showed the admin's own
+   * documents and the whole point of the preview was lost.
+   *
+   * No privilege is gained: RLS still runs as the real session, and an admin
+   * could see these rows anyway.
+   */
+  const effectiveUserEmail = previewUser ? previewUser.email : currentUser?.email
   const [loading, setLoading] = useState(true)
   const [mfaPending, setMfaPending] = useState(null) // { user, factorId } — waiting for TOTP code
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -1440,6 +1453,7 @@ export default function App() {
                   <Leads
                     currentUserRole={effectiveUserRole}
                     currentUserEmail={currentUser?.email}
+                    scopeEmail={effectiveUserEmail}
                     currentUserPermissions={effectiveUserPermissions}
                   />
                 }
@@ -1462,6 +1476,7 @@ export default function App() {
                   <Pipeline
                     currentUserRole={effectiveUserRole}
                     currentUserEmail={currentUser?.email}
+                    scopeEmail={effectiveUserEmail}
                     currentUserPermissions={effectiveUserPermissions}
                   />
                 }
@@ -1486,6 +1501,7 @@ export default function App() {
                     <Activities
                       currentUserRole={effectiveUserRole}
                       currentUserEmail={currentUser?.email}
+                      scopeEmail={effectiveUserEmail}
                       currentUserPermissions={effectiveUserPermissions}
                     />
                   ) : (
@@ -1501,6 +1517,7 @@ export default function App() {
                     <SalesDocuments
                       currentUserRole={effectiveUserRole}
                       currentUserEmail={currentUser?.email}
+                      scopeEmail={effectiveUserEmail}
                       currentUserPermissions={effectiveUserPermissions}
                     />
                   ) : (

@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { ownershipScope } from '../../lib/permissions'
 import toast from 'react-hot-toast'
 import { db, supabase } from '../../api/supabaseClient'
 import { PageSkeleton } from '../../components/Skeleton'
@@ -191,17 +192,24 @@ function MultiCheckFilter({ label, selected, onChange, options }) {
   )
 }
 
-export default function Leads({ currentUserRole, currentUserEmail, currentUserPermissions }) {
+export default function Leads({ currentUserRole, currentUserEmail, currentUserPermissions , scopeEmail}) {
   const { t } = useTranslation()
+  const ownScope = ownershipScope(currentUserRole, currentUserPermissions, 'leads', scopeEmail ?? currentUserEmail)
   const navigate = useNavigate()
   const searchRef = useRef(null)
   const queryClient = useQueryClient()
 
-  const { data: leads = EMPTY_ARRAY, isLoading: loading } = useQuery({
+  const { data: allLeads = EMPTY_ARRAY, isLoading: loading } = useQuery({
     queryKey: ['leads'],
     queryFn: () => db.leads.list(),
     staleTime: 60_000,
   })
+  // A rep sees only leads assigned to them; RLS enforces it, this keeps the
+  // counts and source breakdown on the page consistent with what it serves.
+  const leads = useMemo(
+    () => (ownScope ? allLeads.filter((l) => l.assigned_rep === ownScope) : allLeads),
+    [allLeads, ownScope]
+  )
   const { data: pipelines = EMPTY_ARRAY } = useQuery({
     queryKey: ['pipelines'],
     queryFn: () => db.pipelines.list(),

@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
 import { useURLTab } from '../../hooks/useURLTab'
-import { canDo } from '../../lib/permissions'
+import { canDo, ownershipScope } from '../../lib/permissions'
 import { PageHeader } from '../../components/ui'
 import { safeStorage } from '../../lib/safeStorage'
 import { PageSkeleton } from '../../components/Skeleton'
@@ -127,8 +127,9 @@ function SortableHeader({ label, sortKey, sortConfig, onSort }) {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
-export default function Activities({ currentUserRole, currentUserEmail, currentUserPermissions }) {
+export default function Activities({ currentUserRole, currentUserEmail, currentUserPermissions , scopeEmail}) {
   const { confirm, confirmDialog } = useConfirm()
+  const ownScope = ownershipScope(currentUserRole, currentUserPermissions, 'activities', scopeEmail ?? currentUserEmail)
   const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -163,16 +164,26 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
   const today = new Date().toISOString().split('T')[0]
 
   // ── Data queries ──────────────────────────────────────────────────────────
-  const { data: activities = EMPTY_ARRAY, isLoading } = useQuery({
+  const { data: allActivities = EMPTY_ARRAY, isLoading } = useQuery({
     queryKey: ['activities', 'planned'],
     queryFn: () => db.activities.listAllPlanned(),
     staleTime: 30_000,
   })
-  const { data: completedActivities = EMPTY_ARRAY } = useQuery({
+  const { data: allCompleted = EMPTY_ARRAY } = useQuery({
     queryKey: ['activities', 'completed'],
     queryFn: () => db.activities.listCompleted(),
     staleTime: 30_000,
   })
+  // A rep sees only their own activities — including the approval inbox, which
+  // is where the money documents surface. RLS enforces it server-side.
+  const activities = useMemo(
+    () => (ownScope ? allActivities.filter((a) => a.assigned_rep === ownScope) : allActivities),
+    [allActivities, ownScope]
+  )
+  const completedActivities = useMemo(
+    () => (ownScope ? allCompleted.filter((a) => a.assigned_rep === ownScope) : allCompleted),
+    [allCompleted, ownScope]
+  )
   const { data: leads = EMPTY_ARRAY } = useQuery({
     queryKey: ['leads'],
     queryFn: () => db.leads.list(),

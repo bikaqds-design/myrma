@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { ownershipScope } from '../../lib/permissions'
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
@@ -249,8 +250,9 @@ function MultiCheckFilter({ label, selected, onChange, options }) {
   )
 }
 
-export default function Pipeline({ currentUserRole, currentUserEmail, currentUserPermissions }) {
+export default function Pipeline({ currentUserRole, currentUserEmail, currentUserPermissions , scopeEmail}) {
   const { t } = useTranslation()
+  const ownScope = ownershipScope(currentUserRole, currentUserPermissions, 'deals', scopeEmail ?? currentUserEmail)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -296,7 +298,13 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
   // specifically to hold them), not vanish from the board.
   const { data: deals = EMPTY_ARRAY, isLoading: dealsLoading } = useQuery({
     queryKey: ['deals', pipelineId],
-    queryFn: () => db.deals.list({ pipelineId }),
+    // A rep sees only deals assigned to them. RLS enforces it; passing the
+    // filter keeps the board's per-stage counts and totals consistent with it.
+    queryFn: () =>
+      db.deals.list({
+        pipelineId,
+        ...(ownScope ? { assignedRep: ownScope } : {}),
+      }),
     enabled: !!pipelineId,
   })
 

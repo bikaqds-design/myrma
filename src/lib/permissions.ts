@@ -106,9 +106,9 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
     // (matching contacts_update + leads/deals/activities's composite policies).
     // pipelines write is admin-only at the RLS layer (Step 3 migration) — manager
     // is read-only here, same as every other manager section never getting delete.
-    leads: { view: true, create: true, edit: true, delete: false },
-    deals: { view: true, create: true, edit: true, delete: false },
-    activities: { view: true, create: true, edit: true, delete: false },
+    leads: { view_all: true, view: true, create: true, edit: true, delete: false },
+    deals: { view_all: true, view: true, create: true, edit: true, delete: false },
+    activities: { view_all: true, view: true, create: true, edit: true, delete: false },
     contacts: { view: true, create: true, edit: true, delete: false },
     pipelines: { view: true, manage: false },
     // ── Money modules ───────────────────────────────────────────────────────
@@ -116,6 +116,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
     // Purchasing were all gated on `deals.view`, so a single CRM toggle decided
     // who could raise a purchase order or reverse a payment.
     sales: {
+      view_all: true,
       view: true, create: true, edit: true, delete: false,
       post: true, cancel: true, export: true,
     },
@@ -286,9 +287,9 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
     // implementation. Without it, a sales_rep can't even reference the product
     // catalog when building a deal's product_lines.
     products: { view: true, create: false, edit: false, delete: false, export: false, import: false },
-    leads: { view: true, create: true, edit: true, delete: false },
-    deals: { view: true, create: true, edit: true, delete: false },
-    activities: { view: true, create: true, edit: true, delete: false },
+    leads: { view_all: false, view: true, create: true, edit: true, delete: false },
+    deals: { view_all: false, view: true, create: true, edit: true, delete: false },
+    activities: { view_all: false, view: true, create: true, edit: true, delete: false },
     // contacts RLS is manager_insert/manager_update only — sales_rep is
     // read-only here, matching the actual DB grant (Step 2 migration).
     contacts: { view: true, create: false, edit: false, delete: false },
@@ -310,6 +311,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
     // Can raise and edit a quotation, but posting and cancelling an invoice are
     // manager actions — a rep should not be able to finalise revenue.
     sales: {
+      view_all: false,
       view: true, create: true, edit: true, delete: false,
       post: false, cancel: false, export: true,
     },
@@ -371,3 +373,41 @@ export function canDo(
   if (role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN) return true
   return !!permissions?.[section]?.[action]
 }
+
+/**
+ * ownershipScope — the email a role is restricted to, or null for "sees all".
+ *
+ * A sales rep must only see their own work: their quotations, their sales
+ * orders, their invoices, their deals. Row-level security in Postgres is the
+ * boundary that actually enforces that — this is the app agreeing with it, so
+ * the UI does not build filters, counts and dropdowns out of rows the server
+ * would refuse to serve anyway.
+ *
+ * Returning an email rather than a boolean keeps the call sites honest: a page
+ * either filters by a specific person or it does not filter at all, and there
+ * is no third state where a missing email quietly means "everything".
+ *
+ *     const scope = ownershipScope(role, permissions, 'sales', email)
+ *     const mine = scope ? docs.filter((d) => d.assigned_rep === scope) : docs
+ *
+ * Note this is NOT a security boundary. Anything it hides is still reachable by
+ * a direct API call; RLS is what stops that. Treat this as making the interface
+ * truthful, not as protection.
+ */
+export const NO_OWNER_MATCH = ' no-owner'
+
+export function ownershipScope(
+  role: string,
+  permissions: UserPermissions | null | undefined,
+  section: string,
+  userEmail: string | null | undefined
+): string | null {
+  if (role === ROLES.SUPER_ADMIN || role === ROLES.ADMIN) return null
+  if (canDo(role, permissions, section, 'view_all')) return null
+  // Restricted, but we do not know who they are. Returning null here would mean
+  // "no filter" and hand them everything — the one failure this function must
+  // not have. NO_OWNER_MATCH can never equal a stored email, so the page shows
+  // nothing, which is the safe direction to be wrong in.
+  return userEmail || NO_OWNER_MATCH
+}
+

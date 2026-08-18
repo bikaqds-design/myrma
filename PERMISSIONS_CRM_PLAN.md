@@ -180,3 +180,80 @@ carrying the retired `invoices` key resolves rather than throwing.
   `user_roles.permissions` already supports and `resolvePermissions()` merges
   over the defaults.
 
+---
+
+## Ownership scoping — a rep sees only their own work (2026-08-18)
+
+Reported: a sales rep can see other reps' work.
+
+### What the repo says, and why that is not the answer
+
+Every read policy in `supabase/migrations/` already scopes correctly. I raised
+two false alarms getting there and both were the same mistake — reading the
+first definition rather than the last:
+
+- `deals_read` compares `assigned_rep = auth.uid()`, a text column against a
+  uuid, in `20260622_crm_deals.sql`. **Superseded** by
+  `20260628_crm_assigned_rep_use_email.sql`, which uses
+  `rma_current_user_email()`.
+- `rma_is_staff()` omits `sales_rep` in `20260526_enable_rls.sql`, which would
+  give a rep no sales documents at all. **Superseded** by
+  `20260618_crm_add_sales_rep_role.sql`, which adds the role.
+
+So on paper deals, leads, activities, quotations, sales orders, invoices and
+credit notes are all scoped. Since the symptom is real, **the live database
+must differ from these files** — which is expected here, because migrations are
+applied by hand and the CLI's remote history is empty.
+
+The repo cannot answer this. `supabase/manual/20260818_rls_diagnostic.sql` is
+read-only and asks the three questions that can: is RLS actually *enabled* per
+table (a table with policies but RLS off ignores them entirely, which fits the
+symptom exactly), what do the live SELECT policies say, and are the helper
+functions the current versions.
+
+### What shipped meanwhile: the app now knows what "mine" means
+
+RLS is the boundary. But the app had no concept of ownership at all, so even
+with correct policies it would build filters, tab badges and counts as if the
+whole company's data were in scope. Four pages now filter to the signed-in
+rep's own records — Sales, Pipeline, Leads and Activities — via a single
+`ownershipScope()` helper, driven by a new `view_all` action on `deals`,
+`leads`, `activities` and `sales` (true for manager, false for sales_rep),
+mirroring the `view_all` / `view_assigned` split `rma_tickets` already had.
+
+**This is not a security boundary and is not presented as one.** Anything it
+hides is still reachable by a direct API call; only RLS stops that.
+
+`ownershipScope()` fails closed. A restricted user whose email is unknown gets
+a sentinel that cannot match any stored value, so the page shows nothing —
+returning `null` there would have meant "no filter" at every call site and
+handed them everything. The first version did exactly that, and the test I
+wrote asserted the broken behaviour while its comment described the correct
+one.
+
+### It exposed a real defect in preview-as-user
+
+Previewing a sales rep showed **the admin's own documents**, because preview
+swapped role and permissions but not identity — `currentUserEmail` stayed the
+real user. The banner even documented it: *"data still loads as you"*.
+
+That made the feature useless for the one thing it is now most needed for. A
+separate `effectiveUserEmail` now drives read-side ownership only; writes,
+`created_by` and the audit log still record the real user, so a preview cannot
+falsify history. No privilege is gained — RLS still runs as the real session.
+Disclaimer corrected to *"writes still record as you"*.
+
+### Verified as a sales rep
+
+| | in the database | rep sees |
+|---|---|---|
+| Sales documents | 101 total, 5 owned | **5** (2 quotations, 2 orders, 1 invoice — all archived, so active tabs are empty) |
+| Deals | 56 total, 3 owned | **1 on B2B, 2 on B2C** — the board shows one pipeline at a time |
+| Leads | 33 total, 1 owned | 0 — the single owned lead is `status = converted` |
+| Activities | 171 total, 4 owned | 0 — all four are completed approvals |
+
+The last two look like under-counting and are not: each was checked against the
+rows themselves rather than assumed.
+
+439 tests, up from 434.
+

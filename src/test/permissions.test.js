@@ -4,7 +4,13 @@
  * Covers: canDo() helper, ROLE_DEFAULT_PERMISSIONS structure
  */
 import { describe, it, expect, test } from 'vitest'
-import { canDo, resolvePermissions, ROLE_DEFAULT_PERMISSIONS } from '../lib/permissions'
+import {
+  canDo,
+  resolvePermissions,
+  ownershipScope,
+  NO_OWNER_MATCH,
+  ROLE_DEFAULT_PERMISSIONS,
+} from '../lib/permissions'
 import { ROLES } from '../lib/constants'
 
 // ── canDo — admin bypass ──────────────────────────────────────────────────────
@@ -297,5 +303,50 @@ describe('ROLE_DEFAULT_PERMISSIONS — money modules', () => {
     const merged = resolvePermissions(ROLES.SALES_REP, stored)
     expect(merged.invoices).toEqual({ view: true })
     expect(canDo(ROLES.SALES_REP, merged, 'sales', 'post')).toBe(true)
+  })
+})
+
+// ── Ownership scoping ────────────────────────────────────────────────────────
+// A sales rep must see only their own work. RLS is the boundary; these lock in
+// the app-side rule that keeps the interface honest about it.
+
+describe('ownershipScope', () => {
+  const perms = (role) => ROLE_DEFAULT_PERMISSIONS[role]
+  const REP = 'rep@example.com'
+
+  it('restricts a sales_rep to their own email on every CRM module', () => {
+    for (const section of ['deals', 'leads', 'activities', 'sales']) {
+      expect(ownershipScope(ROLES.SALES_REP, perms(ROLES.SALES_REP), section, REP)).toBe(REP)
+    }
+  })
+
+  it('does not restrict a manager', () => {
+    for (const section of ['deals', 'leads', 'activities', 'sales']) {
+      expect(ownershipScope(ROLES.MANAGER, perms(ROLES.MANAGER), section, 'mgr@example.com')).toBeNull()
+    }
+  })
+
+  it('does not restrict admin or super_admin, who bypass canDo entirely', () => {
+    for (const role of [ROLES.ADMIN, ROLES.SUPER_ADMIN]) {
+      expect(ownershipScope(role, null, 'sales', 'boss@example.com')).toBeNull()
+    }
+  })
+
+  // The dangerous case. A restricted user whose email we do not have must not
+  // fall through to "sees everything" — null means no filter at every call
+  // site. It returns a sentinel that cannot match a stored email, so the page
+  // shows nothing instead.
+  it('fails closed when a restricted user has no email', () => {
+    const scope = ownershipScope(ROLES.SALES_REP, perms(ROLES.SALES_REP), 'sales', null)
+    expect(scope).toBe(NO_OWNER_MATCH)
+    expect(scope).not.toBeNull()
+    expect(Boolean(scope)).toBe(true) // truthy, so `scope ? filter : all` filters
+    expect(['rep@example.com', null, ''].some((v) => v === scope)).toBe(false)
+  })
+
+  it('an explicit view_all override lifts the restriction for that module only', () => {
+    const merged = resolvePermissions(ROLES.SALES_REP, { sales: { view_all: true } })
+    expect(ownershipScope(ROLES.SALES_REP, merged, 'sales', REP)).toBeNull()
+    expect(ownershipScope(ROLES.SALES_REP, merged, 'deals', REP)).toBe(REP)
   })
 })
