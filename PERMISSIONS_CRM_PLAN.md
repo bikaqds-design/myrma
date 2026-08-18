@@ -394,3 +394,62 @@ That leaves two candidates, which parts 1 and 2 separate: RLS switched off on
 some tables (policies present but inert — fits the symptom exactly), or live
 policies that differ from the repo.
 
+---
+
+## The leak found: views were bypassing RLS (2026-08-18)
+
+Diagnostic parts 1 and 2 came back, and between them they rule out everything I
+suspected:
+
+- **RLS is enabled** on all nine CRM tables. Not the "policies present but
+  inert" case.
+- **Every SELECT policy is correct.** deals/leads/activities scope to
+  `assigned_rep = rma_current_user_email()`; the four sales-document tables
+  scope to `assigned_rep` or `created_by`. They match the repo exactly.
+- **The helper functions are current**, including `sales_rep` and `accountant`
+  in `rma_is_staff()`.
+
+So the policies were never the problem. **The pages do not read those tables.**
+
+| View | Page | Underlying tables |
+|---|---|---|
+| `v_sales_documents` | Sales | quotations, sales_orders, crm_invoices, credit_notes |
+| `v_purchase_documents` | Purchasing | purchase_orders, vendor_invoices |
+| `v_customer_ledger` | Accounting, Customer detail | crm_invoices, credit_notes, payments |
+| `v_vendor_ledger` | Accounting, Vendor detail | vendor_invoices, vendor_payments |
+
+In PostgreSQL a view executes with the privileges of its **owner** unless it is
+defined with `security_invoker = true`. The owner is the table owner, which
+bypasses RLS. **None of the four views set the flag**, so the base-table
+policies were never consulted for anything read through a view, and every row
+went to every authenticated user.
+
+That is the whole symptom, and it explains why it presented on exactly the pages
+it did — Sales, Purchasing and the ledgers are the four view-backed pages in the
+app. It also means the app-side `ownershipScope()` filtering added earlier was
+doing real work rather than being belt-and-braces: it was the only thing
+narrowing those lists.
+
+### Fix: `20260778_views_respect_rls.sql`
+
+Sets `security_invoker = on` on all four views, behind a guard that refuses to
+run on PostgreSQL below 15 rather than appearing to succeed.
+
+**It also grants the accountant four read policies**, and that is not
+incidental. `payments` and `vendor_payments` read as
+`manager_or_above OR (is_staff AND created_by = me)`. An accountant is staff but
+not manager, so the moment the ledger views started obeying RLS they would have
+shown only the payments that accountant personally recorded — an incomplete cash
+position, which is the one thing the role exists to prevent. Those policies were
+written before anything read them through an invoker-rights view, so this is
+fallout from the fix, not a pre-existing hole. Same reasoning extends the grant
+to `vendor_invoices` and `purchase_orders`.
+
+### What to check after applying
+
+Each role in turn, because this migration can only ever *narrow* what is
+returned: manager and admin still see everything; accountant still sees all four
+sales-document types and both ledgers in full; sales_rep sees only their own. An
+empty list for a role that should see data means a missing read policy on the
+underlying table — not a reason to revert, since reverting restores the leak.
+
