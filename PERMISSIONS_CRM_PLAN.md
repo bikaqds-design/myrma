@@ -514,3 +514,55 @@ purchasing to manager+ and accountant only, sales-document ownership to
 sales_rep only. Re-running the verification afterwards should show sales_rep at
 5 / 0 / 1 / 0 and technician at 0 / 0 / 0 / 0.
 
+---
+
+## Closed 2026-08-18 — verified against the live database
+
+20260779 applied. Re-running the role simulation:
+
+| role | sales_docs | purchase_docs | cust_ledger | vend_ledger |
+|---|---|---|---|---|
+| manager | 101 | 9 | 21 | 4 |
+| accountant | 101 | 9 | 21 | 4 |
+| **sales_rep** | **5** | **0** | **1** | **0** |
+| **technician** | **0** | **0** | **0** | **0** |
+
+Every cell matches what was predicted before applying. A sales rep sees the five
+documents they own and nothing else; a technician sees none of it; manager and
+accountant are untouched.
+
+The simulation ran from a session that itself bypasses RLS, and that does not
+weaken the result: `SET LOCAL ROLE authenticated` inside the loop is what makes
+the policies apply, and the proof is the numbers. Had RLS not applied, all four
+rows would read 101 / 9 / 21 / 4. Two of them do not.
+
+### What the problem actually was
+
+Not the policies. RLS was enabled on all nine tables and every SELECT policy
+scoped correctly the entire time. Three separate faults, each invisible from the
+interface:
+
+1. **Four views ran with owner rights.** `v_sales_documents`,
+   `v_purchase_documents`, `v_customer_ledger` and `v_vendor_ledger` had no
+   `security_invoker`, so RLS on the base tables was never consulted for
+   anything read through them — and those four views back every money page in
+   the app. This was the reported bug.
+2. **`purchase_orders` and `vendor_invoices` had no ownership condition at
+   all** — `USING (rma_is_staff())`, which is every internal role.
+3. **The sales-document tables scoped ownership to `rma_is_staff()`** rather
+   than to sales reps, so a technician saw documents they had created.
+
+Faults 2 and 3 were only visible once fault 1 was fixed and each role was
+simulated. Neither would ever have surfaced through the UI, because the pages
+that expose them are hidden from the affected roles — which is exactly the
+distinction this whole exercise turned on: a hidden page is not a closed door.
+
+### What the app-side work was, and was not
+
+`ownershipScope()`, the `view_all` action and the route guards are not the
+protection and were never presented as such. What they did do is make the
+interface tell the truth, and they are what made the database faults findable:
+the counts stopped matching, which is what prompted looking underneath.
+
+The protection is `20260778` and `20260779`.
+
