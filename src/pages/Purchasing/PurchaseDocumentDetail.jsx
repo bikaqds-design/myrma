@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { canDo } from '../../lib/permissions'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
@@ -77,7 +78,26 @@ function TotalRow({ label, value, muted }) {
 }
 
 // ─── Purchase Document Detail — PO / Vendor Invoice lifecycle ──────────────────
-export default function PurchaseDocumentDetail({ docType, docId, currentUserEmail, currentUserRole, onBack }) {
+export default function PurchaseDocumentDetail({
+  docType,
+  docId,
+  currentUserEmail,
+  currentUserRole,
+  currentUserPermissions,
+  onBack,
+}) {
+  /**
+   * The sibling of the gap fixed in SalesDocumentDetail: this page took
+   * currentUserRole, passed it to the activity chatter, and gated no action on
+   * it. Every button below was controlled by document status alone, so an
+   * accountant — who has purchasing view and export and nothing else — was
+   * offered Send for Approval, Convert, Cancel and Archive, all of which the
+   * database refuses.
+   */
+  const canEditPurchase   = canDo(currentUserRole, currentUserPermissions, 'purchasing', 'edit')
+  const canCancelPurchase = canDo(currentUserRole, currentUserPermissions, 'purchasing', 'cancel')
+  const canCreatePurchase = canDo(currentUserRole, currentUserPermissions, 'purchasing', 'create')
+  const canReceive        = canDo(currentUserRole, currentUserPermissions, 'purchasing', 'receive')
   const { t } = useTranslation()
   const { confirm, confirmDialog } = useConfirm()
   const navigate = useNavigate()
@@ -270,7 +290,7 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
                 <Button variant="secondary" size="sm" onClick={() => setShowEdit(true)}>{t('salesDocuments.edit')}</Button>
               )}
               {!poIsConverted && doc.status === 'draft' && (
-                <Button variant="secondary" size="sm" onClick={handlePOSendForApproval} loading={busy}>{t('pipeline.sendForApproval')}</Button>
+                <Button disabled={!canEditPurchase} variant="secondary" size="sm" onClick={handlePOSendForApproval} loading={busy}>{t('pipeline.sendForApproval')}</Button>
               )}
               {!poIsConverted && doc.status === 'sent' && (
                 <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2] italic self-center">{t('salesDocuments.awaitingApproval')}</span>
@@ -279,10 +299,10 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
                 <Button variant="secondary" size="sm" onClick={handleDownloadPOPDF}>{t('purchasing.downloadPDF')}</Button>
               )}
               {!poIsConverted && ['confirmed', 'partially_completed'].includes(doc.status) && (
-                <Button size="sm" onClick={handleConvertToVI} loading={busy}>{t('purchasing.createVendorInvoice')}</Button>
+                <Button disabled={!canCreatePurchase} size="sm" onClick={handleConvertToVI} loading={busy}>{t('purchasing.createVendorInvoice')}</Button>
               )}
               {!poIsConverted && ['draft', 'sent', 'confirmed'].includes(doc.status) && (
-                <Button variant="danger" size="sm" onClick={handlePOCancel} loading={busy}>{t('common.cancel')}</Button>
+                <Button disabled={!canCancelPurchase} variant="danger" size="sm" onClick={handlePOCancel} loading={busy}>{t('common.cancel')}</Button>
               )}
             </>
           )}
@@ -293,7 +313,7 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
                 <Button variant="secondary" size="sm" onClick={() => setShowEdit(true)}>{t('salesDocuments.edit')}</Button>
               )}
               {doc.status === 'draft' && (
-                <Button variant="secondary" size="sm" onClick={handleSubmitForApproval} loading={busy}>{t('pipeline.sendForApproval')}</Button>
+                <Button disabled={!canEditPurchase} variant="secondary" size="sm" onClick={handleSubmitForApproval} loading={busy}>{t('pipeline.sendForApproval')}</Button>
               )}
               {doc.status === 'pending_approval' && (
                 <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2] italic self-center">{t('salesDocuments.awaitingApproval')}</span>
@@ -310,12 +330,12 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
                 <Button variant="secondary" size="sm" onClick={handleDownloadVIPDF}>{t('purchasing.downloadPDF')}</Button>
               )}
               {['draft', 'pending_approval', 'approved'].includes(doc.status) && (
-                <Button variant="danger" size="sm" onClick={handleVICancel} loading={busy}>{t('common.cancel')}</Button>
+                <Button disabled={!canCancelPurchase} variant="danger" size="sm" onClick={handleVICancel} loading={busy}>{t('common.cancel')}</Button>
               )}
             </>
           )}
 
-          <Button variant="secondary" size="sm" onClick={handleArchiveToggle} loading={busy}>
+          <Button disabled={!canEditPurchase} variant="secondary" size="sm" onClick={handleArchiveToggle} loading={busy}>
             {doc.archived ? t('purchasing.restore') : t('purchasing.archive')}
           </Button>
         </div>
@@ -347,6 +367,7 @@ export default function PurchaseDocumentDetail({ docType, docId, currentUserEmai
           warehouses={warehouses}
           products={products}
           onClose={() => setShowReceive(false)}
+          canReceive={canReceive}
           userEmail={currentUserEmail}
           onSuccess={refresh}
         />
@@ -627,7 +648,7 @@ function ReceiptHistory({ moves, warehouses }) {
   )
 }
 
-function ReceiveVendorInvoiceModal({ vi, warehouses, products, onClose, userEmail, onSuccess }) {
+function ReceiveVendorInvoiceModal({ vi, warehouses, products, onClose, userEmail, onSuccess, canReceive }) {
   const { t } = useTranslation()
   const [warehouseId, setWarehouseId] = useState('')
   const [entries, setEntries] = useState({})
@@ -724,7 +745,7 @@ function ReceiveVendorInvoiceModal({ vi, warehouses, products, onClose, userEmai
 
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" onClick={handleSubmit} loading={saving} disabled={saving || pendingLines.length === 0}>
+          <Button variant="primary" onClick={handleSubmit} loading={saving} disabled={!canReceive || saving || pendingLines.length === 0}>
             {t('purchasing.receiveSubmit')}
           </Button>
         </div>

@@ -147,6 +147,7 @@ function ProductDetailsRoute({
       currentUserRole={currentUserRole}
       currentUserEmail={currentUserEmail}
       currentUserPermissions={currentUserPermissions}
+      currentUserPermissions={currentUserPermissions}
       onBack={() => navigate('/products')}
       onNavigateToTicket={onNavigateToTicket}
     />
@@ -233,7 +234,7 @@ function VendorDetailsRoute({ currentUserRole, currentUserPermissions }) {
   )
 }
 
-function PurchaseDocumentDetailRoute({ currentUserRole, currentUserEmail }) {
+function PurchaseDocumentDetailRoute({ currentUserRole, currentUserEmail, currentUserPermissions }) {
   const { type, id } = useParams()
   const navigate = useNavigate()
   return (
@@ -242,6 +243,7 @@ function PurchaseDocumentDetailRoute({ currentUserRole, currentUserEmail }) {
       docId={id}
       currentUserRole={currentUserRole}
       currentUserEmail={currentUserEmail}
+      currentUserPermissions={currentUserPermissions}
       onBack={() => navigate('/purchasing')}
     />
   )
@@ -1578,6 +1580,7 @@ export default function App() {
                     <PurchaseDocumentDetailRoute
                       currentUserRole={effectiveUserRole}
                       currentUserEmail={currentUser?.email}
+                      currentUserPermissions={effectiveUserPermissions}
                     />
                   ) : (
                     <Navigate to="/" replace />

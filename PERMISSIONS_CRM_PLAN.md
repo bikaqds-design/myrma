@@ -678,3 +678,39 @@ live draft tests it.
 
 Gate: lint clean, 457 tests, build ✓.
 
+### 20260781 applied and verified
+
+| step | result |
+|---|---|
+| rep updates **own** quotation | `1 row(s) updated` |
+| rep updates **another rep's** | `0 row(s) updated` |
+| technician INSERT | `refused: new row violates row-level security policy` |
+| accountant | `update matched 0 row(s), reads 38 quotation(s)` |
+
+All four as predicted. The technician message names row-level security rather
+than a constraint, so it is a genuine refusal and not an incidental error.
+
+### The Purchasing detail page had the same gap
+
+`PurchaseDocumentDetail` took `currentUserRole`, passed it to the activity
+chatter, and gated no action on it — six buttons controlled by document status
+alone, exactly as `SalesDocumentDetail` had been. Now gated: send-for-approval,
+convert-to-vendor-invoice, cancel (both document types), archive and receive,
+each on the matching `purchasing` verb.
+
+Verified on a live PO: as an accountant, Archive is disabled and Download PDF
+stays enabled, since that role has `purchasing.export`. As a manager on the same
+document, Archive is enabled. The gate discriminates rather than blanket-hiding.
+
+### Left alone, deliberately: ActivityChatter
+
+Every detail page renders `<ActivityChatter ... canEdit ... />` — a bare prop,
+so always true. That leaves Log Note, Schedule Activity, Attach, Reply and
+Reopen enabled for anyone who can open the record, including an accountant, who
+has no `activities` module at all.
+
+Not touched here. It is pre-existing, spans every detail page in the app, and
+commenting on a record you can already read is a different question from
+changing that record. It wants its own pass rather than being folded into this
+one.
+
