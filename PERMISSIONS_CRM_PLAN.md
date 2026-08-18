@@ -453,3 +453,26 @@ sales-document types and both ledgers in full; sales_rep sees only their own. An
 empty list for a role that should see data means a missing read policy on the
 underlying table — not a reason to revert, since reverting restores the leak.
 
+### 20260778 applied 2026-08-18
+
+No regression for a role that should see everything: as super_admin the views
+return exactly what the base tables hold — `v_sales_documents` 101 against 101,
+`v_purchase_documents` 9 against 9 — and both ledgers are populated (21 and 4).
+
+**That is not proof the fix works**, and it is worth being clear about why. An
+admin session passes `manager_or_above()` on every policy, so it sees all rows
+whether the views respect RLS or not. The check above only rules out the fix
+having *broken* something.
+
+Proving it closed the leak needs a restricted session, which this session cannot
+produce — signing in as another user means handling their credentials.
+`supabase/manual/20260818_verify_view_rls.sql` does it in SQL instead: it reads
+back the `security_invoker` flag, then simulates each role with
+`set_config('request.jwt.claims', …)` — which is what `auth.jwt()` reads, and
+therefore what `rma_user_role()` resolves from — and counts rows through all
+four views as that role. A throwaway accountant row is inserted for the test.
+Everything runs inside a transaction that is rolled back, so nothing persists.
+
+The number that matters is the sales_rep row. If it is small, the leak is
+closed. **If it matches the manager count, the views are still bypassing RLS.**
+
