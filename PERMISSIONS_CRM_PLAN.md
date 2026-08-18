@@ -314,11 +314,9 @@ role. It now compares `ROLE_LIST` against `Object.values(ROLES)`, so it says
 
 457 tests, up from 439.
 
-### Needs applying
+### Applied 2026-08-18 and verified end to end
 
-`supabase/migrations/20260777_accountant_role.sql`. Until it runs, the role is
-selectable in the UI but **saving it will fail** — `chk_user_role` rejects any
-value not in its list. The migration widens that constraint, adds the role to
+`supabase/migrations/20260777_accountant_role.sql` is live. The migration widens that constraint, adds the role to
 `rma_is_staff()` (omitting it would let an accountant sign in and see nothing,
 the same trap `sales_rep` hit before 20260618), and grants read on the four
 sales-document tables, since the staff policies scope non-managers to their own
@@ -329,4 +327,24 @@ rows and an accountant is assigned to none.
 Least privilege and roles defined by job function rather than by person; a small
 role set with per-user overrides instead of role explosion; and separation of
 duties on the money path. Sources consulted are listed in the session notes.
+
+### Accountant, verified against the live database
+
+The constraint was tested by actually inserting an accountant row rather than
+reading the constraint definition back — and by a control that an invented role
+is still rejected, so the check is enforcing rather than dropped.
+
+Previewing as that user:
+
+| | |
+|---|---|
+| Nav | Dashboard, Products, Customers, Sales, Accounting, Purchasing, Reports — nothing else |
+| Blocked by URL | `/leads` `/pipeline` `/activities` `/rma-tickets` `/inventory` `/calendar`, all six |
+| Sales | sees **all 30** documents — `view_all` working — with **no "+ New"** |
+| Purchasing | sees all 9 documents and 14 vendors, **no "+ New"** |
+| Accounting | **"+ Record Payment"** present, Void controls enabled |
+
+Which is the separation of duties stated as behaviour: reads the whole money
+path, originates none of it, holds the settlement controls. The throwaway user
+was deleted afterwards — `user_roles` back to 16.
 
