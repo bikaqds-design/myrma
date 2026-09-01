@@ -84,7 +84,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.js'],
     // Scope to project tests only — without this Vitest also picks up copies
     // inside .claude/worktrees/*, doubling every test in the output.
-    include: ['src/test/**/*.test.{js,ts}'],
+    include: ['src/test/**/*.test.{js,jsx,ts,tsx}'],
     // Vitest 4.1.7 + Node 24 worker_threads pool has a race on suite init.
     // forks pool sidesteps it; fileParallelism:false also kept for safety.
     pool: 'forks',
