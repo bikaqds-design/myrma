@@ -40,7 +40,32 @@ export const auth = {
     })
     if (error) throw error
   },
-  async updatePassword(newPassword) {
+  // Change the password of a signed-in user.
+  //
+  // `currentPassword` is required once the project's "Require current password
+  // when updating" setting (GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_CURRENT_PASSWORD)
+  // is on. GoTrue names the field `current_password` — snake_case, unlike the rest
+  // of the JS surface — and simply ignores it while the setting is off, so passing
+  // it is safe either way and this can ship before the setting is flipped.
+  //
+  // Deliberately NOT used by the reset-link flow: see updatePasswordViaRecovery.
+  async updatePassword(newPassword, currentPassword) {
+    const attributes = { password: newPassword }
+    if (currentPassword) attributes.current_password = currentPassword
+    const { error } = await supabase.auth.updateUser(attributes)
+    if (error) throw error
+  },
+  // Set a new password from an emailed recovery link, where by definition the user
+  // cannot supply their current one.
+  //
+  // GoTrue exempts this case: the current-password check in its UserUpdate handler
+  // is guarded by `if !session.IsRecovery()`, and the session established from a
+  // recovery link carries a recovery AMR claim (it is what fires PASSWORD_RECOVERY
+  // in App.jsx). So this path keeps working with the setting on.
+  //
+  // Kept as its own method so the reset page can never be "fixed" into sending a
+  // current password it has no way to know.
+  async updatePasswordViaRecovery(newPassword) {
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     if (error) throw error
   },

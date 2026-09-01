@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { auth } from '../api/supabaseClient'
 import { captureException } from '../lib/sentry'
+import { resetPasswordSchema, getFirstError } from '../lib/schemas'
 import { Input, Button } from '../components/ui'
 
 export default function ResetPassword({ onDone }) {
@@ -43,22 +44,20 @@ export default function ResetPassword({ onDone }) {
     e.preventDefault()
     setError('')
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters')
-      return
-    }
-    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
-      setError('Password must include uppercase, lowercase, and a number')
-      return
-    }
-    if (password !== confirm) {
-      setError('Passwords do not match')
+    const validation = resetPasswordSchema.safeParse({
+      newPassword: password,
+      confirmPassword: confirm,
+    })
+    if (!validation.success) {
+      setError(getFirstError(validation))
       return
     }
 
     setLoading(true)
     try {
-      await auth.updatePassword(password)
+      // Recovery sessions are exempt from the project's require-current-password
+      // setting, so this path deliberately sends no current password.
+      await auth.updatePasswordViaRecovery(password)
       setSuccess(true)
       setTimeout(onDone, 2000)
     } catch (err) {

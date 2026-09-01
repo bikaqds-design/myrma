@@ -1527,7 +1527,7 @@
     "role": "Role",
     "saveChanges": "Save Changes",
     "changePassword": "Change Password",
-    "changePasswordHint": "Choose a strong password — at least 8 characters",
+    "changePasswordHint": "Choose a strong password — at least 8 characters, including an uppercase letter, a lowercase letter, and a number",
     "newPassword": "New Password",
     "confirmPassword": "Confirm Password",
     "twoFactor": "Two-Factor Authentication",

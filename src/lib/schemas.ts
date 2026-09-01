@@ -56,15 +56,31 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email('Enter a valid email address'),
 })
 
+// Shared password strength rule. Both password flows must enforce the same policy,
+// so they reference this rather than restating it — keep it that way.
+const strongPassword = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .refine(
+    (p) => /[A-Z]/.test(p) && /[a-z]/.test(p) && /[0-9]/.test(p),
+    'Password must include uppercase, lowercase, and a number'
+  )
+
 export const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, 'Current password is required'),
-    newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+    newPassword: strongPassword,
     confirmPassword: z.string().min(1, 'Please confirm your new password'),
   })
   .refine((d) => d.newPassword === d.confirmPassword, {
     message: 'Passwords do not match',
     path: ['confirmPassword'],
+  })
+  // GoTrue rejects this server-side with a `same_password` error regardless of the
+  // require-current-password setting; catching it here is faster and clearer.
+  .refine((d) => d.newPassword !== d.currentPassword, {
+    message: 'New password must be different from your current password',
+    path: ['newPassword'],
   })
 
 // ── Customers ─────────────────────────────────────────────────────────────────
@@ -148,9 +164,13 @@ export const addUserSchema = z.object({
   role: z.enum(ROLE_LIST as [Role, ...Role[]]),
 })
 
+// Used by the password-recovery page only. Deliberately has no `currentPassword`
+// field: that flow runs on a Supabase recovery session, which GoTrue exempts from
+// the require-current-password setting, and the user has no way to know their old
+// password there. See changePasswordSchema for the signed-in change-password flow.
 export const resetPasswordSchema = z
   .object({
-    newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+    newPassword: strongPassword,
     confirmPassword: z.string().min(1, 'Please confirm the password'),
   })
   .refine((d) => d.newPassword === d.confirmPassword, {
@@ -422,6 +442,7 @@ export const activitySchema = z.object({
 export type LoginFormData = z.infer<typeof loginSchema>
 export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>
 export type ChangePasswordFormData = z.infer<typeof changePasswordSchema>
+export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>
 export type CustomerFormData = z.infer<typeof customerSchema>
 export type TicketFormData = z.infer<typeof ticketSchema>
 export type ProductFormData = z.infer<typeof productSchema>
