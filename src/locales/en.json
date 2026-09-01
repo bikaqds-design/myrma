@@ -1528,6 +1528,7 @@
     "saveChanges": "Save Changes",
     "changePassword": "Change Password",
     "changePasswordHint": "Choose a strong password — at least 8 characters, including an uppercase letter, a lowercase letter, and a number",
+    "currentPassword": "Current Password",
     "newPassword": "New Password",
     "confirmPassword": "Confirm Password",
     "twoFactor": "Two-Factor Authentication",
@@ -1583,6 +1584,9 @@
     "failedUpdateProfile": "Failed to update profile",
     "passwordUpdatedSuccess": "Password updated!",
     "failedUpdatePassword": "Failed to update password",
+    "currentPasswordRequired": "Enter your current password to change it",
+    "currentPasswordInvalid": "That current password is incorrect",
+    "samePassword": "New password must be different from your current password",
     "preferencesSavedSuccess": "Preferences saved!",
     "failedSavePrefs": "Failed to save preferences",
     "notifItems": {

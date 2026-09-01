@@ -1536,6 +1536,7 @@
     "saveChanges": "حفظ التغييرات",
     "changePassword": "تغيير كلمة المرور",
     "changePasswordHint": "اختر كلمة مرور قوية — 8 أحرف على الأقل، تتضمّن حرفًا كبيرًا وحرفًا صغيرًا ورقمًا",
+    "currentPassword": "كلمة المرور الحالية",
     "newPassword": "كلمة المرور الجديدة",
     "confirmPassword": "تأكيد كلمة المرور",
     "twoFactor": "المصادقة الثنائية",
@@ -1591,6 +1592,9 @@
     "failedUpdateProfile": "فشل تحديث الملف الشخصي",
     "passwordUpdatedSuccess": "تم تحديث كلمة المرور!",
     "failedUpdatePassword": "فشل تحديث كلمة المرور",
+    "currentPasswordRequired": "أدخل كلمة المرور الحالية لتغييرها",
+    "currentPasswordInvalid": "كلمة المرور الحالية غير صحيحة",
+    "samePassword": "يجب أن تختلف كلمة المرور الجديدة عن الحالية",
     "preferencesSavedSuccess": "تم حفظ التفضيلات!",
     "failedSavePrefs": "فشل حفظ التفضيلات",
     "notifItems": {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { auth, db, storage, notifications } from '../api/supabaseClient'
 import { captureException } from '../lib/sentry'
-import { resetPasswordSchema, getFirstError } from '../lib/schemas'
+import { changePasswordSchema, getFirstError } from '../lib/schemas'
 import { safeStorage } from '../lib/safeStorage'
 import { WIDGET_CATALOG, ALL_WIDGET_IDS, resolveEnabledWidgets, toStoredWidgetPrefs } from '../lib/dashboardWidgets'
 import toast from 'react-hot-toast'
@@ -224,8 +224,10 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
   const fileInputRef = useRef(null)
 
   // Security — password
+  const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showCurrent, setShowCurrent] = useState(false)
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [passwordLoading, setPasswordLoading] = useState(false)
@@ -452,15 +454,30 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
     }
   }
 
+  // Maps GoTrue's current-password errors onto our own copy. Worth doing: its
+  // wrong-password response reuses the "Current password required..." wording,
+  // which reads as a bug to anyone who just typed one in.
+  const passwordErrorMessage = (err) => {
+    if (err?.code === 'current_password_required') return t('accountSettings.currentPasswordRequired')
+    if (err?.code === 'current_password_invalid') return t('accountSettings.currentPasswordInvalid')
+    if (err?.code === 'same_password') return t('accountSettings.samePassword')
+    return err?.message || t('accountSettings.failedUpdatePassword')
+  }
+
   const handlePasswordSave = async () => {
-    const validation = resetPasswordSchema.safeParse({ newPassword, confirmPassword })
+    const validation = changePasswordSchema.safeParse({
+      currentPassword,
+      newPassword,
+      confirmPassword,
+    })
     if (!validation.success) {
       toast.error(getFirstError(validation))
       return
     }
     setPasswordLoading(true)
     try {
-      await auth.updatePassword(newPassword)
+      await auth.updatePassword(newPassword, currentPassword)
+      setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
       toast.success(t('accountSettings.passwordUpdatedSuccess'))
@@ -473,7 +490,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
         .catch(() => {})
     } catch (err) {
       captureException(err, { page: 'AccountSettings', context: 'updatePassword' })
-      toast.error(err.message || t('accountSettings.failedUpdatePassword'))
+      toast.error(passwordErrorMessage(err))
     } finally {
       setPasswordLoading(false)
     }
@@ -670,6 +687,31 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
             </div>
 
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                {t('accountSettings.currentPassword')}
+              </label>
+              <div className="relative">
+                <Input
+                  type={showCurrent ? 'text' : 'password'}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="pr-10"
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrent((v) => !v)}
+                  tabIndex={-1}
+                  aria-label={showCurrent ? 'Hide password' : 'Show password'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
+                >
+                  <EyeIcon visible={showCurrent} />
+                </button>
+              </div>
+            </div>
+
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('accountSettings.newPassword')}</label>
               <div className="relative">
                 <Input
@@ -678,6 +720,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="pr-10"
                   placeholder="••••••••"
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -702,6 +745,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="pr-10"
                   placeholder="••••••••"
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -722,7 +766,7 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
               <Button
                 size="lg"
                 loading={passwordLoading}
-                disabled={!newPassword || !confirmPassword}
+                disabled={!currentPassword || !newPassword || !confirmPassword}
                 onClick={handlePasswordSave}
               >
                 {t('accountSettings.changePassword')}
