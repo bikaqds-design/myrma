@@ -7,9 +7,10 @@ import { useTranslation } from 'react-i18next'
 const TOTAL = 5
 
 function ProgressBar({ step, onDismiss }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-center gap-3 px-5 pt-4 pb-3">
-      <span className="text-xs font-semibold text-[#4338ca] dark:text-[#a5b4fc] flex-shrink-0">Step {step}</span>
+      <span className="text-xs font-semibold text-[#4338ca] dark:text-[#a5b4fc] flex-shrink-0">{t('onboarding.step', { n: step })}</span>
       <div className="flex items-center gap-1.5 flex-1">
         {Array.from({ length: TOTAL }).map((_, i) => (
           <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${i < step ? 'bg-[#4338ca] dark:bg-[#a5b4fc]' : 'bg-[#e6e9ef] dark:bg-[#212a38]'}`} />
@@ -26,7 +27,10 @@ function ProgressBar({ step, onDismiss }) {
 }
 
 export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  // Forward/back arrows are directional glyphs: they must point the way the
+  // reader travels, not always right (UX-ONBOARD-003).
+  const isRtl = i18n.language === 'ar'
   const [step, setStep] = useState(1)
   const [companyName, setCompanyName] = useState('')
   const [savingBranding, setSavingBranding] = useState(false)
@@ -106,15 +110,15 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
               </div>
-              <h2 className="text-xl font-bold text-[#211f1b] dark:text-[#e8ebf0] mb-2">Welcome to myCRM!</h2>
+              <h2 className="text-xl font-bold text-[#211f1b] dark:text-[#e8ebf0] mb-2">{t('onboarding.welcome')}</h2>
               <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2] max-w-xs mx-auto">
-                Your RMA and repair management system is ready. This quick setup takes about 2 minutes.
+                {t('onboarding.welcomeBlurb')}
               </p>
               <div className="mt-6 grid grid-cols-3 gap-3 text-left">
                 {[
-                  { icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z', label: 'Manage customers' },
-                  { icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z', label: 'Track RMA tickets' },
-                  { icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', label: 'Reports & analytics' },
+                  { icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z', label: t('onboarding.featCustomers') },
+                  { icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z', label: t('onboarding.featTickets') },
+                  { icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', label: t('onboarding.featReports') },
                 ].map(({ icon, label }) => (
                   <div key={label} className="bg-[#f8f9fb] dark:bg-[#0f1520] rounded-xl p-3 text-center">
                     <svg className="w-5 h-5 text-[#4338ca] dark:text-[#a5b4fc] mx-auto mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -135,11 +139,11 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
                 </svg>
               </div>
-              <h2 className="text-lg font-bold text-[#211f1b] dark:text-[#e8ebf0] mb-1">Set your company name</h2>
-              <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2] mb-4">This appears on emails and PDF reports sent to customers.</p>
-              <label className={lbl}>Company Name</label>
-              <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="e.g. Acme Repairs Ltd." className={inp} autoFocus />
-              <p className="text-xs text-[#746f65] dark:text-[#a4acb7] mt-2">You can set a logo and full branding later in <strong>Control Panel → Branding</strong>.</p>
+              <h2 className="text-lg font-bold text-[#211f1b] dark:text-[#e8ebf0] mb-1">{t('onboarding.companyTitle')}</h2>
+              <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2] mb-4">{t('onboarding.companyBlurb')}</p>
+              <label className={lbl}>{t('onboarding.companyLabel')}</label>
+              <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder={t('onboarding.companyPlaceholder')} className={inp} autoFocus />
+              <p className="text-xs text-[#746f65] dark:text-[#a4acb7] mt-2">{t('onboarding.companyHint')}</p>
             </div>
           )}
 
@@ -151,12 +155,12 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                 </svg>
               </div>
-              <h2 className="text-lg font-bold text-[#211f1b] dark:text-[#e8ebf0] mb-1">Add your first customer</h2>
-              <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2] mb-4">Customers are linked to RMA tickets. Add one to get started.</p>
+              <h2 className="text-lg font-bold text-[#211f1b] dark:text-[#e8ebf0] mb-1">{t('onboarding.customerTitle')}</h2>
+              <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2] mb-4">{t('onboarding.customerBlurb')}</p>
               <div className="space-y-3">
-                <div><label className={lbl}>Name <span className="text-red-500">*</span></label><input value={custName} onChange={(e) => setCustName(e.target.value)} placeholder="Customer or company name" className={inp} autoFocus /></div>
-                <div><label className={lbl}>Email</label><input type="email" value={custEmail} onChange={(e) => setCustEmail(e.target.value)} placeholder="customer@email.com" className={inp} /></div>
-                <div><label className={lbl}>Phone</label><input value={custPhone} onChange={(e) => setCustPhone(e.target.value)} placeholder="+1 555 000 0000" className={inp} /></div>
+                <div><label className={lbl}>{t('onboarding.name')} <span className="text-red-500">*</span></label><input value={custName} onChange={(e) => setCustName(e.target.value)} placeholder={t('onboarding.customerNamePlaceholder')} className={inp} autoFocus /></div>
+                <div><label className={lbl}>{t('onboarding.email')}</label><input type="email" value={custEmail} onChange={(e) => setCustEmail(e.target.value)} placeholder={t('onboarding.emailPlaceholder')} className={inp} /></div>
+                <div><label className={lbl}>{t('onboarding.phone')}</label><input value={custPhone} onChange={(e) => setCustPhone(e.target.value)} placeholder={t('onboarding.phonePlaceholder')} className={inp} /></div>
               </div>
             </div>
           )}
@@ -169,14 +173,14 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                 </svg>
               </div>
-              <h2 className="text-xl font-bold text-[#211f1b] dark:text-[#e8ebf0] mb-2">Create your first RMA ticket</h2>
+              <h2 className="text-xl font-bold text-[#211f1b] dark:text-[#e8ebf0] mb-2">{t('onboarding.ticketTitle')}</h2>
               <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2] max-w-xs mx-auto mb-6">
-                Tickets track every repair job from intake to resolution.
+                {t('onboarding.ticketBlurb')}
                 {savedCust && <span className="block mt-1 font-medium text-[#211f1b] dark:text-[#e8ebf0]">{savedCust.contact_person || custName} is ready to be linked.</span>}
               </p>
               <button onClick={goToTickets}
                 className="w-full py-2.5 rounded-xl bg-[#4338ca] hover:bg-[#3730a3] text-white text-sm font-semibold transition-colors">
-                Go to RMA Tickets
+                {t('onboarding.goToTickets')}
               </button>
             </div>
           )}
@@ -189,14 +193,14 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h2 className="text-xl font-bold text-[#211f1b] dark:text-[#e8ebf0] mb-2">You're all set!</h2>
-              <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2] max-w-xs mx-auto mb-5">myCRM is configured and ready to use. Explore the sidebar to discover everything it can do.</p>
+              <h2 className="text-xl font-bold text-[#211f1b] dark:text-[#e8ebf0] mb-2">{t('onboarding.doneTitle')}</h2>
+              <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2] max-w-xs mx-auto mb-5">{t('onboarding.doneBlurb')}</p>
               <div className="text-left space-y-2 mb-6">
                 {[
-                  companyName ? `Company name set: ${companyName}` : null,
-                  savedCust ? `Customer added: ${savedCust.contact_person || custName}` : null,
-                  'RMA Tickets ready to create',
-                  'Reports & analytics available',
+                  companyName ? t('onboarding.doneCompany', { name: companyName }) : null,
+                  savedCust ? t('onboarding.doneCustomer', { name: savedCust.contact_person || custName }) : null,
+                  t('onboarding.doneTickets'),
+                  t('onboarding.doneReports'),
                 ].filter(Boolean).map((item) => (
                   <div key={item} className="flex items-center gap-2 text-sm text-[#211f1b] dark:text-[#e8ebf0]">
                     <div className="w-4 h-4 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
@@ -221,23 +225,27 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
             )}
             {step < TOTAL && step !== 4 && (
               <div className="flex items-center gap-2 ml-auto">
-                <button onClick={next} className="text-xs text-[#746f65] dark:text-[#a4acb7] hover:underline">Skip</button>
+                <button onClick={next} className="text-xs text-[#746f65] dark:text-[#a4acb7] hover:underline">{t('onboarding.skip')}</button>
                 <button
                   onClick={step === 2 ? saveBranding : step === 3 ? saveCustomer : next}
                   disabled={savingBranding || savingCust}
                   className="px-5 py-2 rounded-xl bg-[#4338ca] hover:bg-[#3730a3] disabled:opacity-50 text-white text-sm font-semibold transition-colors"
                 >
-                  {savingBranding || savingCust ? 'Saving…' : step === TOTAL - 1 ? 'Continue →' : 'Next →'}
+                  {savingBranding || savingCust
+                    ? t('onboarding.saving')
+                    : <>{t(step === TOTAL - 1 ? 'onboarding.continue' : 'onboarding.next')}{' '}
+                        {/* directional glyph — must point the way 'forward' goes */}
+                        <span aria-hidden="true">{isRtl ? '←' : '→'}</span></>}
                 </button>
               </div>
             )}
             {step === 4 && (
-              <button onClick={next} className="text-xs text-[#746f65] dark:text-[#a4acb7] hover:underline ml-auto">Skip for now</button>
+              <button onClick={next} className="text-xs text-[#746f65] dark:text-[#a4acb7] hover:underline ml-auto">{t('onboarding.skipForNow')}</button>
             )}
             {step === TOTAL && (
               <button onClick={finish}
                 className="w-full py-2.5 rounded-xl bg-[#4338ca] hover:bg-[#3730a3] text-white text-sm font-semibold transition-colors">
-                Start using myCRM
+                {t('onboarding.start')}
               </button>
             )}
           </div>

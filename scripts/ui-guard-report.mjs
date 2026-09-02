@@ -7,7 +7,7 @@
  */
 import fs from 'fs'
 
-const RATCHET = 2947
+const RATCHET = 2983
 const report = JSON.parse(fs.readFileSync('eslint-ui.json', 'utf8'))
 const hits = report.flatMap(f =>
   f.messages
@@ -15,9 +15,10 @@ const hits = report.flatMap(f =>
     .map(m => ({ file: f.filePath, line: m.line, message: m.message }))
 )
 const hex = hits.filter(h => h.message.includes('design token')).length
-const physical = hits.length - hex
+const text = hits.filter(h => h.message.includes('Hardcoded user-visible')).length
+const physical = hits.length - hex - text
 
-console.log(`UI guard violations: ${hits.length}  (physical: ${physical}, raw hex: ${hex})`)
+console.log(`UI guard violations: ${hits.length}  (physical: ${physical}, raw hex: ${hex}, hardcoded text: ${text})`)
 console.log(`Ratchet in lint:ci:  ${RATCHET}`)
 if (hits.length > RATCHET) {
   console.error(`\nThis is ABOVE the ratchet. Lower lint:ci only when the count drops.`)

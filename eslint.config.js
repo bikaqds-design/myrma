@@ -131,6 +131,20 @@ export default [
             'Use logical properties: ms-/me-/ps-/pe-, text-start/text-end. Physical ones do not mirror in Arabic (UX-GLOBAL-004).',
         },
         {
+          // Hardcoded user-visible text (UX-GLOBAL-003 / UX-AUTH-001).
+          //
+          // This is the guard for the whole Critical class the audit found. The
+          // bidi damage — `?Forgot password`, `!Welcome to myCRM`, `.minutes` —
+          // was never really a bidi bug. It was English prose sitting inside an
+          // RTL container: terminal punctuation attaches to the paragraph
+          // direction, so it jumps to the leading edge. Translate the string and
+          // the symptom disappears with it. Two or more words, so single-word
+          // labels and punctuation are not flagged.
+          selector: 'JSXText[value=/[A-Za-z]{2,}\s+[A-Za-z]{2,}/]',
+          message:
+            'Hardcoded user-visible text. Use t() — untranslated English inside an RTL page also renders its punctuation on the wrong edge (UX-GLOBAL-003).',
+        },
+        {
           // Raw hex in markup, bypassing the token layer.
           selector:
             "JSXAttribute[name.name='className'] Literal[value=/#[0-9a-fA-F]{3,8}/]",

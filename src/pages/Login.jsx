@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { auth } from '../api/supabaseClient'
@@ -10,6 +11,9 @@ export default function Login({ onLogin }) {
   const { loginBg } = useAppearance()
   const [showPassword, setShowPassword] = useState(false)
   const [serverError, setServerError] = useState('')
+  const { t, i18n } = useTranslation()
+  // The back-arrow is a directional glyph: it must point the way 'back' goes.
+  const isRtl = i18n.language === 'ar'
   const [forgotMode, setForgotMode] = useState(false)
   const [forgotSent, setForgotSent] = useState(false)
 
@@ -25,7 +29,7 @@ export default function Login({ onLogin }) {
     try {
       await onLogin(email, password)
     } catch (err) {
-      setServerError(err.message || 'Login failed')
+      setServerError(err.message || t('login.loginFailed'))
     }
   }
 
@@ -43,7 +47,7 @@ export default function Login({ onLogin }) {
       setForgotSent(true)
     } catch (err) {
       // Surface server-side error inside the form via a thrown error to rhf
-      throw new Error(err.message || 'Failed to send reset email', { cause: err })
+      throw new Error(err.message || t('login.resetFailed'), { cause: err })
     }
   }
 
@@ -77,7 +81,7 @@ export default function Login({ onLogin }) {
           </div>
           <h1 className="text-3xl font-bold text-gray-900">myCRM</h1>
           <p className="text-gray-600 mt-2">
-            {forgotMode ? 'Reset your password' : 'Business Management'}
+            {t(forgotMode ? 'login.resetTagline' : 'login.tagline')}
           </p>
         </div>
 
@@ -85,7 +89,7 @@ export default function Login({ onLogin }) {
           /* ── Login ─────────────────────────────────────────────────────── */
           <form onSubmit={handleSubmit(onLoginSubmit)} className="space-y-6" noValidate>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('login.email')}</label>
               <Input
                 type="email"
                 // UX-AUTH-004: a Latin address inside an RTL page renders
@@ -93,7 +97,7 @@ export default function Login({ onLogin }) {
                 dir="ltr"
                 {...register('email')}
                 className={`py-3 px-4 focus:ring-indigo-600 ${errors.email ? 'border-red-400 bg-red-50' : ''}`}
-                placeholder="admin@example.com"
+                placeholder={t('login.emailPlaceholder')}
                 autoComplete="email"
               />
               {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
@@ -101,7 +105,7 @@ export default function Login({ onLogin }) {
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700">Password</label>
+                <label className="block text-sm font-medium text-gray-700">{t('login.password')}</label>
                 <button
                   type="button"
                   onClick={() => {
@@ -109,7 +113,7 @@ export default function Login({ onLogin }) {
                   }}
                   className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
                 >
-                  Forgot password?
+                  {t('login.forgot')}
                 </button>
               </div>
               <div className="relative">
@@ -125,7 +129,7 @@ export default function Login({ onLogin }) {
                   onClick={() => setShowPassword((v) => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
                   tabIndex={-1}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={t(showPassword ? 'login.hidePassword' : 'login.showPassword')}
                 >
                   {showPassword ? (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -166,7 +170,7 @@ export default function Login({ onLogin }) {
             )}
 
             <Button type="submit" loading={isSubmitting} className="w-full py-3">
-              Sign In
+              {t('login.signIn')}
             </Button>
           </form>
         ) : (
@@ -178,13 +182,13 @@ export default function Login({ onLogin }) {
                   Enter your email address and we'll send you a link to reset your password.
                 </p>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('login.email')}</label>
                   <Input
                     type="email"
                     dir="ltr"
                     {...forgotRegister('email')}
                     className={`py-3 px-4 focus:ring-indigo-600 ${forgotErrors.email ? 'border-red-400 bg-red-50' : ''}`}
-                    placeholder="your@email.com"
+                    placeholder={t('login.yourEmailPlaceholder')}
                     autoFocus
                     autoComplete="email"
                   />
@@ -201,7 +205,7 @@ export default function Login({ onLogin }) {
                 )}
 
                 <Button type="submit" loading={forgotSubmitting} className="w-full py-3">
-                  Send Reset Link
+                  {t('login.sendResetLink')}
                 </Button>
 
                 <button
@@ -209,7 +213,7 @@ export default function Login({ onLogin }) {
                   onClick={backToLogin}
                   className="w-full text-sm text-gray-500 hover:text-gray-700 text-center"
                 >
-                  ← Back to login
+                  <span aria-hidden="true">{isRtl ? '→' : '←'}</span> {t('login.backToLogin')}
                 </button>
               </form>
             ) : (
@@ -230,9 +234,9 @@ export default function Login({ onLogin }) {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-gray-800 font-medium">Check your inbox</p>
+                  <p className="text-gray-800 font-medium">{t('login.checkInbox')}</p>
                   <p className="text-sm text-gray-500 mt-1">
-                    A password reset link has been sent to your email address.
+                    {t('login.resetSent')}
                   </p>
                 </div>
                 <button
@@ -240,7 +244,7 @@ export default function Login({ onLogin }) {
                   onClick={backToLogin}
                   className="w-full text-sm text-indigo-600 hover:text-indigo-800 font-medium"
                 >
-                  ← Back to login
+                  <span aria-hidden="true">{isRtl ? '→' : '←'}</span> {t('login.backToLogin')}
                 </button>
               </div>
             )}
