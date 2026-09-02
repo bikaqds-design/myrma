@@ -24,13 +24,15 @@ is codemods plus lint rules that stop the drift returning.
 
 ## Status
 
-**13 of 37 closed. All 6 Criticals are closed.** Remaining: 0 Critical, 9 High,
-11 Medium, 4 Low.
+**17 of 37 closed. All 6 Criticals and 4 of 9 Highs are closed.**
+Remaining: 0 Critical, 5 High, 11 Medium, 4 Low — and every remaining High is
+effort `L`.
 
 | Closed | in |
 |---|---|
 | UX-AUTH-002, -003, -004, UX-DASH-001, -002, UX-GLOBAL-010, -011, -013 | `c543dee` |
 | UX-AUTH-001, UX-ONBOARD-001, -002, -003, UX-GLOBAL-003 | `e49bde5` |
+| UX-AUTH-005, UX-GLOBAL-005, -014, -015 | `18e6ed5` |
 
 Every Critical was an Arabic/RTL defect, and every one of them reduced to the
 same root cause: **English prose sitting inside an RTL container.** The bidi
@@ -45,19 +47,20 @@ SKU, serial and ID needed isolation; the Arabic accounting screen disproves that
 values break, and the dashboard delta was the only signed-value display in the
 codebase.
 
-## Remaining top issues
+## Remaining top issues — all effort `L`
 
-| # | ID | Issue | Sev |
-|---|---|---|---|
-| 1 | UX-GLOBAL-014 | Permission denial silently redirects to Dashboard with no explanation | High |
-| 2 | UX-GLOBAL-005 | 40 sites leak raw Postgres/RLS errors to users | High |
-| 3 | UX-GLOBAL-006 | 101 of 115 page files have no empty state | High |
-| 4 | UX-GLOBAL-007 | No Table primitive; 72 raw `<table>` in 50 files | High |
-| 5 | UX-GLOBAL-008 | Kit adoption 29–57% depending on primitive | High |
-| 6 | UX-GLOBAL-004 | 585 physical CSS properties (now guarded, not yet fixed) | High |
-| 7 | UX-GLOBAL-001 | 2,362 raw hex values (now guarded, not yet fixed) | High |
-| 8 | UX-AUTH-005 | No language switcher before sign-in | High |
-| 9 | UX-GLOBAL-015 | `Modal.jsx` and `EmptyState.jsx` have zero `t()` calls | High |
+The five left are the codemod and multi-day items. Nothing quick remains.
+
+| # | ID | Issue | Sev | Why it is L |
+|---|---|---|---|---|
+| 1 | UX-GLOBAL-007 | No Table primitive; 72 raw `<table>` in 50 files | High | Build the component, then migrate 72 call sites |
+| 2 | UX-GLOBAL-008 | Kit adoption 29–57% | High | ~250 hand-rolled controls to migrate |
+| 3 | UX-GLOBAL-001 | 2,362 raw hex values | High | Needs the semantic token set defined first, with a dark value per role |
+| 4 | UX-GLOBAL-004 | 585 physical CSS properties | High | Mechanical codemod, but every screen needs re-checking in RTL after |
+| 5 | UX-GLOBAL-006 | 101 of 115 page files have no empty state | High | Per-screen copy and a primary action each |
+
+Both guarded classes (001, 004) are held by lint rules, so they cannot grow
+while they wait.
 
 ## The guard rails
 

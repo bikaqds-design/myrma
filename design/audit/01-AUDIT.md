@@ -2,8 +2,8 @@
 
 Date: 2026-09-02 · Commit `2d8c17d`
 
-**13 of 37 findings are closed** (rows marked ✅), including **all 6 Criticals**.
-Remaining: 0 Critical, 9 High, 11 Medium, 4 Low.
+**17 of 37 findings are closed** (rows marked ✅), including **all 6 Criticals**.
+Remaining: 0 Critical, **5 High**, 11 Medium, 4 Low.
 
 IDs are permanent. `[rendered, not persisted]` marks a finding observed in the
 running app but without a saved screenshot (see `00-INVENTORY.md §8`).
@@ -20,7 +20,7 @@ Severity per Appendix B. Effort: `S` < 1h, `M` half day, `L` multi-day.
 | UX-GLOBAL-002 | All | No z-index ladder. Tailwind `z-10…z-50` coexists with `z-[60]`, `z-[70]`, `z-[200]`, `z-[400]`, `z-[500]` | Consistency | Medium | S | Define 6 named layers; replace all | app-wide |
 | ✅ UX-GLOBAL-003 (CLOSED e49bde5) | All (RTL) | Signed numbers and trailing punctuation render wrong in Arabic. `+8%` displays as `8%+`; `Forgot password?` displays as `?Forgot password` | RTL | **Critical** | M | Apply the existing `<Ltr>` wrapper to every number, currency, percentage, SKU, serial, phone and ID | `src/components/ui.jsx` (Ltr), all value renderers |
 | UX-GLOBAL-004 | All (RTL) | 378 `text-left`/`text-right` against 8 `text-start`/`text-end`; 103 `ml-/mr-`, 85 `left-/right-` | RTL | High | L | Codemod physical → logical; add an ESLint rule to prevent regression | app-wide, `src/styles/rtl.css` |
-| UX-GLOBAL-005 | All | 40 sites dump raw Postgres/Supabase errors into toasts | Feedback | High | M | Central `toUserMessage(error)` mapping constraint/RLS classes to AR+EN copy | `CommentPanel.jsx:96,125,151`, `ProductDocuments.jsx:92,122`, +35 |
+| ✅ UX-GLOBAL-005 (CLOSED 18e6ed5) | All | 40 sites dump raw Postgres/Supabase errors into toasts | Feedback | High | M | Central `toUserMessage(error)` mapping constraint/RLS classes to AR+EN copy | `CommentPanel.jsx:96,125,151`, `ProductDocuments.jsx:92,122`, +35 |
 | UX-GLOBAL-006 | All | Only 14 of 115 page files have an empty state | Feedback | High | L | `EmptyState` on every list/table/widget, with its primary action | `src/components/EmptyState.jsx` (exists, 14 uses) |
 | UX-GLOBAL-007 | All | No shared Table. 72 raw `<table>` across 50 files | Consistency | High | L | Build `Table` with sort/filter/pagination/bulk-select; migrate per module | `src/components/ui/Table/` (empty dir) |
 | UX-GLOBAL-008 | All | Kit adoption: Button 57%, Input 41%, Textarea 40%, Select 29% | Consistency | High | L | Migrate call sites per component per commit | `src/components/ui.jsx` |
@@ -61,7 +61,7 @@ regresses within weeks.
 | ✅ UX-AUTH-002 (CLOSED c543dee) | Set password | **Zero `t()` calls.** Same problem on the invitation screen | i18n | **Critical** | S | Route through `t()` | `src/pages/ResetPassword.jsx` |
 | ✅ UX-AUTH-003 (CLOSED c543dee) | Login | Subtitle reads "RMA Management System" while `index.html` and the PWA manifest now say "Business Management" — three taglines in one product | Consistency | Medium | S | Single source for the tagline | `src/pages/Login.jsx:79` |
 | ✅ UX-AUTH-004 (CLOSED c543dee) | Login (RTL) | Email/password inputs right-align Latin placeholders (`admin@example.com`); no `dir="ltr"` isolation on identifier fields | RTL | High | S | `dir="ltr"` on email, password, phone, serial inputs | `src/pages/Login.jsx:93,117` |
-| UX-AUTH-005 | Login | No language switcher before sign-in. An Arabic user cannot change language until after logging into an English-only screen | i18n | High | M | Language toggle on the auth screens | `src/pages/Login.jsx` |
+| ✅ UX-AUTH-005 (CLOSED 18e6ed5) | Login | No language switcher before sign-in. An Arabic user cannot change language until after logging into an English-only screen | i18n | High | M | Language toggle on the auth screens | `src/pages/Login.jsx` |
 
 ### UX-AUTH-001/002 — detail (Critical)
 
@@ -120,8 +120,8 @@ admin 15 nav items, manager 14, sales_rep 8, technician 7, viewer 7 — and a
 
 | ID | Screen | Issue | Lens | Sev | Eff | Fix summary | Files |
 |---|---|---|---|---|---|---|---|
-| UX-GLOBAL-014 | Any gated route | A role without access is **silently redirected to the Dashboard** with no message. The user clicks a link and lands somewhere else with no explanation | Feedback | High | M | Show a denial that names the permission needed and who to ask, per the brief §9 | `src/App.jsx` route guards |
-| UX-GLOBAL-015 | Shared components | `Modal.jsx` and `EmptyState.jsx` contain **zero** `t()` calls, so any default copy they render cannot be translated by callers | i18n | High | S | Thread `t()` through, or require callers to pass translated copy | `src/components/Modal.jsx`, `EmptyState.jsx` |
+| ✅ UX-GLOBAL-014 (CLOSED 18e6ed5) | Any gated route | A role without access is **silently redirected to the Dashboard** with no message. The user clicks a link and lands somewhere else with no explanation | Feedback | High | M | Show a denial that names the permission needed and who to ask, per the brief §9 | `src/App.jsx` route guards |
+| ✅ UX-GLOBAL-015 (CLOSED 18e6ed5) | Shared components | `Modal.jsx` and `EmptyState.jsx` contain **zero** `t()` calls, so any default copy they render cannot be translated by callers | i18n | High | S | Thread `t()` through, or require callers to pass translated copy | `src/components/Modal.jsx`, `EmptyState.jsx` |
 
 Evidence for UX-GLOBAL-014: `control-panel--viewer--en--desktop.png` shows the
 Dashboard, not a denial screen.
