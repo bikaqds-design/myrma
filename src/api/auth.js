@@ -112,7 +112,16 @@ export const auth = {
    * through a chat app.
    */
   async adminInviteUser(email, role) {
-    return invokeInvite({ action: 'invite', email, role, redirectTo: `${window.location.origin}/` })
+    // Land the invitee on the password screen, not the dashboard. The
+    // invitation link signs them in, so a destination of '/' put them inside
+    // the app having never chosen a password — they got in that day and then
+    // could not log in on their next visit, with nothing explaining why.
+    return invokeInvite({
+      action: 'invite',
+      email,
+      role,
+      redirectTo: `${window.location.origin}/set-password`,
+    })
   },
 
   /**

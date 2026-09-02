@@ -50,10 +50,24 @@ describe('sending an invitation', () => {
     expect(opts.body).toMatchObject({ action: 'invite', email: 'new@test.com', role: 'sales_rep' })
   })
 
-  it('tells the invitation where to send the person back to', async () => {
+  /**
+   * The destination is the password screen, never the dashboard. An invitation
+   * link signs the person in, so sending them to '/' left them inside the app
+   * having never chosen a password — they got in that day and could not log in
+   * on their next visit, with nothing explaining why. Caught by accepting a
+   * real invitation rather than by reading the code.
+   */
+  it('sends the invitee to the password screen, not into the app', async () => {
     invoke.mockResolvedValue({ data: { success: true }, error: null })
     await auth.adminInviteUser('new@test.com', 'viewer')
-    expect(invoke.mock.calls[0][1].body.redirectTo).toBe('https://app.test/')
+    expect(invoke.mock.calls[0][1].body.redirectTo).toBe('https://app.test/set-password')
+  })
+
+  it('builds that destination from the current origin, so each environment invites into itself', async () => {
+    globalThis.window = { location: { origin: 'https://myrma.vercel.app' } }
+    invoke.mockResolvedValue({ data: { success: true }, error: null })
+    await auth.adminInviteUser('new@test.com', 'viewer')
+    expect(invoke.mock.calls[0][1].body.redirectTo).toBe('https://myrma.vercel.app/set-password')
   })
 
   /**

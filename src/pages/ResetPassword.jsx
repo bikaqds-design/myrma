@@ -4,7 +4,23 @@ import { captureException } from '../lib/sentry'
 import { resetPasswordSchema, getFirstError } from '../lib/schemas'
 import { Input, Button } from '../components/ui'
 
-export default function ResetPassword({ onDone }) {
+/**
+ * Set a password from an emailed link.
+ *
+ * Serves two arrivals that need the same thing and differ only in wording:
+ *
+ *   'reset'  — someone asked to reset a password they already have.
+ *   'invite' — someone accepting an invitation, who has never had one. Without
+ *              this screen the invitation link drops them straight into the app
+ *              with no password set, and their NEXT visit fails to log in with
+ *              nothing to explain why.
+ *
+ * Both call updatePasswordViaRecovery, which sends no current password.
+ * Verified against the live project that this is accepted from an invite
+ * session even with require-current-password on.
+ */
+export default function ResetPassword({ onDone, mode = 'reset' }) {
+  const isInvite = mode === 'invite'
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -88,11 +104,13 @@ export default function ResetPassword({ onDone }) {
             </svg>
           </div>
           <h1 className="text-3xl font-bold text-gray-900">myRMA</h1>
-          <p className="text-gray-600 mt-2">Set a new password</p>
+          <p className="text-gray-600 mt-2">
+            {isInvite ? 'Choose a password' : 'Set a new password'}
+          </p>
           <p className="text-xs text-gray-500 mt-3">
-            You're here because someone requested a password reset for your account. If that wasn't
-            you, you can safely close this page — your current password will remain unchanged until
-            you submit a new one.
+            {isInvite
+              ? "Welcome — your invitation has been accepted. Choose a password now so you can sign in again next time."
+              : "You're here because someone requested a password reset for your account. If that wasn't you, you can safely close this page — your current password will remain unchanged until you submit a new one."}
           </p>
         </div>
 
@@ -114,7 +132,9 @@ export default function ResetPassword({ onDone }) {
               </svg>
             </div>
             <p className="text-gray-800 font-medium">Password updated!</p>
-            <p className="text-sm text-gray-500">Redirecting you to login...</p>
+            <p className="text-sm text-gray-500">
+              {isInvite ? 'Taking you into the app...' : 'Redirecting you to login...'}
+            </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">

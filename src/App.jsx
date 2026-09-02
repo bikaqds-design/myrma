@@ -1125,6 +1125,32 @@ export default function App() {
     )
   }
 
+  // Someone arriving from an invitation. The link signs them in and, before
+  // this existed, dropped them on the dashboard — so they reached the app
+  // having never chosen a password and could not log in on their next visit,
+  // with nothing on screen to explain why.
+  //
+  // Deliberately placed after the sign-in gate (they always arrive with a
+  // session) but BEFORE the access check below: their role row still reads
+  // 'pending' at this point, and refusing them here would strand them one step
+  // short of the thing that activates them.
+  if (pathname === '/set-password') {
+    return (
+      <>
+        <ResetPassword
+          mode="invite"
+          onDone={() => {
+            // A full load rather than a client-side navigation, so checkAuth
+            // runs again and acceptInvitationIfPending flips the invitation
+            // from pending to active before the app opens.
+            window.location.replace('/')
+          }}
+        />
+        <Toaster position="top-right" toastOptions={toastOptions} />
+      </>
+    )
+  }
+
   // Signed in, but the account may not use the app. The database refuses it
   // too — this is the explanation, not the enforcement.
   if (accessDenied) {
