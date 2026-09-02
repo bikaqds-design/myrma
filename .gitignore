@@ -39,3 +39,4 @@ lerna-debug.log*
 
 # Misc
 .cache
+eslint-ui.json

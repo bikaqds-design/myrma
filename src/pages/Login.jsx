@@ -77,7 +77,7 @@ export default function Login({ onLogin }) {
           </div>
           <h1 className="text-3xl font-bold text-gray-900">myCRM</h1>
           <p className="text-gray-600 mt-2">
-            {forgotMode ? 'Reset your password' : 'RMA Management System'}
+            {forgotMode ? 'Reset your password' : 'Business Management'}
           </p>
         </div>
 
@@ -88,6 +88,9 @@ export default function Login({ onLogin }) {
               <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
               <Input
                 type="email"
+                // UX-AUTH-004: a Latin address inside an RTL page renders
+                // right-aligned and can reorder around '@' and '.'; isolate it.
+                dir="ltr"
                 {...register('email')}
                 className={`py-3 px-4 focus:ring-indigo-600 ${errors.email ? 'border-red-400 bg-red-50' : ''}`}
                 placeholder="admin@example.com"
@@ -178,6 +181,7 @@ export default function Login({ onLogin }) {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                   <Input
                     type="email"
+                    dir="ltr"
                     {...forgotRegister('email')}
                     className={`py-3 px-4 focus:ring-indigo-600 ${forgotErrors.email ? 'border-red-400 bg-red-50' : ''}`}
                     placeholder="your@email.com"

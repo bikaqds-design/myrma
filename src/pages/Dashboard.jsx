@@ -14,7 +14,7 @@ import { canDo } from '../lib/permissions'
 import { formatMoneyCompact } from '../lib/money'
 import { useBaseCurrency } from '../hooks/useBaseCurrency'
 import { useAppearance } from '../contexts/AppearanceContext'
-import { Spinner } from '../components/ui'
+import { Spinner, Ltr } from '../components/ui'
 import { TICKET_STATUS, TICKET_STATUS_LIST, TICKET_STATUS_RESOLVED, ROLES } from '../lib/constants'
 import { useTranslation } from 'react-i18next'
 import { EMPTY_ARRAY } from '../lib/stableEmpty'
@@ -773,7 +773,10 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
   }
 
   const hasWidgets = layout.length > 0
+  // Values stay canonical English so the filtering logic below is unchanged;
+  // only the label shown to the user is translated (UX-DASH-001).
   const RANGES = ['Today', '7d', '30d', 'All']
+  const rangeLabel = (r) => t(`dashboard.range.${r === '7d' ? 'd7' : r === '30d' ? 'd30' : r.toLowerCase()}`)
 
   // ── Widget bodies ───────────────────────────────────────────────────────────
   // One entry per catalog id, returning only what goes *inside* the card. The
@@ -805,7 +808,9 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
                       style={{ transform: deltaUp ? 'none' : 'rotate(180deg)' }}>
                       <path d="M4.5 7.5V1.5M4.5 1.5L1.5 4.5M4.5 1.5L7.5 4.5" />
                     </svg>
-                    {delta}
+                    {/* UX-DASH-002: a signed number inside RTL text renders as
+                        `8%+` without isolation, which reads as a different value. */}
+                    <Ltr>{delta}</Ltr>
                   </span>
                 ) : (
                   <span style={{ fontSize: 12, color: tk.textMuted }}>{caption}</span>
@@ -1158,7 +1163,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
                 border:     `1px solid ${range === seg ? tk.accent : tk.border}`,
                 cursor: 'pointer', transition: 'all .15s',
               }}>
-              {seg}
+              {rangeLabel(seg)}
             </button>
           ))}
         </div>

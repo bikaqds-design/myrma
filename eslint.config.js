@@ -101,5 +101,45 @@ export default [
     },
   },
 
+  // ── UI guard rails (UX-GLOBAL-001 / 004) ───────────────────────────────────
+  //
+  // Landed BEFORE the codemods they protect, deliberately. The audit found a
+  // design system that exists and is bypassed: 52 declared tokens beside 125
+  // hardcoded hex colours, and 378 physical `text-left/right` against 8 logical
+  // `text-start/end`. Cleaning that up without a guard just resets the clock.
+  //
+  // These are warnings, not errors, because the existing violations are counted
+  // in `lint:ci` as a ratchet (see package.json). The number may go down and
+  // never up; when it reaches zero these become errors.
+  {
+    files: ['src/**/*.{js,jsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'warn',
+        {
+          // Physical direction in Tailwind classes. Arabic is a first-class
+          // locale here, so `ml-`/`text-left` silently mirror wrong.
+          selector:
+            "JSXAttribute[name.name='className'] Literal[value=/text-left|text-right|(^| )-?(ml|mr|pl|pr)-|(^| )(left|right)-[0-9]/]",
+          message:
+            'Use logical properties: ms-/me-/ps-/pe-, text-start/text-end, start-/end-. Physical ones do not mirror in Arabic (UX-GLOBAL-004).',
+        },
+        {
+          selector:
+            "JSXAttribute[name.name='className'] TemplateElement[value.raw=/text-left|text-right|(^| )-?(ml|mr|pl|pr)-/]",
+          message:
+            'Use logical properties: ms-/me-/ps-/pe-, text-start/text-end. Physical ones do not mirror in Arabic (UX-GLOBAL-004).',
+        },
+        {
+          // Raw hex in markup, bypassing the token layer.
+          selector:
+            "JSXAttribute[name.name='className'] Literal[value=/#[0-9a-fA-F]{3,8}/]",
+          message:
+            'Use a design token instead of a raw hex colour (UX-GLOBAL-001). See src/styles/tokens.css.',
+        },
+      ],
+    },
+  },
+
   prettierConfig,
 ]

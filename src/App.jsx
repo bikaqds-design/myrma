@@ -382,10 +382,15 @@ export default function App() {
   const queryClient = useQueryClient()
 
   const { sidebarCompact, updateAppearance, darkMode } = useAppearance()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const toastOptions = darkMode
     ? { style: { background: '#121823', color: '#e8ebf0', border: '1px solid #212a38', borderRadius: 12 } }
     : { style: { borderRadius: 12 } }
+
+  // UX-GLOBAL-010: all eight Toaster mounts used to hardcode top-right, which in
+  // Arabic puts them on the trailing edge — the opposite corner from where the
+  // eye starts. Follow the reading direction instead.
+  const toastPosition = i18n.language === 'ar' ? 'top-left' : 'top-right'
 
   const [currentUser, setCurrentUser] = useState(null)
   const [currentUserRole, setCurrentUserRole] = useState(null)
@@ -1071,7 +1076,7 @@ export default function App() {
     return (
       <>
         <RMATracker />
-        <Toaster position="top-right" toastOptions={toastOptions} />
+        <Toaster position={toastPosition} toastOptions={toastOptions} />
       </>
     )
   }
@@ -1080,7 +1085,7 @@ export default function App() {
     return (
       <>
         <KnowledgeBasePublic />
-        <Toaster position="top-right" toastOptions={toastOptions} />
+        <Toaster position={toastPosition} toastOptions={toastOptions} />
       </>
     )
   }
@@ -1094,7 +1099,7 @@ export default function App() {
             setCurrentUser(null)
           }}
         />
-        <Toaster position="top-right" toastOptions={toastOptions} />
+        <Toaster position={toastPosition} toastOptions={toastOptions} />
       </>
     )
   }
@@ -1111,7 +1116,7 @@ export default function App() {
     return (
       <>
         <MfaChallenge onVerify={handleMfaVerify} onCancel={() => { auth.signOut(); setMfaPending(null) }} />
-        <Toaster position="top-right" toastOptions={toastOptions} />
+        <Toaster position={toastPosition} toastOptions={toastOptions} />
       </>
     )
   }
@@ -1120,7 +1125,7 @@ export default function App() {
     return (
       <>
         <Login onLogin={handleLogin} onSignup={handleSignup} />
-        <Toaster position="top-right" toastOptions={toastOptions} />
+        <Toaster position={toastPosition} toastOptions={toastOptions} />
       </>
     )
   }
@@ -1146,7 +1151,7 @@ export default function App() {
             window.location.replace('/')
           }}
         />
-        <Toaster position="top-right" toastOptions={toastOptions} />
+        <Toaster position={toastPosition} toastOptions={toastOptions} />
       </>
     )
   }
@@ -1162,7 +1167,7 @@ export default function App() {
           row={accessDenied.row}
           onSignOut={handleLogout}
         />
-        <Toaster position="top-right" toastOptions={toastOptions} />
+        <Toaster position={toastPosition} toastOptions={toastOptions} />
       </>
     )
   }
@@ -1172,7 +1177,7 @@ export default function App() {
     <div className="min-h-screen bg-[#f4f6f9] dark:bg-[#0b0f17] flex">
       <AnnouncementBanner />
       <PreviewBanner previewUser={previewUser} onExit={stopPreview} />
-      <Toaster position="top-right" />
+      <Toaster position={toastPosition} toastOptions={toastOptions} />
       {showOnboarding && (
         <OnboardingWizard
           userEmail={currentUser?.email}

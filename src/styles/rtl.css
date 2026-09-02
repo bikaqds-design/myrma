@@ -35,11 +35,19 @@
   font-family: 'Cairo', system-ui, sans-serif;
 }
 
-/* Correct text alignment defaults for inputs and textareas */
+/* Correct text alignment defaults for inputs and textareas.
+ *
+ * `start`, not `right`. This is a descendant selector, so `right` also hit every
+ * field explicitly marked dir="ltr" for an email address, phone number, serial
+ * or SKU — text-align inherits as a resolved physical value, so dir="ltr" set
+ * the caret direction correctly and the text still sat on the right-hand edge.
+ * `start` resolves per element against its own direction: right for the Arabic
+ * fields, left for the isolated Latin ones. Found via computed styles on the
+ * login email input (UX-AUTH-004). */
 [dir="rtl"] input,
 [dir="rtl"] textarea,
 [dir="rtl"] select {
-  text-align: right;
+  text-align: start;
 }
 
 /* Toast notifications: flip position */

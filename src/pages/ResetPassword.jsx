@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { auth } from '../api/supabaseClient'
 import { captureException } from '../lib/sentry'
 import { resetPasswordSchema, getFirstError } from '../lib/schemas'
@@ -20,6 +21,7 @@ import { Input, Button } from '../components/ui'
  * session even with require-current-password on.
  */
 export default function ResetPassword({ onDone, mode = 'reset' }) {
+  const { t } = useTranslation()
   const isInvite = mode === 'invite'
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -78,7 +80,7 @@ export default function ResetPassword({ onDone, mode = 'reset' }) {
       setTimeout(onDone, 2000)
     } catch (err) {
       captureException(err, { page: 'ResetPassword', context: 'updatePassword' })
-      setError(err.message || 'Failed to update password')
+      setError(err.message || t('resetPassword.failed'))
     } finally {
       setLoading(false)
     }
@@ -103,14 +105,12 @@ export default function ResetPassword({ onDone, mode = 'reset' }) {
               />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">myCRM</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{t('resetPassword.brand')}</h1>
           <p className="text-gray-600 mt-2">
-            {isInvite ? 'Choose a password' : 'Set a new password'}
+            {t(isInvite ? 'resetPassword.chooseTitle' : 'resetPassword.resetTitle')}
           </p>
           <p className="text-xs text-gray-500 mt-3">
-            {isInvite
-              ? "Welcome — your invitation has been accepted. Choose a password now so you can sign in again next time."
-              : "You're here because someone requested a password reset for your account. If that wasn't you, you can safely close this page — your current password will remain unchanged until you submit a new one."}
+            {t(isInvite ? 'resetPassword.chooseBlurb' : 'resetPassword.resetBlurb')}
           </p>
         </div>
 
@@ -131,15 +131,15 @@ export default function ResetPassword({ onDone, mode = 'reset' }) {
                 />
               </svg>
             </div>
-            <p className="text-gray-800 font-medium">Password updated!</p>
+            <p className="text-gray-800 font-medium">{t('resetPassword.updated')}</p>
             <p className="text-sm text-gray-500">
-              {isInvite ? 'Taking you into the app...' : 'Redirecting you to login...'}
+              {t(isInvite ? 'resetPassword.takingYouIn' : 'resetPassword.redirectingToLogin')}
             </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('resetPassword.newPassword')}</label>
               <div className="relative">
                 <Input
                   type={showPassword ? 'text' : 'password'}
@@ -153,7 +153,7 @@ export default function ResetPassword({ onDone, mode = 'reset' }) {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={t(showPassword ? 'resetPassword.hidePassword' : 'resetPassword.showPassword')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
                   tabIndex={-1}
                 >
@@ -164,7 +164,7 @@ export default function ResetPassword({ onDone, mode = 'reset' }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Confirm Password
+                {t('resetPassword.confirmPassword')}
               </label>
               <div className="relative">
                 <Input
@@ -178,7 +178,7 @@ export default function ResetPassword({ onDone, mode = 'reset' }) {
                 <button
                   type="button"
                   onClick={() => setShowConfirm((v) => !v)}
-                  aria-label={showConfirm ? 'Hide password' : 'Show password'}
+                  aria-label={t(showConfirm ? 'resetPassword.hidePassword' : 'resetPassword.showPassword')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
                   tabIndex={-1}
                 >
@@ -192,7 +192,7 @@ export default function ResetPassword({ onDone, mode = 'reset' }) {
             )}
 
             <Button type="submit" loading={loading} className="w-full py-3">
-              Update Password
+              {t('resetPassword.submit')}
             </Button>
           </form>
         )}

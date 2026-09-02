@@ -286,6 +286,12 @@
       "quarter": "S",
       "half": "M",
       "full": "L"
+    },
+    "range": {
+      "today": "Today",
+      "d7": "7 days",
+      "d30": "30 days",
+      "all": "All"
     }
   },
   "tickets": {
@@ -4146,5 +4152,21 @@
     "nothingToDo": "Nothing to fix here",
     "nothingToDoHint": "Every product in this view is covered.",
     "addDocument": "Add document"
+  },
+  "resetPassword": {
+    "brand": "myCRM",
+    "chooseTitle": "Choose a password",
+    "resetTitle": "Set a new password",
+    "chooseBlurb": "Welcome — your invitation has been accepted. Choose a password now so you can sign in again next time.",
+    "resetBlurb": "You're here because someone requested a password reset for your account. If that wasn't you, you can safely close this page — your current password will remain unchanged until you submit a new one.",
+    "updated": "Password updated!",
+    "takingYouIn": "Taking you into the app…",
+    "redirectingToLogin": "Redirecting you to login…",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "submit": "Update Password",
+    "failed": "Failed to update password"
   }
 }
