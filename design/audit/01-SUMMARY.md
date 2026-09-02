@@ -22,28 +22,59 @@ That changes the shape of the work. This is a **migration and enforcement**
 engagement, not a redesign. The highest-value output is not new components; it
 is codemods plus lint rules that stop the drift returning.
 
-## Top 10 by impact
+## Status
 
-37 findings: **6 Critical, 13 High, 11 Medium, 7 Low.**
-(UX-GLOBAL-012 was retracted on investigation; UX-GLOBAL-016 opened in its place.)
+**13 of 37 closed. All 6 Criticals are closed.** Remaining: 0 Critical, 9 High,
+11 Medium, 4 Low.
+
+| Closed | in |
+|---|---|
+| UX-AUTH-002, -003, -004, UX-DASH-001, -002, UX-GLOBAL-010, -011, -013 | `c543dee` |
+| UX-AUTH-001, UX-ONBOARD-001, -002, -003, UX-GLOBAL-003 | `e49bde5` |
+
+Every Critical was an Arabic/RTL defect, and every one of them reduced to the
+same root cause: **English prose sitting inside an RTL container.** The bidi
+symptoms — `?Forgot password`, `!Welcome to myCRM`, `.minutes` — were terminal
+punctuation attaching to the paragraph direction. Translating the strings
+removed the symptom along with the cause. No bidi wrapper was needed for any of
+them.
+
+UX-GLOBAL-003 was mis-scoped when raised. It claimed every number, currency,
+SKU, serial and ID needed isolation; the Arabic accounting screen disproves that
+— `80.00`, `8,000.00` and `PAY-2026-00011` all render correctly. Only signed
+values break, and the dashboard delta was the only signed-value display in the
+codebase.
+
+## Remaining top issues
 
 | # | ID | Issue | Sev |
 |---|---|---|---|
-| 1 | UX-AUTH-001 | Login screen has **zero** translation calls — fully hardcoded English | Critical |
-| 2 | UX-ONBOARD-001 | First-run onboarding modal is English inside the Arabic app — the first thing a new colleague sees | Critical |
-| 3 | UX-AUTH-002 | Invitation password screen also has zero translation calls (my defect, from today) | Critical |
-| 4 | UX-GLOBAL-003 | `+8%` renders as `8%+` in Arabic; corrupts displayed numbers | Critical |
-| 5 | UX-ONBOARD-002 | `!Welcome to myCRM` and `.minutes` — punctuation on the wrong edge | Critical |
-| 6 | UX-DASH-002 | Dashboard trend deltas, instance of the same bidi defect | Critical |
-| 7 | UX-GLOBAL-014 | Permission denial silently redirects to Dashboard with no explanation | High |
-| 8 | UX-GLOBAL-005 | 40 sites leak raw Postgres/RLS errors to users | High |
-| 9 | UX-GLOBAL-006 | 101 of 115 page files have no empty state | High |
-| 10 | UX-GLOBAL-007 | No Table primitive; 72 raw `<table>` in 50 files | High |
+| 1 | UX-GLOBAL-014 | Permission denial silently redirects to Dashboard with no explanation | High |
+| 2 | UX-GLOBAL-005 | 40 sites leak raw Postgres/RLS errors to users | High |
+| 3 | UX-GLOBAL-006 | 101 of 115 page files have no empty state | High |
+| 4 | UX-GLOBAL-007 | No Table primitive; 72 raw `<table>` in 50 files | High |
+| 5 | UX-GLOBAL-008 | Kit adoption 29–57% depending on primitive | High |
+| 6 | UX-GLOBAL-004 | 585 physical CSS properties (now guarded, not yet fixed) | High |
+| 7 | UX-GLOBAL-001 | 2,362 raw hex values (now guarded, not yet fixed) | High |
+| 8 | UX-AUTH-005 | No language switcher before sign-in | High |
+| 9 | UX-GLOBAL-015 | `Modal.jsx` and `EmptyState.jsx` have zero `t()` calls | High |
 
-**Every Critical is an Arabic-language or RTL defect.** Not one is a layout or
-aesthetic problem. For a product where Arabic is the primary language of a large
-share of users, the whole first-run path — login, invitation, onboarding modal —
-is English with punctuation rendering backwards.
+## The guard rails
+
+Three ESLint rules now cover the drift classes the audit found, landed before
+the codemods they protect:
+
+| Rule | Current count |
+|---|---:|
+| Physical CSS properties in className | 585 |
+| Raw hex in className | 2,362 |
+| Hardcoded user-visible JSX text | 36 |
+| **Total (ratchet in `lint:ci`)** | **2,983** |
+
+`npm run lint:ui` reports the breakdown. The number can fall and never rise;
+when it reaches zero the rules become errors. That 36 is the honest measure of
+how well translated this codebase already was — the problem was never coverage,
+it was the two screens that never joined the system.
 
 ## Systemic root causes
 
