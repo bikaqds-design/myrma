@@ -256,7 +256,7 @@ export function StockBreakdownModal({
                 <li key={u.id} className="flex items-center justify-between">
                   <span className="text-[#211f1b] dark:text-[#e8ebf0]">
                     {u.serial_number || t('inventory.noSerial')}
-                    <span className="ml-2 text-xs text-[#6c6760] dark:text-[#9aa4b2]">{u.status}</span>
+                    <span className="ms-2 text-xs text-[#6c6760] dark:text-[#9aa4b2]">{u.status}</span>
                   </span>
                   <button
                     onClick={() => setAdjustTarget({ warehouseId: u.warehouse_id, unit: u })}

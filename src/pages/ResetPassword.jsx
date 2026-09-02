@@ -150,7 +150,7 @@ export default function ResetPassword({ onDone, mode = 'reset' }) {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="py-3 px-4 pr-12 focus:ring-indigo-600"
+                  className="py-3 px-4 pe-12 focus:ring-indigo-600"
                   placeholder="••••••••"
                   required
                   autoFocus
@@ -159,7 +159,7 @@ export default function ResetPassword({ onDone, mode = 'reset' }) {
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   aria-label={t(showPassword ? 'resetPassword.hidePassword' : 'resetPassword.showPassword')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
+                  className="absolute end-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
                   tabIndex={-1}
                 >
                   <EyeIcon visible={showPassword} />
@@ -176,7 +176,7 @@ export default function ResetPassword({ onDone, mode = 'reset' }) {
                   type={showConfirm ? 'text' : 'password'}
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
-                  className="py-3 px-4 pr-12 focus:ring-indigo-600"
+                  className="py-3 px-4 pe-12 focus:ring-indigo-600"
                   placeholder="••••••••"
                   required
                 />
@@ -184,7 +184,7 @@ export default function ResetPassword({ onDone, mode = 'reset' }) {
                   type="button"
                   onClick={() => setShowConfirm((v) => !v)}
                   aria-label={t(showConfirm ? 'resetPassword.hidePassword' : 'resetPassword.showPassword')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
+                  className="absolute end-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
                   tabIndex={-1}
                 >
                   <EyeIcon visible={showConfirm} />

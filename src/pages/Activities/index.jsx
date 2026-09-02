@@ -109,16 +109,16 @@ function SortableHeader({ label, sortKey, sortConfig, onSort }) {
       <span>{label}</span>
       {isActive ? (
         sortConfig.direction === 'asc' ? (
-          <svg className="w-3.5 h-3.5 text-indigo-600 dark:text-[#a5b4fc] ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3.5 h-3.5 text-indigo-600 dark:text-[#a5b4fc] ms-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
           </svg>
         ) : (
-          <svg className="w-3.5 h-3.5 text-indigo-600 dark:text-[#a5b4fc] ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3.5 h-3.5 text-indigo-600 dark:text-[#a5b4fc] ms-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         )
       ) : (
-        <svg className="w-3.5 h-3.5 text-gray-300 dark:text-[#a4acb7] ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-3.5 h-3.5 text-gray-300 dark:text-[#a4acb7] ms-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
         </svg>
       )}
@@ -630,9 +630,9 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={t('activities.searchPlaceholder')}
                   aria-label={t('activities.searchPlaceholder')}
-                  className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
+                  className="w-full ps-9 pe-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
                 />
-                <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
@@ -737,7 +737,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
           )}
           <button
             onClick={() => setSelectedActivities(new Set())}
-            className="ml-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
+            className="ms-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
           >
             {t('common.clear')}
           </button>
@@ -776,7 +776,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#e6e9ef] dark:border-[#212a38] bg-[#f8f9fb] dark:bg-[#0f1520]">
-                <th className="pl-4 pr-2 py-3 w-8">
+                <th className="ps-4 pe-2 py-3 w-8">
                   <input
                     type="checkbox"
                     checked={allPageSelected}
@@ -785,26 +785,26 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
                     aria-label={t('common.selectAll')}
                   />
                 </th>
-                <th className="px-2 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase w-10">#</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                <th className="px-2 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase w-10">#</th>
+                <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                   <SortableHeader label={t('activities.colSource')} sortKey="related_type" sortConfig={sortConfig} onSort={handleSort} />
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                   <SortableHeader label={t('activities.colUser')} sortKey="assigned_rep" sortConfig={sortConfig} onSort={handleSort} />
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                   <SortableHeader label={t('activities.colCustomer')} sortKey="customer" sortConfig={sortConfig} onSort={handleSort} />
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                   <SortableHeader label={t('activities.colDetails')} sortKey="title" sortConfig={sortConfig} onSort={handleSort} />
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                   <SortableHeader label={t('activities.colCreated')} sortKey="created_at" sortConfig={sortConfig} onSort={handleSort} />
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                   <SortableHeader label={dateColHeader} sortKey="due_date" sortConfig={sortConfig} onSort={handleSort} />
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('common.actions')}</th>
+                <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -846,7 +846,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
                       }`}
                     >
                       {/* Checkbox */}
-                      <td className="pl-4 pr-2 py-3">
+                      <td className="ps-4 pe-2 py-3">
                         <input
                           type="checkbox"
                           className="rounded border-gray-300 dark:border-[#212a38] text-indigo-600 focus:ring-indigo-500"
@@ -882,7 +882,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
                         {custLink ? (
                           <button
                             onClick={() => navigate(custLink)}
-                            className="text-sm text-[#4338ca] dark:text-[#a5b4fc] hover:underline line-clamp-1 text-left"
+                            className="text-sm text-[#4338ca] dark:text-[#a5b4fc] hover:underline line-clamp-1 text-start"
                           >
                             {custName}
                           </button>

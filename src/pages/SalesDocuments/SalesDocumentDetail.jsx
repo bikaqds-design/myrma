@@ -701,12 +701,12 @@ export default function SalesDocumentDetail({
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
-              <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.fProduct')}</th>
+              <th className="px-4 py-2.5 text-start text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.fProduct')}</th>
               <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.fQty')}</th>
-              <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.fUnitPrice')}</th>
+              <th className="px-3 py-2.5 text-end text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.fUnitPrice')}</th>
               <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.fDiscount')}</th>
               <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.fTax')}</th>
-              <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.fLineTotal')}</th>
+              <th className="px-4 py-2.5 text-end text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.fLineTotal')}</th>
             </tr>
           </thead>
           <tbody>
@@ -723,10 +723,10 @@ export default function SalesDocumentDetail({
                   {l.description && <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{l.description}</div>}
                 </td>
                 <td className="px-3 py-2.5 text-center text-[#211f1b] dark:text-[#e8ebf0]">{l.qty}</td>
-                <td className="px-3 py-2.5 text-right text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(l.unit_price)}</td>
+                <td className="px-3 py-2.5 text-end text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(l.unit_price)}</td>
                 <td className="px-3 py-2.5 text-center text-[#6c6760] dark:text-[#9aa4b2]">{l.discount_pct ? l.discount_pct + '%' : '—'}</td>
                 <td className="px-3 py-2.5 text-center text-[#6c6760] dark:text-[#9aa4b2]">{l.tax_pct ? l.tax_pct + '%' : '—'}</td>
-                <td className="px-4 py-2.5 text-right font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(lineNet(l))}</td>
+                <td className="px-4 py-2.5 text-end font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(lineNet(l))}</td>
               </tr>
             ))}
           </tbody>

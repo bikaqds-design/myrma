@@ -352,7 +352,7 @@ export default function BrandingTab({
                 key={d.id}
                 type="button"
                 onClick={() => update({ tableDensity: d.id })}
-                className={`px-3 py-3 rounded-xl border text-sm font-medium transition-all text-left ${tableDensity === d.id ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'}`}
+                className={`px-3 py-3 rounded-xl border text-sm font-medium transition-all text-start ${tableDensity === d.id ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'}`}
               >
                 <span className="block font-semibold">{d.label}</span>
                 <span className="block text-xs opacity-70 mt-0.5">{d.desc}</span>
@@ -517,7 +517,7 @@ export default function BrandingTab({
                 <div className="w-3.5 h-3.5 rounded-sm bg-gray-200 flex-shrink-0" />
               )}
               <span className="text-xs text-gray-600 truncate">{draftTabTitle || 'myCRM'}</span>
-              <span className="text-gray-300 ml-auto text-xs flex-shrink-0">×</span>
+              <span className="text-gray-300 ms-auto text-xs flex-shrink-0">×</span>
             </div>
           </div>
 

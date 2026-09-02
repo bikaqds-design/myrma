@@ -201,14 +201,14 @@ export default function HierarchyTab({
                         </svg>
                       </button>
                       {brandMenuId === brand.id && (
-                        <div className="absolute right-0 top-7 z-30 w-44 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
+                        <div className="absolute end-0 top-7 z-30 w-44 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
                           <button
                             onClick={() => {
                               setCategoryForm((prev) => ({ ...prev, brand_id: brand.id }))
                               setShowAddCategory(true)
                               setBrandMenuId(null)
                             }}
-                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            className="w-full px-4 py-2 text-start text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                           >
                             <svg
                               className="w-4 h-4 text-gray-500"
@@ -230,7 +230,7 @@ export default function HierarchyTab({
                               handleEditBrand(brand)
                               setBrandMenuId(null)
                             }}
-                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            className="w-full px-4 py-2 text-start text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                           >
                             <svg
                               className="w-4 h-4 text-gray-500"
@@ -253,7 +253,7 @@ export default function HierarchyTab({
                               handleDeleteBrand(brand)
                               setBrandMenuId(null)
                             }}
-                            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                            className="w-full px-4 py-2 text-start text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                           >
                             <svg
                               className="w-4 h-4"
@@ -403,13 +403,13 @@ export default function HierarchyTab({
                         </svg>
                       </button>
                       {catMenuId === cat.id && (
-                        <div className="absolute right-0 top-7 z-30 w-40 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
+                        <div className="absolute end-0 top-7 z-30 w-40 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
                           <button
                             onClick={() => {
                               handleEditCategory(cat)
                               setCatMenuId(null)
                             }}
-                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            className="w-full px-4 py-2 text-start text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                           >
                             <svg
                               className="w-4 h-4 text-gray-500"
@@ -432,7 +432,7 @@ export default function HierarchyTab({
                               handleDeleteCategory(cat)
                               setCatMenuId(null)
                             }}
-                            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                            className="w-full px-4 py-2 text-start text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                           >
                             <svg
                               className="w-4 h-4"

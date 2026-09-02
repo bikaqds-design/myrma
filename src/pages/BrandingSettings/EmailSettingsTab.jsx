@@ -69,14 +69,14 @@ export default function EmailSettingsTab({ settings, setSettings, saving, onSave
             type={showApiKey ? 'text' : 'password'}
             value={settings.api_key}
             onChange={(e) => setSettings({ ...settings, api_key: e.target.value })}
-            className="pr-12 font-mono"
+            className="pe-12 font-mono"
             placeholder="re_xxxxxxxxxxxxxxxxxxxx"
           />
           <button
             type="button"
             onClick={() => setShowApiKey(!showApiKey)}
             aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+            className="absolute end-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
           >
             {showApiKey ? '🙈' : '👁️'}
           </button>

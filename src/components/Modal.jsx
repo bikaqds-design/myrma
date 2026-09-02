@@ -51,7 +51,7 @@ export default function Modal({
         {/* Panel */}
         <Dialog.Content
           className={[
-            'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2',
+            'fixed start-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2',
             'z-50 w-full max-w-lg',
             'bg-white dark:bg-[#121823]',
             'rounded-2xl shadow-xl',

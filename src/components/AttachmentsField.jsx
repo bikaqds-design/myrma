@@ -113,7 +113,7 @@ export default function AttachmentsField({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
         </svg>
         <span className="text-sm text-gray-500 group-hover:text-indigo-600">Attach files</span>
-        <span className="text-xs text-gray-500 ml-auto">PDF, images, docs · max 25 MB each</span>
+        <span className="text-xs text-gray-500 ms-auto">PDF, images, docs · max 25 MB each</span>
         <input type="file" multiple className="hidden" onChange={handleFileSelect} />
       </label>
     </div>

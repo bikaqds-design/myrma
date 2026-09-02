@@ -178,7 +178,7 @@ export function StockMovementsTab({ moves, units, warehouseStockRows, products, 
                   ].map((h, i) => (
                     <th
                       key={i}
-                      className="px-5 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase tracking-wider"
+                      className="px-5 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase tracking-wider"
                     >
                       {h}
                     </th>

@@ -886,7 +886,7 @@ export default function Customers({
     if (sortConfig.key !== col)
       return (
         <svg
-          className="w-3.5 h-3.5 text-[#e6e9ef] dark:text-[#212a38] ml-1"
+          className="w-3.5 h-3.5 text-[#e6e9ef] dark:text-[#212a38] ms-1"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -901,7 +901,7 @@ export default function Customers({
       )
     return sortConfig.direction === 'asc' ? (
       <svg
-        className="w-3.5 h-3.5 text-[#4338ca] dark:text-[#a5b4fc] ml-1"
+        className="w-3.5 h-3.5 text-[#4338ca] dark:text-[#a5b4fc] ms-1"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -910,7 +910,7 @@ export default function Customers({
       </svg>
     ) : (
       <svg
-        className="w-3.5 h-3.5 text-[#4338ca] dark:text-[#a5b4fc] ml-1"
+        className="w-3.5 h-3.5 text-[#4338ca] dark:text-[#a5b4fc] ms-1"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -993,10 +993,10 @@ export default function Customers({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t('customers.searchPlaceholder')}
                   aria-label={t('customers.searchPlaceholder')}
-                  className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
+                  className="w-full ps-9 pe-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
                 />
                 <svg
-                  className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                  className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1075,14 +1075,14 @@ export default function Customers({
                     </svg>
                   </button>
                   {showAddDropdown && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#121823] rounded-lg shadow-lg border border-gray-200 dark:border-[#212a38] z-20">
+                    <div className="absolute end-0 mt-2 w-56 bg-white dark:bg-[#121823] rounded-lg shadow-lg border border-gray-200 dark:border-[#212a38] z-20">
                       <button
                         onClick={() => {
                           resetForm()
                           setShowAddCustomer(true)
                           setShowAddDropdown(false)
                         }}
-                        className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-3 border-b border-gray-100 dark:border-[#212a38] rounded-t-lg"
+                        className="w-full px-4 py-3 text-start hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-3 border-b border-gray-100 dark:border-[#212a38] rounded-t-lg"
                       >
                         <svg
                           className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2]"
@@ -1108,7 +1108,7 @@ export default function Customers({
                             setShowBulkUpload(true)
                             setShowAddDropdown(false)
                           }}
-                          className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-3 rounded-b-lg"
+                          className="w-full px-4 py-3 text-start hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-3 rounded-b-lg"
                         >
                           <svg
                             className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2]"
@@ -1230,7 +1230,7 @@ export default function Customers({
               )}
               <button
                 onClick={() => setSelectedCustomers([])}
-                className="ml-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
+                className="ms-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
               >
                 {t('common.clear')}
               </button>
@@ -1263,7 +1263,7 @@ export default function Customers({
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-[#0f1520] border-y border-gray-200 dark:border-[#212a38]">
                 <tr>
-                  <th className="px-4 py-3 text-left w-10">
+                  <th className="px-4 py-3 text-start w-10">
                     <input
                       type="checkbox"
                       checked={
@@ -1275,28 +1275,28 @@ export default function Customers({
                       className="w-4 h-4 text-indigo-600 rounded"
                     />
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase w-10">
+                  <th className="px-3 py-3 text-start text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase w-10">
                     #
                   </th>
-                  <th className="px-4 py-3 text-left">
+                  <th className="px-4 py-3 text-start">
                     <Th label={t('common.code')} col="customer_code" />
                   </th>
-                  <th className="px-4 py-3 text-left">
+                  <th className="px-4 py-3 text-start">
                     <Th label={t('customers.contactCompany')} col="contact_person" />
                   </th>
-                  <th className="px-4 py-3 text-left">
+                  <th className="px-4 py-3 text-start">
                     <Th label={t('common.type')} col="customer_type" />
                   </th>
-                  <th className="px-4 py-3 text-left">
+                  <th className="px-4 py-3 text-start">
                     <Th label={t('customers.mobile')} col="mobile" />
                   </th>
-                  <th className="px-4 py-3 text-left">
+                  <th className="px-4 py-3 text-start">
                     <Th label={t('common.email')} col="email" />
                   </th>
-                  <th className="px-4 py-3 text-left">
+                  <th className="px-4 py-3 text-start">
                     <Th label={t('common.status')} col="customer_status" />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">
                     {t('common.actions')}
                   </th>
                 </tr>
@@ -1351,7 +1351,7 @@ export default function Customers({
                           <div>
                             <button
                               onClick={() => onNavigateToCustomer(c.id)}
-                              className="font-medium text-gray-900 dark:text-[#e8ebf0] hover:text-indigo-600 text-sm text-left"
+                              className="font-medium text-gray-900 dark:text-[#e8ebf0] hover:text-indigo-600 text-sm text-start"
                             >
                               {c.contact_person || '—'}
                             </button>
@@ -1397,13 +1397,13 @@ export default function Customers({
                           </svg>
                         </button>
                         {openMenuId === c.id && (
-                          <div className="absolute right-0 top-9 z-30 w-44 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-gray-200 dark:border-[#212a38] py-1 overflow-hidden">
+                          <div className="absolute end-0 top-9 z-30 w-44 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-gray-200 dark:border-[#212a38] py-1 overflow-hidden">
                             <button
                               onClick={() => {
                                 onNavigateToCustomer(c.id)
                                 setOpenMenuId(null)
                               }}
-                              className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-2.5"
+                              className="w-full px-4 py-2 text-start text-sm text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-2.5"
                             >
                               <svg
                                 className="w-4 h-4 text-gray-500 dark:text-[#9aa4b2]"
@@ -1432,7 +1432,7 @@ export default function Customers({
                                   handleEditCustomer(c)
                                   setOpenMenuId(null)
                                 }}
-                                className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-2.5"
+                                className="w-full px-4 py-2 text-start text-sm text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-2.5"
                               >
                                 <svg
                                   className="w-4 h-4 text-gray-500 dark:text-[#9aa4b2]"
@@ -1456,7 +1456,7 @@ export default function Customers({
                                   handleDeleteCustomer(c)
                                   setOpenMenuId(null)
                                 }}
-                                className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2.5"
+                                className="w-full px-4 py-2 text-start text-sm text-red-600 hover:bg-red-50 flex items-center gap-2.5"
                               >
                                 <svg
                                   className="w-4 h-4"

@@ -64,7 +64,7 @@ export function ManufacturerTab({
               <button
                 key={brand.id}
                 onClick={() => setSelectedBrand(isA ? null : brand.brand_name)}
-                className={`rounded-2xl border p-4 text-left transition-all ${isA ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-300' : 'border-gray-200 dark:border-[#212a38] bg-white dark:bg-[#121823] hover:border-indigo-200 hover:bg-indigo-50 dark:hover:bg-[#1a2230]/40'}`}
+                className={`rounded-2xl border p-4 text-start transition-all ${isA ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-300' : 'border-gray-200 dark:border-[#212a38] bg-white dark:bg-[#121823] hover:border-indigo-200 hover:bg-indigo-50 dark:hover:bg-[#1a2230]/40'}`}
               >
                 <BrandAvatar name={brand.brand_name} size="md" />
                 <div className="mt-3">
@@ -102,7 +102,7 @@ export function ManufacturerTab({
           {otherBatches.length > 0 && (
             <button
               onClick={() => setSelectedBrand(selectedBrand === '__other' ? null : '__other')}
-              className={`rounded-2xl border p-4 text-left transition-all ${selectedBrand === '__other' ? 'border-gray-400 bg-gray-50 dark:bg-[#0f1520] ring-2 ring-gray-300' : 'border-dashed border-gray-300 bg-white dark:bg-[#121823] hover:border-gray-400'}`}
+              className={`rounded-2xl border p-4 text-start transition-all ${selectedBrand === '__other' ? 'border-gray-400 bg-gray-50 dark:bg-[#0f1520] ring-2 ring-gray-300' : 'border-dashed border-gray-300 bg-white dark:bg-[#121823] hover:border-gray-400'}`}
             >
               <div className="w-9 h-9 bg-gray-200 rounded-xl flex items-center justify-center text-gray-500 dark:text-[#9aa4b2] text-base font-bold">
                 ?
@@ -171,7 +171,7 @@ export function ManufacturerTab({
                   ].map((h, i) => (
                     <th
                       key={i}
-                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider"
+                      className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider"
                     >
                       {h}
                     </th>
@@ -236,7 +236,7 @@ export function ManufacturerTab({
                       <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs whitespace-nowrap">
                         {fmt(b.created_date)}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-end">
                         <span className="text-xs text-indigo-600 hover:underline">{t('inventory.viewLink')}</span>
                       </td>
                     </tr>
@@ -384,7 +384,7 @@ export function CreateBatchModal({ count, brands, onConfirm, onClose }) {
                   key={b.id || b.brand_name}
                   type="button"
                   onClick={() => setBrandName(b.brand_name || b)}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all text-left ${brandName === (b.brand_name || b) ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-gray-200 dark:border-[#212a38] hover:border-indigo-200 text-gray-700 dark:text-[#e8ebf0]'}`}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all text-start ${brandName === (b.brand_name || b) ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-gray-200 dark:border-[#212a38] hover:border-indigo-200 text-gray-700 dark:text-[#e8ebf0]'}`}
                 >
                   <BrandAvatar name={b.brand_name || b} size="xs" />
                   {b.brand_name || b}
@@ -534,7 +534,7 @@ function BatchDetailModal({ batch, batchUnits, canEdit, onClose, onReload }) {
                     {[t('inventory.colProduct'), t('inventory.colSerialNum'), t('inventory.colWarranty'), 'RMA Source', t('inventory.colResolution')].map((h, i) => (
                       <th
                         key={i}
-                        className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2]"
+                        className="px-3 py-2.5 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2]"
                       >
                         {h}
                       </th>

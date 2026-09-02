@@ -977,11 +977,11 @@ export default function CustomerDetails({
                   <table className="w-full">
                     <thead className="bg-gray-50 border-y border-gray-200">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('customerDetails.colRmaNumber')}</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.status')}</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('common.priority')}</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('customerDetails.colIssue')}</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('customerDetails.colCreated')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase">{t('customerDetails.colRmaNumber')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase">{t('common.status')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase">{t('common.priority')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase">{t('customerDetails.colIssue')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase">{t('customerDetails.colCreated')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -1223,10 +1223,10 @@ export default function CustomerDetails({
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 dark:bg-[#0f1520] border-b border-gray-200 dark:border-[#212a38]">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colContactName')}</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colTitle')}</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('common.phone')}</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('common.email')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colContactName')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colTitle')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('common.phone')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('common.email')}</th>
                         {canDo('edit') && <th className="px-4 py-3" />}
                       </tr>
                     </thead>
@@ -1286,12 +1286,12 @@ export default function CustomerDetails({
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 dark:bg-[#0f1520] border-b border-gray-200 dark:border-[#212a38]">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colDealTitle')}</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colDealStage')}</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colDealValue')}</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colDealRep')}</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('common.status')}</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colDealDate')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colDealTitle')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colDealStage')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colDealValue')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colDealRep')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('common.status')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colDealDate')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-[#1a2230]">
@@ -1370,11 +1370,11 @@ export default function CustomerDetails({
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 dark:bg-[#0f1520] border-b border-gray-200 dark:border-[#212a38]">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerDate')}</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerType')}</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerCode')}</th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerAmount')}</th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerBalance')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerDate')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerType')}</th>
+                        <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerCode')}</th>
+                        <th className="px-4 py-3 text-end text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerAmount')}</th>
+                        <th className="px-4 py-3 text-end text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerBalance')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-[#1a2230]">
@@ -1392,10 +1392,10 @@ export default function CustomerDetails({
                               <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2]">{formatDate(entry.entry_date)}</td>
                               <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{t(TYPE_LABEL_KEY[entry.entry_type] ?? entry.entry_type)}</td>
                               <td className="px-4 py-3 font-mono text-xs text-gray-900 dark:text-[#e8ebf0]">{entry.entry_code || '—'}</td>
-                              <td className={`px-4 py-3 text-right font-medium ${entry.amount >= 0 ? 'text-gray-900 dark:text-[#e8ebf0]' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                              <td className={`px-4 py-3 text-end font-medium ${entry.amount >= 0 ? 'text-gray-900 dark:text-[#e8ebf0]' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                 {entry.amount >= 0 ? '+' : ''}{Number(entry.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
-                              <td className="px-4 py-3 text-right text-gray-500 dark:text-[#9aa4b2]">
+                              <td className="px-4 py-3 text-end text-gray-500 dark:text-[#9aa4b2]">
                                 {running.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                             </tr>
@@ -1779,7 +1779,7 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
             </span>
             {getTicketStatusBadge(ticket.ticket_status)}
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+          <div className="flex items-center gap-2 flex-shrink-0 ms-3">
             <button
               onClick={() => exportTicketPDF(ticket, t)}
               title="Export PDF"
@@ -1897,7 +1897,7 @@ function TicketDetailDrawer({ ticket, comments, commentsLoading, formatDate, for
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="font-semibold text-gray-900 dark:text-[#e8ebf0] text-xs">{name}</span>
                           {isTeam && <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-100 text-indigo-700 rounded-full">{t('customerDetails.staffBadge')}</span>}
-                          <span className="text-xs text-gray-400 dark:text-[#a4acb7] ml-auto">{formatDateTime(c.created_date)}</span>
+                          <span className="text-xs text-gray-400 dark:text-[#a4acb7] ms-auto">{formatDateTime(c.created_date)}</span>
                         </div>
                         <p className="text-gray-700 dark:text-[#e8ebf0] whitespace-pre-wrap leading-relaxed">{c.comment_text}</p>
                       </div>

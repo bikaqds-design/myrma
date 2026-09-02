@@ -114,7 +114,7 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
               <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2] max-w-xs mx-auto">
                 {t('onboarding.welcomeBlurb')}
               </p>
-              <div className="mt-6 grid grid-cols-3 gap-3 text-left">
+              <div className="mt-6 grid grid-cols-3 gap-3 text-start">
                 {[
                   { icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z', label: t('onboarding.featCustomers') },
                   { icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z', label: t('onboarding.featTickets') },
@@ -195,7 +195,7 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
               </div>
               <h2 className="text-xl font-bold text-[#211f1b] dark:text-[#e8ebf0] mb-2">{t('onboarding.doneTitle')}</h2>
               <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2] max-w-xs mx-auto mb-5">{t('onboarding.doneBlurb')}</p>
-              <div className="text-left space-y-2 mb-6">
+              <div className="text-start space-y-2 mb-6">
                 {[
                   companyName ? t('onboarding.doneCompany', { name: companyName }) : null,
                   savedCust ? t('onboarding.doneCustomer', { name: savedCust.contact_person || custName }) : null,
@@ -224,7 +224,7 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
               </button>
             )}
             {step < TOTAL && step !== 4 && (
-              <div className="flex items-center gap-2 ml-auto">
+              <div className="flex items-center gap-2 ms-auto">
                 <button onClick={next} className="text-xs text-[#746f65] dark:text-[#a4acb7] hover:underline">{t('onboarding.skip')}</button>
                 <button
                   onClick={step === 2 ? saveBranding : step === 3 ? saveCustomer : next}
@@ -240,7 +240,7 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
               </div>
             )}
             {step === 4 && (
-              <button onClick={next} className="text-xs text-[#746f65] dark:text-[#a4acb7] hover:underline ml-auto">{t('onboarding.skipForNow')}</button>
+              <button onClick={next} className="text-xs text-[#746f65] dark:text-[#a4acb7] hover:underline ms-auto">{t('onboarding.skipForNow')}</button>
             )}
             {step === TOTAL && (
               <button onClick={finish}

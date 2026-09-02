@@ -71,11 +71,11 @@ export default function DocumentNumbering() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#e6e9ef] dark:border-[#212a38]">
-                <th className="py-2 text-left text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.setup.colDocument')}</th>
-                <th className="py-2 text-left text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.setup.colPrefix')}</th>
+                <th className="py-2 text-start text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.setup.colDocument')}</th>
+                <th className="py-2 text-start text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.setup.colPrefix')}</th>
                 <th className="py-2 text-center text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.setup.colYear')}</th>
-                <th className="py-2 text-right text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.setup.colIssued')}</th>
-                <th className="py-2 text-left text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.setup.colNext')}</th>
+                <th className="py-2 text-end text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.setup.colIssued')}</th>
+                <th className="py-2 text-start text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.setup.colNext')}</th>
               </tr>
             </thead>
             <tbody>
@@ -89,7 +89,7 @@ export default function DocumentNumbering() {
                     </td>
                     <td className="py-2.5 font-mono text-gray-700 dark:text-[#e8ebf0]">{prefix}</td>
                     <td className="py-2.5 text-center text-gray-700 dark:text-[#e8ebf0]">{r.seq_year}</td>
-                    <td className="py-2.5 text-right text-gray-700 dark:text-[#e8ebf0]">{r.last_value}</td>
+                    <td className="py-2.5 text-end text-gray-700 dark:text-[#e8ebf0]">{r.last_value}</td>
                     <td className="py-2.5 font-mono text-xs text-gray-500 dark:text-[#9aa4b2]">
                       {prefix}-{r.seq_year}-{next}
                     </td>

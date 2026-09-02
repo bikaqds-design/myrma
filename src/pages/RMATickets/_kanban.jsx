@@ -68,7 +68,7 @@ function KanbanCard({ ticket, onViewDetails, onQuickStatusChange, canQuickEdit, 
         <button
           onClick={handleQuickAction}
           style={{ width: REVEAL_WIDTH }}
-          className="absolute inset-y-0 right-0 flex items-center justify-center px-2 bg-[#4338ca] text-white text-[10px] font-medium text-center leading-tight"
+          className="absolute inset-y-0 end-0 flex items-center justify-center px-2 bg-[#4338ca] text-white text-[10px] font-medium text-center leading-tight"
         >
           {t('tickets.markAs', { status: t(`statusValues.${nextStatus}`, nextStatus) })}
         </button>
@@ -84,7 +84,7 @@ function KanbanCard({ ticket, onViewDetails, onQuickStatusChange, canQuickEdit, 
           transform: isBoardDragging ? undefined : `translateX(${dragX}px)`,
           transition: isDragging ? 'none' : 'transform 0.2s ease',
         }}
-        className={`relative w-full text-left bg-white dark:bg-[#121823] border rounded-[10px] p-3 transition-colors ${
+        className={`relative w-full text-start bg-white dark:bg-[#121823] border rounded-[10px] p-3 transition-colors ${
           isBoardDragging
             ? 'border-[#4338ca] dark:border-[#a5b4fc] shadow-lg'
             : 'border-[#e6e9ef] dark:border-[#212a38] hover:border-[#4338ca] dark:hover:border-[#a5b4fc]'

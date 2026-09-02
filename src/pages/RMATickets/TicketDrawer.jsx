@@ -832,7 +832,7 @@ export function TicketDrawer({
                     {resolution.type.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
                   </span>
                   {canDo('edit_all') && (
-                    <button onClick={handleDeleteResolution} className="ml-auto text-xs text-red-500 hover:underline">{t('ticketDrawer.deleteResolution')}</button>
+                    <button onClick={handleDeleteResolution} className="ms-auto text-xs text-red-500 hover:underline">{t('ticketDrawer.deleteResolution')}</button>
                   )}
                 </div>
                 {(resolution.replacement_product_name || resolution.replacement_serial) && (
@@ -1174,7 +1174,7 @@ export function TicketDrawer({
                         </div>
 
                         {replies.length > 0 && (
-                          <div className="ml-8 mt-2 space-y-2">
+                          <div className="ms-8 mt-2 space-y-2">
                             {replies.map((reply) => {
                               const rName = reply.author_name || reply.user_email || '?'
                               const rTs = new Date(reply.created_date)
@@ -1275,7 +1275,7 @@ export function TicketDrawer({
                         )}
 
                         {replyingTo === comment.id && (
-                          <div className="ml-8 mt-2 bg-white dark:bg-[#121823] border border-indigo-200 rounded-xl p-3 space-y-2">
+                          <div className="ms-8 mt-2 bg-white dark:bg-[#121823] border border-indigo-200 rounded-xl p-3 space-y-2">
                             <div className="flex items-center gap-1.5 mb-1">
                               <svg
                                 className="w-3 h-3 text-indigo-500"
@@ -1356,7 +1356,7 @@ export function TicketDrawer({
                                     className={`relative w-8 h-4 rounded-full transition-colors ${isInternalComment ? 'bg-amber-500' : 'bg-gray-200'}`}
                                   >
                                     <div
-                                      className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white dark:bg-[#121823] rounded-full shadow transition-transform ${isInternalComment ? 'translate-x-4' : ''}`}
+                                      className={`absolute top-0.5 start-0.5 w-3 h-3 bg-white dark:bg-[#121823] rounded-full shadow transition-transform ${isInternalComment ? 'translate-x-4' : ''}`}
                                     />
                                   </div>
                                   <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">Internal</span>
@@ -1454,7 +1454,7 @@ export function TicketDrawer({
                         className={`relative w-9 h-5 rounded-full transition-colors ${isInternalComment ? 'bg-amber-500' : 'bg-gray-200'}`}
                       >
                         <div
-                          className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white dark:bg-[#121823] rounded-full shadow transition-transform ${isInternalComment ? 'translate-x-4' : ''}`}
+                          className={`absolute top-0.5 start-0.5 w-4 h-4 bg-white dark:bg-[#121823] rounded-full shadow transition-transform ${isInternalComment ? 'translate-x-4' : ''}`}
                         />
                       </div>
                       <span className="text-xs text-gray-600 dark:text-[#9aa4b2]">{t('ticketDrawer.internalOnly')}</span>

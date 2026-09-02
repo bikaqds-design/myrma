@@ -212,10 +212,10 @@ export default function CountrySetup({ currentUserEmail }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#e6e9ef] dark:border-[#212a38]">
-                  <th className="py-2 text-left text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.setup.colAreaCode')}</th>
-                  <th className="py-2 text-left text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.setup.colArea')}</th>
+                  <th className="py-2 text-start text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.setup.colAreaCode')}</th>
+                  <th className="py-2 text-start text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.setup.colArea')}</th>
                   <th className="py-2 text-center text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.setup.colSubscriberDigits')}</th>
-                  <th className="py-2 text-left text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.setup.colExample')}</th>
+                  <th className="py-2 text-start text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.setup.colExample')}</th>
                   <th className="py-2 w-8" />
                 </tr>
               </thead>
@@ -233,7 +233,7 @@ export default function CountrySetup({ currentUserEmail }) {
                     <td className="py-2.5 font-mono text-xs text-gray-500 dark:text-[#9aa4b2]">
                       {country?.trunk_prefix}{a.area_code}{'x'.repeat(a.digits)}
                     </td>
-                    <td className="py-2.5 text-right">
+                    <td className="py-2.5 text-end">
                       <button
                         type="button"
                         onClick={() => removeArea(a.id)}

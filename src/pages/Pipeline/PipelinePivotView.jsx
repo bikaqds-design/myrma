@@ -168,7 +168,7 @@ export default function PipelinePivotView({ deals, stages }) {
             <thead>
               <tr className={`border-b ${BORDER} bg-[#f8f9fb] dark:bg-[#0f1520]`}>
                 <th
-                  className={`px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] min-w-[160px] border-r ${BORDER}`}
+                  className={`px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] min-w-[160px] border-r ${BORDER}`}
                 >
                   <span>{t(`pipeline.pivotDim_${rowDim}`)}</span>
                   <span className="mx-1 opacity-40">/</span>
@@ -177,13 +177,13 @@ export default function PipelinePivotView({ deals, stages }) {
                 {colKeys.map((ck) => (
                   <th
                     key={ck}
-                    className="px-4 py-3 text-right text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] whitespace-nowrap"
+                    className="px-4 py-3 text-end text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] whitespace-nowrap"
                   >
                     {ck}
                   </th>
                 ))}
                 <th
-                  className={`px-4 py-3 text-right text-xs font-bold text-[#211f1b] dark:text-[#e8ebf0] whitespace-nowrap border-l ${BORDER}`}
+                  className={`px-4 py-3 text-end text-xs font-bold text-[#211f1b] dark:text-[#e8ebf0] whitespace-nowrap border-l ${BORDER}`}
                 >
                   {t('pipeline.pivotTotal')}
                 </th>
@@ -215,7 +215,7 @@ export default function PipelinePivotView({ deals, stages }) {
                       return (
                         <td
                           key={ck}
-                          className={`px-4 py-2.5 text-right text-xs ${
+                          className={`px-4 py-2.5 text-end text-xs ${
                             v !== null
                               ? 'text-[#211f1b] dark:text-[#e8ebf0]'
                               : 'text-[#6c6760] dark:text-[#9aa4b2]'
@@ -226,7 +226,7 @@ export default function PipelinePivotView({ deals, stages }) {
                       )
                     })}
                     <td
-                      className={`px-4 py-2.5 text-right text-xs font-semibold text-[#211f1b] dark:text-[#e8ebf0] border-l ${BORDER}`}
+                      className={`px-4 py-2.5 text-end text-xs font-semibold text-[#211f1b] dark:text-[#e8ebf0] border-l ${BORDER}`}
                     >
                       {fmt(rowTotals[rk])}
                     </td>
@@ -247,13 +247,13 @@ export default function PipelinePivotView({ deals, stages }) {
                   {colKeys.map((ck) => (
                     <td
                       key={ck}
-                      className="px-4 py-2.5 text-right text-xs font-bold text-[#211f1b] dark:text-[#e8ebf0]"
+                      className="px-4 py-2.5 text-end text-xs font-bold text-[#211f1b] dark:text-[#e8ebf0]"
                     >
                       {fmt(colTotals[ck])}
                     </td>
                   ))}
                   <td
-                    className={`px-4 py-2.5 text-right text-xs font-bold text-[#4338ca] dark:text-[#a5b4fc] border-l ${BORDER}`}
+                    className={`px-4 py-2.5 text-end text-xs font-bold text-[#4338ca] dark:text-[#a5b4fc] border-l ${BORDER}`}
                   >
                     {fmt(grandTotal)}
                   </td>

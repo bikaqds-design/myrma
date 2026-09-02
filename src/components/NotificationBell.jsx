@@ -374,7 +374,7 @@ export default function NotificationBell({
             />
           </svg>
           {unread > 0 && !showLabel && (
-            <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center">
+            <span className="absolute -top-1.5 -end-1.5 flex items-center justify-center">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60" />
               <span className="relative min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
                 {unread > 99 ? '99+' : unread}
@@ -382,7 +382,7 @@ export default function NotificationBell({
             </span>
           )}
         </div>
-        {showLabel && <span className="flex-1 text-left">{t('notifications.title')}</span>}
+        {showLabel && <span className="flex-1 text-start">{t('notifications.title')}</span>}
         {showLabel && unread > 0 && (
           <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full leading-none">
             {unread > 99 ? '99+' : unread}

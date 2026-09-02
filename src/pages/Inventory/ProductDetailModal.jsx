@@ -365,33 +365,33 @@ export function ProductDetailModal({
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   {isStock && canManageBatches && <th className="px-4 py-3 w-10" />}
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500">
                     {t('inventory.colSerialNum')}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500">
                     {t('inventory.colWarranty')}
                   </th>
                   {!isStock && (
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
+                    <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500">
                       {t('inventory.colStatus')}
                     </th>
                   )}
                   {isStock && (
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
+                    <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500">
                       {t('inventory.colResolution')}
                     </th>
                   )}
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">{t('inventory.colRmaNum')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500">{t('inventory.colRmaNum')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500">
                     {t('inventory.colTicketStatus')}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500">
                     {t('inventory.colCustomer')}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500">
                     {t('inventory.colWarehouse')}
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">{t('inventory.colDays')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500">{t('inventory.colDays')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">

@@ -419,16 +419,16 @@ export function WarehousesTab({
           <table className="w-full text-xs border-collapse">
             <thead className="bg-gray-100 sticky top-0 z-10">
               <tr>
-                <th className="px-4 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200 w-28">
+                <th className="px-4 py-2.5 text-start font-semibold text-gray-600 border-b border-r border-gray-200 w-28">
                   {t('inventory.colCode')}
                 </th>
-                <th className="px-4 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200">
+                <th className="px-4 py-2.5 text-start font-semibold text-gray-600 border-b border-r border-gray-200">
                   {t('inventory.colName')}
                 </th>
-                <th className="px-4 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200">
+                <th className="px-4 py-2.5 text-start font-semibold text-gray-600 border-b border-r border-gray-200">
                   {t('inventory.colLocation')}
                 </th>
-                <th className="px-4 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200">
+                <th className="px-4 py-2.5 text-start font-semibold text-gray-600 border-b border-r border-gray-200">
                   {t('inventory.colDescription')}
                 </th>
                 <th className="px-4 py-2.5 text-center font-semibold text-gray-600 border-b border-r border-gray-200 w-20">
@@ -437,7 +437,7 @@ export function WarehousesTab({
                 <th className="px-4 py-2.5 text-center font-semibold text-gray-600 border-b border-r border-gray-200 w-20">
                   {t('inventory.colStatus')}
                 </th>
-                <th className="px-4 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200 w-32">
+                <th className="px-4 py-2.5 text-start font-semibold text-gray-600 border-b border-r border-gray-200 w-32">
                   {t('inventory.colCreated')}
                 </th>
                 {canManage && <th className="px-4 py-2.5 border-b border-gray-200 w-20" />}
@@ -840,10 +840,10 @@ function WarehouseDetailModal({
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('inventory.searchUnitPlaceholder')}
               aria-label={t('inventory.searchUnitPlaceholder')}
-              className="w-full pl-9 pr-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
+              className="w-full ps-9 pe-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
             />
             <svg
-              className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2"
+              className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute start-3 top-1/2 -translate-y-1/2"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -898,7 +898,7 @@ function WarehouseDetailModal({
                   ].map((h, i) => (
                     <th
                       key={i}
-                      className={`px-3 py-2.5 text-left font-semibold text-gray-600 border-b border-r border-gray-200 ${h.cls || ''}`}
+                      className={`px-3 py-2.5 text-start font-semibold text-gray-600 border-b border-r border-gray-200 ${h.cls || ''}`}
                     >
                       {t(`inventory:${h.key}`)}
                     </th>
@@ -992,7 +992,7 @@ function WarehouseDetailModal({
               ? t('inventory.footerUnitsOf', { filtered: filtered.length, total: units.length })
               : t('inventory.footerUnitsTotal', { count: units.length })}
             {selected.length > 0 && (
-              <span className="ml-2 text-indigo-600 font-medium">
+              <span className="ms-2 text-indigo-600 font-medium">
                 {t('inventory.footerSelected', { count: selected.length })}
               </span>
             )}

@@ -165,7 +165,7 @@ export function DealCommentPanel({ dealId, currentUserEmail, canEdit }) {
         </svg>
         <span className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{t('pipeline.commentsPanel')}</span>
         {comments.length > 0 && (
-          <span className="ml-auto text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-[#a5b4fc] px-1.5 py-0.5 rounded-full font-medium">
+          <span className="ms-auto text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-[#a5b4fc] px-1.5 py-0.5 rounded-full font-medium">
             {comments.length}
           </span>
         )}
@@ -219,7 +219,7 @@ export function DealCommentPanel({ dealId, currentUserEmail, canEdit }) {
                     {canEdit && (
                       <button
                         onClick={() => { setReplyingTo(replyingTo === a.id ? null : a.id); setReplyText('') }}
-                        className="text-[11px] text-indigo-500 dark:text-[#a5b4fc] hover:underline mt-1 ml-1"
+                        className="text-[11px] text-indigo-500 dark:text-[#a5b4fc] hover:underline mt-1 ms-1"
                       >
                         {t('activityChatter.reply')}
                       </button>
@@ -227,7 +227,7 @@ export function DealCommentPanel({ dealId, currentUserEmail, canEdit }) {
 
                     {/* Replies */}
                     {replies.length > 0 && (
-                      <div className="mt-2 space-y-2 border-l-2 border-[#e6e9ef] dark:border-[#212a38] pl-3">
+                      <div className="mt-2 space-y-2 border-l-2 border-[#e6e9ef] dark:border-[#212a38] ps-3">
                         {replies.map((r) => (
                           <div key={r.id} className="flex items-start gap-2">
                             <div className={`w-5 h-5 rounded-full ${avatarColor(r.created_by)} flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 mt-0.5`}>

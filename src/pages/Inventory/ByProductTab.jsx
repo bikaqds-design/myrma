@@ -232,10 +232,10 @@ export function ByProductTab({
                     <th className="w-8 px-2 py-2 text-center text-gray-500 dark:text-[#9aa4b2] font-semibold border-b border-r border-gray-200 dark:border-[#212a38]">
                       #
                     </th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38]">
+                    <th className="px-3 py-2 text-start font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38]">
                       {t('inventory.colBrand')}
                     </th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38]">
+                    <th className="px-3 py-2 text-start font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38]">
                       {t('inventory.colProduct')}
                     </th>
                     <th className="px-3 py-2 text-center font-semibold text-gray-600 dark:text-[#9aa4b2] border-b border-r border-gray-200 dark:border-[#212a38] whitespace-nowrap">

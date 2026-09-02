@@ -10,7 +10,7 @@ import { associateFieldId } from '../../lib/fieldAssociation'
 
 // ─── SHARED HELPERS ────────────────────────────────────────────────────────────
 
-const Req = () => <span className="text-red-500 ml-0.5">*</span>
+const Req = () => <span className="text-red-500 ms-0.5">*</span>
 const inp =
   'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none'
 const sel =

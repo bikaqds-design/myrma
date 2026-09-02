@@ -224,7 +224,7 @@ export default function Integrations({ currentUserEmail }) {
               ].map((h, i) => (
                 <th
                   key={i}
-                  className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase"
+                  className="px-4 py-3 text-start text-xs font-semibold text-gray-500 uppercase"
                 >
                   {h}
                 </th>
@@ -282,14 +282,14 @@ export default function Integrations({ currentUserEmail }) {
                     </svg>
                   </button>
                   {openMenuId === w.id && (
-                    <div className="absolute right-0 top-9 z-30 w-44 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
+                    <div className="absolute end-0 top-9 z-30 w-44 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
                       <button
                         onClick={() => {
                           handleTest(w)
                           setOpenMenuId(null)
                         }}
                         disabled={testing === w.id || !w.is_active}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5 disabled:opacity-40"
+                        className="w-full px-4 py-2 text-start text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5 disabled:opacity-40"
                       >
                         <svg
                           className="w-4 h-4 text-green-500"
@@ -311,7 +311,7 @@ export default function Integrations({ currentUserEmail }) {
                           openEdit(w)
                           setOpenMenuId(null)
                         }}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
+                        className="w-full px-4 py-2 text-start text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
                       >
                         <svg
                           className="w-4 h-4 text-gray-500"
@@ -333,7 +333,7 @@ export default function Integrations({ currentUserEmail }) {
                           handleDelete(w.id)
                           setOpenMenuId(null)
                         }}
-                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2.5"
+                        className="w-full px-4 py-2 text-start text-sm text-red-600 hover:bg-red-50 flex items-center gap-2.5"
                       >
                         <svg
                           className="w-4 h-4"

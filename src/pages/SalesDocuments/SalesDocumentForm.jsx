@@ -185,14 +185,14 @@ export default function SalesDocumentForm({ docType, initial = null, customers =
             autoComplete="off"
           />
           {!isEdit && customerOpen && customerMatches.length > 0 && (
-            <div className="absolute top-full left-0 mt-1 w-full z-30 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] py-1 max-h-48 overflow-y-auto">
+            <div className="absolute top-full start-0 mt-1 w-full z-30 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] py-1 max-h-48 overflow-y-auto">
               {customerMatches.map((c) => (
                 <button
                   key={c.id}
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => { setCustomerId(c.id); setCustomerQuery(''); setCustomerOpen(false) }}
-                  className="w-full px-3 py-2 text-left text-sm hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520] flex items-center justify-between gap-2"
+                  className="w-full px-3 py-2 text-start text-sm hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520] flex items-center justify-between gap-2"
                 >
                   <span className="font-medium text-[#211f1b] dark:text-[#e8ebf0] truncate">{c.company_name || c.contact_person}</span>
                   {c.customer_code && <span className="text-xs font-mono text-[#6c6760] dark:text-[#9aa4b2] flex-shrink-0">{c.customer_code}</span>}
@@ -274,7 +274,7 @@ export default function SalesDocumentForm({ docType, initial = null, customers =
                 <NumCell label={t('salesDocuments.fUnitPrice')} value={l.unit_price} onChange={(v) => updateLine(i, { unit_price: v })} />
                 <NumCell label={t('salesDocuments.fDiscount')} value={l.discount_pct ?? ''} onChange={(v) => updateLine(i, { discount_pct: v })} />
                 <NumCell label={t('salesDocuments.fTax')} value={l.tax_pct ?? ''} onChange={(v) => updateLine(i, { tax_pct: v })} />
-                <div className="text-right">
+                <div className="text-end">
                   <div className="text-[10px] uppercase text-[#6c6760] dark:text-[#9aa4b2] mb-1">{t('salesDocuments.fLineTotal')}</div>
                   <div className="text-sm font-semibold text-[#211f1b] dark:text-[#e8ebf0] py-2">
                     {lineTotal(l).toLocaleString(undefined, { maximumFractionDigits: 2 })}

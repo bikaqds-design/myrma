@@ -2,8 +2,8 @@
 
 Date: 2026-09-02 · Commit `2d8c17d`
 
-**17 of 37 findings are closed** (rows marked ✅), including **all 6 Criticals**.
-Remaining: 0 Critical, **5 High**, 11 Medium, 4 Low.
+**18 of 38 findings are closed** (rows marked ✅), including **all 6 Criticals**.
+Remaining: 0 Critical, **4 High**, 12 Medium, 4 Low.
 
 IDs are permanent. `[rendered, not persisted]` marks a finding observed in the
 running app but without a saved screenshot (see `00-INVENTORY.md §8`).
@@ -19,7 +19,7 @@ Severity per Appendix B. Effort: `S` < 1h, `M` half day, `L` multi-day.
 | UX-GLOBAL-001 | All | 125 distinct hardcoded hex colours and 5,648 arbitrary Tailwind values bypass the 52 tokens already declared | Consistency | High | L | Map the top 20 colours (covering ~85% of uses) to semantic tokens; codemod; lint against raw hex | `src/styles/tokens.css`, app-wide |
 | UX-GLOBAL-002 | All | No z-index ladder. Tailwind `z-10…z-50` coexists with `z-[60]`, `z-[70]`, `z-[200]`, `z-[400]`, `z-[500]` | Consistency | Medium | S | Define 6 named layers; replace all | app-wide |
 | ✅ UX-GLOBAL-003 (CLOSED e49bde5) | All (RTL) | Signed numbers and trailing punctuation render wrong in Arabic. `+8%` displays as `8%+`; `Forgot password?` displays as `?Forgot password` | RTL | **Critical** | M | Apply the existing `<Ltr>` wrapper to every number, currency, percentage, SKU, serial, phone and ID | `src/components/ui.jsx` (Ltr), all value renderers |
-| UX-GLOBAL-004 | All (RTL) | 378 `text-left`/`text-right` against 8 `text-start`/`text-end`; 103 `ml-/mr-`, 85 `left-/right-` | RTL | High | L | Codemod physical → logical; add an ESLint rule to prevent regression | app-wide, `src/styles/rtl.css` |
+| ✅ UX-GLOBAL-004 (CLOSED — codemod) | All (RTL) | 378 `text-left`/`text-right` against 8 `text-start`/`text-end`; 103 `ml-/mr-`, 85 `left-/right-` | RTL | High | L | Codemod physical → logical; add an ESLint rule to prevent regression | app-wide, `src/styles/rtl.css` |
 | ✅ UX-GLOBAL-005 (CLOSED 18e6ed5) | All | 40 sites dump raw Postgres/Supabase errors into toasts | Feedback | High | M | Central `toUserMessage(error)` mapping constraint/RLS classes to AR+EN copy | `CommentPanel.jsx:96,125,151`, `ProductDocuments.jsx:92,122`, +35 |
 | UX-GLOBAL-006 | All | Only 14 of 115 page files have an empty state | Feedback | High | L | `EmptyState` on every list/table/widget, with its primary action | `src/components/EmptyState.jsx` (exists, 14 uses) |
 | UX-GLOBAL-007 | All | No shared Table. 72 raw `<table>` across 50 files | Consistency | High | L | Build `Table` with sort/filter/pagination/bulk-select; migrate per module | `src/components/ui/Table/` (empty dir) |
@@ -29,6 +29,7 @@ Severity per Appendix B. Effort: `S` < 1h, `M` half day, `L` multi-day.
 | ✅ UX-GLOBAL-011 (CLOSED c543dee) | All | The app-shell Toaster is the only one without `toastOptions`, so in-app toasts are styled differently from auth/tracker toasts | Consistency | Low | S | Pass `toastOptions` to the shell mount | `src/App.jsx:1175` |
 | UX-GLOBAL-012 | — | ~~`ar.json` has more keys than `en.json`~~ **RETRACTED — not a defect.** The 47 extra Arabic keys are CLDR plural forms (`_zero/_one/_two/_few/_many`) that Arabic requires and English does not. Correct i18n practice. | i18n | ~~Medium~~ **None** | — | No action | `src/locales/*.json` |
 | UX-GLOBAL-016 | — | 21 keys have an Arabic value identical to the English. Most are legitimate (CLI commands, `English (en)`, `VIP`, phone placeholders) but a few are genuinely untranslated, e.g. `cp.webhooks.header = "Webhooks"` | i18n | Low | S | Review the 21; translate the real ones, add a comment marker to the deliberate ones | `src/locales/ar.json` |
+| UX-GLOBAL-017 | Lists with pagination (RTL) | Pagination arrows point the wrong way in Arabic — `التالي →` / `السابق ←`. Same class as UX-ONBOARD-003, found during the RTL re-capture on the inventory table | RTL | Medium | S | Mirror the glyphs by direction, as done in Login and the wizard | pagination controls |
 | ✅ UX-GLOBAL-013 (CLOSED c543dee) | — | Empty `src/components/ui/Form/` and `ui/Table/` directories, untracked by git | Consistency | Low | S | Delete, or build the Table that was intended | `src/components/ui/` |
 
 ### UX-GLOBAL-003 — detail (Critical)

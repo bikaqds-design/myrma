@@ -169,7 +169,7 @@ export default function HomeView({ onNavigate, currentUserEmail: _currentUserEma
                 <button
                   key={f.id}
                   onClick={() => onNavigate(f.id)}
-                  className={`group bg-white dark:bg-[#121823] border border-gray-200 dark:border-[#212a38] rounded-xl p-4 text-left transition-all hover:shadow-md ${c.hover}`}
+                  className={`group bg-white dark:bg-[#121823] border border-gray-200 dark:border-[#212a38] rounded-xl p-4 text-start transition-all hover:shadow-md ${c.hover}`}
                 >
                   <div
                     className={`w-9 h-9 rounded-lg flex items-center justify-center mb-3 ${c.icon}`}

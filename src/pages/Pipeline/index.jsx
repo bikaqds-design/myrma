@@ -232,7 +232,7 @@ function MultiCheckFilter({ label, selected, onChange, options }) {
         </svg>
       </button>
       {open && (
-        <div className="absolute top-full mt-1 left-0 bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-xl shadow-lg z-20 py-1.5 min-w-[160px]">
+        <div className="absolute top-full mt-1 start-0 bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-xl shadow-lg z-20 py-1.5 min-w-[160px]">
           {options.map((opt) => (
             <label key={opt.value} className="flex items-center gap-2.5 px-3 py-2 hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] cursor-pointer">
               <input
@@ -569,11 +569,11 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
               </svg>
             </button>
             {showExportDropdown && (
-              <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] z-20 py-1.5">
+              <div className="absolute end-0 mt-2 w-64 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] z-20 py-1.5">
                 {/* Export All */}
                 <button
                   onClick={() => { exportDealsXlsx(deals, stages, customerMap, t('pipeline.currency'), t, 'pipeline-all'); setShowExportDropdown(false) }}
-                  className="w-full px-4 py-2.5 text-left hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3"
+                  className="w-full px-4 py-2.5 text-start hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3"
                 >
                   <svg className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -587,7 +587,7 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
                 {filteredDeals.length !== deals.length && (
                   <button
                     onClick={() => { exportDealsXlsx(filteredDeals, stages, customerMap, t('pipeline.currency'), t, 'pipeline-filtered'); setShowExportDropdown(false) }}
-                    className="w-full px-4 py-2.5 text-left hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3 border-t border-[#f0f2f6] dark:border-[#1a2230]"
+                    className="w-full px-4 py-2.5 text-start hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3 border-t border-[#f0f2f6] dark:border-[#1a2230]"
                   >
                     <svg className="w-4 h-4 text-indigo-500 dark:text-[#a5b4fc] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
@@ -606,7 +606,7 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
                       exportDealsXlsx(data, stages, customerMap, t('pipeline.currency'), t, 'pipeline-selected')
                       setShowExportDropdown(false)
                     }}
-                    className="w-full px-4 py-2.5 text-left hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3 border-t border-[#f0f2f6] dark:border-[#1a2230]"
+                    className="w-full px-4 py-2.5 text-start hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3 border-t border-[#f0f2f6] dark:border-[#1a2230]"
                   >
                     <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -627,7 +627,7 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
       {/* Search & filter toolbar */}
       <div className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-3 mb-4 flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
@@ -636,7 +636,7 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('pipeline.searchPlaceholder')}
             aria-label={t('pipeline.searchPlaceholder')}
-            className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
+            className="w-full ps-9 pe-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
           />
         </div>
         <button

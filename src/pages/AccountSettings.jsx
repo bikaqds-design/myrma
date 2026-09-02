@@ -606,7 +606,7 @@ export default function AccountSettings({ currentUser, currentUserRole, currentU
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   aria-label={t('accountSettings.uploadPhoto')}
-                  className="absolute -bottom-1 -right-1 w-7 h-7 bg-white border-2 border-gray-200 rounded-full flex items-center justify-center hover:bg-indigo-50 hover:border-indigo-300 shadow-sm transition-colors"
+                  className="absolute -bottom-1 -end-1 w-7 h-7 bg-white border-2 border-gray-200 rounded-full flex items-center justify-center hover:bg-indigo-50 hover:border-indigo-300 shadow-sm transition-colors"
                 >
                   <svg
                     className="w-3.5 h-3.5 text-gray-600"
@@ -634,7 +634,7 @@ export default function AccountSettings({ currentUser, currentUserRole, currentU
                 {avatarPreview && (
                   <Button
                     variant="secondary"
-                    className="ml-3"
+                    className="ms-3"
                     onClick={() => {
                       setAvatarPreview(null)
                       setAvatarFile(null)
@@ -724,7 +724,7 @@ export default function AccountSettings({ currentUser, currentUserRole, currentU
                   type={showCurrent ? 'text' : 'password'}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="pr-10"
+                  className="pe-10"
                   placeholder="••••••••"
                   autoComplete="current-password"
                 />
@@ -733,7 +733,7 @@ export default function AccountSettings({ currentUser, currentUserRole, currentU
                   onClick={() => setShowCurrent((v) => !v)}
                   tabIndex={-1}
                   aria-label={showCurrent ? 'Hide password' : 'Show password'}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
+                  className="absolute end-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
                 >
                   <EyeIcon visible={showCurrent} />
                 </button>
@@ -747,7 +747,7 @@ export default function AccountSettings({ currentUser, currentUserRole, currentU
                   type={showNew ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="pr-10"
+                  className="pe-10"
                   placeholder="••••••••"
                   autoComplete="new-password"
                 />
@@ -756,7 +756,7 @@ export default function AccountSettings({ currentUser, currentUserRole, currentU
                   onClick={() => setShowNew((v) => !v)}
                   tabIndex={-1}
                   aria-label={showNew ? 'Hide password' : 'Show password'}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
+                  className="absolute end-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
                 >
                   <EyeIcon visible={showNew} />
                 </button>
@@ -772,7 +772,7 @@ export default function AccountSettings({ currentUser, currentUserRole, currentU
                   type={showConfirm ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="pr-10"
+                  className="pe-10"
                   placeholder="••••••••"
                   autoComplete="new-password"
                 />
@@ -781,7 +781,7 @@ export default function AccountSettings({ currentUser, currentUserRole, currentU
                   onClick={() => setShowConfirm((v) => !v)}
                   tabIndex={-1}
                   aria-label={showConfirm ? 'Hide password' : 'Show password'}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
+                  className="absolute end-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
                 >
                   <EyeIcon visible={showConfirm} />
                 </button>

@@ -209,11 +209,11 @@ export default function CurrencySettings({ currentUserEmail }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#e6e9ef] dark:border-[#212a38]">
-                <th className="py-2 text-left text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.currency.colCode')}</th>
-                <th className="py-2 text-left text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.currency.colName')}</th>
-                <th className="py-2 text-left text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.currency.colSymbol')}</th>
+                <th className="py-2 text-start text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.currency.colCode')}</th>
+                <th className="py-2 text-start text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.currency.colName')}</th>
+                <th className="py-2 text-start text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.currency.colSymbol')}</th>
                 <th className="py-2 text-center text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.currency.colDecimals')}</th>
-                <th className="py-2 text-right text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.currency.colActive')}</th>
+                <th className="py-2 text-end text-xs uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('cp.currency.colActive')}</th>
               </tr>
             </thead>
             <tbody>
@@ -232,7 +232,7 @@ export default function CurrencySettings({ currentUserEmail }) {
                     <td className="py-2.5 text-gray-700 dark:text-[#e8ebf0]">{c.name}</td>
                     <td className="py-2.5 text-gray-700 dark:text-[#e8ebf0]">{c.symbol}</td>
                     <td className="py-2.5 text-center text-gray-700 dark:text-[#e8ebf0]">{c.decimals}</td>
-                    <td className="py-2.5 text-right">
+                    <td className="py-2.5 text-end">
                       {/* The base currency cannot be deactivated: every amount
                           in the system is denominated in it. */}
                       {isBase ? (

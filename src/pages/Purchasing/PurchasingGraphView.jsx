@@ -201,7 +201,7 @@ export default function PurchasingGraphView({ documents, vendorName }) {
                 </option>
               ))}
             </select>
-            <label className="text-xs text-[#6c6760] dark:text-[#9aa4b2] ml-2">{t('purchasing.graphGroupBy')}</label>
+            <label className="text-xs text-[#6c6760] dark:text-[#9aa4b2] ms-2">{t('purchasing.graphGroupBy')}</label>
             <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} className={selectCls}>
               {DIMENSIONS.map((g) => (
                 <option key={g} value={g}>

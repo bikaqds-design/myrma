@@ -446,7 +446,7 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                           </div>
                         </div>
                         {canApproveDoc(a) && onApproveActivity && onRejectActivity && (
-                          <div className="flex gap-2 mt-2 ml-8">
+                          <div className="flex gap-2 mt-2 ms-8">
                             {/* The activity is passed alongside its id because its title
                                 encodes which document the approval targets — a parent may
                                 hold several. Extra arg; existing callers can ignore it. */}
@@ -464,7 +464,7 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                             </button>
                           </div>
                         )}
-                        <p className="text-xs text-gray-400 dark:text-[#a4acb7] mt-2 ml-8">
+                        <p className="text-xs text-gray-400 dark:text-[#a4acb7] mt-2 ms-8">
                           {a.created_by || '—'} · {fmtTime(a.created_at)}
                         </p>
                       </div>
@@ -483,7 +483,7 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                     </div>
                     )}
                     {a.type !== 'approval' && reschedulingId === a.id && (
-                      <div className="flex items-center gap-2 mt-2 ml-8">
+                      <div className="flex items-center gap-2 mt-2 ms-8">
                         <Input
                           type="datetime-local"
                           value={rescheduleDue}
@@ -499,7 +499,7 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
                       </div>
                     )}
                     {a.type !== 'approval' && canEdit && reschedulingId !== a.id && (
-                      <div className="flex items-center gap-4 mt-2 ml-8">
+                      <div className="flex items-center gap-4 mt-2 ms-8">
                         <button onClick={() => handleMarkDone(a)} className="text-xs font-medium text-indigo-600 dark:text-[#a5b4fc] hover:underline">
                           ✓ {t('activityChatter.markDone')}
                         </button>
@@ -588,7 +588,7 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
 
                           {/* Replies thread */}
                           {replies.length > 0 && (
-                            <ul className="mt-2 space-y-2 border-l-2 border-gray-200 dark:border-[#212a38] pl-3">
+                            <ul className="mt-2 space-y-2 border-l-2 border-gray-200 dark:border-[#212a38] ps-3">
                               {replies.map((r) => (
                                 <li key={r.id}>
                                   <p className="text-sm text-gray-800 dark:text-[#e8ebf0] whitespace-pre-wrap">{r.title}</p>

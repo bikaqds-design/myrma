@@ -24,15 +24,15 @@ is codemods plus lint rules that stop the drift returning.
 
 ## Status
 
-**17 of 37 closed. All 6 Criticals and 4 of 9 Highs are closed.**
-Remaining: 0 Critical, 5 High, 11 Medium, 4 Low — and every remaining High is
-effort `L`.
+**18 of 38 closed. All 6 Criticals and 5 of 9 Highs.**
+Remaining: 0 Critical, 4 High, 12 Medium, 4 Low.
 
 | Closed | in |
 |---|---|
 | UX-AUTH-002, -003, -004, UX-DASH-001, -002, UX-GLOBAL-010, -011, -013 | `c543dee` |
 | UX-AUTH-001, UX-ONBOARD-001, -002, -003, UX-GLOBAL-003 | `e49bde5` |
 | UX-AUTH-005, UX-GLOBAL-005, -014, -015 | `18e6ed5` |
+| UX-GLOBAL-004 (585 physical properties -> 0) | this commit |
 
 Every Critical was an Arabic/RTL defect, and every one of them reduced to the
 same root cause: **English prose sitting inside an RTL container.** The bidi
@@ -56,7 +56,6 @@ The five left are the codemod and multi-day items. Nothing quick remains.
 | 1 | UX-GLOBAL-007 | No Table primitive; 72 raw `<table>` in 50 files | High | Build the component, then migrate 72 call sites |
 | 2 | UX-GLOBAL-008 | Kit adoption 29–57% | High | ~250 hand-rolled controls to migrate |
 | 3 | UX-GLOBAL-001 | 2,362 raw hex values | High | Needs the semantic token set defined first, with a dark value per role |
-| 4 | UX-GLOBAL-004 | 585 physical CSS properties | High | Mechanical codemod, but every screen needs re-checking in RTL after |
 | 5 | UX-GLOBAL-006 | 101 of 115 page files have no empty state | High | Per-screen copy and a primary action each |
 
 Both guarded classes (001, 004) are held by lint rules, so they cannot grow
@@ -69,10 +68,10 @@ the codemods they protect:
 
 | Rule | Current count |
 |---|---:|
-| Physical CSS properties in className | 585 |
-| Raw hex in className | 2,362 |
+| Physical CSS properties in className | **0** |
+| Raw hex in className | 2,365 |
 | Hardcoded user-visible JSX text | 36 |
-| **Total (ratchet in `lint:ci`)** | **2,983** |
+| **Total (ratchet in `lint:ci`)** | **2,401** |
 
 `npm run lint:ui` reports the breakdown. The number can fall and never rise;
 when it reaches zero the rules become errors. That 36 is the honest measure of

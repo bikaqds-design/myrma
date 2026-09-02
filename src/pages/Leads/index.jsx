@@ -866,10 +866,10 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
               </svg>
             </button>
             {showAddLeadDropdown && (
-              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#121823] rounded-lg shadow-lg border border-gray-200 dark:border-[#212a38] z-20">
+              <div className="absolute end-0 mt-2 w-56 bg-white dark:bg-[#121823] rounded-lg shadow-lg border border-gray-200 dark:border-[#212a38] z-20">
                 <button
                   onClick={() => { resetForm(); setShowAddLead(true); setShowAddLeadDropdown(false); }}
-                  className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[#1a2230] flex items-center gap-3 border-b border-gray-100 dark:border-[#212a38]"
+                  className="w-full px-4 py-3 text-start hover:bg-gray-50 dark:hover:bg-[#1a2230] flex items-center gap-3 border-b border-gray-100 dark:border-[#212a38]"
                 >
                   <svg className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -881,7 +881,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                 </button>
                 <button
                   onClick={() => { setShowBulkUpload(true); setShowAddLeadDropdown(false) }}
-                  className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-3 rounded-b-lg"
+                  className="w-full px-4 py-3 text-start hover:bg-gray-50 dark:hover:bg-[#1a2230] dark:bg-[#0f1520] flex items-center gap-3 rounded-b-lg"
                 >
                   <svg className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -941,9 +941,9 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t('leads.searchPlaceholder')}
                   aria-label={t('leads.searchPlaceholder')}
-                  className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
+                  className="w-full ps-9 pe-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
                 />
-                <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
@@ -1044,7 +1044,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
           )}
           <button
             onClick={() => setSelectedLeads(new Set())}
-            className="ml-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
+            className="ms-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
           >
             {t('common.clear')}
           </button>
@@ -1078,7 +1078,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
             <table className="w-full">
               <thead className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
                 <tr>
-                  <th className="pl-4 pr-2 py-3 w-8">
+                  <th className="ps-4 pe-2 py-3 w-8">
                     <input
                       type="checkbox"
                       className="rounded border-gray-300 dark:border-[#212a38] text-indigo-600 focus:ring-indigo-500"
@@ -1091,25 +1091,25 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                       aria-label={t('common.selectAll')}
                     />
                   </th>
-                  <th className="px-2 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase w-10">#</th>
-                  <th className="px-2 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase w-32">{t('common.code')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                  <th className="px-2 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase w-10">#</th>
+                  <th className="px-2 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase w-32">{t('common.code')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                     <SortableHeader label={t('leads.colName')} sortKey="full_name" sortConfig={sortConfig} onSort={handleSort} />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('leads.colContact')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('leads.colContact')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                     <SortableHeader label={t('leads.colSource')} sortKey="source" sortConfig={sortConfig} onSort={handleSort} />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                     <SortableHeader label={t('common.status')} sortKey="status" sortConfig={sortConfig} onSort={handleSort} />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                     <SortableHeader label={t('leads.colAssignedRep')} sortKey="assigned_rep" sortConfig={sortConfig} onSort={handleSort} />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                     <SortableHeader label={t('common.createdAt')} sortKey="created_at" sortConfig={sortConfig} onSort={handleSort} />
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('common.actions')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
@@ -1127,7 +1127,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                 ) : (
                   paginatedLeads.map((l, idx) => (
                     <tr key={l.id} className={`hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520] transition-colors ${selectedLeads.has(l.id) ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}`}>
-                      <td className="pl-4 pr-2 py-3">
+                      <td className="ps-4 pe-2 py-3">
                         <input
                           type="checkbox"
                           disabled={l.status === 'converted'}
@@ -1229,7 +1229,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                                   navigate(`/leads/${l.id}`)
                                   setOpenMenuId(null)
                                 }}
-                                className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230]"
+                                className="w-full px-4 py-2 text-start text-sm text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230]"
                               >
                                 {t('leads.viewLead')}
                               </button>
@@ -1239,7 +1239,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                                     handleEditLead(l)
                                     setOpenMenuId(null)
                                   }}
-                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230]"
+                                  className="w-full px-4 py-2 text-start text-sm text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230]"
                                 >
                                   {t('common.edit')}
                                 </button>
@@ -1250,7 +1250,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                                     handleOpenConvert(l)
                                     setOpenMenuId(null)
                                   }}
-                                  className="w-full px-4 py-2 text-left text-sm text-indigo-600 hover:bg-gray-50 dark:hover:bg-[#1a2230]"
+                                  className="w-full px-4 py-2 text-start text-sm text-indigo-600 hover:bg-gray-50 dark:hover:bg-[#1a2230]"
                                 >
                                   {t('leads.convertToDeal')}
                                 </button>
@@ -1261,7 +1261,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                                     handleDeleteLead(l)
                                     setOpenMenuId(null)
                                   }}
-                                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                  className="w-full px-4 py-2 text-start text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                                 >
                                   {t('leads.disqualify')}
                                 </button>
@@ -1272,7 +1272,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                                     handleReopenLead(l)
                                     setOpenMenuId(null)
                                   }}
-                                  className="w-full px-4 py-2 text-left text-sm text-indigo-600 hover:bg-gray-50 dark:hover:bg-[#1a2230]"
+                                  className="w-full px-4 py-2 text-start text-sm text-indigo-600 hover:bg-gray-50 dark:hover:bg-[#1a2230]"
                                 >
                                   {t('leads.reopenLead')}
                                 </button>
@@ -1395,7 +1395,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
               <button
                 key={s}
                 onClick={() => handleInlineStatus(statusMenuLead, s)}
-                className={`w-full px-3 py-1.5 text-left flex items-center transition-colors ${statusMenuLead.status === s ? 'opacity-40 cursor-default' : 'hover:bg-gray-50 dark:hover:bg-[#1a2230]'}`}
+                className={`w-full px-3 py-1.5 text-start flex items-center transition-colors ${statusMenuLead.status === s ? 'opacity-40 cursor-default' : 'hover:bg-gray-50 dark:hover:bg-[#1a2230]'}`}
               >
                 <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${STATUS_BADGE[s] || STATUS_BADGE.new}`}>
                   {t(`leadStatus.${s}`)}
@@ -1419,7 +1419,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
               <button
                 key={s}
                 onClick={() => handleInlineSource(sourceMenuLead, s)}
-                className={`w-full px-3 py-1.5 text-left flex items-center transition-colors ${sourceMenuLead.source === s ? 'opacity-40 cursor-default' : 'hover:bg-gray-50 dark:hover:bg-[#1a2230]'}`}
+                className={`w-full px-3 py-1.5 text-start flex items-center transition-colors ${sourceMenuLead.source === s ? 'opacity-40 cursor-default' : 'hover:bg-gray-50 dark:hover:bg-[#1a2230]'}`}
               >
                 <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${SOURCE_BADGE[s] || SOURCE_BADGE['walk-in']}`}>
                   {t(`leadSource.${s.replace('-', '_')}`)}

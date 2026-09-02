@@ -126,10 +126,10 @@ export default function AuditLog() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('cp.auditLog.searchPlaceholder')}
             aria-label={t('cp.auditLog.searchPlaceholder')}
-            className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
+            className="w-full ps-9 pe-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
           />
           <svg
-            className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2"
+            className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute start-3 top-1/2 -translate-y-1/2"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -199,7 +199,7 @@ export default function AuditLog() {
                 {HEADERS.map((h, i) => (
                   <th
                     key={i}
-                    className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase"
+                    className="px-4 py-3 text-start text-xs font-semibold text-gray-500 uppercase"
                   >
                     {h}
                   </th>

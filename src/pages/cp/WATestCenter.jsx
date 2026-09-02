@@ -207,7 +207,7 @@ export default function WATestCenter({ currentUserEmail }) {
         )}
         <div className="flex items-center gap-3">
           <Button variant="primary" onClick={handleRunWorker} disabled={running} className="min-w-[160px]">
-            {running ? <><Spinner size="sm" color="white" /><span className="ml-2">{t('cp.waTestCenter.runningWorker')}</span></> : t('cp.waTestCenter.runWorker')}
+            {running ? <><Spinner size="sm" color="white" /><span className="ms-2">{t('cp.waTestCenter.runningWorker')}</span></> : t('cp.waTestCenter.runWorker')}
           </Button>
           <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{t('cp.waTestCenter.workerJobs')}</p>
         </div>
@@ -268,7 +268,7 @@ export default function WATestCenter({ currentUserEmail }) {
         )}
 
         <Button variant="primary" onClick={handleSendTest} disabled={sending} className="min-w-[160px]">
-          {sending ? <><Spinner size="sm" color="white" /><span className="ml-2">{t('cp.waTestCenter.sending')}</span></> : t('cp.waTestCenter.sendBtn')}
+          {sending ? <><Spinner size="sm" color="white" /><span className="ms-2">{t('cp.waTestCenter.sending')}</span></> : t('cp.waTestCenter.sendBtn')}
         </Button>
       </section>
 
@@ -302,7 +302,7 @@ export default function WATestCenter({ currentUserEmail }) {
           </div>
         </div>
         <Button variant="secondary" onClick={handleSimulate} disabled={simulating}>
-          {simulating ? <><Spinner size="sm" /><span className="ml-2">{t('cp.waTestCenter.simulating')}</span></> : t('cp.waTestCenter.simulateBtn')}
+          {simulating ? <><Spinner size="sm" /><span className="ms-2">{t('cp.waTestCenter.simulating')}</span></> : t('cp.waTestCenter.simulateBtn')}
         </Button>
       </section>
 

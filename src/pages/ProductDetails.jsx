@@ -738,19 +738,19 @@ export default function ProductDetails({
                   <table className="w-full">
                     <thead className="bg-gray-50 border-y border-gray-200">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase">
                           {t('customerDetails.colRmaNumber')}
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase">
                           {t('products.colCustomer')}
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase">
                           {t('common.status')}
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase">
                           {t('common.priority')}
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase">
                           {t('products.colCreated')}
                         </th>
                       </tr>

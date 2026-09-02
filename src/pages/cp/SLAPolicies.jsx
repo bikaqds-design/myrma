@@ -73,7 +73,7 @@ export default function SLAPolicies({ currentUserEmail }) {
               className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${localConfig.enabled ? 'bg-indigo-600' : 'bg-gray-300'}`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white dark:bg-[#121823] shadow transition-transform ${localConfig.enabled ? 'translate-x-4' : 'translate-x-0'}`}
+                className={`absolute top-0.5 start-0.5 w-4 h-4 rounded-full bg-white dark:bg-[#121823] shadow transition-transform ${localConfig.enabled ? 'translate-x-4' : 'translate-x-0'}`}
               />
             </button>
           </label>
@@ -104,7 +104,7 @@ export default function SLAPolicies({ currentUserEmail }) {
                     className="w-24 px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
                   />
                   <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('cp.slaPolicies.hours')}</span>
-                  <span className="text-xs text-gray-500 dark:text-[#9aa4b2] ml-2">
+                  <span className="text-xs text-gray-500 dark:text-[#9aa4b2] ms-2">
                     (
                     {policy.hours >= 24 ? `${(policy.hours / 24).toFixed(1)}d` : `${policy.hours}h`}
                     )
@@ -121,7 +121,7 @@ export default function SLAPolicies({ currentUserEmail }) {
                 className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${localConfig.pauseOnHold ? 'bg-indigo-600' : 'bg-gray-300'}`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white dark:bg-[#121823] shadow transition-transform ${localConfig.pauseOnHold ? 'translate-x-4' : 'translate-x-0'}`}
+                  className={`absolute top-0.5 start-0.5 w-4 h-4 rounded-full bg-white dark:bg-[#121823] shadow transition-transform ${localConfig.pauseOnHold ? 'translate-x-4' : 'translate-x-0'}`}
                 />
               </button>
               <span className="text-sm text-gray-600 dark:text-[#9aa4b2]">

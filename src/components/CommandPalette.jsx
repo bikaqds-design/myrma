@@ -154,7 +154,7 @@ export default function CommandPalette({ onSelectTicket, onSelectProduct, inputR
 
       {/* Dropdown */}
       {open && (query.trim().length >= 2) && (
-        <div className="absolute left-0 top-full mt-1.5 w-96 bg-white dark:bg-[#121823] rounded-xl shadow-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden z-[200]">
+        <div className="absolute start-0 top-full mt-1.5 w-96 bg-white dark:bg-[#121823] rounded-xl shadow-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden z-[200]">
           {results.length > 0 ? (
             <ul className="max-h-80 overflow-y-auto py-1.5">
               {ticketResults.length > 0 && (

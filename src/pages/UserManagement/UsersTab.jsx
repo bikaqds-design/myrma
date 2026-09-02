@@ -142,22 +142,22 @@ export function UsersTab({
                 className="rounded border-gray-300"
               />
             </th>
-            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-3 sm:px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase">
               {t('userManagement.colUser')}
             </th>
-            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-3 sm:px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase">
               {t('userManagement.colStatus')}
             </th>
-            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-3 sm:px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase">
               {t('userManagement.colRole')}
             </th>
-            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-3 sm:px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase">
               {t('userManagement.colChangeRole')}
             </th>
-            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-3 sm:px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase">
               {t('userManagement.colPermissions')}
             </th>
-            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-3 sm:px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase">
               {t('userManagement.colActions')}
             </th>
           </tr>
@@ -179,7 +179,7 @@ export function UsersTab({
                   <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-semibold">
                     {user.user_email.charAt(0).toUpperCase()}
                   </div>
-                  <div className="ml-3">
+                  <div className="ms-3">
                     <p className="text-sm font-medium text-gray-900">{user.user_email}</p>
                     {user.last_login && (
                       <p className="text-xs text-gray-500">
@@ -254,13 +254,13 @@ export function UsersTab({
                   </svg>
                 </button>
                 {openMenuId === user.id && (
-                  <div className="absolute right-0 top-9 z-30 w-40 sm:w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
+                  <div className="absolute end-0 top-9 z-30 w-40 sm:w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 overflow-hidden">
                     <button
                       onClick={() => {
                         onUserControl(user)
                         setOpenMenuId(null)
                       }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
+                      className="w-full px-4 py-2 text-start text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
                     >
                       <svg
                         className="w-4 h-4 text-gray-500"
@@ -288,7 +288,7 @@ export function UsersTab({
                         onResetPassword(user)
                         setOpenMenuId(null)
                       }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
+                      className="w-full px-4 py-2 text-start text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
                     >
                       <svg
                         className="w-4 h-4 text-gray-500"
@@ -315,7 +315,7 @@ export function UsersTab({
                           onDeleteUser(user)
                           setOpenMenuId(null)
                         }}
-                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2.5 border-t border-gray-100"
+                        className="w-full px-4 py-2 text-start text-sm text-red-600 hover:bg-red-50 flex items-center gap-2.5 border-t border-gray-100"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -329,7 +329,7 @@ export function UsersTab({
                         onViewActivity(user)
                         setOpenMenuId(null)
                       }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
+                      className="w-full px-4 py-2 text-start text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
                     >
                       <svg
                         className="w-4 h-4 text-gray-500"
@@ -352,7 +352,7 @@ export function UsersTab({
                           onPreview(user)
                           setOpenMenuId(null)
                         }}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
+                        className="w-full px-4 py-2 text-start text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2.5"
                       >
                         <svg
                           className="w-4 h-4 text-gray-500"
@@ -577,7 +577,7 @@ export function AddUserModal({
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => onPasswordChange(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent pr-10"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent pe-10"
               placeholder="Min 6 characters"
               required
               minLength={6}
@@ -586,7 +586,7 @@ export function AddUserModal({
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+              className="absolute end-3 top-1/2 -translate-y-1/2 text-gray-500"
             >
               {showPassword ? '🙈' : '👁️'}
             </button>
@@ -665,7 +665,7 @@ export function PasswordResetModal({ user, isSuperAdmin, password, onPasswordCha
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => onPasswordChange(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent pr-10 text-sm"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent pe-10 text-sm"
                 placeholder={t('userManagement.minSixChars')}
                 minLength={6}
                 autoFocus
@@ -674,7 +674,7 @@ export function PasswordResetModal({ user, isSuperAdmin, password, onPasswordCha
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
+                className="absolute end-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
               >
                 {showPassword ? '🙈' : '👁️'}
               </button>

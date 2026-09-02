@@ -580,7 +580,7 @@ export default function RMATracker() {
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-5">
                 Messages{' '}
                 {comments.length > 0 && (
-                  <span className="ml-1 text-gray-500">({comments.length})</span>
+                  <span className="ms-1 text-gray-500">({comments.length})</span>
                 )}
               </h2>
 
@@ -676,7 +676,7 @@ export default function RMATracker() {
                           <button
                             type="button"
                             onClick={() => removeFile(i)}
-                            className="text-gray-500 hover:text-red-500 ml-0.5"
+                            className="text-gray-500 hover:text-red-500 ms-0.5"
                           >
                             ✕
                           </button>
@@ -778,7 +778,7 @@ function CommentThread({ comment, replies, replyingTo, onReply }) {
         onReply={onReply}
       />
       {replies.length > 0 && (
-        <div className="ml-8 mt-2 space-y-2 pl-4 border-l-2 border-gray-100">
+        <div className="ms-8 mt-2 space-y-2 ps-4 border-l-2 border-gray-100">
           {replies.map((reply) => {
             const rIsTeam = !reply.is_customer_comment
             const rName = reply.author_name || reply.user_email || 'Team'
@@ -826,7 +826,7 @@ function CommentBubble({
               Support Team
             </span>
           )}
-          <span className="text-xs text-gray-500 ml-auto">{fmtDateTime(comment.created_date)}</span>
+          <span className="text-xs text-gray-500 ms-auto">{fmtDateTime(comment.created_date)}</span>
         </div>
         <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
           {comment.comment_text}

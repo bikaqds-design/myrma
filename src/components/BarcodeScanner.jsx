@@ -102,10 +102,10 @@ export default function BarcodeScanner({ onScan, onClose }) {
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-52 h-36 relative">
                   <div className="absolute inset-0 border border-[#a5b4fc]/30 rounded-lg" />
-                  <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-[#a5b4fc] rounded-tl-lg" />
-                  <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-[#a5b4fc] rounded-tr-lg" />
-                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-[#a5b4fc] rounded-bl-lg" />
-                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-[#a5b4fc] rounded-br-lg" />
+                  <div className="absolute top-0 start-0 w-6 h-6 border-t-2 border-l-2 border-[#a5b4fc] rounded-tl-lg" />
+                  <div className="absolute top-0 end-0 w-6 h-6 border-t-2 border-r-2 border-[#a5b4fc] rounded-tr-lg" />
+                  <div className="absolute bottom-0 start-0 w-6 h-6 border-b-2 border-l-2 border-[#a5b4fc] rounded-bl-lg" />
+                  <div className="absolute bottom-0 end-0 w-6 h-6 border-b-2 border-r-2 border-[#a5b4fc] rounded-br-lg" />
                   <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 h-px bg-[#a5b4fc]/50 animate-pulse" />
                 </div>
               </div>

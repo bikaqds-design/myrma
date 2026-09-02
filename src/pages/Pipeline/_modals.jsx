@@ -101,7 +101,7 @@ function CustomerSearchField({ customers, value, label, onSelect, id }) {
                 setQuery(c.company_name || c.contact_person)
                 setOpen(false)
               }}
-              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-[#1a2230] text-gray-800 dark:text-[#e8ebf0]"
+              className="w-full px-3 py-2 text-start text-sm hover:bg-gray-50 dark:hover:bg-[#1a2230] text-gray-800 dark:text-[#e8ebf0]"
             >
               <div className="font-medium">{c.company_name || c.contact_person}</div>
               {c.company_name && <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">{c.contact_person}</div>}

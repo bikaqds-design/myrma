@@ -361,11 +361,11 @@ export default function WATemplates({ currentUserEmail }) {
             <div className="px-6 py-5 space-y-4">
               {/* Phone mockup */}
               <div className="bg-[#e5ddd5] rounded-xl p-4">
-                <div className="bg-[#dcf8c6] rounded-xl rounded-br-sm px-4 py-3 max-w-[85%] ml-auto shadow-sm">
+                <div className="bg-[#dcf8c6] rounded-xl rounded-br-sm px-4 py-3 max-w-[85%] ms-auto shadow-sm">
                   <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
                     {renderPreview(selected, previewVars)}
                   </p>
-                  <p className="text-[10px] text-gray-500 text-right mt-1">12:00 ✓✓</p>
+                  <p className="text-[10px] text-gray-500 text-end mt-1">12:00 ✓✓</p>
                 </div>
               </div>
               {/* Variable overrides */}

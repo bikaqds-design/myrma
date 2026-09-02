@@ -278,7 +278,7 @@ function PipelineCard({ pipeline, stageCounts, currentUserEmail, onSaved, confir
             }`}
           >
             <span
-              className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+              className={`absolute top-0.5 start-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
                 draft.is_active ? 'translate-x-4' : 'translate-x-0'
               }`}
             />
@@ -291,12 +291,12 @@ function PipelineCard({ pipeline, stageCounts, currentUserEmail, onSaved, confir
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-[#0f1520] text-xs text-gray-600 dark:text-[#9aa4b2]">
             <tr>
-              <th className="px-2 py-2 text-left w-16">{t('cp.pipelineStages.colOrder')}</th>
-              <th className="px-2 py-2 text-left">{t('cp.pipelineStages.colName')}</th>
-              <th className="px-2 py-2 text-left">{t('cp.pipelineStages.colId')}</th>
-              <th className="px-2 py-2 text-left w-24">{t('cp.pipelineStages.colProb')}</th>
-              <th className="px-2 py-2 text-left w-20">{t('cp.pipelineStages.colDeals')}</th>
-              <th className="px-2 py-2 text-left w-20">{t('cp.pipelineStages.colActions')}</th>
+              <th className="px-2 py-2 text-start w-16">{t('cp.pipelineStages.colOrder')}</th>
+              <th className="px-2 py-2 text-start">{t('cp.pipelineStages.colName')}</th>
+              <th className="px-2 py-2 text-start">{t('cp.pipelineStages.colId')}</th>
+              <th className="px-2 py-2 text-start w-24">{t('cp.pipelineStages.colProb')}</th>
+              <th className="px-2 py-2 text-start w-20">{t('cp.pipelineStages.colDeals')}</th>
+              <th className="px-2 py-2 text-start w-20">{t('cp.pipelineStages.colActions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-[#212a38]">
@@ -342,12 +342,12 @@ function PipelineCard({ pipeline, stageCounts, currentUserEmail, onSaved, confir
                         debugging a report needs the value the rows store. */}
                     <code className="text-xs text-gray-500 dark:text-[#9aa4b2]">{s.id}</code>
                     {s.is_won && (
-                      <span className="ml-2 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                      <span className="ms-2 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
                         {t('cp.pipelineStages.wonTag')}
                       </span>
                     )}
                     {s.is_lost && (
-                      <span className="ml-2 text-[10px] font-semibold text-red-700 dark:text-red-300">
+                      <span className="ms-2 text-[10px] font-semibold text-red-700 dark:text-red-300">
                         {t('cp.pipelineStages.lostTag')}
                       </span>
                     )}

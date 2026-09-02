@@ -373,7 +373,7 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
         <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">
           {t('reports.ticketCount', { count: filtered.length })}
         </span>
-        <div className="ml-auto">
+        <div className="ms-auto">
           <ExportButtons onCSV={handleExport} onExcel={handleExportExcel} />
         </div>
       </div>
@@ -402,7 +402,7 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
                   ].map((h, i) => (
                     <th
                       key={i}
-                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
+                      className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
                     >
                       {h}
                     </th>
@@ -608,7 +608,7 @@ function CustomersTab({ customers, tickets, formatDate }) {
                   ].map((h, i) => (
                     <th
                       key={i}
-                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider"
+                      className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider"
                     >
                       {h}
                     </th>
@@ -774,7 +774,7 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
                   ].map((h, i) => (
                     <th
                       key={i}
-                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
+                      className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
                     >
                       {h}
                     </th>
@@ -1041,19 +1041,19 @@ function PipelineTab({ deals, leads, pipelines }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-gray-600 dark:text-[#9aa4b2] uppercase tracking-wider">
-                  <th className="text-left font-semibold pb-2">{t('reports.colSource')}</th>
-                  <th className="text-right font-semibold pb-2">{t('reports.colLeads')}</th>
-                  <th className="text-right font-semibold pb-2">{t('reports.colConverted')}</th>
-                  <th className="text-right font-semibold pb-2">{t('reports.colRate')}</th>
+                  <th className="text-start font-semibold pb-2">{t('reports.colSource')}</th>
+                  <th className="text-end font-semibold pb-2">{t('reports.colLeads')}</th>
+                  <th className="text-end font-semibold pb-2">{t('reports.colConverted')}</th>
+                  <th className="text-end font-semibold pb-2">{t('reports.colRate')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
                 {bySource.map((r) => (
                   <tr key={r.source}>
                     <td className="py-2 text-gray-700 dark:text-[#e8ebf0] capitalize">{r.source}</td>
-                    <td className="py-2 text-right text-gray-700 dark:text-[#e8ebf0] tabular-nums">{r.total}</td>
-                    <td className="py-2 text-right text-gray-700 dark:text-[#e8ebf0] tabular-nums">{r.converted}</td>
-                    <td className="py-2 text-right font-medium text-gray-900 dark:text-[#e8ebf0] tabular-nums">
+                    <td className="py-2 text-end text-gray-700 dark:text-[#e8ebf0] tabular-nums">{r.total}</td>
+                    <td className="py-2 text-end text-gray-700 dark:text-[#e8ebf0] tabular-nums">{r.converted}</td>
+                    <td className="py-2 text-end font-medium text-gray-900 dark:text-[#e8ebf0] tabular-nums">
                       {pct(r.converted, r.total)}
                     </td>
                   </tr>
@@ -1110,7 +1110,7 @@ function PipelineTab({ deals, leads, pipelines }) {
                   ].map((h, i) => (
                     <th
                       key={i}
-                      className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
+                      className="px-4 py-3 text-start text-xs font-semibold text-gray-600 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
                     >
                       {h}
                     </th>
@@ -1312,7 +1312,7 @@ function SalesTab({ quotations, salesOrders, invoices, payments, allSalesOrders,
                   <span className="text-gray-600 dark:text-[#9aa4b2] tabular-nums">
                     {st.count} · {fmt$(st.value)}
                     {prev && (
-                      <span className="ml-2 text-gray-500 dark:text-[#9aa4b2]">
+                      <span className="ms-2 text-gray-500 dark:text-[#9aa4b2]">
                         ({pct(st.count, prev.count)} {t('reports.ofPrevious')})
                       </span>
                     )}
@@ -1366,7 +1366,7 @@ function SalesTab({ quotations, salesOrders, invoices, payments, allSalesOrders,
                   ].map((h, i) => (
                     <th
                       key={i}
-                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
+                      className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
                     >
                       {h}
                     </th>
@@ -1550,7 +1550,7 @@ function FinancialTab({ invoices, quotations, customers, formatDate }) {
                   ].map((h, i) => (
                     <th
                       key={i}
-                      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
+                      className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider whitespace-nowrap"
                     >
                       {h}
                     </th>
@@ -1867,7 +1867,7 @@ export default function Reports({
           max={today}
           className={inputCls}
         />
-        <div className="flex items-center gap-1.5 flex-wrap ml-2">
+        <div className="flex items-center gap-1.5 flex-wrap ms-2">
           <button
             onClick={() => applyPreset(7)}
             className={presetCls(isPreset7 && toDate === today)}

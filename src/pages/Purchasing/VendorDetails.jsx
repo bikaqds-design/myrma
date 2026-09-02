@@ -197,11 +197,11 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('purchasing.colType')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('purchasing.colCode')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('purchasing.colStatus')}</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('purchasing.colTotal')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('purchasing.colCreated')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('purchasing.colType')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('purchasing.colCode')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('purchasing.colStatus')}</th>
+                  <th className="px-4 py-3 text-end text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('purchasing.colTotal')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('purchasing.colCreated')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-[#1a2230]">
@@ -231,7 +231,7 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-[#e8ebf0]">
+                    <td className="px-4 py-3 text-end font-medium text-gray-900 dark:text-[#e8ebf0]">
                       {fmtMoney(doc.total)}
                       {/* Only on a foreign document. Repeating "EGP" down a
                           column where everything is EGP trains people to stop
@@ -267,11 +267,11 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerDate')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerType')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerCode')}</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerAmount')}</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerBalance')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerDate')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerType')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerCode')}</th>
+                  <th className="px-4 py-3 text-end text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerAmount')}</th>
+                  <th className="px-4 py-3 text-end text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerBalance')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-[#1a2230]">
@@ -289,13 +289,13 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
                           {t(LEDGER_TYPE_LABEL_KEY[entry.entry_type] ?? entry.entry_type)}
                         </td>
                         <td className="px-4 py-3 font-mono text-xs text-gray-900 dark:text-[#e8ebf0]">{entry.entry_code || '—'}</td>
-                        <td className={`px-4 py-3 text-right font-medium ${entry.amount >= 0 ? 'text-gray-900 dark:text-[#e8ebf0]' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                        <td className={`px-4 py-3 text-end font-medium ${entry.amount >= 0 ? 'text-gray-900 dark:text-[#e8ebf0]' : 'text-emerald-600 dark:text-emerald-400'}`}>
                           {entry.amount >= 0 ? '+' : ''}{fmtMoney(entry.amount)}
                           {entry.currency && entry.currency !== baseCurrency && (
                             <span className="ms-1 text-xs font-semibold text-amber-600 dark:text-amber-400">{entry.currency}</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right text-gray-500 dark:text-[#9aa4b2]">{fmtMoney(running)}</td>
+                        <td className="px-4 py-3 text-end text-gray-500 dark:text-[#9aa4b2]">{fmtMoney(running)}</td>
                       </tr>
                     )
                   })

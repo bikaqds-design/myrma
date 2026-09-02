@@ -202,7 +202,7 @@ export function Label({ children, required, htmlFor, className = '' }) {
       className={`block text-sm font-medium text-gray-700 mb-1 ${className}`}
     >
       {children}
-      {required && <span className="text-red-500 ml-0.5">*</span>}
+      {required && <span className="text-red-500 ms-0.5">*</span>}
     </label>
   )
 }

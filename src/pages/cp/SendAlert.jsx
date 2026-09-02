@@ -82,7 +82,7 @@ export default function SendAlert({ currentUserEmail }) {
               <button
                 key={at.value}
                 onClick={() => setType(at.value)}
-                className={`flex items-center gap-3 p-3.5 rounded-xl border-2 text-left transition-colors ${type === at.value ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 dark:border-[#212a38] hover:border-gray-300 dark:border-[#212a38] bg-white dark:bg-[#121823]'}`}
+                className={`flex items-center gap-3 p-3.5 rounded-xl border-2 text-start transition-colors ${type === at.value ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 dark:border-[#212a38] hover:border-gray-300 dark:border-[#212a38] bg-white dark:bg-[#121823]'}`}
               >
                 <span className="text-2xl">{at.icon}</span>
                 <div>
@@ -121,7 +121,7 @@ export default function SendAlert({ currentUserEmail }) {
             className="w-full px-3 py-2.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent resize-none"
             placeholder="Describe the alert in detail..."
           />
-          <p className="text-xs text-gray-500 dark:text-[#9aa4b2] text-right mt-1">{message.length}/500</p>
+          <p className="text-xs text-gray-500 dark:text-[#9aa4b2] text-end mt-1">{message.length}/500</p>
         </div>
 
         {/* Target */}

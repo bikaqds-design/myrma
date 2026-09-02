@@ -297,14 +297,14 @@ export function CreateCreditNoteModal({ invoice, onClose, onConfirm }) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
-                    <th className="pl-3 pr-2 py-2 w-8" />
-                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">
+                    <th className="ps-3 pe-2 py-2 w-8" />
+                    <th className="px-3 py-2 text-start text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">
                       {t('salesDocuments.fProduct')}
                     </th>
                     <th className="px-3 py-2 text-center text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2] w-24">
                       {t('salesDocuments.fQty')}
                     </th>
-                    <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2] w-28">
+                    <th className="px-3 py-2 text-end text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2] w-28">
                       {t('salesDocuments.fLineTotal')}
                     </th>
                   </tr>
@@ -312,7 +312,7 @@ export function CreateCreditNoteModal({ invoice, onClose, onConfirm }) {
                 <tbody>
                   {lines.map((l, i) => (
                     <tr key={i} className={`border-b border-[#f0f2f6] dark:border-[#1a2230] ${!l.included ? 'opacity-40' : ''}`}>
-                      <td className="pl-3 pr-2 py-2">
+                      <td className="ps-3 pe-2 py-2">
                         <input
                           type="checkbox"
                           checked={l.included}
@@ -339,7 +339,7 @@ export function CreateCreditNoteModal({ invoice, onClose, onConfirm }) {
                           max {l.qty}
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-right font-medium text-[#211f1b] dark:text-[#e8ebf0]">
+                      <td className="px-3 py-2 text-end font-medium text-[#211f1b] dark:text-[#e8ebf0]">
                         {fmtMoney(lineTotal(l))}
                       </td>
                     </tr>
@@ -507,14 +507,14 @@ export function CreateStandaloneCreditNoteModal({
                 autoComplete="off"
               />
               {!lockCustomer && customerOpen && customerMatches.length > 0 && (
-                <div className="absolute top-full left-0 mt-1 w-full z-30 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] py-1 max-h-48 overflow-y-auto">
+                <div className="absolute top-full start-0 mt-1 w-full z-30 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] py-1 max-h-48 overflow-y-auto">
                   {customerMatches.map((c) => (
                     <button
                       key={c.id}
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => { setCustomerId(c.id); setCustomerQuery(''); setCustomerOpen(false) }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520] flex items-center justify-between gap-2"
+                      className="w-full px-3 py-2 text-start text-sm hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520] flex items-center justify-between gap-2"
                     >
                       <span className="font-medium text-[#211f1b] dark:text-[#e8ebf0] truncate">{c.company_name || c.contact_person}</span>
                       {c.customer_code && <span className="text-xs font-mono text-[#6c6760] dark:text-[#9aa4b2] flex-shrink-0">{c.customer_code}</span>}
@@ -588,7 +588,7 @@ export function CreateStandaloneCreditNoteModal({
                       <div className="text-[10px] uppercase text-[#6c6760] dark:text-[#9aa4b2] mb-1">{t('salesDocuments.fUnitPrice')}</div>
                       <Input type="number" min={0} value={l.unit_price} onChange={(e) => updateLine(i, { unit_price: e.target.value })} className="text-sm" />
                     </div>
-                    <div className="text-right">
+                    <div className="text-end">
                       <div className="text-[10px] uppercase text-[#6c6760] dark:text-[#9aa4b2] mb-1">{t('salesDocuments.fLineTotal')}</div>
                       <div className="text-sm font-semibold text-[#211f1b] dark:text-[#e8ebf0] py-2">
                         {fmtMoney(lineTotal(l))}

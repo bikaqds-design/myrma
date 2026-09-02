@@ -126,7 +126,7 @@ function LineItemsEditor({ lines, setLines, products, t }) {
                 onChange={(v) => updateLine(i, { discount_pct: parseFloat(v) || 0 })} />
               <NumCell label={t('salesDocuments.fTax')} min="0" max="100" value={line.tax_pct ?? ''}
                 onChange={(v) => updateLine(i, { tax_pct: parseFloat(v) || 0 })} />
-              <div className="text-right">
+              <div className="text-end">
                 <div className="text-[10px] uppercase text-[#6c6760] dark:text-[#9aa4b2] mb-1">{t('salesDocuments.fLineTotal')}</div>
                 <div className="text-sm font-semibold text-[#211f1b] dark:text-[#e8ebf0] py-2">
                   {lineTotal(line).toLocaleString(undefined, { maximumFractionDigits: 2 })}
@@ -793,10 +793,10 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
-                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('purchasing.colCode')}</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('purchasing.dueDate')}</th>
-                        <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('purchasing.remainingBalance')}</th>
-                        <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2] w-28">{t('accounting.applyAmount')}</th>
+                        <th className="px-3 py-2 text-start text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('purchasing.colCode')}</th>
+                        <th className="px-3 py-2 text-start text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('purchasing.dueDate')}</th>
+                        <th className="px-3 py-2 text-end text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('purchasing.remainingBalance')}</th>
+                        <th className="px-3 py-2 text-end text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2] w-28">{t('accounting.applyAmount')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -806,13 +806,13 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
                           <tr key={inv.id} className="border-b border-[#f0f2f6] dark:border-[#1a2230] last:border-0">
                             <td className="px-3 py-2 font-mono text-xs text-[#211f1b] dark:text-[#e8ebf0]">{inv.vi_code || '—'}</td>
                             <td className="px-3 py-2 text-[#6c6760] dark:text-[#9aa4b2]">{inv.due_date || '—'}</td>
-                            <td className="px-3 py-2 text-right text-[#6c6760] dark:text-[#9aa4b2]">{fmtMoney(remaining)}</td>
+                            <td className="px-3 py-2 text-end text-[#6c6760] dark:text-[#9aa4b2]">{fmtMoney(remaining)}</td>
                             <td className="px-3 py-2">
                               <input
                                 type="number" min={0} max={remaining} step={0.01}
                                 value={allocations[inv.id] ?? ''}
                                 onChange={(e) => updateAllocation(inv.id, e.target.value)}
-                                className="w-full px-2 py-1 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded text-sm text-right focus:ring-1 focus:ring-[#4338ca] outline-none"
+                                className="w-full px-2 py-1 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded text-sm text-end focus:ring-1 focus:ring-[#4338ca] outline-none"
                               />
                             </td>
                           </tr>

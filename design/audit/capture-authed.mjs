@@ -42,8 +42,8 @@ async function sessionFor(email) {
 const browser = await chromium.launch()
 const results = []
 
-for (const role of ['admin', 'manager', 'technician', 'sales_rep', 'viewer']) {
-  const email = `zz-audit-${role}@qdsegypt.com`
+for (const role of (process.env.ROLES || 'admin,manager,technician,sales_rep,viewer').split(',')) {
+  const email = process.env.FIXTURE_EMAIL || `zz-audit-${role}@qdsegypt.com`
   let session
   try { session = await sessionFor(email) }
   catch (e) { results.push({ role, error: e.message }); continue }

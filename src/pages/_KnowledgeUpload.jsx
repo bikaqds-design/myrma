@@ -184,7 +184,7 @@ export default function KnowledgeUpload({ currentUserEmail }) {
               disabled={busy}
               accept=".pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,image/*"
               aria-label={t('bulkUpload.chooseFiles')}
-              className="block w-full text-sm text-gray-600 dark:text-[#9aa4b2] file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50"
+              className="block w-full text-sm text-gray-600 dark:text-[#9aa4b2] file:me-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50"
             />
           </div>
           <div>

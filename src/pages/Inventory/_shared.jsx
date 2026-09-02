@@ -263,10 +263,10 @@ export function InvToolbar({
             // placeholder is not an accessible name, so without this the search
             // box on every Inventory tab was an unlabelled text field.
             aria-label={placeholder}
-            className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
+            className="w-full ps-9 pe-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
           />
           <svg
-            className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2"
+            className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute start-3 top-1/2 -translate-y-1/2"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -310,7 +310,7 @@ export function InvFilterPanel({ show, onClear, activeFilterCount = 0, children 
     <div className="flex items-center gap-4 p-4 bg-[#f8f9fb] dark:bg-[#0f1520] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] flex-wrap">
       {children}
       {activeFilterCount > 0 && (
-        <button onClick={onClear} className="text-sm text-red-600 hover:underline ml-auto">
+        <button onClick={onClear} className="text-sm text-red-600 hover:underline ms-auto">
           {t('inventory.clearFilters')}
         </button>
       )}
@@ -454,7 +454,7 @@ export function InvSortBtn({ label, sortKey, activeSortKey, activeSortDir, onSor
       {isActive ? (
         activeSortDir === 'asc' ? (
           <svg
-            className="w-3 h-3 text-indigo-600 ml-0.5"
+            className="w-3 h-3 text-indigo-600 ms-0.5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -463,7 +463,7 @@ export function InvSortBtn({ label, sortKey, activeSortKey, activeSortDir, onSor
           </svg>
         ) : (
           <svg
-            className="w-3 h-3 text-indigo-600 ml-0.5"
+            className="w-3 h-3 text-indigo-600 ms-0.5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -473,7 +473,7 @@ export function InvSortBtn({ label, sortKey, activeSortKey, activeSortDir, onSor
         )
       ) : (
         <svg
-          className="w-3 h-3 text-gray-300 ml-0.5"
+          className="w-3 h-3 text-gray-300 ms-0.5"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"

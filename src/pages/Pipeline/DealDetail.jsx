@@ -738,7 +738,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
       <div className="grid grid-cols-[1fr_40px_80px_50px_50px_24px] gap-1.5 text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase mb-1.5 px-1">
         <span>{t('salesDocs.lineProduct')}</span>
         <span className="text-center">{t('salesDocs.lineQty')}</span>
-        <span className="text-right">{t('salesDocs.lineUnitPrice')}</span>
+        <span className="text-end">{t('salesDocs.lineUnitPrice')}</span>
         <span className="text-center">{t('salesDocs.lineDiscount')}</span>
         <span className="text-center">{t('salesDocs.lineTax')}</span>
         <span />
@@ -756,7 +756,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
               inputClassName="w-full px-2 py-1.5 border border-gray-300 dark:border-[#212a38] dark:bg-[#0f1520] dark:text-[#e8ebf0] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm bg-white placeholder-gray-400 transition-colors"
             />
             <Input type="number" min="1" value={l.qty} onChange={(e) => updateQtLine(i, 'qty', e.target.value)} className="w-10 text-sm text-center !px-1" />
-            <Input type="number" min="0" value={l.unit_price} onChange={(e) => updateQtLine(i, 'unit_price', e.target.value)} className="w-20 text-sm text-right !px-1.5" />
+            <Input type="number" min="0" value={l.unit_price} onChange={(e) => updateQtLine(i, 'unit_price', e.target.value)} className="w-20 text-sm text-end !px-1.5" />
             <Input type="number" min="0" max="100" value={l.discount_pct ?? ''} onChange={(e) => updateQtLine(i, 'discount_pct', e.target.value !== '' ? Number(e.target.value) : null)} placeholder="0" className="w-12 text-sm text-center !px-1" />
             <Input type="number" min="0" max="100" value={l.tax_pct ?? ''} onChange={(e) => updateQtLine(i, 'tax_pct', e.target.value !== '' ? Number(e.target.value) : null)} placeholder="0" className="w-12 text-sm text-center !px-1" />
             <button onClick={() => removeQtLine(i)} className="w-6 h-6 flex items-center justify-center text-red-400 hover:text-red-600 text-base">×</button>
@@ -881,25 +881,25 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
               value={customerSearch}
               onChange={(e) => setCustomerSearch(e.target.value)}
               placeholder={t('pipeline.searchCustomer')}
-              className="w-full text-sm pl-3 pr-7 py-1.5 border border-indigo-500 rounded-lg dark:bg-[#0f1520] dark:text-[#e8ebf0] dark:border-indigo-400 focus:outline-none"
+              className="w-full text-sm ps-3 pe-7 py-1.5 border border-indigo-500 rounded-lg dark:bg-[#0f1520] dark:text-[#e8ebf0] dark:border-indigo-400 focus:outline-none"
               autoFocus
               onKeyDown={(e) => { if (e.key === 'Escape') { setEditingCustomer(false); setCustomerSearch('') } }}
             />
             <button
               onClick={() => { setEditingCustomer(false); setCustomerSearch('') }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-[#e8ebf0] text-base leading-none"
+              className="absolute end-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-[#e8ebf0] text-base leading-none"
             >×</button>
             {filteredCustomers.length > 0 && (
-              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+              <div className="absolute z-50 top-full start-0 end-0 mt-1 bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-lg shadow-lg overflow-hidden max-h-48 overflow-y-auto">
                 {filteredCustomers.map((c) => (
                   <button
                     key={c.id}
                     onClick={() => handleSelectCustomer(c)}
-                    className="w-full px-3 py-2 text-sm text-left hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] border-b border-[#f0f2f6] dark:border-[#1a2230] last:border-0"
+                    className="w-full px-3 py-2 text-sm text-start hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0] border-b border-[#f0f2f6] dark:border-[#1a2230] last:border-0"
                   >
                     {c.company_name || c.contact_person}
                     {c.company_name && c.contact_person && (
-                      <span className="text-xs text-gray-400 dark:text-[#a4acb7] ml-1">· {c.contact_person}</span>
+                      <span className="text-xs text-gray-400 dark:text-[#a4acb7] ms-1">· {c.contact_person}</span>
                     )}
                   </button>
                 ))}
@@ -1147,7 +1147,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
               {t('pipeline.quotationTab')}
               {/* A single QT still shows its code; several show the count instead. */}
               {hasQuotation && (
-                <span className="ml-1.5 text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-[#a5b4fc] px-1.5 py-0.5 rounded-full">
+                <span className="ms-1.5 text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-[#a5b4fc] px-1.5 py-0.5 rounded-full">
                   {quotations.length === 1 ? quotations[0].qt_code : quotations.length}
                 </span>
               )}
@@ -1269,10 +1269,10 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
                               <div className="grid grid-cols-[1fr_40px_80px_50px_50px_70px] gap-1.5 text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase mb-1.5 px-1">
                                 <span>{t('salesDocs.lineProduct')}</span>
                                 <span className="text-center">{t('salesDocs.lineQty')}</span>
-                                <span className="text-right">{t('salesDocs.lineUnitPrice')}</span>
+                                <span className="text-end">{t('salesDocs.lineUnitPrice')}</span>
                                 <span className="text-center">{t('salesDocs.lineDiscount')}</span>
                                 <span className="text-center">{t('salesDocs.lineTax')}</span>
-                                <span className="text-right">{t('salesDocs.lineSubtotal')}</span>
+                                <span className="text-end">{t('salesDocs.lineSubtotal')}</span>
                               </div>
                               <div className="space-y-1.5">
                                 {qt.line_items.map((l, i) => {
@@ -1284,10 +1284,10 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
                                     <div key={i} className="grid grid-cols-[1fr_40px_80px_50px_50px_70px] gap-1.5 items-center text-sm text-gray-700 dark:text-[#e8ebf0] px-1">
                                       <span className="truncate">{l.product_name}</span>
                                       <span className="text-center text-gray-500 dark:text-[#9aa4b2]">{l.qty}</span>
-                                      <span className="text-right text-gray-500 dark:text-[#9aa4b2]">{Number(l.unit_price).toLocaleString()}</span>
+                                      <span className="text-end text-gray-500 dark:text-[#9aa4b2]">{Number(l.unit_price).toLocaleString()}</span>
                                       <span className="text-center text-gray-400 dark:text-[#a4acb7] text-xs">{l.discount_pct ? `${l.discount_pct}%` : '—'}</span>
                                       <span className="text-center text-gray-400 dark:text-[#a4acb7] text-xs">{l.tax_pct ? `${l.tax_pct}%` : '—'}</span>
-                                      <span className="text-right font-medium">{(net + tax).toLocaleString()}</span>
+                                      <span className="text-end font-medium">{(net + tax).toLocaleString()}</span>
                                     </div>
                                   )
                                 })}
@@ -1337,7 +1337,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                                       </svg>
-                                      {t('salesDocuments.qtViewSO')}: <span className="font-mono ml-0.5">{convertedSO.so_code}</span>
+                                      {t('salesDocuments.qtViewSO')}: <span className="font-mono ms-0.5">{convertedSO.so_code}</span>
                                     </button>
                                   )}
                                   {/* No PDF button here: handleDownloadPDF emits the QUOTATION pdf,

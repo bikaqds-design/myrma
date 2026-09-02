@@ -27,7 +27,7 @@ export default function TemplatesTab({ templates, onEdit, onSendTest }) {
                     ))}
                 </div>
               </div>
-              <div className="flex gap-2 ml-4">
+              <div className="flex gap-2 ms-4">
                 <button
                   onClick={() => onEdit(template)}
                   className="px-3 py-1 text-sm bg-indigo-100 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 rounded hover:bg-indigo-200 dark:hover:bg-indigo-900/30"

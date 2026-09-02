@@ -32,16 +32,16 @@ function SortableHeader({ label, sortKey, sortConfig, onSort }) {
       <span>{label}</span>
       {isActive ? (
         sortConfig.direction === 'asc' ? (
-          <svg className="w-3.5 h-3.5 text-indigo-600 dark:text-[#a5b4fc] ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3.5 h-3.5 text-indigo-600 dark:text-[#a5b4fc] ms-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
           </svg>
         ) : (
-          <svg className="w-3.5 h-3.5 text-indigo-600 dark:text-[#a5b4fc] ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3.5 h-3.5 text-indigo-600 dark:text-[#a5b4fc] ms-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         )
       ) : (
-        <svg className="w-3.5 h-3.5 text-gray-300 dark:text-[#a4acb7] ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-3.5 h-3.5 text-gray-300 dark:text-[#a4acb7] ms-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
         </svg>
       )}
@@ -60,9 +60,9 @@ function SearchBox({ value, onChange, placeholder }) {
         // Named from the placeholder each caller passes — same reason as
         // InvToolbar's search: a placeholder is not an accessible name.
         aria-label={placeholder}
-        className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
+        className="w-full ps-9 pe-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
       />
-      <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
       </svg>
     </div>
@@ -456,7 +456,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
             {/* View switcher — list is the default; graph answers "where is the
                 money going", which the table cannot. Persisted in the URL so a
                 chart can be linked to, matching Pipeline's ?view= convention. */}
-            <div className="flex items-center gap-1 mr-1">
+            <div className="flex items-center gap-1 me-1">
               <button
                 onClick={() => setView('list')}
                 title={t('purchasing.viewList')}
@@ -509,18 +509,18 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
               <div ref={newMenuRef} className="relative">
                 <Button onClick={() => setNewMenuOpen((o) => !o)} aria-haspopup="menu" aria-expanded={newMenuOpen}>
                   + {t('purchasing.newDocument')}
-                  <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 ms-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </Button>
                 {newMenuOpen && (
-                  <div role="menu" className="absolute right-0 mt-1 w-56 z-30 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] py-1">
+                  <div role="menu" className="absolute end-0 mt-1 w-56 z-30 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] py-1">
                     <button role="menuitem" onClick={() => { setNewMenuOpen(false); setCreateType('purchase_order') }}
-                      className="w-full px-3 py-2 text-left text-sm text-[#211f1b] dark:text-[#e8ebf0] hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]">
+                      className="w-full px-3 py-2 text-start text-sm text-[#211f1b] dark:text-[#e8ebf0] hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]">
                       {t('purchasing.newPurchaseOrder')}
                     </button>
                     <button role="menuitem" onClick={() => { setNewMenuOpen(false); setCreateType('vendor_invoice') }}
-                      className="w-full px-3 py-2 text-left text-sm text-[#211f1b] dark:text-[#e8ebf0] hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]">
+                      className="w-full px-3 py-2 text-start text-sm text-[#211f1b] dark:text-[#e8ebf0] hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]">
                       {t('purchasing.newVendorInvoice')}
                     </button>
                   </div>
@@ -606,7 +606,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
                     { label: t('purchasing.phone'), key: 'phone' },
                     { label: t('purchasing.paymentTerms'), key: 'payment_terms' },
                   ].map(({ label, key }) => (
-                    <th key={key} className="px-5 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase tracking-wider">
+                    <th key={key} className="px-5 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase tracking-wider">
                       <SortableHeader label={label} sortKey={key} sortConfig={vendorSort} onSort={handleVendorSort} />
                     </th>
                   ))}
@@ -630,7 +630,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
                             action so a quick field change does not need a round trip. */}
                         <button
                           onClick={() => navigate(`/purchasing/vendor/${v.id}`)}
-                          className="text-[#4338ca] dark:text-[#a5b4fc] hover:underline text-left"
+                          className="text-[#4338ca] dark:text-[#a5b4fc] hover:underline text-start"
                         >
                           {v.brand_name}
                         </button>
@@ -639,7 +639,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
                       <td className="px-5 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{v.email || '—'}</td>
                       <td className="px-5 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{v.phone || '—'}</td>
                       <td className="px-5 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{v.payment_terms || '—'}</td>
-                      <td className="px-5 py-3 text-right">
+                      <td className="px-5 py-3 text-end">
                         <button onClick={() => setEditVendor(v)} className="text-sm text-[#4338ca] dark:text-[#a5b4fc] hover:underline">
                           {t('common.edit')}
                         </button>
@@ -769,7 +769,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
               )}
               <button
                 onClick={() => setSelectedKeys(new Set())}
-                className="ml-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
+                className="ms-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
               >
                 {t('common.clear')}
               </button>
@@ -799,7 +799,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[#e6e9ef] dark:border-[#212a38] bg-[#f8f9fb] dark:bg-[#0f1520]">
-                    <th className="pl-4 pr-2 py-3 w-8">
+                    <th className="ps-4 pe-2 py-3 w-8">
                       <input
                         type="checkbox"
                         checked={allPageSelected}
@@ -808,28 +808,28 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
                         aria-label={t('common.selectAll')}
                       />
                     </th>
-                    <th className="px-2 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase w-10">#</th>
+                    <th className="px-2 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase w-10">#</th>
                     {showTypeCol && (
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                      <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                         <SortableHeader label={t('purchasing.colType')} sortKey="doc_type" sortConfig={sortConfig} onSort={handleSort} />
                       </th>
                     )}
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                    <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                       <SortableHeader label={t('purchasing.colCode')} sortKey="doc_code" sortConfig={sortConfig} onSort={handleSort} />
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                    <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                       <SortableHeader label={t('purchasing.colVendor')} sortKey="vendor" sortConfig={sortConfig} onSort={handleSort} />
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                    <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                       <SortableHeader label={t('purchasing.colStatus')} sortKey="doc_status" sortConfig={sortConfig} onSort={handleSort} />
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                    <th className="px-4 py-3 text-end text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                       <SortableHeader label={t('purchasing.colTotal')} sortKey="total" sortConfig={sortConfig} onSort={handleSort} />
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                    <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                       <SortableHeader label={t('purchasing.colDate')} sortKey="type_specific_date" sortConfig={sortConfig} onSort={handleSort} />
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
+                    <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">
                       <SortableHeader label={t('purchasing.colCreated')} sortKey="created_at" sortConfig={sortConfig} onSort={handleSort} />
                     </th>
                   </tr>
@@ -853,7 +853,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
                         className={`border-t border-[#e6e9ef] dark:border-[#212a38] hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520] transition-colors cursor-pointer ${selectedKeys.has(rowKey(doc)) ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}`}
                         onClick={() => navigate(`/purchasing/${doc.doc_type}/${doc.id}`)}
                       >
-                        <td className="pl-4 pr-2 py-3" onClick={(e) => e.stopPropagation()}>
+                        <td className="ps-4 pe-2 py-3" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={selectedKeys.has(rowKey(doc))}
@@ -888,7 +888,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-right text-sm font-semibold text-[#211f1b] dark:text-[#e8ebf0] whitespace-nowrap">
+                        <td className="px-4 py-3 text-end text-sm font-semibold text-[#211f1b] dark:text-[#e8ebf0] whitespace-nowrap">
                           {(Number(doc.total) || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                           {hasMissingRate(doc, baseCurrency) && (
                             <span

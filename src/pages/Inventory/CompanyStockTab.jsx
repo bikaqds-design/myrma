@@ -203,10 +203,10 @@ export function CompanyStockTab({
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('inventory.searchByProductBrand')}
               aria-label={t('inventory.searchByProductBrand')}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+              className="w-full ps-10 pe-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
             />
             <svg
-              className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2"
+              className="w-5 h-5 text-gray-500 dark:text-[#9aa4b2] absolute start-3 top-1/2 -translate-y-1/2"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -292,7 +292,7 @@ export function CompanyStockTab({
                 setFilterResolution('')
                 setFilterProduct('')
               }}
-              className="text-sm text-red-600 hover:underline ml-auto"
+              className="text-sm text-red-600 hover:underline ms-auto"
             >
               {t('inventory.clearFilters')}
             </button>
@@ -309,7 +309,7 @@ export function CompanyStockTab({
             <span className="text-sm font-medium text-indigo-700">
               {t('inventory.productsSelected', { count: selectedRows.length })}
               {selectedUnitIds.length > 0 && (
-                <span className="text-indigo-400 ml-1">
+                <span className="text-indigo-400 ms-1">
                   ({t('inventory.unitsSelected', { count: selectedUnitIds.length })})
                 </span>
               )}
@@ -414,7 +414,7 @@ export function CompanyStockTab({
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                       />
                     </th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider w-10">
+                    <th className="px-3 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider w-10">
                       #
                     </th>
                     {[
@@ -428,7 +428,7 @@ export function CompanyStockTab({
                     ].map((h, i) => (
                       <th
                         key={i}
-                        className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider"
+                        className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wider"
                       >
                         {h}
                       </th>
@@ -503,7 +503,7 @@ export function CompanyStockTab({
                           )}
                         </td>
                         <td className="px-4 py-3 font-bold text-gray-800">{g.units.length}</td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-end">
                           <span className="text-xs text-indigo-600 font-medium">{t('inventory.manageLink')}</span>
                         </td>
                       </tr>

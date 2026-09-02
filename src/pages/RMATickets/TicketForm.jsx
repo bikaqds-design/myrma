@@ -842,7 +842,7 @@ export function TicketForm({
                                   setFormData({ ...formData, customer_name: displayName, customer_id: c.id, customer_email: c.email || '' })
                                   setShowCustomerDropdown(false)
                                 }}
-                                className="w-full h-full px-4 text-left hover:bg-indigo-50 border-b border-gray-100 flex flex-col justify-center"
+                                className="w-full h-full px-4 text-start hover:bg-indigo-50 border-b border-gray-100 flex flex-col justify-center"
                               >
                                 <div className="text-sm font-medium text-gray-900">
                                   {displayName}
@@ -926,7 +926,7 @@ export function TicketForm({
               <div>
                 <label className={labelClass}>
                   {t('ticketForm.dueDate')}{' '}
-                  <span className="text-xs text-gray-500 font-normal ml-1">{t('ticketForm.dueDateHint')}</span>
+                  <span className="text-xs text-gray-500 font-normal ms-1">{t('ticketForm.dueDateHint')}</span>
                 </label>
                 <input
                   type="date"
@@ -1013,7 +1013,7 @@ export function TicketForm({
                                     d[idx] = false
                                     setShowProductDropdowns(d)
                                   }}
-                                  className="w-full px-3 py-2 text-left hover:bg-indigo-50 border-b border-gray-100 last:border-0"
+                                  className="w-full px-3 py-2 text-start hover:bg-indigo-50 border-b border-gray-100 last:border-0"
                                 >
                                   <div className="text-sm font-medium text-gray-900">
                                     {p.product_name}
@@ -1046,7 +1046,7 @@ export function TicketForm({
                           data-serial-idx={idx}
                           value={product.serial_number}
                           onChange={(e) => updateProduct(idx, 'serial_number', e.target.value)}
-                          className="w-full pl-3 pr-9 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm bg-white"
+                          className="w-full ps-3 pe-9 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 text-sm bg-white"
                           required={isSerialRequired(product)}
                         />
                         <button
@@ -1059,7 +1059,7 @@ export function TicketForm({
                               document.querySelector(`[data-serial-idx="${idx}"]`)?.focus()
                             }
                           }}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600 transition-colors">
+                          className="absolute end-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600 transition-colors">
                           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                             <rect x="2"  y="3" width="2" height="18" rx="0.5" />
                             <rect x="6"  y="3" width="1" height="18" rx="0.5" />
@@ -1218,7 +1218,7 @@ export function TicketForm({
             <div>
               <label className={labelClass}>
                 {t('ticketForm.attachments')}
-                <span className="text-xs text-gray-500 font-normal ml-2">
+                <span className="text-xs text-gray-500 font-normal ms-2">
                   ({(formData.attachments?.length || 0) + pendingFiles.length}/10)
                 </span>
               </label>

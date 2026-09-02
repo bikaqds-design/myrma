@@ -323,15 +323,15 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#e6e9ef] dark:border-[#212a38] bg-[#f8f9fb] dark:bg-[#0f1520]">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colCode')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colCustomer')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colMethod')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colReference')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colDate')}</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colAmount')}</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colUnapplied')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colStatus')}</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colActions')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colCode')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colCustomer')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colMethod')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colReference')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colDate')}</th>
+                  <th className="px-4 py-3 text-end text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colAmount')}</th>
+                  <th className="px-4 py-3 text-end text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colUnapplied')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colStatus')}</th>
+                  <th className="px-4 py-3 text-end text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -355,14 +355,14 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
                       <td className="px-4 py-3 text-[#6c6760] dark:text-[#9aa4b2]">{t(METHOD_LABEL_KEY[p.method] ?? p.method)}</td>
                       <td className="px-4 py-3 text-[#6c6760] dark:text-[#9aa4b2]">{p.reference_number || '—'}</td>
                       <td className="px-4 py-3 text-[#6c6760] dark:text-[#9aa4b2]">{p.payment_date}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(p.amount)}</td>
-                      <td className="px-4 py-3 text-right text-[#6c6760] dark:text-[#9aa4b2]">{p.unapplied_amount > 0 ? fmtMoney(p.unapplied_amount) : '—'}</td>
+                      <td className="px-4 py-3 text-end font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(p.amount)}</td>
+                      <td className="px-4 py-3 text-end text-[#6c6760] dark:text-[#9aa4b2]">{p.unapplied_amount > 0 ? fmtMoney(p.unapplied_amount) : '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_PILL[p.status] ?? STATUS_PILL.active}`}>
                           {t(`accounting.status_${p.status}`)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-end">
                         {p.status === 'active' && (
                           <Button disabled={!canReverse} variant="danger" size="sm" onClick={() => setVoidingPaymentId(p.id)}>
                             {t('accounting.voidBtn')}
@@ -399,11 +399,11 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#e6e9ef] dark:border-[#212a38] bg-[#f8f9fb] dark:bg-[#0f1520]">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colCustomer')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colCustomer')}</th>
                   {BUCKET_KEYS.map((b) => (
-                    <th key={b} className="px-4 py-3 text-right text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t(BUCKET_LABEL_KEY[b])}</th>
+                    <th key={b} className="px-4 py-3 text-end text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t(BUCKET_LABEL_KEY[b])}</th>
                   ))}
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colTotal')}</th>
+                  <th className="px-4 py-3 text-end text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colTotal')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -423,9 +423,9 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
                     <tr key={r.customer_id} className="border-b border-[#f0f2f6] dark:border-[#1a2230] last:border-0 hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]">
                       <td className="px-4 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{customerName(r.customer_id)}</td>
                       {BUCKET_KEYS.map((b) => (
-                        <td key={b} className="px-4 py-3 text-right text-[#6c6760] dark:text-[#9aa4b2]">{r[b] > 0 ? fmtMoney(r[b]) : '—'}</td>
+                        <td key={b} className="px-4 py-3 text-end text-[#6c6760] dark:text-[#9aa4b2]">{r[b] > 0 ? fmtMoney(r[b]) : '—'}</td>
                       ))}
-                      <td className="px-4 py-3 text-right font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(r.total)}</td>
+                      <td className="px-4 py-3 text-end font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(r.total)}</td>
                     </tr>
                   ))
                 )}
@@ -452,15 +452,15 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#e6e9ef] dark:border-[#212a38] bg-[#f8f9fb] dark:bg-[#0f1520]">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colCode')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('purchasing.vendor')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colMethod')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colReference')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colDate')}</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colAmount')}</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colUnapplied')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colStatus')}</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colActions')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colCode')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('purchasing.vendor')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colMethod')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colReference')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colDate')}</th>
+                  <th className="px-4 py-3 text-end text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colAmount')}</th>
+                  <th className="px-4 py-3 text-end text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colUnapplied')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colStatus')}</th>
+                  <th className="px-4 py-3 text-end text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -483,14 +483,14 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
                       <td className="px-4 py-3 text-[#6c6760] dark:text-[#9aa4b2]">{t(METHOD_LABEL_KEY[p.method] ?? p.method)}</td>
                       <td className="px-4 py-3 text-[#6c6760] dark:text-[#9aa4b2]">{p.reference_number || '—'}</td>
                       <td className="px-4 py-3 text-[#6c6760] dark:text-[#9aa4b2]">{p.payment_date}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(p.amount)}</td>
-                      <td className="px-4 py-3 text-right text-[#6c6760] dark:text-[#9aa4b2]">{p.unapplied_amount > 0 ? fmtMoney(p.unapplied_amount) : '—'}</td>
+                      <td className="px-4 py-3 text-end font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(p.amount)}</td>
+                      <td className="px-4 py-3 text-end text-[#6c6760] dark:text-[#9aa4b2]">{p.unapplied_amount > 0 ? fmtMoney(p.unapplied_amount) : '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_PILL[p.status] ?? STATUS_PILL.active}`}>
                           {t(`accounting.status_${p.status}`)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-end">
                         {p.status === 'active' && (
                           <Button disabled={!canReverse} variant="danger" size="sm" onClick={() => setVoidingVendorPaymentId(p.id)}>
                             {t('accounting.voidBtn')}
@@ -527,11 +527,11 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#e6e9ef] dark:border-[#212a38] bg-[#f8f9fb] dark:bg-[#0f1520]">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('purchasing.vendor')}</th>
+                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('purchasing.vendor')}</th>
                   {BUCKET_KEYS.map((b) => (
-                    <th key={b} className="px-4 py-3 text-right text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t(BUCKET_LABEL_KEY[b])}</th>
+                    <th key={b} className="px-4 py-3 text-end text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t(BUCKET_LABEL_KEY[b])}</th>
                   ))}
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colTotal')}</th>
+                  <th className="px-4 py-3 text-end text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colTotal')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -551,9 +551,9 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
                     <tr key={r.vendor_id} className="border-b border-[#f0f2f6] dark:border-[#1a2230] last:border-0 hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]">
                       <td className="px-4 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{vendorName(r.vendor_id)}</td>
                       {BUCKET_KEYS.map((b) => (
-                        <td key={b} className="px-4 py-3 text-right text-[#6c6760] dark:text-[#9aa4b2]">{r[b] > 0 ? fmtMoney(r[b]) : '—'}</td>
+                        <td key={b} className="px-4 py-3 text-end text-[#6c6760] dark:text-[#9aa4b2]">{r[b] > 0 ? fmtMoney(r[b]) : '—'}</td>
                       ))}
-                      <td className="px-4 py-3 text-right font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(r.total)}</td>
+                      <td className="px-4 py-3 text-end font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(r.total)}</td>
                     </tr>
                   ))
                 )}

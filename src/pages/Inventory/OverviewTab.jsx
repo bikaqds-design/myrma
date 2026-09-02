@@ -208,7 +208,7 @@ export function OverviewTab({
           )}
           <button
             onClick={() => setSelected(new Set())}
-            className="ml-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
+            className="ms-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
           >
             {t('common.clear')}
           </button>
@@ -286,7 +286,7 @@ export function OverviewTab({
                   ].map((h, i) => (
                     <th
                       key={i}
-                      className="px-5 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase tracking-wider"
+                      className="px-5 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase tracking-wider"
                     >
                       {h}
                     </th>
@@ -315,7 +315,7 @@ export function OverviewTab({
                       >
                         {row.product_name}
                         {!row.in_catalog && (
-                          <span className="ml-2 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2] align-middle">
+                          <span className="ms-2 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2] align-middle">
                             {t('inventory.notInCatalog')}
                           </span>
                         )}

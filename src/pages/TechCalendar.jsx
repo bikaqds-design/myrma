@@ -83,7 +83,7 @@ function ActivityCard({ activity }) {
   return (
     <div
       title={activity.title || ''}
-      className={`rounded-md border-l-2 pl-2 pr-1.5 py-1.5 text-[11px] bg-[#f8f9fb] dark:bg-[#0f1520] ${
+      className={`rounded-md border-l-2 ps-2 pe-1.5 py-1.5 text-[11px] bg-[#f8f9fb] dark:bg-[#0f1520] ${
         overdue ? 'border-l-red-500 dark:border-l-red-400' : 'border-l-indigo-400 dark:border-l-indigo-300'
       }`}
     >
@@ -325,7 +325,7 @@ export default function TechCalendar({
 
         {/* Technician filter — admin/manager only */}
         {isAdminOrManager && (
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ms-auto flex items-center gap-2">
             <label className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('calendar.technician')}:</label>
             <select
               aria-label={t('calendar.technician')}
@@ -438,7 +438,7 @@ export default function TechCalendar({
           </svg>
           {t('calendar.unscheduledTickets')}
           {unscheduled.length > 0 && (
-            <span className="ml-1 px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2] text-xs font-medium">
+            <span className="ms-1 px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2] text-xs font-medium">
               {unscheduled.length}
             </span>
           )}

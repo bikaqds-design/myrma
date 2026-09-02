@@ -26,7 +26,7 @@ function PreviewBanner({ previewUser, onExit }) {
   const { t } = useTranslation()
   if (!previewUser) return null
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between gap-3 px-4 py-2 bg-amber-500 text-white text-sm">
+    <div className="fixed top-0 start-0 end-0 z-50 flex items-center justify-between gap-3 px-4 py-2 bg-amber-500 text-white text-sm">
       <span>
         {t('preview.banner', { email: previewUser.email, role: previewUser.role })}
         {' — '}
@@ -61,7 +61,7 @@ function AnnouncementBanner() {
   }
   const ICONS = { info: 'ℹ️', warning: '⚠️', success: '✅', error: '🚨' }
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 space-y-0.5">
+    <div className="fixed top-0 start-0 end-0 z-50 space-y-0.5">
       {visible.map((a) => (
         <div
           key={a.id}
@@ -72,7 +72,7 @@ function AnnouncementBanner() {
           </span>
           <button
             onClick={() => setDismissed((d) => [...d, a.id])}
-            className="ml-4 opacity-75 hover:opacity-100"
+            className="ms-4 opacity-75 hover:opacity-100"
           >
             ✕
           </button>
@@ -1197,7 +1197,7 @@ export default function App() {
 
       <div
         id="app-sidebar"
-        className={`fixed lg:static inset-y-0 left-0 z-30 ${sidebarCompact ? 'w-16' : 'w-64'} bg-white dark:bg-[#121823] border-r border-[#e6e9ef] dark:border-[#212a38] flex flex-col transform transition-all duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+        className={`fixed lg:static inset-y-0 start-0 z-30 ${sidebarCompact ? 'w-16' : 'w-64'} bg-white dark:bg-[#121823] border-r border-[#e6e9ef] dark:border-[#212a38] flex flex-col transform transition-all duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
       >
         <div
           className={`border-b border-[#e6e9ef] dark:border-[#212a38] flex items-center ${sidebarCompact ? 'flex-col gap-2 p-3' : 'px-4 py-3 justify-between'}`}
@@ -1238,7 +1238,7 @@ export default function App() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
-                <div className="text-left">
+                <div className="text-start">
                   {/* A brand mark, not a heading. As an <h1> it was a second
                       first-level heading on every page, sitting above the real
                       page title and outside any landmark. */}
@@ -1430,7 +1430,7 @@ export default function App() {
           <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setUserMenuOpen((o) => !o)}
-              className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
+              className="flex items-center gap-2 ps-2 pe-3 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors"
             >
               {currentUser?.user_metadata?.avatar_url ? (
                 <img
@@ -1443,7 +1443,7 @@ export default function App() {
                   {(currentUser?.user_metadata?.display_name || currentUser?.email || '?')[0]}
                 </div>
               )}
-              <div className="text-left hidden xl:block">
+              <div className="text-start hidden xl:block">
                 <div className="text-[13px] font-[600] text-[#211f1b] dark:text-[#e8ebf0] leading-none truncate max-w-[160px]">
                   {currentUser?.user_metadata?.display_name || currentUser?.email}
                 </div>
@@ -1465,7 +1465,7 @@ export default function App() {
             </button>
 
             {userMenuOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-52 bg-white dark:bg-[#121823] rounded-[14px] shadow-lg border border-[#e6e9ef] dark:border-[#212a38] z-50 overflow-hidden">
+              <div className="absolute end-0 top-full mt-1.5 w-52 bg-white dark:bg-[#121823] rounded-[14px] shadow-lg border border-[#e6e9ef] dark:border-[#212a38] z-50 overflow-hidden">
                 <div className="px-4 py-3 border-b border-[#eef0f4] dark:border-[#1a2230]">
                   <div className="text-[13px] font-[600] text-[#211f1b] dark:text-[#e8ebf0] truncate">
                     {currentUser?.user_metadata?.display_name || currentUser?.email}
@@ -1477,7 +1477,7 @@ export default function App() {
                     handleNavigate('/account')
                     setUserMenuOpen(false)
                   }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-[#211f1b] dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors text-left"
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-[#211f1b] dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors text-start"
                 >
                   <svg
                     className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] flex-shrink-0"
@@ -1500,7 +1500,7 @@ export default function App() {
                     handleLogout()
                     setUserMenuOpen(false)
                   }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-left"
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-start"
                 >
                   <svg
                     className="w-4 h-4 flex-shrink-0"

@@ -253,7 +253,7 @@ export default function PipelineGraphView({ deals, stages }) {
         </div>
 
         {/* Chart type */}
-        <div className="flex gap-1 ml-auto">
+        <div className="flex gap-1 ms-auto">
           <ChartTypeBtn active={chartType === 'bar'} onClick={() => setChartType('bar')} title="Bar chart">
             <svg viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4">
               <rect x="1" y="6" width="3" height="9" rx="1" />

@@ -130,8 +130,8 @@ export default function WALogs() {
           <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(0) }}
             placeholder={t('cp.waLogs.searchPlaceholder')}
             aria-label={t('cp.waLogs.searchPlaceholder')}
-            className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]" />
-          <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            className="w-full ps-9 pe-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]" />
+          <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute start-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
@@ -164,7 +164,7 @@ export default function WALogs() {
           )}
           {t('cp.waLogs.exportCsv')}
         </button>
-        <p className="text-xs text-gray-500 dark:text-[#9aa4b2] ml-auto whitespace-nowrap">
+        <p className="text-xs text-gray-500 dark:text-[#9aa4b2] ms-auto whitespace-nowrap">
           {isFetching ? 'Loading…' : `${count.toLocaleString()} result${count !== 1 ? 's' : ''}`}
         </p>
       </div>
@@ -219,7 +219,7 @@ export default function WALogs() {
                     t('cp.waLogs.statusCol'),
                     t('cp.waLogs.actionsCol'),
                   ].map((h, i) => (
-                    <th key={i} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    <th key={i} className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>

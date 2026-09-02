@@ -93,7 +93,7 @@ export default function ExportMenu({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 mt-2 w-64 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] z-20 py-1.5"
+          className="absolute end-0 mt-2 w-64 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] z-20 py-1.5"
         >
           <button role="menuitem" onClick={() => choose(allRows, 'all')} className={itemCls}>
             <svg className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

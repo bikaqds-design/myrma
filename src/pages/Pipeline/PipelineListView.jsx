@@ -14,9 +14,9 @@ const BORDER = 'border-[#e6e9ef] dark:border-[#212a38]'
 // the header it sits in. indigo-500 for the active arrow was 4.24, also short.
 function SortIcon({ col, sortCol, sortDir }) {
   if (col !== sortCol)
-    return <span className="text-gray-600 dark:text-[#7c8ba5] ml-1 text-[10px]">↕</span>
+    return <span className="text-gray-600 dark:text-[#7c8ba5] ms-1 text-[10px]">↕</span>
   return (
-    <span className="text-indigo-600 dark:text-[#a5b4fc] ml-1 text-[10px]">
+    <span className="text-indigo-600 dark:text-[#a5b4fc] ms-1 text-[10px]">
       {sortDir === 'asc' ? '↑' : '↓'}
     </span>
   )
@@ -63,18 +63,18 @@ function StagePin({ deal, stages, stageMap, open, onToggle, onMove }) {
         )}
       </button>
       {open && (
-        <div className="absolute z-30 top-full left-0 mt-1 bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-xl shadow-lg py-1 min-w-[160px]">
+        <div className="absolute z-30 top-full start-0 mt-1 bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-xl shadow-lg py-1 min-w-[160px]">
           {openStages.map((s, si) => (
             <button
               key={s.id}
               onClick={(e) => { e.stopPropagation(); onMove(deal.id, s.id) }}
-              className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] transition-colors ${
+              className={`w-full text-start px-3 py-2 text-xs flex items-center gap-2 hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] transition-colors ${
                 s.id === deal.stage ? 'font-semibold text-[#211f1b] dark:text-[#e8ebf0]' : 'text-[#211f1b] dark:text-[#e8ebf0]'
               }`}
             >
               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${OPEN_STAGE_DOTS[si % OPEN_STAGE_DOTS.length]}`} />
               {s.name}
-              {s.id === deal.stage && <span className="ml-auto text-[#4338ca] dark:text-[#a5b4fc]">✓</span>}
+              {s.id === deal.stage && <span className="ms-auto text-[#4338ca] dark:text-[#a5b4fc]">✓</span>}
             </button>
           ))}
         </div>
@@ -287,7 +287,7 @@ export default function PipelineListView({
           )}
           <button
             onClick={() => onSelectedChange(new Set())}
-            className="ml-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
+            className="ms-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
           >
             {t('common.clear')}
           </button>
@@ -303,7 +303,7 @@ export default function PipelineListView({
             {' · '}
             {totalValue.toLocaleString()} {t('pipeline.currency')}
             {selectedDeals.size > 0 && (
-              <span className="ml-2 text-[#4338ca] dark:text-[#a5b4fc] font-medium">
+              <span className="ms-2 text-[#4338ca] dark:text-[#a5b4fc] font-medium">
                 · {selectedDeals.size} {t('common.selected')}
               </span>
             )}
@@ -327,7 +327,7 @@ export default function PipelineListView({
           <table className="w-full text-sm">
             <thead>
               <tr className={`border-b ${BORDER} bg-[#f8f9fb] dark:bg-[#0f1520]`}>
-                <th className="pl-4 pr-2 py-3 w-8">
+                <th className="ps-4 pe-2 py-3 w-8">
                   <input
                     type="checkbox"
                     className="rounded border-gray-300 dark:border-[#212a38] text-indigo-600 focus:ring-indigo-500"
@@ -336,8 +336,8 @@ export default function PipelineListView({
                     aria-label={t('common.selectAll')}
                   />
                 </th>
-                <th className="px-2 py-3 text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] text-left w-10 select-none">#</th>
-                <th className="px-2 py-3 text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] text-left w-32 select-none whitespace-nowrap">
+                <th className="px-2 py-3 text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] text-start w-10 select-none">#</th>
+                <th className="px-2 py-3 text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] text-start w-32 select-none whitespace-nowrap">
                   {t('common.code')}
                 </th>
                 {COLS.map((col) => (
@@ -345,7 +345,7 @@ export default function PipelineListView({
                     key={col.key}
                     onClick={() => handleSort(col.key)}
                     className={`px-4 py-3 text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] cursor-pointer hover:text-[#211f1b] dark:hover:text-[#e8ebf0] select-none whitespace-nowrap ${
-                      col.right ? 'text-right' : 'text-left'
+                      col.right ? 'text-end' : 'text-start'
                     }`}
                   >
                     {col.label}
@@ -378,7 +378,7 @@ export default function PipelineListView({
                       }`}
                     >
                       {/* Checkbox */}
-                      <td className="pl-4 pr-2 py-3" onClick={(e) => e.stopPropagation()}>
+                      <td className="ps-4 pe-2 py-3" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           className="rounded border-gray-300 dark:border-[#212a38] text-indigo-600 focus:ring-indigo-500"
@@ -420,7 +420,7 @@ export default function PipelineListView({
                         />
                       </td>
                       {/* Value */}
-                      <td className="px-4 py-3 font-medium text-[#211f1b] dark:text-[#e8ebf0] text-right whitespace-nowrap">
+                      <td className="px-4 py-3 font-medium text-[#211f1b] dark:text-[#e8ebf0] text-end whitespace-nowrap">
                         {deal.value != null
                           ? `${Number(deal.value).toLocaleString()} ${t('pipeline.currency')}`
                           : '—'}
@@ -446,7 +446,7 @@ export default function PipelineListView({
                     {t('pipeline.listTotal')} ({sorted.length})
                   </td>
                   {/* value — always shows grand total for all filtered deals */}
-                  <td className="px-4 py-2.5 text-xs font-semibold text-[#211f1b] dark:text-[#e8ebf0] text-right whitespace-nowrap">
+                  <td className="px-4 py-2.5 text-xs font-semibold text-[#211f1b] dark:text-[#e8ebf0] text-end whitespace-nowrap">
                     {totalValue.toLocaleString()} {t('pipeline.currency')}
                   </td>
                   {/* rep + created_at */}

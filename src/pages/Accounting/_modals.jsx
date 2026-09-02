@@ -164,14 +164,14 @@ export function RecordPaymentModal({ customers = [], currentUserEmail, initialCu
                 autoComplete="off"
               />
               {!lockCustomer && customerOpen && customerMatches.length > 0 && (
-                <div className="absolute top-full left-0 mt-1 w-full z-30 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] py-1 max-h-48 overflow-y-auto">
+                <div className="absolute top-full start-0 mt-1 w-full z-30 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] py-1 max-h-48 overflow-y-auto">
                   {customerMatches.map((c) => (
                     <button
                       key={c.id}
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => { setCustomerId(c.id); setCustomerQuery(''); setCustomerOpen(false) }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520] flex items-center justify-between gap-2"
+                      className="w-full px-3 py-2 text-start text-sm hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520] flex items-center justify-between gap-2"
                     >
                       <span className="font-medium text-[#211f1b] dark:text-[#e8ebf0] truncate">{c.company_name || c.contact_person}</span>
                       {c.customer_code && <span className="text-xs font-mono text-[#6c6760] dark:text-[#9aa4b2] flex-shrink-0">{c.customer_code}</span>}
@@ -224,10 +224,10 @@ export function RecordPaymentModal({ customers = [], currentUserEmail, initialCu
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
-                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.colCode')}</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.fDueDate')}</th>
-                        <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.remainingBalance')}</th>
-                        <th className="px-3 py-2 text-right text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2] w-28">{t('accounting.applyAmount')}</th>
+                        <th className="px-3 py-2 text-start text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.colCode')}</th>
+                        <th className="px-3 py-2 text-start text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.fDueDate')}</th>
+                        <th className="px-3 py-2 text-end text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.remainingBalance')}</th>
+                        <th className="px-3 py-2 text-end text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2] w-28">{t('accounting.applyAmount')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -237,7 +237,7 @@ export function RecordPaymentModal({ customers = [], currentUserEmail, initialCu
                           <tr key={inv.id} className="border-b border-[#f0f2f6] dark:border-[#1a2230] last:border-0">
                             <td className="px-3 py-2 font-mono text-xs text-[#211f1b] dark:text-[#e8ebf0]">{inv.inv_code}</td>
                             <td className="px-3 py-2 text-[#6c6760] dark:text-[#9aa4b2]">{inv.due_date || '—'}</td>
-                            <td className="px-3 py-2 text-right text-[#6c6760] dark:text-[#9aa4b2]">{fmtMoney(remaining)}</td>
+                            <td className="px-3 py-2 text-end text-[#6c6760] dark:text-[#9aa4b2]">{fmtMoney(remaining)}</td>
                             <td className="px-3 py-2">
                               <input
                                 type="number"
@@ -246,7 +246,7 @@ export function RecordPaymentModal({ customers = [], currentUserEmail, initialCu
                                 step={0.01}
                                 value={allocations[inv.id] ?? ''}
                                 onChange={(e) => updateAllocation(inv.id, e.target.value)}
-                                className="w-full px-2 py-1 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded text-sm text-right focus:ring-1 focus:ring-[#4338ca] outline-none"
+                                className="w-full px-2 py-1 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded text-sm text-end focus:ring-1 focus:ring-[#4338ca] outline-none"
                               />
                             </td>
                           </tr>

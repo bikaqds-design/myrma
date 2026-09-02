@@ -255,7 +255,7 @@ export function CustomRolesTab({ customRoles, onCreateRole, onEditRole, onDelete
                 </div>
                 <button
                   onClick={() => onEditRole(role)}
-                  className="text-indigo-600 hover:text-indigo-800 mr-3 text-sm font-medium"
+                  className="text-indigo-600 hover:text-indigo-800 me-3 text-sm font-medium"
                 >
                   {t('common.edit')}
                 </button>
@@ -679,7 +679,7 @@ export function PermissionMatrix({ permissions, baseline, onToggle, onToggleModu
                             <span
                               title={t('userManagement.overriddenHint')}
                               aria-label={t('userManagement.overriddenHint')}
-                              className="ml-1 text-indigo-600 dark:text-indigo-300 font-semibold"
+                              className="ms-1 text-indigo-600 dark:text-indigo-300 font-semibold"
                             >
                               ◆
                             </span>
@@ -687,7 +687,7 @@ export function PermissionMatrix({ permissions, baseline, onToggle, onToggleModu
                           {SENSITIVE_ACTIONS.has(perm) && (
                             <span
                               title={t('userManagement.sensitiveAction')}
-                              className="ml-1 text-amber-600 dark:text-amber-400"
+                              className="ms-1 text-amber-600 dark:text-amber-400"
                               aria-label={t('userManagement.sensitiveAction')}
                             >
                               ●

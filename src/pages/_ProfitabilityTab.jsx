@@ -107,20 +107,20 @@ export default function ProfitabilityTab() {
         <table className="w-full">
           <thead className="bg-gray-50 dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
             <tr>
-              <th className={`${th} text-left`}>{t('reports.marginRep')}</th>
-              <th className={`${th} text-right`}>{t('reports.marginInvoices')}</th>
-              <th className={`${th} text-right`}>{t('reports.marginRevenue')}</th>
-              <th className={`${th} text-right`}>{t('reports.marginCostedRevenue')}</th>
-              <th className={`${th} text-right`}>{t('reports.marginCogs')}</th>
-              <th className={`${th} text-right`}>{t('reports.marginProfit')}</th>
-              <th className={`${th} text-right`}>{t('reports.marginPct')}</th>
+              <th className={`${th} text-start`}>{t('reports.marginRep')}</th>
+              <th className={`${th} text-end`}>{t('reports.marginInvoices')}</th>
+              <th className={`${th} text-end`}>{t('reports.marginRevenue')}</th>
+              <th className={`${th} text-end`}>{t('reports.marginCostedRevenue')}</th>
+              <th className={`${th} text-end`}>{t('reports.marginCogs')}</th>
+              <th className={`${th} text-end`}>{t('reports.marginProfit')}</th>
+              <th className={`${th} text-end`}>{t('reports.marginPct')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-[#1a2230]">
             {reps.map((r) => (
               <tr key={r.assigned_rep}>
                 <td className={`${td} font-medium`}>{r.assigned_rep}</td>
-                <td className={`${td} text-right`}>
+                <td className={`${td} text-end`}>
                   {r.invoices_total}
                   {r.invoices_cost_unknown > 0 && (
                     <span
@@ -131,11 +131,11 @@ export default function ProfitabilityTab() {
                     </span>
                   )}
                 </td>
-                <td className={`${td} text-right`}>{fmt(r.revenue_base)}</td>
-                <td className={`${td} text-right`}>{fmt(r.costed_revenue_base)}</td>
-                <td className={`${td} text-right`}>{fmt(r.cogs_base)}</td>
-                <td className={`${td} text-right font-semibold`}>{fmt(r.margin_base)}</td>
-                <td className={`${td} text-right`}>{pct(r.margin_pct)}</td>
+                <td className={`${td} text-end`}>{fmt(r.revenue_base)}</td>
+                <td className={`${td} text-end`}>{fmt(r.costed_revenue_base)}</td>
+                <td className={`${td} text-end`}>{fmt(r.cogs_base)}</td>
+                <td className={`${td} text-end font-semibold`}>{fmt(r.margin_base)}</td>
+                <td className={`${td} text-end`}>{pct(r.margin_pct)}</td>
               </tr>
             ))}
           </tbody>
@@ -147,13 +147,13 @@ export default function ProfitabilityTab() {
         <table className="w-full">
           <thead className="bg-gray-50 dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
             <tr>
-              <th className={`${th} text-left`}>{t('reports.marginInvoice')}</th>
-              <th className={`${th} text-left`}>{t('reports.marginCustomer')}</th>
-              <th className={`${th} text-left`}>{t('reports.marginRep')}</th>
-              <th className={`${th} text-right`}>{t('reports.marginRevenue')}</th>
-              <th className={`${th} text-right`}>{t('reports.marginCogs')}</th>
-              <th className={`${th} text-right`}>{t('reports.marginProfit')}</th>
-              <th className={`${th} text-right`}>{t('reports.marginPct')}</th>
+              <th className={`${th} text-start`}>{t('reports.marginInvoice')}</th>
+              <th className={`${th} text-start`}>{t('reports.marginCustomer')}</th>
+              <th className={`${th} text-start`}>{t('reports.marginRep')}</th>
+              <th className={`${th} text-end`}>{t('reports.marginRevenue')}</th>
+              <th className={`${th} text-end`}>{t('reports.marginCogs')}</th>
+              <th className={`${th} text-end`}>{t('reports.marginProfit')}</th>
+              <th className={`${th} text-end`}>{t('reports.marginPct')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-[#1a2230]">
@@ -162,9 +162,9 @@ export default function ProfitabilityTab() {
                 <td className={`${td} font-mono text-xs`}>{i.inv_code || '—'}</td>
                 <td className={td}>{i.customer_name || '—'}</td>
                 <td className={td}>{i.assigned_rep || '—'}</td>
-                <td className={`${td} text-right`}>{fmt(i.revenue_base)}</td>
-                <td className={`${td} text-right`}>{i.cogs_complete ? fmt(i.cogs_base) : '—'}</td>
-                <td className={`${td} text-right font-semibold`}>
+                <td className={`${td} text-end`}>{fmt(i.revenue_base)}</td>
+                <td className={`${td} text-end`}>{i.cogs_complete ? fmt(i.cogs_base) : '—'}</td>
+                <td className={`${td} text-end font-semibold`}>
                   {/* Never a number when the cost is incomplete. A dash reads as
                       "cannot tell"; a zero would read as "made nothing". */}
                   {i.cogs_complete ? (
@@ -182,7 +182,7 @@ export default function ProfitabilityTab() {
                     </span>
                   )}
                 </td>
-                <td className={`${td} text-right`}>{pct(i.margin_pct)}</td>
+                <td className={`${td} text-end`}>{pct(i.margin_pct)}</td>
               </tr>
             ))}
           </tbody>

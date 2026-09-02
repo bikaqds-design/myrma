@@ -135,7 +135,7 @@ export function ExportMenu({ units, batches, warehouses, brandMap }) {
         </svg>
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl border border-gray-200 shadow-xl z-30 py-1 overflow-hidden">
+        <div className="absolute end-0 top-full mt-1 w-56 bg-white rounded-xl border border-gray-200 shadow-xl z-30 py-1 overflow-hidden">
           <p className="px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
             {t('inventory.exportAsCSV')}
           </p>
@@ -143,7 +143,7 @@ export function ExportMenu({ units, batches, warehouses, brandMap }) {
             <button
               key={o.label}
               onClick={o.fn}
-              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-indigo-50 transition-colors text-left"
+              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-indigo-50 transition-colors text-start"
             >
               <svg
                 className="w-4 h-4 text-indigo-500 flex-shrink-0"

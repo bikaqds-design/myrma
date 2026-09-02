@@ -132,10 +132,10 @@ export default function LandedCharges({
                     <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2]"> — {c.description}</span>
                   )}
                 </td>
-                <td className="py-2 text-right font-medium text-[#211f1b] dark:text-[#e8ebf0] whitespace-nowrap">
+                <td className="py-2 text-end font-medium text-[#211f1b] dark:text-[#e8ebf0] whitespace-nowrap">
                   {formatMoney(c.amount, currency)}
                 </td>
-                <td className="py-2 w-8 text-right">
+                <td className="py-2 w-8 text-end">
                   {canEdit && !locked && (
                     <button
                       type="button"
@@ -154,7 +154,7 @@ export default function LandedCharges({
               <td className="pt-2 font-semibold text-[#211f1b] dark:text-[#e8ebf0]">
                 {t('purchasing.chargesTotal')}
               </td>
-              <td className="pt-2 text-right font-bold text-indigo-600 dark:text-[#a5b4fc] whitespace-nowrap">
+              <td className="pt-2 text-end font-bold text-indigo-600 dark:text-[#a5b4fc] whitespace-nowrap">
                 {formatMoney(total, currency)}
               </td>
               <td />

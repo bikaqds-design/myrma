@@ -77,7 +77,7 @@ export default function ProductsListTab({
         {isActive ? (
           direction === 'asc' ? (
             <svg
-              className="w-3.5 h-3.5 text-[#4338ca] dark:text-[#a5b4fc] ml-0.5"
+              className="w-3.5 h-3.5 text-[#4338ca] dark:text-[#a5b4fc] ms-0.5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -91,7 +91,7 @@ export default function ProductsListTab({
             </svg>
           ) : (
             <svg
-              className="w-3.5 h-3.5 text-[#4338ca] dark:text-[#a5b4fc] ml-0.5"
+              className="w-3.5 h-3.5 text-[#4338ca] dark:text-[#a5b4fc] ms-0.5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -106,7 +106,7 @@ export default function ProductsListTab({
           )
         ) : (
           <svg
-            className="w-3.5 h-3.5 text-[#e6e9ef] dark:text-[#212a38] ml-0.5"
+            className="w-3.5 h-3.5 text-[#e6e9ef] dark:text-[#212a38] ms-0.5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -185,10 +185,10 @@ export default function ProductsListTab({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t('products.searchPlaceholder')}
                   aria-label={t('products.searchPlaceholder')}
-                  className="w-full pl-9 pr-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
+                  className="w-full ps-9 pe-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
                 />
                 <svg
-                  className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                  className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -266,13 +266,13 @@ export default function ProductsListTab({
                 </svg>
               </button>
               {showAddDropdown && (
-                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#121823] rounded-lg shadow-lg border border-gray-200 dark:border-[#212a38] z-20 overflow-hidden">
+                <div className="absolute end-0 mt-2 w-56 bg-white dark:bg-[#121823] rounded-lg shadow-lg border border-gray-200 dark:border-[#212a38] z-20 overflow-hidden">
                   <button
                     onClick={() => {
                       setShowAddProduct(true)
                       setShowAddDropdown(false)
                     }}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[#1a2230] flex items-center gap-3 border-b border-gray-100 dark:border-[#212a38]"
+                    className="w-full px-4 py-3 text-start hover:bg-gray-50 dark:hover:bg-[#1a2230] flex items-center gap-3 border-b border-gray-100 dark:border-[#212a38]"
                   >
                     <svg
                       className="w-4 h-4 text-gray-500 dark:text-[#9aa4b2]"
@@ -298,7 +298,7 @@ export default function ProductsListTab({
                         setShowBulkUpload(true)
                         setShowAddDropdown(false)
                       }}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[#1a2230] flex items-center gap-3"
+                      className="w-full px-4 py-3 text-start hover:bg-gray-50 dark:hover:bg-[#1a2230] flex items-center gap-3"
                     >
                       <svg
                         className="w-4 h-4 text-gray-500 dark:text-[#9aa4b2]"
@@ -438,7 +438,7 @@ export default function ProductsListTab({
           )}
           <button
             onClick={() => setSelectedProducts([])}
-            className="ml-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
+            className="ms-auto text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#211f1b] dark:hover:text-[#e8ebf0]"
           >
             {t('common.clear')}
           </button>
@@ -450,7 +450,7 @@ export default function ProductsListTab({
         <table className="w-full">
           <thead className="bg-gray-50 border-y border-gray-200">
             <tr>
-              <th className="px-4 py-3 text-left">
+              <th className="px-4 py-3 text-start">
                 <input
                   type="checkbox"
                   checked={selectedProducts.length === products.length && products.length > 0}
@@ -459,31 +459,31 @@ export default function ProductsListTab({
                   className="w-4 h-4 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-600"
                 />
               </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase w-10">
+              <th className="px-3 py-3 text-start text-xs font-medium text-gray-500 uppercase w-10">
                 #
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase">
                 {t('products.imageHeader')}
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader label={t('products.sku')} sortKey="sku" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader label={t('products.productName')} sortKey="product_name" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
+              <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
                 <SortableHeader label={t('products.brand')} sortKey="brand" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
+              <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
                 <SortableHeader label={t('products.category')} sortKey="category" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader label={t('common.type')} sortKey="product_type" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase">
                 <SortableHeader label={t('common.status')} sortKey="status" />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              <th className="px-4 py-3 text-start text-xs font-medium text-gray-500 uppercase">
                 {t('products.actionsHeader')}
               </th>
             </tr>
@@ -551,7 +551,7 @@ export default function ProductsListTab({
                   <td className="px-4 py-3">
                     <button
                       onClick={() => handleViewProduct(product)}
-                      className="font-medium text-gray-900 hover:text-indigo-600 hover:underline text-left"
+                      className="font-medium text-gray-900 hover:text-indigo-600 hover:underline text-start"
                     >
                       {product.product_name}
                     </button>
@@ -602,13 +602,13 @@ export default function ProductsListTab({
                       </svg>
                     </button>
                     {openMenuId === product.id && (
-                      <div className="absolute right-0 top-9 z-30 w-44 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-gray-200 dark:border-[#212a38] py-1 overflow-hidden">
+                      <div className="absolute end-0 top-9 z-30 w-44 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-gray-200 dark:border-[#212a38] py-1 overflow-hidden">
                         <button
                           onClick={() => {
                             handleViewProduct(product)
                             setOpenMenuId(null)
                           }}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] flex items-center gap-2.5"
+                          className="w-full px-4 py-2 text-start text-sm text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] flex items-center gap-2.5"
                         >
                           <svg
                             className="w-4 h-4 text-gray-500 dark:text-[#9aa4b2]"
@@ -637,7 +637,7 @@ export default function ProductsListTab({
                               handleEditProduct(product)
                               setOpenMenuId(null)
                             }}
-                            className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] flex items-center gap-2.5"
+                            className="w-full px-4 py-2 text-start text-sm text-gray-700 dark:text-[#e8ebf0] hover:bg-gray-50 dark:hover:bg-[#1a2230] flex items-center gap-2.5"
                           >
                             <svg
                               className="w-4 h-4 text-gray-500 dark:text-[#9aa4b2]"
@@ -661,7 +661,7 @@ export default function ProductsListTab({
                               handleDeleteProduct(product)
                               setOpenMenuId(null)
                             }}
-                            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2.5"
+                            className="w-full px-4 py-2 text-start text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2.5"
                           >
                             <svg
                               className="w-4 h-4"

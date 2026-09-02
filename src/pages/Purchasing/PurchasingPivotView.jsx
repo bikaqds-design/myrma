@@ -104,14 +104,14 @@ export default function PurchasingPivotView({ documents, vendorName }) {
             <option value="spend">{t('purchasing.graphMeasureSpend')}</option>
           </select>
 
-          <label className="text-xs text-[#6c6760] dark:text-[#9aa4b2] ml-2">{t('purchasing.pivotRows')}</label>
+          <label className="text-xs text-[#6c6760] dark:text-[#9aa4b2] ms-2">{t('purchasing.pivotRows')}</label>
           <select value={rowDim} onChange={(e) => setRowDim(e.target.value)} className={selectCls}>
             {DIMENSIONS.map((d) => (
               <option key={d} value={d}>{t(`purchasing.graphGroup_${d}`)}</option>
             ))}
           </select>
 
-          <label className="text-xs text-[#6c6760] dark:text-[#9aa4b2] ml-2">{t('purchasing.pivotColumns')}</label>
+          <label className="text-xs text-[#6c6760] dark:text-[#9aa4b2] ms-2">{t('purchasing.pivotColumns')}</label>
           <select value={colDim} onChange={(e) => setColDim(e.target.value)} className={selectCls}>
             {DIMENSIONS.map((d) => (
               <option key={d} value={d}>{t(`purchasing.graphGroup_${d}`)}</option>
@@ -121,7 +121,7 @@ export default function PurchasingPivotView({ documents, vendorName }) {
           {rowDim === colDim && (
             // Not blocked — the diagonal is a valid, if useless, view — but the
             // reader should know why every off-diagonal cell is empty.
-            <span className="text-xs text-amber-600 dark:text-amber-400 ml-2">
+            <span className="text-xs text-amber-600 dark:text-amber-400 ms-2">
               {t('purchasing.pivotSameDimension')}
             </span>
           )}
@@ -136,40 +136,40 @@ export default function PurchasingPivotView({ documents, vendorName }) {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-[#e6e9ef] dark:border-[#212a38] bg-[#f8f9fb] dark:bg-[#0f1520]">
-                  <th className={`${th} text-left sticky left-0 bg-[#f8f9fb] dark:bg-[#0f1520]`}>
+                  <th className={`${th} text-start sticky start-0 bg-[#f8f9fb] dark:bg-[#0f1520]`}>
                     {t(`purchasing.graphGroup_${rowDim}`)}
                   </th>
                   {pivot.colKeys.map((c) => (
-                    <th key={c} className={`${th} text-right whitespace-nowrap`} dir="auto">{c}</th>
+                    <th key={c} className={`${th} text-end whitespace-nowrap`} dir="auto">{c}</th>
                   ))}
-                  <th className={`${th} text-right whitespace-nowrap`}>{t('purchasing.pivotTotal')}</th>
+                  <th className={`${th} text-end whitespace-nowrap`}>{t('purchasing.pivotTotal')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#f0f2f6] dark:divide-[#1a2230]">
                 {pivot.rowKeys.map((r) => (
                   <tr key={r} className="hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230]">
-                    <td className={`${td} font-medium sticky left-0 bg-white dark:bg-[#121823]`} dir="auto">{r}</td>
+                    <td className={`${td} font-medium sticky start-0 bg-white dark:bg-[#121823]`} dir="auto">{r}</td>
                     {pivot.colKeys.map((c) => {
                       const bucket = pivot.cells.get(r)?.get(c)
                       return (
-                        <td key={c} className={`${td} text-right`} style={cellStyle(bucket)}>
+                        <td key={c} className={`${td} text-end`} style={cellStyle(bucket)}>
                           {fmt(bucket)}
                         </td>
                       )
                     })}
-                    <td className={`${td} text-right font-semibold`}>{fmt(pivot.rowTotals.get(r))}</td>
+                    <td className={`${td} text-end font-semibold`}>{fmt(pivot.rowTotals.get(r))}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-[#e6e9ef] dark:border-[#212a38] bg-[#f8f9fb] dark:bg-[#0f1520]">
-                  <td className={`${td} font-semibold sticky left-0 bg-[#f8f9fb] dark:bg-[#0f1520]`}>
+                  <td className={`${td} font-semibold sticky start-0 bg-[#f8f9fb] dark:bg-[#0f1520]`}>
                     {t('purchasing.pivotTotal')}
                   </td>
                   {pivot.colKeys.map((c) => (
-                    <td key={c} className={`${td} text-right font-semibold`}>{fmt(pivot.colTotals.get(c))}</td>
+                    <td key={c} className={`${td} text-end font-semibold`}>{fmt(pivot.colTotals.get(c))}</td>
                   ))}
-                  <td className={`${td} text-right font-bold text-indigo-600 dark:text-[#a5b4fc]`}>
+                  <td className={`${td} text-end font-bold text-indigo-600 dark:text-[#a5b4fc]`}>
                     {fmt(pivot.grand)}
                   </td>
                 </tr>

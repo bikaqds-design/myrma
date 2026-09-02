@@ -94,7 +94,7 @@ export default function PipelineActivityView({ deals, stages, customerMap, activ
             <thead>
               <tr className={`border-b ${BORDER} bg-[#f8f9fb] dark:bg-[#0f1520]`}>
                 <th
-                  className={`px-4 py-3 text-left text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] min-w-[240px] border-r ${BORDER}`}
+                  className={`px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] min-w-[240px] border-r ${BORDER}`}
                 >
                   {t('pipeline.activityDeal')}
                 </th>

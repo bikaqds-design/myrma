@@ -113,7 +113,7 @@ export default function KnowledgeBasePublic() {
                       <button
                         onClick={() => setOpenId(isOpen ? null : a.id)}
                         aria-expanded={isOpen}
-                        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-gray-50 transition-colors"
+                        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-start hover:bg-gray-50 transition-colors"
                       >
                         <span className="font-medium text-gray-900 text-sm">{a.title}</span>
                         <svg

@@ -125,14 +125,14 @@ export default function Login({ onLogin }) {
                 <Input
                   type={showPassword ? 'text' : 'password'}
                   {...register('password')}
-                  className={`py-3 px-4 pr-12 focus:ring-indigo-600 ${errors.password ? 'border-red-400 bg-red-50' : ''}`}
+                  className={`py-3 px-4 pe-12 focus:ring-indigo-600 ${errors.password ? 'border-red-400 bg-red-50' : ''}`}
                   placeholder="••••••••"
                   autoComplete="current-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
+                  className="absolute end-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-600"
                   tabIndex={-1}
                   aria-label={t(showPassword ? 'login.hidePassword' : 'login.showPassword')}
                 >

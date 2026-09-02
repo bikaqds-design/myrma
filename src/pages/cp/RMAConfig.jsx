@@ -216,7 +216,7 @@ export default function RMAConfig({ currentUserEmail }) {
                 ].map((h, i) => (
                   <th
                     key={i}
-                    className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase"
+                    className="px-4 py-3 text-start text-xs font-semibold text-gray-500 uppercase"
                   >
                     {h}
                   </th>
