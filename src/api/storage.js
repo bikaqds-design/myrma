@@ -40,6 +40,35 @@ export const storage = {
     const { error } = await supabase.storage.from('rma-attachments').remove([path])
     if (error) throw error
   },
+  /**
+   * A datasheet or manual attached to a product.
+   *
+   * Deliberately does NOT go through resizeImage: these are documents, and
+   * while resizeImage passes non-images through untouched, calling it here
+   * would imply an image pipeline that does not apply.
+   *
+   * The path keeps documents beside the product's images but in their own
+   * folder, so a bucket listing is readable by a person.
+   *
+   * NOTE: this bucket is public. Anyone with the URL can read the file without
+   * logging in. That is a deliberate choice for product datasheets, which are
+   * published vendor material — it would be the wrong choice for anything
+   * internal, and anyone adding a new document type here should check first.
+   */
+  async uploadProductDocument(file, productSku) {
+    validateAttachment(file)
+    const safeExt = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '')
+    const fileName = `products/${productSku}/docs/${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(7)}.${safeExt}`
+    const { error } = await supabase.storage.from('rma-attachments').upload(fileName, file)
+    if (error) throw error
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('rma-attachments').getPublicUrl(fileName)
+    return { name: file.name, url: publicUrl, path: fileName, size: file.size, type: file.type }
+  },
+
   async uploadProductImage(file, productSku) {
     file = await resizeImage(file) // P-3
     const fileExt = file.name.split('.').pop()

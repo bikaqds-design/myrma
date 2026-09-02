@@ -1,11 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
 import Modal from '../../components/Modal'
 import { ModalOverlay, ModalCard, Button, Label, Select, Input, Textarea } from '../../components/ui'
 import { ProductSearchInput } from '../Pipeline/_shared'
-import { PDF_LAYOUT_DEFAULT } from '../../lib/documentPdf'
+import { captureException } from '../../lib/sentry'
+import { useDocumentCurrency } from '../../hooks/useDocumentCurrency'
+import { CurrencyRateFields } from '../../components/CurrencyRateFields'
+import { PhoneNote, EmailNote } from '../../components/ContactValidation'
+import { useContactValidation } from '../../hooks/useContactValidation'
+import { useCountryOptions } from '../../hooks/useCountryRules'
 
 // Shared modal header — mirrors ModalHeader in SalesDocuments/_modals.jsx so
 // every Purchasing modal has the same title bar/close-button chrome.
@@ -137,20 +142,55 @@ function LineItemsEditor({ lines, setLines, products, t }) {
 
 // Shared vendor field-set (brand + vendor fields) — reused by the Products
 // brand modal's "Vendor details" section and the two modals below.
-export function VendorFieldsSection({ values, onChange, t }) {
+export function VendorFieldsSection({ values, onChange, t, editing = false }) {
+  // A vendor has one phone box, so it is validated as either kind — a supplier
+  // who gives their switchboard number is not making a mistake. Overseas
+  // vendors are the reason the per-record country override exists: this
+  // business already buys from four of them.
+  const countries = useCountryOptions()
+  const contact = useContactValidation({
+    phone: values.phone,
+    email: values.email,
+    countryCode: values.country_code,
+    editing,
+  })
+
   return (
     <div className="grid grid-cols-2 gap-3">
       <div className="col-span-2">
         <Label>{t('purchasing.contactPerson')}</Label>
         <Input aria-label={t('purchasing.contactPerson')} value={values.contact_person || ''} onChange={(e) => onChange({ contact_person: e.target.value })} className="w-full" />
       </div>
+      {countries.length > 1 && (
+        <div className="col-span-2">
+          <Label>{t('purchasing.vendorCountry')}</Label>
+          <Select
+            aria-label={t('purchasing.vendorCountry')}
+            value={values.country_code || ''}
+            onChange={(e) => onChange({ country_code: e.target.value || null })}
+            className="w-full"
+          >
+            <option value="">{t('purchasing.vendorCountryDefault')}</option>
+            {countries.map((c) => (
+              <option key={c.code} value={c.code}>{c.name} ({c.dial_code})</option>
+            ))}
+          </Select>
+        </div>
+      )}
       <div>
         <Label>{t('common.email')}</Label>
         <Input aria-label={t('common.email')} type="email" value={values.email || ''} onChange={(e) => onChange({ email: e.target.value })} className="w-full" />
+        <EmailNote
+          result={contact.emailResult}
+          onAccept={(domain) =>
+            onChange({ email: `${String(values.email).split('@')[0]}@${domain}` })
+          }
+        />
       </div>
       <div>
         <Label>{t('purchasing.phone')}</Label>
         <Input aria-label={t('purchasing.phone')} value={values.phone || ''} onChange={(e) => onChange({ phone: e.target.value })} className="w-full" />
+        <PhoneNote result={contact.phoneResult} editing={editing} />
       </div>
       <div>
         <Label>{t('purchasing.taxId')}</Label>
@@ -218,6 +258,9 @@ export function VendorEditModal({ vendor, onClose, userEmail, onSuccess }) {
   const [vendorFields, setVendorFields] = useState({
     contact_person: vendor.contact_person, email: vendor.email,
     phone: vendor.phone, tax_id: vendor.tax_id, payment_terms: vendor.payment_terms,
+    // NULL means "use the system default country" — which is what almost every
+    // vendor is, and why nothing had to be backfilled when the column arrived.
+    country_code: vendor.country_code || null,
   })
   const [saving, setSaving] = useState(false)
 
@@ -246,7 +289,7 @@ export function VendorEditModal({ vendor, onClose, userEmail, onSuccess }) {
           <Label required>{t('purchasing.vendorName')}</Label>
           <Input aria-label={t('purchasing.vendorName')} value={name} onChange={(e) => setName(e.target.value)} className="w-full" autoFocus />
         </div>
-        <VendorFieldsSection values={vendorFields} onChange={(patch) => setVendorFields((v) => ({ ...v, ...patch }))} t={t} />
+        <VendorFieldsSection values={vendorFields} onChange={(patch) => setVendorFields((v) => ({ ...v, ...patch }))} t={t} editing />
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
           <Button variant="primary" onClick={handleSave} loading={saving} disabled={saving}>{t('common.save')}</Button>
@@ -263,7 +306,7 @@ export function CreatePurchaseOrderModal({ mode = 'create', initial, onClose, ve
   const [lines, setLines] = useState(initial?.line_items || [])
   const [issueDate, setIssueDate] = useState(initial?.issue_date || new Date().toISOString().slice(0, 10))
   const [expectedDate, setExpectedDate] = useState(initial?.expected_delivery_date || '')
-  const [currency, setCurrency] = useState(initial?.currency || '')
+  const cur = useDocumentCurrency(initial)
   const [paymentTerms, setPaymentTerms] = useState(initial?.payment_terms || '')
   const [deliveryTerms, setDeliveryTerms] = useState(initial?.delivery_terms || '')
   const [shippingAddress, setShippingAddress] = useState(initial?.shipping_address || '')
@@ -273,7 +316,22 @@ export function CreatePurchaseOrderModal({ mode = 'create', initial, onClose, ve
   const [saving, setSaving] = useState(false)
   const [products, setProducts] = useState([])
 
-  useEffect(() => { db.products.list().then(setProducts).catch(() => {}) }, [])
+  // A failed load used to leave products as [], which renders as an empty
+  // product picker — indistinguishable from a vendor that genuinely has no
+  // products, so the user concludes the catalogue is empty rather than that
+  // something broke.
+  useEffect(() => {
+    db.products
+      .list()
+      .then(setProducts)
+      .catch((err) => {
+        captureException(err, { page: 'Purchasing', context: 'modal/products.list' })
+        toast.error(t('purchasing.productsLoadFailed'))
+      })
+    // Mount only. Including t would refetch the whole catalogue every time the
+    // interface language changes, which the picker does not need.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const vendorName = useMemo(() => vendors?.find((v) => v.id === vendorId)?.brand_name, [vendors, vendorId])
   // Purchase Orders are placed with one vendor (= one Brand) — only offer
@@ -285,13 +343,17 @@ export function CreatePurchaseOrderModal({ mode = 'create', initial, onClose, ve
       toast.error(t('purchasing.vendorAndLineRequired'))
       return
     }
+    if (!cur.rateValid) {
+      toast.error(t('purchasing.exchangeRateRequired', { currency: cur.currency }))
+      return
+    }
     setSaving(true)
     try {
       const fields = {
         lineItems: lines,
         issueDate: issueDate || undefined,
         expectedDeliveryDate: expectedDate || undefined,
-        currency: currency || undefined,
+        ...cur.payload,
         paymentTerms: paymentTerms || undefined,
         deliveryTerms: deliveryTerms || undefined,
         shippingAddress: shippingAddress || undefined,
@@ -303,7 +365,7 @@ export function CreatePurchaseOrderModal({ mode = 'create', initial, onClose, ve
       if (mode === 'edit') {
         row = await db.purchaseOrders.update(initial.id, {
           line_items: lines, issue_date: issueDate || null, expected_delivery_date: expectedDate || null,
-          currency: currency || null, payment_terms: paymentTerms || null, delivery_terms: deliveryTerms || null,
+          currency: cur.payload.currency, exchange_rate: cur.payload.exchangeRate, payment_terms: paymentTerms || null, delivery_terms: deliveryTerms || null,
           shipping_address: shippingAddress || null, billing_address: billingAddress || null,
           terms_conditions: termsConditions || null, notes: notes || null,
         })
@@ -348,15 +410,7 @@ export function CreatePurchaseOrderModal({ mode = 'create', initial, onClose, ve
               <Label>{t('purchasing.expectedDeliveryDate')}</Label>
               <Input aria-label={t('purchasing.expectedDeliveryDate')} type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="w-full" />
             </div>
-            <div>
-              <Label>{t('purchasing.currency')}</Label>
-              {/* Placeholder shows the code actually used when this is left blank.
-                  It read "USD", but the PO renders with
-                  `purchaseOrder.currency || layout.currency || 'EGP'` — so a blank
-                  field produced EGP while the hint promised USD. PDF_LAYOUT_DEFAULT
-                  is the same constant getPdfLayout() falls back to. */}
-              <Input aria-label={t('purchasing.currency')} value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full" placeholder={PDF_LAYOUT_DEFAULT.currency} />
-            </div>
+            <CurrencyRateFields cx={cur} />
             <div>
               <Label>{t('purchasing.paymentTerms')}</Label>
               <Input aria-label={t('purchasing.paymentTerms')} value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} className="w-full" />
@@ -427,11 +481,30 @@ export function VendorInvoiceFormModal({ mode, initial, vendors, userEmail, onCl
   const [lines, setLines] = useState(initial?.line_items || [])
   const [invoiceDate, setInvoiceDate] = useState(initial?.invoice_date || '')
   const [dueDate, setDueDate] = useState(initial?.due_date || '')
+  // The vendor invoice is what actually costs the stock: its rate becomes the
+  // landed unit cost of everything it receives, so it matters more here than on
+  // the purchase order, which is only an intention to buy.
+  const cur = useDocumentCurrency(initial)
   const [notes, setNotes] = useState(initial?.notes || '')
   const [saving, setSaving] = useState(false)
   const [products, setProducts] = useState([])
 
-  useEffect(() => { db.products.list().then(setProducts).catch(() => {}) }, [])
+  // A failed load used to leave products as [], which renders as an empty
+  // product picker — indistinguishable from a vendor that genuinely has no
+  // products, so the user concludes the catalogue is empty rather than that
+  // something broke.
+  useEffect(() => {
+    db.products
+      .list()
+      .then(setProducts)
+      .catch((err) => {
+        captureException(err, { page: 'Purchasing', context: 'modal/products.list' })
+        toast.error(t('purchasing.productsLoadFailed'))
+      })
+    // Mount only. Including t would refetch the whole catalogue every time the
+    // interface language changes, which the picker does not need.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const vendorName = useMemo(() => vendors?.find((v) => v.id === vendorId)?.brand_name, [vendors, vendorId])
   // Same scoping as the PO form: only this vendor's (= this brand's) products.
@@ -442,16 +515,23 @@ export function VendorInvoiceFormModal({ mode, initial, vendors, userEmail, onCl
       toast.error(t('purchasing.vendorAndLineRequired'))
       return
     }
+    // Caught here rather than at the database, which would surface as a raw
+    // constraint error the user cannot act on.
+    if (!cur.rateValid) {
+      toast.error(t('purchasing.exchangeRateRequired', { currency: cur.currency }))
+      return
+    }
     setSaving(true)
     try {
       let row
       if (mode === 'edit') {
         row = await db.vendorInvoices.update(initial.id, {
           line_items: lines, invoice_date: invoiceDate || null, due_date: dueDate || null, notes: notes || null,
+          currency: cur.payload.currency, exchange_rate: cur.payload.exchangeRate,
         })
       } else {
         row = await db.vendorInvoices.create({
-          vendorId, lineItems: lines,
+          vendorId, lineItems: lines, ...cur.payload,
           invoiceDate: invoiceDate || undefined, dueDate: dueDate || undefined,
           notes: notes || undefined, createdBy: userEmail,
         })
@@ -489,6 +569,7 @@ export function VendorInvoiceFormModal({ mode, initial, vendors, userEmail, onCl
             <Label>{t('purchasing.dueDate')}</Label>
             <Input aria-label={t('purchasing.dueDate')} type="date" value={dueDate || ''} onChange={(e) => setDueDate(e.target.value)} className="w-full" />
           </div>
+          <CurrencyRateFields cx={cur} />
         </div>
         <div>
           <Label>{t('purchasing.notes')}</Label>
@@ -527,8 +608,33 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
   const [loadingInvoices, setLoadingInvoices] = useState(false)
   const [allocations, setAllocations] = useState({})
   const [saving, setSaving] = useState(false)
+  const cur = useDocumentCurrency()
+  // Destructured so the loader effect below can depend on it without depending
+  // on the whole `cur` object, which is rebuilt on every render.
+  const { selectCurrency } = cur
 
   const selectedVendor = vendors.find((v) => v.id === vendorId)
+
+  /**
+   * Only invoices in the payment's currency can be settled by it.
+   *
+   * The database refuses a cross-currency application (20260793) because
+   * `amount_paid + applied >= total` compares the two figures directly — a
+   * E£1,000 payment would otherwise mark a $1,000 invoice paid in full. Filtering
+   * the list rather than validating on save means the impossible allocation
+   * cannot be typed in the first place, instead of being rejected after the
+   * work of entering it.
+   */
+  const payableInvoices = useMemo(
+    () => openInvoices.filter((vi) => (vi.currency || cur.baseCurrency) === cur.currency),
+    [openInvoices, cur.currency, cur.baseCurrency]
+  )
+  // Currencies this vendor actually has open invoices in, so switching the
+  // picker tells the user immediately whether anything is settleable.
+  const openCurrencies = useMemo(
+    () => [...new Set(openInvoices.map((vi) => vi.currency || cur.baseCurrency))],
+    [openInvoices, cur.baseCurrency]
+  )
 
   useEffect(() => {
     setOpenInvoices([])
@@ -547,6 +653,9 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
         if (initialInvoiceId) {
           const inv = open.find((vi) => vi.id === initialInvoiceId)
           if (inv) {
+            // Paying a named invoice: the payment takes that invoice's
+            // currency, since it is the only one it could legally settle.
+            if (inv.currency) selectCurrency(inv.currency)
             const remaining = Math.round(((inv.total ?? 0) - (inv.amount_paid ?? 0)) * 100) / 100
             setAllocations({ [inv.id]: remaining.toFixed(2) })
             setAmount(remaining.toFixed(2))
@@ -556,7 +665,18 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
       .catch((err) => console.error('load open vendor invoices failed', err))
       .finally(() => { if (!cancelled) setLoadingInvoices(false) })
     return () => { cancelled = true }
-  }, [vendorId, initialInvoiceId])
+  }, [vendorId, initialInvoiceId, selectCurrency])
+
+  // Switching currency invalidates every allocation, because none of those
+  // invoices can be settled by this payment any more. Clearing is the only
+  // honest outcome; keeping them would send the server allocations it refuses.
+  const currencyRef = useRef(cur.currency)
+  useEffect(() => {
+    if (currencyRef.current !== cur.currency) {
+      currencyRef.current = cur.currency
+      setAllocations({})
+    }
+  }, [cur.currency])
 
   const totalAmount = parseFloat(amount) || 0
   const allocatedTotal = Object.values(allocations).reduce((sum, v) => sum + (parseFloat(v) || 0), 0)
@@ -565,7 +685,7 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
   const handleAutoAllocate = () => {
     let remaining = totalAmount
     const next = {}
-    for (const inv of openInvoices) {
+    for (const inv of payableInvoices) {
       if (remaining <= 0.001) break
       const due = Math.round(((inv.total ?? 0) - (inv.amount_paid ?? 0)) * 100) / 100
       const give = Math.min(due, remaining)
@@ -575,7 +695,7 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
   }
 
   const updateAllocation = (invoiceId, value) => setAllocations((prev) => ({ ...prev, [invoiceId]: value }))
-  const isValid = !!vendorId && totalAmount > 0 && allocatedTotal <= totalAmount + 0.001
+  const isValid = !!vendorId && totalAmount > 0 && allocatedTotal <= totalAmount + 0.001 && cur.rateValid
 
   const handleSubmit = async () => {
     if (!isValid) return
@@ -589,6 +709,8 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
         payment_date: paymentDate,
         notes: notes.trim() || null,
         created_by: currentUserEmail,
+        currency: cur.payload.currency,
+        exchangeRate: cur.payload.exchangeRate,
         allocations: Object.entries(allocations)
           .map(([invoice_id, v]) => ({ invoice_id, amount: parseFloat(v) || 0 }))
           .filter((a) => a.amount > 0),
@@ -624,6 +746,7 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
               <Label required>{t('accounting.amount')}</Label>
               <Input aria-label={t('accounting.amount')} type="number" min={0.01} step={0.01} value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
+            <CurrencyRateFields cx={cur} />
             <div>
               <Label>{t('accounting.method')}</Label>
               <Select aria-label={t('accounting.method')} value={method} onChange={(e) => setMethod(e.target.value)}>
@@ -648,7 +771,7 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
             <div>
               <div className="flex items-center justify-between mb-2">
                 <Label className="mb-0">{t('purchasing.applyToInvoices')}</Label>
-                {openInvoices.length > 0 && (
+                {payableInvoices.length > 0 && (
                   <button onClick={handleAutoAllocate} className="text-xs font-medium text-[#4338ca] dark:text-[#a5b4fc] hover:underline">
                     {t('accounting.autoAllocate')}
                   </button>
@@ -656,8 +779,15 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
               </div>
               {loadingInvoices ? (
                 <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('common.loading')}</div>
-              ) : openInvoices.length === 0 ? (
-                <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('purchasing.noOpenInvoices')}</div>
+              ) : payableInvoices.length === 0 ? (
+                <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">
+                  {openCurrencies.length > 0 && !openCurrencies.includes(cur.currency)
+                    ? t('purchasing.noOpenInvoicesInCurrency', {
+                        currency: cur.currency,
+                        others: openCurrencies.join(', '),
+                      })
+                    : t('purchasing.noOpenInvoices')}
+                </div>
               ) : (
                 <div className="rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden">
                   <table className="w-full text-sm">
@@ -670,7 +800,7 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
                       </tr>
                     </thead>
                     <tbody>
-                      {openInvoices.map((inv) => {
+                      {payableInvoices.map((inv) => {
                         const remaining = Math.round(((inv.total ?? 0) - (inv.amount_paid ?? 0)) * 100) / 100
                         return (
                           <tr key={inv.id} className="border-b border-[#f0f2f6] dark:border-[#1a2230] last:border-0">

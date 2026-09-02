@@ -39,7 +39,7 @@ export default function Customers({
   })
   const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
-    queryFn: () => db.userRoles.listAllRoles(),
+    queryFn: () => db.userRoles.directory(),
     staleTime: 5 * 60_000,
   })
   const { data: customersTotalCount = null } = useQuery({
@@ -375,6 +375,9 @@ export default function Customers({
       mobile: customerForm.mobile,
       landline: customerForm.landline || null,
       email: customerForm.email || null,
+      // NULL means "use the system default country", which is almost every
+      // record — so nothing had to be backfilled when the column was added.
+      country_code: customerForm.country_code || null,
       address: customerForm.address || null,
       cr_number: customerForm.cr_number || null,
       tax_id: customerForm.tax_id || null,
@@ -480,6 +483,7 @@ export default function Customers({
       mobile: customer.mobile || '',
       landline: customer.landline || '',
       email: customer.email || '',
+      country_code: customer.country_code || '',
       address: customer.address || '',
       cr_number: customer.cr_number || '',
       tax_id: customer.tax_id || '',

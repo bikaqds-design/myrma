@@ -4,7 +4,12 @@ import { auth, db, storage, notifications } from '../api/supabaseClient'
 import { captureException } from '../lib/sentry'
 import { changePasswordSchema, getFirstError } from '../lib/schemas'
 import { safeStorage } from '../lib/safeStorage'
-import { WIDGET_CATALOG, ALL_WIDGET_IDS, resolveEnabledWidgets, toStoredWidgetPrefs } from '../lib/dashboardWidgets'
+import {
+  WIDGET_SIZES,
+  resolveWidgetSettings,
+  toStoredWidgetPrefs,
+} from '../lib/dashboardWidgets'
+import { canDo } from '../lib/permissions'
 import toast from 'react-hot-toast'
 import { Spinner, PageHeader, Button, Input } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
@@ -162,7 +167,7 @@ const SYSTEM_NOTIF_CATEGORIES = [
   },
 ]
 
-export default function AccountSettings({ currentUser, currentUserRole, onProfileUpdate }) {
+export default function AccountSettings({ currentUser, currentUserRole, currentUserPermissions, onProfileUpdate }) {
   const { t } = useTranslation()
   const isAdmin = currentUserRole === ROLES.ADMIN || currentUserRole === ROLES.SUPER_ADMIN
   const tabs = [
@@ -184,36 +189,47 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
   // different fallbacks — all sixteen here, AppearanceContext's ten there — so
   // with no saved preference this page showed every widget ticked while the
   // dashboard rendered ten.
-  const [widgetPrefs, setWidgetPrefs] = useState(() =>
-    resolveEnabledWidgets(safeStorage.get(`dashboard_widgets_${currentUser?.email}`, null))
+  // Only widgets this role can actually read are listed. A technician cannot
+  // read deals, so offering them a CRM widget would let them switch on a card
+  // that renders zeros — which looks like a bug rather than a boundary.
+  const canWidget = (section, action) => canDo(currentUserRole, currentUserPermissions, section, action)
+
+  // rows carries every permitted widget, enabled or not, in the user's order.
+  // `layout` is just the enabled ones — what actually gets written back.
+  const [rows, setRows] = useState(() =>
+    resolveWidgetSettings(safeStorage.get(`dashboard_widgets_${currentUser?.email}`, null), canWidget)
   )
 
-  const persistWidgets = (next) => {
-    safeStorage.set(widgetStorageKey, toStoredWidgetPrefs(next))
+  const persistRows = (nextRows) => {
+    setRows(nextRows)
+    safeStorage.set(widgetStorageKey, toStoredWidgetPrefs(nextRows.filter((r) => r.enabled)))
     window.dispatchEvent(new Event('dashboard-widgets-changed'))
   }
 
-  const toggleWidget = (id) => {
-    setWidgetPrefs((prev) => {
-      const next = prev.includes(id) ? prev.filter((w) => w !== id) : [...prev, id]
-      persistWidgets(next)
-      return next
-    })
+  const toggleWidget = (id) =>
+    persistRows(rows.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)))
+
+  const setWidgetSize = (id, size) =>
+    persistRows(rows.map((r) => (r.id === id ? { ...r, size } : r)))
+
+  const moveWidget = (id, delta) => {
+    const from = rows.findIndex((r) => r.id === id)
+    const to = from + delta
+    if (from < 0 || to < 0 || to >= rows.length) return
+    const next = [...rows]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    persistRows(next)
   }
 
-  const enableAllWidgets = () => {
-    setWidgetPrefs([...ALL_WIDGET_IDS])
-    persistWidgets(ALL_WIDGET_IDS)
-  }
+  const enableAllWidgets = () => persistRows(rows.map((r) => ({ ...r, enabled: true })))
 
-  const disableAllWidgets = () => {
-    // persistWidgets, not a bare []: an empty array is the legacy shape, and the
-    // resolver reads that as "nothing was switched off among the ids that
-    // existed back then", which would leave the six newer widgets on. The v2
-    // shape says explicitly that all sixteen are off.
-    setWidgetPrefs([])
-    persistWidgets([])
-  }
+  // Every row explicitly off, rather than a bare empty array: an empty array is
+  // the legacy shape, and the resolver reads that as "nothing was switched off
+  // among the ids that existed back then", which would leave newer widgets on.
+  const disableAllWidgets = () => persistRows(rows.map((r) => ({ ...r, enabled: false })))
+
+  const enabledCount = rows.filter((r) => r.enabled).length
 
   // Profile
   const [displayName, setDisplayName] = useState(currentUser?.user_metadata?.display_name || '')
@@ -278,10 +294,23 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
     } catch {}
   }
 
-  // A-3: persist to DB (fire-and-forget; localStorage stays the fast path)
+  // A-3: persist to DB. localStorage stays the fast path and the source of
+  // truth for this device, so a failure here does not lose the setting — but it
+  // does mean the preference stops following the user to another browser, and
+  // that used to happen in complete silence.
+  //
+  // Warned once rather than per toggle: this fires on every switch, and a toast
+  // each time would be noise for a degradation that is real but not urgent.
+  const warnedPrefsSync = useRef(false)
   const persistPrefsToDb = (prefs) => {
     if (!currentUser?.email) return
-    db.userPreferences.set(currentUser.email, { notifSystem: prefs }).catch(() => {})
+    db.userPreferences.set(currentUser.email, { notifSystem: prefs }).catch((err) => {
+      captureException(err, { page: 'AccountSettings', context: 'persistPrefsToDb' })
+      if (!warnedPrefsSync.current) {
+        warnedPrefsSync.current = true
+        toast(t('accountSettings.prefsSyncFailed'), { icon: '⚠️' })
+      }
+    })
   }
 
   const toggleSysNotif = (key) => {
@@ -1168,35 +1197,68 @@ export default function AccountSettings({ currentUser, currentUserRole, onProfil
               </div>
             </div>
 
+            {/* One row per widget, in dashboard order: on/off, width, and where
+                it sits. The same three controls the dashboard's edit mode
+                offers, for people who would rather set them here. */}
             <div className="mt-5 space-y-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-gray-100 rounded-xl overflow-hidden border border-gray-100">
-                {WIDGET_CATALOG.map((w) => (
+              <div className="divide-y divide-gray-100 rounded-xl overflow-hidden border border-gray-100">
+                {rows.map((w, i) => (
                   <div
                     key={w.id}
-                    className="flex items-center justify-between p-4 bg-white hover:bg-gray-50 transition-colors"
+                    className="flex items-center gap-3 p-4 bg-white hover:bg-gray-50 transition-colors"
                   >
-                    <div className="min-w-0 flex-1 pr-4">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-gray-800">{w.label}</p>
-                        <span
-                          className={`text-xs px-1.5 py-0.5 rounded font-medium ${w.size === 'full' ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]'}`}
-                        >
-                          {w.size === 'full' ? t('accountSettings.widgetFullWidth') : t('accountSettings.widgetHalfWidth')}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-0.5">{w.desc}</p>
+                    <div className="flex flex-col">
+                      <button
+                        type="button"
+                        onClick={() => moveWidget(w.id, -1)}
+                        disabled={i === 0}
+                        aria-label={t('dashboard.moveEarlier')}
+                        className="text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:hover:text-gray-400 leading-none text-xs"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveWidget(w.id, 1)}
+                        disabled={i === rows.length - 1}
+                        aria-label={t('dashboard.moveLater')}
+                        className="text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:hover:text-gray-400 leading-none text-xs"
+                      >
+                        ▼
+                      </button>
                     </div>
-                    <Toggle
-                      checked={widgetPrefs.includes(w.id)}
-                      onChange={() => toggleWidget(w.id)}
-                    />
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-800">{t(w.labelKey)}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{t(w.descKey)}</p>
+                    </div>
+
+                    <div className="flex rounded-lg overflow-hidden border border-gray-200" role="group"
+                      aria-label={t('accountSettings.widgetWidth')}>
+                      {WIDGET_SIZES.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setWidgetSize(w.id, s)}
+                          aria-pressed={w.size === s}
+                          title={t(`accountSettings.widgetSize.${s}`)}
+                          className={`px-2.5 py-1 text-xs font-semibold transition-colors ${
+                            w.size === s ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                          }`}
+                        >
+                          {t(`dashboard.size.${s}`)}
+                        </button>
+                      ))}
+                    </div>
+
+                    <Toggle checked={w.enabled} onChange={() => toggleWidget(w.id)} />
                   </div>
                 ))}
               </div>
             </div>
 
             <p className="text-xs text-gray-500 mt-4 text-center">
-              {t('accountSettings.widgetsEnabledSummary', { count: widgetPrefs.length, total: WIDGET_CATALOG.length })}
+              {t('accountSettings.widgetsEnabledSummary', { count: enabledCount, total: rows.length })}
             </p>
           </div>
         </div>

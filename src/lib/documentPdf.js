@@ -37,6 +37,16 @@ export async function getPdfLayout() {
       }
     }
     if (saved) Object.assign(layout, saved)
+    // The base currency is installation config, not a PDF preference. It used
+    // to come from the sales-document layout settings, which meant an admin
+    // could set the PDF currency to USD while the books were kept in EGP and
+    // every quotation would print dollars over pound amounts. Config wins;
+    // the layout field is display-only now.
+    if (!cfgResult.missing) {
+      const cur = cfgResult.data.find((r) => r.config_key === 'default_currency')
+      const code = typeof cur?.config_value === 'string' ? cur.config_value : cur?.config_value?.toString?.()
+      if (code) layout.currency = code
+    }
     if (brd) {
       logoUrl = brd.logo_url || null
       if (!layout.companyName) layout.companyName = brd.company_name || ''

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import i18next from 'i18next'
+import ProfitabilityTab from './_ProfitabilityTab'
 import { useURLTab } from '../hooks/useURLTab'
 import { useQuery } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
@@ -1654,6 +1655,7 @@ export default function Reports({
           { id: 'pipeline', label: t('reports.tabPipeline') },
           { id: 'sales', label: t('reports.tabSales') },
           { id: 'financial', label: t('reports.tabFinancial') },
+          { id: 'profitability', label: t('reports.tabProfitability') },
         ]
       : []),
     { id: 'tickets', label: t('reports.tabTickets'), startsRmaGroup: isAdminOrManager },
@@ -1962,6 +1964,11 @@ export default function Reports({
               formatDate={formatDate}
             />
           )}
+          {/* Reads its own data from the margin views rather than the page's
+              shared query: cost and profit come from v_invoice_margin, which
+              nothing else on this page needs, and loading it for every tab
+              would make five other tabs slower to open. */}
+          {visibleTab === 'profitability' && isAdminOrManager && <ProfitabilityTab />}
         </>
       )}
     </div>

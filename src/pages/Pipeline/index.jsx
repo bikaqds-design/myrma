@@ -270,7 +270,7 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
   })
   const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
-    queryFn: () => db.userRoles.listAllRoles(),
+    queryFn: () => db.userRoles.directory(),
     staleTime: 5 * 60_000,
   })
   const salesReps = usersList.filter((u) => u.role === 'sales_rep' || u.role === 'manager')

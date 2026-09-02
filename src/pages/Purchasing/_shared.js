@@ -91,3 +91,57 @@ export function sortDimensionKeys(keys, dimension, weightOf) {
     ? [...keys].sort((a, b) => a.localeCompare(b))
     : [...keys].sort((a, b) => weightOf(b) - weightOf(a))
 }
+
+/**
+ * A purchase document's total in the base currency.
+ *
+ * Everything that ADDS documents together has to go through this. `total` is in
+ * the document's own currency, so summing it across a mix of local and imported
+ * purchases produces a number that is not money in any currency — a $10,000
+ * import would land in a spend total as though it were E£10,000.
+ *
+ * `total_base` is a generated column (20260792), so it cannot be stale. The
+ * fallback multiplies by the rate only for a client running against a database
+ * that predates it; a missing rate means a base-currency document, where the
+ * two figures are the same number anyway.
+ */
+export function docTotalBase(doc) {
+  if (doc?.total_base != null) return Number(doc.total_base) || 0
+  return (Number(doc?.total) || 0) * (Number(doc?.exchange_rate) || 1)
+}
+
+/**
+ * True when a document is not in the base currency, and so needs its currency
+ * shown next to every amount. A local purchase does not: labelling every figure
+ * on a screen where everything is EGP is noise that trains people to stop
+ * reading the label, which is exactly when the one foreign document slips past.
+ */
+export function isForeignDoc(doc, baseCurrency) {
+  return Boolean(doc?.currency) && doc.currency !== baseCurrency
+}
+
+/**
+ * Landed charge kinds, matching the charge_type CHECK constraint on
+ * vendor_invoice_charges (20260792). A value here that the constraint does not
+ * allow fails on save with a database error rather than a form message, so the
+ * two lists have to agree.
+ */
+export const CHARGE_TYPES = ['freight', 'customs', 'clearance', 'insurance', 'handling', 'other']
+
+/**
+ * True when a document claims a foreign currency but carries a rate of 1.
+ *
+ * That combination is not a rate anyone chose — it means the rate was never
+ * recorded, and the document is being counted as though its amounts were
+ * already base currency. A $3,750 order sits in every spend total as E£3,750.
+ *
+ * The database refuses this on anything written since 20260792, but rows that
+ * already existed took the rate from a column default and were never passed
+ * through the guard. Those are the ones this finds, and they cannot be found by
+ * looking at a total — 3,750 looks perfectly reasonable until you notice which
+ * currency it is in.
+ */
+export function hasMissingRate(doc, baseCurrency) {
+  if (!doc?.currency || doc.currency === baseCurrency) return false
+  return Number(doc.exchange_rate) === 1
+}

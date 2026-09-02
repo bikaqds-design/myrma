@@ -12,7 +12,11 @@ export interface VendorLedgerEntryRow {
   entry_type: VendorLedgerEntryType
   entry_code: string | null
   vendor_id: string
+  /** Signed, in the entry's own `currency`. Never add these across rows. */
   amount: number
+  currency: string
+  /** `amount` in the base currency. This is what a running balance must use. */
+  amount_base: number | null
   status: string
   due_date: string | null
   entry_date: string
@@ -26,7 +30,15 @@ export interface ApAgingInvoiceRow {
   invoice_id: string
   vi_code: string | null
   due_date: string | null
+  /** Outstanding in the invoice's own `currency`. */
   remaining: number
+  currency: string
+  /**
+   * The same balance in base currency. Aging buckets sum across every vendor
+   * invoice, so they have to add these — adding `remaining` would put dollars
+   * and pounds in one total and report a number that is not money.
+   */
+  remaining_base: number
   daysPastDue: number
   bucket: ApAgingBucket
 }
@@ -74,6 +86,7 @@ export const vendorLedger = {
       .map((inv) => {
         const remaining = Math.round(((inv.total ?? 0) - (inv.amount_paid ?? 0)) * 100) / 100
         if (remaining <= 0.001) return null
+        const rate = Number(inv.exchange_rate) || 1
         const daysPastDue = inv.due_date
           ? Math.floor((today - new Date(inv.due_date).getTime()) / 86_400_000)
           : 0
@@ -83,6 +96,8 @@ export const vendorLedger = {
           vi_code: inv.vi_code,
           due_date: inv.due_date,
           remaining,
+          currency: inv.currency,
+          remaining_base: Math.round(remaining * rate * 100) / 100,
           daysPastDue,
           bucket: bucketFor(daysPastDue),
         } as ApAgingInvoiceRow

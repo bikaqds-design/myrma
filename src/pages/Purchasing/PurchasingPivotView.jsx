@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { DIMENSIONS, dimensionKey, isLiveDocument, sortDimensionKeys } from './_shared'
+import { DIMENSIONS, dimensionKey, docTotalBase, isLiveDocument, sortDimensionKeys } from './_shared'
+import { useBaseCurrency } from '../../hooks/useBaseCurrency'
 
 /**
  * PurchasingPivotView — purchase documents crossed by two dimensions at once.
@@ -22,6 +23,9 @@ import { DIMENSIONS, dimensionKey, isLiveDocument, sortDimensionKeys } from './_
  */
 export default function PurchasingPivotView({ documents, vendorName }) {
   const { t } = useTranslation()
+  // Every spend cell is a sum across documents, so all of them are in base
+  // currency and the footnote has to name it.
+  const baseCurrency = useBaseCurrency()
 
   const [measure, setMeasure] = useState('spend')
   const [rowDim, setRowDim] = useState('vendor')
@@ -38,7 +42,7 @@ export default function PurchasingPivotView({ documents, vendorName }) {
 
     const bump = (bucket, doc) => {
       bucket.count += 1
-      bucket.spend += Number(doc.total) || 0
+      bucket.spend += docTotalBase(doc)
     }
     const ensure = (map, key) => {
       if (!map.has(key)) map.set(key, { count: 0, spend: 0 })
@@ -176,7 +180,7 @@ export default function PurchasingPivotView({ documents, vendorName }) {
       </div>
 
       <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">
-        {measure === 'spend' && `${t('purchasing.currencyCode')} · `}
+        {measure === 'spend' && `${baseCurrency} · `}
         {t('purchasing.graphExcludesCancelled')}
       </p>
     </div>

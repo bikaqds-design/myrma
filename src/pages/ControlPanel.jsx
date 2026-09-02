@@ -12,6 +12,7 @@ import DataCleanup from './cp/DataCleanup'
 import Integrations from './cp/Integrations'
 import CustomFields from './cp/CustomFields'
 import PDFLayout from './cp/PDFLayout'
+import SystemSetup from './cp/SystemSetup'
 import WASettings from './cp/WASettings'
 import WATemplates from './cp/WATemplates'
 import WALogs from './cp/WALogs'
@@ -147,6 +148,7 @@ export default function ControlPanel({ currentUserRole, currentUserEmail, curren
       {section === 'integrations' && <Integrations currentUserEmail={currentUserEmail} />}
       {section === 'customfields' && <CustomFields currentUserEmail={currentUserEmail} />}
       {section === 'pdflayout' && <PDFLayout currentUserEmail={currentUserEmail} />}
+      {section === 'system-setup' && <SystemSetup currentUserEmail={currentUserEmail} />}
       {section === 'sla' && <SLAPolicies currentUserEmail={currentUserEmail} />}
       {section === 'automation' && <AutomationRules currentUserEmail={currentUserEmail} />}
       {section === 'webhooks' && <WebhooksConfig currentUserEmail={currentUserEmail} />}

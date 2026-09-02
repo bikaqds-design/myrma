@@ -125,7 +125,8 @@
       "Bash(awk 'NR==1377,NR==1501' src/pages/RMATickets/index.jsx)",
       "Bash(docker info *)",
       "PowerShell(Start-Process \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\")",
-      "PowerShell(\"Docker Desktop launch requested\")"
+      "PowerShell(\"Docker Desktop launch requested\")",
+      "Bash(echo \"exit: $?\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\bika_\\.claude\\projects\\d--myrma-app",

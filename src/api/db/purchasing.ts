@@ -39,7 +39,9 @@ export interface PurchaseOrderRow {
   total: number
   issue_date: string | null
   expected_delivery_date: string | null
-  currency: string | null
+  currency: string
+  exchange_rate: number
+  total_base: number | null
   payment_terms: string | null
   delivery_terms: string | null
   shipping_address: string | null
@@ -67,7 +69,11 @@ export interface VendorInvoiceRow {
   total: number
   invoice_date: string | null
   due_date: string | null
+  currency: string
+  exchange_rate: number
+  total_base: number | null
   notes: string | null
+  /** In the invoice's own `currency` — settlement may not cross currencies. */
   amount_paid: number
   payment_status: 'unpaid' | 'partial' | 'paid' | 'reversed'
   paid_at: string | null
@@ -89,7 +95,12 @@ export interface PurchaseDocumentRow {
   created_by: string
   doc_status: string
   payment_status: string | null
+  /** In the document's own `currency`. Never add these across rows. */
   total: number
+  currency: string
+  exchange_rate: number
+  /** `total` converted to the base currency. Use this for any total. */
+  total_base: number | null
   created_at: string
   updated_at: string | null
   type_specific_date: string | null
@@ -151,7 +162,15 @@ export const purchaseOrders = {
     lineItems: PurchaseLine[]
     issueDate?: string
     expectedDeliveryDate?: string
-    currency?: string
+    /** ISO 4217. Required since 20260792 — the column is NOT NULL. */
+    currency: string
+    /**
+     * Units of base currency per one unit of `currency`. Must be exactly 1 for a
+     * base-currency document and something else for a foreign one; the database
+     * refuses anything else, because a rate of 1 on a USD invoice would record
+     * dollars as though they were pounds.
+     */
+    exchangeRate?: number
     paymentTerms?: string
     deliveryTerms?: string
     shippingAddress?: string
@@ -173,7 +192,8 @@ export const purchaseOrders = {
           ...totals,
           issue_date: input.issueDate || null,
           expected_delivery_date: input.expectedDeliveryDate || null,
-          currency: input.currency || null,
+          currency: input.currency,
+          exchange_rate: input.exchangeRate ?? 1,
           payment_terms: input.paymentTerms || null,
           delivery_terms: input.deliveryTerms || null,
           shipping_address: input.shippingAddress || null,
@@ -275,6 +295,14 @@ export const vendorInvoices = {
     lineItems: PurchaseLine[]
     invoiceDate?: string
     dueDate?: string
+    /** ISO 4217. Required since 20260792 — the column is NOT NULL. */
+    currency: string
+    /**
+     * Units of base currency per one unit of `currency`. This is the rate that
+     * costs the received stock, so it is the one number on this document that
+     * later determines every margin drawn from it.
+     */
+    exchangeRate?: number
     notes?: string
     createdBy: string
   }): Promise<VendorInvoiceRow> {
@@ -288,6 +316,8 @@ export const vendorInvoices = {
           vendor_id: input.vendorId,
           line_items: lineItems,
           ...totals,
+          currency: input.currency,
+          exchange_rate: input.exchangeRate ?? 1,
           invoice_date: input.invoiceDate || null,
           due_date: input.dueDate || null,
           notes: input.notes || null,
@@ -402,4 +432,91 @@ export const purchaseDocuments = {
       .eq('id', id)
     if (error) throw error
   },
+}
+
+// ── Landed charges ────────────────────────────────────────────────────────────
+
+export type ChargeType =
+  | 'freight' | 'customs' | 'clearance' | 'insurance' | 'handling' | 'other'
+
+export interface VendorInvoiceChargeRow {
+  id: string
+  vendor_invoice_id: string
+  charge_type: ChargeType
+  description: string | null
+  /** In the vendor invoice's own currency, like its line items. */
+  amount: number
+  created_by: string | null
+  created_at: string
+}
+
+/**
+ * Freight, customs and clearance on a vendor invoice.
+ *
+ * These are part of what the goods cost. Left out, every imported item looks
+ * cheaper than it was and its margin looks better than it is — on an air
+ * shipment the freight alone can be a tenth of the invoice.
+ *
+ * The database refuses a change once the invoice has been received
+ * (trg_charges_before_receipt, 20260794): the landed cost is already written
+ * onto the units in stock by then, and editing the charge afterwards would
+ * leave the invoice and the stock disagreeing with nothing to say which is
+ * right.
+ */
+export const vendorInvoiceCharges = {
+  async list(vendorInvoiceId: string): Promise<VendorInvoiceChargeRow[]> {
+    const { data, error } = await supabase
+      .from('vendor_invoice_charges')
+      .select('*')
+      .eq('vendor_invoice_id', vendorInvoiceId)
+      .order('created_at', { ascending: true })
+    if (error) {
+      if (error.code === '42P01') return []
+      throw error
+    }
+    return (data ?? []) as VendorInvoiceChargeRow[]
+  },
+
+  async create(input: {
+    vendorInvoiceId: string
+    chargeType: ChargeType
+    description?: string | null
+    amount: number
+    createdBy: string
+  }): Promise<VendorInvoiceChargeRow> {
+    const { data, error } = await supabase
+      .from('vendor_invoice_charges')
+      .insert({
+        vendor_invoice_id: input.vendorInvoiceId,
+        charge_type: input.chargeType,
+        description: input.description?.trim() || null,
+        amount: input.amount,
+        created_by: input.createdBy,
+      })
+      .select()
+      .single()
+    if (error) throw error
+    return data as VendorInvoiceChargeRow
+  },
+
+  async remove(id: string): Promise<void> {
+    const { error } = await supabase.from('vendor_invoice_charges').delete().eq('id', id)
+    if (error) throw error
+  },
+}
+
+/**
+ * What each line of a vendor invoice will cost per unit, landed, in base
+ * currency — the same figure receive_vendor_invoice will write onto the stock,
+ * from the same database function, so the preview cannot disagree with what
+ * actually happens.
+ */
+export async function landedUnitCosts(
+  vendorInvoiceId: string
+): Promise<{ product_id: string; unit_cost_base: number }[]> {
+  const { data, error } = await supabase.rpc('rma_vi_landed_unit_costs', {
+    p_vi_id: vendorInvoiceId,
+  })
+  if (error) throw error
+  return (data ?? []) as { product_id: string; unit_cost_base: number }[]
 }

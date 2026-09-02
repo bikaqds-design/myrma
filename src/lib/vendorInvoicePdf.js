@@ -109,6 +109,19 @@ export async function downloadVIPDF({ vendorInvoice, vendor, purchaseOrder = nul
     { label: 'Currency', value: currency },
     { label: 'Payment Terms', value: vendorInvoice.payment_terms || 'N/A' },
   ]
+  // On an import, the rate and what the invoice came to in base currency. This
+  // is the number every unit cost and every margin figure downstream is derived
+  // from, so the printed copy filed against the shipment should carry it —
+  // otherwise reconciling the file against the books means re-deriving a rate
+  // that was recorded months ago.
+  const baseCurrency = layout.currency || 'EGP'
+  if (currency !== baseCurrency) {
+    const rate = Number(vendorInvoice.exchange_rate) || 0
+    const totalBase =
+      vendorInvoice.total_base != null ? Number(vendorInvoice.total_base) : (Number(total) || 0) * rate
+    metaRows.push({ label: 'Exchange Rate', value: `1 ${currency} = ${rate} ${baseCurrency}` })
+    metaRows.push({ label: `Total (${baseCurrency})`, value: formatMoney(totalBase, baseCurrency) })
+  }
   // Only shown when the invoice actually came from a PO, so a standalone
   // invoice does not print an empty reference row.
   if (purchaseOrder?.po_code) {

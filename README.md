@@ -99,115 +99,34 @@ Both variables **must** be prefixed with `VITE_` to be exposed by Vite.
 
 ### 3. Set up the database
 
-Run the migrations in order from the Supabase SQL editor or CLI:
+**On a fresh Supabase project, run these two files and nothing else:**
 
-```bash
-# Using Supabase CLI (recommended)
-supabase db push
-
-# Or apply manually in this order:
-supabase/migrations/20260524_customer_cascade_delete.sql
-supabase/migrations/20260524_features.sql
-supabase/migrations/20260526_enable_rls.sql
-supabase/migrations/20260526_check_constraints.sql
-supabase/migrations/20260527_storage_bucket_policies.sql
-supabase/migrations/20260528_ticket_cascade_fk.sql
-supabase/migrations/20260529_repair_permissions.sql
-supabase/migrations/20260531_relax_ticket_status_constraint.sql
-supabase/migrations/20260602_whatsapp_notifications.sql
-supabase/migrations/20260603_user_preferences_rls.sql
-supabase/migrations/20260613_search_by_serial.sql
-supabase/migrations/20260617_kb_articles.sql
-# CRM upgrade (Track A) — apply in order:
-supabase/migrations/20260618_crm_add_sales_rep_role.sql
-supabase/migrations/20260619_crm_contacts.sql
-supabase/migrations/20260620_crm_pipelines.sql
-supabase/migrations/20260621_crm_leads.sql
-supabase/migrations/20260622_crm_deals.sql
-supabase/migrations/20260623_crm_activities.sql
-supabase/migrations/20260624_crm_customers_extend.sql
-supabase/migrations/20260625_crm_notification_events.sql
-supabase/migrations/20260626_crm_leads_convert_rpc.sql
-supabase/migrations/20260627_crm_fix_duplicate_user_roles_check.sql
-supabase/migrations/20260628_crm_assigned_rep_use_email.sql
-supabase/migrations/20260629_crm_created_by_use_email.sql
-supabase/migrations/20260630_crm_convert_lead_customer_code.sql
-supabase/migrations/20260701_crm_leads_add_statuses.sql
-supabase/migrations/20260702_crm_activities_chatter.sql
-supabase/migrations/20260703_crm_activities_replies.sql
-supabase/migrations/20260704_crm_pipeline_rename_new_lead_stage.sql
-supabase/migrations/20260705_crm_remove_b2c_pipeline.sql
-supabase/migrations/20260706_seed_test_users_and_deals.sql
-supabase/migrations/20260707_crm_rename_new_deal_stage_plural.sql
-supabase/migrations/20260708_crm_sync_deal_values.sql
-supabase/migrations/20260709_crm_lead_deal_codes.sql
-supabase/migrations/20260710_crm_deal_code_rename.sql
-supabase/migrations/20260711_crm_convert_rpc_deal_code.sql
-# Sales Documents — CRM Sprint 6 (apply in order):
-supabase/migrations/20260712_document_sequences.sql
-supabase/migrations/20260713_stock_moves.sql
-supabase/migrations/20260714_quotations.sql
-supabase/migrations/20260715_sales_orders.sql
-supabase/migrations/20260716_crm_invoices.sql
-supabase/migrations/20260717_credit_notes.sql
-supabase/migrations/20260718_credit_note_applications.sql
-supabase/migrations/20260719_inventory_reservation.sql
-supabase/migrations/20260720_sales_documents_view.sql
-supabase/migrations/20260721_crm_activities_approval_type.sql
-supabase/migrations/20260722_sales_documents_archive.sql
-supabase/migrations/20260723_sales_orders_approval_statuses.sql
-supabase/migrations/20260724_crm_convert_lead_created_by_email.sql
-supabase/migrations/20260725_quotations_add_converted_status.sql
-supabase/migrations/20260726_crm_deal_code_prefix_opp.sql
-# Accounting Module v1 (apply in order):
-supabase/migrations/20260727_crm_payments.sql
-supabase/migrations/20260728_crm_payment_sequence.sql
-supabase/migrations/20260729_crm_customer_credit_limit.sql
-supabase/migrations/20260730_crm_customer_ledger_view.sql
-# Sales Funnel Hardening — Sprint 7.5 (apply in order):
-supabase/migrations/20260732_funnel_line_reservation.sql
-supabase/migrations/20260733_so_lifecycle_rpcs.sql
-supabase/migrations/20260734_invoice_lifecycle_rpcs.sql
-supabase/migrations/20260735_cn_payment_lifecycle_rpcs.sql
-supabase/migrations/20260736_lead_deal_guards.sql
-# Inventory Model Reconciliation — Sprint 7.6 (apply in order):
-supabase/migrations/20260737_inventory_units_add_product_id.sql
-supabase/migrations/20260738_inventory_model_reconciliation.sql
-supabase/migrations/20260739_inventory_serial_uniqueness.sql
-# Inventory & Warehouse Management — Sprint 8 (apply in order):
-supabase/migrations/20260740_inventory_bulk_stock_schema.sql
-supabase/migrations/20260741_warehouse_stock_reservation_rpcs.sql
-supabase/migrations/20260742_funnel_reserve_line_bulk_branch.sql
-supabase/migrations/20260743_receive_stock_rpc.sql
-supabase/migrations/20260744_transfer_stock_rpc.sql
-supabase/migrations/20260745_adjust_archive_recalculate_rpcs.sql
-# Purchase Module — Sprint 9 (apply in order):
-supabase/migrations/20260746_purchase_vendors.sql
-supabase/migrations/20260747_purchase_documents.sql
-supabase/migrations/20260748_inventory_units_vendor_invoice_fk.sql
-supabase/migrations/20260749_receive_vendor_invoice_rpc.sql
-supabase/migrations/20260750_purchase_documents_view.sql
-# Audit Hardening — 2026-07-02 (apply in order):
-supabase/migrations/20260751_harden_money_rpcs.sql
-supabase/migrations/20260752_lockdown_rpc_execute.sql
-supabase/migrations/20260753_stock_moves_actor_from_jwt.sql
-supabase/migrations/20260754_payment_cn_reversal.sql
-supabase/migrations/20260755_fix_restore_units_status_conflation.sql
-# Purchase Module Redesign — 2026-07-05, Brands as vendors, PO→VI funnel, AP payments (apply in order):
-supabase/migrations/20260756_brands_vendor_fields.sql
-supabase/migrations/20260757_purchasing_reset.sql
-supabase/migrations/20260758_receive_vi_po_completion.sql
-supabase/migrations/20260759_activities_purchase_related_types.sql
-supabase/migrations/20260760_vendor_payments.sql
-supabase/migrations/20260761_vendor_ledger_view.sql
-supabase/migrations/20260762_purchase_documents_view.sql
-supabase/migrations/20260763_vendor_invoices_updated_at.sql
-# Warehouse Module Redesign — R1, 2026-07-09, RMA stages as real locations + Warehouse Dashboard (apply in order):
-supabase/migrations/20260764_warehouse_system_locations.sql
-supabase/migrations/20260765_stock_moves_rma_ticket_doctype.sql
-supabase/migrations/20260766_rma_move_rpcs.sql
-supabase/migrations/20260767_backfill_rma_unit_locations.sql
 ```
+supabase/migrations/00000000_baseline_schema.sql
+supabase/migrations/00000001_baseline_reference_data.sql
+```
+
+The first creates the complete public schema — 62 tables, 199 policies, 168
+grants, 89 functions, 6 views, 30 triggers, RLS on every table. The second
+seeds the reference data the app cannot start without: currencies, countries,
+landline area codes and system configuration.
+
+**Do not then replay the historical migrations.** The baseline already reflects
+their end state; re-running them would apply `ALTER`s against a schema that
+already has them. The dated files under `supabase/migrations/` are kept as the
+change history, not as a provisioning path — and they never were one: twenty of
+the tables (including `customers`, `products`, `rma_tickets` and `user_roles`)
+were created directly in the database and by no migration, so
+"apply them in order" fails at the first `ALTER TABLE` on a table that does not
+exist. That is precisely the gap the baseline closes.
+
+**Never run `supabase db push` against the production project.** Its remote
+migration history is empty, so a push would attempt to replay the entire dated
+series against live data.
+
+To regenerate the baseline after schema changes, run
+`supabase/manual/GENERATE_baseline_schema.sql` in the SQL editor and save its
+single output cell over `00000000_baseline_schema.sql`.
 
 ### 4. Set up storage
 
@@ -237,7 +156,27 @@ WHATSAPP_WEBHOOK_VERIFY_TOKEN # arbitrary string matching Meta webhook config
 - Templates must be **Utility** category, not Marketing — Marketing templates are delivery-throttled by Meta (error 131049). Keep bodies purely transactional.
 - Each template's variable count must equal its Meta `{{n}}` count; no positional param may be empty (error 131008 / 132000).
 
-### 6. Start development
+### 6. Create the first administrator
+
+**A new deployment has no administrator, and one cannot be created through the
+UI.** The `admin_write` policy on `user_roles` requires `rma_is_admin()`, so
+only an existing admin can appoint another. The first one is inserted directly.
+
+Since `20260786` this matters more than it used to: an account with no
+`user_roles` row genuinely has no access at either layer, and the app tells the
+person so rather than showing an empty shell.
+
+1. Sign up in the app, or invite yourself from **Supabase Dashboard →
+   Authentication → Users**.
+2. Sign in. You will see *"Your account is not set up yet"* — expected.
+3. Edit the email in `supabase/manual/BOOTSTRAP_first_admin.sql` and run it in
+   the SQL editor. It refuses to run with the placeholder address still in it.
+4. Reload the page. No new sign-in needed.
+
+The same script restores a locked-out administrator, which is the only route
+back if the last one loses access.
+
+### 7. Start development
 
 ```bash
 npm run dev

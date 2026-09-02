@@ -31,12 +31,19 @@ export default [
         URL: 'readonly',
         URLSearchParams: 'readonly',
         localStorage: 'readonly',
+        // The Storage prototype, for tests that make it throw the way a
+        // private window or a full quota does.
+        Storage: 'readonly',
         sessionStorage: 'readonly',
         crypto: 'readonly',
         BroadcastChannel: 'readonly',
         Image: 'readonly',
         Promise: 'readonly',
         TextEncoder: 'readonly',
+        // Added with the Knowledge Center chat: it reads a streamed response
+        // and lets the user stop one mid-answer.
+        TextDecoder: 'readonly',
+        AbortController: 'readonly',
         Uint8Array: 'readonly',
         FormData: 'readonly',
         File: 'readonly',

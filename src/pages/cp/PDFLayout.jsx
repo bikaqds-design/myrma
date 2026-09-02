@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { db, branding as brandingAPI } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../../lib/sentry'
+import { useBaseCurrency } from '../../hooks/useBaseCurrency'
 
 const DEFAULT_SECTION_ORDER = [
   'ticketInfo',
@@ -65,6 +66,7 @@ const FONTS = [
 
 export default function PDFLayout({ currentUserEmail }) {
   const { t } = useTranslation()
+  const baseCurrency = useBaseCurrency()
 
   const SECTIONS_META = [
     { key: 'ticketInfo',          label: t('cp.pdfLayout.sectionTicketInfo'),     desc: t('cp.pdfLayout.sectionTicketInfoDesc') },
@@ -240,9 +242,23 @@ export default function PDFLayout({ currentUserEmail }) {
                       <label className="block text-xs font-medium text-gray-600 mb-1.5">{t('cp.pdfLayout.companyPhone')}</label>
                       <input value={config.companyPhone || ''} onChange={(e) => set('companyPhone', e.target.value)} className={inp} placeholder={t('cp.pdfLayout.companyPhonePlaceholder')} />
                     </div>
+                    {/* Read-only on purpose. This was an editable box, which
+                        made it a second place to decide what currency the
+                        business trades in — set it to USD while the books are
+                        kept in EGP and every quotation printed dollars over
+                        pound amounts. The base currency is installation config
+                        and getPdfLayout() now takes it from there; leaving an
+                        editable control that no longer decides anything would
+                        be worse than showing the value plainly. */}
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1.5">{t('cp.pdfLayout.currency')}</label>
-                      <input value={config.currency || 'EGP'} onChange={(e) => set('currency', e.target.value)} className={`${inp} font-mono`} placeholder="EGP" maxLength={6} />
+                      <input
+                        value={baseCurrency}
+                        readOnly
+                        aria-readonly="true"
+                        className={`${inp} font-mono bg-gray-50 text-gray-600 cursor-not-allowed`}
+                      />
+                      <p className="text-[11px] text-gray-500 mt-1">{t('cp.pdfLayout.currencyFromConfig')}</p>
                     </div>
                   </div>
                 </div>
@@ -523,7 +539,7 @@ export default function PDFLayout({ currentUserEmail }) {
                       </table>
                       <div style={{ marginTop: '6px', marginLeft: 'auto', display: 'flex', justifyContent: 'space-between', gap: '16px', background: '#f1f2f4', borderRadius: '4px', padding: '4px 8px' }}>
                         <span style={{ fontWeight: 'bold', fontSize: `${previewFontSize * 0.58}px`, color: '#211f1b' }}>Balance Due:</span>
-                        <span style={{ fontWeight: 'bold', fontSize: `${previewFontSize * 0.58}px`, color: previewColor }}>{`${config.currency || 'EGP'} 104,834.22`}</span>
+                        <span style={{ fontWeight: 'bold', fontSize: `${previewFontSize * 0.58}px`, color: previewColor }}>{`${baseCurrency} 104,834.22`}</span>
                       </div>
                     </div>
                   </div>

@@ -10,6 +10,8 @@ import {
   ownershipScope,
   NO_OWNER_MATCH,
   ROLE_DEFAULT_PERMISSIONS,
+  accessDenialReason,
+  ACCESS_DENIED,
 } from '../lib/permissions'
 import { ROLES } from '../lib/constants'
 
@@ -402,5 +404,85 @@ describe('resolvePermissions — custom roles', () => {
     // ...which is exactly why the database gates these on rma_is_manager_or_above
     // and rma_can_handle_cash rather than trusting the permission map.
     expect(merged.purchasing.approve).toBe(true)
+  })
+})
+
+// ── accessDenialReason — the client twin of rma_access_is_current() ───────────
+//
+// These assertions are the contract between src/lib/permissions.ts and the SQL
+// function added in 20260786. If one gains a state the other lacks, the app and
+// the database disagree about who may sign in — and the app is the half users
+// actually see. Every case below has a matching SQL case in
+// supabase/manual/20260820_verify_user_status.sql.
+
+describe('accessDenialReason', () => {
+  const active = { role: ROLES.MANAGER, status: 'active', access_expires_at: null }
+
+  it('grants access to an active account with no expiry', () => {
+    expect(accessDenialReason(active)).toBe(null)
+  })
+
+  // The regression this was written for. finishLogin() used to read
+  // `roleData?.role || 'technician'`, so an unprovisioned signup got a
+  // technician's UI against a database that refused every one of its queries.
+  it('denies an account with no user_roles row', () => {
+    expect(accessDenialReason(null)).toBe(ACCESS_DENIED.NO_ROLE)
+    expect(accessDenialReason(undefined)).toBe(ACCESS_DENIED.NO_ROLE)
+    expect(accessDenialReason({})).toBe(ACCESS_DENIED.NO_ROLE)
+    expect(accessDenialReason({ status: 'active' })).toBe(ACCESS_DENIED.NO_ROLE)
+  })
+
+  it.each([
+    ['suspended', ACCESS_DENIED.SUSPENDED],
+    ['locked', ACCESS_DENIED.LOCKED],
+    ['deactivated', ACCESS_DENIED.DEACTIVATED],
+    ['pending', ACCESS_DENIED.PENDING],
+  ])('denies a %s account', (status, expected) => {
+    expect(accessDenialReason({ ...active, status })).toBe(expected)
+  })
+
+  // Rows predating the status column hold NULL. 20260786 normalises those to
+  // 'active', and COALESCE here reads them the same way in the meantime.
+  it('treats a null or missing status as active', () => {
+    expect(accessDenialReason({ ...active, status: null })).toBe(null)
+    expect(accessDenialReason({ role: ROLES.MANAGER })).toBe(null)
+  })
+
+  // Failing closed. A status this build has never heard of must not be read as
+  // permission — the same direction rma_access_is_current() fails in.
+  it('denies an unrecognised status rather than assuming access', () => {
+    expect(accessDenialReason({ ...active, status: 'archived' })).toBe('archived')
+  })
+
+  describe('expiry', () => {
+    const now = new Date('2026-08-19T12:00:00Z')
+
+    it('denies once the expiry has passed', () => {
+      const row = { ...active, access_expires_at: '2026-08-19T11:59:59Z' }
+      expect(accessDenialReason(row, now)).toBe(ACCESS_DENIED.EXPIRED)
+    })
+
+    it('grants while the expiry is still in the future', () => {
+      const row = { ...active, access_expires_at: '2026-08-19T12:00:01Z' }
+      expect(accessDenialReason(row, now)).toBe(null)
+    })
+
+    // Matches SQL's `p_expires > now()`: exactly at the instant, access is over.
+    it('denies exactly at the expiry instant', () => {
+      const row = { ...active, access_expires_at: '2026-08-19T12:00:00Z' }
+      expect(accessDenialReason(row, now)).toBe(ACCESS_DENIED.EXPIRED)
+    })
+
+    it('ignores an unparseable expiry rather than locking the user out', () => {
+      const row = { ...active, access_expires_at: 'not a date' }
+      expect(accessDenialReason(row, now)).toBe(null)
+    })
+
+    // Status is checked before expiry, so the message names the deliberate act
+    // rather than a date that happens to have passed as well.
+    it('reports the status when an account is both suspended and expired', () => {
+      const row = { role: ROLES.MANAGER, status: 'suspended', access_expires_at: '2020-01-01T00:00:00Z' }
+      expect(accessDenialReason(row, now)).toBe(ACCESS_DENIED.SUSPENDED)
+    })
   })
 })

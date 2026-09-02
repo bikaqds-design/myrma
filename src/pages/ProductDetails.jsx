@@ -9,6 +9,7 @@ import { Button } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
 import { ROLES, TICKET_STATUS } from '../lib/constants'
 import { captureException } from '../lib/sentry'
+import ProductDocuments from '../components/ProductDocuments'
 
 export default function ProductDetails({
   productId,
@@ -342,6 +343,20 @@ export default function ProductDetails({
               }
             >
               {t('products.tabRMAHistory', { count: relatedTickets.length })}
+            </button>
+            {/* The datasheet lives with the product, not in a separate uploads
+                area — the moment someone wants to attach one is the moment they
+                are looking at the product. */}
+            <button
+              onClick={() => setActiveTab('documents')}
+              className={
+                'py-4 border-b-2 font-medium transition-colors ' +
+                (activeTab === 'documents'
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700')
+              }
+            >
+              {t('documents.tab')}
             </button>
           </nav>
         </div>
@@ -684,6 +699,17 @@ export default function ProductDetails({
                 )}
               </div>
             </div>
+          )}
+
+          {activeTab === 'documents' && (
+            <ProductDocuments
+              product={product}
+              currentUserEmail={currentUserEmail}
+              // This page already has its own canDo(action) closure over the
+              // current role and permissions; importing the library one shadowed
+              // it with a different signature.
+              canEdit={canDo('edit')}
+            />
           )}
 
           {activeTab === 'rma-history' && (

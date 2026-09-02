@@ -5,7 +5,7 @@ import { Toaster, toast } from 'react-hot-toast'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { auth, db, branding as brandingAPI, supabase } from './api/supabaseClient'
 import { useAppearance } from './contexts/AppearanceContext'
-import { resolvePermissions, canDo, roleDefaults } from './lib/permissions'
+import { resolvePermissions, canDo, roleDefaults, accessDenialReason, ACCESS_DENIED } from './lib/permissions'
 import { ROLES, ROLE_LIST } from './lib/constants'
 import { safeStorage } from './lib/safeStorage'
 import { registerTicketEventHandlers } from './lib/events/ticketEventHandlers'
@@ -82,6 +82,7 @@ function AnnouncementBanner() {
 }
 
 import Login from './pages/Login'
+import AccessDenied from './components/AccessDenied'
 import ResetPassword from './pages/ResetPassword'
 import RMATracker from './pages/RMATracker'
 import KnowledgeBasePublic from './pages/KnowledgeBasePublic'
@@ -112,6 +113,7 @@ const Customers = lazyWithReload(() => import('./pages/Customers'))
 const CustomerDetails = lazyWithReload(() => import('./pages/CustomerDetails'))
 const RMATickets = lazyWithReload(() => import('./pages/RMATickets'))
 const Inventory = lazyWithReload(() => import('./pages/Inventory'))
+const KnowledgeCenter = lazyWithReload(() => import('./pages/KnowledgeCenter'))
 const ControlPanel = lazyWithReload(() => import('./pages/ControlPanel'))
 const TechCalendar = lazyWithReload(() => import('./pages/TechCalendar'))
 const Reports = lazyWithReload(() => import('./pages/Reports'))
@@ -146,7 +148,6 @@ function ProductDetailsRoute({
       productId={id}
       currentUserRole={currentUserRole}
       currentUserEmail={currentUserEmail}
-      currentUserPermissions={currentUserPermissions}
       currentUserPermissions={currentUserPermissions}
       onBack={() => navigate('/products')}
       onNavigateToTicket={onNavigateToTicket}
@@ -352,6 +353,7 @@ const ROUTE_PERMISSIONS = [
   ['/inventory', ['inventory', 'view']],
   ['/calendar', ['calendar', 'view']],
   ['/reports', ['reports', 'view']],
+  ['/knowledge-center', ['products', 'view']],
 ]
 
 function requiredPermissionFor(pathname) {
@@ -387,6 +389,9 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState(null)
   const [currentUserRole, setCurrentUserRole] = useState(null)
+  // Set when a signed-in account may not use the app: no user_roles row, or a
+  // status of suspended / locked / deactivated / pending, or a passed expiry.
+  const [accessDenied, setAccessDenied] = useState(null)
   const [currentUserPermissions, setCurrentUserPermissions] = useState(null)
   // FT-09: permission preview — lets an admin temporarily see the app as another
   // user's role+permissions would render it. Does NOT swap the real Supabase
@@ -461,6 +466,7 @@ export default function App() {
         setCurrentUserRole(null)
         setCurrentUserPermissions(null)
         setMfaPending(null)
+        setAccessDenied(null)
         navigate('/')
       }
     })
@@ -470,9 +476,44 @@ export default function App() {
 
   const finishLogin = async (user) => {
     setCurrentUser(user)
-    const roleData = await db.userRoles.getUserRole(user.email)
+
+    // A failure here used to propagate to checkAuth, which logs and swallows,
+    // leaving currentUser set with a null role — the same empty shell this
+    // whole change exists to remove. Treated as no access, which is both the
+    // safe direction and recoverable: the screen offers a sign-out.
+    let roleData
+    try {
+      roleData = await db.userRoles.getUserRole(user.email)
+    } catch (error) {
+      captureException(error, { page: "App", context: "finishLogin/getUserRole" })
+      setAccessDenied({ reason: ACCESS_DENIED.LOOKUP_FAILED, email: user.email, row: null })
+      setCurrentUserRole(null)
+      setCurrentUserPermissions(null)
+      return
+    }
+
+    // Before 20260786 this line read `roleData?.role || 'technician'`. An
+    // account with no user_roles row — a self-signup nobody provisioned, or a
+    // user whose row was deleted — silently became a technician in the UI
+    // while rma_user_role() returned NULL and the database refused every
+    // query. The result was a full app shell in which nothing loaded and no
+    // error explained why. Suspended, locked, deactivated and expired accounts
+    // reached the same shell, except their queries succeeded, because until
+    // 20260786 nothing enforced status at all.
+    //
+    // Now the two layers agree: if the database will not grant a role, the app
+    // says so rather than pretending.
+    const denial = accessDenialReason(roleData)
+    if (denial) {
+      setAccessDenied({ reason: denial, email: user.email, row: roleData })
+      setCurrentUserRole(null)
+      setCurrentUserPermissions(null)
+      return
+    }
+
     queryClient.setQueryData(['user-role', user.email], roleData)
-    const role = roleData?.role || 'technician'
+    const role = roleData.role
+    setAccessDenied(null)
     setCurrentUserRole(role)
     // A custom role carries its own permission map on the custom_roles row.
     // Only fetched when the role is not a built-in, so the common path costs
@@ -720,7 +761,14 @@ export default function App() {
     const data = await auth.signUp(email, password)
     const user = data?.user || data
     setCurrentUser(user)
-    setCurrentUserRole('technician')
+    // A new signup has no user_roles row and cannot create one — the
+    // admin_write policy requires rma_is_admin(). So it has no access until an
+    // administrator provisions it, and the database already behaves that way.
+    // This used to set 'technician', which granted a nav and a dashboard on
+    // the client while every query behind them was refused.
+    setCurrentUserRole(null)
+    setCurrentUserPermissions(null)
+    setAccessDenied({ reason: ACCESS_DENIED.NO_ROLE, email: user?.email || email, row: null })
   }
 
   const handleLogout = async () => {
@@ -730,6 +778,7 @@ export default function App() {
     setCurrentUser(null)
     setCurrentUserRole(null)
     setCurrentUserPermissions(null)
+    setAccessDenied(null)
     navigate('/')
   }
 
@@ -891,6 +940,13 @@ export default function App() {
       active: pathname === '/calendar',
       icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
       requiredPermission: ['calendar', 'view'],
+    },
+    {
+      path: '/knowledge-center',
+      label: t('nav.knowledgeCenter'),
+      active: pathname === '/knowledge-center',
+      icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+      requiredPermission: ['products', 'view'],
     },
     {
       path: '/reports',
@@ -1056,6 +1112,22 @@ export default function App() {
     return (
       <>
         <Login onLogin={handleLogin} onSignup={handleSignup} />
+        <Toaster position="top-right" toastOptions={toastOptions} />
+      </>
+    )
+  }
+
+  // Signed in, but the account may not use the app. The database refuses it
+  // too — this is the explanation, not the enforcement.
+  if (accessDenied) {
+    return (
+      <>
+        <AccessDenied
+          reason={accessDenied.reason}
+          email={accessDenied.email}
+          row={accessDenied.row}
+          onSignOut={handleLogout}
+        />
         <Toaster position="top-right" toastOptions={toastOptions} />
       </>
     )
@@ -1425,7 +1497,7 @@ export default function App() {
               <Route
                 path="/"
                 element={
-                  <Dashboard currentUserEmail={currentUser?.email} currentUserRole={effectiveUserRole} onNavigate={handleNavigate} />
+                  <Dashboard currentUserEmail={currentUser?.email} currentUserRole={effectiveUserRole} currentUserPermissions={effectiveUserPermissions} onNavigate={handleNavigate} />
                 }
               />
               <Route path="/dashboard" element={<Navigate to="/" replace />} />
@@ -1659,6 +1731,7 @@ export default function App() {
                   <AccountSettings
                     currentUser={currentUser}
                     currentUserRole={currentUserRole}
+                    currentUserPermissions={currentUserPermissions}
                     onProfileUpdate={handleProfileUpdate}
                   />
                 }
@@ -1709,6 +1782,8 @@ export default function App() {
                   />
                 }
               />
+
+              <Route path="/knowledge-center" element={<KnowledgeCenter currentUserEmail={currentUser?.email} />} />
 
               {/* A-1: catch-all 404 — previously typo URLs silently landed on Dashboard */}
               <Route path="*" element={<NotFoundPage />} />

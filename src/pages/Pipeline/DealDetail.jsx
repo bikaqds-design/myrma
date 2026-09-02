@@ -97,7 +97,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
   })
   const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
-    queryFn: () => db.userRoles.listAllRoles(),
+    queryFn: () => db.userRoles.directory(),
     staleTime: 5 * 60_000,
   })
   const { data: products = EMPTY_ARRAY } = useQuery({

@@ -16,7 +16,8 @@ import {
   Legend,
 } from 'recharts'
 import { useAppearance } from '../../contexts/AppearanceContext'
-import { DIMENSIONS, dimensionKey, isLiveDocument, sortDimensionKeys } from './_shared'
+import { DIMENSIONS, dimensionKey, docTotalBase, isLiveDocument, sortDimensionKeys } from './_shared'
+import { useBaseCurrency } from '../../hooks/useBaseCurrency'
 
 /**
  * PurchasingGraphView — spend analytics over purchase documents.
@@ -66,6 +67,10 @@ function ChartTypeBtn({ active, onClick, children, title }) {
 
 export default function PurchasingGraphView({ documents, vendorName }) {
   const { t } = useTranslation()
+  // Spend is summed in base currency, so the axis and tooltips have to be
+  // labelled with the base currency rather than a fixed string in the locale
+  // file — that said EGP whatever the system was actually configured to use.
+  const baseCurrency = useBaseCurrency()
   const { darkMode } = useAppearance()
 
   const [measure, setMeasure] = useState('spend')
@@ -80,7 +85,7 @@ export default function PurchasingGraphView({ documents, vendorName }) {
       const key = dimensionKey(doc, groupBy, { vendorName, t })
       if (!groups[key]) groups[key] = { name: key, count: 0, spend: 0 }
       groups[key].count += 1
-      groups[key].spend += Number(doc.total) || 0
+      groups[key].spend += docTotalBase(doc)
     }
     return sortDimensionKeys(Object.keys(groups), groupBy, (k) => groups[k][measure]).map(
       (k) => groups[k]
@@ -90,7 +95,7 @@ export default function PurchasingGraphView({ documents, vendorName }) {
   const totals = useMemo(
     () => ({
       docs: live.length,
-      spend: live.reduce((sum, d) => sum + (Number(d.total) || 0), 0),
+      spend: live.reduce((sum, d) => sum + docTotalBase(d), 0),
       vendors: new Set(live.map((d) => d.vendor_id).filter(Boolean)).size,
     }),
     [live]
@@ -108,7 +113,7 @@ export default function PurchasingGraphView({ documents, vendorName }) {
   const yFmt = (v) => (measure === 'spend' ? Number(v).toLocaleString() : v)
   const tooltipFmt = (v) =>
     measure === 'spend'
-      ? [`${Number(v).toLocaleString()} ${t('purchasing.currencyCode')}`, measureLabel]
+      ? [`${Number(v).toLocaleString()} ${baseCurrency}`, measureLabel]
       : [v, measureLabel]
 
   const tooltipStyle = { backgroundColor: tooltipBg, border: `1px solid ${gridColor}`, borderRadius: 8 }
@@ -220,7 +225,7 @@ export default function PurchasingGraphView({ documents, vendorName }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatTile label={t('purchasing.statDocuments')} value={totals.docs.toLocaleString()} />
-        <StatTile label={t('purchasing.statTotalSpend')} value={`${totals.spend.toLocaleString()} ${t('purchasing.currencyCode')}`} />
+        <StatTile label={t('purchasing.statTotalSpend')} value={`${totals.spend.toLocaleString()} ${baseCurrency}`} />
         <StatTile label={t('purchasing.statVendors')} value={totals.vendors.toLocaleString()} />
       </div>
 

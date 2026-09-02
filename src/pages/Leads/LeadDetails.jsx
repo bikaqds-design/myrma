@@ -68,7 +68,7 @@ export default function LeadDetails({ leadId, currentUserRole, currentUserEmail,
   })
   const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
-    queryFn: () => db.userRoles.listAllRoles(),
+    queryFn: () => db.userRoles.directory(),
     staleTime: 5 * 60_000,
   })
   const salesReps = usersList.filter((u) =>

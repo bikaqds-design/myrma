@@ -6,6 +6,7 @@ import { notificationEventBus } from './NotificationEventBus.js'
 import type { NotificationEvent, EventType } from '../messaging/types.js'
 import { TemplateEngine } from '../messaging/TemplateEngine.js'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { captureException } from '../sentry.js'
 
 const CRM_EVENTS: EventType[] = [
   'crm.followup_due',
@@ -13,10 +14,6 @@ const CRM_EVENTS: EventType[] = [
   'crm.deal_won',
   'crm.deal_overdue',
 ]
-
-function normalizePhone(raw: string): string {
-  return raw.replace(/[^0-9]/g, '')
-}
 
 async function isWhatsAppEnabled(supabase: SupabaseClient): Promise<boolean> {
   const { data } = await supabase
@@ -48,19 +45,48 @@ async function fetchActiveTemplate(supabase: SupabaseClient, eventType: EventTyp
   return data?.[0] ?? null
 }
 
-// Resolve the assigned rep's phone from user_roles (reps store their phone
-// via AccountSettings → profile; the field is `phone` on the user_roles row).
+let warnedNoRepPhoneStore = false
+
+/**
+ * Resolve the assigned rep's phone number.
+ *
+ * **There is nowhere to resolve it from.** This previously ran
+ *
+ *     supabase.from('user_roles').select('phone').eq('email', repEmail)
+ *
+ * against a table that has neither column — it is `user_email`, and no `phone`
+ * exists anywhere in the schema. The query therefore always failed, `data` was
+ * always undefined, and the caller's `if (!phone) return` meant every CRM
+ * WhatsApp notification to a rep has silently done nothing since it was
+ * written. A comment claimed reps set this in AccountSettings; no such field
+ * exists.
+ *
+ * The doomed query is removed rather than kept — it cost a round trip per
+ * event to produce a guaranteed null. What replaces it is a single warning, so
+ * the gap is visible instead of silent. Deciding where a rep's phone should
+ * live is a product question: a column on user_roles with a field in
+ * AccountSettings, or `user_preferences.prefs`. Either needs a SECURITY
+ * DEFINER lookup, because a rep may not read another rep's row under the
+ * policies in 20260790.
+ *
+ * Ticket notifications to customers are unaffected — those read the phone from
+ * the customer record and work.
+ */
 async function resolveRepPhone(
-  supabase: SupabaseClient,
+  _supabase: SupabaseClient,
   repEmail: string | null | undefined
 ): Promise<string | null> {
   if (!repEmail) return null
-  const { data } = await supabase
-    .from('user_roles')
-    .select('phone')
-    .eq('email', repEmail)
-    .single()
-  if (data?.phone) return normalizePhone(String(data.phone))
+  if (!warnedNoRepPhoneStore) {
+    warnedNoRepPhoneStore = true
+    captureException(
+      new Error(
+        'CRM rep notifications are not deliverable: no phone number is stored for staff users. ' +
+          'See Finding 8 in PRELAUNCH_REVIEW.md.'
+      ),
+      { context: 'crmEventHandlers/resolveRepPhone' }
+    )
+  }
   return null
 }
 

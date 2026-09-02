@@ -483,3 +483,64 @@ export function ownershipScope(
   return userEmail || NO_OWNER_MATCH
 }
 
+
+// ── Account access state ──────────────────────────────────────────────────────
+/**
+ * Whether a user_roles row grants access right now, and if not, why.
+ *
+ * This is the client-side twin of the SQL function rma_access_is_current()
+ * added in 20260786. The database is the boundary — a suspended user's
+ * rma_user_role() returns NULL and every policy denies. This exists so the app
+ * can say "your account is suspended" instead of rendering a shell in which
+ * every query silently fails.
+ *
+ * Keep the two in step. If one gains a state the other does not, the app and
+ * the database disagree about who may sign in, and the app is the one users
+ * see.
+ *
+ * Returns null when access is granted, otherwise a reason key.
+ */
+export const ACCESS_DENIED = {
+  NO_ROLE: 'no_role',
+  SUSPENDED: 'suspended',
+  LOCKED: 'locked',
+  DEACTIVATED: 'deactivated',
+  PENDING: 'pending',
+  EXPIRED: 'expired',
+  /**
+   * Not a stored row state: the role lookup itself failed. Set by finishLogin,
+   * never returned by accessDenialReason, so it has no SQL counterpart.
+   */
+  LOOKUP_FAILED: 'lookup_failed',
+} as const
+
+export type AccessDenialReason = (typeof ACCESS_DENIED)[keyof typeof ACCESS_DENIED] | string
+
+export interface AccessRow {
+  role?: string | null
+  status?: string | null
+  access_expires_at?: string | null
+}
+
+export function accessDenialReason(
+  row: AccessRow | null | undefined,
+  now: Date = new Date()
+): AccessDenialReason | null {
+  // No row at all: a signup that no administrator has provisioned, or a user
+  // whose row was deleted. Previously this fell through to 'technician', which
+  // rendered a technician's app against a database that refused every query.
+  if (!row || !row.role) return ACCESS_DENIED.NO_ROLE
+
+  // COALESCE(status,'active') mirrors the SQL helper: rows predating the
+  // column read as active. Any non-active value denies, including one this
+  // build does not recognise — failing closed is the correct direction.
+  const status = row.status || 'active'
+  if (status !== 'active') return status
+
+  if (row.access_expires_at) {
+    const expires = new Date(row.access_expires_at)
+    if (!Number.isNaN(expires.getTime()) && expires <= now) return ACCESS_DENIED.EXPIRED
+  }
+
+  return null
+}

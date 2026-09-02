@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { PhoneNote, EmailNote } from '../../components/ContactValidation'
+import { useContactValidation } from '../../hooks/useContactValidation'
 import toast from 'react-hot-toast'
 import { ModalOverlay, ModalCard, Input, Select, Textarea, Label, Button } from '../../components/ui'
 import { associateFieldId } from '../../lib/fieldAssociation'
@@ -42,6 +44,15 @@ function Field({ label, required, children }) {
 export function CreateLeadModal({ form, setForm, editing, leadCode, salesReps, onSave, onClose }) {
   const { t } = useTranslation()
   const set = (key, val) => setForm((prev) => ({ ...prev, [key]: val }))
+
+  // One phone box, so it is validated as either a mobile or a landline: a lead
+  // who leaves a switchboard number is not making a mistake. Leads carry no
+  // country override of their own, so they follow the system default.
+  const contact = useContactValidation({
+    phone: form.phone,
+    email: form.email,
+    editing,
+  })
 
   return (
     <ModalOverlay onClose={onClose}>
@@ -91,6 +102,7 @@ export function CreateLeadModal({ form, setForm, editing, leadCode, salesReps, o
                 onChange={(e) => set('phone', e.target.value)}
                 placeholder={t('leadModal.phonePlaceholder')}
               />
+              <PhoneNote result={contact.phoneResult} editing={editing} />
             </Field>
             <Field label={t('common.email')}>
               <Input
@@ -98,6 +110,12 @@ export function CreateLeadModal({ form, setForm, editing, leadCode, salesReps, o
                 value={form.email}
                 onChange={(e) => set('email', e.target.value)}
                 placeholder={t('leadModal.emailPlaceholder')}
+              />
+              <EmailNote
+                result={contact.emailResult}
+                onAccept={(domain) =>
+                  set('email', `${String(form.email).split('@')[0]}@${domain}`)
+                }
               />
             </Field>
           </div>
@@ -149,7 +167,14 @@ export function CreateLeadModal({ form, setForm, editing, leadCode, salesReps, o
           <Button variant="secondary" onClick={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={onSave}>{editing ? t('common.saveChanges') : t('leadModal.createLead')}</Button>
+          {/* A new lead must comply; an existing one saves with a warning. */}
+          <Button
+            onClick={onSave}
+            disabled={contact.blocking}
+            title={contact.blocking ? t('phone.fixBeforeSaving') : undefined}
+          >
+            {editing ? t('common.saveChanges') : t('leadModal.createLead')}
+          </Button>
         </div>
       </ModalCard>
     </ModalOverlay>

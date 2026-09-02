@@ -9,6 +9,13 @@ export interface VendorPaymentRow {
   vendor_id: string
   amount: number
   unapplied_amount: number
+  // 20260793. A payment is made in the currency of the invoices it settles and
+  // may only be applied to invoices in that currency — the database refuses a
+  // mismatch, because `amount_paid + applied >= total` compares the two
+  // directly and would mark a $1,000 invoice paid with E£1,000.
+  currency: string
+  exchange_rate: number
+  amount_base: number | null
   method: 'cash' | 'bank_transfer' | 'check' | 'card' | 'other'
   reference_number: string | null
   payment_date: string
@@ -73,6 +80,8 @@ export const vendorPayments = {
     notes?: string | null
     created_by: string
     allocations?: { invoice_id: string; amount: number }[]
+    currency?: string | null
+    exchangeRate?: number | null
   }): Promise<VendorPaymentRow> {
     const allocations = (input.allocations ?? []).filter((a) => a.amount > 0)
     const { data: paymentId, error } = await supabase.rpc('record_vendor_payment', {
@@ -88,6 +97,10 @@ export const vendorPayments = {
       // jsonb_array_elements(p_allocations) fails with
       // "cannot extract elements from a scalar".
       p_allocations: allocations,
+      // Omitted means a local payment: the RPC defaults to the base currency at
+      // a rate of 1, so callers that predate the currency engine are unchanged.
+      p_currency: input.currency ?? null,
+      p_exchange_rate: input.exchangeRate ?? null,
     })
     if (error) throw error
     const payment = await vendorPayments.get(paymentId as string)

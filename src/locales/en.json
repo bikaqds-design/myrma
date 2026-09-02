@@ -23,7 +23,8 @@
     "dealDetails": "Deal Details",
     "salesDocuments": "Sales Documents",
     "salesDocument": "Sales Document",
-    "accountSettings": "Account Settings"
+    "accountSettings": "Account Settings",
+    "knowledgeCenter": "Knowledge Center"
   },
   "common": {
     "save": "Save",
@@ -140,7 +141,8 @@
     "fontSubtitle": "Applied globally across all pages",
     "tableDensity": "Table Density",
     "tableDensitySubtitle": "Controls row height in all data tables",
-    "dateFormat": "Date Format"
+    "dateFormat": "Date Format",
+    "saveFailed": "Appearance saved on screen, but could not be stored — it may revert next time you sign in."
   },
   "languages": {
     "en": "English",
@@ -151,8 +153,8 @@
     "rmaOperations": "RMA Operations",
     "systemOverview": "System overview & analytics",
     "updatedJustNow": "updated just now",
-    "noWidgets": "No widgets enabled",
-    "noWidgetsHint": "Go to Account Settings → Appearance to enable widgets",
+    "noWidgets": "No widgets on your dashboard",
+    "noWidgetsHint": "Add them back from Account Settings → Appearance.",
     "performance": "Performance",
     "trends": "Trends",
     "teamInventory": "Team & Inventory",
@@ -206,7 +208,85 @@
     "repLeaderboard": "Rep Leaderboard",
     "dealsWonThisMonthLabel": "Deals won this month",
     "noDealsWonYet": "No deals won this month yet",
-    "rmaSection": "RMA & Service"
+    "rmaSection": "RMA & Service",
+    "widgets": {
+      "stat_tickets": {
+        "label": "Ticket KPIs",
+        "desc": "Hero tiles and the status strip"
+      },
+      "crm_kpi": {
+        "label": "CRM KPIs",
+        "desc": "Open pipeline value, deals won and leads this month"
+      },
+      "stat_inventory": {
+        "label": "Inventory Snapshot",
+        "desc": "Five inventory status categories"
+      },
+      "sla_health": {
+        "label": "SLA Health",
+        "desc": "On-time ticket completion rate"
+      },
+      "resolution_rate": {
+        "label": "Resolution Rate",
+        "desc": "Percentage of tickets closed"
+      },
+      "overdue_tickets": {
+        "label": "Overdue Tickets",
+        "desc": "Tickets past their due date"
+      },
+      "overdue_followups": {
+        "label": "Overdue Follow-Ups",
+        "desc": "CRM activities past their due date"
+      },
+      "pipeline_by_stage": {
+        "label": "Pipeline by Stage",
+        "desc": "Open deal count and value per stage"
+      },
+      "rep_leaderboard": {
+        "label": "Rep Leaderboard",
+        "desc": "Top reps by deals won this month"
+      },
+      "recent_tickets": {
+        "label": "Recent Tickets",
+        "desc": "The most recently created tickets"
+      },
+      "weekly_trend": {
+        "label": "Weekly Trend",
+        "desc": "Ticket creation over 7 days"
+      },
+      "monthly_trend": {
+        "label": "Monthly Trend",
+        "desc": "Ticket creation over 30 days"
+      },
+      "technician_performance": {
+        "label": "Technician Performance",
+        "desc": "Top technicians by close rate"
+      },
+      "top_issues": {
+        "label": "Top Issues",
+        "desc": "The most common reported product issues"
+      },
+      "status_distribution": {
+        "label": "Status Distribution",
+        "desc": "Ticket statuses as a donut"
+      },
+      "priority_distribution": {
+        "label": "Priority Distribution",
+        "desc": "Ticket priorities as a donut"
+      }
+    },
+    "editLayout": "Edit layout",
+    "doneEditing": "Done",
+    "moveEarlier": "Move earlier",
+    "moveLater": "Move later",
+    "changeSize": "Change size",
+    "removeWidget": "Remove {{widget}}",
+    "openWidget": "Open {{widget}}",
+    "size": {
+      "quarter": "S",
+      "half": "M",
+      "full": "L"
+    }
   },
   "tickets": {
     "title": "RMA Tickets",
@@ -438,7 +518,8 @@
     "tabDisqualified": "Disqualified",
     "reopenLead": "Reopen Lead",
     "leadReopened": "Lead reopened",
-    "bulkDeleteTitle": "Delete Leads"
+    "bulkDeleteTitle": "Delete Leads",
+    "convertedButStageFailed": "Lead converted, but the deal could not be moved to the stage you chose — it is in the pipeline’s first stage."
   },
   "activityType": {
     "call": "Call",
@@ -1225,7 +1306,31 @@
     "colOpen": "Open",
     "colLost": "Lost",
     "colOpenValue": "Open Value",
-    "kpiCustomersWithTickets": "Customers with Tickets"
+    "kpiCustomersWithTickets": "Customers with Tickets",
+    "tabProfitability": "Profitability",
+    "marginByRep": "By sales rep",
+    "marginByInvoice": "By invoice",
+    "marginRep": "Sales rep",
+    "marginInvoice": "Invoice",
+    "marginCustomer": "Customer",
+    "marginInvoices": "Invoices",
+    "marginRevenue": "Revenue",
+    "marginCostedRevenue": "Costed revenue",
+    "marginCostedRevenueHint": "The part with a known cost of goods",
+    "marginCogs": "Cost of goods",
+    "marginProfit": "Gross profit",
+    "marginPct": "Margin",
+    "marginOfCosted": "of costed revenue",
+    "marginUnknown": "cost unknown ({{n}})",
+    "marginUnknownShort": "{{n}} uncosted",
+    "marginRepUnknownHint": "{{n}} of these invoices shipped goods with no recorded cost, so they are excluded from margin.",
+    "marginIncompleteTitle": "{{unknown}} of {{total}} invoices have no complete cost of goods",
+    "marginIncompleteBody": "Their {{amount}} of revenue is excluded from every margin figure above. Counting them would report that revenue as pure profit. Give the stock an opening cost, or receive it through a vendor invoice, and it will be included.",
+    "marginNotProvisioned": "Margin reporting is not set up yet",
+    "marginNotProvisionedHint": "The reporting views have not been created. Apply migration 20260798_margin_reporting.sql.",
+    "marginNoInvoices": "No posted invoices yet",
+    "marginNoInvoicesHint": "Profit is measured when an invoice is posted. Post one and it will appear here.",
+    "marginNotCaptured": "no cost recorded"
   },
   "products": {
     "title": "Products",
@@ -1719,6 +1824,13 @@
         "label": "Custom alerts",
         "desc": "Manual alerts sent by the admin team"
       }
+    },
+    "prefsSyncFailed": "Saved on this device, but could not sync to your account. Preferences may not follow you to another browser.",
+    "widgetWidth": "Widget width",
+    "widgetSize": {
+      "quarter": "Small (quarter width)",
+      "half": "Medium (half width)",
+      "full": "Large (full width)"
     }
   },
   "ticketForm": {
@@ -1916,7 +2028,9 @@
     "clickToChangeFile": "Click to change file",
     "clickToUploadCSV": "Click to upload CSV file",
     "dragAndDrop": "or drag and drop",
-    "bulkUploadWarning": "Each imported customer will get a unique CB-XXXXXXXX code generated automatically."
+    "bulkUploadWarning": "Each imported customer will get a unique CB-XXXXXXXX code generated automatically.",
+    "country": "Country",
+    "countryDefault": "System default"
   },
   "leadModal": {
     "editTitle": "Edit Lead",
@@ -2725,7 +2839,8 @@
       "tabRmaTicket": "RMA Ticket",
       "salesSubtitle": "Layout for quotations, sales orders, invoices, credit notes & purchase orders.",
       "rmaSubtitle": "Layout for the RMA repair ticket printout.",
-      "documentStyle": "Document Style"
+      "documentStyle": "Document Style",
+      "currencyFromConfig": "Set in Control Panel → currency settings. Applies to every document."
     },
     "rmaConfig": {
       "header": "RMA Configuration",
@@ -2942,6 +3057,125 @@
       "repaired": "Moved {{count}} deal",
       "repaired_other": "Moved {{count}} deals",
       "repairFailed": "Could not move the deals"
+    },
+    "currencyLabel": "Currency & Costing",
+    "currencyDesc": "Base currency, the currencies you trade in, and whether purchase tax counts as cost",
+    "currency": {
+      "header": "Currency & Costing",
+      "subtitle": "What money means in this system: the currency the books are kept in, the currencies you can transact in, and how purchase tax is treated.",
+      "baseTitle": "Base currency",
+      "baseExplain": "The currency the books are kept in. Every sales document is in it, every exchange rate is a ratio to it, and every cost and margin figure is expressed in it.",
+      "baseLocked": "This cannot be changed: {{count}} transaction documents already exist and their amounts were recorded against it. Changing it would not convert anything — it would silently reinterpret every figure in the system. The database refuses it.",
+      "baseChangeable": "No transaction documents exist yet, so this can still be changed in SQL. Once the first quotation, order, invoice or payment is raised it is fixed for good.",
+      "baseTag": "base",
+      "alwaysOn": "always on",
+      "listTitle": "Currencies you can transact in",
+      "listHint": "Turn one on to use it on a purchase order or vendor invoice. Turning one off hides it from new documents; existing documents keep the currency they were raised in.",
+      "add": "Add currency",
+      "colCode": "Code",
+      "colName": "Name",
+      "colSymbol": "Symbol",
+      "colDecimals": "Decimals",
+      "colActive": "Active",
+      "taxTitle": "Purchase tax counts as cost",
+      "taxExplain": "Off by default. VAT on goods bought for resale is normally recoverable, so putting it in unit cost overstates the cost of goods and understates margin on every line. Turn this on only if your business cannot reclaim it.",
+      "taxRetroactive": "This applies to goods received from now on. Stock already received keeps the cost it was given at the time.",
+      "saved": "Saved"
+    },
+    "systemSetupLabel": "System Setup",
+    "systemSetupDesc": "Currency and costing, countries and phone rules, business identity, tax and fiscal year, document numbering",
+    "setup": {
+      "header": "System Setup",
+      "subtitle": "The settings the whole installation depends on: what money means, what a phone number looks like, who this business legally is, and how documents are numbered.",
+      "saved": "Saved",
+      "tabCurrency": "Currency & Costing",
+      "tabCountry": "Country & Numbers",
+      "tabIdentity": "Business Identity",
+      "tabRegional": "Tax, Fiscal Year & Email",
+      "tabNumbering": "Document Numbering",
+      "countryTitle": "Countries",
+      "countryNotProvisioned": "The country tables have not been created. Apply migration 20260799_system_setup.sql.",
+      "defaultCountryTitle": "Default country",
+      "defaultCountry": "Country",
+      "defaultCountryHint": "Every customer and vendor validates phone numbers against this country unless their own record says otherwise.",
+      "defaultCountryCurrency": "The currency shown beside each country is the one it trades in.",
+      "viewingCountry": "Viewing country",
+      "rulesTitle": "Phone rules",
+      "noCountry": "Choose a country to see its rules.",
+      "dialCode": "Dial code",
+      "trunkPrefix": "Trunk prefix",
+      "mobilePrefixes": "Mobile prefixes",
+      "mobileDigits": "Mobile digits",
+      "none": "none",
+      "any": "any",
+      "digitsExplain": "A mobile here is {{digits}} digits written the way people in this country write it, counting the trunk prefix ({{trunk}}). Whether that prefix is part of the count differs between countries, which is why it is recorded rather than assumed.",
+      "areaCodesTitle": "Landline area codes",
+      "areaCodesHint": "A landline must start with one of these and carry exactly that area’s number of subscriber digits.",
+      "noAreaCodes": "No area codes for this country. Landlines here are checked on total length alone — or not at all, if no length is set.",
+      "addAreaCode": "Add area code",
+      "colAreaCode": "Code",
+      "colArea": "Area",
+      "colSubscriberDigits": "Digits after",
+      "colExample": "Looks like",
+      "testerTitle": "Try a number",
+      "testerHint": "Checked against {{country}}. A rule you cannot try is a rule nobody trusts — paste a real number before these start turning customers away.",
+      "testMobile": "Mobile",
+      "testLandline": "Landline",
+      "identityTitle": "Business identity",
+      "identityHint": "These print on quotations, invoices and purchase orders. They were previously split between branding and the PDF layout, so two documents could disagree. Leave anything that does not apply blank — a blank simply does not print.",
+      "legalName": "Registered legal name",
+      "legalNameHint": "The name on your commercial register, if it differs from your trading name.",
+      "taxNumber": "Tax registration number",
+      "taxNumberHint": "Leave blank if not registered for VAT.",
+      "crNumber": "Commercial registration number",
+      "registeredAddress": "Registered address",
+      "taxTitle": "Default tax rate",
+      "taxHint": "Pre-filled on new sales and purchase document lines, so nobody types 14 forty times a day.",
+      "taxRate": "Rate %",
+      "taxRange": "Must be between 0 and 100",
+      "taxNotRetroactive": "A default for new lines only. Changing it never alters a line already typed or a document already issued.",
+      "fiscalTitle": "Fiscal year and timezone",
+      "fiscalHint": "Reports and every “this year” filter currently assume the calendar year and the viewer’s browser timezone.",
+      "fiscalStart": "Financial year starts in",
+      "timezone": "Timezone",
+      "emailTitle": "Warn about mistyped email domains",
+      "emailHint": "Suggests a correction when an address is a keystroke away from a very common domain — gmai.com, hotmai.com, outlok.com.",
+      "emailNoAllowlist": "A warning, never a rejection. There is deliberately no list of permitted domains: rejecting an unlisted one would turn away a new customer on their own company domain, which is the worst thing to refuse.",
+      "numberingTitle": "Document numbering",
+      "numberingHint": "Where each gapless counter stands, and what the next code will be.",
+      "numberingEmpty": "No counters have been created yet.",
+      "numberingNotProvisioned": "Apply migration 20260800_document_counters_readable.sql to see the counters.",
+      "numberingReadOnly": "Read-only on purpose. These counters guarantee that no two documents share a number; a screen that could edit them could break that. Prefixes are fixed in code — changing one would not renumber history, it would start a second series alongside the first.",
+      "numberingRestoreWarning": "If you ever restore from a backup, these counters must be restored too. Without them numbering restarts at 1 and the next invoice collides with one that already exists.",
+      "colDocument": "Document",
+      "colPrefix": "Prefix",
+      "colYear": "Year",
+      "colIssued": "Issued",
+      "colNext": "Next code",
+      "doc_invoice": "Invoice",
+      "doc_credit_note": "Credit note",
+      "doc_payment": "Customer payment",
+      "doc_vendor_payment": "Vendor payment",
+      "doc_vendor_invoice": "Vendor invoice",
+      "doc_quotation": "Quotation",
+      "doc_sales_order": "Sales order",
+      "tabAi": "Knowledge Center AI",
+      "aiTitle": "Answer engine",
+      "aiHint": "The Knowledge Center can answer questions from your uploaded documents. It reaches the model through an Edge Function so the API key never enters the browser.",
+      "aiModel": "Model",
+      "aiModelHint": "The provider’s exact model identifier, copied from their console. Left blank, the chat says it is not configured rather than failing obscurely.",
+      "aiBaseUrl": "API base URL",
+      "aiBaseUrlHint": "Any OpenAI-compatible endpoint. Leave blank to use the function’s default.",
+      "aiKeyTitle": "Where the API key goes",
+      "aiKeyBody": "NOT here. Anything on this page is readable by every staff member and travels in every backup. Set it on the Edge Function instead:",
+      "aiKeyCommand": "supabase secrets set KB_LLM_API_KEY=your-key",
+      "aiDeploy": "And deploy the function once:",
+      "aiDeployCommand": "supabase functions deploy kb-chat",
+      "aiMaxTokens": "Answer length limit (tokens)",
+      "aiMaxTokensHint": "Reasoning models spend this budget thinking before writing. Too small and the answer comes back empty rather than short — 4096 is a safe floor for those, and plenty for ordinary models.",
+      "aiMaxTokensRange": "Must be between 256 and 32768",
+      "aiModelIsKey": "That looks like an API key, not a model name. Keys must never be stored here — every staff member can read this page and it is included in every backup.",
+      "aiKeyWhyNotHere": "There is deliberately no field for the key on this page. Anything stored here is readable by every staff member and travels in every backup; the function’s secret store is neither."
     }
   },
   "notifications": {
@@ -3013,7 +3247,7 @@
     "typeProducts": "products",
     "typeCustomers": "customers",
     "typeTickets": "tickets",
-    "exportAllSuccess": "Complete backup exported successfully!",
+    "exportAllSuccess": "Full backup exported successfully",
     "failedExportProducts": "Failed to export products",
     "failedExportCustomers": "Failed to export customers",
     "failedExportTickets": "Failed to export tickets",
@@ -3021,7 +3255,7 @@
     "tipsTitle": "Backup Tips:",
     "tip1": "Download regular backups (weekly recommended)",
     "tip2": "Store backups in a safe location",
-    "tip3": "Complete backup includes all system data",
+    "tip3": "The full backup covers every table the system uses, including CRM, accounting, purchasing and inventory",
     "restoreTitle": "Restore Data",
     "restoreSubtitle": "Upload backup files",
     "invalidJsonFile": "Please upload a valid JSON backup file",
@@ -3041,12 +3275,33 @@
     "warn1": "Restore will merge data with existing records",
     "warn2": "Duplicate IDs will be updated",
     "warn3": "Create a backup before restoring",
-    "warn4": "Only Products, Customers, and Tickets can be restored",
+    "warn4": "Everything in the file is restored except delivery logs, queued notifications, stock history and email credentials",
     "howToRestoreTitle": "How to Restore:",
     "step1": "Click the upload area above",
     "step2": "Select your backup JSON file",
     "step3": "Wait for the restore process to complete",
-    "step4": "Refresh the page to see restored data"
+    "step4": "Refresh the page to see restored data",
+    "restoreSuccessTables": "Restored {{rows}} rows across {{tables}} tables",
+    "restorePartialSummary": "{{tables}} tables ({{rows}} rows) were restored before the failure — check the data before retrying",
+    "tip4": "Restoring overwrites rows with the same ID and never deletes anything",
+    "warn5": "Document numbering (document_sequences) is NOT restored — an administrator must reinstate it in SQL, or the next invoice will reuse a number that already exists",
+    "exportAllPartial": "Backup is INCOMPLETE — these tables failed and are missing from the file: {{tables}}",
+    "exportSummaryTitle": "Last export",
+    "exportSummaryRows": "{{rows}} rows across {{tables}} tables",
+    "exportSummaryComplete": "Complete — every table exported",
+    "exportSummaryFailed": "Incomplete — missing: {{tables}}",
+    "exportSummarySkipped": "Not provisioned, so nothing to export: {{tables}}",
+    "module_system": "System & configuration",
+    "module_catalogue": "Catalogue (brands, products, documents)",
+    "module_crm": "Customers & CRM",
+    "module_rma": "RMA & service",
+    "module_purchasing": "Purchasing & vendors",
+    "module_inventory": "Inventory & stock",
+    "module_sales": "Sales & accounting",
+    "module_comms": "Knowledge & notifications",
+    "moduleTableCount": "{{count}} tables",
+    "moduleExported": "{{module}} exported — {{rows}} rows",
+    "moduleNotStandalone": "A module file restores into a system that still has its other data. Only the complete backup can rebuild an empty database on its own."
   },
   "preview": {
     "banner": "Previewing as {{email}} ({{role}})",
@@ -3607,7 +3862,41 @@
     "receivedBy": "by {{name}}",
     "bulkArchiveTitle": "Archive Documents",
     "bulkRestoreTitle": "Restore Documents",
-    "cancelTitle": "Cancel Document"
+    "cancelTitle": "Cancel Document",
+    "productsLoadFailed": "Could not load products. The list below is incomplete — reopen this window to try again.",
+    "baseCurrency": "base currency",
+    "exchangeRate": "Exchange rate ({{currency}} → {{base}})",
+    "exchangeRateHint": "How many {{base}} per 1 {{currency}}",
+    "exchangeRatePreview": "{{amount}} = {{converted}}",
+    "exchangeRateRequired": "An exchange rate is required for a {{currency}} document",
+    "colCurrency": "Currency",
+    "colTotalBase": "Total ({{currency}})",
+    "foreignTotalHint": "{{currency}} document — {{amount}} {{base}} at the recorded rate",
+    "documentCurrency": "Document currency",
+    "baseEquivalent": "≈ {{amount}} at the recorded rate",
+    "paymentCurrencyNote": "A payment must be in the same currency as the invoices it settles.",
+    "noOpenInvoicesInCurrency": "No open {{currency}} invoices for this vendor. Open invoices exist in: {{others}}.",
+    "landedCharges": "Landed charges",
+    "chargesHint": "Freight, customs and clearance. Added to unit cost when the goods are received, apportioned across the lines by value.",
+    "chargesLocked": "The goods have been received, so the landed cost is fixed and these can no longer be changed.",
+    "addCharge": "Add charge",
+    "noCharges": "No charges recorded. If this shipment had freight or customs, add them before receiving — afterwards the cost is fixed.",
+    "chargesTotal": "Total charges",
+    "chargeKind": "Type",
+    "chargeDescription": "Description",
+    "chargeAmount": "Amount ({{currency}})",
+    "chargeType_freight": "Freight",
+    "chargeType_customs": "Customs",
+    "chargeType_clearance": "Clearance",
+    "chargeType_insurance": "Insurance",
+    "chargeType_handling": "Handling",
+    "chargeType_other": "Other",
+    "rateMissing": "no rate",
+    "rateMissingHint": "This {{currency}} document has no exchange rate, so it is being counted as {{base}}.",
+    "rateMissingTitle": "This document has no exchange rate",
+    "rateMissingBody": "It is recorded in {{currency}} but at a rate of 1, so {{total}} {{currency}} is being counted as {{total}} {{base}} everywhere — in spend totals, in vendor balances and, once the goods are received, in the cost of the stock. Set the rate that was actually paid before receiving.",
+    "vendorCountry": "Country",
+    "vendorCountryDefault": "System default"
   },
   "resolutionTypeValues": {
     "replacement": "Replacement",
@@ -3633,5 +3922,191 @@
     "Inactive": "Inactive",
     "Suspended": "Suspended",
     "VIP": "VIP"
+  },
+  "accessDenied": {
+    "reasonLabel": "Reason given",
+    "expiredOnLabel": "Access ended",
+    "signOut": "Sign out",
+    "no_role": {
+      "title": "Your account is not set up yet",
+      "body": "You are signed in, but no role has been assigned to this account, so there is nothing you can access. An administrator needs to add you in User Management before you can use the system."
+    },
+    "suspended": {
+      "title": "Your account is suspended",
+      "body": "An administrator has suspended this account. Contact them to have it restored."
+    },
+    "locked": {
+      "title": "Your account is locked",
+      "body": "This account has been locked and cannot be used. Contact an administrator to unlock it."
+    },
+    "deactivated": {
+      "title": "Your account is deactivated",
+      "body": "This account is no longer active. If you believe this is a mistake, contact an administrator."
+    },
+    "pending": {
+      "title": "Your account is awaiting approval",
+      "body": "An administrator has not yet approved this account. You will be able to sign in once they do."
+    },
+    "expired": {
+      "title": "Your access has expired",
+      "body": "This account was given access until a set date, and that date has passed. An administrator can extend it."
+    },
+    "unknown": {
+      "title": "You do not have access",
+      "body": "This account cannot use the system at the moment. Contact an administrator for help."
+    },
+    "lookup_failed": {
+      "title": "We could not check your account",
+      "body": "Something went wrong while loading your permissions, so we cannot safely let you in. Try signing in again — if it keeps happening, contact an administrator."
+    }
+  },
+  "phone": {
+    "ok": "Valid",
+    "empty": "",
+    "no_rules": "No rules configured for this country, so nothing is being checked.",
+    "bad_prefix": "Must start with one of: {{expected}}",
+    "bad_length": "Expected {{expected}} digits, got {{actual}}",
+    "bad_area": "Not a known area code. Expected one of: {{expected}}",
+    "savedAnyway": "(saved anyway — this record predates the rule)",
+    "emailTypo": "Did you mean @{{suggestion}}? You typed @{{domain}}.",
+    "emailUseSuggestion": "Use it",
+    "fixBeforeSaving": "Correct the phone number before saving",
+    "bad_either": "Not a valid mobile or landline. Mobiles are {{expectedMobile}} digits starting with {{expectedPrefixes}}."
+  },
+  "months": {
+    "january": "January",
+    "february": "February",
+    "march": "March",
+    "april": "April",
+    "may": "May",
+    "june": "June",
+    "july": "July",
+    "august": "August",
+    "september": "September",
+    "october": "October",
+    "november": "November",
+    "december": "December"
+  },
+  "knowledgeCenter": {
+    "title": "Knowledge Center",
+    "subtitle": "Every product datasheet and manual, searchable by what is inside them.",
+    "search": "Search",
+    "searchPlaceholder": "Search inside datasheets — a part number, a spec, a phrase…",
+    "clear": "Clear",
+    "allTypes": "All types",
+    "documentCount_one": "{{count}} document",
+    "documentCount_other": "{{count}} documents",
+    "resultsFor_one": "{{count}} result for “{{query}}”",
+    "resultsFor_other": "{{count}} results for “{{query}}”",
+    "unsearchableNote_one": "{{count}} document cannot be searched inside",
+    "unsearchableNote_other": "{{count}} documents cannot be searched inside",
+    "noResults": "Nothing found for “{{query}}”",
+    "noResultsHint": "Try a shorter phrase or a part number. Scanned documents cannot be searched inside — they are listed but their text was never readable.",
+    "empty": "No documents yet",
+    "emptyHint": "Open a product and use its Documents tab to upload a datasheet. It becomes searchable here as soon as it is uploaded.",
+    "notProvisioned": "The Knowledge Center is not set up yet",
+    "notProvisionedHint": "Apply migration 20260801_product_documents.sql.",
+    "modeSearch": "Search",
+    "modeChat": "Ask",
+    "filters": "Filters",
+    "filterBrand": "Brand",
+    "filterCategory": "Category",
+    "allBrands": "All brands",
+    "allCategories": "All categories",
+    "filterSearchableOnly": "Only documents I can search inside",
+    "noneMatchFilters": "No documents match these filters",
+    "modeUpload": "Bulk upload",
+    "modeCoverage": "Coverage"
+  },
+  "documents": {
+    "tab": "Documents",
+    "addTitle": "Add a document",
+    "addHint": "PDF, text or CSV files are read at upload so their contents become searchable. Other types are stored and viewable, but cannot be searched inside.",
+    "chooseFile": "Choose a file",
+    "title": "Title",
+    "type": "Type",
+    "description": "Description",
+    "upload": "Upload",
+    "none": "No documents attached to this product yet.",
+    "notSearchable": "not searchable",
+    "notExtractable": "This file type cannot be read, so it will be stored and viewable but will not appear in Knowledge Center searches.",
+    "pages": "{{n}} pages",
+    "uploadedSearchable": "Uploaded and indexed — it is searchable now",
+    "uploadedNotSearchable": "Uploaded. Its text could not be read, so it will not appear in searches.",
+    "stage_extracting": "Reading the document…",
+    "stage_uploading": "Uploading…",
+    "type_datasheet": "Datasheet",
+    "type_manual": "Manual",
+    "type_warranty": "Warranty",
+    "type_certificate": "Certificate",
+    "type_drawing": "Drawing",
+    "type_other": "Other",
+    "status_pending_hint": "Not yet processed.",
+    "status_empty_hint": "The file held no readable text — usually a scan, which is a picture of text rather than text.",
+    "status_failed_hint": "The file could not be read.",
+    "status_unsupported_hint": "This file type cannot be read for text.",
+    "updated": "Document updated",
+    "editFileFixed": "The file itself cannot be changed here — {{file}}. Upload a new document to replace it."
+  },
+  "knowledgeChat": {
+    "title": "Ask the documents",
+    "subtitle": "Answers are drawn only from uploaded datasheets, and the documents used are shown with each one.",
+    "newChat": "New conversation",
+    "emptyTitle": "Ask a question about any product you have uploaded documents for",
+    "emptyHint": "Answers come only from those documents. If they do not cover it, you will be told so rather than given a guess.",
+    "example1": "Which boards support DDR5?",
+    "example2": "What is the TDP of the Cylon cooler?",
+    "example3": "What warranty is stated on the Patriot SSDs?",
+    "placeholder": "Ask about a specification, a part number, a compatibility…",
+    "send": "Ask",
+    "stop": "Stop",
+    "stopped": "Stopped.",
+    "thinking": "Reading the documents…",
+    "disclaimer": "Answers are generated from your uploaded documents and can be wrong. Check the cited document before ordering parts.",
+    "errorNotConfigured": "The answer engine is not configured yet",
+    "errorUnavailable": "The answer engine is not reachable",
+    "errorProvider": "The model provider returned an error",
+    "history": "History ({{count}})",
+    "historyTitle": "Recent conversations",
+    "historyLocal": "Kept in this browser only",
+    "untitled": "Untitled conversation",
+    "historyEmpty": "No conversations yet"
+  },
+  "bulkUpload": {
+    "title": "Upload many documents at once",
+    "hint": "Pick a folder of files. Each one is matched to a product by the SKU in its filename — check the matches before uploading.",
+    "chooseFiles": "Choose files",
+    "file": "File",
+    "product": "Product",
+    "status": "Status",
+    "chooseProduct": "Choose a product…",
+    "skip": "Skip this file",
+    "summary": "{{total}} files · {{matched}} matched · {{unmatched}} need a product",
+    "uploadN": "Upload {{count}}",
+    "stopAfterCurrent": "Stop after this file",
+    "finished": "Uploaded {{count}} documents",
+    "finishedWithErrors": "Uploaded {{count}}, {{failed}} failed",
+    "errorNoProduct": "Product no longer exists",
+    "reason_exact": "Filename matches the SKU",
+    "reason_contained": "SKU found in the filename",
+    "status_ready": "Ready",
+    "status_unmatched": "No product matched",
+    "status_extracting": "Reading text…",
+    "status_uploading": "Uploading…",
+    "status_done": "Done",
+    "status_failed": "Failed",
+    "status_skipped": "Skipped"
+  },
+  "coverage": {
+    "headline": "{{pct}}% of products have a searchable document",
+    "headlineHint": "{{covered}} of {{total}} products",
+    "covered": "Searchable",
+    "missing": "No document",
+    "unsearchable": "Cannot be searched",
+    "missingHint": "These products have no document at all. Anyone searching for them finds nothing.",
+    "unsearchableHint": "These have a document, but the text could not be read — usually a scanned PDF. Ask the vendor for a text version.",
+    "nothingToDo": "Nothing to fix here",
+    "nothingToDoHint": "Every product in this view is covered.",
+    "addDocument": "Add document"
   }
 }

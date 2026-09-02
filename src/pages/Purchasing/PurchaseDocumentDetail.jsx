@@ -1,5 +1,9 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useBaseCurrency } from '../../hooks/useBaseCurrency'
+import LandedCharges from './_LandedCharges'
+import { hasMissingRate } from './_shared'
+import { formatMoney, toBase } from '../../lib/money'
 import { canDo } from '../../lib/permissions'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -99,6 +103,7 @@ export default function PurchaseDocumentDetail({
   const canCreatePurchase = canDo(currentUserRole, currentUserPermissions, 'purchasing', 'create')
   const canReceive        = canDo(currentUserRole, currentUserPermissions, 'purchasing', 'receive')
   const { t } = useTranslation()
+  const baseCurrency = useBaseCurrency()
   const { confirm, confirmDialog } = useConfirm()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -261,6 +266,13 @@ export default function PurchaseDocumentDetail({
 
   const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : '—')
   const fmtMoney = (n) => (Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })
+  // Every figure on this screen is in the document's own currency. The symbol
+  // is shown on the totals that get read on their own — the grand total, what
+  // is paid and what is left — rather than on every line-item cell, where
+  // repeating it forty times adds nothing.
+  const docCurrency = doc?.currency || baseCurrency
+  const isForeignDoc = Boolean(doc?.currency) && doc.currency !== baseCurrency
+  const fmtDocMoney = (n) => formatMoney(Number(n) || 0, docCurrency)
 
   if (!adapter) {
     return <div className="p-6"><EmptyState title={t('purchasing.noDocumentsYet')} description="" action={onBack} actionLabel={t('common.back')} /></div>
@@ -449,13 +461,22 @@ export default function PurchaseDocumentDetail({
           {isVI && <Field label={t('purchasing.invoiceDate')} value={fmtDate(doc.invoice_date)} />}
           {isVI && <Field label={t('purchasing.dueDate')} value={fmtDate(doc.due_date)} />}
           {doc.currency && <Field label={t('purchasing.currency')} value={doc.currency} />}
+          {isForeignDoc && (
+            <Field
+              label={t('purchasing.exchangeRate', { currency: doc.currency, base: baseCurrency })}
+              value={t('purchasing.exchangeRatePreview', {
+                amount: formatMoney(1, doc.currency),
+                converted: formatMoney(Number(doc.exchange_rate) || 0, baseCurrency),
+              })}
+            />
+          )}
           {doc.payment_terms && <Field label={t('purchasing.paymentTerms')} value={doc.payment_terms} />}
           {isPO && doc.delivery_terms && <Field label={t('purchasing.deliveryTerms')} value={doc.delivery_terms} />}
           <Field label={t('purchasing.colCreated')} value={fmtDate(doc.created_at)} />
           {isVI && ['approved', 'partially_received', 'received'].includes(doc.status) && (
             <>
-              <Field label={t('purchasing.amountPaid')} value={fmtMoney(doc.amount_paid)} />
-              <Field label={t('purchasing.remainingBalance')} value={fmtMoney((doc.total ?? 0) - (doc.amount_paid ?? 0))} />
+              <Field label={t('purchasing.amountPaid')} value={fmtDocMoney(doc.amount_paid)} />
+              <Field label={t('purchasing.remainingBalance')} value={fmtDocMoney((doc.total ?? 0) - (doc.amount_paid ?? 0))} />
             </>
           )}
         </div>
@@ -506,11 +527,52 @@ export default function PurchaseDocumentDetail({
             {Number(doc.tax_amount) > 0 && <TotalRow label={t('salesDocuments.totalTax')} value={fmtMoney(doc.tax_amount)} muted />}
             <div className="flex items-center justify-between pt-2 mt-1 border-t border-[#e6e9ef] dark:border-[#212a38]">
               <span className="font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{t('salesDocuments.grandTotal')}</span>
-              <span className="font-bold text-indigo-600 dark:text-[#a5b4fc]">{fmtMoney(doc.total)}</span>
+              <span className="font-bold text-indigo-600 dark:text-[#a5b4fc]">{fmtDocMoney(doc.total)}</span>
             </div>
+            {/* What the purchase actually cost the business. This is the figure
+                every report and every unit cost is derived from, so it belongs
+                on the document rather than only in the database. */}
+            {isForeignDoc && (
+              <div className="flex items-center justify-end text-xs text-[#6c6760] dark:text-[#9aa4b2]">
+                {t('purchasing.baseEquivalent', {
+                  amount: formatMoney(
+                    doc.total_base ?? toBase(doc.total, doc.exchange_rate) ?? 0,
+                    baseCurrency
+                  ),
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {hasMissingRate(doc, baseCurrency) && (
+        <div className="border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 rounded-[14px] p-[18px] mb-4">
+          <div className="text-sm font-semibold text-red-800 dark:text-red-300">
+            {t('purchasing.rateMissingTitle')}
+          </div>
+          <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+            {t('purchasing.rateMissingBody', {
+              currency: doc.currency,
+              base: baseCurrency,
+              total: (Number(doc.total) || 0).toLocaleString(),
+            })}
+          </p>
+        </div>
+      )}
+
+      {isVI && (
+        <LandedCharges
+          vendorInvoiceId={doc.id}
+          currency={docCurrency}
+          // Once any of the goods are in, their cost is fixed and the database
+          // refuses a change, so offering the controls would be an offer the
+          // server declines.
+          locked={['partially_received', 'received'].includes(doc.status)}
+          canEdit={canEditPurchase}
+          currentUserEmail={currentUserEmail}
+        />
+      )}
 
       {(doc.notes || (isPO && doc.terms_conditions)) && (
         <div className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-[18px] mb-4 space-y-3">

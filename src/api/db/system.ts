@@ -450,3 +450,37 @@ export const automationRules = {
     }
   },
 }
+
+// ── Currencies ────────────────────────────────────────────────────────────────
+
+export interface CurrencyRow {
+  code: string
+  name: string
+  symbol: string
+  decimals: number
+  is_active: boolean
+}
+
+/**
+ * The currencies this installation can transact in.
+ *
+ * Read-mostly reference data seeded by 20260791. Sales documents are always in
+ * the base currency; this exists so a purchase can be raised in the vendor's.
+ */
+export const currencies = {
+  async listActive(): Promise<CurrencyRow[]> {
+    const { data, error } = await supabase
+      .from('currencies')
+      .select('*')
+      .eq('is_active', true)
+      .order('code')
+    if (error) {
+      // 42P01 undefined_table: the migration has not been applied yet. An empty
+      // list degrades the picker to base-currency-only rather than breaking the
+      // whole purchasing form.
+      if (error.code === '42P01' || error.code === 'PGRST205') return []
+      throw error
+    }
+    return data || []
+  },
+}

@@ -51,7 +51,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   })
   const { data: users = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
-    queryFn: () => db.userRoles.listAllRoles(),
+    queryFn: () => db.userRoles.directory(),
     staleTime: 5 * 60_000,
   })
   const { data: ticketsTotalCount = null } = useQuery({

@@ -3,16 +3,14 @@ import { useQuery } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
 import { TICKET_STATUS } from '../../lib/constants'
 import { GROUPS, COLOR_MAP } from './_registry'
+import { formatMoneyCompact } from '../../lib/money'
+import { useBaseCurrency } from '../../hooks/useBaseCurrency'
 
-function fmtCurrency(val) {
-  if (!val) return '$0'
-  if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(1)}M`
-  if (val >= 1_000) return `$${(val / 1_000).toFixed(1)}K`
-  return `$${val.toFixed(0)}`
-}
 
 export default function HomeView({ onNavigate, currentUserEmail: _currentUserEmail }) {
   const { t } = useTranslation()
+  const baseCurrency = useBaseCurrency()
+  const fmtCurrency = (v) => formatMoneyCompact(v, baseCurrency)
   const { data: stats } = useQuery({
     queryKey: ['control-panel-stats'],
     queryFn: async () => {

@@ -13,7 +13,8 @@ import { PageSkeleton } from '../../components/Skeleton'
 import ExportMenu from '../../components/ExportMenu'
 import PurchasingGraphView from './PurchasingGraphView'
 import PurchasingPivotView from './PurchasingPivotView'
-import { DOC_TYPE_BADGE, DOC_TYPE_LABEL_KEY, statusLabel, statusPillCls } from './_shared'
+import { DOC_TYPE_BADGE, DOC_TYPE_LABEL_KEY, docTotalBase, hasMissingRate, statusLabel, statusPillCls } from './_shared'
+import { useBaseCurrency } from '../../hooks/useBaseCurrency'
 import { CreateVendorModal, VendorEditModal, CreatePurchaseOrderModal, VendorInvoiceFormModal } from './_modals'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { useConfirm } from '../../hooks/useConfirm'
@@ -153,6 +154,7 @@ function PaginationBar({
 // ─── Purchasing — Vendor(=Brand) -> Purchase Order -> Vendor Invoice -> Receive ─
 export default function Purchasing({ currentUserRole, currentUserEmail, currentUserPermissions }) {
   const { t } = useTranslation()
+  const baseCurrency = useBaseCurrency()
   const { confirm, confirmDialog } = useConfirm()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -272,7 +274,9 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
     f = [...f].sort((a, b) => {
       let aVal, bVal
       if (sortConfig.key === 'total') {
-        aVal = Number(a.total) || 0; bVal = Number(b.total) || 0
+        // Base currency, or the column sorts a $2,000 import below a E£5,000
+        // local purchase that cost a twentieth as much.
+        aVal = docTotalBase(a); bVal = docTotalBase(b)
       } else if (sortConfig.key === 'created_at' || sortConfig.key === 'type_specific_date') {
         aVal = new Date(a[sortConfig.key] || 0).getTime()
         bVal = new Date(b[sortConfig.key] || 0).getTime()
@@ -396,6 +400,10 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
       [t('purchasing.colVendor')]: vendorName(d.vendor_id),
       [t('purchasing.colStatus')]: statusLabel(d.doc_status, t),
       [t('purchasing.colTotal')]: Number(d.total) || 0,
+      [t('purchasing.colCurrency')]: d.currency || baseCurrency,
+      // Without this column a spreadsheet total across the export is a sum of
+      // mixed currencies, which is the exact mistake this engine exists to stop.
+      [t('purchasing.colTotalBase', { currency: baseCurrency })]: docTotalBase(d),
       [t('purchasing.colDate')]: d.type_specific_date ? new Date(d.type_specific_date).toLocaleDateString() : '',
       [t('purchasing.colCreated')]: new Date(d.created_at).toLocaleDateString(),
     }))
@@ -882,6 +890,26 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
                         </td>
                         <td className="px-4 py-3 text-right text-sm font-semibold text-[#211f1b] dark:text-[#e8ebf0] whitespace-nowrap">
                           {(Number(doc.total) || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                          {hasMissingRate(doc, baseCurrency) && (
+                            <span
+                              className="ms-1 text-xs font-semibold text-red-600 dark:text-red-400"
+                              title={t('purchasing.rateMissingHint', { currency: doc.currency, base: baseCurrency })}
+                            >
+                              {t('purchasing.rateMissing')}
+                            </span>
+                          )}
+                          {doc.currency && doc.currency !== baseCurrency && (
+                            <span
+                              className="ms-1 text-xs font-semibold text-amber-600 dark:text-amber-400"
+                              title={t('purchasing.foreignTotalHint', {
+                                currency: doc.currency,
+                                base: baseCurrency,
+                                amount: docTotalBase(doc).toLocaleString(undefined, { maximumFractionDigits: 2 }),
+                              })}
+                            >
+                              {doc.currency}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-xs text-[#6c6760] dark:text-[#9aa4b2] whitespace-nowrap">
                           {fmtDate(doc.type_specific_date)}

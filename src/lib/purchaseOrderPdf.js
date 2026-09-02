@@ -85,6 +85,26 @@ export async function downloadPOPDF({ purchaseOrder, vendor }) {
       <div class="sign-col"><div class="sl">Vendor Acknowledgement</div><div class="sv"></div></div>
     </div>`
 
+  const metaRows = [
+    { label: 'Issue Date',        value: fmtDate(purchaseOrder.issue_date) },
+    { label: 'Expected Delivery', value: fmtDate(purchaseOrder.expected_delivery_date) },
+    { label: 'Currency',          value: currency },
+    { label: 'Payment Terms',     value: purchaseOrder.payment_terms || 'N/A' },
+    { label: 'Delivery Terms',    value: purchaseOrder.delivery_terms || 'N/A' },
+  ]
+  // On a foreign order, the rate it was raised at and what it commits in base
+  // currency — the figure the budget is actually spending.
+  const baseCurrency = layout.currency || 'EGP'
+  if (currency !== baseCurrency) {
+    const rate = Number(purchaseOrder.exchange_rate) || 0
+    const totalBase =
+      purchaseOrder.total_base != null
+        ? Number(purchaseOrder.total_base)
+        : (Number(purchaseOrder.total) || 0) * rate
+    metaRows.push({ label: 'Exchange Rate', value: `1 ${currency} = ${rate} ${baseCurrency}` })
+    metaRows.push({ label: `Total (${baseCurrency})`, value: formatMoney(totalBase, baseCurrency) })
+  }
+
   const html = buildDocumentHTML({
     layout,
     logoUrl,
@@ -99,13 +119,7 @@ export async function downloadPOPDF({ purchaseOrder, vendor }) {
       mobile: vendor?.phone || null,
       email: vendor?.email || null,
     },
-    metaRows: [
-      { label: 'Issue Date',       value: fmtDate(purchaseOrder.issue_date) },
-      { label: 'Expected Delivery', value: fmtDate(purchaseOrder.expected_delivery_date) },
-      { label: 'Currency',         value: currency },
-      { label: 'Payment Terms',    value: purchaseOrder.payment_terms || 'N/A' },
-      { label: 'Delivery Terms',   value: purchaseOrder.delivery_terms || 'N/A' },
-    ],
+    metaRows,
     balanceLabel: 'Order Total',
     balanceValue: formatMoney(purchaseOrder.total ?? 0, currency),
     bodyHtml,

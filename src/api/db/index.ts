@@ -15,6 +15,7 @@ import {
   auditLog,
   slaConfig,
   automationRules,
+  currencies,
 } from './system.js'
 import { inventory, warehouses, warehouseStock, stockMoves, parts, ticketParts, timeEntries, invoices } from './inventory.js'
 import { notifications } from './notifications.js'
@@ -37,9 +38,12 @@ import { creditNotes } from './creditNotes.js'
 import { salesDocuments } from './salesDocuments.js'
 import { payments } from './payments.js'
 import { customerLedger } from './customerLedger.js'
-import { purchaseOrders, vendorInvoices, purchaseDocuments } from './purchasing.js'
+import { purchaseOrders, vendorInvoices, purchaseDocuments, vendorInvoiceCharges } from './purchasing.js'
 import { vendorPayments } from './vendorPayments.js'
 import { vendorLedger } from './vendorLedger.js'
+import { margin } from './margin.js'
+import { geo } from './geo.js'
+import { productDocuments } from './documents.js'
 
 export const db = {
   // Users & roles
@@ -73,6 +77,7 @@ export const db = {
   auditLog,
   slaConfig,
   automationRules,
+  currencies,
 
   // Inventory & parts
   inventory,
@@ -118,8 +123,12 @@ export const db = {
   purchaseOrders,
   vendorInvoices,
   purchaseDocuments,
+  vendorInvoiceCharges,
   vendorPayments,
   vendorLedger,
+  margin,
+  geo,
+  productDocuments,
 }
 
 // Re-export all Row types for page components to import
@@ -155,9 +164,15 @@ export type { PaymentRow, PaymentApplicationRow } from './payments.js'
 export type { LedgerEntryRow, LedgerEntryType, AgingBucket, AgingInvoiceRow } from './customerLedger.js'
 export type {
   PurchaseLine, PurchaseOrderRow, VendorInvoiceRow,
-  PurchaseDocType, PurchaseDocumentRow,
+  PurchaseDocType, PurchaseDocumentRow, VendorInvoiceChargeRow, ChargeType,
 } from './purchasing.js'
+export { landedUnitCosts } from './purchasing.js'
 export type { VendorPaymentRow, VendorPaymentApplicationRow } from './vendorPayments.js'
 export type {
   VendorLedgerEntryRow, VendorLedgerEntryType, ApAgingBucket, ApAgingInvoiceRow,
 } from './vendorLedger.js'
+export type { InvoiceMarginRow, SalesRepPerformanceRow } from './margin.js'
+export { summariseMargin } from './margin.js'
+export type { CountryRow, CountryAreaCodeRow, CountryRules } from './geo.js'
+export { toRules } from './geo.js'
+export type { ProductDocumentRow, DocType, ExtractionStatus } from './documents.js'

@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { db } from '../api/supabaseClient'
 import { safeStorage } from '../lib/safeStorage'
 import i18n from '../lib/i18n.js'
+import toast from 'react-hot-toast'
+import { captureException } from '../lib/sentry'
 
 const DEFAULT = {
   darkMode: false,
@@ -137,12 +139,23 @@ export function AppearanceProvider({ children }) {
     setLanguageState(lang)
   }, [])
 
+  // The local update is optimistic so the interface responds immediately. When
+  // the write failed, the empty catch meant the change simply reverted on the
+  // next load with nothing said — the user reasonably concluded the setting
+  // "doesn't stick" rather than that saving had failed.
+  //
+  // Returns whether it persisted, so a caller can react; reports either way.
   const updateAppearance = async (partial, userEmail) => {
     const merged = { ...settings, ...partial }
     setSettings(merged)
     try {
       await db.rmaConfig.set('appearance_settings', merged, userEmail)
-    } catch {}
+      return true
+    } catch (error) {
+      captureException(error, { context: 'AppearanceContext/updateAppearance' })
+      toast(i18n.t('appearance.saveFailed'), { icon: '⚠️' })
+      return false
+    }
   }
 
   const formatDate = (dateStr) => {

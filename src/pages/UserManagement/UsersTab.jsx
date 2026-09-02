@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { EmailNote } from '../../components/ContactValidation'
+import { checkEmail } from '../../lib/emailPolicy'
 import toast from 'react-hot-toast'
 import Modal from '../../components/Modal'
 import { ROLES } from '../../lib/constants'
@@ -299,6 +301,13 @@ export function AddUserModal({
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
             placeholder="user@example.com"
             required
+          />
+          {/* A suggestion only. Inviting a colleague is the wrong moment to
+              refuse an unfamiliar domain, and an undeliverable address is a
+              problem the invitation itself will surface. */}
+          <EmailNote
+            result={checkEmail(email)}
+            onAccept={(domain) => onEmailChange(`${String(email).split('@')[0]}@${domain}`)}
           />
         </div>
 

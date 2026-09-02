@@ -15,6 +15,8 @@ export interface UserRoleRow {
   suspended_reason: string | null
   suspended_by: string | null
   suspended_date: string | null
+  /** When access ends. NULL means never. Enforced in RLS by 20260786. */
+  access_expires_at: string | null
   created_date: string
 }
 
@@ -48,6 +50,24 @@ export const userRoles = {
     }
     return data
   },
+  /**
+   * Who exists and what role they hold — for assignee dropdowns.
+   *
+   * Use this anywhere a page needs a list of colleagues. listAllRoles() reads
+   * the whole user_roles row, which carries permission maps, administrator
+   * notes, suspension reasons and a legacy password_hash column; since 20260790
+   * only an administrator can read those, and a non-admin calling
+   * listAllRoles() gets back just their own row.
+   *
+   * The RPC is SECURITY DEFINER and returns three columns, so the narrow policy
+   * on the table and the needs of the dropdowns stop being in conflict.
+   */
+  async directory(): Promise<{ user_email: string; role: string; status: string | null }[]> {
+    const { data, error } = await supabase.rpc('rma_staff_directory')
+    if (error) throw error
+    return data || []
+  },
+  /** Admin surface: the complete row. Non-admins see only themselves. */
   async listAllRoles(): Promise<UserRoleRow[]> {
     const { data, error } = await supabase
       .from('user_roles')
@@ -95,6 +115,24 @@ export const userRoles = {
     const { data, error } = await supabase
       .from('user_roles')
       .update(updates)
+      .eq('user_email', email)
+      .select()
+    if (error) throw error
+    return data?.[0]
+  },
+  /**
+   * Set or clear the instant a user's access ends. Pass null to remove it.
+   *
+   * The User Management "Set Expiration" action called this method for as long
+   * as it existed, but it was never written and `access_expires_at` was never
+   * added — the action threw a TypeError every time. Column and enforcement
+   * both arrived in 20260786; RLS honours it through rma_access_is_current(),
+   * so nothing else has to check the date.
+   */
+  async setUserExpiration(email: string, expiresAt: string | null): Promise<UserRoleRow | undefined> {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .update({ access_expires_at: expiresAt })
       .eq('user_email', email)
       .select()
     if (error) throw error

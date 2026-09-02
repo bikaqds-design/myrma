@@ -217,7 +217,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   })
   const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
-    queryFn: () => db.userRoles.listAllRoles(),
+    queryFn: () => db.userRoles.directory(),
     staleTime: 5 * 60_000,
   })
   const salesReps = usersList.filter((u) =>
@@ -638,16 +638,43 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
         pipelineId: convertForm.pipeline_id,
         value: convertForm.value ? Number(convertForm.value) : undefined,
       })
-      // If user chose a non-default stage, move the deal after creation
+      // If the user chose a non-default stage, move the deal after creation.
+      //
+      // This used to be fire-and-forget with the error discarded, and without
+      // the actor email that every other moveStage call passes. So a failure
+      // left the deal sitting in the pipeline's first stage — not the one the
+      // user picked in this very form — under a "Lead converted" toast, with
+      // nothing recording who moved it.
+      //
+      // The conversion itself has already succeeded at this point, so a failed
+      // move is reported as a partial success rather than an error: the lead is
+      // converted either way, and saying otherwise would send the user looking
+      // for a deal that exists.
+      let stageMoved = true
       if (convertForm.stage_id) {
-        db.deals.moveStage(result.deal.id, convertForm.stage_id).catch(() => {})
+        try {
+          await db.deals.moveStage(result.deal.id, convertForm.stage_id, currentUserEmail)
+        } catch (stageError) {
+          stageMoved = false
+          captureException(stageError, { page: 'Leads', context: 'convert/moveStage' })
+        }
       }
-      toast.success(t('leads.leadConverted'))
+      if (stageMoved) {
+        toast.success(t('leads.leadConverted'))
+      } else {
+        toast(t('leads.convertedButStageFailed'), { icon: '⚠️' })
+      }
       db.auditLog
         .log(currentUserEmail, 'lead_converted', `Converted lead ${convertingLead.full_name} to deal ${result.deal.id}`)
         .catch(() => {})
       setConvertingLead(null)
+      // Conversion creates a customer and a deal as well as changing the lead,
+      // so invalidating only ['leads'] left the Pipeline board and the Customers
+      // list showing state from before the conversion until something else
+      // happened to refetch them.
       queryClient.invalidateQueries({ queryKey: ['leads'] })
+      queryClient.invalidateQueries({ queryKey: ['deals'] })
+      queryClient.invalidateQueries({ queryKey: ['customers'] })
     } catch (error) {
       toast.error(t('leads.failedConvert', { error: error.message }))
     }

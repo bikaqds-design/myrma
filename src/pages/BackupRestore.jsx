@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { backup as backupAPI, db } from '../api/supabaseClient'
+import { BACKUP_MODULES } from '../api/backup'
 import toast from 'react-hot-toast'
 import { captureException } from '../lib/sentry'
 import { useTranslation } from 'react-i18next'
@@ -8,6 +9,9 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [restoring, setRestoring] = useState(false)
+  // What the last export actually contained. A backup you cannot see the shape
+  // of is a backup you are trusting on faith.
+  const [lastExport, setLastExport] = useState(null)
 
   const downloadJSON = (data, filename) => {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -21,52 +25,33 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
     URL.revokeObjectURL(url)
   }
 
-  const handleExportProducts = async () => {
+  const handleExportModule = async (moduleId) => {
     setLoading(true)
     try {
-      const data = await backupAPI.exportProducts()
-      downloadJSON(data, `products-backup-${new Date().toISOString().split('T')[0]}.json`)
-      toast.success(t('backupRestore.exportedCount', { count: data.length, type: t('backupRestore.typeProducts') }))
+      const data = await backupAPI.exportModule(moduleId)
+      downloadJSON(data, `myrma-${moduleId}-${new Date().toISOString().split('T')[0]}.json`)
+      if (data.complete) {
+        toast.success(
+          t('backupRestore.moduleExported', {
+            module: t(`backupRestore.module_${moduleId}`),
+            rows: data.total_rows,
+          })
+        )
+      } else {
+        toast.error(
+          t('backupRestore.exportAllPartial', {
+            tables: data.failed_tables.map((f) => f.table).join(', '),
+          }),
+          { duration: 12000 }
+        )
+      }
+      setLastExport(data)
       db.auditLog
-        .log(currentUserEmail, 'backup_exported', `Exported ${data.length} products backup`)
+        .log(currentUserEmail, 'backup_exported', `Exported ${moduleId} module (${data.total_rows} rows)`)
         .catch(() => {})
     } catch (error) {
       captureException(error)
-      toast.error(t('backupRestore.failedExportProducts'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleExportCustomers = async () => {
-    setLoading(true)
-    try {
-      const data = await backupAPI.exportCustomers()
-      downloadJSON(data, `customers-backup-${new Date().toISOString().split('T')[0]}.json`)
-      toast.success(t('backupRestore.exportedCount', { count: data.length, type: t('backupRestore.typeCustomers') }))
-      db.auditLog
-        .log(currentUserEmail, 'backup_exported', `Exported ${data.length} customers backup`)
-        .catch(() => {})
-    } catch (error) {
-      captureException(error)
-      toast.error(t('backupRestore.failedExportCustomers'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleExportTickets = async () => {
-    setLoading(true)
-    try {
-      const data = await backupAPI.exportTickets()
-      downloadJSON(data, `tickets-backup-${new Date().toISOString().split('T')[0]}.json`)
-      toast.success(t('backupRestore.exportedCount', { count: data.length, type: t('backupRestore.typeTickets') }))
-      db.auditLog
-        .log(currentUserEmail, 'backup_exported', `Exported ${data.length} tickets backup`)
-        .catch(() => {})
-    } catch (error) {
-      captureException(error)
-      toast.error(t('backupRestore.failedExportTickets'))
+      toast.error(`${t('backupRestore.failedExportAll')} — ${error.message}`, { duration: 12000 })
     } finally {
       setLoading(false)
     }
@@ -77,17 +62,68 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
     try {
       const data = await backupAPI.exportAll()
       downloadJSON(data, `myrma-full-backup-${new Date().toISOString().split('T')[0]}.json`)
-      toast.success(t('backupRestore.exportAllSuccess'))
+      // A partial backup still downloads — it is worth far more than nothing —
+      // but it must never be mistaken for a whole one, so the tables that
+      // failed are named on screen rather than left in the file for somebody
+      // to find later.
+      if (data.complete) {
+        toast.success(t('backupRestore.exportAllSuccess'))
+      } else {
+        toast.error(
+          t('backupRestore.exportAllPartial', {
+            tables: data.failed_tables.map((f) => f.table).join(', '),
+          }),
+          { duration: 12000 }
+        )
+      }
+      setLastExport(data)
       db.auditLog
         .log(currentUserEmail, 'backup_exported', 'Exported complete system backup')
         .catch(() => {})
     } catch (error) {
       captureException(error)
-      toast.error(t('backupRestore.failedExportAll'))
+      // The reason used to go only to Sentry while the screen said "Failed to
+      // export" — which names neither the table nor the cause, and leaves
+      // somebody staring at a button that does not work.
+      toast.error(`${t('backupRestore.failedExportAll')} — ${error.message}`, { duration: 12000 })
     } finally {
       setLoading(false)
     }
   }
+
+  /** What the last export contained, so the file is not trusted on faith. */
+  const ExportSummary = () =>
+    !lastExport ? null : (
+      <div
+        className={`mt-4 p-4 rounded-lg border text-sm ${
+          lastExport.complete
+            ? 'bg-green-50 border-green-200 text-green-800'
+            : 'bg-red-50 border-red-200 text-red-800'
+        }`}
+      >
+        <p className="font-medium">{t('backupRestore.exportSummaryTitle')}</p>
+        <p>
+          {t('backupRestore.exportSummaryRows', {
+            rows: lastExport.total_rows,
+            tables: Object.keys(lastExport.counts).length,
+          })}
+        </p>
+        <p className="mt-1">
+          {lastExport.complete
+            ? t('backupRestore.exportSummaryComplete')
+            : t('backupRestore.exportSummaryFailed', {
+                tables: lastExport.failed_tables.map((f) => `${f.table} (${f.error})`).join('; '),
+              })}
+        </p>
+        {lastExport.skipped_tables?.length > 0 && (
+          <p className="mt-1 text-xs opacity-80">
+            {t('backupRestore.exportSummarySkipped', {
+              tables: lastExport.skipped_tables.join(', '),
+            })}
+          </p>
+        )}
+      </div>
+    )
 
   const handleFileUpload = async (event) => {
     const file = event.target.files[0]
@@ -113,9 +149,10 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
 
           const { data } = backupData
 
-          // Check if any data exists
-          const hasData =
-            data.products?.length > 0 || data.customers?.length > 0 || data.tickets?.length > 0
+          // Any table with rows is worth restoring. This used to look only at
+          // products, customers and tickets, so a backup containing nothing but
+          // deals, invoices or inventory was rejected as "no data to restore".
+          const hasData = Object.values(data).some((rows) => Array.isArray(rows) && rows.length > 0)
 
           if (!hasData) {
             toast.error(t('backupRestore.noDataToRestore'))
@@ -124,70 +161,41 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
             return
           }
 
-          // Import only products, customers, and tickets (skip activity due to RLS)
-          const results = {
-            products: 0,
-            customers: 0,
-            tickets: 0,
-            errors: [],
-          }
+          // One call, which restores every table in foreign-key order. The
+          // three calls this replaced — importProducts, importCustomers,
+          // importTickets — were never implemented, so every restore threw and
+          // reported "Failed to restore any data". importAll did exist and was
+          // never called.
+          const summary = await backupAPI.importAll(backupData)
 
-          // Import Products
-          if (data.products && data.products.length > 0) {
-            try {
-              await backupAPI.importProducts(data.products)
-              results.products = data.products.length
-            } catch (err) {
-              results.errors.push(`Products: ${err.message}`)
-            }
-          }
-
-          // Import Customers
-          if (data.customers && data.customers.length > 0) {
-            try {
-              await backupAPI.importCustomers(data.customers)
-              results.customers = data.customers.length
-            } catch (err) {
-              results.errors.push(`Customers: ${err.message}`)
-            }
-          }
-
-          // Import Tickets
-          if (data.tickets && data.tickets.length > 0) {
-            try {
-              await backupAPI.importTickets(data.tickets)
-              results.tickets = data.tickets.length
-            } catch (err) {
-              results.errors.push(`Tickets: ${err.message}`)
-            }
-          }
-
-          // Show results
-          const successCount = results.products + results.customers + results.tickets
-
-          if (successCount > 0) {
-            const message = t('backupRestore.restoreSuccess', { products: results.products, customers: results.customers, tickets: results.tickets })
-            toast.success(message)
-            db.auditLog
-              .log(
-                currentUserEmail,
-                'backup_imported',
-                `Restored ${results.products} products, ${results.customers} customers, ${results.tickets} tickets from backup`
-              )
-              .catch(() => {})
-
-            if (results.errors.length > 0) {
-              console.warn('Some errors occurred:', results.errors)
-              toast.error(t('backupRestore.partialRestoreError'))
-            } else {
-              toast.success(t('backupRestore.refreshToSeeData'))
-            }
-          } else {
-            toast.error(t('backupRestore.failedRestoreAny'))
-          }
+          toast.success(
+            t('backupRestore.restoreSuccessTables', {
+              tables: summary.tablesRestored,
+              rows: summary.rowsRestored,
+            })
+          )
+          db.auditLog
+            .log(
+              currentUserEmail,
+              'backup_imported',
+              `Restored ${summary.rowsRestored} rows across ${summary.tablesRestored} tables from backup`
+            )
+            .catch(() => {})
+          toast.success(t('backupRestore.refreshToSeeData'))
         } catch (error) {
           captureException(error)
           toast.error(t('backupRestore.failedRestoreData', { error: error.message }))
+          // A restore that fails halfway has still written everything before
+          // the failure. Saying so matters: the alternative is a user who
+          // assumes nothing landed and restores again on top of partial data.
+          if (error.summary?.tablesRestored) {
+            toast(
+              t('backupRestore.restorePartialSummary', {
+                tables: error.summary.tablesRestored,
+                rows: error.summary.rowsRestored,
+              })
+            )
+          }
         } finally {
           setRestoring(false)
           event.target.value = ''
@@ -264,114 +272,28 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
           </div>
 
           <div className="space-y-3">
-            <button
-              onClick={handleExportProducts}
-              disabled={loading}
-              className="w-full px-4 py-3 bg-white border-2 border-gray-200 text-gray-700 rounded-lg hover:border-blue-500 hover:bg-blue-50 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between group"
-            >
-              <span className="flex items-center gap-2">
-                <svg
-                  className="w-5 h-5 text-gray-500 group-hover:text-blue-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+            {/* One button per module. Each writes the SAME envelope as the
+                complete backup, so the restore reads them by the same path —
+                the three buttons this replaced wrote a bare array that the
+                restore rejected as an invalid file. */}
+            <div className="grid sm:grid-cols-2 gap-2">
+              {BACKUP_MODULES.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => handleExportModule(m.id)}
+                  disabled={loading}
+                  className="px-4 py-3 bg-white border-2 border-gray-200 text-gray-700 rounded-lg hover:border-blue-500 hover:bg-blue-50 text-start disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                  />
-                </svg>
-                {t('backupRestore.exportProducts')}
-              </span>
-              <svg
-                className="w-5 h-5 text-gray-500 group-hover:text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-            </button>
+                  <span className="block font-medium">{t(`backupRestore.module_${m.id}`)}</span>
+                  <span className="block text-xs text-gray-500">
+                    {t('backupRestore.moduleTableCount', { count: m.tables.length })}
+                  </span>
+                </button>
+              ))}
+            </div>
 
-            <button
-              onClick={handleExportCustomers}
-              disabled={loading}
-              className="w-full px-4 py-3 bg-white border-2 border-gray-200 text-gray-700 rounded-lg hover:border-blue-500 hover:bg-blue-50 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between group"
-            >
-              <span className="flex items-center gap-2">
-                <svg
-                  className="w-5 h-5 text-gray-500 group-hover:text-blue-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                </svg>
-                {t('backupRestore.exportCustomers')}
-              </span>
-              <svg
-                className="w-5 h-5 text-gray-500 group-hover:text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-            </button>
-
-            <button
-              onClick={handleExportTickets}
-              disabled={loading}
-              className="w-full px-4 py-3 bg-white border-2 border-gray-200 text-gray-700 rounded-lg hover:border-blue-500 hover:bg-blue-50 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between group"
-            >
-              <span className="flex items-center gap-2">
-                <svg
-                  className="w-5 h-5 text-gray-500 group-hover:text-blue-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
-                  />
-                </svg>
-                {t('backupRestore.exportTickets')}
-              </span>
-              <svg
-                className="w-5 h-5 text-gray-500 group-hover:text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-            </button>
-
+            {/* Said here rather than discovered during a recovery. */}
+            <p className="text-xs text-gray-500">{t('backupRestore.moduleNotStandalone')}</p>
             <div className="pt-3 border-t-2 border-gray-200">
               <button
                 onClick={handleExportAll}
@@ -421,10 +343,13 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
                   <li>{t('backupRestore.tip1')}</li>
                   <li>{t('backupRestore.tip2')}</li>
                   <li>{t('backupRestore.tip3')}</li>
+                  <li>{t('backupRestore.tip4')}</li>
                 </ul>
               </div>
             </div>
           </div>
+
+          <ExportSummary />
         </div>
 
         {/* Restore Section */}
@@ -516,6 +441,10 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
                   <li>{t('backupRestore.warn2')}</li>
                   <li>{t('backupRestore.warn3')}</li>
                   <li>{t('backupRestore.warn4')}</li>
+                  {/* The one that actually bites. Restoring without
+                      reinstating the counters restarts invoice numbering at 1,
+                      straight into codes the restore just recreated. */}
+                  <li className="font-medium">{t('backupRestore.warn5')}</li>
                 </ul>
               </div>
             </div>

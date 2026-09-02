@@ -5,7 +5,8 @@ import { db } from '../../api/supabaseClient'
 import { PageSkeleton } from '../../components/Skeleton'
 import EmptyState from '../../components/EmptyState'
 import { Button, Ltr } from '../../components/ui'
-import { DOC_TYPE_BADGE, docTypeLabel, statusLabel, statusPillCls } from './_shared'
+import { DOC_TYPE_BADGE, docTotalBase, docTypeLabel, statusLabel, statusPillCls } from './_shared'
+import { useBaseCurrency } from '../../hooks/useBaseCurrency'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 
 /**
@@ -69,6 +70,7 @@ function Field({ label, children, autoDir = false }) {
 
 export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEditVendor, canEdit = false }) {
   const { t } = useTranslation()
+  const baseCurrency = useBaseCurrency()
 
   const { data: vendorList = EMPTY_ARRAY, isLoading: loadingVendor } = useQuery({
     queryKey: ['brands'],
@@ -100,14 +102,17 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
     () =>
       documents
         .filter((d) => !DEAD_STATUSES.has(String(d.doc_status || '').toLowerCase()))
-        .reduce((sum, d) => sum + (Number(d.total) || 0), 0),
+        // Base currency: a vendor can be invoiced in more than one, and adding
+        // the raw totals would report dollars and pounds as a single figure.
+        .reduce((sum, d) => sum + docTotalBase(d), 0),
     [documents]
   )
 
   // The ledger is signed: invoices positive, payments negative. The sum is what
   // is still owed, which is why it needs no separate query.
   const outstanding = useMemo(
-    () => ledger.reduce((sum, e) => sum + (Number(e.amount) || 0), 0),
+    // Signed and in base currency, for the same reason as spend above.
+    () => ledger.reduce((sum, e) => sum + (Number(e.amount_base ?? e.amount) || 0), 0),
     [ledger]
   )
 
@@ -165,12 +170,12 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatTile
           label={t('purchasing.vendorTotalSpend')}
-          value={`${fmtMoney(totalSpend)} ${t('purchasing.currencyCode')}`}
+          value={`${fmtMoney(totalSpend)} ${baseCurrency}`}
           hint={t('purchasing.vendorSpendHint')}
         />
         <StatTile
           label={t('purchasing.vendorOutstanding')}
-          value={`${fmtMoney(outstanding)} ${t('purchasing.currencyCode')}`}
+          value={`${fmtMoney(outstanding)} ${baseCurrency}`}
           tone={outstanding > 0.001 ? 'warn' : 'default'}
         />
         <StatTile label={t('purchasing.vendorDocumentCount')} value={documents.length.toLocaleString()} />
@@ -226,7 +231,15 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-[#e8ebf0]">{fmtMoney(doc.total)}</td>
+                    <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-[#e8ebf0]">
+                      {fmtMoney(doc.total)}
+                      {/* Only on a foreign document. Repeating "EGP" down a
+                          column where everything is EGP trains people to stop
+                          reading it, which is when the one import slips past. */}
+                      {doc.currency && doc.currency !== baseCurrency && (
+                        <span className="ms-1 text-xs font-semibold text-amber-600 dark:text-amber-400">{doc.currency}</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-xs text-gray-500 dark:text-[#9aa4b2]">{fmtDate(doc.created_at)}</td>
                   </tr>
                 ))}
@@ -265,7 +278,10 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
                 {(() => {
                   let running = 0
                   return ledger.map((entry) => {
-                    running += Number(entry.amount) || 0
+                    // The balance adds every entry, so it can only be in base
+                    // currency; the entry beside it stays in the currency it
+                    // was actually recorded in.
+                    running += Number(entry.amount_base ?? entry.amount) || 0
                     return (
                       <tr key={entry.id}>
                         <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2]">{fmtDate(entry.entry_date)}</td>
@@ -275,6 +291,9 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
                         <td className="px-4 py-3 font-mono text-xs text-gray-900 dark:text-[#e8ebf0]">{entry.entry_code || '—'}</td>
                         <td className={`px-4 py-3 text-right font-medium ${entry.amount >= 0 ? 'text-gray-900 dark:text-[#e8ebf0]' : 'text-emerald-600 dark:text-emerald-400'}`}>
                           {entry.amount >= 0 ? '+' : ''}{fmtMoney(entry.amount)}
+                          {entry.currency && entry.currency !== baseCurrency && (
+                            <span className="ms-1 text-xs font-semibold text-amber-600 dark:text-amber-400">{entry.currency}</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right text-gray-500 dark:text-[#9aa4b2]">{fmtMoney(running)}</td>
                       </tr>

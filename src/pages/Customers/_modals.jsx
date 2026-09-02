@@ -1,5 +1,8 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { PhoneNote, EmailNote } from '../../components/ContactValidation'
+import { useContactValidation } from '../../hooks/useContactValidation'
+import { useCountryOptions } from '../../hooks/useCountryRules'
 import toast from 'react-hot-toast'
 import AttachmentsField from '../../components/AttachmentsField'
 import { Button } from '../../components/ui'
@@ -55,6 +58,18 @@ export function AddCustomerModal({
   const { t } = useTranslation()
   const isB2B = form.customer_type === 'B2B'
   const set = (key, val) => setForm((prev) => ({ ...prev, [key]: val }))
+
+  // A new customer must comply; an existing one is warned and saved anyway.
+  // Blocking every edit on a number typed before the rules existed would stop
+  // someone updating an address, with no way forward but to invent a number.
+  const countries = useCountryOptions()
+  const contact = useContactValidation({
+    mobile: form.mobile,
+    landline: form.landline,
+    email: form.email,
+    countryCode: form.country_code,
+    editing,
+  })
 
   return (
     <div className="modal-overlay-bg fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto overscroll-contain">
@@ -151,6 +166,27 @@ export function AddCustomerModal({
             </Field>
           </div>
 
+          {/* Country override — blank means the system default, which is
+              what almost every record uses. Only shown when more than one
+              country is configured, so a single-country install never sees a
+              field with one option. */}
+          {countries.length > 1 && (
+            <Field label={t('customerModal.country')}>
+              <select
+                value={form.country_code || ''}
+                onChange={(e) => set('country_code', e.target.value || null)}
+                className={inp}
+              >
+                <option value="">{t('customerModal.countryDefault')}</option>
+                {countries.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.name} ({c.dial_code})
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+
           {/* Mobile + Landline */}
           <div className="grid grid-cols-2 gap-4">
             <Field label={t('customerModal.mobile')} required>
@@ -159,8 +195,9 @@ export function AddCustomerModal({
                 value={form.mobile}
                 onChange={(e) => set('mobile', e.target.value)}
                 className={inp}
-                placeholder="+20 XXX XXX XXXX"
+                placeholder={contact.rules ? `${contact.rules.dialCode} …` : '+20 XXX XXX XXXX'}
               />
+              <PhoneNote result={contact.mobileResult} editing={editing} />
             </Field>
             <Field label={t('customerModal.landline')}>
               <input
@@ -168,8 +205,9 @@ export function AddCustomerModal({
                 value={form.landline}
                 onChange={(e) => set('landline', e.target.value)}
                 className={inp}
-                placeholder="+2 0X XXXX XXXX"
+                placeholder={contact.rules ? `${contact.rules.dialCode} …` : '+2 0X XXXX XXXX'}
               />
+              <PhoneNote result={contact.landlineResult} editing={editing} />
             </Field>
           </div>
 
@@ -181,6 +219,13 @@ export function AddCustomerModal({
               onChange={(e) => set('email', e.target.value)}
               className={inp}
               placeholder="email@example.com"
+            />
+            {/* A suggestion with a one-click fix, never a refusal. */}
+            <EmailNote
+              result={contact.emailResult}
+              onAccept={(domain) =>
+                set('email', `${String(form.email).split('@')[0]}@${domain}`)
+              }
             />
           </Field>
 
@@ -249,7 +294,16 @@ export function AddCustomerModal({
           <Button variant="secondary" className="flex-1 justify-center" onClick={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button className="flex-1 justify-center" onClick={onSave}>
+          {/* Blocked only on a NEW record with a real format problem. An
+              existing record saves with a warning, so nobody is stopped from
+              editing a customer because of a number typed before the rules
+              existed. */}
+          <Button
+            className="flex-1 justify-center"
+            onClick={onSave}
+            disabled={contact.blocking}
+            title={contact.blocking ? t('phone.fixBeforeSaving') : undefined}
+          >
             {editing ? t('customerModal.updateCustomer') : t('customerModal.createCustomer')}
           </Button>
         </div>

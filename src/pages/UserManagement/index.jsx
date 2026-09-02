@@ -7,7 +7,7 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import { Spinner } from '../../components/ui'
 import { useURLTab } from '../../hooks/useURLTab'
 import { ROLES } from '../../lib/constants'
-import { canDo } from '../../lib/permissions'
+import { canDo, accessDenialReason } from '../../lib/permissions'
 import { captureException } from '../../lib/sentry'
 import { addUserSchema, getFirstError } from '../../lib/schemas'
 import { validatePasswordStrength, getDefaultPermissions } from './_utils'
@@ -313,8 +313,12 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
    */
   const LOCKOUT_ACTIONS = ['suspend', 'lock', 'deactivate', 'set_expiration', 'delete']
 
+  // 'Active' has to mean the same thing here as it does in the database.
+  // accessDenialReason mirrors rma_access_is_current(), so an expired super
+  // admin is not counted — before 20260786 this compared status alone, and an
+  // expiry set on the last super admin would have slipped past the guard.
   const activeSuperAdmins = (users || []).filter(
-    (u) => u.role === ROLES.SUPER_ADMIN && u.status === 'active'
+    (u) => u.role === ROLES.SUPER_ADMIN && !accessDenialReason(u)
   )
 
   const handleUserControlAction = async () => {
