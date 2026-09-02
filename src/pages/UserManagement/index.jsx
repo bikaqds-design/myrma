@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, auth } from '../../api/supabaseClient'
@@ -12,6 +12,7 @@ import { captureException } from '../../lib/sentry'
 import { addUserSchema, getFirstError } from '../../lib/schemas'
 import { validatePasswordStrength, getDefaultPermissions } from './_utils'
 import { UsersTab, AddUserModal, InviteUserModal, PasswordResetModal, UserControlModal, ActivityModal } from './UsersTab'
+import { filterUsers, paginate, pruneSelection, deletableSelection } from './_directory'
 import { RoleTemplatesTab, CustomRolesTab, CreateRoleModal, PermissionsModal } from './RolesTab'
 
 // Custom Roles were hidden because they were not wired end-to-end: "not
@@ -43,7 +44,107 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
       return { usersData, rolesData }
     },
   })
-  const users = umData?.usersData ?? []
+  const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [selected, setSelected] = useState(() => new Set())
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
+  const users = useMemo(() => umData?.usersData ?? [], [umData])
+
+  // Search and filters narrow the list; paging then cuts one page from what is
+  // left. Order matters — paging first would page the unfiltered directory.
+  const filteredUsers = useMemo(
+    () => filterUsers(users, { search, role: roleFilter, status: statusFilter }),
+    [users, search, roleFilter, statusFilter]
+  )
+  const pageInfo = useMemo(
+    () => paginate(filteredUsers, page, pageSize),
+    [filteredUsers, page, pageSize]
+  )
+
+  // A selection must never outlive the rows it was made on: selecting twelve
+  // people, filtering to one and pressing Delete must not take the other eleven
+  // with it. Pruned against what the filters currently show, not the page —
+  // paging away from a row is not the same as deciding not to act on it.
+  useEffect(() => {
+    setSelected((prev) => {
+      const next = pruneSelection(prev, filteredUsers)
+      return next.size === prev.size ? prev : next
+    })
+  }, [filteredUsers])
+
+  // Narrowing the list can leave the page number past the end. paginate()
+  // clamps what it returns, so this only realigns the state behind it.
+  useEffect(() => {
+    if (pageInfo.page !== page) setPage(pageInfo.page)
+  }, [pageInfo.page, page])
+
+  const toggleOne = (email) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(email)) next.delete(email)
+      else next.add(email)
+      return next
+    })
+
+  const toggleAllOnPage = (checked) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      for (const u of pageInfo.rows) {
+        if (checked) next.add(u.user_email)
+        else next.delete(u.user_email)
+      }
+      return next
+    })
+
+  /**
+   * Delete the selected users for good — role row AND auth account.
+   *
+   * Your own address is stripped before asking, so the count in the
+   * confirmation is the number that will actually go.
+   */
+  const handleBulkDelete = () => handleDeleteUsers([...selected])
+
+  const handleDeleteUsers = (emails) => {
+    const targets = deletableSelection(new Set(emails), currentUserEmail)
+    if (targets.length === 0) {
+      toast.error(t('userManagement.cannotDeleteSelf'))
+      return
+    }
+    confirm(
+      t('userManagement.deleteSelectedTitle', { count: targets.length }),
+      t('userManagement.deleteSelectedMsg', { count: targets.length, emails: targets.join(', ') }),
+      {
+        variant: 'danger',
+        confirmText: t('userManagement.deleteConfirmBtn'),
+        onConfirm: async () => {
+          try {
+            const result = await auth.adminDeleteUsers(targets)
+            if (result.failed?.length) {
+              toast.error(
+                t('userManagement.deleteSomeFailed', {
+                  deleted: result.deleted,
+                  failed: result.failed.map((f) => `${f.email}: ${f.error}`).join('; '),
+                })
+              )
+            } else {
+              toast.success(t('userManagement.deletedCount', { count: result.deleted }))
+            }
+            db.auditLog
+              .log(currentUserEmail, 'users_deleted', `Deleted ${result.deleted} user(s): ${targets.join(', ')}`)
+              .catch(() => {})
+            setSelected(new Set())
+            invalidate()
+          } catch (error) {
+            captureException(error)
+            toast.error(error.message || t('userManagement.deleteFailed'))
+          }
+        },
+      }
+    )
+  }
   const customRoles = umData?.rolesData ?? []
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
@@ -709,7 +810,29 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
         <div className="p-6">
           {activeTab === 'users' && (
             <UsersTab
-              users={users}
+              users={pageInfo.rows}
+              totalUsers={pageInfo.total}
+              search={search}
+              onSearchChange={setSearch}
+              roleFilter={roleFilter}
+              onRoleFilterChange={setRoleFilter}
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
+              selected={selected}
+              onToggleOne={toggleOne}
+              onToggleAll={toggleAllOnPage}
+              onBulkDelete={handleBulkDelete}
+              onDeleteUser={(user) => {
+                setSelected(new Set([user.user_email]))
+                handleDeleteUsers([user.user_email])
+              }}
+              page={pageInfo.page}
+              pageCount={pageInfo.pageCount}
+              pageFrom={pageInfo.from}
+              pageTo={pageInfo.to}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(n) => { setPageSize(n); setPage(1) }}
               customRoles={customRoles}
               currentUserRole={currentUserRole}
               currentUserEmail={currentUserEmail}

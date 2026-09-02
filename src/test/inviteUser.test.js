@@ -101,6 +101,46 @@ describe('revoking an invitation', () => {
   })
 })
 
+describe('deleting users', () => {
+  it('always sends an array, so one user and many share the same guarded path', async () => {
+    invoke.mockResolvedValue({ data: { success: true, deleted: 1, failed: [] }, error: null })
+    await auth.adminDeleteUsers('one@test.com')
+    expect(invoke.mock.calls[0][1].body).toEqual({ emails: ['one@test.com'] })
+  })
+
+  it('passes a list through unchanged', async () => {
+    invoke.mockResolvedValue({ data: { success: true, deleted: 2, failed: [] }, error: null })
+    await auth.adminDeleteUsers(['a@test.com', 'b@test.com'])
+    expect(invoke.mock.calls[0][1].body.emails).toEqual(['a@test.com', 'b@test.com'])
+  })
+
+  /**
+   * The server refuses self-deletion even though the screen hides it. If that
+   * reason did not reach the caller, the button would appear to do nothing.
+   */
+  it('surfaces the refusal when you try to delete yourself', async () => {
+    invoke.mockResolvedValue({
+      data: null,
+      error: httpError(400, { error: 'You cannot delete your own account' }),
+    })
+    await expect(auth.adminDeleteUsers(['me@test.com'])).rejects.toThrow(/your own account/)
+  })
+
+  /**
+   * A partial failure must come back as data, not an exception: deleting four
+   * of five and reporting nothing would leave the screen showing five.
+   */
+  it('returns partial results rather than throwing', async () => {
+    invoke.mockResolvedValue({
+      data: { success: false, deleted: 1, failed: [{ email: 'b@test.com', error: 'last super admin' }] },
+      error: null,
+    })
+    const result = await auth.adminDeleteUsers(['a@test.com', 'b@test.com'])
+    expect(result.deleted).toBe(1)
+    expect(result.failed[0].error).toMatch(/last super admin/)
+  })
+})
+
 describe('accepting an invitation at sign-in', () => {
   it('reports what the RPC did', async () => {
     rpc.mockResolvedValue({ data: 'activated', error: null })

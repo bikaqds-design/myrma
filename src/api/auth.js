@@ -115,6 +115,33 @@ export const auth = {
     return invokeInvite({ action: 'invite', email, role, redirectTo: `${window.location.origin}/` })
   },
 
+  /**
+   * Delete users for good — the role row AND the auth account (super_admin only).
+   *
+   * The old path removed only the role row, so the login and password survived
+   * a "permanent" delete. Deleting an auth account needs the service_role key,
+   * which is why it has to happen server-side.
+   *
+   * Takes an array so one user and many follow the same guarded path.
+   */
+  async adminDeleteUsers(emails) {
+    const list = Array.isArray(emails) ? emails : [emails]
+    const { data, error } = await supabase.functions.invoke('admin-delete-user', {
+      body: { emails: list },
+    })
+    if (error) {
+      let detail = ''
+      try {
+        detail = (await error.context?.json?.())?.error ?? ''
+      } catch {
+        /* no readable body */
+      }
+      throw new Error(detail || error.message || 'The users could not be deleted')
+    }
+    if (data?.error) throw new Error(data.error)
+    return data
+  },
+
   /** Withdraw an invitation that has not been accepted (super_admin only). */
   async adminRevokeInvitation(email) {
     return invokeInvite({ action: 'revoke', email })

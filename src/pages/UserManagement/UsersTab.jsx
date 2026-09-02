@@ -6,9 +6,29 @@ import toast from 'react-hot-toast'
 import Modal from '../../components/Modal'
 import { ROLES } from '../../lib/constants'
 import { StatusBadge, RoleBadge, ASSIGNABLE_ROLES } from './_shared'
+import { FILTER_ROLES, FILTER_STATUSES, PAGE_SIZES } from './_directory'
 
 export function UsersTab({
   users,
+  totalUsers,
+  search,
+  onSearchChange,
+  roleFilter,
+  onRoleFilterChange,
+  statusFilter,
+  onStatusFilterChange,
+  selected,
+  onToggleOne,
+  onToggleAll,
+  onBulkDelete,
+  onDeleteUser,
+  page,
+  pageCount,
+  pageFrom,
+  pageTo,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
   customRoles,
   currentUserRole,
   currentUserEmail,
@@ -42,11 +62,86 @@ export function UsersTab({
   // would let the acting admin grant themselves elevated UI access, defeating the point.
   const canPreview = (u) =>
     u.user_email !== currentUserEmail && u.role !== ROLES.ADMIN && u.role !== ROLES.SUPER_ADMIN
+  const allOnPageSelected = users.length > 0 && users.every((u) => selected.has(u.user_email))
+  const inputCls =
+    'px-3 py-2 border border-gray-300 dark:border-[#212a38] dark:bg-[#121823] dark:text-[#e8ebf0] rounded-lg text-sm'
+
   return (
+    <div>
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder={t('userManagement.searchPlaceholder')}
+            aria-label={t('userManagement.searchLabel')}
+            className={`${inputCls} w-full ps-9`}
+          />
+          <svg className="w-4 h-4 absolute start-3 top-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+          </svg>
+        </div>
+
+        <select value={roleFilter} onChange={(e) => onRoleFilterChange(e.target.value)}
+          aria-label={t('userManagement.filterRole')} className={inputCls}>
+          <option value="">{t('userManagement.allRoles')}</option>
+          {FILTER_ROLES.map((r) => (
+            <option key={r} value={r}>{t(`userManagement.role_${r}`, r)}</option>
+          ))}
+        </select>
+
+        <select value={statusFilter} onChange={(e) => onStatusFilterChange(e.target.value)}
+          aria-label={t('userManagement.filterStatus')} className={inputCls}>
+          <option value="">{t('userManagement.allStatuses')}</option>
+          {FILTER_STATUSES.map((st) => (
+            <option key={st} value={st}>{t(`userManagement.status${st.charAt(0).toUpperCase()}${st.slice(1)}`, st)}</option>
+          ))}
+        </select>
+
+        {(search || roleFilter || statusFilter) && (
+          <button type="button" onClick={() => { onSearchChange(''); onRoleFilterChange(''); onStatusFilterChange('') }}
+            className="px-3 py-2 text-sm text-gray-600 dark:text-[#9aa4b2] border border-gray-300 dark:border-[#212a38] rounded-lg">
+            {t('userManagement.clearFilters')}
+          </button>
+        )}
+      </div>
+
+      {/* The selection bar only exists while something is selected, so a
+          destructive action is never sitting on screen waiting to be hit. */}
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3 px-4 py-2.5 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
+          <span className="text-sm text-indigo-900 dark:text-[#a5b4fc]">
+            {t('userManagement.selectedCount', { count: selected.size })}
+          </span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => onToggleAll(false)}
+              className="text-sm text-gray-600 dark:text-[#9aa4b2] hover:underline">
+              {t('userManagement.clearSelection')}
+            </button>
+            {isSuperAdmin && (
+              <button type="button" onClick={onBulkDelete}
+                className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700">
+                {t('userManagement.deleteSelected', { count: selected.size })}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead className="bg-gray-50">
           <tr>
+            <th className="px-3 sm:px-4 py-3 w-10">
+              <input
+                type="checkbox"
+                checked={allOnPageSelected}
+                onChange={(e) => onToggleAll(e.target.checked)}
+                aria-label={t('userManagement.selectAllOnPage')}
+                className="rounded border-gray-300"
+              />
+            </th>
             <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
               {t('userManagement.colUser')}
             </th>
@@ -70,6 +165,15 @@ export function UsersTab({
         <tbody className="divide-y divide-gray-200">
           {users.map((user) => (
             <tr key={user.id} className="hover:bg-gray-50">
+              <td className="px-3 sm:px-4 py-4">
+                <input
+                  type="checkbox"
+                  checked={selected.has(user.user_email)}
+                  onChange={() => onToggleOne(user.user_email)}
+                  aria-label={`${t('userManagement.selectUser')} ${user.user_email}`}
+                  className="rounded border-gray-300"
+                />
+              </td>
               <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center">
                   <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-semibold">
@@ -201,6 +305,25 @@ export function UsersTab({
                       </svg>
                       {t('userManagement.resetPassword')}
                     </button>
+                    {/* Deleting one person used to mean: row menu, Controls,
+                        an action dropdown, then Execute — four levels down, with
+                        Delete as the last item of a generic list. It is a real
+                        action and it belongs where the other row actions are. */}
+                    {isSuperAdmin && user.user_email !== currentUserEmail && (
+                      <button
+                        onClick={() => {
+                          onDeleteUser(user)
+                          setOpenMenuId(null)
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2.5 border-t border-gray-100"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        {t('userManagement.deleteUserRow')}
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         onViewActivity(user)
@@ -260,6 +383,57 @@ export function UsersTab({
           ))}
         </tbody>
       </table>
+    </div>
+
+      {/* Paging sits under the table and always states the totals, so "where
+          did everyone go" after a filter has a visible answer. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-3 text-sm">
+        <span className="text-gray-600 dark:text-[#9aa4b2]">
+          {totalUsers === 0
+            ? t('userManagement.showingNone')
+            : t('userManagement.showingRange', { from: pageFrom, to: pageTo, total: totalUsers })}
+        </span>
+
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-gray-600 dark:text-[#9aa4b2]">
+            {t('userManagement.perPage')}
+            <select
+              value={pageSize}
+              onChange={(e) => onPageSizeChange(Number(e.target.value))}
+              aria-label={t('userManagement.perPage')}
+              className="px-2 py-1 border border-gray-300 dark:border-[#212a38] dark:bg-[#121823] dark:text-[#e8ebf0] rounded-lg"
+            >
+              {PAGE_SIZES.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </label>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onPageChange(page - 1)}
+              disabled={page <= 1}
+              aria-label={t('userManagement.previousPage')}
+              className="px-3 py-1 border border-gray-300 dark:border-[#212a38] rounded-lg disabled:opacity-40"
+            >
+              ‹
+            </button>
+            <span className="px-2 text-gray-600 dark:text-[#9aa4b2]">
+              {t('userManagement.pageOf', { page, pageCount })}
+            </span>
+            <button
+              type="button"
+              onClick={() => onPageChange(page + 1)}
+              disabled={page >= pageCount}
+              aria-label={t('userManagement.nextPage')}
+              className="px-3 py-1 border border-gray-300 dark:border-[#212a38] rounded-lg disabled:opacity-40"
+            >
+              ›
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
