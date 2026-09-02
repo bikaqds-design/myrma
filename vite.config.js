@@ -2,7 +2,22 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Which build an error came from.
+//
+// Sentry groups errors by release. Without one, every error in the dashboard
+// looks like it came from the same nameless version, and "did my fix work?"
+// becomes unanswerable. Vercel exposes the commit it is building as
+// VERCEL_GIT_COMMIT_SHA, but Vite only forwards variables prefixed VITE_, so it
+// has to be handed over explicitly here. Falls back to 'dev' for local builds.
+const APP_VERSION =
+  process.env.VITE_APP_VERSION ||
+  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ||
+  'dev'
+
 export default defineConfig({
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(APP_VERSION),
+  },
   plugins: [
     react(),
     VitePWA({
