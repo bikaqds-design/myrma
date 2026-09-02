@@ -72,8 +72,8 @@ describe('changePasswordSchema', () => {
   it('accepts a matching password meeting every character class', () => {
     const result = changePasswordSchema.safeParse({
       currentPassword: 'old-pass',
-      newPassword: 'Newpass1',
-      confirmPassword: 'Newpass1',
+      newPassword: 'Newpass1!',
+      confirmPassword: 'Newpass1!',
     })
     expect(result.success).toBe(true)
   })
@@ -81,8 +81,8 @@ describe('changePasswordSchema', () => {
   it('rejects mismatched passwords', () => {
     const result = changePasswordSchema.safeParse({
       currentPassword: 'old-pass',
-      newPassword: 'Newpass1',
-      confirmPassword: 'Different1',
+      newPassword: 'Newpass1!',
+      confirmPassword: 'Different1!',
     })
     expect(result.success).toBe(false)
     const errs = getFieldErrors(result)
@@ -92,8 +92,8 @@ describe('changePasswordSchema', () => {
   it('rejects short new password', () => {
     const result = changePasswordSchema.safeParse({
       currentPassword: 'old',
-      newPassword: 'Short1',
-      confirmPassword: 'Short1',
+      newPassword: 'Short1!',
+      confirmPassword: 'Short1!',
     })
     expect(result.success).toBe(false)
     const errs = getFieldErrors(result)
@@ -103,18 +103,22 @@ describe('changePasswordSchema', () => {
   it('rejects a missing current password', () => {
     const result = changePasswordSchema.safeParse({
       currentPassword: '',
-      newPassword: 'Newpass1',
-      confirmPassword: 'Newpass1',
+      newPassword: 'Newpass1!',
+      confirmPassword: 'Newpass1!',
     })
     expect(result.success).toBe(false)
     const errs = getFieldErrors(result)
     expect(errs.currentPassword).toMatch(/current password is required/i)
   })
 
+  // The symbol case is the one that was missing while the Supabase policy
+  // required it: `Password123` passed here and was rejected by the server
+  // against a rule no screen mentioned.
   test.each([
-    ['no uppercase', 'newpass1'],
-    ['no lowercase', 'NEWPASS1'],
-    ['no digit', 'Newpassword'],
+    ['no uppercase', 'newpass1!'],
+    ['no lowercase', 'NEWPASS1!'],
+    ['no digit', 'Newpassword!'],
+    ['no symbol', 'Newpass123'],
   ])('rejects a new password with %s', (_label, password) => {
     const result = changePasswordSchema.safeParse({
       currentPassword: 'old-pass',
@@ -123,14 +127,14 @@ describe('changePasswordSchema', () => {
     })
     expect(result.success).toBe(false)
     const errs = getFieldErrors(result)
-    expect(errs.newPassword).toMatch(/uppercase, lowercase, and a number/i)
+    expect(errs.newPassword).toMatch(/uppercase, lowercase, a number, and a symbol/i)
   })
 
   it('rejects reusing the current password', () => {
     const result = changePasswordSchema.safeParse({
-      currentPassword: 'Samepass1',
-      newPassword: 'Samepass1',
-      confirmPassword: 'Samepass1',
+      currentPassword: 'Samepass1!',
+      newPassword: 'Samepass1!',
+      confirmPassword: 'Samepass1!',
     })
     expect(result.success).toBe(false)
     const errs = getFieldErrors(result)
@@ -143,16 +147,16 @@ describe('changePasswordSchema', () => {
 describe('resetPasswordSchema', () => {
   it('accepts a matching password meeting every character class', () => {
     const result = resetPasswordSchema.safeParse({
-      newPassword: 'Newpass1',
-      confirmPassword: 'Newpass1',
+      newPassword: 'Newpass1!',
+      confirmPassword: 'Newpass1!',
     })
     expect(result.success).toBe(true)
   })
 
   it('rejects mismatched passwords', () => {
     const result = resetPasswordSchema.safeParse({
-      newPassword: 'Newpass1',
-      confirmPassword: 'Different1',
+      newPassword: 'Newpass1!',
+      confirmPassword: 'Different1!',
     })
     expect(result.success).toBe(false)
     const errs = getFieldErrors(result)
@@ -161,8 +165,8 @@ describe('resetPasswordSchema', () => {
 
   it('rejects a password shorter than 8 characters', () => {
     const result = resetPasswordSchema.safeParse({
-      newPassword: 'Short1',
-      confirmPassword: 'Short1',
+      newPassword: 'Short1!',
+      confirmPassword: 'Short1!',
     })
     expect(result.success).toBe(false)
     const errs = getFieldErrors(result)
@@ -180,15 +184,15 @@ describe('resetPasswordSchema', () => {
     })
     expect(result.success).toBe(false)
     const errs = getFieldErrors(result)
-    expect(errs.newPassword).toMatch(/uppercase, lowercase, and a number/i)
+    expect(errs.newPassword).toMatch(/uppercase, lowercase, a number, and a symbol/i)
   })
 
   // The recovery flow runs on a Supabase recovery session, which GoTrue exempts
   // from the require-current-password setting.
   it('does not require a currentPassword field', () => {
     const result = resetPasswordSchema.safeParse({
-      newPassword: 'Newpass1',
-      confirmPassword: 'Newpass1',
+      newPassword: 'Newpass1!',
+      confirmPassword: 'Newpass1!',
     })
     expect(result.success).toBe(true)
     expect(result.data).not.toHaveProperty('currentPassword')

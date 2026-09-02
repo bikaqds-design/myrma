@@ -58,12 +58,23 @@ export const forgotPasswordSchema = z.object({
 
 // Shared password strength rule. Both password flows must enforce the same policy,
 // so they reference this rather than restating it — keep it that way.
+/**
+ * Must match the Supabase project's own password policy, which is set to
+ * "Lowercase, uppercase letters, digits and symbols" with a minimum of 8.
+ *
+ * These rules exist twice by necessity — GoTrue enforces them and cannot be
+ * asked what they are — so they can drift, and drifting is not harmless. When
+ * the server briefly required a symbol and this did not, `Password123` passed
+ * every check the app made, was submitted, and came back rejected against a
+ * rule no screen had mentioned. The user has no way to work that out. If the
+ * dashboard policy is ever changed, change this and the hint text with it.
+ */
 const strongPassword = z
   .string()
   .min(8, 'Password must be at least 8 characters')
   .refine(
-    (p) => /[A-Z]/.test(p) && /[a-z]/.test(p) && /[0-9]/.test(p),
-    'Password must include uppercase, lowercase, and a number'
+    (p) => /[A-Z]/.test(p) && /[a-z]/.test(p) && /[0-9]/.test(p) && /[^A-Za-z0-9]/.test(p),
+    'Password must include uppercase, lowercase, a number, and a symbol'
   )
 
 export const changePasswordSchema = z
