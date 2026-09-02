@@ -2,6 +2,32 @@ import { supabase } from './client.js'
 
 // Helper: invoke the admin-reset-password Edge Function (handles set + create-if-missing).
 // The Edge Function validates the caller's JWT and confirms super_admin role server-side.
+/**
+ * Call admin-invite-user and surface the reason it refused.
+ *
+ * functions.invoke() reports a non-2xx only as "Edge Function returned a
+ * non-2xx status code" and leaves the body unread, so every considered message
+ * the function returns — "that address already has a pending invitation", "that
+ * user has already accepted" — was being replaced by that sentence. The body is
+ * on error.context; reading it is the difference between telling someone what
+ * happened and telling them nothing.
+ */
+async function invokeInvite(body) {
+  const { data, error } = await supabase.functions.invoke('admin-invite-user', { body })
+  if (error) {
+    let detail = ''
+    try {
+      const parsed = await error.context?.json?.()
+      detail = parsed?.error ?? ''
+    } catch {
+      /* no readable body — fall through to the generic message */
+    }
+    throw new Error(detail || error.message || 'The invitation could not be processed')
+  }
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
 async function invokeAdminUserOp(targetEmail, newPassword) {
   const { data, error } = await supabase.functions.invoke('admin-reset-password', {
     body: { targetEmail, newPassword },
@@ -74,6 +100,47 @@ export const auth = {
   async adminSetPassword(targetEmail, newPassword) {
     return invokeAdminUserOp(targetEmail, newPassword)
   },
+  /**
+   * Invite someone to the system with a role chosen up front (super_admin only).
+   *
+   * The role is recorded as 'pending' when the invitation is sent, so what the
+   * person will be able to do is settled and visible before the email goes out.
+   * 'pending' grants nothing until they accept — see rma_accept_invitation.
+   *
+   * Unlike adminCreateUser, no password is chosen on their behalf: the invitee
+   * sets their own from the emailed link, so no working credential travels
+   * through a chat app.
+   */
+  async adminInviteUser(email, role) {
+    return invokeInvite({ action: 'invite', email, role, redirectTo: `${window.location.origin}/` })
+  },
+
+  /** Withdraw an invitation that has not been accepted (super_admin only). */
+  async adminRevokeInvitation(email) {
+    return invokeInvite({ action: 'revoke', email })
+  },
+
+  /**
+   * Turn an accepted invitation into a working account.
+   *
+   * Called after every successful sign-in, not only the first: the RPC is a
+   * no-op for anyone who is not pending, and calling it unconditionally means
+   * there is no state to track about whether it has run.
+   *
+   * Deliberately never throws. A failure here must not stop someone signing in;
+   * the worst case is that an invitee stays pending and an administrator can
+   * activate them by hand.
+   */
+  async acceptInvitationIfPending() {
+    try {
+      const { data, error } = await supabase.rpc('rma_accept_invitation')
+      if (error) return null
+      return data
+    } catch {
+      return null
+    }
+  },
+
   // Create a Supabase Auth account for a new user (super_admin only).
   // Runs server-side via the same Edge Function (treats missing user as create).
   async adminCreateUser(email, password) {

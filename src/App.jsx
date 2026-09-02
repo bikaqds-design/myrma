@@ -477,6 +477,14 @@ export default function App() {
   const finishLogin = async (user) => {
     setCurrentUser(user)
 
+    // Someone arriving from an invitation has a role row sitting at 'pending',
+    // which grants nothing. Activate it BEFORE the role is read below, or the
+    // first thing an invited colleague sees is an access-denied screen.
+    //
+    // A no-op for everyone else, and it never throws — a failure here must not
+    // block a sign-in that would otherwise succeed.
+    await auth.acceptInvitationIfPending()
+
     // A failure here used to propagate to checkAuth, which logs and swallows,
     // leaving currentUser set with a null role — the same empty shell this
     // whole change exists to remove. Treated as no access, which is both the

@@ -2266,7 +2266,18 @@
     "saveRoleBtn": "Save Changes",
     "overriddenHint": "Differs from this role's default",
     "overriddenCount": "{{count}} override",
-    "overriddenCount_other": "{{count}} overrides"
+    "overriddenCount_other": "{{count}} overrides",
+    "inviteTitle": "Invite a user",
+    "inviteSubtitle": "They will receive an email and choose their own password. The role you pick here applies the moment they accept.",
+    "inviteSend": "Send invitation",
+    "inviteSending": "Sending…",
+    "inviteRoleNote": "The role is recorded now but grants nothing until the invitation is accepted.",
+    "inviteSentToast": "Invitation sent to {{email}}",
+    "inviteFailed": "Could not send the invitation",
+    "createManually": "Create manually",
+    "revokeInvite": "Revoke invitation",
+    "revokeInviteConfirm": "Withdraw the invitation for {{email}}? They will not be able to use the link.",
+    "revokeInviteToast": "Invitation for {{email}} withdrawn"
   },
   "customerDetails": {
     "title": "Customer Details",

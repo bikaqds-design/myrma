@@ -11,7 +11,7 @@ import { canDo, accessDenialReason } from '../../lib/permissions'
 import { captureException } from '../../lib/sentry'
 import { addUserSchema, getFirstError } from '../../lib/schemas'
 import { validatePasswordStrength, getDefaultPermissions } from './_utils'
-import { UsersTab, AddUserModal, PasswordResetModal, UserControlModal, ActivityModal } from './UsersTab'
+import { UsersTab, AddUserModal, InviteUserModal, PasswordResetModal, UserControlModal, ActivityModal } from './UsersTab'
 import { RoleTemplatesTab, CustomRolesTab, CreateRoleModal, PermissionsModal } from './RolesTab'
 
 // Custom Roles were hidden because they were not wired end-to-end: "not
@@ -56,6 +56,10 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
   const closeConfirm = () => setConfirmDialog((d) => ({ ...d, open: false }))
 
   const [showAddUserModal, setShowAddUserModal] = useState(false)
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState('technician')
+  const [inviting, setInviting] = useState(false)
   const [showCreateRoleModal, setShowCreateRoleModal] = useState(false)
   const [showPermissionsModal, setShowPermissionsModal] = useState(false)
   const [showUserControlModal, setShowUserControlModal] = useState(false)
@@ -91,6 +95,50 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
   }, [])
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['user-management'] })
+
+  const handleInvite = async (e) => {
+    e.preventDefault()
+
+    // Same email+role validation the manual path uses, so the two cannot
+    // disagree about what a valid address or role is.
+    const validation = addUserSchema.safeParse({ email: inviteEmail, role: inviteRole })
+    if (!validation.success) {
+      toast.error(getFirstError(validation))
+      return
+    }
+
+    setInviting(true)
+    try {
+      await auth.adminInviteUser(inviteEmail, inviteRole)
+      db.userActivity
+        .create(currentUserEmail, 'user_invited', `Invited ${inviteEmail} as ${inviteRole}`)
+        .catch(() => {})
+      db.auditLog
+        .log(currentUserEmail, 'user_invited', `Invited ${inviteEmail} with role ${inviteRole}`)
+        .catch(() => {})
+      db.notifications
+        .create({
+          type: 'user_invited',
+          title: 'User Invited',
+          message: `${inviteEmail} was invited as ${inviteRole}`,
+          entityType: 'user',
+          createdBy: currentUserEmail,
+          targetRoles: ['super_admin'],
+          targetEmails: [],
+        })
+        .catch(() => {})
+      toast.success(t('userManagement.inviteSentToast', { email: inviteEmail }))
+      setInviteEmail('')
+      setInviteRole('technician')
+      setShowInviteModal(false)
+      invalidate()
+    } catch (error) {
+      captureException(error)
+      toast.error(error.message || t('userManagement.inviteFailed'))
+    } finally {
+      setInviting(false)
+    }
+  }
 
   const handleAddUser = async (e) => {
     e.preventDefault()
@@ -595,15 +643,25 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
           <p className="text-sm text-gray-500 mt-0.5">{t('userManagement.subtitle')}</p>
         </div>
         {canDo(currentUserRole, currentUserPermissions, 'user_management', 'create_users') && (
-          <button
-            onClick={() => setShowAddUserModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            {t('userManagement.inviteUser')}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Manual creation is unchanged and still available — but it no
+                longer calls itself an invitation, now that one exists. */}
+            <button
+              onClick={() => setShowAddUserModal(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-[#212a38] text-gray-700 dark:text-[#e8ebf0] rounded-lg hover:bg-gray-50 dark:hover:bg-[#1a2230] text-sm font-medium transition-colors"
+            >
+              {t('userManagement.createManually')}
+            </button>
+            <button
+              onClick={() => setShowInviteModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              {t('userManagement.inviteSend')}
+            </button>
+          </div>
         )}
       </div>
 
@@ -687,6 +745,18 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
           )}
         </div>
       </div>
+
+      {showInviteModal && (
+        <InviteUserModal
+          email={inviteEmail}
+          role={inviteRole}
+          busy={inviting}
+          onEmailChange={setInviteEmail}
+          onRoleChange={setInviteRole}
+          onSubmit={handleInvite}
+          onClose={() => setShowInviteModal(false)}
+        />
+      )}
 
       {showAddUserModal && (
         <AddUserModal

@@ -2282,7 +2282,18 @@
     "overriddenCount_two": "تغييران",
     "overriddenCount_few": "{{count}} تغييرات",
     "overriddenCount_many": "{{count}} تغييرًا",
-    "overriddenCount_other": "{{count}} تغيير"
+    "overriddenCount_other": "{{count}} تغيير",
+    "inviteTitle": "دعوة مستخدم",
+    "inviteSubtitle": "سيصله بريد إلكتروني ويختار كلمة المرور بنفسه. الدور الذي تختاره هنا يُطبَّق فور قبوله الدعوة.",
+    "inviteSend": "إرسال الدعوة",
+    "inviteSending": "جارٍ الإرسال…",
+    "inviteRoleNote": "يُسجَّل الدور الآن لكنه لا يمنح أي صلاحية حتى تُقبل الدعوة.",
+    "inviteSentToast": "تم إرسال الدعوة إلى {{email}}",
+    "inviteFailed": "تعذّر إرسال الدعوة",
+    "createManually": "إنشاء يدوي",
+    "revokeInvite": "سحب الدعوة",
+    "revokeInviteConfirm": "هل تريد سحب الدعوة الخاصة بـ {{email}}؟ لن يتمكن من استخدام الرابط.",
+    "revokeInviteToast": "تم سحب دعوة {{email}}"
   },
   "customerDetails": {
     "title": "تفاصيل العميل",

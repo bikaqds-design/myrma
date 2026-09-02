@@ -264,6 +264,91 @@ export function UsersTab({
   )
 }
 
+/**
+ * Invite someone, choosing their role before the email goes out.
+ *
+ * No password field, and that absence is the point. The form beside this one
+ * has an administrator type a password for a colleague and then tell them what
+ * it is — over chat, usually — which hands out a working credential and
+ * undoes the password rules the system otherwise enforces. Here the invitee
+ * sets their own from the emailed link.
+ *
+ * The role is recorded as 'pending' the moment the invitation is sent, so what
+ * this person will be able to do is decided and visible before they accept,
+ * rather than remembered and applied afterwards. Pending grants nothing.
+ */
+export function InviteUserModal({ email, role, onEmailChange, onRoleChange, onSubmit, onClose, busy }) {
+  const { t } = useTranslation()
+
+  return (
+    <Modal open={true} onClose={onClose} title={t('userManagement.inviteTitle')} className="max-w-md" hideHeader>
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+        {t('userManagement.inviteTitle')}
+      </h2>
+      <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mb-4">{t('userManagement.inviteSubtitle')}</p>
+
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('common.email')} *</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => onEmailChange(e.target.value)}
+            aria-label={t('common.email')}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+            placeholder="colleague@example.com"
+            required
+          />
+          {/* A suggestion, never a refusal: an unfamiliar domain is a normal
+              thing for a new colleague to have, and a wrong address is a
+              problem the undelivered invitation will surface anyway. */}
+          <EmailNote
+            result={checkEmail(email)}
+            onAccept={(domain) => onEmailChange(`${String(email).split('@')[0]}@${domain}`)}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('userManagement.colRole')} *</label>
+          <select
+            value={role}
+            onChange={(e) => onRoleChange(e.target.value)}
+            aria-label={t('userManagement.colRole')}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+          >
+            {ASSIGNABLE_ROLES.filter((r) => !r.superAdminOnly).map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-xs text-gray-500 dark:text-[#9aa4b2]">
+            {t('userManagement.inviteRoleNote')}
+          </p>
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {t('common.cancel')}
+          </button>
+          <button
+            type="submit"
+            disabled={busy || !email.trim()}
+            className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {busy ? t('userManagement.inviteSending') : t('userManagement.inviteSend')}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
 export function AddUserModal({
   email,
   password,
