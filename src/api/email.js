@@ -1,6 +1,6 @@
 // Email notifications module — distinct from in-app notifications (src/api/db/notifications.js).
 // This is exported as `notifications` from supabaseClient.js for backward compatibility.
-import { supabase, supabaseUrl, supabaseKey } from './client.js'
+import { supabase, supabaseUrl } from './client.js'
 
 export const notifications = {
   async getPreferences(userEmail) {
@@ -113,10 +113,24 @@ export const notifications = {
       return data?.[0]
     }
   },
+  /**
+   * Sends one templated email.
+   *
+   * Presents the signed-in person's own access token, not the anon key.
+   * send-email identifies its caller and requires an active administrator; the
+   * anon key ships in this bundle, so sending it proved nothing about who was
+   * asking and left the endpoint callable by anyone who read the JavaScript.
+   */
   async sendEmail(recipientEmail, templateName, variables) {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) throw new Error('You must be signed in to send email')
+
     const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabaseKey}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
       body: JSON.stringify({ recipientEmail, templateName, variables }),
     })
     const result = await response.json()

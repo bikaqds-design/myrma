@@ -59,7 +59,6 @@ serve(async (req: Request) => {
 
   const supabaseUrl      = Deno.env.get('SUPABASE_URL')!
   const serviceRoleKey   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  const anonKey          = Deno.env.get('SUPABASE_ANON_KEY')!
 
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey)
 
@@ -148,7 +147,9 @@ serve(async (req: Request) => {
         const res = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${anonKey}`,
+            // The service role key, not the anon key: send-email now identifies
+            // its caller, and the anon key is public.
+            'Authorization': `Bearer ${serviceRoleKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ recipientEmail: to, templateName: emailTemplate, variables }),
