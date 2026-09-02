@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import i18next from 'i18next'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { toUserMessage } from '../../lib/errorMessage'
 import { captureException } from '../../lib/sentry'
 
 export default function DataCleanup() {
@@ -77,7 +78,7 @@ export default function DataCleanup() {
       load()
     } catch (err) {
       captureException(err)
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     } finally {
       setWorking(false)
     }

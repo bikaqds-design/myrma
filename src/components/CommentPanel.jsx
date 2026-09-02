@@ -5,6 +5,7 @@ import { db, storage, supabase } from '../api/supabaseClient'
 import { EMPTY_ARRAY } from '../lib/stableEmpty'
 import { Button, Spinner } from './ui'
 import toast from 'react-hot-toast'
+import { toUserMessage } from '../lib/errorMessage'
 
 const NOTE_MAX = 500
 
@@ -93,7 +94,7 @@ export function CommentPanel({ relatedType, relatedId, currentUserEmail, canEdit
       }
       setFiles((prev) => [...prev, ...uploaded])
     } catch (err) {
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -122,7 +123,7 @@ export function CommentPanel({ relatedType, relatedId, currentUserEmail, canEdit
       setFiles([])
       queryClient.invalidateQueries({ queryKey })
     } catch (err) {
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     } finally {
       setSubmitting(false)
     }
@@ -148,7 +149,7 @@ export function CommentPanel({ relatedType, relatedId, currentUserEmail, canEdit
       setReplyingTo(null)
       queryClient.invalidateQueries({ queryKey })
     } catch (err) {
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     } finally {
       setReplySubmitting(false)
     }

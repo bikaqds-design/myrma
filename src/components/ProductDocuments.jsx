@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { toUserMessage } from '../lib/errorMessage'
 import { db, storage } from '../api/supabaseClient'
 import { Button, Label, Input, Select, Textarea } from './ui'
 import { captureException } from '../lib/sentry'
@@ -89,7 +90,7 @@ export default function ProductDocuments({ product, currentUserEmail, canEdit })
       else toast.success(t('documents.uploadedNotSearchable'))
     } catch (err) {
       captureException(err)
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     } finally {
       setBusy(false)
       setStage(null)
@@ -119,7 +120,7 @@ export default function ProductDocuments({ product, currentUserEmail, canEdit })
       return true
     } catch (err) {
       captureException(err)
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
       return false
     } finally {
       setBusy(false)
@@ -142,7 +143,7 @@ export default function ProductDocuments({ product, currentUserEmail, canEdit })
       queryClient.invalidateQueries({ queryKey: ['knowledge-center'] })
     } catch (err) {
       captureException(err)
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     } finally {
       setBusy(false)
     }

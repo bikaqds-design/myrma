@@ -4,6 +4,7 @@ import { auth } from '../api/supabaseClient'
 import { captureException } from '../lib/sentry'
 import { resetPasswordSchema, getFirstError } from '../lib/schemas'
 import { Input, Button } from '../components/ui'
+import LanguageToggle from '../components/LanguageToggle'
 
 /**
  * Set a password from an emailed link.
@@ -88,7 +89,11 @@ export default function ResetPassword({ onDone, mode = 'reset' }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+      <div className="w-full max-w-md">
+        <div className="flex justify-end mb-3">
+          <LanguageToggle />
+        </div>
+        <div className="bg-white rounded-2xl shadow-xl w-full p-8">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4">
             <svg
@@ -196,6 +201,7 @@ export default function ResetPassword({ onDone, mode = 'reset' }) {
             </Button>
           </form>
         )}
+      </div>
       </div>
     </div>
   )

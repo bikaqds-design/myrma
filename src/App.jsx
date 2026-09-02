@@ -18,6 +18,7 @@ import NotificationBell from './components/NotificationBell'
 import Breadcrumb from './components/Breadcrumb'
 import { RouteSkeleton } from './components/Skeleton'
 import OnboardingWizard from './components/OnboardingWizard'
+import NoModuleAccess from './components/NoModuleAccess'
 import { Spinner } from './components/ui'
 import { captureException } from './lib/sentry'
 
@@ -370,7 +371,9 @@ function RouteGuard({ role, permissions, children }) {
   const { pathname } = useLocation()
   const required = requiredPermissionFor(pathname)
   if (required && !canDo(role, permissions, ...required)) {
-    return <Navigate to="/" replace />
+    // Explain rather than redirect (UX-GLOBAL-014). Silently landing the user
+    // on the dashboard looked identical to the feature being broken.
+    return <NoModuleAccess module={required[0]} role={role} />
   }
   return children
 }
@@ -1645,7 +1648,7 @@ export default function App() {
                       currentUserPermissions={effectiveUserPermissions}
                     />
                   ) : (
-                    <Navigate to="/" replace />
+                    <NoModuleAccess role={effectiveUserRole} />
                   )
                 }
               />
@@ -1661,7 +1664,7 @@ export default function App() {
                       currentUserPermissions={effectiveUserPermissions}
                     />
                   ) : (
-                    <Navigate to="/" replace />
+                    <NoModuleAccess role={effectiveUserRole} />
                   )
                 }
               />
@@ -1676,7 +1679,7 @@ export default function App() {
                       currentUserPermissions={effectiveUserPermissions}
                     />
                   ) : (
-                    <Navigate to="/" replace />
+                    <NoModuleAccess role={effectiveUserRole} />
                   )
                 }
               />
@@ -1691,7 +1694,7 @@ export default function App() {
                       currentUserPermissions={effectiveUserPermissions}
                     />
                   ) : (
-                    <Navigate to="/" replace />
+                    <NoModuleAccess role={effectiveUserRole} />
                   )
                 }
               />
@@ -1705,7 +1708,7 @@ export default function App() {
                       currentUserPermissions={effectiveUserPermissions}
                     />
                   ) : (
-                    <Navigate to="/" replace />
+                    <NoModuleAccess role={effectiveUserRole} />
                   )
                 }
               />
@@ -1720,7 +1723,7 @@ export default function App() {
                       currentUserPermissions={effectiveUserPermissions}
                     />
                   ) : (
-                    <Navigate to="/" replace />
+                    <NoModuleAccess role={effectiveUserRole} />
                   )
                 }
               />
@@ -1735,7 +1738,7 @@ export default function App() {
                       currentUserPermissions={effectiveUserPermissions}
                     />
                   ) : (
-                    <Navigate to="/" replace />
+                    <NoModuleAccess role={effectiveUserRole} />
                   )
                 }
               />
@@ -1787,7 +1790,7 @@ export default function App() {
                       onStartPreview={startPreview}
                     />
                   ) : (
-                    <Navigate to="/" replace />
+                    <NoModuleAccess role={effectiveUserRole} />
                   )
                 }
               />

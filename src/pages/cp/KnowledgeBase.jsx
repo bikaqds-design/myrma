@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { toUserMessage } from '../../lib/errorMessage'
 import { captureException } from '../../lib/sentry'
 import { MigrationNotice } from './Announcements'
 
@@ -85,7 +86,7 @@ export default function KnowledgeBase({ currentUserEmail }) {
       load()
     } catch (err) {
       captureException(err)
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     } finally {
       setSaving(false)
     }
@@ -102,7 +103,7 @@ export default function KnowledgeBase({ currentUserEmail }) {
       load()
     } catch (err) {
       captureException(err)
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     }
   }
 
@@ -119,7 +120,7 @@ export default function KnowledgeBase({ currentUserEmail }) {
       load()
     } catch (err) {
       captureException(err)
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     }
   }
 

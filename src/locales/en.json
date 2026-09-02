@@ -4217,5 +4217,60 @@
     "resetSent": "A password reset link has been sent to your email address.",
     "loginFailed": "Login failed",
     "resetFailed": "Failed to send reset email"
+  },
+  "emptyState": {
+    "nothingYet": "Nothing here yet",
+    "close": "Close",
+    "tickets": {
+      "title": "No tickets found",
+      "description": "Try adjusting your filters or create a new RMA ticket."
+    },
+    "customers": {
+      "title": "No customers found",
+      "description": "Try adjusting your search or add a new customer."
+    },
+    "products": {
+      "title": "No products found",
+      "description": "Try adjusting your search or add a new product."
+    },
+    "inventory": {
+      "title": "No inventory records",
+      "description": "No items match your current filters."
+    },
+    "search": {
+      "title": "No results found",
+      "description": "Try a different search term or clear your filters."
+    }
+  },
+  "noAccess": {
+    "title": "You don't have access to this page",
+    "titleNamed": "You don't have access to {{module}}",
+    "body": "Your role doesn't include this module. If you need it, ask an administrator to grant you access.",
+    "yourRole": "Your role:",
+    "backToDashboard": "Back to Dashboard"
+  },
+  "roles": {
+    "super_admin": "Super Admin",
+    "admin": "Admin",
+    "manager": "Manager",
+    "technician": "Technician",
+    "viewer": "Viewer",
+    "sales_rep": "Sales Rep",
+    "accountant": "Accountant"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "duplicate": "That already exists. Use a different value.",
+    "inUse": "This is still used elsewhere and can't be removed.",
+    "missingRequired": "A required field is empty.",
+    "notAllowed": "That value isn't allowed here.",
+    "badValue": "That value isn't in the expected format.",
+    "tooLong": "That value is too long.",
+    "noPermission": "You don't have permission to do that.",
+    "conflict": "Someone else changed this at the same time. Try again.",
+    "sessionExpired": "Your session has expired. Please sign in again.",
+    "notFound": "That record no longer exists.",
+    "network": "Can't reach the server. Check your connection.",
+    "rateLimited": "Too many attempts. Please wait a moment and try again."
   }
 }

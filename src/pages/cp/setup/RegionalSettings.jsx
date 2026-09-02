@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { toUserMessage } from '../../../lib/errorMessage'
 import { Button, Label, Input, Select } from '../../../components/ui'
 import { captureException } from '../../../lib/sentry'
 import { SetupCard } from './_shared'
@@ -56,7 +57,7 @@ export default function RegionalSettings({ currentUserEmail }) {
       toast.success(t('cp.setup.saved'))
     } catch (err) {
       captureException(err)
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     } finally {
       setBusy(false)
     }

@@ -6,6 +6,7 @@ import { auth } from '../api/supabaseClient'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { loginSchema, forgotPasswordSchema } from '../lib/schemas'
 import { Input, Button } from '../components/ui'
+import LanguageToggle from '../components/LanguageToggle'
 
 export default function Login({ onLogin }) {
   const { loginBg } = useAppearance()
@@ -62,7 +63,11 @@ export default function Login({ onLogin }) {
       className="min-h-screen flex items-center justify-center p-4"
       style={{ background: loginBg || '#eef2ff' }}
     >
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+      <div className="w-full max-w-md">
+        <div className="flex justify-end mb-3">
+          <LanguageToggle />
+        </div>
+        <div className="bg-white rounded-2xl shadow-xl w-full p-8">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4">
             <svg
@@ -250,6 +255,7 @@ export default function Login({ onLogin }) {
             )}
           </div>
         )}
+      </div>
       </div>
     </div>
   )

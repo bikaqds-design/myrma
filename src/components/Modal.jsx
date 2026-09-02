@@ -19,6 +19,7 @@
  *   </Modal>
  */
 import * as Dialog from '@radix-ui/react-dialog'
+import { useTranslation } from 'react-i18next'
 
 export default function Modal({
   open,
@@ -35,6 +36,7 @@ export default function Modal({
   /** Remove the default p-6 padding — for modals with custom internal layout */
   noPadding = false,
 }) {
+  const { t } = useTranslation()
   return (
     <Dialog.Root
       open={open}
@@ -92,7 +94,7 @@ export default function Modal({
               </Dialog.Title>
               <Dialog.Close asChild>
                 <button
-                  aria-label="Close"
+                  aria-label={t('emptyState.close')}
                   className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-[#9aa4b2] dark:hover:text-slate-200 dark:hover:bg-slate-700 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

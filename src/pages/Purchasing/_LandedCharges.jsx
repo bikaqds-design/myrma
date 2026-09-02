@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { toUserMessage } from '../../lib/errorMessage'
 import { db } from '../../api/supabaseClient'
 import { Button, Label, Select, Input } from '../../components/ui'
 import { captureException } from '../../lib/sentry'
@@ -78,7 +79,7 @@ export default function LandedCharges({
       refresh()
     } catch (err) {
       captureException(err)
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     } finally {
       setBusy(false)
     }
@@ -91,7 +92,7 @@ export default function LandedCharges({
       refresh()
     } catch (err) {
       captureException(err)
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     } finally {
       setBusy(false)
     }

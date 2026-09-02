@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from './ui'
 
 const PRESETS = {
@@ -18,8 +19,7 @@ const PRESETS = {
         />
       </svg>
     ),
-    title: 'No tickets found',
-    description: 'Try adjusting your filters or create a new RMA ticket.',
+    key: 'tickets',
   },
   customers: {
     icon: (
@@ -37,8 +37,7 @@ const PRESETS = {
         />
       </svg>
     ),
-    title: 'No customers found',
-    description: 'Try adjusting your search or add a new customer.',
+    key: 'customers',
   },
   products: {
     icon: (
@@ -56,8 +55,7 @@ const PRESETS = {
         />
       </svg>
     ),
-    title: 'No products found',
-    description: 'Try adjusting your search or add a new product.',
+    key: 'products',
   },
   inventory: {
     icon: (
@@ -75,8 +73,7 @@ const PRESETS = {
         />
       </svg>
     ),
-    title: 'No inventory records',
-    description: 'No items match your current filters.',
+    key: 'inventory',
   },
   search: {
     icon: (
@@ -94,8 +91,7 @@ const PRESETS = {
         />
       </svg>
     ),
-    title: 'No results found',
-    description: 'Try a different search term or clear your filters.',
+    key: 'search',
   },
 }
 
@@ -108,10 +104,16 @@ export default function EmptyState({
   actionLabel,
   className = '',
 }) {
+  const { t } = useTranslation()
   const p = PRESETS[preset] || {}
   const resolvedIcon = icon || p.icon
-  const resolvedTitle = title || p.title || 'Nothing here yet'
-  const resolvedDescription = description || p.description || ''
+  // Presets carry a translation key, not English copy: a caller that passes no
+  // title used to get an English string that no locale could reach
+  // (UX-GLOBAL-015). An explicit title still wins, so existing callers that
+  // already translate are unaffected.
+  const resolvedTitle = title || (p.key ? t(`emptyState.${p.key}.title`) : t('emptyState.nothingYet'))
+  const resolvedDescription =
+    description || (p.key ? t(`emptyState.${p.key}.description`) : '')
 
   return (
     <div

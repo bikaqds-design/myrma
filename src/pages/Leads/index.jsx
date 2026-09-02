@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { ownershipScope } from '../../lib/permissions'
 import toast from 'react-hot-toast'
+import { toUserMessage } from '../../lib/errorMessage'
 import { db, supabase } from '../../api/supabaseClient'
 import { PageSkeleton } from '../../components/Skeleton'
 import { PageHeader, Ltr } from '../../components/ui'
@@ -699,7 +700,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
           setSelectedLeads(new Set())
           queryClient.invalidateQueries({ queryKey: ['leads'] })
         } catch (err) {
-          toast.error(err.message)
+          toast.error(toUserMessage(err))
         }
       }
     )
@@ -713,7 +714,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
       setSelectedLeads(new Set())
       queryClient.invalidateQueries({ queryKey: ['leads'] })
     } catch (err) {
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     }
   }
 
@@ -725,7 +726,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
       setSelectedLeads(new Set())
       queryClient.invalidateQueries({ queryKey: ['leads'] })
     } catch (err) {
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     }
   }
 

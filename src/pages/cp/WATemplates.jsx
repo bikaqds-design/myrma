@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { toUserMessage } from '../../lib/errorMessage'
 import { Button, Spinner } from '../../components/ui'
 import ConfirmDialog from '../../components/ConfirmDialog'
 
@@ -102,7 +103,7 @@ export default function WATemplates({ currentUserEmail }) {
       qc.invalidateQueries({ queryKey: ['whatsapp-templates'] })
       setModal(null)
     } catch (err) {
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     } finally {
       setSaving(false)
     }
@@ -120,7 +121,7 @@ export default function WATemplates({ currentUserEmail }) {
           qc.invalidateQueries({ queryKey: ['whatsapp-templates'] })
           toast.success(t('cp.waTemplates.deleted'))
         } catch (err) {
-          toast.error(err.message)
+          toast.error(toUserMessage(err))
         }
       },
     })

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { toUserMessage } from '../../lib/errorMessage'
 import { captureException } from '../../lib/sentry'
 
 const EMPTY_FORM = {
@@ -119,7 +120,7 @@ export default function Announcements({ currentUserEmail }) {
       load()
     } catch (err) {
       captureException(err)
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     } finally {
       setSaving(false)
     }
@@ -136,7 +137,7 @@ export default function Announcements({ currentUserEmail }) {
       load()
     } catch (err) {
       captureException(err)
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     }
   }
 
@@ -153,7 +154,7 @@ export default function Announcements({ currentUserEmail }) {
       load()
     } catch (err) {
       captureException(err)
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     }
   }
 

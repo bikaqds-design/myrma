@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { db, branding as brandingAPI } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
+import { toUserMessage } from '../../lib/errorMessage'
 import { captureException } from '../../lib/sentry'
 import { useBaseCurrency } from '../../hooks/useBaseCurrency'
 
@@ -145,7 +146,7 @@ export default function PDFLayout({ currentUserEmail }) {
       toast.success(t('cp.pdfLayout.saved'))
     } catch (err) {
       captureException(err)
-      toast.error(err.message)
+      toast.error(toUserMessage(err))
     } finally {
       setSaving(false)
     }
