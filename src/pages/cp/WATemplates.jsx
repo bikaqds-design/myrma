@@ -323,7 +323,7 @@ export default function WATemplates({ currentUserEmail }) {
               {/* Footer + options */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField label={t('cp.waTemplates.footerLabel')} value={form.footer_content}
-                  onChange={(v) => setForm((f) => ({ ...f, footer_content: v }))} placeholder="e.g. myRMA Support" />
+                  onChange={(v) => setForm((f) => ({ ...f, footer_content: v }))} placeholder="e.g. myCRM Support" />
                 <div className="flex items-center gap-3 pt-5">
                   <input type="checkbox" id="attach_pdf" checked={!!form.attach_pdf}
                     onChange={(e) => setForm((f) => ({ ...f, attach_pdf: e.target.checked }))}

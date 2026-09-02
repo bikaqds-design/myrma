@@ -106,7 +106,7 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
               </div>
-              <h2 className="text-xl font-bold text-[#211f1b] dark:text-[#e8ebf0] mb-2">Welcome to myRMA!</h2>
+              <h2 className="text-xl font-bold text-[#211f1b] dark:text-[#e8ebf0] mb-2">Welcome to myCRM!</h2>
               <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2] max-w-xs mx-auto">
                 Your RMA and repair management system is ready. This quick setup takes about 2 minutes.
               </p>
@@ -190,7 +190,7 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
                 </svg>
               </div>
               <h2 className="text-xl font-bold text-[#211f1b] dark:text-[#e8ebf0] mb-2">You're all set!</h2>
-              <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2] max-w-xs mx-auto mb-5">myRMA is configured and ready to use. Explore the sidebar to discover everything it can do.</p>
+              <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2] max-w-xs mx-auto mb-5">myCRM is configured and ready to use. Explore the sidebar to discover everything it can do.</p>
               <div className="text-left space-y-2 mb-6">
                 {[
                   companyName ? `Company name set: ${companyName}` : null,
@@ -237,7 +237,7 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
             {step === TOTAL && (
               <button onClick={finish}
                 className="w-full py-2.5 rounded-xl bg-[#4338ca] hover:bg-[#3730a3] text-white text-sm font-semibold transition-colors">
-                Start using myRMA
+                Start using myCRM
               </button>
             )}
           </div>

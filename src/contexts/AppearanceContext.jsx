@@ -14,7 +14,7 @@ const DEFAULT = {
   dateFormat: 'DD/MM/YYYY',
   timeFormat: '24h',
   faviconUrl: '',
-  tabTitle: 'myRMA',
+  tabTitle: 'myCRM',
   // No dashboardWidgets default here any more. It was a hardcoded ten-id array
   // used as the Dashboard's fallback, and because nothing ever wrote to it, it
   // silently capped every account at the ten widgets that existed when it was
@@ -83,7 +83,7 @@ export function AppearanceProvider({ children }) {
     html.classList.toggle('dark', !!s.darkMode)
     html.setAttribute('data-density', s.tableDensity || 'comfortable')
     document.body.style.fontFamily = FONT_STACKS[s.fontFamily] || FONT_STACKS.inter
-    document.title = s.tabTitle || 'myRMA'
+    document.title = s.tabTitle || 'myCRM'
     if (s.fontFamily && s.fontFamily !== 'system' && GOOGLE_FONTS[s.fontFamily]) {
       const id = `gfont-${s.fontFamily}`
       // Remove any previously injected Google Font links other than the current one

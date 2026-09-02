@@ -104,7 +104,7 @@ export default function EmailSettingsTab({ settings, setSettings, saving, onSave
             type="text"
             value={settings.from_name}
             onChange={(e) => setSettings({ ...settings, from_name: e.target.value })}
-            placeholder="myRMA System"
+            placeholder="myCRM System"
           />
         </div>
       </div>

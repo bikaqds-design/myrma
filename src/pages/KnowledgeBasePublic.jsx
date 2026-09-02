@@ -23,7 +23,7 @@ export default function KnowledgeBasePublic() {
   }, [])
 
   const primaryColor = branding?.primary_color || '#4F46E5'
-  const companyName = branding?.company_name || 'myRMA'
+  const companyName = branding?.company_name || 'myCRM'
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()

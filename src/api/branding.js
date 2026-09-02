@@ -6,7 +6,7 @@ export const branding = {
     if (error) {
       if (error.code === 'PGRST116')
         return {
-          company_name: 'myRMA',
+          company_name: 'myCRM',
           logo_url: null,
           primary_color: '#4F46E5',
           secondary_color: '#818CF8',

@@ -26,9 +26,9 @@ export default defineConfig({
       injectRegister: 'auto',
 
       manifest: {
-        name: 'myRMA — RMA Management',
-        short_name: 'myRMA',
-        description: 'Enterprise RMA and warranty ticket management',
+        name: 'myCRM — Business Management',
+        short_name: 'myCRM',
+        description: 'Business management for sales, service, inventory and warranty returns',
         theme_color: '#4f46e5',
         background_color: '#0f172a',
         display: 'standalone',

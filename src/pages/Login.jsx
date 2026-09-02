@@ -75,7 +75,7 @@ export default function Login({ onLogin }) {
               />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">myRMA</h1>
+          <h1 className="text-3xl font-bold text-gray-900">myCRM</h1>
           <p className="text-gray-600 mt-2">
             {forgotMode ? 'Reset your password' : 'RMA Management System'}
           </p>

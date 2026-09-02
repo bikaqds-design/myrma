@@ -87,7 +87,7 @@ export const notifications = {
           provider: 'resend',
           api_key: '',
           from_email: 'noreply@yourdomain.com',
-          from_name: 'myRMA System',
+          from_name: 'myCRM System',
           is_active: false,
         }
       throw error

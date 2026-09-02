@@ -88,7 +88,7 @@ export default function WebhooksConfig({ currentUserEmail }) {
         body: JSON.stringify({
           event: 'test',
           timestamp: new Date().toISOString(),
-          data: { message: 'Test from myRMA' },
+          data: { message: 'Test from myCRM' },
         }),
       })
       res.ok

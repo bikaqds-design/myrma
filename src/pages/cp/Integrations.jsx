@@ -130,7 +130,7 @@ export default function Integrations({ currentUserEmail }) {
       const payload = {
         event: 'webhook.test',
         timestamp: new Date().toISOString(),
-        data: { message: 'Test webhook from myRMA Control Panel' },
+        data: { message: 'Test webhook from myCRM Control Panel' },
       }
       await fetch(w.url, {
         method: 'POST',

@@ -37,7 +37,7 @@ export default function BrandingTab({
   }, [tabTitle])
   // Update browser title live without triggering global re-render
   React.useEffect(() => {
-    document.title = draftTabTitle || 'myRMA'
+    document.title = draftTabTitle || 'myCRM'
   }, [draftTabTitle])
 
   const handleFaviconUpload = (e) => {
@@ -120,7 +120,7 @@ export default function BrandingTab({
                 type="text"
                 value={branding.company_name}
                 onChange={(e) => setBranding({ ...branding, company_name: e.target.value })}
-                placeholder="myRMA"
+                placeholder="myCRM"
               />
               <p className="text-xs text-gray-500 mt-1">Shown in sidebar and login page</p>
             </div>
@@ -266,7 +266,7 @@ export default function BrandingTab({
                     className="font-bold text-lg leading-none"
                     style={{ color: branding.primary_color }}
                   >
-                    {branding.company_name || 'myRMA'}
+                    {branding.company_name || 'myCRM'}
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">RMA Management</p>
                 </div>
@@ -482,7 +482,7 @@ export default function BrandingTab({
                 <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
               </div>
               <div className="flex-1 bg-white rounded px-2 py-0.5 text-xs text-gray-600 font-medium truncate border border-gray-200">
-                {draftTabTitle || 'myRMA'} ×
+                {draftTabTitle || 'myCRM'} ×
               </div>
             </div>
           </div>
@@ -492,7 +492,7 @@ export default function BrandingTab({
             onChange={(e) => setDraftTabTitle(e.target.value)}
             onBlur={() => update({ tabTitle: draftTabTitle })}
             className="mt-2"
-            placeholder="myRMA 2.0 - RMA Management"
+            placeholder="myCRM — Business Management"
           />
         </div>
 
@@ -516,7 +516,7 @@ export default function BrandingTab({
               ) : (
                 <div className="w-3.5 h-3.5 rounded-sm bg-gray-200 flex-shrink-0" />
               )}
-              <span className="text-xs text-gray-600 truncate">{draftTabTitle || 'myRMA'}</span>
+              <span className="text-xs text-gray-600 truncate">{draftTabTitle || 'myCRM'}</span>
               <span className="text-gray-300 ml-auto text-xs flex-shrink-0">×</span>
             </div>
           </div>

@@ -1234,7 +1234,7 @@ export default function App() {
                   {/* A brand mark, not a heading. As an <h1> it was a second
                       first-level heading on every page, sitting above the real
                       page title and outside any landmark. */}
-                  <span className="block text-[15px] font-[750] tracking-tight text-[#211f1b] dark:text-[#e8ebf0] leading-none">myRMA</span>
+                  <span className="block text-[15px] font-[750] tracking-tight text-[#211f1b] dark:text-[#e8ebf0] leading-none">myCRM</span>
                   <p className="text-[12px] text-[#6c6760] dark:text-[#9aa4b2] mt-0.5">{companyName || 'RMA Management'}</p>
                 </div>
               </button>

@@ -260,7 +260,7 @@ export default function RMATracker() {
   const getReplies = (id) => comments.filter((c) => c.parent_comment_id === id)
 
   const primaryColor = branding?.primary_color || '#4F46E5'
-  const companyName = branding?.company_name || 'myRMA'
+  const companyName = branding?.company_name || 'myCRM'
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -752,7 +752,7 @@ export default function RMATracker() {
       </main>
 
       <footer className="border-t border-gray-200 mt-10 py-5 text-center text-xs text-gray-500">
-        Powered by <span className="font-semibold text-gray-500">myRMA</span> — Secure service
+        Powered by <span className="font-semibold text-gray-500">myCRM</span> — Secure service
         request tracking
       </footer>
     </div>

@@ -1588,7 +1588,7 @@ async function exportTicketPDF(ticket, t) {
   const font = pdfCfg.font || 'Arial, sans-serif'
   const fontSize = pdfCfg.fontSize || 11
   const sec = pdfCfg.sections || PDF_DEFAULT.sections
-  const companyName = brandingData.company_name || 'myRMA'
+  const companyName = brandingData.company_name || 'myCRM'
   const logoUrl = pdfCfg.showLogo ? brandingData.logo_url || null : null
 
   const fmtPdf = (d) =>

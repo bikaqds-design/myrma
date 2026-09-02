@@ -564,7 +564,7 @@ export default function PDFLayout({ currentUserEmail }) {
                     </tbody>
                   </table>
                   <div style={{ marginTop: 'auto', borderTop: '1px solid #E5E7EB', paddingTop: '5px', textAlign: 'center', color: '#9CA3AF', fontSize: `${previewFontSize * 0.5}px` }}>
-                    {config.footerText || config.companyName || 'myRMA'}
+                    {config.footerText || config.companyName || 'myCRM'}
                     {config.showGeneratedDate ? ` · Generated ${new Date().toLocaleDateString()}` : ''}
                   </div>
                 </div>
@@ -624,7 +624,7 @@ export default function PDFLayout({ currentUserEmail }) {
                     )}
                   </div>
                   <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '5px', marginTop: '8px', display: 'flex', justifyContent: 'space-between', color: '#9CA3AF', fontSize: `${previewFontSize * 0.55}px` }}>
-                    <span>{config.footerText || 'myRMA'}</span>
+                    <span>{config.footerText || 'myCRM'}</span>
                     {config.showGeneratedDate && <span>Generated: 18/05/2026</span>}
                   </div>
                 </div>
