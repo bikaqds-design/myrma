@@ -306,3 +306,5 @@ export function ModalCard({ children, className = '', 'aria-label': ariaLabel, '
 // this kit combined — but is re-exported here so callers import it the same way
 // as every other primitive.
 export { default as Table } from './Table'
+
+export { default as Pagination } from './Pagination'

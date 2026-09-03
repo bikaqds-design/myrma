@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { db } from '../api/supabaseClient'
 import { EMPTY_ARRAY } from '../lib/stableEmpty'
 import EmptyState from '../components/EmptyState'
+import Pagination from '../components/Pagination'
 
 /**
  * Which products have no document, and which have one nobody can search.
@@ -67,6 +68,28 @@ export default function KnowledgeCoverage() {
   const total = missing.length + unsearchable.length + covered.length
   const pct = total === 0 ? 0 : Math.round((covered.length / total) * 100)
 
+  const listed = view === 'missing' ? missing : unsearchable
+
+  // Every product without a readable datasheet, rendered in one list. With 406
+  // products that is a page nobody can work through, and the row that needs
+  // acting on is as likely to be at position 300 as at position 3.
+  //
+  // Declared above the loading and not-provisioned early returns: hooks must run
+  // in the same order on every render, and placing them below meant the first
+  // render after loading finished called three hooks the previous render had
+  // not. Caught by react-hooks/rules-of-hooks — the build was happy with it.
+  const [page, setPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(25)
+  const paged = useMemo(
+    () => listed.slice((page - 1) * itemsPerPage, page * itemsPerPage),
+    [listed, page, itemsPerPage]
+  )
+
+  // Switching tab or brand filter changes the list under the current page.
+  useEffect(() => {
+    setPage(1)
+  }, [view, brandId])
+
   if (loadingProducts || loadingDocs) {
     return <div className="py-16 text-center text-sm text-gray-500">{t('common.loading')}</div>
   }
@@ -80,7 +103,7 @@ export default function KnowledgeCoverage() {
     )
   }
 
-  const listed = view === 'missing' ? missing : unsearchable
+
 
   const cards = [
     { id: 'covered', n: covered.length, label: t('coverage.covered'), tone: 'text-green-600 dark:text-green-400' },
@@ -158,7 +181,7 @@ export default function KnowledgeCoverage() {
           />
         ) : (
           <div className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
-            {listed.map((p) => (
+            {paged.map((p) => (
               <div key={p.id} className="flex items-center gap-3 px-4 py-2.5">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-gray-900 dark:text-[#e8ebf0] truncate">
@@ -176,6 +199,18 @@ export default function KnowledgeCoverage() {
                 </Link>
               </div>
             ))}
+          </div>
+        )}
+
+        {listed.length > 0 && (
+          <div className="mt-3">
+            <Pagination
+              total={listed.length}
+              page={page}
+              itemsPerPage={itemsPerPage}
+              setItemsPerPage={setItemsPerPage}
+              onPage={setPage}
+            />
           </div>
         )}
       </div>

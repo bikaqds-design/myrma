@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import i18next from 'i18next'
 import { useQuery } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
-import { Table } from '../../components/ui'
+import { Table, Pagination } from '../../components/ui'
 import toast from 'react-hot-toast'
 import { captureException } from '../../lib/sentry'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
@@ -27,6 +27,11 @@ export default function AuditLog() {
       toast.error(i18next.t('cp.auditLog.loadFailed'))
     }
   }, [isError, error])
+
+  // The query asks for 500 rows and the table rendered every one of them. Paging
+  // keeps the DOM small and gives a way to reach the older entries.
+  const [page, setPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(25)
 
   const filtered = useMemo(() => {
     let f = [...logs]
@@ -79,6 +84,18 @@ export default function AuditLog() {
   const activeFilterCount = [filterUser, filterAction, filterFrom, filterTo].filter(Boolean).length
   const inp =
     'px-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent'
+
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * itemsPerPage, page * itemsPerPage),
+    [filtered, page, itemsPerPage]
+  )
+
+  // Filtering while on a later page leaves the page number past the end, which
+  // shows an empty table over rows that plainly exist.
+  useEffect(() => {
+    const lastPage = Math.max(1, Math.ceil(filtered.length / itemsPerPage))
+    if (page > lastPage) setPage(1)
+  }, [filtered.length, itemsPerPage, page])
 
   if (loading)
     return (
@@ -180,9 +197,15 @@ export default function AuditLog() {
         </div>
       )}
 
-      <div className="text-xs text-gray-500">
-        {t('cp.auditLog.showingOf', { filtered: filtered.length, total: logs.length })}
-      </div>
+      {/* Only while a filter is narrowing the set. With nothing filtered it read
+          "Showing 500 of 500 records" directly above the pager's "Showing 1-25
+          of 500" — two sentences starting the same way and appearing to
+          contradict each other. */}
+      {filtered.length !== logs.length && (
+        <div className="text-xs text-gray-500 dark:text-[#9aa4b2]">
+          {t('cp.auditLog.showingOf', { filtered: filtered.length, total: logs.length })}
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
@@ -219,9 +242,18 @@ export default function AuditLog() {
                 cell: (l) => l.action_details || '—',
               },
             ]}
-            rows={filtered}
+            rows={paged}
             rowKey={(l) => l.id}
             empty={{ title: t('cp.auditLog.noEntries') }}
+          />
+        </div>
+        <div className="px-4 pb-3">
+          <Pagination
+            total={filtered.length}
+            page={page}
+            itemsPerPage={itemsPerPage}
+            setItemsPerPage={setItemsPerPage}
+            onPage={setPage}
           />
         </div>
       </div>

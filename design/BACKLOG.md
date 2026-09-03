@@ -2,7 +2,8 @@
 
 Findings from `design/audit/01-AUDIT.md` that are not closed, and why.
 
-**Status: 23 of 43 closed. 0 Critical, 4 High, 12 Medium, 4 Low remaining.**
+**Status: 25 of 44 closed. 0 Critical, 4 High, 11 Medium, 4 Low remaining.**
+(UX-GLOBAL-017 retracted; UX-PAGE-001/002 added and closed — see `design/audit/03-PAGINATION.md`.)
 Every dark-mode finding is closed; both light and dark measure 0 AA contrast failures.
 (Five dark-mode findings added 2026-09-03.)
 
@@ -58,7 +59,7 @@ See `design/audit/01-AUDIT.md` for the full table. The notable ones:
 
 | ID | Issue | Sev |
 |---|---|---|
-| UX-GLOBAL-017 | Pagination arrows point the wrong way in Arabic | Medium |
+| ~~UX-GLOBAL-017~~ | ~~Pagination arrows point the wrong way in Arabic~~ **RETRACTED** — measured and correct | — |
 | UX-GLOBAL-016 | 21 Arabic values identical to their English source | Low |
 
 ---
