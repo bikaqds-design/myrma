@@ -40,13 +40,13 @@ page, not the source.
 
 | ID | Issue | Severity | Effort |
 |----|-------|----------|--------|
-| UX-DARK-001 | Appearance settings are global, not per user | High | M |
+| ✅ UX-DARK-001 | Appearance settings are global, not per user | High | **CLOSED** |
 | UX-DARK-002 | Dark mode never follows the operating system | Medium | S |
 | UX-DARK-003 | An 88 KB config blob is fetched on every app mount | Medium | M |
 | UX-DARK-004 | Knowledge Center muted text fails AA in dark only | Low | S |
 | UX-GLOBAL-018 | Notification badge fails AA in **both** modes | Medium | S |
 
-### UX-DARK-001 — Appearance settings are global (High)
+### ✅ UX-DARK-001 — Appearance settings are global (High) — CLOSED
 
 `rmaConfig.set` upserts on `config_key` alone:
 
@@ -66,6 +66,25 @@ This is also why the first capture run of this audit produced entirely light
 screenshots while claiming dark mode was on: the context fetches this global row
 on mount and overwrites whatever was set locally. The audit had to intercept
 that request to measure anything.
+
+**Fixed.** No migration was needed — a `user_preferences` table already existed,
+unused, with the right shape, RLS scoping every policy to
+`user_email = rma_current_user_email()`, and a unique index for upsert.
+
+The fix is a split by what each setting *is*, not by who may change it:
+
+| personal (`user_preferences.prefs.appearance`) | company (`rma_config`) |
+|---|---|
+| `darkMode`, `fontFamily`, `tableDensity`, `sidebarCompact`, `dateFormat`, `timeFormat` | `faviconUrl`, `loginBg`, `tabTitle` |
+
+The company row is kept as the **org default** rather than emptied, and personal
+values layer on top — resolution is `DEFAULT -> company -> personal`. Nothing
+changes for anyone on first load, no backfill is required, and an admin setting
+the house date format still sets it for everyone who has not chosen their own.
+
+Verified end to end against production with two throwaway accounts: user A
+enabled dark mode, user B was unaffected, and the company row still reads
+`darkMode: false` — A's choice did not leak into it.
 
 ### UX-DARK-002 — Never follows the OS (Medium)
 

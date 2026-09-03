@@ -2,7 +2,7 @@
 
 Findings from `design/audit/01-AUDIT.md` that are not closed, and why.
 
-**Status: 18 of 43 closed. 0 Critical, 5 High, 15 Medium, 5 Low remaining.**
+**Status: 19 of 43 closed. 0 Critical, 4 High, 15 Medium, 5 Low remaining.**
 (Five dark-mode findings added 2026-09-03.)
 
 Every Critical is closed. Nothing here blocks launch.
@@ -72,7 +72,7 @@ Five findings opened, one of them High:
 
 | ID | Issue | Sev |
 |---|---|---|
-| UX-DARK-001 | Appearance settings are global — one user's dark mode applies to everyone | High |
+| ✅ UX-DARK-001 | ~~Appearance settings are global~~ **CLOSED** — split personal vs company, no migration needed | High |
 | UX-DARK-002 | Never follows the operating system's colour scheme | Medium |
 | UX-DARK-003 | 88 KB config blob fetched on every app mount | Medium |
 | UX-GLOBAL-018 | Notification badge fails AA in **both** modes, on every route | Medium |
