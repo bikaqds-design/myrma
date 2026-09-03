@@ -87,7 +87,7 @@ adding locale keys. UX-AUTH-002 is my defect.
 |---|---|---|---|---|---|---|---|
 | ✅ UX-DASH-001 (CLOSED c543dee) | `/` (RTL) | Date-range chips "All / 30d / 7d / Today" remain untranslated English and in LTR order while the rest of the page is Arabic | i18n | High | S | Translate; order by direction | `src/pages/Dashboard.jsx` |
 | ✅ UX-DASH-002 (CLOSED c543dee) | `/` (RTL) | Trend deltas render `8%+ ↑` — instance of UX-GLOBAL-003 | RTL | Critical | S | Wrap in `<Ltr>` | `src/pages/Dashboard.jsx` |
-| UX-DASH-003 | `/` | Sparklines run left-to-right in RTL, so time flows against reading direction | RTL | Low | M | Mirror the time axis in RTL, or state the convention deliberately | `DashboardCharts.jsx` |
+| ⏹ UX-DASH-003 (WON'T FIX — decided 2026-09-03: charts stay left-to-right in every language) | `/` | Sparklines run left-to-right in RTL, so time flows against reading direction | RTL | Low | M | Mirror the time axis in RTL, or state the convention deliberately | `DashboardCharts.jsx` |
 | ✅ UX-DASH-004 (CLOSED — "View all" was an inert span; now a real link) | `/` | Widgets show counts but it is not established whether each links to the filtered list behind it | Flow | Medium | M | Verify every widget deep-links | `src/pages/Dashboard.jsx` |
 
 `[rendered, not persisted]` — verified live in Arabic at 1440×900.

@@ -2,7 +2,22 @@
 
 Findings from `design/audit/01-AUDIT.md` that are not closed, and why.
 
-**Status: 27 of 44 closed, 3 further retracted. 0 Critical, 3 High, 1 Medium, 1 Low remaining.**
+**Status: 27 of 44 closed, 3 retracted, 1 won't-fix. 0 Critical, 3 High, 1 Medium, 0 Low remaining.**
+
+The single remaining Medium is UX-GLOBAL-009 (spinners rather than skeletons in
+27 files), and it shrinks on its own as tables move to the `Table` primitive,
+which supplies skeleton rows.
+
+### UX-DASH-003 — charts stay left-to-right (decided 2026-09-03)
+
+Sparklines and trend charts do not mirror in RTL, so in Arabic the oldest point
+sits on the left and time runs against the reading direction. **Deliberate.**
+Time flows left-to-right in Odoo, Zoho, Excel and most Arabic-language
+dashboards: a chart reads as a universal notation rather than as text, and an
+Arabic reader accustomed to that would misread a mirrored axis at a glance.
+
+Recorded so it is not raised again. Everything that *is* text — labels, legends,
+axis titles, tooltips — still mirrors normally.
 
 Of the six Medium/Low findings checked on 2026-09-03, **three were wrong as
 written** and were retracted after measurement, two were fixed, and one needs a
@@ -71,7 +86,7 @@ See `design/audit/01-AUDIT.md` for the full table. The notable ones:
 | ✅ UX-GLOBAL-002 | ~~No z-index ladder~~ **CLOSED** — named rungs in tailwind.config, relative order preserved | Medium |
 | ✅ UX-DASH-004 | ~~Unclear whether widgets link~~ **CLOSED** — "View all" was an inert span; now navigates | Medium |
 | UX-GLOBAL-009 | Loading is a spinner in 27 files, a skeleton in 5 | Medium |
-| UX-DASH-003 | Sparklines run left-to-right in RTL — **needs a decision**, see below | Low |
+| ⏹ UX-DASH-003 | ~~Sparklines run left-to-right in RTL~~ **WON'T FIX** (decided 2026-09-03) | — |
 
 ---
 
