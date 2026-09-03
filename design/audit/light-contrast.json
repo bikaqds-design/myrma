@@ -1,0 +1,210 @@
+[
+ {
+  "route": "/",
+  "failures": 1,
+  "worst": [
+   {
+    "ratio": 3.76,
+    "need": 4.5,
+    "color": "rgb(255, 255, 255)",
+    "size": 10,
+    "text": "50"
+   }
+  ]
+ },
+ {
+  "route": "/leads",
+  "failures": 1,
+  "worst": [
+   {
+    "ratio": 3.76,
+    "need": 4.5,
+    "color": "rgb(255, 255, 255)",
+    "size": 10,
+    "text": "50"
+   }
+  ]
+ },
+ {
+  "route": "/pipeline",
+  "failures": 1,
+  "worst": [
+   {
+    "ratio": 3.76,
+    "need": 4.5,
+    "color": "rgb(255, 255, 255)",
+    "size": 10,
+    "text": "50"
+   }
+  ]
+ },
+ {
+  "route": "/activities",
+  "failures": 1,
+  "worst": [
+   {
+    "ratio": 3.76,
+    "need": 4.5,
+    "color": "rgb(255, 255, 255)",
+    "size": 10,
+    "text": "50"
+   }
+  ]
+ },
+ {
+  "route": "/sales",
+  "failures": 1,
+  "worst": [
+   {
+    "ratio": 3.76,
+    "need": 4.5,
+    "color": "rgb(255, 255, 255)",
+    "size": 10,
+    "text": "50"
+   }
+  ]
+ },
+ {
+  "route": "/accounting",
+  "failures": 1,
+  "worst": [
+   {
+    "ratio": 3.76,
+    "need": 4.5,
+    "color": "rgb(255, 255, 255)",
+    "size": 10,
+    "text": "50"
+   }
+  ]
+ },
+ {
+  "route": "/purchasing",
+  "failures": 1,
+  "worst": [
+   {
+    "ratio": 3.76,
+    "need": 4.5,
+    "color": "rgb(255, 255, 255)",
+    "size": 10,
+    "text": "50"
+   }
+  ]
+ },
+ {
+  "route": "/rma-tickets",
+  "failures": 1,
+  "worst": [
+   {
+    "ratio": 3.76,
+    "need": 4.5,
+    "color": "rgb(255, 255, 255)",
+    "size": 10,
+    "text": "50"
+   }
+  ]
+ },
+ {
+  "route": "/inventory",
+  "failures": 1,
+  "worst": [
+   {
+    "ratio": 3.76,
+    "need": 4.5,
+    "color": "rgb(255, 255, 255)",
+    "size": 10,
+    "text": "50"
+   }
+  ]
+ },
+ {
+  "route": "/products",
+  "failures": 1,
+  "worst": [
+   {
+    "ratio": 3.76,
+    "need": 4.5,
+    "color": "rgb(255, 255, 255)",
+    "size": 10,
+    "text": "50"
+   }
+  ]
+ },
+ {
+  "route": "/customers",
+  "failures": 1,
+  "worst": [
+   {
+    "ratio": 3.76,
+    "need": 4.5,
+    "color": "rgb(255, 255, 255)",
+    "size": 10,
+    "text": "50"
+   }
+  ]
+ },
+ {
+  "route": "/reports",
+  "failures": 1,
+  "worst": [
+   {
+    "ratio": 3.76,
+    "need": 4.5,
+    "color": "rgb(255, 255, 255)",
+    "size": 10,
+    "text": "50"
+   }
+  ]
+ },
+ {
+  "route": "/calendar",
+  "failures": 1,
+  "worst": [
+   {
+    "ratio": 3.76,
+    "need": 4.5,
+    "color": "rgb(255, 255, 255)",
+    "size": 10,
+    "text": "50"
+   }
+  ]
+ },
+ {
+  "route": "/knowledge-center",
+  "failures": 1,
+  "worst": [
+   {
+    "ratio": 3.76,
+    "need": 4.5,
+    "color": "rgb(255, 255, 255)",
+    "size": 10,
+    "text": "50"
+   }
+  ]
+ },
+ {
+  "route": "/control-panel",
+  "failures": 1,
+  "worst": [
+   {
+    "ratio": 3.76,
+    "need": 4.5,
+    "color": "rgb(255, 255, 255)",
+    "size": 10,
+    "text": "50"
+   }
+  ]
+ },
+ {
+  "route": "/account",
+  "failures": 1,
+  "worst": [
+   {
+    "ratio": 3.76,
+    "need": 4.5,
+    "color": "rgb(255, 255, 255)",
+    "size": 10,
+    "text": "50"
+   }
+  ]
+ }
+]

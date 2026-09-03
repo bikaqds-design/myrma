@@ -2,7 +2,8 @@
 
 Findings from `design/audit/01-AUDIT.md` that are not closed, and why.
 
-**Status: 18 of 38 closed. 0 Critical, 4 High, 12 Medium, 4 Low remaining.**
+**Status: 18 of 43 closed. 0 Critical, 5 High, 15 Medium, 5 Low remaining.**
+(Five dark-mode findings added 2026-09-03.)
 
 Every Critical is closed. Nothing here blocks launch.
 
@@ -61,14 +62,25 @@ See `design/audit/01-AUDIT.md` for the full table. The notable ones:
 
 ---
 
-## Not audited at all
+## Dark mode — audited 2026-09-03
 
-**Dark mode.** It is implemented, in scope (decided 2026-09-02), and has never
-been looked at. All 71 baseline screenshots are light mode only. This is the
-largest unknown remaining in the UI: the matrix needs a dark dimension, the
-contrast work doubles, and four of the most-repeated hardcoded hex values
-(`#0f1520`, `#121823`, `#1a2230`, `#212a38`) are dark-mode surfaces applied as
-raw hex via `dark:` variants.
+**Audited and in good shape.** 32 of 32 route/direction combinations render
+correctly with zero light surfaces, and contrast is at near-parity with light
+mode (18 AA failures against 16). Full report: `design/audit/02-DARK-MODE.md`.
+
+Five findings opened, one of them High:
+
+| ID | Issue | Sev |
+|---|---|---|
+| UX-DARK-001 | Appearance settings are global — one user's dark mode applies to everyone | High |
+| UX-DARK-002 | Never follows the operating system's colour scheme | Medium |
+| UX-DARK-003 | 88 KB config blob fetched on every app mount | Medium |
+| UX-GLOBAL-018 | Notification badge fails AA in **both** modes, on every route | Medium |
+| UX-DARK-004 | Knowledge Center muted text fails AA in dark only | Low |
+
+Still unexamined in dark: **modals and drawers** (behind interactions the sweep
+did not perform), **mobile width**, and whether `RMATracker.jsx` — the public
+customer tracker — is deliberately light-only or merely unconverted.
 
 **Phases 4 through 9 of the brief.** No module received the per-screen redesign
 pass, and no click/keystroke baselines were ever measured — so the Definition of

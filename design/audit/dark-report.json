@@ -1,0 +1,322 @@
+[
+ {
+  "mod": "dashboard",
+  "route": "/",
+  "locale": "en",
+  "isDark": true,
+  "htmlDir": "ltr",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/dashboard/dashboard--en--dark.png"
+ },
+ {
+  "mod": "dashboard",
+  "route": "/",
+  "locale": "ar",
+  "isDark": true,
+  "htmlDir": "rtl",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/dashboard/dashboard--ar--dark.png"
+ },
+ {
+  "mod": "sales-funnel",
+  "route": "/leads",
+  "locale": "en",
+  "isDark": true,
+  "htmlDir": "ltr",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/sales-funnel/leads--en--dark.png"
+ },
+ {
+  "mod": "sales-funnel",
+  "route": "/leads",
+  "locale": "ar",
+  "isDark": true,
+  "htmlDir": "rtl",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/sales-funnel/leads--ar--dark.png"
+ },
+ {
+  "mod": "sales-funnel",
+  "route": "/pipeline",
+  "locale": "en",
+  "isDark": true,
+  "htmlDir": "ltr",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/sales-funnel/pipeline--en--dark.png"
+ },
+ {
+  "mod": "sales-funnel",
+  "route": "/pipeline",
+  "locale": "ar",
+  "isDark": true,
+  "htmlDir": "rtl",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/sales-funnel/pipeline--ar--dark.png"
+ },
+ {
+  "mod": "activities",
+  "route": "/activities",
+  "locale": "en",
+  "isDark": true,
+  "htmlDir": "ltr",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/activities/activities--en--dark.png"
+ },
+ {
+  "mod": "activities",
+  "route": "/activities",
+  "locale": "ar",
+  "isDark": true,
+  "htmlDir": "rtl",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/activities/activities--ar--dark.png"
+ },
+ {
+  "mod": "sales-docs",
+  "route": "/sales",
+  "locale": "en",
+  "isDark": true,
+  "htmlDir": "ltr",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/sales-docs/sales--en--dark.png"
+ },
+ {
+  "mod": "sales-docs",
+  "route": "/sales",
+  "locale": "ar",
+  "isDark": true,
+  "htmlDir": "rtl",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/sales-docs/sales--ar--dark.png"
+ },
+ {
+  "mod": "accounting",
+  "route": "/accounting",
+  "locale": "en",
+  "isDark": true,
+  "htmlDir": "ltr",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/accounting/accounting--en--dark.png"
+ },
+ {
+  "mod": "accounting",
+  "route": "/accounting",
+  "locale": "ar",
+  "isDark": true,
+  "htmlDir": "rtl",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/accounting/accounting--ar--dark.png"
+ },
+ {
+  "mod": "purchases",
+  "route": "/purchasing",
+  "locale": "en",
+  "isDark": true,
+  "htmlDir": "ltr",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/purchases/purchasing--en--dark.png"
+ },
+ {
+  "mod": "purchases",
+  "route": "/purchasing",
+  "locale": "ar",
+  "isDark": true,
+  "htmlDir": "rtl",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/purchases/purchasing--ar--dark.png"
+ },
+ {
+  "mod": "rma",
+  "route": "/rma-tickets",
+  "locale": "en",
+  "isDark": true,
+  "htmlDir": "ltr",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/rma/rma-tickets--en--dark.png"
+ },
+ {
+  "mod": "rma",
+  "route": "/rma-tickets",
+  "locale": "ar",
+  "isDark": true,
+  "htmlDir": "rtl",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/rma/rma-tickets--ar--dark.png"
+ },
+ {
+  "mod": "inventory",
+  "route": "/inventory",
+  "locale": "en",
+  "isDark": true,
+  "htmlDir": "ltr",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/inventory/inventory--en--dark.png"
+ },
+ {
+  "mod": "inventory",
+  "route": "/inventory",
+  "locale": "ar",
+  "isDark": true,
+  "htmlDir": "rtl",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/inventory/inventory--ar--dark.png"
+ },
+ {
+  "mod": "products",
+  "route": "/products",
+  "locale": "en",
+  "isDark": true,
+  "htmlDir": "ltr",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/products/products--en--dark.png"
+ },
+ {
+  "mod": "products",
+  "route": "/products",
+  "locale": "ar",
+  "isDark": true,
+  "htmlDir": "rtl",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/products/products--ar--dark.png"
+ },
+ {
+  "mod": "customers",
+  "route": "/customers",
+  "locale": "en",
+  "isDark": true,
+  "htmlDir": "ltr",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/customers/customers--en--dark.png"
+ },
+ {
+  "mod": "customers",
+  "route": "/customers",
+  "locale": "ar",
+  "isDark": true,
+  "htmlDir": "rtl",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/customers/customers--ar--dark.png"
+ },
+ {
+  "mod": "reports",
+  "route": "/reports",
+  "locale": "en",
+  "isDark": true,
+  "htmlDir": "ltr",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/reports/reports--en--dark.png"
+ },
+ {
+  "mod": "reports",
+  "route": "/reports",
+  "locale": "ar",
+  "isDark": true,
+  "htmlDir": "rtl",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/reports/reports--ar--dark.png"
+ },
+ {
+  "mod": "calendar",
+  "route": "/calendar",
+  "locale": "en",
+  "isDark": true,
+  "htmlDir": "ltr",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/calendar/calendar--en--dark.png"
+ },
+ {
+  "mod": "calendar",
+  "route": "/calendar",
+  "locale": "ar",
+  "isDark": true,
+  "htmlDir": "rtl",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/calendar/calendar--ar--dark.png"
+ },
+ {
+  "mod": "knowledge",
+  "route": "/knowledge-center",
+  "locale": "en",
+  "isDark": true,
+  "htmlDir": "ltr",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/knowledge/knowledge-center--en--dark.png"
+ },
+ {
+  "mod": "knowledge",
+  "route": "/knowledge-center",
+  "locale": "ar",
+  "isDark": true,
+  "htmlDir": "rtl",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/knowledge/knowledge-center--ar--dark.png"
+ },
+ {
+  "mod": "admin",
+  "route": "/control-panel",
+  "locale": "en",
+  "isDark": true,
+  "htmlDir": "ltr",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/admin/control-panel--en--dark.png"
+ },
+ {
+  "mod": "admin",
+  "route": "/control-panel",
+  "locale": "ar",
+  "isDark": true,
+  "htmlDir": "rtl",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/admin/control-panel--ar--dark.png"
+ },
+ {
+  "mod": "settings",
+  "route": "/account",
+  "locale": "en",
+  "isDark": true,
+  "htmlDir": "ltr",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/settings/account--en--dark.png"
+ },
+ {
+  "mod": "settings",
+  "route": "/account",
+  "locale": "ar",
+  "isDark": true,
+  "htmlDir": "rtl",
+  "lightSurfaces": [],
+  "lightSurfaceTotal": 0,
+  "file": "design/audit/screens-dark/settings/account--ar--dark.png"
+ }
+]
