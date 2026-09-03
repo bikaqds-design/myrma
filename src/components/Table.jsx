@@ -52,6 +52,13 @@ export default function Table({
   /** Sorting: { key, direction } plus a handler. Columns opt in with sortable. */
   sort,
   onSortChange,
+  /**
+   * Totals row. An array of cells: { span, content, align, numeric }.
+   * Spans must sum to the column count — the component checks, because the
+   * hand-written versions carried comments like "checkbox + # + code = 6" and
+   * a colSpan counted by hand goes silently wrong the day a column is added.
+   */
+  footer,
   stickyHeader = false,
   /** Screen-reader description of the table. */
   caption,
@@ -63,6 +70,18 @@ export default function Table({
     () => (selectable ? [{ key: '__select', width: '1%' }, ...columns] : columns),
     [columns, selectable]
   )
+
+  // A footer whose spans do not cover the table misaligns every cell after the
+  // gap, and does it silently. Fail loudly in development instead.
+  if (import.meta.env.DEV && footer) {
+    const span = footer.reduce((n, c) => n + (c.span || 1), 0)
+    if (span !== cols.length) {
+      console.error(
+        `Table: footer spans ${span} column(s) but the table has ${cols.length}. ` +
+          'The totals row will not line up.'
+      )
+    }
+  }
 
   const keyOf = (row, i) => (rowKey ? rowKey(row) : (row.id ?? i))
   const visibleKeys = (rows ?? []).map(keyOf)
@@ -234,6 +253,24 @@ export default function Table({
             })
           )}
         </tbody>
+
+        {footer && (rows ?? []).length > 0 && (
+          <tfoot>
+            <tr className="border-t-2 border-[#e6e9ef] dark:border-[#212a38] bg-[#f8f9fb] dark:bg-[#0f1520]">
+              {footer.map((cell, i) => (
+                <td
+                  key={i}
+                  colSpan={cell.span || 1}
+                  className={`px-4 py-2.5 text-xs font-semibold text-[#211f1b] dark:text-[#e8ebf0] ${
+                    ALIGN[cell.align] || ALIGN.start
+                  }`}
+                >
+                  {cell.numeric ? <Ltr>{cell.content}</Ltr> : cell.content}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   )

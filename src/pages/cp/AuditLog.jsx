@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import i18next from 'i18next'
 import { useQuery } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
+import { Table } from '../../components/ui'
 import toast from 'react-hot-toast'
 import { captureException } from '../../lib/sentry'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
@@ -78,13 +79,6 @@ export default function AuditLog() {
   const activeFilterCount = [filterUser, filterAction, filterFrom, filterTo].filter(Boolean).length
   const inp =
     'px-3 py-1.5 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent'
-
-  const HEADERS = [
-    t('cp.auditLog.dateTime'),
-    t('cp.auditLog.userCol'),
-    t('cp.auditLog.actionCol'),
-    t('cp.auditLog.detailsCol'),
-  ]
 
   if (loading)
     return (
@@ -193,45 +187,42 @@ export default function AuditLog() {
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
-              <tr>
-                {HEADERS.map((h, i) => (
-                  <th
-                    key={i}
-                    className="px-4 py-3 text-start text-xs font-semibold text-gray-500 uppercase"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-4 py-12 text-center text-gray-500">
-                    {t('cp.auditLog.noEntries')}
-                  </td>
-                </tr>
-              )}
-              {filtered.map((l, i) => (
-                <tr key={l.id || i} className="hover:bg-gray-50 text-sm">
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">
-                    {new Date(l.created_date).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-gray-700 font-medium">{l.user_email}</td>
-                  <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-xs font-mono">
-                      {l.action_type}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 max-w-sm truncate">
-                    {l.action_details || '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Table
+            caption={t('cp.auditLog.dateTime')}
+            stickyHeader
+            columns={[
+              {
+                key: 'when',
+                header: t('cp.auditLog.dateTime'),
+                cellClassName: 'whitespace-nowrap text-xs text-[#6c6760] dark:text-[#9aa4b2]',
+                cell: (l) => new Date(l.created_date).toLocaleString(),
+              },
+              {
+                key: 'user',
+                header: t('cp.auditLog.userCol'),
+                cellClassName: 'font-medium',
+                cell: (l) => l.user_email,
+              },
+              {
+                key: 'action',
+                header: t('cp.auditLog.actionCol'),
+                cell: (l) => (
+                  <span className="px-2 py-0.5 bg-indigo-50 dark:bg-[#1e1b4b] text-indigo-700 dark:text-[#a5b4fc] rounded text-xs font-mono">
+                    {l.action_type}
+                  </span>
+                ),
+              },
+              {
+                key: 'details',
+                header: t('cp.auditLog.detailsCol'),
+                cellClassName: 'max-w-sm truncate text-[#6c6760] dark:text-[#9aa4b2]',
+                cell: (l) => l.action_details || '—',
+              },
+            ]}
+            rows={filtered}
+            rowKey={(l) => l.id}
+            empty={{ title: t('cp.auditLog.noEntries') }}
+          />
         </div>
       </div>
     </div>

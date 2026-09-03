@@ -53,7 +53,25 @@ The five left are the codemod and multi-day items. Nothing quick remains.
 
 | # | ID | Issue | Sev | Why it is L |
 |---|---|---|---|---|
-| 1 | UX-GLOBAL-007 | **Primitive built and tested; 71 of 72 call sites still to migrate** | High | Mechanical per-caller work now that the component exists |
+| 1 | UX-GLOBAL-007 | **Primitive built and tested; 4 of ~64 real call sites migrated** | High | Per-caller translation of bespoke JSX into column config — not mechanisable |
+
+### Why the table migration cannot be automated
+
+The 68 `<table>` elements are not 68 copies of one thing. Each has its own
+columns, conditional cell rendering, nested components, row actions and
+formatting. Turning that into a column config is a reading-and-rewriting job per
+call site, not a find-and-replace — a codemod would produce code that compiles
+and renders the wrong thing.
+
+Two carve-outs found during the first batch:
+
+- **`cp/PDFLayout.jsx` (2 tables) must not migrate.** They render the printed
+  document preview, which has its own layout rules and no dark mode.
+- **`components/Skeleton.jsx` (2)** are loading placeholders, now superseded by
+  the primitive's own skeleton rows.
+
+Editable cells are fine — `cell` is a render function, so inputs inside rows
+work unchanged.
 | 2 | UX-GLOBAL-008 | Kit adoption 29–57% | High | ~250 hand-rolled controls to migrate |
 | 3 | UX-GLOBAL-001 | 2,362 raw hex values | High | Needs the semantic token set defined first, with a dark value per role |
 | 5 | UX-GLOBAL-006 | 101 of 115 page files have no empty state | High | Per-screen copy and a primary action each |

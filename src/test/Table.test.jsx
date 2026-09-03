@@ -263,3 +263,56 @@ describe('containment', () => {
     expect(cap.className).toContain('sr-only')
   })
 })
+
+describe('the totals footer', () => {
+  it('renders cells with the spans given', () => {
+    const { container } = render(
+      <Table
+        columns={COLUMNS}
+        rows={ROWS}
+        footer={[{ span: 1, content: 'Total' }, { content: '17', align: 'end', numeric: true }]}
+      />
+    )
+    const cells = container.querySelectorAll('tfoot td')
+    expect(cells.length).toBe(2)
+    expect(cells[0].getAttribute('colspan')).toBe('1')
+    expect(cells[1].textContent).toBe('17')
+  })
+
+  it('bidi-isolates a numeric total', () => {
+    const { container } = render(
+      <Table
+        columns={COLUMNS}
+        rows={ROWS}
+        footer={[{ content: 'Total' }, { content: '+8%', align: 'end', numeric: true }]}
+      />
+    )
+    expect(container.querySelector('tfoot [dir="ltr"]').textContent).toBe('+8%')
+  })
+
+  /**
+   * The reason this exists. The hand-written footers carried comments counting
+   * columns by hand; the day someone adds a column, every footer cell after the
+   * gap shifts and nothing says so.
+   */
+  it('complains when the spans do not cover the table', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    render(<Table columns={COLUMNS} rows={ROWS} footer={[{ span: 5, content: 'Total' }]} />)
+    expect(err).toHaveBeenCalledWith(expect.stringContaining('footer spans 5'))
+    err.mockRestore()
+  })
+
+  it('stays quiet when the spans are right', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    render(<Table columns={COLUMNS} rows={ROWS} footer={[{ span: 2, content: 'Total' }]} />)
+    expect(err).not.toHaveBeenCalled()
+    err.mockRestore()
+  })
+
+  it('is hidden when there is nothing to total', () => {
+    const { container } = render(
+      <Table columns={COLUMNS} rows={[]} empty={{ title: 'None' }} footer={[{ span: 2, content: 'Total' }]} />
+    )
+    expect(container.querySelector('tfoot')).toBeNull()
+  })
+})

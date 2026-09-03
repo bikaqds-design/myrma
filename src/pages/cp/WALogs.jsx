@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
-import { Spinner } from '../../components/ui'
+import { Spinner, Table } from '../../components/ui'
 
 const STATUS_STYLES = {
   pending:   'bg-gray-100 text-gray-600 dark:bg-[#1a2230] dark:text-[#9aa4b2]',
@@ -208,59 +208,89 @@ export default function WALogs() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-[#f8f9fb] dark:bg-[#0f1520] border-b border-[#e6e9ef] dark:border-[#212a38]">
-                <tr>
-                  {[
-                    t('cp.waLogs.dateCol'),
-                    t('cp.waLogs.recipientCol'),
-                    t('cp.waLogs.eventCol'),
-                    t('cp.waLogs.providerCol'),
-                    t('cp.waLogs.statusCol'),
-                    t('cp.waLogs.actionsCol'),
-                  ].map((h, i) => (
-                    <th key={i} className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase tracking-wide whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
-                {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520] transition-colors">
-                    <td className="px-4 py-3 text-xs text-gray-500 dark:text-[#9aa4b2] whitespace-nowrap">{fmt(log.sent_at)}</td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-gray-800 dark:text-[#e8ebf0] font-mono text-xs">{log.recipient}</p>
-                      {log.recipient_name && <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{log.recipient_name}</p>}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-600 dark:text-[#9aa4b2] whitespace-nowrap">{log.event_type}</td>
-                    <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700 dark:bg-[#1a2230] dark:text-[#a5b4fc] capitalize">{log.provider}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col gap-1">
-                        <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_STYLES[log.delivery_status] ?? STATUS_STYLES.pending}`}>
-                          {log.delivery_status}
-                        </span>
-                        {log.error_message && (
-                          <p className="text-[10px] text-red-500 dark:text-red-400 max-w-[160px] truncate" title={log.error_message}>
-                            {log.error_message}
-                          </p>
-                        )}
-                        {log.delivered_at && <p className="text-[10px] text-gray-400 dark:text-[#a4acb7]">✓ {fmt(log.delivered_at)}</p>}
-                        {log.read_at      && <p className="text-[10px] text-emerald-500">👁 {fmt(log.read_at)}</p>}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {log.delivery_status === 'failed' && (
-                        <button onClick={() => handleRetry(log)} disabled={retrying === log.id}
-                          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-[#a5b4fc] border border-indigo-200 dark:border-[#212a38] rounded-lg hover:bg-indigo-50 dark:hover:bg-[#1a2230] transition-colors disabled:opacity-50">
-                          {retrying === log.id ? <Spinner size="sm" /> : t('cp.waLogs.retry')}
-                        </button>
+            <Table
+              caption={t('cp.waLogs.statusCol')}
+              columns={[
+                {
+                  key: 'sent',
+                  header: t('cp.waLogs.dateCol'),
+                  cellClassName: 'text-xs text-gray-500 dark:text-[#9aa4b2] whitespace-nowrap',
+                  cell: (log) => fmt(log.sent_at),
+                },
+                {
+                  key: 'recipient',
+                  header: t('cp.waLogs.recipientCol'),
+                  cell: (log) => (
+                    <>
+                      {/* A phone number inside Arabic text reorders without isolation. */}
+                      <p className="font-medium text-gray-800 dark:text-[#e8ebf0] font-mono text-xs" dir="ltr">
+                        {log.recipient}
+                      </p>
+                      {log.recipient_name && (
+                        <p className="text-xs text-gray-500 dark:text-[#9aa4b2]">{log.recipient_name}</p>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </>
+                  ),
+                },
+                {
+                  key: 'event',
+                  header: t('cp.waLogs.eventCol'),
+                  cellClassName: 'text-xs text-gray-600 dark:text-[#9aa4b2] whitespace-nowrap',
+                  cell: (log) => log.event_type,
+                },
+                {
+                  key: 'provider',
+                  header: t('cp.waLogs.providerCol'),
+                  cell: (log) => (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700 dark:bg-[#1e1b4b] dark:text-[#a5b4fc]">
+                      {log.provider}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'status',
+                  header: t('cp.waLogs.statusCol'),
+                  cell: (log) => (
+                    <div className="flex flex-col gap-1">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_STYLES[log.delivery_status] || ''}`}
+                      >
+                        {log.delivery_status}
+                      </span>
+                      {log.error_message && (
+                        <p
+                          className="text-[10px] text-red-500 dark:text-red-400 max-w-[160px] truncate"
+                          title={log.error_message}
+                        >
+                          {log.error_message}
+                        </p>
+                      )}
+                      {log.delivered_at && (
+                        <p className="text-[10px] text-gray-400 dark:text-[#a4acb7]">✓ {fmt(log.delivered_at)}</p>
+                      )}
+                      {log.read_at && <p className="text-[10px] text-emerald-500">👁 {fmt(log.read_at)}</p>}
+                    </div>
+                  ),
+                },
+                {
+                  key: 'actions',
+                  header: t('cp.waLogs.actionsCol'),
+                  cell: (log) =>
+                    log.delivery_status === 'failed' ? (
+                      <button
+                        onClick={() => handleRetry(log)}
+                        disabled={retrying === log.id}
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-600 dark:text-[#a5b4fc] rounded-lg hover:bg-indigo-50 dark:hover:bg-[#1e1b4b] disabled:opacity-50"
+                      >
+                        {retrying === log.id ? <Spinner size="sm" /> : t('cp.waLogs.retry')}
+                      </button>
+                    ) : null,
+                },
+              ]}
+              rows={logs}
+              rowKey={(log) => log.id}
+              empty={{ preset: 'search' }}
+            />
           </div>
         )}
       </div>
