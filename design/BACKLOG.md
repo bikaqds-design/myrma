@@ -2,7 +2,8 @@
 
 Findings from `design/audit/01-AUDIT.md` that are not closed, and why.
 
-**Status: 27 of 44 closed, 3 retracted, 1 won't-fix. 0 Critical, 3 High, 1 Medium, 0 Low remaining.**
+**Status: 27 of 47 closed, 3 retracted, 1 won't-fix. 0 Critical, 3 High, 2 Medium, 2 Low remaining.**
+(Three search findings added 2026-09-03.)
 
 The single remaining Medium is UX-GLOBAL-009 (spinners rather than skeletons in
 27 files), and it shrinks on its own as tables move to the `Table` primitive,
@@ -87,6 +88,24 @@ See `design/audit/01-AUDIT.md` for the full table. The notable ones:
 | ✅ UX-DASH-004 | ~~Unclear whether widgets link~~ **CLOSED** — "View all" was an inert span; now navigates | Medium |
 | UX-GLOBAL-009 | Loading is a spinner in 27 files, a skeleton in 5 | Medium |
 | ⏹ UX-DASH-003 | ~~Sparklines run left-to-right in RTL~~ **WON'T FIX** (decided 2026-09-03) | — |
+
+---
+
+## Search and filters — audited 2026-09-03
+
+Full report: `design/audit/04-SEARCH-AND-FILTERS.md`. Thirty-seven files carry a
+search box; two real findings, one latent.
+
+| ID | Issue | Sev | Effort |
+|---|---|---|---|
+| UX-SEARCH-001 | Search and filters are not in the URL — lost on refresh, not shareable, back does not undo them. 0 of 37 files use `useSearchParams` | Medium | M |
+| UX-SEARCH-002 | No clear control on a search box, and only 2 of ~32 inputs are `type="search"` so the native one is absent too | Low | S |
+| UX-SEARCH-003 | Arabic not normalised for search (`احمد` will not find `أحمد`). **Latent** — zero Arabic text in 888 customers, 406 products, 33 leads | Low | S |
+
+Three candidates were dropped after measuring: debouncing is already correct
+(220 ms with a 2-character minimum in `CommandPalette`), page search runs at
+27–38 ms over 888 records, and the Customers placeholder honours all four fields
+it promises.
 
 ---
 
