@@ -7,7 +7,7 @@
  */
 import fs from 'fs'
 
-const RATCHET = 2401
+const RATCHET = 2395
 const report = JSON.parse(fs.readFileSync('eslint-ui.json', 'utf8'))
 const hits = report.flatMap(f =>
   f.messages

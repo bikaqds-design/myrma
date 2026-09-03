@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
 import { useURLTab } from '../../hooks/useURLTab'
-import { Button, PageHeader } from '../../components/ui'
+import { Button, PageHeader, Table } from '../../components/ui'
 import { PageSkeleton } from '../../components/Skeleton'
 import { RecordPaymentModal } from './_modals'
 import { VoidModal } from '../SalesDocuments/_modals'
@@ -396,41 +396,35 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
           </div>
 
           <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[#e6e9ef] dark:border-[#212a38] bg-[#f8f9fb] dark:bg-[#0f1520]">
-                  <th className="px-4 py-3 text-start text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colCustomer')}</th>
-                  {BUCKET_KEYS.map((b) => (
-                    <th key={b} className="px-4 py-3 text-end text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t(BUCKET_LABEL_KEY[b])}</th>
-                  ))}
-                  <th className="px-4 py-3 text-end text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase">{t('accounting.colTotal')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {agingByCustomer.length === 0 ? (
-                  <tr>
-                    <td colSpan={6}>
-                      <div className="py-16 flex flex-col items-center text-center">
-                        <svg className="w-12 h-12 text-[#746f65] dark:text-[#a4acb7] mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.4} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <p className="text-sm font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{t('accounting.noOutstanding')}</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  agingByCustomer.map((r) => (
-                    <tr key={r.customer_id} className="border-b border-[#f0f2f6] dark:border-[#1a2230] last:border-0 hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]">
-                      <td className="px-4 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{customerName(r.customer_id)}</td>
-                      {BUCKET_KEYS.map((b) => (
-                        <td key={b} className="px-4 py-3 text-end text-[#6c6760] dark:text-[#9aa4b2]">{r[b] > 0 ? fmtMoney(r[b]) : '—'}</td>
-                      ))}
-                      <td className="px-4 py-3 text-end font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(r.total)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+            <Table
+              caption={t('accounting.tabArAging')}
+              columns={[
+                {
+                  key: 'customer',
+                  header: t('accounting.colCustomer'),
+                  cell: (r) => customerName(r.customer_id),
+                },
+                ...BUCKET_KEYS.map((b) => ({
+                  key: b,
+                  header: t(BUCKET_LABEL_KEY[b]),
+                  align: 'end',
+                  numeric: true,
+                  cellClassName: 'text-[#6c6760] dark:text-[#9aa4b2]',
+                  cell: (r) => (r[b] > 0 ? fmtMoney(r[b]) : '—'),
+                })),
+                {
+                  key: 'total',
+                  header: t('accounting.colTotal'),
+                  align: 'end',
+                  numeric: true,
+                  cellClassName: 'font-semibold',
+                  cell: (r) => fmtMoney(r.total),
+                },
+              ]}
+              rows={agingByCustomer}
+              rowKey={(r) => r.customer_id}
+              empty={{ title: t('accounting.noOutstanding') }}
+            />
           </div>
         </>
       )}

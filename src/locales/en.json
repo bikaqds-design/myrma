@@ -4272,5 +4272,9 @@
     "notFound": "That record no longer exists.",
     "network": "Can't reach the server. Check your connection.",
     "rateLimited": "Too many attempts. Please wait a moment and try again."
+  },
+  "table": {
+    "selectAll": "Select all rows",
+    "selectRow": "Select row"
   }
 }

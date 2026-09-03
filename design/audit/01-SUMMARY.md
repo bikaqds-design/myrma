@@ -53,7 +53,7 @@ The five left are the codemod and multi-day items. Nothing quick remains.
 
 | # | ID | Issue | Sev | Why it is L |
 |---|---|---|---|---|
-| 1 | UX-GLOBAL-007 | No Table primitive; 72 raw `<table>` in 50 files | High | Build the component, then migrate 72 call sites |
+| 1 | UX-GLOBAL-007 | **Primitive built and tested; 71 of 72 call sites still to migrate** | High | Mechanical per-caller work now that the component exists |
 | 2 | UX-GLOBAL-008 | Kit adoption 29–57% | High | ~250 hand-rolled controls to migrate |
 | 3 | UX-GLOBAL-001 | 2,362 raw hex values | High | Needs the semantic token set defined first, with a dark value per role |
 | 5 | UX-GLOBAL-006 | 101 of 115 page files have no empty state | High | Per-screen copy and a primary action each |
@@ -71,7 +71,7 @@ the codemods they protect:
 | Physical CSS properties in className | **0** |
 | Raw hex in className | 2,365 |
 | Hardcoded user-visible JSX text | 36 |
-| **Total (ratchet in `lint:ci`)** | **2,401** |
+| **Total (ratchet in `lint:ci`)** | **2,395** |
 
 `npm run lint:ui` reports the breakdown. The number can fall and never rise;
 when it reaches zero the rules become errors. That 36 is the honest measure of
