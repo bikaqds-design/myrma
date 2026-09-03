@@ -29,6 +29,33 @@ export default {
   ],
   theme: {
     extend: {
+      /**
+       * A named stacking ladder (UX-GLOBAL-002).
+       *
+       * Overlay z-indexes were eight ad-hoc values — z-50 beside z-[60], z-[70],
+       * z-[200], z-[400] and z-[500]. The ORDER happened to be right, so nothing
+       * stacked wrong; the problem is that the next person adding an overlay has
+       * nothing to read and picks a number by guessing higher than whatever they
+       * saw last. That is how the ladder got to 500.
+       *
+       * Named rungs, with gaps left between them so something can be slotted in
+       * without renumbering.
+       */
+      zIndex: {
+        dropdown: '100',   // menus, comboboxes, popovers anchored to a control
+        overlay: '200',    // modal and drawer backdrops
+        modal: '300',      // the dialog itself
+        // A modal opened from inside another one. TransferModal and
+        // ProductDetailModal sat at z-[70] against z-[60] for the surrounding
+        // screen's own modal, and WarehousesTab renders both — collapsing them
+        // to one rung would have let DOM order decide, silently reversing it.
+        modalNested: '350',
+        confirm: '400',    // a confirmation opened FROM a modal, so it sits above
+        fullscreen: '500', // camera scanner and similar takeovers
+        onboarding: '600', // first-run wizard, above everything
+        toast: '700',      // feedback must never be hidden by what triggered it
+      },
+
       screens: {
         'xs': '475px',
       },

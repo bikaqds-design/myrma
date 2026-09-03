@@ -36,7 +36,7 @@ export default function ConfirmDialog({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center">
+    <div className="fixed inset-0 z-confirm flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
       <div className="relative bg-white dark:bg-[#121823] rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 border border-gray-100 dark:border-[#212a38]">
         <div className="flex items-start gap-4">

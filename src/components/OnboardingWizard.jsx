@@ -94,7 +94,7 @@ export default function OnboardingWizard({ userEmail, onClose, onNavigate }) {
   const inp = 'w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] placeholder-[#746f65] dark:placeholder-[#a4acb7] focus:outline-none focus:border-[#4338ca] dark:focus:border-[#a5b4fc] transition-colors'
 
   return (
-    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-onboarding flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={dismiss} />
       <div className="relative w-full max-w-md bg-white dark:bg-[#121823] rounded-2xl shadow-2xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden">
 

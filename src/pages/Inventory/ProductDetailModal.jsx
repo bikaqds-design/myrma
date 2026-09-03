@@ -44,7 +44,7 @@ export function TicketPreviewModal({ rmaNumber, onClose, onOpenFull }) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/60 z-modalNested flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div

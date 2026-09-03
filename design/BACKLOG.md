@@ -2,7 +2,13 @@
 
 Findings from `design/audit/01-AUDIT.md` that are not closed, and why.
 
-**Status: 25 of 44 closed. 0 Critical, 4 High, 11 Medium, 4 Low remaining.**
+**Status: 27 of 44 closed, 3 further retracted. 0 Critical, 3 High, 1 Medium, 1 Low remaining.**
+
+Of the six Medium/Low findings checked on 2026-09-03, **three were wrong as
+written** and were retracted after measurement, two were fixed, and one needs a
+product decision. That is now five retractions across this audit — the pattern is
+consistent: findings raised from reading source or screenshots have a much worse
+hit rate than findings raised from measuring the running app.
 (UX-GLOBAL-017 retracted; UX-PAGE-001/002 added and closed — see `design/audit/03-PAGINATION.md`.)
 Every dark-mode finding is closed; both light and dark measure 0 AA contrast failures.
 (Five dark-mode findings added 2026-09-03.)
@@ -59,8 +65,13 @@ See `design/audit/01-AUDIT.md` for the full table. The notable ones:
 
 | ID | Issue | Sev |
 |---|---|---|
-| ~~UX-GLOBAL-017~~ | ~~Pagination arrows point the wrong way in Arabic~~ **RETRACTED** — measured and correct | — |
-| UX-GLOBAL-016 | 21 Arabic values identical to their English source | Low |
+| ~~UX-GLOBAL-017~~ | ~~Pagination arrows wrong way in Arabic~~ **RETRACTED** — measured, correct | — |
+| ~~UX-GLOBAL-016~~ | ~~21 Arabic values identical to English~~ **RETRACTED** — 23 of 26 legitimately identical (code, addresses, format examples), 2 are language names correctly in their own script, 1 is a technical term | — |
+| ~~UX-ONBOARD-004~~ | ~~Onboarding blocks the screen for every new user~~ **RETRACTED as written** — gated to admin/super_admin only, and dismissible | — |
+| ✅ UX-GLOBAL-002 | ~~No z-index ladder~~ **CLOSED** — named rungs in tailwind.config, relative order preserved | Medium |
+| ✅ UX-DASH-004 | ~~Unclear whether widgets link~~ **CLOSED** — "View all" was an inert span; now navigates | Medium |
+| UX-GLOBAL-009 | Loading is a spinner in 27 files, a skeleton in 5 | Medium |
+| UX-DASH-003 | Sparklines run left-to-right in RTL — **needs a decision**, see below | Low |
 
 ---
 

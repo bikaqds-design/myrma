@@ -17,7 +17,7 @@ Severity per Appendix B. Effort: `S` < 1h, `M` half day, `L` multi-day.
 | ID | Screen | Issue | Lens | Sev | Eff | Fix summary | Files |
 |---|---|---|---|---|---|---|---|
 | UX-GLOBAL-001 | All | 125 distinct hardcoded hex colours and 5,648 arbitrary Tailwind values bypass the 52 tokens already declared | Consistency | High | L | Map the top 20 colours (covering ~85% of uses) to semantic tokens; codemod; lint against raw hex | `src/styles/tokens.css`, app-wide |
-| UX-GLOBAL-002 | All | No z-index ladder. Tailwind `z-10…z-50` coexists with `z-[60]`, `z-[70]`, `z-[200]`, `z-[400]`, `z-[500]` | Consistency | Medium | S | Define 6 named layers; replace all | app-wide |
+| ✅ UX-GLOBAL-002 (CLOSED — named z-index ladder) | All | No z-index ladder. Tailwind `z-10…z-50` coexists with `z-[60]`, `z-[70]`, `z-[200]`, `z-[400]`, `z-[500]` | Consistency | Medium | S | Define 6 named layers; replace all | app-wide |
 | ✅ UX-GLOBAL-003 (CLOSED e49bde5) | All (RTL) | Signed numbers and trailing punctuation render wrong in Arabic. `+8%` displays as `8%+`; `Forgot password?` displays as `?Forgot password` | RTL | **Critical** | M | Apply the existing `<Ltr>` wrapper to every number, currency, percentage, SKU, serial, phone and ID | `src/components/ui.jsx` (Ltr), all value renderers |
 | ✅ UX-GLOBAL-004 (CLOSED — codemod) | All (RTL) | 378 `text-left`/`text-right` against 8 `text-start`/`text-end`; 103 `ml-/mr-`, 85 `left-/right-` | RTL | High | L | Codemod physical → logical; add an ESLint rule to prevent regression | app-wide, `src/styles/rtl.css` |
 | ✅ UX-GLOBAL-005 (CLOSED 18e6ed5) | All | 40 sites dump raw Postgres/Supabase errors into toasts | Feedback | High | M | Central `toUserMessage(error)` mapping constraint/RLS classes to AR+EN copy | `CommentPanel.jsx:96,125,151`, `ProductDocuments.jsx:92,122`, +35 |
@@ -28,7 +28,7 @@ Severity per Appendix B. Effort: `S` < 1h, `M` half day, `L` multi-day.
 | ✅ UX-GLOBAL-010 (CLOSED c543dee) | All | Toasts hardcode `position="top-right"` in all 8 mounts regardless of direction | RTL | Medium | S | Derive position from direction (top-left in RTL) | `src/App.jsx:1074–1175` |
 | ✅ UX-GLOBAL-011 (CLOSED c543dee) | All | The app-shell Toaster is the only one without `toastOptions`, so in-app toasts are styled differently from auth/tracker toasts | Consistency | Low | S | Pass `toastOptions` to the shell mount | `src/App.jsx:1175` |
 | UX-GLOBAL-012 | — | ~~`ar.json` has more keys than `en.json`~~ **RETRACTED — not a defect.** The 47 extra Arabic keys are CLDR plural forms (`_zero/_one/_two/_few/_many`) that Arabic requires and English does not. Correct i18n practice. | i18n | ~~Medium~~ **None** | — | No action | `src/locales/*.json` |
-| UX-GLOBAL-016 | — | 21 keys have an Arabic value identical to the English. Most are legitimate (CLI commands, `English (en)`, `VIP`, phone placeholders) but a few are genuinely untranslated, e.g. `cp.webhooks.header = "Webhooks"` | i18n | Low | S | Review the 21; translate the real ones, add a comment marker to the deliberate ones | `src/locales/ar.json` |
+| ~~UX-GLOBAL-016~~ (RETRACTED — 23 of 26 are legitimately identical, 2 are language names correctly in their own script, 1 is a technical term with no standard Arabic form) | — | 21 keys have an Arabic value identical to the English. Most are legitimate (CLI commands, `English (en)`, `VIP`, phone placeholders) but a few are genuinely untranslated, e.g. `cp.webhooks.header = "Webhooks"` | i18n | Low | S | Review the 21; translate the real ones, add a comment marker to the deliberate ones | `src/locales/ar.json` |
 | ~~UX-GLOBAL-017~~ | Lists with pagination (RTL) | ~~Pagination arrows point the wrong way in Arabic~~ **RETRACTED — measured in the running app and they are correct.** Previous carries a right-arrow at x=196, Next a left-arrow at x=10; in RTL that is right. Raised from misreading a screenshot. | RTL | ~~Medium~~ **None** | — | No action | — |
 | ✅ UX-GLOBAL-013 (CLOSED c543dee) | — | Empty `src/components/ui/Form/` and `ui/Table/` directories, untracked by git | Consistency | Low | S | Delete, or build the Table that was intended | `src/components/ui/` |
 
@@ -88,7 +88,7 @@ adding locale keys. UX-AUTH-002 is my defect.
 | ✅ UX-DASH-001 (CLOSED c543dee) | `/` (RTL) | Date-range chips "All / 30d / 7d / Today" remain untranslated English and in LTR order while the rest of the page is Arabic | i18n | High | S | Translate; order by direction | `src/pages/Dashboard.jsx` |
 | ✅ UX-DASH-002 (CLOSED c543dee) | `/` (RTL) | Trend deltas render `8%+ ↑` — instance of UX-GLOBAL-003 | RTL | Critical | S | Wrap in `<Ltr>` | `src/pages/Dashboard.jsx` |
 | UX-DASH-003 | `/` | Sparklines run left-to-right in RTL, so time flows against reading direction | RTL | Low | M | Mirror the time axis in RTL, or state the convention deliberately | `DashboardCharts.jsx` |
-| UX-DASH-004 | `/` | Widgets show counts but it is not established whether each links to the filtered list behind it | Flow | Medium | M | Verify every widget deep-links | `src/pages/Dashboard.jsx` |
+| ✅ UX-DASH-004 (CLOSED — "View all" was an inert span; now a real link) | `/` | Widgets show counts but it is not established whether each links to the filtered list behind it | Flow | Medium | M | Verify every widget deep-links | `src/pages/Dashboard.jsx` |
 
 `[rendered, not persisted]` — verified live in Arabic at 1440×900.
 
@@ -103,7 +103,7 @@ Evidence: `design/audit/screens/rma/rma-tickets--admin--ar--desktop.png`
 | ✅ UX-ONBOARD-001 (CLOSED e49bde5) | Onboarding modal | Modal body is English inside an Arabic RTL page: "Welcome to myCRM!", "Your RMA and repair management system is ready…", "Reports & analytics", "Next", "Skip". Only 4 `t()` calls in the file | i18n | **Critical** | M | Route all copy through `t()` | `src/components/OnboardingWizard.jsx` |
 | ✅ UX-ONBOARD-002 (CLOSED e49bde5) | Onboarding modal | Bidi punctuation: renders `!Welcome to myCRM` and `.minutes` — terminal punctuation jumps to the leading edge | RTL | Critical | S | Wrap English strings in `<Ltr>`, or translate (which removes the cause) | same |
 | ✅ UX-ONBOARD-003 (CLOSED e49bde5) | Onboarding modal | `→ Next` arrow points right in RTL, i.e. backwards | RTL | High | S | Mirror directional glyphs by direction, or use a logical icon | same |
-| UX-ONBOARD-004 | Onboarding modal | Blocks the whole screen on first login for every new user, over the ticket table | Flow | Medium | S | Make dismissable without covering the primary table, or defer to first idle | same |
+| ~~UX-ONBOARD-004~~ (RETRACTED as written — the wizard is gated to admin/super_admin, not "every new user", and is dismissible) | Onboarding modal | Blocks the whole screen on first login for every new user, over the ticket table | Flow | Medium | S | Make dismissable without covering the primary table, or defer to first idle | same |
 
 This is the **first thing a newly invited Arabic-speaking colleague sees** after
 setting their password — an English modal with punctuation on the wrong side and

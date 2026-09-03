@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, supabase } from '../api/supabaseClient'
@@ -246,11 +247,23 @@ function StatusPill({ status, dark }) {
   )
 }
 
-function CardHead({ title, action, tk }) {
+function CardHead({ title, action, to, tk }) {
+  // `action` is a caption for most widgets — "441 units", "Top 5 by close rate"
+  // — and those are correctly not interactive. But "View all" on Recent Tickets
+  // rendered as the same inert <span>: it read as a link and did nothing
+  // (UX-DASH-004). A `to` makes it a real link; without one it stays a caption.
+  const style = { fontSize: 11.5, fontWeight: 600, color: to ? tk.accent : tk.textFaint }
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
       <h3 style={{ margin: 0, fontSize: 13.5, fontWeight: 650, color: tk.text, letterSpacing: -0.1 }}>{title}</h3>
-      {action && <span style={{ fontSize: 11.5, fontWeight: 600, color: tk.textFaint }}>{action}</span>}
+      {action &&
+        (to ? (
+          <Link to={to} style={{ ...style, textDecoration: 'none' }}>
+            {action}
+          </Link>
+        ) : (
+          <span style={style}>{action}</span>
+        ))}
     </div>
   )
 }
@@ -1020,7 +1033,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
 
     recent_tickets: () => (
       <>
-        <CardHead title={t('dashboard.recentTickets')} action={t('common.viewAll')} tk={tk} />
+        <CardHead title={t('dashboard.recentTickets')} action={t('common.viewAll')} to="/rma-tickets" tk={tk} />
         {recentTickets.length === 0
           ? <p style={{ color: tk.textFaint, fontSize: 13, textAlign: 'center', padding: '20px 0' }}>{t('dashboard.noTicketsYet')}</p>
           : recentTickets.map((row, i) => (

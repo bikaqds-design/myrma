@@ -367,7 +367,7 @@ export function CreateBatchModal({ count, brands, onConfirm, onClose }) {
     setSaving(false)
   }
   return (
-    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-modal flex items-center justify-center p-4">
       <div className="bg-white dark:bg-[#121823] rounded-2xl shadow-2xl w-full max-w-sm">
         <div className="p-6 border-b border-gray-100 dark:border-[#212a38]">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-[#e8ebf0]">{t('inventory.createMfrBatch')}</h3>

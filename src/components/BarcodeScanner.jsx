@@ -74,7 +74,7 @@ export default function BarcodeScanner({ onScan, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[400] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-fullscreen flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80" onClick={onClose} />
       <div className="relative w-full max-w-sm bg-[#121823] rounded-2xl overflow-hidden shadow-2xl border border-[#212a38]">
 
