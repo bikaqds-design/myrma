@@ -10,7 +10,7 @@ things that looked wrong in the source and turned out to be correct.
 
 ## What is actually wrong
 
-### UX-SEARCH-001 — Search and filters are not in the URL (Medium)
+### ✅ UX-SEARCH-001 — Search and filters are not in the URL (Medium) — PARTLY CLOSED
 
 **Verified by doing it:** typed `computer` into the Customers search, refreshed,
 and the search box came back empty with the URL unchanged at
@@ -29,8 +29,48 @@ Consequences, all of them ordinary daily friction:
 The brief asks for exactly this: *"filters reflected in the URL so views are
 shareable and survive refresh."*
 
-**Effort: M.** The pattern is one hook applied per list page; the state already
-exists in each page's `useState`, it simply is not mirrored to the URL.
+**Fixed on Customers and RMA Tickets; the remaining list pages follow the same
+recipe.**
+
+`src/lib/useUrlState.js` is a drop-in replacement for `useState` that keeps the
+value in the query string:
+
+```js
+const [q, setQ] = useState('')          // becomes
+const [q, setQ] = useUrlState('q', '')
+```
+
+Verified in the running app: `?q=computer&page=2` on Customers restores the
+search box and lands on "Showing 26–50 of 56"; changing the search then resets to
+page 1 and drops `page` from the URL. On RMA Tickets, `?status=Open` returns
+exactly the 5 Open tickets the database holds, and typing in the search box now
+writes `q=` into the URL.
+
+RMA Tickets turned out to already read `status` and `overdue` from
+`window.location.search` on mount — a one-way link, so someone could be *sent* to
+a filtered view but could not produce one. The param names are unchanged, so the
+existing inbound links still work.
+
+**Two bugs were found by testing rather than by review:**
+
+*React Router does not queue functional updates.* `setSearchParams` applies each
+call against the last committed location, so two setters in one handler — the
+ordinary case, since changing a filter also resets the page — both start from the
+same snapshot and the second discards the first. Writes now accumulate in a
+module-level pending object and flush once per tick. A test that clicked the two
+setters separately passed against the broken version, because React re-renders
+between events; only firing both in one handler exposed it.
+
+*StrictMode defeats a mount flag.* The first attempt at "reset the page only
+after mount" used a `useRef` flag. React double-invokes effects in development,
+so the first invocation consumed the flag and the second reset the page anyway —
+meaning a shared link would have dropped its page number locally but worked in
+production. The reset now compares the actual filter values.
+
+**Trade-off, stated plainly:** updates use `replace` rather than `push`, so Back
+does not step through filter changes. The alternative leaves one history entry
+per keystroke, which is worse. The shareable-link and survives-refresh wins are
+unaffected.
 
 ### UX-SEARCH-002 — No way to clear a search (Low)
 

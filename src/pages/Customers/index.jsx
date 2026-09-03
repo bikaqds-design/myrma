@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, db, storage } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
+import { useUrlState } from '../../lib/useUrlState'
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 import ExportMenu from '../../components/ExportMenu'
@@ -52,14 +53,16 @@ export default function Customers({
   })
 
   const [filteredCustomers, setFilteredCustomers] = useState([])
-  const [searchQuery, setSearchQuery] = useState('')
+  // Filter state lives in the URL so a filtered view can be shared and
+  // survives a refresh (UX-SEARCH-001).
+  const [searchQuery, setSearchQuery] = useUrlState('q', '')
   const [selectedCustomers, setSelectedCustomers] = useState([])
   const [showAddCustomer, setShowAddCustomer] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState(null)
   const [openMenuId, setOpenMenuId] = useState(null)
-  const [filterStatus, setFilterStatus] = useState('')
-  const [filterType, setFilterType] = useState('')
-  const [filterCompany, setFilterCompany] = useState('')
+  const [filterStatus, setFilterStatus] = useUrlState('status', '')
+  const [filterType, setFilterType] = useUrlState('type', '')
+  const [filterCompany, setFilterCompany] = useUrlState('company', '')
   const [showFilters, setShowFilters] = useState(false)
   // usersList now comes from useQuery above
   const [customerForm, setCustomerForm] = useState(EMPTY_FORM)
@@ -68,7 +71,7 @@ export default function Customers({
   const [showAddDropdown, setShowAddDropdown] = useState(false)
 
   // Pagination
-  const [currentPage, setCurrentPage] = useState(1)
+  const [currentPage, setCurrentPage] = useUrlState('page', 1)
   const [itemsPerPage, setItemsPerPage] = useState(
     () => safeStorage.get('customersPerPage', 25)
   )
@@ -142,7 +145,22 @@ export default function Customers({
   useEffect(() => {
     safeStorage.set('customersSortConfig', sortConfig)
   }, [sortConfig])
+  // Reset to the first page when a filter actually changes — not on mount, or a
+  // shared link like ?q=acme&page=3 would land the recipient on page 1.
+  //
+  // Compares the values rather than using a "have I mounted" flag: StrictMode
+  // double-invokes effects in development, so a flag is consumed by the first
+  // invocation and the second resets anyway. That would have behaved one way
+  // locally and another in production, which is worse than the bug.
+  const lastFilters = useRef(null)
   useEffect(() => {
+    const signature = JSON.stringify([searchQuery, itemsPerPage, filterStatus, filterType, filterCompany])
+    if (lastFilters.current === null) {
+      lastFilters.current = signature
+      return
+    }
+    if (lastFilters.current === signature) return
+    lastFilters.current = signature
     setCurrentPage(1)
   }, [searchQuery, itemsPerPage, filterStatus, filterType, filterCompany])
 

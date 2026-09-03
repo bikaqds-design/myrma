@@ -26,6 +26,7 @@ export default [
         setInterval: 'readonly',
         clearInterval: 'readonly',
         requestAnimationFrame: 'readonly',
+        queueMicrotask: 'readonly',
         cancelAnimationFrame: 'readonly',
         fetch: 'readonly',
         URL: 'readonly',

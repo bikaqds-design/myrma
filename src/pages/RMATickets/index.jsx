@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, db, branding as brandingAPI, notifications } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
+import { useUrlState } from '../../lib/useUrlState'
 import toast from 'react-hot-toast'
 import QRCode from 'qrcode'
 import ConfirmDialog from '../../components/ConfirmDialog'
@@ -64,9 +65,13 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   })
 
   const [filteredTickets, setFilteredTickets] = useState([])
-  const [searchTerm, setSearchTerm] = useState('')
+  // Two-way URL state. status and overdue were already read from the URL on
+  // mount — inbound links exist — but never written back, so changing a filter
+  // here produced a view nobody could link to. The param names are unchanged,
+  // so those inbound links keep working (UX-SEARCH-001).
+  const [searchTerm, setSearchTerm] = useUrlState('q', '')
 
-  const [currentPage, setCurrentPage] = useState(1)
+  const [currentPage, setCurrentPage] = useUrlState('page', 1)
   const [itemsPerPage, setItemsPerPage] = useState(
     () => safeStorage.get('rmaTicketsPerPage', 25)
   )
@@ -75,17 +80,13 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     safeStorage.get('rmaTicketsSortConfig', { key: 'created_date', direction: 'desc' })
   )
 
-  const [filterStatus, setFilterStatus] = useState(
-    () => new URLSearchParams(window.location.search).get('status') || ''
-  )
-  const [filterOverdue, setFilterOverdue] = useState(
-    () => new URLSearchParams(window.location.search).get('overdue') === 'true'
-  )
+  const [filterStatus, setFilterStatus] = useUrlState('status', '')
+  const [filterOverdue, setFilterOverdue] = useUrlState('overdue', false)
   const [showFilters, setShowFilters] = useState(() => {
     const p = new URLSearchParams(window.location.search)
     return !!(p.get('status') || p.get('overdue'))
   })
-  const [filterPriority, setFilterPriority] = useState('')
+  const [filterPriority, setFilterPriority] = useUrlState('priority', '')
   const [filterAssigned, setFilterAssigned] = useState('')
   const [filterCustomer, setFilterCustomer] = useState('')
   const [filterCustomerSearch, setFilterCustomerSearch] = useState('')
@@ -143,7 +144,19 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   useEffect(() => {
     safeStorage.set('rmaTicketsSortConfig', sortConfig)
   }, [sortConfig])
+  // Only on a real change, and value-compared rather than flag-guarded:
+  // StrictMode double-invokes effects in development, so a mount flag is
+  // consumed by the first invocation and the second resets anyway — which
+  // would drop the page from a shared link locally but not in production.
+  const lastFilters = useRef(null)
   useEffect(() => {
+    const signature = JSON.stringify([searchTerm, filterStatus, filterPriority, filterOverdue, itemsPerPage])
+    if (lastFilters.current === null) {
+      lastFilters.current = signature
+      return
+    }
+    if (lastFilters.current === signature) return
+    lastFilters.current = signature
     setCurrentPage(1)
     setSelectedTickets([])
   }, [
