@@ -42,7 +42,7 @@ page, not the source.
 |----|-------|----------|--------|
 | ✅ UX-DARK-001 | Appearance settings are global, not per user | High | **CLOSED** |
 | UX-DARK-002 | Dark mode never follows the operating system | Medium | S |
-| UX-DARK-003 | An 88 KB config blob is fetched on every app mount | Medium | M |
+| ✅ UX-DARK-003 | An 88 KB config blob is fetched on every app mount | Medium | **CLOSED** |
 | UX-DARK-004 | Knowledge Center muted text fails AA in dark only | Low | S |
 | UX-GLOBAL-018 | Notification badge fails AA in **both** modes | Medium | S |
 
@@ -93,12 +93,31 @@ default of `false`. There is no `prefers-color-scheme` handling anywhere in
 `src/`. Someone whose system is set to dark gets a light app until they find the
 toggle — and, per UX-DARK-001, flipping it changes everyone else's too.
 
-### UX-DARK-003 — 88 KB fetched on every mount (Medium)
+### ✅ UX-DARK-003 — 88 KB fetched on every mount (Medium) — CLOSED
 
-The `appearance_settings` row's `config_value` is **88,788 characters**. It is
-read on every app mount, before first paint, and it blocks nothing but competes
-with everything. Worth finding out what is in it — a dashboard layout or an
-inlined logo are the likely candidates — and moving that out of the settings blob.
+The `appearance_settings` row's `config_value` was **88,788 characters**, read on
+every app mount before first paint, by every user.
+
+It was the favicon: a 66 KB PNG inlined as a base64 data URI. `handleFaviconUpload`
+read the file with `FileReader.readAsDataURL` and stored the result in the config
+row, with a 1 MB size allowance — so that row could have carried megabytes.
+
+**Fixed.** Favicons now upload to Supabase Storage under `branding/`, beside the
+logo, which already worked this way; only the URL is stored. `uploadFavicon`
+sets a one-year `cacheControl`, so the browser fetches the image once instead of
+re-reading it inside the config on every mount.
+
+The existing favicon was migrated in place: decoded from the data URI, uploaded,
+and confirmed byte-identical (66,396 bytes both sides) and reachable **before**
+the config row was touched — a failure at any point would have left the working
+favicon alone.
+
+| | before | after |
+|---|---:|---:|
+| `appearance_settings` row | 88,788 chars | **354 chars** |
+
+All nine appearance keys intact, and the favicon verified still rendering from
+the storage URL after a reload.
 
 ### UX-DARK-004 — Knowledge Center muted text (Low)
 

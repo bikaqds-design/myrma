@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { useAppearance } from '../../contexts/AppearanceContext'
 import { Button, Input } from '../../components/ui'
 import { BChip, BToggle, BRow, BCard } from './_shared'
+import { branding as brandingApi } from '../../api/branding'
+import { toUserMessage } from '../../lib/errorMessage'
 
 export default function BrandingTab({
   branding,
@@ -40,20 +42,23 @@ export default function BrandingTab({
     document.title = draftTabTitle || 'myCRM'
   }, [draftTabTitle])
 
-  const handleFaviconUpload = (e) => {
+  const handleFaviconUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
     if (file.size > 1024 * 1024) {
       toast.error(t('brandingSettings.faviconTooLarge'))
       return
     }
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      update({ faviconUrl: reader.result })
+    // Uploaded to storage, not inlined as base64. The data URI went into the
+    // appearance config row, which every user fetches on every app mount before
+    // first paint (UX-DARK-003).
+    try {
+      const url = await brandingApi.uploadFavicon(file)
+      update({ faviconUrl: url })
       toast.success(t('brandingSettings.faviconUpdated'))
+    } catch (err) {
+      toast.error(toUserMessage(err))
     }
-    reader.onerror = () => toast.error(t('brandingSettings.failedReadFavicon'))
-    reader.readAsDataURL(file)
   }
 
   const FONTS = [
