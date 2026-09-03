@@ -53,7 +53,7 @@ The five left are the codemod and multi-day items. Nothing quick remains.
 
 | # | ID | Issue | Sev | Why it is L |
 |---|---|---|---|---|
-| 1 | UX-GLOBAL-007 | **Primitive built and tested; 4 of ~64 real call sites migrated** | High | Per-caller translation of bespoke JSX into column config — not mechanisable |
+| 1 | UX-GLOBAL-007 | **DEFERRED — opportunistic migration.** Primitive built and tested; 4 of ~64 migrated. See `design/BACKLOG.md`. | High | Decision taken 2026-09-03, not to be re-litigated |
 
 ### Why the table migration cannot be automated
 
