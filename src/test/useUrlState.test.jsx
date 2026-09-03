@@ -11,11 +11,11 @@
  *    `?status=&type=&page=1` and the feature is worse than not having it;
  *  - a hand-edited `?page=abc` must not put the page into NaN.
  */
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import React from 'react'
-import { useUrlState } from '../lib/useUrlState'
+import { useUrlState, useResetOnFilterChange } from '../lib/useUrlState'
 
 afterEach(cleanup)
 
@@ -235,5 +235,60 @@ describe('typed values', () => {
       </Harness>
     )
     expect(screen.getByTestId('page').textContent).toBe('1')
+  })
+})
+
+function Resetting({ filter, onReset }) {
+  useResetOnFilterChange([filter], onReset)
+  return <span>{String(filter)}</span>
+}
+
+function ResettingSet({ chosen, onReset }) {
+  useResetOnFilterChange([chosen], onReset)
+  return <span>set</span>
+}
+
+describe('resetting only on a real change', () => {
+  /**
+   * The whole point: a shared link carries its page, so the reset must not fire
+   * just because the component mounted with filters already applied.
+   */
+  it('does not fire on mount', () => {
+    const reset = vi.fn()
+    render(<Harness><Resetting filter="acme" onReset={reset} /></Harness>)
+    expect(reset).not.toHaveBeenCalled()
+  })
+
+  it('fires when the value changes', () => {
+    const reset = vi.fn()
+    const { rerender } = render(<Harness><Resetting filter="acme" onReset={reset} /></Harness>)
+    rerender(<Harness><Resetting filter="widget" onReset={reset} /></Harness>)
+    expect(reset).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not fire when a re-render carries the same value', () => {
+    const reset = vi.fn()
+    const { rerender } = render(<Harness><Resetting filter="acme" onReset={reset} /></Harness>)
+    rerender(<Harness><Resetting filter="acme" onReset={reset} /></Harness>)
+    expect(reset).not.toHaveBeenCalled()
+  })
+
+  /**
+   * Several pages hold multi-select filters as a Set. Plain JSON.stringify turns
+   * every Set into `{}`, so two different selections would look identical and
+   * the page would never reset — a silent regression on those pages.
+   */
+  it('notices a Set changing', () => {
+    const reset = vi.fn()
+    const { rerender } = render(<Harness><ResettingSet chosen={new Set(['a'])} onReset={reset} /></Harness>)
+    rerender(<Harness><ResettingSet chosen={new Set(['a', 'b'])} onReset={reset} /></Harness>)
+    expect(reset).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats the same Set contents in a new object as unchanged', () => {
+    const reset = vi.fn()
+    const { rerender } = render(<Harness><ResettingSet chosen={new Set(['a', 'b'])} onReset={reset} /></Harness>)
+    rerender(<Harness><ResettingSet chosen={new Set(['b', 'a'])} onReset={reset} /></Harness>)
+    expect(reset).not.toHaveBeenCalled()
   })
 })

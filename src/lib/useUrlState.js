@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 /**
@@ -95,3 +95,35 @@ export function useUrlState(key, defaultValue) {
 }
 
 export default useUrlState
+
+/**
+ * Run `reset` when `deps` actually change — not on mount.
+ *
+ * Every list page resets to page 1 when a filter changes. Once the page number
+ * lives in the URL, doing that on mount discards the page from a shared link:
+ * `?q=acme&page=3` would land the recipient on page 1.
+ *
+ * Compares values rather than using a "have I mounted" flag. React StrictMode
+ * double-invokes effects in development, so a flag is consumed by the first
+ * invocation and the second resets anyway — behaving one way locally and another
+ * in production, which is worse than the bug it was meant to fix.
+ *
+ * Sets are serialised by their sorted contents. Several pages hold multi-select
+ * filters as a Set, and plain JSON.stringify turns every Set into `{}` — so two
+ * different selections would look identical and the reset would never fire.
+ */
+export function useResetOnFilterChange(deps, reset) {
+  const last = useRef(null)
+  const signature = JSON.stringify(deps, (_k, v) =>
+    v instanceof Set ? [...v].sort() : v
+  )
+  useEffect(() => {
+    if (last.current === null) {
+      last.current = signature
+      return
+    }
+    if (last.current === signature) return
+    last.current = signature
+    reset()
+  }, [signature]) // eslint-disable-line react-hooks/exhaustive-deps
+}

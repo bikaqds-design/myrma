@@ -9,6 +9,7 @@ import { useURLTab } from '../../hooks/useURLTab'
 import { canDo, ownershipScope } from '../../lib/permissions'
 import { Button, PageHeader } from '../../components/ui'
 import { safeStorage } from '../../lib/safeStorage'
+import { useUrlState, useResetOnFilterChange } from '../../lib/useUrlState'
 import { PageSkeleton } from '../../components/Skeleton'
 import { CreateDocumentModal, CreateStandaloneCreditNoteModal } from './_modals'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
@@ -109,16 +110,18 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
   const [bulkBusy, setBulkBusy] = useState(false)
   const rowKey = (d) => `${d.doc_type}-${d.id}`
 
-  const [search, setSearch] = useState('')
+  // Filters live in the URL so a view can be shared and survives a refresh
+  // (UX-SEARCH-001).
+  const [search, setSearch] = useUrlState('q', '')
   const [showFilters, setShowFilters] = useState(false)
-  const [filterStatus, setFilterStatus] = useState('')
-  const [filterRep, setFilterRep] = useState('')
+  const [filterStatus, setFilterStatus] = useUrlState('status', '')
+  const [filterRep, setFilterRep] = useUrlState('rep', '')
 
   const [sortConfig, setSortConfig] = useState(() =>
     safeStorage.get('salesDocsSortConfig', { key: 'created_at', direction: 'desc' })
   )
 
-  const [currentPage, setCurrentPage] = useState(1)
+  const [currentPage, setCurrentPage] = useUrlState('page', 1)
   const [itemsPerPage, setItemsPerPage] = useState(() => safeStorage.get('salesDocsPerPage', 25))
   const [jumpToPage, setJumpToPage] = useState('')
 
@@ -173,7 +176,9 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
   // ── Effects ─────────────────────────────────────────────────────────────────
   useEffect(() => { safeStorage.set('salesDocsPerPage', itemsPerPage) }, [itemsPerPage])
   useEffect(() => { safeStorage.set('salesDocsSortConfig', sortConfig) }, [sortConfig])
-  useEffect(() => { setCurrentPage(1) }, [search, filterStatus, filterRep, tab, itemsPerPage, sortConfig])
+  // Reset to page one only when a filter really changes, never on mount —
+  // otherwise a shared link like ?q=acme&page=3 lands on page 1.
+  useResetOnFilterChange([search, filterStatus, filterRep, tab, itemsPerPage, sortConfig], () => setCurrentPage(1))
   useEffect(() => { setSelectedKeys(new Set()) }, [tab])
   useEffect(() => {
     const handler = (e) => { if (!newMenuRef.current?.contains(e.target)) setNewMenuOpen(false) }

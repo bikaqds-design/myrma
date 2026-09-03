@@ -8,6 +8,7 @@ import { useURLTab } from '../../hooks/useURLTab'
 import { canDo, ownershipScope } from '../../lib/permissions'
 import { PageHeader } from '../../components/ui'
 import { safeStorage } from '../../lib/safeStorage'
+import { useUrlState, useResetOnFilterChange } from '../../lib/useUrlState'
 import { PageSkeleton } from '../../components/Skeleton'
 import { APPROVAL_DOC_TYPE_LABEL_KEY, approvalRequestLabel } from '../../lib/approvalLabels'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
@@ -138,11 +139,13 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
   const [tab, setTab] = useURLTab('tab', 'all')
 
   // Search & filters
-  const [search, setSearch] = useState('')
+  // Filters live in the URL so a view can be shared and survives a refresh
+  // (UX-SEARCH-001).
+  const [search, setSearch] = useUrlState('q', '')
   const [showFilters, setShowFilters] = useState(false)
-  const [filterType, setFilterType] = useState('')
-  const [filterAssignee, setFilterAssignee] = useState('')
-  const [filterSource, setFilterSource] = useState('')
+  const [filterType, setFilterType] = useUrlState('type', '')
+  const [filterAssignee, setFilterAssignee] = useUrlState('assignee', '')
+  const [filterSource, setFilterSource] = useUrlState('source', '')
 
   // Selection
   const [selectedActivities, setSelectedActivities] = useState(new Set())
@@ -157,7 +160,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
   )
 
   // Pagination
-  const [currentPage, setCurrentPage] = useState(1)
+  const [currentPage, setCurrentPage] = useUrlState('page', 1)
   const [itemsPerPage, setItemsPerPage] = useState(() => safeStorage.get('activitiesPerPage', 25))
   const [jumpToPage, setJumpToPage] = useState('')
 
@@ -252,7 +255,9 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
   // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => { safeStorage.set('activitiesPerPage', itemsPerPage) }, [itemsPerPage])
   useEffect(() => { safeStorage.set('activitiesSortConfig', sortConfig) }, [sortConfig])
-  useEffect(() => { setCurrentPage(1) }, [search, filterType, filterAssignee, filterSource, tab, itemsPerPage, sortConfig])
+  // Reset to page one only when a filter really changes, never on mount —
+  // otherwise a shared link like ?q=acme&page=3 lands on page 1.
+  useResetOnFilterChange([search, filterType, filterAssignee, filterSource, tab, itemsPerPage, sortConfig], () => setCurrentPage(1))
   // Clear selection when tab changes
   useEffect(() => { setSelectedActivities(new Set()) }, [tab])
 

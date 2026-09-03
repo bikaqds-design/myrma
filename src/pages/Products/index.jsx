@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, db, storage } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
+import { useUrlState, useResetOnFilterChange } from '../../lib/useUrlState'
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 import ConfirmDialog from '../../components/ConfirmDialog'
@@ -44,14 +45,16 @@ export default function Products({
   // effect below, and a fresh `[]` each render looped it until data arrived.
   const products = productsPageData?.productsData ?? EMPTY_ARRAY
   const [filteredProducts, setFilteredProducts] = useState([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filterBrand, setFilterBrand] = useState('')
-  const [filterCategory, setFilterCategory] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
+  // Filters live in the URL so a view can be shared and survives a refresh
+  // (UX-SEARCH-001).
+  const [searchQuery, setSearchQuery] = useUrlState('q', '')
+  const [filterBrand, setFilterBrand] = useUrlState('brand', '')
+  const [filterCategory, setFilterCategory] = useUrlState('category', '')
+  const [filterStatus, setFilterStatus] = useUrlState('status', '')
   const [selectedProducts, setSelectedProducts] = useState([])
 
   // Pagination State
-  const [currentPage, setCurrentPage] = useState(1)
+  const [currentPage, setCurrentPage] = useUrlState('page', 1)
   const [itemsPerPage, setItemsPerPage] = useState(
     () => safeStorage.get('productsPerPage', 25)
   )
@@ -205,9 +208,9 @@ export default function Products({
     safeStorage.set('productsSortConfig', sortConfig)
   }, [sortConfig])
 
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [searchQuery, itemsPerPage])
+  // Reset to page one only when a filter really changes, never on mount —
+  // otherwise a shared link like ?q=acme&page=3 lands on page 1.
+  useResetOnFilterChange([searchQuery, itemsPerPage], () => setCurrentPage(1))
 
   useEffect(() => {
     const handleClickOutside = (e) => {

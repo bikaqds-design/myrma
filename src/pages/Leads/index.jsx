@@ -16,6 +16,7 @@ import { leadSchema, getFirstError } from '../../lib/schemas'
 import { LEAD_STATUS_LIST, LEAD_SOURCE_LIST } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
 import { safeStorage } from '../../lib/safeStorage'
+import { useUrlState, useResetOnFilterChange } from '../../lib/useUrlState'
 import { EMPTY_FORM, EMPTY_CONVERT_FORM } from './_constants'
 import { CreateLeadModal, ConvertLeadModal, BulkUploadLeadsModal } from './_modals'
 import { SortableHeader } from './_shared'
@@ -228,7 +229,9 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   const [sortConfig, setSortConfig] = useState(() =>
     safeStorage.get('leadsSortConfig', { key: 'created_at', direction: 'desc' })
   )
-  const [searchQuery, setSearchQuery] = useState('')
+  // Filters live in the URL (UX-SEARCH-001). The multi-select Sets below are
+  // not URL-backed yet; they need list encoding.
+  const [searchQuery, setSearchQuery] = useUrlState('q', '')
   const [filterStatuses, setFilterStatuses] = useState(new Set())
   const [filterSources, setFilterSources] = useState(new Set())
   const [filterReps, setFilterReps] = useState(new Set())
@@ -258,7 +261,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   const [pendingLeadCode, setPendingLeadCode] = useState('')
 
   // Pagination
-  const [currentPage, setCurrentPage] = useState(1)
+  const [currentPage, setCurrentPage] = useUrlState('page', 1)
   const [itemsPerPage, setItemsPerPage] = useState(() => safeStorage.get('leadsPerPage', 25))
   const [jumpToPage, setJumpToPage] = useState('')
 
@@ -271,9 +274,9 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   useEffect(() => {
     safeStorage.set('leadsPerPage', itemsPerPage)
   }, [itemsPerPage])
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [searchQuery, itemsPerPage, filterStatuses, filterSources, filterReps, statusTab])
+  // Reset to page one only when a filter really changes, never on mount —
+  // otherwise a shared link like ?q=acme&page=3 lands on page 1.
+  useResetOnFilterChange([searchQuery, itemsPerPage, filterStatuses, filterSources, filterReps, statusTab], () => setCurrentPage(1))
 
   const canDo = (action) => {
     if (currentUserRole === 'super_admin' || currentUserRole === 'admin') return true

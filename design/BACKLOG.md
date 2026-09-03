@@ -98,7 +98,7 @@ search box; two real findings, one latent.
 
 | ID | Issue | Sev | Effort |
 |---|---|---|---|
-| 🟡 UX-SEARCH-001 | ~~Search and filters not in the URL~~ **`useUrlState` built and applied to Customers and RMA Tickets.** Remaining list pages follow the same recipe | Medium | S each |
+| ✅ UX-SEARCH-001 | ~~Search and filters not in the URL~~ **CLOSED** — all 7 standalone list routes, each verified from a cold link. Tabbed screens need tab-scoped param names; Leads' Set-based multi-selects need list encoding | Medium | — |
 | UX-SEARCH-002 | No clear control on a search box, and only 2 of ~32 inputs are `type="search"` so the native one is absent too | Low | S |
 | UX-SEARCH-003 | Arabic not normalised for search (`احمد` will not find `أحمد`). **Latent** — zero Arabic text in 888 customers, 406 products, 33 leads | Low | S |
 

@@ -10,7 +10,7 @@ things that looked wrong in the source and turned out to be correct.
 
 ## What is actually wrong
 
-### ✅ UX-SEARCH-001 — Search and filters are not in the URL (Medium) — PARTLY CLOSED
+### ✅ UX-SEARCH-001 — Search and filters are not in the URL (Medium) — CLOSED
 
 **Verified by doing it:** typed `computer` into the Customers search, refreshed,
 and the search box came back empty with the URL unchanged at
@@ -29,8 +29,28 @@ Consequences, all of them ordinary daily friction:
 The brief asks for exactly this: *"filters reflected in the URL so views are
 shareable and survive refresh."*
 
-**Fixed on Customers and RMA Tickets; the remaining list pages follow the same
-recipe.**
+**Fixed on all seven standalone list routes:** Customers, RMA Tickets, Products,
+Leads, Activities, Purchasing and Sales Documents. Each verified from a cold
+link.
+
+| route | link | result |
+|---|---|---|
+| Customers | `?q=computer&page=2` | box restored, "Showing 26–50 of 56" |
+| RMA Tickets | `?status=Open` | exactly the 5 Open tickets |
+| Products | `?q=steel` | "Showing 1–15 of 15" |
+| Leads | `?q=a` | "Showing 1–21 of 21" |
+| Activities | `?q=call` | "Showing 1–2 of 2" |
+| Purchasing | `?q=po` | "Showing 1–5 of 5" (9 unfiltered) |
+| Sales Documents | `?q=q` | "Showing 1–25 of 30" |
+
+Deliberately **not** in the URL: `itemsPerPage`, which is a personal preference
+already persisted per user, and `jumpToPage`, which is transient input. Leads'
+three multi-select filters are still local — they hold `Set`s and need list
+encoding.
+
+The tabbed screens — the Inventory tabs, User Management, Knowledge Center —
+are not converted. They share one route, so a bare `q=` would carry a search
+across tab switches. They need tab-scoped parameter names.
 
 `src/lib/useUrlState.js` is a drop-in replacement for `useState` that keeps the
 value in the query string:
@@ -60,6 +80,14 @@ same snapshot and the second discards the first. Writes now accumulate in a
 module-level pending object and flush once per tick. A test that clicked the two
 setters separately passed against the broken version, because React re-renders
 between events; only firing both in one handler exposed it.
+
+*A third instance of the same bug, found by the rollout.* Purchasing clears its
+search when the tab changes, because a code matching a purchase order matches no
+vendor. That effect also fires on mount, so it wiped the search arriving from a
+shared link before anyone saw it — `?q=po` opened as an unfiltered list. Guarded
+with the same hook. The pattern is worth naming: **any effect that resets state
+"when X changes" also fires on mount, and mount is exactly when URL state
+arrives.**
 
 *StrictMode defeats a mount flag.* The first attempt at "reset the page only
 after mount" used a `useRef` flag. React double-invokes effects in development,

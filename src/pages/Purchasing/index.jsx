@@ -9,6 +9,7 @@ import { useURLTab } from '../../hooks/useURLTab'
 import { canDo } from '../../lib/permissions'
 import { Button, PageHeader } from '../../components/ui'
 import { safeStorage } from '../../lib/safeStorage'
+import { useUrlState, useResetOnFilterChange } from '../../lib/useUrlState'
 import { PageSkeleton } from '../../components/Skeleton'
 import ExportMenu from '../../components/ExportMenu'
 import PurchasingGraphView from './PurchasingGraphView'
@@ -174,10 +175,12 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
   const [bulkBusy, setBulkBusy] = useState(false)
   const rowKey = (d) => `${d.doc_type}-${d.id}`
 
-  const [search, setSearch] = useState('')
+  // Filters live in the URL so a view can be shared and survives a refresh
+  // (UX-SEARCH-001).
+  const [search, setSearch] = useUrlState('q', '')
   const [showFilters, setShowFilters] = useState(false)
-  const [filterStatus, setFilterStatus] = useState('')
-  const [filterVendor, setFilterVendor] = useState('')
+  const [filterStatus, setFilterStatus] = useUrlState('status', '')
+  const [filterVendor, setFilterVendor] = useUrlState('vendor', '')
 
   const isVendorsTab = tab === 'vendors'
 
@@ -188,7 +191,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
     safeStorage.get('purchasingVendorSort', { key: 'brand_name', direction: 'asc' })
   )
 
-  const [currentPage, setCurrentPage] = useState(1)
+  const [currentPage, setCurrentPage] = useUrlState('page', 1)
   const [itemsPerPage, setItemsPerPage] = useState(() => safeStorage.get('purchasingPerPage', 25))
   const [jumpToPage, setJumpToPage] = useState('')
 
@@ -215,10 +218,14 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
   useEffect(() => { safeStorage.set('purchasingPerPage', itemsPerPage) }, [itemsPerPage])
   useEffect(() => { safeStorage.set('purchasingSortConfig', sortConfig) }, [sortConfig])
   useEffect(() => { safeStorage.set('purchasingVendorSort', vendorSort) }, [vendorSort])
-  useEffect(() => { setCurrentPage(1) }, [search, filterStatus, filterVendor, tab, itemsPerPage, sortConfig, vendorSort])
+  // Reset to page one only when a filter really changes, never on mount —
+  // otherwise a shared link like ?q=acme&page=3 lands on page 1.
+  useResetOnFilterChange([search, filterStatus, filterVendor, tab, itemsPerPage, sortConfig, vendorSort], () => setCurrentPage(1))
   // The search box is shared between documents and vendors, and a code that
   // matched a PO will match no vendor. Carrying it across reads as an empty tab.
-  useEffect(() => { setSearch('') }, [tab])
+  // Guarded the same way as the page reset: this fires on mount too, and was
+  // wiping the search arriving from a shared link before anyone saw it.
+  useResetOnFilterChange([tab], () => setSearch(''))
   useEffect(() => { setSelectedKeys(new Set()) }, [tab])
   useEffect(() => {
     const handler = (e) => { if (!newMenuRef.current?.contains(e.target)) setNewMenuOpen(false) }
