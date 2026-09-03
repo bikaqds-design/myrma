@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { ACTIVITY_TYPE_SCHEDULABLE } from '../../lib/constants'
 
 const STATE_CELL = {
-  overdue: 'bg-red-500 text-white',
+  overdue: 'bg-red-600 text-white',
   today: 'bg-amber-500 text-white',
   planned: 'bg-emerald-500 text-white',
 }

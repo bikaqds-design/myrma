@@ -190,7 +190,7 @@ export default function KnowledgeChat() {
 
       <ul className="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5">
         {sessions.length === 0 && (
-          <li className="px-3 py-2 text-xs text-gray-400 dark:text-[#6c7280]">
+          <li className="px-3 py-2 text-xs text-gray-400 dark:text-[#9aa4b2]">
             {t('knowledgeChat.historyEmpty')}
           </li>
         )}
@@ -212,7 +212,7 @@ export default function KnowledgeChat() {
                   {session.title || t('knowledgeChat.untitled')}
                 </p>
                 {session.at && (
-                  <p className="text-[11px] text-gray-400 dark:text-[#6c7280]">
+                  <p className="text-[11px] text-gray-400 dark:text-[#9aa4b2]">
                     {new Date(session.at).toLocaleDateString()}
                   </p>
                 )}
@@ -232,7 +232,7 @@ export default function KnowledgeChat() {
 
       {/* The one thing about this feature that could surprise someone, said
           once and quietly rather than as a banner. */}
-      <p className="px-4 py-2 text-[11px] text-gray-400 dark:text-[#6c7280] border-t border-[#e6e9ef] dark:border-[#212a38]">
+      <p className="px-4 py-2 text-[11px] text-gray-400 dark:text-[#9aa4b2] border-t border-[#e6e9ef] dark:border-[#212a38]">
         {t('knowledgeChat.historyLocal')}
       </p>
     </div>
@@ -333,7 +333,7 @@ export default function KnowledgeChat() {
                   )}
                   <div className="rounded-2xl rounded-bl-sm bg-gray-100 dark:bg-[#1a2230] text-gray-900 dark:text-[#e8ebf0] px-4 py-2.5 text-sm whitespace-pre-wrap">
                     {m.content || (
-                      <span className="text-gray-400 dark:text-[#6c7280]">
+                      <span className="text-gray-400 dark:text-[#9aa4b2]">
                         {t('knowledgeChat.thinking')}
                       </span>
                     )}
@@ -398,7 +398,7 @@ export default function KnowledgeChat() {
           )}
         </form>
 
-        <p className="px-4 pb-3 text-[11px] text-gray-400 dark:text-[#6c7280]">
+        <p className="px-4 pb-3 text-[11px] text-gray-400 dark:text-[#9aa4b2]">
           {t('knowledgeChat.disclaimer')}
         </p>
       </div>

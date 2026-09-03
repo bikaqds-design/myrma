@@ -16,7 +16,7 @@ const ROUTES = ['/', '/leads', '/pipeline', '/activities', '/sales', '/accountin
 
 const sb = createClient(URL, ANON)
 const { data, error } = await sb.auth.signInWithPassword({
-  email: 'zz-dark@qdsegypt.com', password: 'AuditShot#2026aA' })
+  email: 'zz-os@qdsegypt.com', password: 'AuditShot#2026aA' })
 if (error) throw error
 
 const AUDIT = () => {
@@ -71,7 +71,10 @@ for (const route of ROUTES) {
   const page = await ctx.newPage()
   await page.route('**/rest/v1/rma_config*', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '[]' }))
   try { await page.goto('http://localhost:5173' + route, { waitUntil: 'networkidle', timeout: 30000 }) } catch {}
-  await page.waitForTimeout(3000)
+  // 3s was not enough for data-heavy routes: the Knowledge Center's file list
+  // had not rendered, so its failing rows were measured as absent and the run
+  // reported zero. A contrast audit that under-reports is worse than none.
+  await page.waitForTimeout(7000)
   let fails = []
   try { fails = await page.evaluate(AUDIT) } catch {}
   all.push({ route, failures: fails.length, worst: fails.slice(0, 4) })

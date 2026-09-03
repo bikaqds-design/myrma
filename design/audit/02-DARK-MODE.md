@@ -20,6 +20,22 @@ I expected this to be the largest liability left in the UI. It is not.
 **Dark mode adds 2 net contrast failures over light.** That is near-parity, and
 it is not what a partially-implemented dark mode looks like.
 
+**All of them are now fixed:** both modes measure **0 AA failures** across the
+16 routes.
+
+### A flaw in this audit's own tooling, found while verifying the fix
+
+The first re-measurement reported zero failures before the muted-text colour had
+been changed. The audit waited 3 seconds after `networkidle`, which is not enough
+for the Knowledge Center's file list — the failing rows had not rendered, so they
+were measured as absent rather than as passing. A contrast audit that
+under-reports is worse than no audit, because it produces a clean number nobody
+questions.
+
+The settle time is now 7 seconds, and any claim from this tool should be
+confirmed against the specific elements in question. That is how the miss was
+caught: measuring the two named rows directly rather than trusting the total.
+
 ### A measurement of mine that was wrong
 
 A static scan counted **1,086 light-only colour utilities** across 56 files —
@@ -41,10 +57,10 @@ page, not the source.
 | ID | Issue | Severity | Effort |
 |----|-------|----------|--------|
 | ✅ UX-DARK-001 | Appearance settings are global, not per user | High | **CLOSED** |
-| UX-DARK-002 | Dark mode never follows the operating system | Medium | S |
+| ✅ UX-DARK-002 | Dark mode never follows the operating system | Medium | **CLOSED** |
 | ✅ UX-DARK-003 | An 88 KB config blob is fetched on every app mount | Medium | **CLOSED** |
-| UX-DARK-004 | Knowledge Center muted text fails AA in dark only | Low | S |
-| UX-GLOBAL-018 | Notification badge fails AA in **both** modes | Medium | S |
+| ✅ UX-DARK-004 | Knowledge Center muted text fails AA in dark only | Low | **CLOSED** |
+| ✅ UX-GLOBAL-018 | Notification badge fails AA in **both** modes | Medium | **CLOSED** |
 
 ### ✅ UX-DARK-001 — Appearance settings are global (High) — CLOSED
 
@@ -86,12 +102,23 @@ Verified end to end against production with two throwaway accounts: user A
 enabled dark mode, user B was unaffected, and the company row still reads
 `darkMode: false` — A's choice did not leak into it.
 
-### UX-DARK-002 — Never follows the OS (Medium)
+### ✅ UX-DARK-002 — Never follows the OS (Medium) — CLOSED
 
 `darkMode: 'class'` with `html.classList.toggle('dark', !!s.darkMode)` and a
 default of `false`. There is no `prefers-color-scheme` handling anywhere in
 `src/`. Someone whose system is set to dark gets a light app until they find the
 toggle — and, per UX-DARK-001, flipping it changes everyone else's too.
+
+**Fixed.** Resolution for `darkMode` is now `personal choice -> operating system
+-> light`. Someone who has never used the toggle gets whatever their machine is
+set to, and the app follows a live OS change without a reload. The moment they
+use the toggle it becomes their explicit choice and the OS stops being consulted
+for them.
+
+The company row deliberately supplies no theme: with no personal choice the OS
+layer supersedes it, and with one the personal layer does. Verified by emulating
+both OS schemes for a user with no stored preference — dark OS gave a dark app,
+light OS a light one.
 
 ### ✅ UX-DARK-003 — 88 KB fetched on every mount (Medium) — CLOSED
 
@@ -119,19 +146,28 @@ favicon alone.
 All nine appearance keys intact, and the favicon verified still rendering from
 the storage URL after a reload.
 
-### UX-DARK-004 — Knowledge Center muted text (Low)
+### ✅ UX-DARK-004 — Knowledge Center muted text (Low) — CLOSED
 
 `rgb(108, 114, 128)` (gray-500) at 11px on the dark surface measures **3.69:1**
 against a 4.5:1 requirement. Affects file metadata lines such as
 `24G42E leaflet LQ.pdf · 1071 KB · 2 pages`. Dark-only; the light equivalent
 passes.
 
-### UX-GLOBAL-018 — Notification badge (Medium, not a dark-mode issue)
+**Fixed.** The colour was `dark:text-[#6c7280]`, a one-off that had drifted from
+the system — the app already has a muted-on-dark token, `#9aa4b2`, which measures
+7.05:1 on the same surface. Eleven uses across five files now use it. The two
+failing rows re-measure at **7.05:1**.
+
+### ✅ UX-GLOBAL-018 — Notification badge (Medium, not a dark-mode issue) — CLOSED
 
 White 10px text on the red count badge measures **3.76:1** against 4.5:1. It
 fails identically in light and dark, on every route, so it is filed as a global
 finding rather than a dark one. It is the single most repeated contrast failure
 in the app — 15 of the 16 per-route failures in each mode are this one badge.
+
+**Fixed.** `bg-red-500` (3.76:1 against white) becomes `bg-red-600` (**4.83:1**),
+the smallest change that clears AA. Applied to all four white-on-red badges, not
+just the notification one.
 
 ---
 

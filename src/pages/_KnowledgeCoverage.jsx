@@ -164,7 +164,7 @@ export default function KnowledgeCoverage() {
                   <p className="text-sm text-gray-900 dark:text-[#e8ebf0] truncate">
                     {p.product_name}
                   </p>
-                  <p className="text-[11px] text-gray-400 dark:text-[#6c7280]">{p.sku}</p>
+                  <p className="text-[11px] text-gray-400 dark:text-[#9aa4b2]">{p.sku}</p>
                 </div>
                 {/* Straight to the tab that fixes it, rather than leaving
                     someone to navigate there themselves. */}

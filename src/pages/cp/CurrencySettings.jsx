@@ -236,7 +236,7 @@ export default function CurrencySettings({ currentUserEmail }) {
                       {/* The base currency cannot be deactivated: every amount
                           in the system is denominated in it. */}
                       {isBase ? (
-                        <span className="text-xs text-gray-400 dark:text-[#6c7280]">
+                        <span className="text-xs text-gray-400 dark:text-[#9aa4b2]">
                           {t('cp.currency.alwaysOn')}
                         </span>
                       ) : (

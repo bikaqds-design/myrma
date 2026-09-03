@@ -1290,7 +1290,7 @@ export default function App() {
                     <>
                       <span className="flex-1 text-start">{label}</span>
                       {badge != null && (
-                        <span className="w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="w-5 h-5 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center flex-shrink-0">
                           {badge > 99 ? '99+' : badge}
                         </span>
                       )}

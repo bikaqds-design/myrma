@@ -59,6 +59,22 @@ vi.mock('../api/client', () => ({
 }))
 
 vi.mock('../lib/i18n.js', () => ({ default: { changeLanguage: () => {}, t: (k) => k } }))
+
+// Controllable OS colour scheme.
+const listeners = new Set()
+beforeEach(() => {
+  listeners.clear()
+  state.osDark = false
+  window.matchMedia = (q) => ({
+    matches: q.includes('dark') ? state.osDark : false,
+    addEventListener: (_, fn) => listeners.add(fn),
+    removeEventListener: (_, fn) => listeners.delete(fn),
+  })
+})
+const setOs = (dark) => {
+  state.osDark = dark
+  listeners.forEach((fn) => fn({ matches: dark }))
+}
 vi.mock('react-hot-toast', () => ({ default: Object.assign(() => {}, { error: () => {} }) }))
 vi.mock('../lib/sentry', () => ({ captureException: vi.fn() }))
 
@@ -177,5 +193,81 @@ describe('degrading safely', () => {
     mount()
     // Falls all the way back to DEFAULT rather than rendering nothing.
     await waitFor(() => expect(api.fontFamily).toBe('inter'))
+  })
+})
+
+describe('following the operating system', () => {
+  /**
+   * The point of UX-DARK-002. Someone who has never touched the toggle should
+   * get whatever their machine is set to, not an admin's choice.
+   */
+  it('uses the OS theme when the person has expressed no preference', async () => {
+    state.osDark = true
+    state.personal = null
+    mount()
+    await waitFor(() => expect(api.darkMode).toBe(true))
+  })
+
+  it('stays light when the OS is light and nothing is set', async () => {
+    state.osDark = false
+    state.personal = null
+    mount()
+    await waitFor(() => expect(api.fontFamily).toBe('poppins'))
+    expect(api.darkMode).toBe(false)
+  })
+
+  /**
+   * An explicit choice must survive a contrary OS. Otherwise the toggle looks
+   * broken to anyone whose machine disagrees with them.
+   */
+  it('respects an explicit choice over the OS', async () => {
+    state.osDark = true
+    state.personal = { appearance: { darkMode: false } }
+    mount()
+    await waitFor(() => expect(api.fontFamily).toBe('poppins'))
+    expect(api.darkMode).toBe(false)
+  })
+
+  /**
+   * The company row must never supply a theme — inheriting an admin's is the
+   * defect UX-DARK-001 removed. Asserted from both sides, because a company
+   * value of `true` with an OS of `false` is indistinguishable from the OS
+   * simply winning unless the opposite case is checked too.
+   */
+  it('ignores darkMode in the company row when the OS says light', async () => {
+    state.orgRow = { config_value: { darkMode: true, fontFamily: 'poppins' } }
+    state.osDark = false
+    state.personal = null
+    mount()
+    await waitFor(() => expect(api.fontFamily).toBe('poppins'))
+    expect(api.darkMode).toBe(false)
+  })
+
+  it('ignores darkMode in the company row when the OS says dark', async () => {
+    state.orgRow = { config_value: { darkMode: false, fontFamily: 'poppins' } }
+    state.osDark = true
+    state.personal = null
+    mount()
+    await waitFor(() => expect(api.darkMode).toBe(true))
+  })
+
+  it('follows the OS live while no preference is set', async () => {
+    state.osDark = false
+    state.personal = null
+    mount()
+    await waitFor(() => expect(api.darkMode).toBe(false))
+    await act(async () => { setOs(true) })
+    await waitFor(() => expect(api.darkMode).toBe(true))
+  })
+
+  it('stops following the OS once the person chooses', async () => {
+    state.osDark = false
+    state.personal = null
+    mount()
+    await waitFor(() => expect(api).toBeTruthy())
+    await act(async () => { await api.updateAppearance({ darkMode: false }, 'tech@test.com') })
+    // The OS flipping must no longer move them.
+    await act(async () => { setOs(true) })
+    expect(api.darkMode).toBe(false)
   })
 })

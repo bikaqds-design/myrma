@@ -338,7 +338,7 @@ export function DocumentRow({ doc, onRemove, onSave, busy, showProduct = false, 
 
           {/* The file itself is not editable here, and saying so beats leaving
               someone hunting for a control that does not exist. */}
-          <p className="sm:col-span-3 text-[11px] text-gray-400 dark:text-[#6c7280]">
+          <p className="sm:col-span-3 text-[11px] text-gray-400 dark:text-[#9aa4b2]">
             {t('documents.editFileFixed', { file: doc.file_name })}
           </p>
 
@@ -403,7 +403,7 @@ export function DocumentRow({ doc, onRemove, onSave, busy, showProduct = false, 
             {snippet.after && '…'}
           </p>
         )}
-        <p className="text-[11px] text-gray-400 dark:text-[#6c7280] mt-1">
+        <p className="text-[11px] text-gray-400 dark:text-[#9aa4b2] mt-1">
           {doc.file_name}
           {kb !== null && ` · ${kb} KB`}
           {doc.page_count ? ` · ${t('documents.pages', { n: doc.page_count })}` : ''}

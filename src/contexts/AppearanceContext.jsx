@@ -60,6 +60,29 @@ const GOOGLE_FONTS = {
 const PERSONAL_KEYS = ['darkMode', 'fontFamily', 'tableDensity', 'sidebarCompact', 'dateFormat', 'timeFormat']
 const isPersonal = (k) => PERSONAL_KEYS.includes(k)
 
+/**
+ * Dark mode is the one setting where the company row must NOT supply a default.
+ *
+ * Everything else in the org row is a sensible house default to inherit — a date
+ * format, a font. A theme is not: inheriting an admin's is precisely the defect
+ * UX-DARK-001 fixed, and the operating system already knows the answer. So the
+ * resolution for darkMode is:
+ *
+ *     personal choice  ->  operating system  ->  light
+ *
+ * Someone who has never expressed a preference gets whatever their machine is
+ * set to (UX-DARK-002). The moment they use the toggle it becomes their explicit
+ * choice and the OS stops being consulted for them.
+ */
+const prefersDark = () => {
+  try {
+    return !!window.matchMedia?.('(prefers-color-scheme: dark)')?.matches
+  } catch {
+    // matchMedia is absent in some test environments and older webviews.
+    return false
+  }
+}
+
 const pick = (obj, keys) =>
   Object.fromEntries(Object.entries(obj || {}).filter(([k]) => keys.includes(k)))
 
@@ -75,6 +98,8 @@ const AppearanceContext = createContext({
 })
 
 export function AppearanceProvider({ children }) {
+  // Whether this user has an explicit theme. While false, the OS is followed.
+  const hasPersonalTheme = React.useRef(false)
   const [settings, setSettings] = useState(() => ({
     ...DEFAULT,
     ...safeStorage.get('mrma_appearance', {}),
@@ -111,12 +136,33 @@ export function AppearanceProvider({ children }) {
       } catch { /* fall back to the org settings */ }
 
       if (cancelled) return
-      const merged = { ...DEFAULT, ...org, ...personal }
+      // Only consult the OS when this person has expressed no preference. Note
+      // this layer sits after `org`, which is what stops the company row's
+      // darkMode reaching anyone: with no personal choice the OS supersedes it,
+      // and with one the personal layer does. An earlier version also filtered
+      // darkMode out of `org`, which read as the guarantee but was unreachable
+      // — a mutation test could not kill it, so it went.
+      const osTheme = 'darkMode' in personal ? {} : { darkMode: prefersDark() }
+      const merged = { ...DEFAULT, ...org, ...osTheme, ...personal }
       setSettings(merged)
       safeStorage.set('mrma_appearance', merged)
+      hasPersonalTheme.current = 'darkMode' in personal
     }
 
     load()
+
+    // Follow the OS while it is still the source of truth. Someone who switches
+    // their machine to dark at dusk should not have to reload.
+    let mq
+    const onScheme = (e) => {
+      if (hasPersonalTheme.current) return
+      setSettings((prev) => ({ ...prev, darkMode: e.matches }))
+    }
+    try {
+      mq = window.matchMedia('(prefers-color-scheme: dark)')
+      mq.addEventListener('change', onScheme)
+    } catch { /* unsupported: the initial resolution still applies */ }
+
     // Re-resolve on sign-in, so switching account does not leave the previous
     // person's theme in place.
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
@@ -125,6 +171,7 @@ export function AppearanceProvider({ children }) {
     return () => {
       cancelled = true
       sub?.subscription?.unsubscribe()
+      try { mq?.removeEventListener('change', onScheme) } catch { /* never attached */ }
     }
   }, [])
 
@@ -206,6 +253,7 @@ export function AppearanceProvider({ children }) {
 
     // Personal keys go to this user's own row; company keys stay global. A change
     // touching both writes both.
+    if ('darkMode' in partial) hasPersonalTheme.current = true
     const personal = pick(partial, PERSONAL_KEYS)
     const org = Object.fromEntries(Object.entries(partial).filter(([k]) => !isPersonal(k)))
 

@@ -2,7 +2,8 @@
 
 Findings from `design/audit/01-AUDIT.md` that are not closed, and why.
 
-**Status: 20 of 43 closed. 0 Critical, 4 High, 14 Medium, 5 Low remaining.**
+**Status: 23 of 43 closed. 0 Critical, 4 High, 12 Medium, 4 Low remaining.**
+Every dark-mode finding is closed; both light and dark measure 0 AA contrast failures.
 (Five dark-mode findings added 2026-09-03.)
 
 Every Critical is closed. Nothing here blocks launch.
@@ -73,10 +74,10 @@ Five findings opened, one of them High:
 | ID | Issue | Sev |
 |---|---|---|
 | ✅ UX-DARK-001 | ~~Appearance settings are global~~ **CLOSED** — split personal vs company, no migration needed | High |
-| UX-DARK-002 | Never follows the operating system's colour scheme | Medium |
+| ✅ UX-DARK-002 | ~~Never follows the operating system~~ **CLOSED** | Medium |
 | ✅ UX-DARK-003 | ~~88 KB config blob fetched on every app mount~~ **CLOSED** — it was the favicon; now in Storage, row is 354 chars | Medium |
-| UX-GLOBAL-018 | Notification badge fails AA in **both** modes, on every route | Medium |
-| UX-DARK-004 | Knowledge Center muted text fails AA in dark only | Low |
+| ✅ UX-GLOBAL-018 | ~~Notification badge fails AA in both modes~~ **CLOSED** — red-600, 4.83:1 | Medium |
+| ✅ UX-DARK-004 | ~~Knowledge Center muted text fails AA in dark~~ **CLOSED** — 7.05:1 | Low |
 
 Still unexamined in dark: **modals and drawers** (behind interactions the sweep
 did not perform), **mobile width**, and whether `RMATracker.jsx` — the public

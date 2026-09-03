@@ -163,7 +163,7 @@ export default function KnowledgeUpload({ currentUserEmail }) {
     uploading: 'text-indigo-600 dark:text-[#a5b4fc]',
     done: 'text-green-600 dark:text-green-400',
     failed: 'text-red-600 dark:text-red-400',
-    skipped: 'text-gray-400 dark:text-[#6c7280]',
+    skipped: 'text-gray-400 dark:text-[#9aa4b2]',
   }
 
   return (
@@ -256,7 +256,7 @@ export default function KnowledgeUpload({ currentUserEmail }) {
                       <p className="text-gray-900 dark:text-[#e8ebf0] break-all">{row.fileName}</p>
                       {/* How the match was made, so an odd one is obvious. */}
                       {row.productId && row.reason !== 'manual' && (
-                        <p className="text-[11px] text-gray-400 dark:text-[#6c7280]">
+                        <p className="text-[11px] text-gray-400 dark:text-[#9aa4b2]">
                           {t(`bulkUpload.reason_${row.reason}`)}
                         </p>
                       )}
