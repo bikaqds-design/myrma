@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { assertUpdated } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ export const brands = {
   async update(id: string, brand: Partial<BrandRow>): Promise<BrandRow | undefined> {
     const { data, error } = await supabase.from('brands').update(brand).eq('id', id).select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'Brand')
   },
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from('brands').delete().eq('id', id)
@@ -121,7 +122,7 @@ export const categories = {
   async update(id: string, category: Partial<CategoryRow>): Promise<CategoryRow | undefined> {
     const { data, error } = await supabase.from('categories').update(category).eq('id', id).select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'Category')
   },
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from('categories').delete().eq('id', id)
@@ -264,7 +265,7 @@ export const products = {
   async update(id: string, product: Partial<ProductRow>): Promise<ProductRow | undefined> {
     const { data, error } = await supabase.from('products').update(product).eq('id', id).select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'Product')
   },
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from('products').delete().eq('id', id)

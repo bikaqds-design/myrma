@@ -162,7 +162,7 @@ export default function Customers({
     if (lastFilters.current === signature) return
     lastFilters.current = signature
     setCurrentPage(1)
-  }, [searchQuery, itemsPerPage, filterStatus, filterType, filterCompany])
+  }, [searchQuery, itemsPerPage, filterStatus, filterType, filterCompany, setCurrentPage])
 
   useEffect(() => {
     const handleClickOutside = (e) => {

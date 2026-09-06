@@ -6,7 +6,7 @@ const CP_GROUPS = [
   { labelKey: 'cp.groupTickets', sections: ['rmaconfig', 'customfields', 'pdflayout'] },
   { labelKey: 'cp.groupUsers', sections: ['users', 'announcements', 'broadcast'] },
   { labelKey: 'cp.groupAppearance', sections: ['appearance', 'email'] },
-  { labelKey: 'cp.groupAutomation', sections: ['sla', 'automation', 'webhooks', 'integrations'] },
+  { labelKey: 'cp.groupAutomation', sections: ['sla', 'automation', 'integrations'] },
   { labelKey: 'cp.groupMessaging', sections: ['wa-settings', 'wa-templates', 'wa-logs', 'wa-test'] },
   { labelKey: 'cp.groupData', sections: ['audit', 'cleanup', 'backup'] },
 ]

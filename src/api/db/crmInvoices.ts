@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { computeDocumentTotals } from './_documentTotals.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -39,34 +40,6 @@ export interface CrmInvoiceRow {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function computeTotals(lines: CrmInvoiceLine[]): {
-  subtotal: number
-  discount_amount: number
-  tax_amount: number
-  total: number
-} {
-  let subtotal = 0
-  let discount_amount = 0
-  let tax_amount = 0
-
-  for (const line of lines) {
-    const lineBase = line.qty * line.unit_price
-    const disc = lineBase * ((line.discount_pct ?? 0) / 100)
-    const afterDisc = lineBase - disc
-    const tax = afterDisc * ((line.tax_pct ?? 0) / 100)
-    subtotal += lineBase
-    discount_amount += disc
-    tax_amount += tax
-  }
-
-  return {
-    subtotal: Math.round(subtotal * 100) / 100,
-    discount_amount: Math.round(discount_amount * 100) / 100,
-    tax_amount: Math.round(tax_amount * 100) / 100,
-    total: Math.round((subtotal - discount_amount + tax_amount) * 100) / 100,
-  }
-}
 
 // ── Module ────────────────────────────────────────────────────────────────────
 
@@ -113,7 +86,7 @@ export const crmInvoices = {
     created_by: string
   }): Promise<CrmInvoiceRow> {
     const lines = input.line_items ?? []
-    const totals = computeTotals(lines)
+    const totals = computeDocumentTotals(lines)
 
     const { data, error } = await supabase
       .from('crm_invoices')
@@ -155,7 +128,7 @@ export const crmInvoices = {
     const updates: Record<string, unknown> = { ...fields }
 
     if (fields.line_items) {
-      Object.assign(updates, computeTotals(fields.line_items))
+      Object.assign(updates, computeDocumentTotals(fields.line_items))
     }
 
     const { data, error } = await supabase

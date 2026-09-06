@@ -18,7 +18,7 @@ CREATE INDEX IF NOT EXISTS kb_articles_published_idx ON kb_articles(is_published
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON kb_articles TO anon, authenticated;
 
--- set_updated_date() is already defined in 20260524_features.sql
+-- set_updated_date() is already defined in 20260524000001_features.sql
 DROP TRIGGER IF EXISTS kb_articles_updated_date ON kb_articles;
 CREATE TRIGGER kb_articles_updated_date
   BEFORE UPDATE ON kb_articles FOR EACH ROW EXECUTE FUNCTION set_updated_date();

@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { assertUpdated } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -124,7 +125,7 @@ export const activities = {
     if (outcomeNotes !== undefined) updates.outcome_notes = outcomeNotes
     const { data, error } = await supabase.from('activities').update(updates).eq('id', id).select()
     if (error) throw error
-    return data[0]
+    return assertUpdated(data, 'Activity')
   },
   // reopen — undo a Mark Done, moving the activity back to Planned.
   async reopen(id: string): Promise<ActivityRow> {

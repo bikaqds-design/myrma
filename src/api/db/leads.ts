@@ -1,5 +1,6 @@
 import { supabase } from '../client.js'
 import { activities } from './activities.js'
+import { assertUpdated } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -65,7 +66,7 @@ export const leads = {
     }
     const { data, error } = await supabase.from('leads').update(lead).eq('id', id).select()
     if (error) throw error
-    return data[0]
+    return assertUpdated(data, 'Lead')
   },
   /**
    * updateStatus — change a lead's status and auto-log the transition to the

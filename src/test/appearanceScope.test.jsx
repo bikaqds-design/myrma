@@ -15,7 +15,7 @@
  *    setting applies to everyone who has not chosen their own.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, cleanup, act } from '@testing-library/react'
+import { render, waitFor, cleanup, act } from '@testing-library/react'
 import React from 'react'
 
 const state = {

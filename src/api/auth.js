@@ -28,9 +28,14 @@ async function invokeInvite(body) {
   return data
 }
 
-async function invokeAdminUserOp(targetEmail, newPassword) {
+async function invokeAdminUserOp(targetEmail, newPassword, role) {
   const { data, error } = await supabase.functions.invoke('admin-reset-password', {
-    body: { targetEmail, newPassword },
+    // `role` is sent only when creating someone. The function writes the
+    // user_roles row itself when it is present, so the account and its role are
+    // made together instead of in two requests that can half-succeed — see
+    // BUG-018. An older deployment of the function ignores the field, which is
+    // what makes it safe to ship this before the function.
+    body: role ? { targetEmail, newPassword, role } : { targetEmail, newPassword },
   })
   if (error) throw new Error(error.message || 'Admin user operation failed')
   if (data?.error) throw new Error(data.error)
@@ -179,8 +184,16 @@ export const auth = {
 
   // Create a Supabase Auth account for a new user (super_admin only).
   // Runs server-side via the same Edge Function (treats missing user as create).
-  async adminCreateUser(email, password) {
-    return invokeAdminUserOp(email, password)
+  /**
+   * Create a staff account with its role, in one server-side operation.
+   *
+   * Returns the function's response, whose `roleCreated` says whether the role
+   * row was written server-side. A deployment of the function that predates
+   * BUG-018 ignores `role` and reports `roleCreated: false`, in which case the
+   * caller must still write the role itself.
+   */
+  async adminCreateUser(email, password, role) {
+    return invokeAdminUserOp(email, password, role)
   },
   async updateProfile(metadata) {
     const { data, error } = await supabase.auth.updateUser({ data: metadata })

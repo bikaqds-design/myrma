@@ -3,6 +3,7 @@ import { buildTicketUnits } from '../../lib/rmaUnitCreate.js'
 import type { TicketProductInput, CatalogProduct } from '../../lib/rmaUnitCreate.js'
 import { summarizeSerializedUnits } from '../../lib/stockSummary.js'
 import type { TableResult } from './types.js'
+import { assertUpdated } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -765,7 +766,7 @@ export const warehouses = {
   async update(id: string, warehouse: Partial<WarehouseRow>): Promise<WarehouseRow | undefined> {
     const { data, error } = await supabase.from('warehouses').update(warehouse).eq('id', id).select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'Warehouse')
   },
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from('warehouses').delete().eq('id', id)
@@ -1064,7 +1065,7 @@ export const timeEntries = {
   async update(id: string, updates: Partial<TimeEntryRow>): Promise<TimeEntryRow | undefined> {
     const { data, error } = await supabase.from('time_entries').update(updates).eq('id', id).select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'Time entry')
   },
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from('time_entries').delete().eq('id', id)

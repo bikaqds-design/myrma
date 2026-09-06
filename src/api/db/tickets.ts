@@ -1,6 +1,7 @@
 import { supabase } from '../client.js'
 import type { TableResult } from './types.js'
 import { captureException } from '../../lib/sentry.js'
+import { assertUpdated } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -109,12 +110,20 @@ export const rmaTickets = {
   async update(id: string, ticket: Partial<RMATicketRow>): Promise<RMATicketRow | undefined> {
     const { data, error } = await supabase.from('rma_tickets').update(ticket).eq('id', id).select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'Ticket')
   },
   async delete(id: string): Promise<void> {
     // Cascade is enforced by ON DELETE CASCADE FKs on inventory_units,
     // ticket_comments, ticket_activity → rma_tickets (migration 20260528).
     const { error } = await supabase.from('rma_tickets').delete().eq('id', id)
+    if (error) throw error
+  },
+  // One statement instead of N, so a bulk cleanup either applies or fails as a
+  // unit rather than part-way through. Data Cleanup previously fanned out N
+  // individual deletes and did not await them (BUG-012).
+  async bulkDelete(ids: string[]): Promise<void> {
+    if (!ids.length) return
+    const { error } = await supabase.from('rma_tickets').delete().in('id', ids)
     if (error) throw error
   },
 }

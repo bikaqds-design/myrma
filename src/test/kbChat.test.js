@@ -524,14 +524,33 @@ describe('sources are not gated behind the model', () => {
   // arrive as a stream event rather than an HTTP error the client never sees.
   it('reports a provider failure through the stream once it has opened', () => {
     expect(fn).toContain('Could not reach the model provider')
-    expect(fn).toContain('Provider returned ${upstream.status}')
+    expect(fn).toContain('provider returned ${upstream.status}')
     expect(fn).toContain("type: 'error'")
+  })
+
+  /**
+   * BUG-021. The provider's own response body used to be forwarded to the
+   * browser, as `Provider returned ${status}: ${detail.slice(0, 400)}`. That
+   * body can carry request ids, quota figures and account identifiers, and the
+   * person who needs them is whoever reads the function logs — not whoever
+   * asked a question in the Knowledge Center.
+   *
+   * The status code still reaches the user, because "the provider said 429" is
+   * actionable and leaks nothing. The body is logged instead.
+   */
+  it('logs the provider response body rather than streaming it to the client', () => {
+    expect(fn).toContain('console.error(`[kb-chat] provider ${upstream.status}')
+    // No fail() message may interpolate the provider's body.
+    expect(fn).not.toMatch(/fail\(`[^`]*\$\{detail/)
   })
 })
 
 describe('the search filters', () => {
   const docs = readFileSync('src/api/db/documents.ts', 'utf8')
   const page = readFileSync('src/pages/KnowledgeCenter.jsx', 'utf8')
+  // The Search tab's own layout moved here in the 2026-09-03 redesign — a
+  // folder tree over the catalogue instead of flat brand/category dropdowns.
+  const explorer = readFileSync('src/pages/_KnowledgeExplorer.jsx', 'utf8')
 
   // Without !inner PostgREST does a LEFT join, and a filter on a product column
   // silently returns everything instead of narrowing — a filter that appears to
@@ -555,17 +574,25 @@ describe('the search filters', () => {
   })
 
   // An empty select would otherwise become .eq('brand_id', '') and match
-  // nothing, so choosing "All brands" would return no documents at all.
-  it('turns an unset dropdown into no filter, not an empty-string filter', () => {
-    expect(page).toContain("brandId: filters.brandId || null")
-    expect(page).toContain("categoryId: filters.categoryId || null")
+  // nothing. The tree-based explorer that replaced the dropdowns does not
+  // need the `|| null` guard the old code did — browsing to the root folder
+  // supplies no brandId/categoryId key at all, rather than an empty one.
+  it('turns "no folder selected" into no filter, not an empty-string filter', () => {
+    expect(explorer).toContain("case 'brand':")
+    expect(explorer).toContain('return { brandId: currentNode.id }')
+    expect(explorer).toContain('docType: docType || null')
   })
 
-  // Categories belong to a brand; offering the others produces combinations
-  // that can only ever return nothing.
-  it('narrows the category list to the chosen brand and resets a stale one', () => {
-    expect(page).toContain('c.brand_id === applied.brandId')
-    expect(page).toContain("...(key === 'brandId' ? { categoryId: '' } : {})")
+  // The old flat <select> could show "Monitors" under a brand you had not
+  // chosen, and needed an explicit `categoryId: ''` reset when the brand
+  // changed. The tree removes the combination instead of resetting it: a
+  // category only ever renders nested under its own brand's node (see
+  // knowledgeTree.js's placement rules, and knowledgeTree.test.js's "falls
+  // back to the brand when the category belongs to a different brand"), so
+  // there is no control through which a mismatched pair could be chosen.
+  it('browses the catalogue through the folder tree, not independent dropdowns', () => {
+    expect(explorer).toContain("from '../lib/knowledgeTree'")
+    expect(explorer).toContain('buildTree(')
   })
 
   // A count that moved with the filters would suggest filtering had fixed

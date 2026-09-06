@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsOriginHeaders } from '../_shared/cors.ts'
+import { currentAccess, canAct } from '../_shared/access.ts'
 
 serve(async (req) => {
   const corsHeaders = {
@@ -8,27 +9,54 @@ serve(async (req) => {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   }
 
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // ── Who may use this ───────────────────────────────────────────────────────
+  // BUG-021: this function checked only that the caller was SOMEBODY
+  // authenticated. It had no role check and no status check at all, so any
+  // signed-in identity — a viewer, or a suspended account still holding a live
+  // JWT — could spend the organisation's paid LLM quota at will.
+  //
+  // Gated to current, non-viewer staff, the same line the RLS layer draws for
+  // anything that spends money or leaves the building.
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader) return json({ error: 'Unauthorized' }, 401)
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+  const supabaseClient = createClient(
+    supabaseUrl,
+    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    { global: { headers: { Authorization: authHeader } } }
+  )
+
+  const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+  if (authError || !user) return json({ error: 'Unauthorized' }, 401)
+
+  const adminClient = createClient(
+    supabaseUrl,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  )
+  const access = await currentAccess(adminClient, user.email)
+  if (!canAct(access)) {
+    return json({ error: 'Forbidden: your account cannot use the assistant' }, 403)
+  }
+
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) throw new Error('Missing authorization header')
-
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    )
-
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
-    if (authError || !user) throw new Error('Unauthorized')
-
     const { context_type, data } = await req.json()
 
     const nvidiaKey = Deno.env.get('NVIDIA_API_KEY')
-    if (!nvidiaKey) throw new Error('NVIDIA_API_KEY not configured in Supabase secrets')
+    if (!nvidiaKey) {
+      console.error('[ai-assist] NVIDIA_API_KEY is not configured')
+      return json({ error: 'The assistant is not configured.' }, 503)
+    }
 
     const { systemPrompt, userPrompt } = buildPrompt(context_type, data)
 
@@ -51,8 +79,12 @@ serve(async (req) => {
     })
 
     if (!resp.ok) {
-      const errText = await resp.text()
-      throw new Error(`NVIDIA error ${resp.status}: ${errText}`)
+      // BUG-021: the provider's body was handed to the browser verbatim. It can
+      // carry request ids and account details, and the person who needs it is
+      // whoever reads the function logs.
+      const errText = await resp.text().catch(() => '')
+      console.error(`[ai-assist] provider ${resp.status}: ${errText.slice(0, 400)}`)
+      return json({ error: `The assistant is unavailable (provider returned ${resp.status}).` }, 502)
     }
 
     const nvidiaResult = await resp.json()
@@ -61,14 +93,13 @@ serve(async (req) => {
 
     const parsed = JSON.parse(raw)
 
-    return new Response(JSON.stringify(parsed), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return json(parsed)
   } catch (err) {
-    return new Response(JSON.stringify({ error: (err as Error).message }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    // BUG-021: every failure here returned HTTP 200 with an `error` field, so a
+    // caller could not tell success from failure by status, and the message was
+    // whatever the underlying error happened to say — including the provider's.
+    console.error('[ai-assist]', err)
+    return json({ error: 'The assistant could not complete that request.' }, 500)
   }
 })
 

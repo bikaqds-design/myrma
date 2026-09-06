@@ -7,8 +7,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const insertMock = vi.fn()
+const getUserMock = vi.fn()
 vi.mock('../api/client.js', () => ({
-  supabase: { from: () => ({ insert: insertMock }) },
+  supabase: {
+    from: () => ({ insert: insertMock }),
+    auth: { getUser: getUserMock },
+  },
 }))
 
 const captureExceptionMock = vi.fn()
@@ -16,7 +20,7 @@ vi.mock('../lib/sentry.js', () => ({
   captureException: captureExceptionMock,
 }))
 
-const { auditInsert, _auditEnqueue } = await import('../api/db/audit')
+const { auditInsert, _auditEnqueue, auditFlushQueue } = await import('../api/db/audit')
 const { STORAGE_KEY } = await import('../lib/constants')
 
 const entry = {
@@ -28,6 +32,8 @@ const entry = {
 
 beforeEach(() => {
   insertMock.mockReset()
+  getUserMock.mockReset()
+  getUserMock.mockResolvedValue({ data: { user: { email: 'tech@example.com' } } })
   captureExceptionMock.mockClear()
   localStorage.clear()
 })
@@ -86,5 +92,70 @@ describe('_auditEnqueue — queue cap', () => {
     expect(queue).toHaveLength(50)
     expect(queue[0].action_type).toBe('action_5')
     expect(queue[49].action_type).toBe('action_54')
+  })
+})
+
+describe('auditFlushQueue — attribution safety (BUG-019)', () => {
+  // The queue is per-browser, not per-user, and the database stamps
+  // user_email from the JWT (migration 20260821). Replaying another user's
+  // entry would therefore file it under whoever is signed in now.
+
+  it("flushes the current user's own queued entries", async () => {
+    _auditEnqueue(entry)
+    insertMock.mockResolvedValueOnce({ error: null })
+
+    await auditFlushQueue()
+
+    expect(insertMock).toHaveBeenCalledTimes(1)
+    expect(insertMock).toHaveBeenCalledWith([entry])
+    expect(localStorage.getItem(STORAGE_KEY.AUDIT_QUEUE)).toBeNull()
+  })
+
+  it('drops entries belonging to a different user instead of misattributing them', async () => {
+    _auditEnqueue({ ...entry, user_email: 'someone.else@example.com' })
+
+    await auditFlushQueue()
+
+    expect(insertMock).not.toHaveBeenCalled()
+    expect(localStorage.getItem(STORAGE_KEY.AUDIT_QUEUE)).toBeNull()
+  })
+
+  it('flushes only the mine half of a mixed queue', async () => {
+    _auditEnqueue({ ...entry, user_email: 'someone.else@example.com' })
+    _auditEnqueue(entry)
+    insertMock.mockResolvedValueOnce({ error: null })
+
+    await auditFlushQueue()
+
+    expect(insertMock).toHaveBeenCalledWith([entry])
+  })
+
+  it('matches the signed-in address case-insensitively', async () => {
+    getUserMock.mockResolvedValue({ data: { user: { email: 'TECH@Example.com' } } })
+    _auditEnqueue(entry)
+    insertMock.mockResolvedValueOnce({ error: null })
+
+    await auditFlushQueue()
+
+    expect(insertMock).toHaveBeenCalledWith([entry])
+  })
+
+  it('keeps the queue when there is no session, rather than dropping it', async () => {
+    getUserMock.mockResolvedValue({ data: { user: null } })
+    _auditEnqueue(entry)
+
+    await auditFlushQueue()
+
+    expect(insertMock).not.toHaveBeenCalled()
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY.AUDIT_QUEUE))).toContainEqual(entry)
+  })
+
+  it('keeps the queue when the insert fails, so nothing is lost', async () => {
+    _auditEnqueue(entry)
+    insertMock.mockResolvedValueOnce({ error: { message: 'offline' } })
+
+    await auditFlushQueue()
+
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY.AUDIT_QUEUE))).toContainEqual(entry)
   })
 })

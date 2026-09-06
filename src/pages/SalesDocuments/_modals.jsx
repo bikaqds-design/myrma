@@ -5,6 +5,7 @@ import { db } from '../../api/supabaseClient'
 import { ModalOverlay, ModalCard, Button, Label, Input } from '../../components/ui'
 import SalesDocumentForm from './SalesDocumentForm'
 import { ProductSearchInput } from '../Pipeline/_shared'
+import { computeLineTotal } from '../../api/db/_documentTotals'
 
 // ── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -222,10 +223,14 @@ export function CreateCreditNoteModal({ invoice, onClose, onConfirm }) {
 
   const lineTotal = (l) => {
     if (!l.included) return 0
-    const qty = Math.min(Number(l.adjustedQty) || 0, l.qty)
-    const base = qty * (Number(l.unit_price) || 0)
-    const net = base - base * ((Number(l.discount_pct) || 0) / 100)
-    return net + net * ((Number(l.tax_pct) || 0) / 100)
+    // Same helper the credit note is actually stored with, so the preview and
+    // the saved document cannot drift apart again (BUG-013).
+    return computeLineTotal({
+      qty: Math.min(Number(l.adjustedQty) || 0, l.qty),
+      unit_price: Number(l.unit_price) || 0,
+      discount_pct: Number(l.discount_pct) || 0,
+      tax_pct: Number(l.tax_pct) || 0,
+    })
   }
   const grandTotal = lines.reduce((sum, l) => sum + lineTotal(l), 0)
 
@@ -240,6 +245,13 @@ export function CreateCreditNoteModal({ invoice, onClose, onConfirm }) {
         product_name: l.product_name,
         qty: Math.min(Number(l.adjustedQty), l.qty),
         unit_price: Number(l.unit_price) || 0,
+        // Carry the invoice line's discount and tax through. Dropping them here
+        // was BUG-013: the modal previewed the tax-inclusive figure while the
+        // saved credit note held only qty x unit_price, so crediting a 1000.00
+        // line at 10% discount and 14% VAT showed 1026.00 and stored 1000.00,
+        // leaving the invoice 26.00 outstanding.
+        discount_pct: Number(l.discount_pct) || 0,
+        tax_pct: Number(l.tax_pct) || 0,
         restock: false,
       }))
     onConfirm({ type: cnType, reason: reason.trim(), lines: included })

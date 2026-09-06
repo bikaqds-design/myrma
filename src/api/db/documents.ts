@@ -29,6 +29,9 @@ export interface ProductDocumentRow {
   uploaded_by: string | null
   created_at: string
   updated_at: string
+  /** Set when the document is in Trash; null for a live document. */
+  deleted_at: string | null
+  deleted_by: string | null
   /** Present on joined reads. */
   product?: {
     id: string
@@ -78,7 +81,12 @@ const DOC_COLUMNS = [
   'uploaded_by',
   'created_at',
   'updated_at',
+  'deleted_at',
+  'deleted_by',
 ].join(', ')
+
+/** How long a trashed document stays recoverable before it is purged for good. */
+export const TRASH_RETENTION_DAYS = 5
 
 const WITH_PRODUCT = `${DOC_COLUMNS}, ${PRODUCT_JOIN}`
 const WITH_PRODUCT_AND_TEXT = `${DOC_COLUMNS}, extracted_text, ${PRODUCT_JOIN}`
@@ -91,6 +99,8 @@ export interface DocumentFilters {
   productId?: string | null
   /** Only documents whose text was actually readable. */
   searchableOnly?: boolean
+  /** Only documents that are NOT readable — the coverage-gap worklist. */
+  notSearchableOnly?: boolean
 }
 
 /** Apply the filter set to a query. Kept in one place so browse and search agree. */
@@ -105,6 +115,7 @@ function applyFilters(query: ReturnType<typeof supabase.from>, filters?: Documen
   // so this only changes what browsing shows — which is exactly where someone
   // hunting for gaps wants it.
   if (filters?.searchableOnly) q = q.eq('extraction_status', 'ok')
+  if (filters?.notSearchableOnly) q = q.neq('extraction_status', 'ok')
   return q
 }
 
@@ -114,6 +125,7 @@ export const productDocuments = {
       .from('product_documents')
       .select(DOC_COLUMNS)
       .eq('product_id', productId)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
     if (error) {
       if (NOT_PROVISIONED.includes(error.code)) return []
@@ -126,7 +138,7 @@ export const productDocuments = {
     filters?: DocumentFilters
   ): Promise<{ data: ProductDocumentRow[]; missing: boolean }> {
     const { data, error } = await applyFilters(
-      supabase.from('product_documents').select(WITH_PRODUCT),
+      supabase.from('product_documents').select(WITH_PRODUCT).is('deleted_at', null),
       filters
     ).order('created_at', { ascending: false })
     if (error) {
@@ -137,12 +149,24 @@ export const productDocuments = {
   },
 
   /**
-   * Full-text search across titles, descriptions and document bodies.
+   * Full-text search across titles, descriptions and document bodies —
+   * PLUS the product a document is filed under, which `search_vector` does
+   * not and cannot cover (it is a generated column on `product_documents`
+   * itself; Postgres generated columns can only read their own row, not a
+   * join). Confirmed empirically: searching a product's own SKU returned
+   * nothing, even though the document is filed right under it and the whole
+   * point of this page is "someone who knows a part number should find it."
    *
    * websearch_to_tsquery and not plainto_tsquery: it understands quoted phrases
    * and OR, which is how people actually type into a search box, and it never
    * throws on odd punctuation — plainto_ would reject a query containing a
    * part number with a colon in it.
+   *
+   * The product-name/SKU match runs as two independent `ilike` calls rather
+   * than one `.or('sku.ilike...,product_name.ilike...')`: PostgREST's `.or()`
+   * takes a raw string DSL that splits on commas, so a search containing a
+   * comma (a plausible thing to type — "Dell, HP") would corrupt the filter
+   * instead of matching literally.
    */
   async search(
     query: string,
@@ -151,20 +175,55 @@ export const productDocuments = {
     const q = query.trim()
     if (!q) return productDocuments.listAll(filters)
 
-    const { data, error } = await applyFilters(
-      supabase
-        .from('product_documents')
-        // The body comes back here and only here, to build the snippet that
-        // shows why each result matched.
-        .select(WITH_PRODUCT_AND_TEXT)
-        .textSearch('search_vector', q, { type: 'websearch', config: 'simple' }),
-      filters
-    ).limit(100)
-    if (error) {
-      if (NOT_PROVISIONED.includes(error.code)) return { data: [], missing: true }
-      throw error
+    // A literal % or _ in the query is a plausible thing to type (a part
+    // number, a percentage) and must not act as an ilike wildcard.
+    const pattern = `%${q.replace(/[%_\\]/g, (c) => `\\${c}`)}%`
+
+    const [textRes, skuRes, nameRes] = await Promise.all([
+      applyFilters(
+        supabase
+          .from('product_documents')
+          // The body comes back here and only here, to build the snippet that
+          // shows why each result matched.
+          .select(WITH_PRODUCT_AND_TEXT)
+          .is('deleted_at', null)
+          .textSearch('search_vector', q, { type: 'websearch', config: 'simple' }),
+        filters
+      ).limit(100),
+      supabase.from('products').select('id').ilike('sku', pattern).limit(50),
+      supabase.from('products').select('id').ilike('product_name', pattern).limit(50),
+    ])
+
+    if (textRes.error) {
+      if (NOT_PROVISIONED.includes(textRes.error.code)) return { data: [], missing: true }
+      throw textRes.error
     }
-    return { data: (data ?? []) as ProductDocumentRow[], missing: false }
+
+    const matchedProductIds = [
+      ...new Set([...(skuRes.data ?? []), ...(nameRes.data ?? [])].map((p) => p.id)),
+    ]
+
+    // Merge by id — a document whose product AND body both matched must not
+    // appear twice.
+    const byId = new Map<string, ProductDocumentRow>()
+    for (const d of (textRes.data ?? []) as ProductDocumentRow[]) byId.set(d.id, d)
+
+    if (matchedProductIds.length > 0) {
+      const { data: byProduct, error } = await applyFilters(
+        supabase
+          .from('product_documents')
+          .select(WITH_PRODUCT_AND_TEXT)
+          .is('deleted_at', null)
+          .in('product_id', matchedProductIds),
+        filters
+      )
+      if (error) throw error
+      for (const d of (byProduct ?? []) as ProductDocumentRow[]) {
+        if (!byId.has(d.id)) byId.set(d.id, d)
+      }
+    }
+
+    return { data: [...byId.values()], missing: false }
   },
 
   async create(input: {
@@ -217,14 +276,104 @@ export const productDocuments = {
     if (error) throw error
   },
 
+  /** The hard-delete primitive. Only the purge sweep calls this directly. */
   async remove(id: string): Promise<void> {
     const { error } = await supabase.from('product_documents').delete().eq('id', id)
     if (error) throw error
   },
 
+  /**
+   * Moves a document to Trash. Every user-facing delete goes through this —
+   * there is deliberately no other path to removing a document, so "it's
+   * recoverable for 5 days" is true everywhere, not just in the screen that
+   * happened to be rewritten for it.
+   */
+  async trash(id: string, deletedBy: string): Promise<void> {
+    const { error } = await supabase
+      .from('product_documents')
+      .update({ deleted_at: new Date().toISOString(), deleted_by: deletedBy })
+      .eq('id', id)
+    if (error) throw error
+  },
+
+  async restore(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('product_documents')
+      .update({ deleted_at: null, deleted_by: null })
+      .eq('id', id)
+    if (error) throw error
+  },
+
+  /**
+   * Everything currently in Trash and still within its retention window.
+   * Excludes anything past the cutoff even if a purge sweep has not run yet
+   * — Trash should never claim more time is left than actually is.
+   */
+  async listTrash(): Promise<ProductDocumentRow[]> {
+    const cutoff = new Date(Date.now() - TRASH_RETENTION_DAYS * 86_400_000).toISOString()
+    const { data, error } = await supabase
+      .from('product_documents')
+      .select(WITH_PRODUCT)
+      .not('deleted_at', 'is', null)
+      .gt('deleted_at', cutoff)
+      .order('deleted_at', { ascending: false })
+    if (error) {
+      if (NOT_PROVISIONED.includes(error.code)) return []
+      throw error
+    }
+    return (data ?? []) as ProductDocumentRow[]
+  },
+
+  /**
+   * Trashed past the retention window — due for permanent removal. Returns
+   * the rows rather than deleting them itself, because deleting the row is
+   * only half the job: the storage file has to go too, and that needs the
+   * `storage` module, which this file deliberately does not import (kept
+   * database and storage concerns separated, matching the rest of this
+   * module). See `src/lib/documentTrash.js` for the orchestration.
+   */
+  async listExpiredTrash(): Promise<ProductDocumentRow[]> {
+    const cutoff = new Date(Date.now() - TRASH_RETENTION_DAYS * 86_400_000).toISOString()
+    const { data, error } = await supabase
+      .from('product_documents')
+      .select(DOC_COLUMNS)
+      .not('deleted_at', 'is', null)
+      .lte('deleted_at', cutoff)
+    if (error) {
+      if (NOT_PROVISIONED.includes(error.code)) return []
+      throw error
+    }
+    return (data ?? []) as ProductDocumentRow[]
+  },
+
+  /**
+   * Any existing document — live or trashed — of the same type already
+   * filed under this product. Uploading a second one of the same kind is
+   * either a genuine duplicate or a re-upload of something just trashed;
+   * either way the uploader should be told before it happens quietly.
+   */
+  async findByProductAndType(
+    productId: string,
+    docType: DocType
+  ): Promise<Pick<ProductDocumentRow, 'id' | 'title' | 'deleted_at'>[]> {
+    const { data, error } = await supabase
+      .from('product_documents')
+      .select('id, title, deleted_at')
+      .eq('product_id', productId)
+      .eq('doc_type', docType)
+    if (error) {
+      if (NOT_PROVISIONED.includes(error.code)) return []
+      throw error
+    }
+    return data ?? []
+  },
+
   /** How many documents each product has, for the product list. */
   async countsByProduct(): Promise<Record<string, number>> {
-    const { data, error } = await supabase.from('product_documents').select('product_id')
+    const { data, error } = await supabase
+      .from('product_documents')
+      .select('product_id')
+      .is('deleted_at', null)
     if (error) {
       if (NOT_PROVISIONED.includes(error.code)) return {}
       throw error

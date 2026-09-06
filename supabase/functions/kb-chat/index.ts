@@ -47,9 +47,13 @@
 // read from rma_config it is a dropdown.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { corsOriginHeaders } from '../_shared/cors.ts'
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
+// BUG-021: this hardcoded '*' while every other function used the shared
+// helper, so setting ALLOWED_ORIGINS would have hardened the others and
+// silently left this one open. The helper still falls back to '*' until that
+// secret is set, so this changes nothing until it is.
+const CORS_STATIC = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
@@ -121,13 +125,6 @@ export function questionToQuery(question: string): string {
   return [...new Set(terms)].slice(0, 24).join(' or ')
 }
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
-  })
-}
-
 /**
  * Split a document into overlapping passages.
  *
@@ -187,6 +184,16 @@ function scorePassage(passage: string, terms: string[]): number {
 }
 
 Deno.serve(async (req: Request) => {
+  // Per-request closures, because the allowed origin depends on THIS request's
+  // Origin header. This is the pattern the other functions already use; kb-chat
+  // held CORS at module scope, which is why it could only ever be a wildcard.
+  const CORS = { ...CORS_STATIC, ...corsOriginHeaders(req) }
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    })
+
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
@@ -400,15 +407,21 @@ Deno.serve(async (req: Request) => {
           }),
         })
       } catch (err) {
-        return fail(`Could not reach the model provider: ${String(err)}`)
+        console.error('[kb-chat] provider unreachable:', err)
+        return fail('Could not reach the model provider.')
       }
 
       if (!upstream.ok || !upstream.body) {
         // The provider's own message is passed through: "model not found" and
         // "quota exceeded" need completely different responses from a person,
         // and collapsing both into "the AI failed" wastes their afternoon.
+        // BUG-021: the provider's response body was passed straight to the
+        // browser. It can carry request ids, quota details and account
+        // identifiers; the person who needs it is whoever reads the function
+        // logs, not the person who asked a question.
         const detail = await upstream.text().catch(() => '')
-        return fail(`Provider returned ${upstream.status}: ${detail.slice(0, 400)}`)
+        console.error(`[kb-chat] provider ${upstream.status}: ${detail.slice(0, 400)}`)
+        return fail(`The assistant is unavailable (provider returned ${upstream.status}).`)
       }
 
       const reader = upstream.body.getReader()

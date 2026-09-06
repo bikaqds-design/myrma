@@ -53,10 +53,17 @@ export default function DataCleanup() {
       new Date(t.updated_date) < cutoff(cancelledDays)
   )
 
-  const ticketIds = [...new Set(tickets.map((t) => t.customer_name).filter(Boolean))]
+  // A customer counts as linked if a ticket references it by id OR by display
+  // name. Matching on the name alone (as this did) offered any customer whose
+  // name had since changed for deletion, even though the FK still bound it —
+  // the delete would then be refused and the count was simply wrong (BUG-012).
+  // Matching on id alone would mis-flag legacy tickets that carry only a name,
+  // so the union is used: it can only ever reduce false orphans.
+  const linkedIds = new Set(tickets.map((t) => t.customer_id).filter(Boolean))
+  const linkedNames = new Set(tickets.map((t) => t.customer_name).filter(Boolean))
   const orphanCustomers = customers.filter((c) => {
     const name = c.customer_type === 'B2B' && c.company_name ? c.company_name : c.contact_person
-    return !ticketIds.includes(name)
+    return !linkedIds.has(c.id) && !linkedNames.has(name)
   })
 
   const nameCounts = customers.reduce((acc, c) => {
@@ -71,11 +78,17 @@ export default function DataCleanup() {
     if (!confirm(t('cp.dataCleanup.deleteConfirm', { count: list.length, label }))) return
     setWorking(true)
     try {
-      ;(await db.rmaTickets.bulkDelete)
-        ? db.rmaTickets.bulkDelete(list.map((t) => t.id))
-        : Promise.all(list.map((t) => db.rmaTickets.delete(t.id)))
+      // Previously: `;(await db.rmaTickets.bulkDelete) ? … : Promise.all(…)`.
+      // That awaited the *function reference* rather than a call, and neither
+      // branch of the ternary was awaited — so the success toast and reload
+      // fired before a single delete had resolved, and any failure became an
+      // unhandled rejection that never reached the catch below. These are hard
+      // deletes that cascade to inventory_units, ticket_comments,
+      // ticket_activity, time_entries, ticket_parts and ticket_resolutions, so
+      // reporting success without confirming them is the worst case (BUG-012).
+      await db.rmaTickets.bulkDelete(list.map((t) => t.id))
       toast.success(t('cp.dataCleanup.deleted', { count: list.length, label }))
-      load()
+      await load()
     } catch (err) {
       captureException(err)
       toast.error(toUserMessage(err))

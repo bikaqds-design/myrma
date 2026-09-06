@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { assertUpdated } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -48,6 +49,6 @@ export const pipelines = {
     if (pipeline.stages) validateStages(pipeline.stages)
     const { data, error } = await supabase.from('pipelines').update(pipeline).eq('id', id).select()
     if (error) throw error
-    return data[0]
+    return assertUpdated(data, 'Pipeline')
   },
 }

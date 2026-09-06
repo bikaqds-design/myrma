@@ -159,15 +159,13 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     lastFilters.current = signature
     setCurrentPage(1)
     setSelectedTickets([])
-  }, [
-    searchTerm,
-    itemsPerPage,
-    filterStatus,
-    filterPriority,
-    filterAssigned,
-    filterCustomer,
-    sortConfig,
-  ])
+    // Dependencies must mirror `signature` exactly. They had drifted:
+    // filterOverdue was in the signature but not here, so toggling the overdue
+    // filter never reset the page — you stayed on page 7 of a now-shorter list
+    // and saw an empty table. filterAssigned, filterCustomer and sortConfig
+    // were here but not in the signature, so they re-ran the effect only to hit
+    // the early return.
+  }, [searchTerm, filterStatus, filterPriority, filterOverdue, itemsPerPage, setCurrentPage, setSelectedTickets])
 
   useEffect(() => {
     const handler = (e) => {

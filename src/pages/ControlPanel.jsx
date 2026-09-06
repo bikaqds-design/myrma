@@ -22,7 +22,6 @@ import HomeView from './cp/HomeView'
 import PipelineStages from './cp/PipelineStages'
 import SLAPolicies from './cp/SLAPolicies'
 import AutomationRules from './cp/AutomationRules'
-import WebhooksConfig from './cp/WebhooksConfig'
 import { ALL_FEATURES } from './cp/_registry'
 
 export default function ControlPanel({ currentUserRole, currentUserEmail, currentUserPermissions, onStartPreview }) {
@@ -151,7 +150,6 @@ export default function ControlPanel({ currentUserRole, currentUserEmail, curren
       {section === 'system-setup' && <SystemSetup currentUserEmail={currentUserEmail} />}
       {section === 'sla' && <SLAPolicies currentUserEmail={currentUserEmail} />}
       {section === 'automation' && <AutomationRules currentUserEmail={currentUserEmail} />}
-      {section === 'webhooks' && <WebhooksConfig currentUserEmail={currentUserEmail} />}
       {section === 'wa-settings' && <WASettings currentUserEmail={currentUserEmail} />}
       {section === 'wa-templates' && <WATemplates currentUserEmail={currentUserEmail} />}
       {section === 'wa-logs' && <WALogs currentUserEmail={currentUserEmail} />}

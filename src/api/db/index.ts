@@ -44,6 +44,7 @@ import { vendorLedger } from './vendorLedger.js'
 import { margin } from './margin.js'
 import { geo } from './geo.js'
 import { productDocuments } from './documents.js'
+import { companyDocuments } from './companyDocuments.js'
 
 export const db = {
   // Users & roles
@@ -129,6 +130,7 @@ export const db = {
   margin,
   geo,
   productDocuments,
+  companyDocuments,
 }
 
 // Re-export all Row types for page components to import

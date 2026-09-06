@@ -27,6 +27,9 @@
     "knowledgeCenter": "Knowledge Center"
   },
   "common": {
+    "untitled": "Untitled",
+    "expand": "Expand",
+    "collapse": "Collapse",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",
@@ -4081,8 +4084,8 @@
     "emptyHint": "Open a product and use its Documents tab to upload a datasheet. It becomes searchable here as soon as it is uploaded.",
     "notProvisioned": "The Knowledge Center is not set up yet",
     "notProvisionedHint": "Apply migration 20260801_product_documents.sql.",
-    "modeSearch": "Search",
-    "modeChat": "Ask",
+    "modeSearch": "Vault",
+    "modeChat": "Bika GPT",
     "filters": "Filters",
     "filterBrand": "Brand",
     "filterCategory": "Category",
@@ -4091,7 +4094,44 @@
     "filterSearchableOnly": "Only documents I can search inside",
     "noneMatchFilters": "No documents match these filters",
     "modeUpload": "Bulk upload",
-    "modeCoverage": "Coverage"
+    "modeCompanyDocs": "Company Docs",
+    "companyDocs": {
+      "searchPlaceholder": "Search company documents — a policy, a price list, a form…",
+      "empty": "No company documents yet",
+      "emptyHint": "Upload a price list, policy or certificate to get started.",
+      "notProvisioned": "Company Docs is not set up yet",
+      "notProvisionedHint": "Apply migration 20260809_company_documents.sql."
+    },
+    "explorer": {
+      "allDocuments": "All Documents",
+      "browse": "Browse",
+      "recent": "Recent",
+      "recentEmpty": "Nothing uploaded yet",
+      "status": "Status",
+      "statusAll": "All",
+      "statusSearchable": "Searchable",
+      "statusUnsearchable": "Not searchable",
+      "fileType": "File Type",
+      "newFolder": "New Folder",
+      "colName": "Name",
+      "colType": "Type",
+      "colSize": "Size",
+      "colModified": "Modified",
+      "colUploadedBy": "Uploaded by",
+      "kindFolder": "Folder",
+      "itemCount_one": "{{count}} item",
+      "itemCount_other": "{{count}} items",
+      "emptyFolderTitle": "This folder is empty",
+      "emptyFolderHint": "Upload a document, or open a subfolder.",
+      "trash": "Trash",
+      "trashEmptyTitle": "Trash is empty",
+      "trashEmptyHint": "A document you remove stays here for 5 days before it is purged for good.",
+      "daysLeft_zero": "Purging soon",
+      "daysLeft_one": "{{count}} day left",
+      "daysLeft_other": "{{count}} days left",
+      "restore": "Restore",
+      "restored": "Restored"
+    }
   },
   "documents": {
     "tab": "Documents",
@@ -4121,7 +4161,13 @@
     "status_failed_hint": "The file could not be read.",
     "status_unsupported_hint": "This file type cannot be read for text.",
     "updated": "Document updated",
-    "editFileFixed": "The file itself cannot be changed here — {{file}}. Upload a new document to replace it."
+    "editFileFixed": "The file itself cannot be changed here — {{file}}. Upload a new document to replace it.",
+    "movedToTrash": "Moved to Trash — recoverable for 5 days",
+    "conflictTitle": "A document like this already exists",
+    "conflictActiveMessage": "This product already has a document of this type — “{{title}}”. Uploading will move it to Trash and continue.",
+    "conflictTrashedMessage": "This product already had a document of this type — “{{title}}” — but it is in Trash. Continue uploading a new one?",
+    "conflictReplace": "Replace",
+    "conflictContinue": "Continue"
   },
   "knowledgeChat": {
     "title": "Ask the documents",
@@ -4171,18 +4217,6 @@
     "status_done": "Done",
     "status_failed": "Failed",
     "status_skipped": "Skipped"
-  },
-  "coverage": {
-    "headline": "{{pct}}% of products have a searchable document",
-    "headlineHint": "{{covered}} of {{total}} products",
-    "covered": "Searchable",
-    "missing": "No document",
-    "unsearchable": "Cannot be searched",
-    "missingHint": "These products have no document at all. Anyone searching for them finds nothing.",
-    "unsearchableHint": "These have a document, but the text could not be read — usually a scanned PDF. Ask the vendor for a text version.",
-    "nothingToDo": "Nothing to fix here",
-    "nothingToDoHint": "Every product in this view is covered.",
-    "addDocument": "Add document"
   },
   "resetPassword": {
     "brand": "myCRM",

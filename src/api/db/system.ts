@@ -2,6 +2,7 @@ import { supabase } from '../client.js'
 import type { TableResult } from './types.js'
 import { auditInsert, auditFlushQueue } from './audit.js'
 import { PRIORITY, CONFIG_KEY, AUTOMATION_ACTION } from '../../lib/constants.js'
+import { assertUpdated } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -132,7 +133,7 @@ export const announcements = {
   async update(id: string, ann: Partial<AnnouncementRow>): Promise<AnnouncementRow | undefined> {
     const { data, error } = await supabase.from('announcements').update(ann).eq('id', id).select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'Announcement')
   },
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from('announcements').delete().eq('id', id)
@@ -237,7 +238,7 @@ export const webhooks = {
   async update(id: string, webhook: Partial<WebhookRow>): Promise<WebhookRow | undefined> {
     const { data, error } = await supabase.from('webhooks').update(webhook).eq('id', id).select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'Webhook')
   },
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from('webhooks').delete().eq('id', id)

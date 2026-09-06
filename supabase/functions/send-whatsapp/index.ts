@@ -14,6 +14,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsOriginHeaders } from '../_shared/cors.ts'
+import { currentAccess, canAct } from '../_shared/access.ts'
 
 interface SendRequest {
   to: string
@@ -62,13 +63,14 @@ serve(async (req: Request) => {
   // not that they're allowed to send WhatsApp messages — a 'viewer' could
   // burn the org's Meta send quota. Gate to non-viewer staff, matching the
   // rma_is_staff() AND role <> 'viewer' idiom used throughout the RLS layer.
-  const { data: roleRow } = await supabaseAdmin
-    .from('user_roles')
-    .select('role')
-    .eq('user_email', user.email)
-    .single()
-  if (!roleRow || roleRow.role === 'viewer') {
-    return json({ error: 'Forbidden: viewers cannot send WhatsApp messages' }, 403)
+  //
+  // BUG-021: that check read `role` alone. Suspending someone does not revoke
+  // the session they already hold, so a suspended or expired account with a
+  // live JWT kept sending on the company's Meta number. currentAccess() applies
+  // the same three conditions the database does.
+  const access = await currentAccess(supabaseAdmin, user.email)
+  if (!canAct(access)) {
+    return json({ error: 'Forbidden: your account cannot send WhatsApp messages' }, 403)
   }
 
   // ── Config ──────────────────────────────────────────────────────────────

@@ -88,6 +88,12 @@ export function useUrlState(key, defaultValue) {
         })
       }
     },
+    // `params` is deliberately omitted. The callback reads `pending ?? params`,
+    // and `pending` is what carries writes made earlier in the same tick.
+    // Including `params` would give setValue a new identity on every URL
+    // change, re-creating it mid-tick and breaking the one-navigation-per-tick
+    // accumulation this hook exists to provide.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [key, defaultValue, parse, setParams]
   )
 

@@ -1,5 +1,6 @@
 import { supabase } from '../client.js'
 import type { TableResult, PagedResult, CountedResult } from './types.js'
+import { assertAffected } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -349,8 +350,9 @@ export const notificationQueue = {
   },
 
   async cancel(id: string): Promise<void> {
-    const { error } = await supabase.from('notification_queue').update({ status: 'cancelled' }).eq('id', id)
+    const { data, error } = await supabase.from('notification_queue').update({ status: 'cancelled' }).eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Queued notification')
   },
 
   async cancelAll(status = 'pending'): Promise<void> {

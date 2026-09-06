@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { assertUpdated } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -89,7 +90,7 @@ export const customers = {
   async update(id: string, customer: Partial<CustomerRow>): Promise<CustomerRow | undefined> {
     const { data, error } = await supabase.from('customers').update(customer).eq('id', id).select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'Customer')
   },
   async delete(id: string): Promise<void> {
     // Atomic cascade delete via server-side RPC (H-8 fix).
@@ -195,7 +196,7 @@ export const customerNotes = {
   async update(id: string, note: Partial<CustomerNoteRow>): Promise<CustomerNoteRow | undefined> {
     const { data, error } = await supabase.from('customer_notes').update(note).eq('id', id).select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'Customer note')
   },
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from('customer_notes').delete().eq('id', id)

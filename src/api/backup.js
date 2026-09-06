@@ -123,6 +123,9 @@ export const BACKUP_TABLES = [
   // files gives working search over documents whose links are dead, which is
   // the better half to keep.
   { table: 'product_documents' },
+  // Company-wide reference material — price lists, policies, certificates
+  // (20260809). Same file-not-included caveat as product_documents above.
+  { table: 'company_documents' },
   { table: 'customers' },
   { table: 'contacts' },
   { table: 'customer_notes' },
@@ -232,6 +235,7 @@ export const BACKUP_MODULES = [
       'custom_field_definitions', 'custom_roles', 'user_roles', 'user_preferences',
       'branding_settings', 'email_settings', 'email_templates', 'whatsapp_templates',
       'notification_settings', 'notification_preferences', 'webhooks', 'pipelines', 'warehouses',
+      'company_documents',
     ],
   },
   {

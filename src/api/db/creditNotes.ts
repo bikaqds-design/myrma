@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { computeDocumentTotals } from './_documentTotals.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -9,6 +10,11 @@ export interface CreditNoteLine {
   unit_price: number
   restock: boolean
   warehouse_id?: string | null
+  // Carried over from the invoice line being credited. Without these the
+  // credit note silently reversed only the pre-discount, pre-tax amount
+  // (BUG-013).
+  discount_pct?: number | null
+  tax_pct?: number | null
 }
 
 export interface CreditNoteRow {
@@ -22,6 +28,7 @@ export interface CreditNoteRow {
   status: 'draft' | 'issued' | 'applied' | 'voided'
   line_items: CreditNoteLine[]
   subtotal: number
+  discount_amount: number
   tax_amount: number
   total: number
   applied_amount: number
@@ -96,8 +103,10 @@ export const creditNotes = {
     assigned_rep?: string | null
   }): Promise<CreditNoteRow> {
     const lines = input.line_items ?? []
-    const subtotal = lines.reduce((sum, l) => sum + l.qty * l.unit_price, 0)
-    const total = Math.round(subtotal * 100) / 100
+    // Was: subtotal = sum(qty * unit_price), tax_amount hard-coded to 0, and
+    // total = subtotal — so any discount or tax on the credited invoice line
+    // was thrown away and the customer was under- or over-credited (BUG-013).
+    const totals = computeDocumentTotals(lines)
 
     const { data, error } = await supabase
       .from('credit_notes')
@@ -108,9 +117,10 @@ export const creditNotes = {
         created_by: input.created_by,
         status: 'draft',
         line_items: lines,
-        subtotal: total,
-        tax_amount: 0,
-        total,
+        subtotal: totals.subtotal,
+        discount_amount: totals.discount_amount,
+        tax_amount: totals.tax_amount,
+        total: totals.total,
         applied_amount: 0,
         remaining_balance: 0,
         restock_status: input.type === 'rma_return' ? 'pending' : 'not_applicable',
@@ -134,9 +144,7 @@ export const creditNotes = {
     const updates: Record<string, unknown> = { ...fields }
 
     if (fields.line_items) {
-      const subtotal = fields.line_items.reduce((sum, l) => sum + l.qty * l.unit_price, 0)
-      updates.subtotal = Math.round(subtotal * 100) / 100
-      updates.total = updates.subtotal
+      Object.assign(updates, computeDocumentTotals(fields.line_items))
     }
 
     const { data, error } = await supabase

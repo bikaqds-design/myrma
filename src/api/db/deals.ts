@@ -1,6 +1,7 @@
 import { supabase } from '../client.js'
 import { activities } from './activities.js'
 import type { PipelineStage } from './pipelines.js'
+import { assertUpdated } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -114,7 +115,7 @@ export const deals = {
     }
     const { data, error } = await supabase.from('deals').update(deal).eq('id', id).select()
     if (error) throw error
-    return data[0]
+    return assertUpdated(data, 'Deal')
   },
   /**
    * moveStage — used by both the Kanban drag-drop and the deal detail page.

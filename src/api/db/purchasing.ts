@@ -1,5 +1,6 @@
 import { supabase } from '../client.js'
 import type { TableResult } from './types.js'
+import { assertUpdated, assertAffected } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 // Vendors are Brands (src/api/db/catalog.ts `brands`) — there is no separate
@@ -212,25 +213,29 @@ export const purchaseOrders = {
     if (patch.line_items) Object.assign(patch, computeTotals(patch.line_items))
     const { data, error } = await supabase.from('purchase_orders').update(patch).eq('id', id).select()
     if (error) throw error
-    return data[0]
+    return assertUpdated(data, 'Purchase order')
   },
   /** markSent — also used as the "Send for Approval" step; the PO sits here until a manager approves it (via Activities) into Confirmed. */
   async markSent(id: string): Promise<void> {
-    const { error } = await supabase.from('purchase_orders').update({ status: 'sent' }).eq('id', id)
+    const { data, error } = await supabase.from('purchase_orders').update({ status: 'sent' }).eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Purchase order')
   },
   async markConfirmed(id: string): Promise<void> {
-    const { error } = await supabase.from('purchase_orders').update({ status: 'confirmed' }).eq('id', id)
+    const { data, error } = await supabase.from('purchase_orders').update({ status: 'confirmed' }).eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Purchase order')
   },
   /** rejectToDraft — sends a pending-approval PO back to draft, editable and resubmittable (mirrors vendorInvoices.rejectToDraft). */
   async rejectToDraft(id: string): Promise<void> {
-    const { error } = await supabase.from('purchase_orders').update({ status: 'draft' }).eq('id', id)
+    const { data, error } = await supabase.from('purchase_orders').update({ status: 'draft' }).eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Purchase order')
   },
   async cancel(id: string): Promise<void> {
-    const { error } = await supabase.from('purchase_orders').update({ status: 'cancelled' }).eq('id', id)
+    const { data, error } = await supabase.from('purchase_orders').update({ status: 'cancelled' }).eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Purchase order')
   },
   /**
    * convertToVendorInvoice — preserves vendor/lines/notes/totals and keeps the
@@ -334,7 +339,7 @@ export const vendorInvoices = {
     if (patch.line_items) Object.assign(patch, computeTotals(patch.line_items))
     const { data, error } = await supabase.from('vendor_invoices').update(patch).eq('id', id).select()
     if (error) throw error
-    return data[0]
+    return assertUpdated(data, 'Vendor invoice')
   },
   async submitForApproval(id: string): Promise<void> {
     const { error } = await supabase
@@ -352,12 +357,14 @@ export const vendorInvoices = {
   },
   /** rejectToDraft — sends a pending-approval VI back to draft, editable and resubmittable. */
   async rejectToDraft(id: string): Promise<void> {
-    const { error } = await supabase.from('vendor_invoices').update({ status: 'draft' }).eq('id', id)
+    const { data, error } = await supabase.from('vendor_invoices').update({ status: 'draft' }).eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Vendor invoice')
   },
   async cancel(id: string): Promise<void> {
-    const { error } = await supabase.from('vendor_invoices').update({ status: 'cancelled' }).eq('id', id)
+    const { data, error } = await supabase.from('vendor_invoices').update({ status: 'cancelled' }).eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Vendor invoice')
   },
   /**
    * receive — the atomic receipt path (Sprint 9, status guard updated by the

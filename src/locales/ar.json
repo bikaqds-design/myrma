@@ -4284,8 +4284,8 @@
     "emptyHint": "افتح منتجًا واستخدم تبويب المستندات لرفع كتالوج. سيصبح قابلًا للبحث هنا فور رفعه.",
     "notProvisioned": "مركز المعرفة غير مُهيأ بعد",
     "notProvisionedHint": "طبِّق الترحيل 20260801_product_documents.sql.",
-    "modeSearch": "بحث",
-    "modeChat": "اسأل",
+    "modeSearch": "الخزينة",
+    "modeChat": "Bika GPT",
     "filters": "عوامل التصفية",
     "filterBrand": "العلامة التجارية",
     "filterCategory": "الفئة",
@@ -4294,7 +4294,14 @@
     "filterSearchableOnly": "المستندات القابلة للبحث بداخلها فقط",
     "noneMatchFilters": "لا توجد مستندات مطابقة لعوامل التصفية",
     "modeUpload": "رفع جماعي",
-    "modeCoverage": "التغطية",
+    "modeCompanyDocs": "مستندات الشركة",
+    "companyDocs": {
+      "searchPlaceholder": "ابحث في مستندات الشركة — سياسة، قائمة أسعار، نموذج…",
+      "empty": "لا توجد مستندات للشركة بعد",
+      "emptyHint": "ارفع قائمة أسعار أو سياسة أو شهادة للبدء.",
+      "notProvisioned": "مستندات الشركة غير مُهيأة بعد",
+      "notProvisionedHint": "طبِّق الترحيل 20260809_company_documents.sql."
+    },
     "explorer": {
       "allDocuments": "كل المستندات",
       "browse": "تصفح",
@@ -4319,7 +4326,18 @@
       "itemCount_many": "{{count}} عنصراً",
       "itemCount_other": "{{count}} عنصر",
       "emptyFolderTitle": "هذا المجلد فارغ",
-      "emptyFolderHint": "ارفع مستندًا، أو افتح مجلدًا فرعيًا."
+      "emptyFolderHint": "ارفع مستندًا، أو افتح مجلدًا فرعيًا.",
+      "trash": "سلة المهملات",
+      "trashEmptyTitle": "سلة المهملات فارغة",
+      "trashEmptyHint": "المستند الذي تحذفه يبقى هنا 5 أيام قبل حذفه نهائيًا.",
+      "daysLeft_zero": "سيُحذف قريبًا",
+      "daysLeft_one": "يوم واحد متبقٍ",
+      "daysLeft_two": "يومان متبقيان",
+      "daysLeft_few": "{{count}} أيام متبقية",
+      "daysLeft_many": "{{count}} يومًا متبقيًا",
+      "daysLeft_other": "{{count}} يوم متبقٍ",
+      "restore": "استرجاع",
+      "restored": "تم الاسترجاع"
     }
   },
   "documents": {
@@ -4350,7 +4368,13 @@
     "status_failed_hint": "تعذّرت قراءة الملف.",
     "status_unsupported_hint": "لا يمكن استخراج نص من هذا النوع.",
     "updated": "تم تحديث المستند",
-    "editFileFixed": "لا يمكن تغيير الملف نفسه من هنا — {{file}}. ارفع مستندًا جديدًا لاستبداله."
+    "editFileFixed": "لا يمكن تغيير الملف نفسه من هنا — {{file}}. ارفع مستندًا جديدًا لاستبداله.",
+    "movedToTrash": "نُقل إلى سلة المهملات — قابل للاسترجاع لمدة 5 أيام",
+    "conflictTitle": "يوجد مستند مشابه بالفعل",
+    "conflictActiveMessage": "هذا المنتج لديه بالفعل مستند من هذا النوع — «{{title}}». الرفع سينقله إلى سلة المهملات ويتابع.",
+    "conflictTrashedMessage": "كان لهذا المنتج مستند من هذا النوع — «{{title}}» — لكنه في سلة المهملات. هل تريد المتابعة برفع مستند جديد؟",
+    "conflictReplace": "استبدال",
+    "conflictContinue": "متابعة"
   },
   "knowledgeChat": {
     "title": "اسأل المستندات",
@@ -4400,18 +4424,6 @@
     "status_done": "تم",
     "status_failed": "فشل",
     "status_skipped": "تم التخطي"
-  },
-  "coverage": {
-    "headline": "{{pct}}٪ من المنتجات لديها مستند قابل للبحث",
-    "headlineHint": "{{covered}} من {{total}} منتج",
-    "covered": "قابل للبحث",
-    "missing": "بدون مستند",
-    "unsearchable": "غير قابل للبحث",
-    "missingHint": "هذه المنتجات ليس لديها أي مستند. لن يجدها أحد عند البحث.",
-    "unsearchableHint": "لديها مستند، لكن تعذّرت قراءة النص — غالبًا ملف ممسوح ضوئيًا. اطلب نسخة نصية من المورد.",
-    "nothingToDo": "لا يوجد ما يحتاج إلى معالجة",
-    "nothingToDoHint": "كل المنتجات في هذا العرض مغطاة.",
-    "addDocument": "إضافة مستند"
   },
   "resetPassword": {
     "brand": "myCRM",

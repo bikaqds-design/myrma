@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { captureException } from '../../lib/sentry.js'
 import type { TableResult } from './types.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -42,9 +43,9 @@ export const notifications = {
     createdBy,
     targetRoles = [],
     targetEmails = [],
-  }: CreateNotificationParams): Promise<NotificationRow | null> {
+  }: CreateNotificationParams): Promise<void> {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('notifications')
         .insert([
           {
@@ -61,14 +62,25 @@ export const notifications = {
             read_by: [],
           },
         ])
-        .select()
-      if (error) {
-        if (error.code === '42P01') return null
-        return null
+      // Deliberately NO .select() here (BUG-079). PostgREST compiles .select()
+      // into INSERT ... RETURNING, and RETURNING is evaluated against the
+      // *SELECT* policy — `user_read_targeted`, which only exposes a
+      // notification aimed at your own role or address. So a technician
+      // creating an alert for ['admin','super_admin'] had the RETURNING clause
+      // refused with 42501, which aborts the whole statement: the row was never
+      // written and this function silently returned null. Bulk customer and
+      // product alerts, and ticket status changes, therefore produced no
+      // notification at all whenever a non-admin performed them.
+      //
+      // Widening user_read_targeted would be the wrong fix — not being able to
+      // read other roles' notifications is correct. No caller uses the returned
+      // row (every call site is `db.notifications.create({...}).catch(...)`),
+      // so dropping the read-back costs nothing.
+      if (error && error.code !== '42P01') {
+        captureException(error, { context: 'notifications.create', type })
       }
-      return data?.[0] ?? null
     } catch {
-      return null
+      /* notifications are best-effort and must never break the calling flow */
     }
   },
 

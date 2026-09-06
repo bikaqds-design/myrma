@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { assertAffected } from './_assertUpdated.js'
 
 /**
  * Countries and their phone-number rules (20260799).
@@ -88,8 +89,9 @@ export const geo = {
   },
 
   async updateCountry(code: string, patch: Partial<CountryRow>): Promise<void> {
-    const { error } = await supabase.from('countries').update(patch).eq('code', code)
+    const { data, error } = await supabase.from('countries').update(patch).eq('code', code).select('id')
     if (error) throw error
+    assertAffected(data, 'Country')
   },
 
   async addAreaCode(input: {

@@ -262,10 +262,21 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
     }
 
     try {
-      // Create the Supabase Auth account first (requires service-role key)
-      await auth.adminCreateUser(newUserEmail, newUserPassword)
-      // Then record the role in user_roles
-      await db.userRoles.createRole(newUserEmail, newUserRole)
+      // The account and its role are created together, server-side. Passing the
+      // role lets admin-reset-password write user_roles in the same operation
+      // and undo the auth account if that write fails — BUG-018, where the two
+      // steps were separate requests and a failure between them left an account
+      // that could sign in but had no role and so could do nothing.
+      const createResult = await auth.adminCreateUser(
+        newUserEmail,
+        newUserPassword,
+        newUserRole
+      )
+      // Older deployments of the function ignore `role` and report roleCreated
+      // false; the role still has to be written from here in that case.
+      if (!createResult?.roleCreated) {
+        await db.userRoles.createRole(newUserEmail, newUserRole)
+      }
       db.userActivity
         .create(
           currentUserEmail,

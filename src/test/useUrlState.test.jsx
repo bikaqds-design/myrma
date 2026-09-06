@@ -82,8 +82,8 @@ describe('writing to the URL', () => {
 })
 
 function TwoFilters() {
-  const [q, setQ] = useUrlState('q', '')
-  const [status, setStatus] = useUrlState('status', '')
+  const [_q, setQ] = useUrlState('q', '')
+  const [_status, setStatus] = useUrlState('status', '')
   const loc = useLocation()
   return (
     <>
@@ -127,8 +127,8 @@ describe('several filters on one page', () => {
 })
 
 function SameTick() {
-  const [q, setQ] = useUrlState('q', '')
-  const [page, setPage] = useUrlState('page', 1)
+  const [_q, setQ] = useUrlState('q', '')
+  const [_page, setPage] = useUrlState('page', 1)
   const loc = useLocation()
   return (
     <>

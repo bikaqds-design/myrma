@@ -789,8 +789,13 @@ export default function App() {
 
   const handleLogout = async () => {
     const email = currentUser?.email
+    // Log BEFORE signing out. After signOut() there is no session, so RLS
+    // refuses this insert and it lands in the localStorage retry queue to be
+    // replayed in some later session — which is why 'logout' entries were
+    // missing or attributed to the wrong person (BUG-019). Awaited so it
+    // reaches the server while the session is still valid.
+    if (email) await db.userActivity.create(email, 'logout', 'Signed out').catch(() => {})
     await auth.signOut()
-    if (email) db.userActivity.create(email, 'logout', 'Signed out').catch(() => {})
     setCurrentUser(null)
     setCurrentUserRole(null)
     setCurrentUserPermissions(null)
@@ -1010,7 +1015,7 @@ export default function App() {
               {
                 tabId: 'sla',
                 label: t('cp.groupAutomation'),
-                activeSections: ['sla', 'automation', 'webhooks', 'integrations'],
+                activeSections: ['sla', 'automation', 'integrations'],
               },
               {
                 tabId: 'wa-settings',
@@ -1825,7 +1830,16 @@ export default function App() {
                 }
               />
 
-              <Route path="/knowledge-center" element={<KnowledgeCenter currentUserEmail={currentUser?.email} />} />
+              <Route
+                path="/knowledge-center"
+                element={
+                  <KnowledgeCenter
+                    currentUserEmail={currentUser?.email}
+                    currentUserRole={effectiveUserRole}
+                    currentUserPermissions={effectiveUserPermissions}
+                  />
+                }
+              />
 
               {/* A-1: catch-all 404 — previously typo URLs silently landed on Dashboard */}
               <Route path="*" element={<NotFoundPage />} />

@@ -6,7 +6,7 @@
 // Trigger modes:
 //   1. Immediately after event handler queues a job (fire-and-forget)
 //   2. Manual from Admin → Test Center ("Run Worker")
-//   3. pg_cron (Pro plan) every 2 minutes — x-trigger-source: pg_cron header
+//   3. pg_cron every 2 minutes — must present x-worker-secret (see BUG-022)
 //
 // Required Supabase secrets:
 //   WHATSAPP_ACCESS_TOKEN      (for WhatsApp jobs)
@@ -19,6 +19,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsOriginHeaders } from '../_shared/cors.ts'
+import { currentAccess, canAct } from '../_shared/access.ts'
 
 const BATCH_SIZE        = 10
 const RATE_LIMIT_MS     = 200   // min ms between messages within one batch
@@ -62,45 +63,67 @@ serve(async (req: Request) => {
 
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey)
 
-  // ── Auth: worker secret OR valid staff JWT OR pg_cron trigger ─────────────
-  // Audit MED-7 (+ a more severe gap found while fixing it): the previous
-  // x-trigger-source check was `!req.headers.get('x-trigger-source')` — i.e.
-  // "reject only if the header is ABSENT." Any value at all (attacker-chosen,
-  // not just 'pg_cron') satisfied it, meaning any unauthenticated caller could
-  // drain the queue and burn WhatsApp/email send quota. Tightened to an exact
-  // match against what the pg_cron migration (20260604_pgcron_notifications.sql)
-  // actually sends, so the real cron job is unaffected. This is still a
-  // client-supplied string, not a real secret — closing it fully requires the
-  // cron job to also send x-worker-secret (Supabase Vault-backed), which
-  // needs to be wired up against the live project and is a follow-up, not
-  // done here.
-  // The Bearer-token branch previously accepted ANY authenticated user
-  // (including 'viewer') — added a role check so only non-viewer staff can
-  // trigger the worker, closing MED-7 itself.
+  // ── Auth: worker secret, or a current non-viewer staff JWT ────────────────
+  //
+  // BUG-022. There used to be a third way in: a caller with no Authorization
+  // header at all was admitted if they sent `x-trigger-source: pg_cron`. A
+  // header any client can type is not a credential, and the comment that used
+  // to sit here said as much while leaving it in place.
+  //
+  // It was reachable, not theoretical. The Functions gateway accepts the JWT in
+  // EITHER `Authorization` or `apikey`, and the anon key ships in the browser
+  // bundle, so:
+  //
+  //   apikey: <anon key>            satisfies the gateway
+  //   (no Authorization header)     skips the Bearer branch below
+  //   x-trigger-source: pg_cron     satisfied the old third branch
+  //
+  // — and the queue drained, spending WhatsApp and Resend quota, for anyone who
+  // had read the bundle. Removing the branch is the whole fix: every caller now
+  // has to prove something.
+  //
+  // Deliberately not tested against the live project: the only way to confirm
+  // it end to end is to let it actually drain, which would send real messages
+  // from the 341-job backlog.
+  //
+  // The real cron job is unaffected by the removal, because it is not working
+  // today either — it sends no Authorization header and every run has been
+  // rejected by the gateway with 401 since June (BUG-005). Re-enabling it means
+  // giving it x-worker-secret; see
+  // supabase/manual/20260854_wire_cron_worker_secret.sql, which must not be run
+  // until that backlog has been dealt with.
+  //
+  // x-trigger-source survives as a LABEL — it records which entry point woke
+  // the worker, which is worth having in the logs — and grants nothing.
   const workerSecret    = Deno.env.get('WORKER_SECRET')
   const providedSecret  = req.headers.get('x-worker-secret')
   const authHeader      = req.headers.get('Authorization') ?? ''
-  const triggerSource   = req.headers.get('x-trigger-source')
+  const triggerSource   = req.headers.get('x-trigger-source') ?? 'unknown'
 
   if (workerSecret && providedSecret === workerSecret) {
-    // cron / external caller with correct secret — allowed
+    // A machine caller holding the shared secret: cron, or an external
+    // scheduler. This requires WORKER_SECRET to be SET — with it unset the
+    // branch can never match and a cron job presenting only a header is
+    // refused, which is the right direction to fail.
   } else if (authHeader.startsWith('Bearer ')) {
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(
       authHeader.replace('Bearer ', '')
     )
     if (error || !user) return json({ error: 'Unauthorized' }, 401)
 
-    const { data: roleRow } = await supabaseAdmin
-      .from('user_roles')
-      .select('role')
-      .eq('user_email', user.email)
-      .single()
-    if (!roleRow || roleRow.role === 'viewer') {
-      return json({ error: 'Forbidden: viewers cannot trigger the notification worker' }, 403)
+    // BUG-021: this read `role` alone, so a suspended or expired account with a
+    // still-valid JWT could keep draining the queue and spending send quota.
+    const access = await currentAccess(supabaseAdmin, user.email)
+    if (!canAct(access)) {
+      return json({ error: 'Forbidden: your account cannot trigger the notification worker' }, 403)
     }
-  } else if (triggerSource !== 'pg_cron') {
+  } else {
+    // One message for both "no credential" and "wrong secret": telling an
+    // anonymous caller which of the two they got wrong is free reconnaissance.
     return json({ error: 'Unauthorized' }, 401)
   }
+
+  console.log(`[notification-worker] triggered by ${triggerSource}`)
 
   // ── WhatsApp config (only needed for WA jobs; checked per-job below) ─────
   const accessToken   = Deno.env.get('WHATSAPP_ACCESS_TOKEN')
@@ -297,5 +320,5 @@ serve(async (req: Request) => {
     await new Promise((r) => setTimeout(r, RATE_LIMIT_MS))
   }
 
-  return json({ processed, failed, total: (jobs as QueueJob[]).length })
+  return json({ processed, failed, total: (jobs as QueueJob[]).length, source: triggerSource })
 })

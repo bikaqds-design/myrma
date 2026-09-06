@@ -3,13 +3,15 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { toUserMessage } from '../lib/errorMessage'
-import { db, storage } from '../api/supabaseClient'
+import { db } from '../api/supabaseClient'
 import { Button, Label, Input, Select, Textarea } from './ui'
+import ConfirmDialog from './ConfirmDialog'
 import { captureException } from '../lib/sentry'
 import { EMPTY_ARRAY } from '../lib/stableEmpty'
-import { extractText, EXTRACTABLE_TYPES } from '../lib/pdfText'
+import { EXTRACTABLE_TYPES } from '../lib/pdfText'
 import { DOC_TYPES } from '../lib/documentTypes'
 import { buildSnippet } from '../lib/snippet'
+import { uploadProductDocument, findUploadConflict } from '../lib/documentUpload'
 
 /**
  * Documents attached to one product — the Knowledge Center's raw material.
@@ -31,6 +33,10 @@ export default function ProductDocuments({ product, currentUserEmail, canEdit })
   const [stage, setStage] = useState(null)
   const [pending, setPending] = useState(null)
   const [form, setForm] = useState({ title: '', docType: 'datasheet', description: '' })
+  // Set only when a same-type document already exists for this product,
+  // live or trashed — see findUploadConflict. `run` is what actually
+  // proceeds, captured so the dialog does not need to know about `conflict`.
+  const [conflict, setConflict] = useState(null)
 
   const { data: docs = EMPTY_ARRAY, isLoading } = useQuery({
     queryKey: ['product-documents', product?.id],
@@ -55,38 +61,39 @@ export default function ProductDocuments({ product, currentUserEmail, canEdit })
 
   const upload = async () => {
     if (!pending || !form.title.trim()) return
+    // A product carrying two active datasheets is either a genuine mistake
+    // or a re-upload of one just trashed — either way the uploader should be
+    // asked before it happens quietly, not after.
+    const found = await findUploadConflict(product.id, form.docType)
+    if (found) {
+      setConflict({ ...found, run: () => runUpload(found) })
+      return
+    }
+    await runUpload(null)
+  }
+
+  const runUpload = async (resolvedConflict) => {
+    setConflict(null)
     setBusy(true)
     try {
-      // Extract first. If the file cannot be read we still want to store it,
-      // but the status has to be recorded with the row rather than patched in
-      // afterwards, where a failure would leave it stuck on 'pending'.
-      setStage('extracting')
-      const extraction = await extractText(pending)
-
-      setStage('uploading')
-      const uploaded = await storage.uploadProductDocument(pending, product.sku || product.id)
-
-      await db.productDocuments.create({
-        productId: product.id,
+      if (resolvedConflict && !resolvedConflict.isTrashed) {
+        await db.productDocuments.trash(resolvedConflict.existing.id, currentUserEmail)
+      }
+      const created = await uploadProductDocument({
+        product,
+        file: pending,
         title: form.title,
         docType: form.docType,
         description: form.description,
-        fileName: uploaded.name,
-        fileUrl: uploaded.url,
-        storagePath: uploaded.path,
-        fileSize: uploaded.size,
-        mimeType: uploaded.type,
-        extractedText: extraction.text,
-        extractionStatus: extraction.status,
-        pageCount: extraction.pages,
-        uploadedBy: currentUserEmail,
+        currentUserEmail,
+        onStage: setStage,
       })
 
       queryClient.invalidateQueries({ queryKey: ['product-documents'] })
       queryClient.invalidateQueries({ queryKey: ['knowledge-center'] })
       reset()
 
-      if (extraction.status === 'ok') toast.success(t('documents.uploadedSearchable'))
+      if (created.extraction_status === 'ok') toast.success(t('documents.uploadedSearchable'))
       else toast.success(t('documents.uploadedNotSearchable'))
     } catch (err) {
       captureException(err)
@@ -127,20 +134,20 @@ export default function ProductDocuments({ product, currentUserEmail, canEdit })
     }
   }
 
+  /**
+   * Moves a document to Trash rather than deleting it outright — recoverable
+   * for 5 days from the Vault's Trash view, and only actually removed (row
+   * and storage file) once that window passes. This used to hard-delete
+   * immediately with no confirmation at all; trash is the safety net that
+   * was missing, not an extra step on top of one.
+   */
   const remove = async (doc) => {
     setBusy(true)
     try {
-      await db.productDocuments.remove(doc.id)
-      // The row is what the app reads, so it goes first: a deleted row with an
-      // orphaned file is untidy, a live row pointing at a deleted file is a
-      // broken link someone will click.
-      try {
-        await storage.deleteFile(doc.storage_path)
-      } catch (fileErr) {
-        captureException(fileErr)
-      }
+      await db.productDocuments.trash(doc.id, currentUserEmail)
       queryClient.invalidateQueries({ queryKey: ['product-documents'] })
       queryClient.invalidateQueries({ queryKey: ['knowledge-center'] })
+      toast.success(t('documents.movedToTrash'))
     } catch (err) {
       captureException(err)
       toast.error(toUserMessage(err))
@@ -249,6 +256,20 @@ export default function ProductDocuments({ product, currentUserEmail, canEdit })
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!conflict}
+        title={t('documents.conflictTitle')}
+        message={
+          conflict?.isTrashed
+            ? t('documents.conflictTrashedMessage', { title: conflict.existing.title })
+            : t('documents.conflictActiveMessage', { title: conflict?.existing.title })
+        }
+        confirmLabel={conflict?.isTrashed ? t('documents.conflictContinue') : t('documents.conflictReplace')}
+        confirmClass="bg-indigo-600 hover:bg-indigo-700 text-white"
+        onConfirm={() => conflict?.run()}
+        onCancel={() => setConflict(null)}
+      />
     </div>
   )
 }

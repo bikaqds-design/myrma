@@ -37,7 +37,23 @@ export async function auditFlushQueue(): Promise<void> {
   try {
     const q = safeStorage.get<AuditEntry[]>(AUDIT_QUEUE_KEY, [])
     if (!q.length) return
-    const { error } = await supabase.from('user_activity_log').insert(q)
+
+    // The queue lives in localStorage, which is per-browser rather than
+    // per-user, so it can hold entries enqueued by whoever signed in last.
+    // The database now stamps user_email from the JWT (migration 20260821,
+    // BUG-019), which means replaying someone else's entry would file it under
+    // the current user's name. Drop foreign entries instead of misattributing
+    // them — a lost log line is better than a false one.
+    const { data } = await supabase.auth.getUser()
+    const me = data?.user?.email?.toLowerCase()
+    if (!me) return
+
+    const mine = q.filter((e) => e.user_email?.toLowerCase() === me)
+    if (!mine.length) {
+      safeStorage.remove(AUDIT_QUEUE_KEY)
+      return
+    }
+    const { error } = await supabase.from('user_activity_log').insert(mine)
     if (!error) safeStorage.remove(AUDIT_QUEUE_KEY)
   } catch {}
 }

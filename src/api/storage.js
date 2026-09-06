@@ -69,6 +69,23 @@ export const storage = {
     return { name: file.name, url: publicUrl, path: fileName, size: file.size, type: file.type }
   },
 
+  /** A company-wide document — a price list, a policy, a certificate. Not
+   * filed under any product, so it gets its own path rather than living
+   * inside `products/`. */
+  async uploadCompanyDocument(file) {
+    validateAttachment(file)
+    const safeExt = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '')
+    const fileName = `company-docs/${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(7)}.${safeExt}`
+    const { error } = await supabase.storage.from('rma-attachments').upload(fileName, file)
+    if (error) throw error
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('rma-attachments').getPublicUrl(fileName)
+    return { name: file.name, url: publicUrl, path: fileName, size: file.size, type: file.type }
+  },
+
   async uploadProductImage(file, productSku) {
     file = await resizeImage(file) // P-3
     const fileExt = file.name.split('.').pop()

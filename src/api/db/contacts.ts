@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { assertUpdated } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -59,7 +60,7 @@ export const contacts = {
     }
     const { data, error } = await supabase.from('contacts').update(contact).eq('id', id).select()
     if (error) throw error
-    return data[0]
+    return assertUpdated(data, 'Contact')
   },
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from('contacts').delete().eq('id', id)

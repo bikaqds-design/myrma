@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, db, storage } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
@@ -80,6 +81,27 @@ export default function Products({
   const [showAddBrand, setShowAddBrand] = useState(false)
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
+
+  const location = useLocation()
+  const navigate = useNavigate()
+  // The Knowledge Center's "New folder" arrives here, because a folder in its
+  // tree IS a product: there is nowhere else to create one. Read once on
+  // arrival and clear the state immediately — otherwise the modal would
+  // reopen every time this page remounts from the same history entry (a
+  // refresh, or Back-then-Forward).
+  useEffect(() => {
+    const incoming = location.state?.createProduct
+    if (!incoming) return
+    setProductForm((f) => ({
+      ...f,
+      brand_id: incoming.brandId || '',
+      category_id: incoming.categoryId || '',
+      subcategory_id: incoming.subcategoryId || '',
+    }))
+    setShowAddProduct(true)
+    navigate(location.pathname + location.search, { replace: true, state: {} })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,

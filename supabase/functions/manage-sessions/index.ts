@@ -41,7 +41,7 @@ serve(async (req: Request) => {
   let payload: Record<string, unknown> = {}
   try {
     payload = JSON.parse(atob(token.split('.')[1]))
-  } catch { return json({ error: 'Failed to decode token' }) }
+  } catch { return json({ error: 'Failed to decode token' }, 400) }
 
   let body: Record<string, string> = {}
   try { body = await req.json() } catch { /* empty body ok */ }
@@ -70,5 +70,5 @@ serve(async (req: Request) => {
     return json({ sessions: [currentSession], currentSessionId: payload.session_id, activity: activityRows ?? [] })
   }
 
-  return json({ error: 'Unknown action' })
+  return json({ error: 'Unknown action' }, 400)
 })
