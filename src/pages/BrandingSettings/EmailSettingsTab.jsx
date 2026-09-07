@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Input } from '../../components/ui'
 
 export default function EmailSettingsTab({ settings, setSettings, saving, onSave }) {
+  const { t } = useTranslation()
   const [showApiKey, setShowApiKey] = useState(false)
 
   return (
@@ -29,9 +31,9 @@ export default function EmailSettingsTab({ settings, setSettings, saving, onSave
             />
           </svg>
           <div>
-            <p className="text-sm font-medium text-blue-900">Get your Resend API Key</p>
+            <p className="text-sm font-medium text-blue-900">{t('branding.resendHelpTitle')}</p>
             <p className="text-xs text-blue-700 mt-1">
-              1. Sign up at{' '}
+              {t('branding.resendStep1')}{' '}
               <a
                 href="https://resend.com"
                 target="_blank"
@@ -41,18 +43,18 @@ export default function EmailSettingsTab({ settings, setSettings, saving, onSave
                 resend.com
               </a>
               <br />
-              2. Go to API Keys
+              {t('branding.resendStep2')}
               <br />
-              3. Create a new API key
+              {t('branding.resendStep3')}
               <br />
-              4. Copy and paste it below
+              {t('branding.resendStep4')}
             </p>
           </div>
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Email Provider</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">{t('branding.emailProviderLabel')}</label>
         <select
           value={settings.provider}
           onChange={(e) => setSettings({ ...settings, provider: e.target.value })}
@@ -63,7 +65,7 @@ export default function EmailSettingsTab({ settings, setSettings, saving, onSave
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Resend API Key *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">{t('branding.resendApiKeyLabel')}</label>
         <div className="relative">
           <Input
             type={showApiKey ? 'text' : 'password'}
@@ -75,31 +77,31 @@ export default function EmailSettingsTab({ settings, setSettings, saving, onSave
           <button
             type="button"
             onClick={() => setShowApiKey(!showApiKey)}
-            aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+            aria-label={showApiKey ? t('branding.hideApiKey') : t('branding.showApiKey')}
             className="absolute end-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
           >
             {showApiKey ? '🙈' : '👁️'}
           </button>
         </div>
         <p className="text-xs text-gray-500 mt-1">
-          Your API key is stored securely and never exposed to the frontend
+          {t('branding.apiKeyStoredNote')}
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">From Email *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('branding.fromEmailLabel')}</label>
           <Input
             type="email"
             value={settings.from_email}
             onChange={(e) => setSettings({ ...settings, from_email: e.target.value })}
             placeholder="noreply@yourdomain.com"
           />
-          <p className="text-xs text-gray-500 mt-1">Use a verified domain in Resend</p>
+          <p className="text-xs text-gray-500 mt-1">{t('branding.verifiedDomainNote')}</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">From Name</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">{t('branding.fromNameLabel')}</label>
           <Input
             type="text"
             value={settings.from_name}

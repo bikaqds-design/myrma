@@ -47,18 +47,27 @@ export default defineConfig({
         // App-shell strategy: pre-cache all static assets Vite emits
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
 
-        // Network-first for Supabase API calls so data is always fresh
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'supabase-api',
-              networkTimeoutSeconds: 10,
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-        ],
+        // Supabase responses are deliberately NOT cached (BUG-024).
+        //
+        // This used to hold a NetworkFirst rule matching
+        // /^https:\/\/.*\.supabase\.co\/.*/i, which covers REST, Auth and
+        // Storage alike. Every authenticated GET — customers, tickets,
+        // invoices, user_roles — was written to Cache Storage under
+        // 'supabase-api' and never removed, because nothing in the app called
+        // caches.delete or unregistered the worker. Signing out took the
+        // session away and left the data, so on a shared machine the next
+        // person could read the previous user's records out of DevTools with
+        // no session at all.
+        //
+        // The offline benefit did not justify that: NetworkFirst serves the
+        // network whenever it is reachable, so the cache only mattered when
+        // offline, and offline access to someone else's customer list is the
+        // problem rather than the feature. Static assets are still precached
+        // by globPatterns above, which is the part that makes this a PWA.
+        //
+        // Removing the rule only prevents NEW caching. Browsers that already
+        // hold a populated cache are purged on sign-out by
+        // src/lib/purgeCaches.js.
 
         // Don't cache the service worker itself or the Vite dev HMR endpoint
         navigateFallback: '/index.html',

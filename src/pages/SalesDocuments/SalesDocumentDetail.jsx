@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
-import { TICKET_STATUS } from '../../lib/constants'
 import { PageHeader, Spinner, Button } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
 import { downloadQuotationPDF } from '../../lib/quotationPdf'
@@ -375,9 +374,11 @@ export default function SalesDocumentDetail({
   // ── Credit Note lifecycle ─────────────────────────────────────────────────
 
   const handleIssueCN = () => runAction(async () => {
-    const cnCode = await db.creditNotes.issue(doc.id, currentUserEmail)
+    // Second of the two call sites that issued the note and closed the ticket
+    // as separate writes (BUG-048). The close now happens inside the RPC, in
+    // the same transaction, so the pair cannot come apart.
+    const cnCode = await db.creditNotes.issue(doc.id, currentUserEmail, !!doc.ticket_id)
     if (doc.ticket_id) {
-      await db.rmaTickets.update(doc.ticket_id, { ticket_status: TICKET_STATUS.CLOSED })
       await db.ticketActivity.log(doc.ticket_id, 'credit_note_created', `${cnCode} issued — ${doc.reason}`, currentUserEmail)
       toast.success(t('salesDocuments.cnFromTicketToast', { code: cnCode }))
     } else {

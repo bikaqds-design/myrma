@@ -448,7 +448,10 @@
     "deleteBlockedByTickets_one": "{{name}} cannot be deleted: {{count}} RMA ticket references this customer. Delete or reassign the ticket first — its serials, repair outcome and stock history would go with it.",
     "deleteBlockedByTickets_other": "{{name}} cannot be deleted: {{count}} RMA tickets reference this customer. Delete or reassign them first — their serials, repair outcomes and stock history would go with them.",
     "bulkDeleteBlockedByTickets_one": "Cannot delete these {{count}} customers: {{tickets}} RMA ticket references one of them. The delete is all-or-nothing, so deselect that customer or clear the ticket first.",
-    "bulkDeleteBlockedByTickets_other": "Cannot delete these {{count}} customers: {{tickets}} RMA tickets reference them. The delete is all-or-nothing, so deselect those customers or clear the tickets first."
+    "bulkDeleteBlockedByTickets_other": "Cannot delete these {{count}} customers: {{tickets}} RMA tickets reference them. The delete is all-or-nothing, so deselect those customers or clear the tickets first.",
+    "statusActive": "Active",
+    "statusInactive": "Inactive",
+    "statusSuspended": "Suspended"
   },
   "leads": {
     "title": "Leads",
@@ -528,7 +531,8 @@
     "reopenLead": "Reopen Lead",
     "leadReopened": "Lead reopened",
     "bulkDeleteTitle": "Delete Leads",
-    "convertedButStageFailed": "Lead converted, but the deal could not be moved to the stage you chose — it is in the pipeline’s first stage."
+    "convertedButStageFailed": "Lead converted, but the deal could not be moved to the stage you chose — it is in the pipeline’s first stage.",
+    "importPartial": "Import stopped after {{count}} leads. The rest were not imported — check the file and try again."
   },
   "activityType": {
     "call": "Call",
@@ -1657,7 +1661,7 @@
     "activeSessions": "Active Sessions",
     "signOutAll": "Sign Out All Devices",
     "currentSession": "Current Session",
-    "unknownDevice": "Unknown Device",
+    "unknownDevice": "Unknown device",
     "noSessionData": "No session data available",
     "emailNotifications": "Email Notifications",
     "emailNotifsDesc": "Choose which events trigger an email to your inbox",
@@ -1840,7 +1844,14 @@
       "quarter": "Small (quarter width)",
       "half": "Medium (half width)",
       "full": "Large (full width)"
-    }
+    },
+    "sessionLastActive": " · Last active {{time}}",
+    "revokeSession": "Sign out",
+    "revokeSessionConfirm": "Sign this device out? It will not be able to sign back in without your password. An access token it already holds stays valid for up to an hour.",
+    "sessionRevoked": "Device signed out",
+    "failedRevokeSession": "Could not sign that device out: {{error}}",
+    "noSessions": "No active sessions found.",
+    "sessionsAccessTokenNote": "A signed-out device loses access when its current token expires, within the hour."
   },
   "ticketForm": {
     "createTitle": "Create New RMA Ticket",
@@ -2461,7 +2472,35 @@
     "notifCommentAdded": "Comment Added",
     "notifDueSoon": "Due Soon",
     "notifOverdue": "Overdue",
-    "notifDailySummary": "Daily Summary"
+    "notifDailySummary": "Daily Summary",
+    "tableDensity": "Table Density",
+    "tableDensityDesc": "Controls row height in all data tables",
+    "densitySpacious": "Spacious",
+    "densitySpaciousDesc": "More breathing room",
+    "densityComfortable": "Comfortable",
+    "densityComfortableDesc": "Balanced (default)",
+    "densityCompact": "Compact",
+    "densityCompactDesc": "More rows visible",
+    "tabTitleLabel": "Browser Tab Title",
+    "tabTitleDesc": "Text shown in the browser tab — updates instantly",
+    "faviconLabel": "Browser Favicon",
+    "faviconDesc": "Icon shown in the browser tab · PNG, ICO, SVG · Max 1MB · Recommended: 32×32 or 64×64 px",
+    "saveFootnote": "Display settings apply immediately for all users · Branding requires Save",
+    "resendHelpTitle": "Get your Resend API Key",
+    "resendStep1": "1. Sign up at",
+    "resendStep2": "2. Go to API Keys",
+    "resendStep3": "3. Create a new API key",
+    "resendStep4": "4. Copy and paste it below",
+    "emailProviderLabel": "Email Provider",
+    "resendApiKeyLabel": "Resend API Key *",
+    "hideApiKey": "Hide API key",
+    "showApiKey": "Show API key",
+    "apiKeyStoredNote": "Your API key is stored securely and never exposed to the frontend",
+    "fromEmailLabel": "From Email *",
+    "fromNameLabel": "From Name",
+    "verifiedDomainNote": "Use a verified domain in Resend",
+    "emailTemplatesTitle": "Email Templates",
+    "emailTemplatesDesc": "Customize email notification templates"
   },
   "backup": {
     "title": "Backup & Restore",
@@ -2600,7 +2639,9 @@
       "savePolicies": "Save Policies",
       "howItWorks": "How it works:",
       "saved": "SLA policies saved",
-      "saveFailed": "SLA policies save failed"
+      "saveFailed": "SLA policies save failed",
+      "autoSetDesc": "Auto-set ticket due dates based on priority when a new ticket is created.",
+      "howItWorksBody": "When SLA is enabled, creating a new ticket will automatically set its due date based on the priority selected. The due date can always be overridden manually in the ticket form."
     },
     "automationRules": {
       "header": "Automation Rules",
@@ -2762,7 +2803,9 @@
       "updated": "Field updated",
       "created": "Custom field created",
       "deleted": "Deleted",
-      "deleteConfirm": "Delete this custom field? Data stored in this field will not be deleted from existing records."
+      "deleteConfirm": "Delete this custom field? Data stored in this field will not be deleted from existing records.",
+      "notWiredTitle": "Fields defined here do not appear on forms yet.",
+      "notWiredBody": "Definitions are saved, but no ticket or customer form renders custom fields and there is nowhere to store their values. Anything added here has no effect until that is built."
     },
     "dataCleanup": {
       "header": "Data Cleanup",
@@ -2791,7 +2834,22 @@
       "mergeHint": "To merge or delete records, go to the Customers page and edit them directly.",
       "working": "Working...",
       "deleteConfirm": "Delete {{count}} {{label}} tickets? This cannot be undone.",
-      "deleted": "Deleted {{count}} {{label}} tickets"
+      "deleted": "Deleted {{count}} {{label}} tickets",
+      "integrityHeader": "Data Integrity",
+      "integrityDesc": "Standing checks over invariants the data can break. Read-only — nothing here changes a row.",
+      "integrityRun": "Run checks",
+      "integrityRunning": "Checking…",
+      "integrityClean": "No integrity violations found.",
+      "integrityFailed": "Could not run the integrity checks: {{error}}",
+      "integrityShowRows": "Show affected rows",
+      "integrityHideRows": "Hide rows",
+      "check_unbacked_amount_paid": "Invoices claiming payment with nothing applied",
+      "check_delivered_without_stock_moves": "Delivered orders with no stock movement recorded",
+      "check_unit_without_serial": "Inventory units with no serial number",
+      "check_posted_invoice_without_due_date": "Posted invoices with no due date",
+      "severity_high": "High",
+      "severity_medium": "Medium",
+      "severity_low": "Low"
     },
     "integrations": {
       "header": "Integrations",
@@ -2823,7 +2881,10 @@
       "deleted": "Deleted",
       "deleteConfirm": "Delete this webhook?",
       "testSent": "Test payload sent",
-      "testFailed": "Failed to reach webhook URL — check CORS or the URL"
+      "testFailed": "Failed to reach webhook URL — check CORS or the URL",
+      "secretPlaceholder": "A shared secret used to sign deliveries",
+      "secretSetPlaceholder": "A secret is set — leave blank to keep it",
+      "secretHelp": "Deliveries are signed with HMAC-SHA256 and sent as the X-Signature-256 header. The secret is stored server-side and cannot be read back."
     },
     "pdfLayout": {
       "header": "PDF Layout",
@@ -2891,28 +2952,17 @@
     },
     "rmaConfig": {
       "header": "RMA Configuration",
-      "subtitle": "SLA rules, auto-assignment, and ticket defaults",
+      "subtitle": "Default values applied to new tickets",
       "saveAll": "Save All Changes",
       "defaultSettings": "Default Ticket Settings",
       "defaultPriority": "Default Priority",
       "defaultStatus": "Default Status",
       "autoDueDays": "Auto Due Date (days)",
-      "slaRules": "SLA Rules by Priority",
-      "slaDesc": "Define response and resolution time targets in hours.",
-      "priorityCol": "Priority",
-      "responseCol": "Response Target (hrs)",
-      "resolutionCol": "Resolution Target (hrs)",
-      "autoAssignment": "Auto-Assignment Rules",
-      "autoAssignDesc": "Automatically assign tickets based on conditions.",
-      "addRule": "Add Rule",
-      "noRules": "No auto-assignment rules. Click \"Add Rule\" to create one.",
-      "when": "When",
-      "is": "is",
-      "assignTo": "→ assign to",
-      "selectUser": "Select user...",
-      "customerNamePlaceholder": "Customer name...",
       "loadFailed": "Failed to load config",
-      "saved": "Configuration saved"
+      "saved": "Configuration saved",
+      "defaultSettingsDesc": "Applied when a new ticket is created. Anyone raising a ticket can still change them.",
+      "movedTitle": "Looking for SLA targets or auto-assignment?",
+      "movedBody": "SLA response and resolution targets are set in SLA Policies. Rules that assign a ticket automatically are set in Automation Rules, which can also change status and priority. This screen previously carried a second copy of both; the copies were never applied to any ticket and have been removed."
     },
     "waSettings": {
       "messagingProviders": "Messaging Providers",
@@ -4250,7 +4300,9 @@
     "checkInbox": "Check your inbox",
     "resetSent": "A password reset link has been sent to your email address.",
     "loginFailed": "Login failed",
-    "resetFailed": "Failed to send reset email"
+    "resetFailed": "Failed to send reset email",
+    "mfaUnavailable": "Could not confirm your two-factor status, so the sign-in was stopped. Check your connection and try again.",
+    "forgotIntro": "Enter your email address and we'll send you a link to reset your password."
   },
   "emptyState": {
     "nothingYet": "Nothing here yet",
@@ -4310,5 +4362,54 @@
   "table": {
     "selectAll": "Select all rows",
     "selectRow": "Select row"
+  },
+  "tracker": {
+    "issueDescription": "Issue Description",
+    "messages": "Messages",
+    "noMessages": "No messages yet. Send a message below to contact our team.",
+    "replyingToMessage": "Replying to message",
+    "cancelReply": "Cancel reply",
+    "sendMessage": "Send Message",
+    "sendFailed": "Could not send your message. Please try again."
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "subtitle": "The page crashed unexpectedly.",
+    "copied": "Copied!",
+    "copyDetails": "Copy error details",
+    "reload": "Reload page",
+    "goHome": "Go to dashboard"
+  },
+  "printLabel": {
+    "title": "RMA LABEL",
+    "customerInfo": "CUSTOMER INFO",
+    "ticketInfo": "TICKET INFO",
+    "products": "PRODUCTS",
+    "customerName": "Customer Name:",
+    "createdDate": "Created Date:",
+    "priority": "Priority:",
+    "status": "Status:",
+    "technician": "Technician:",
+    "unassigned": "Unassigned",
+    "dueDate": "Due Date:",
+    "serial": "Serial: {{value}}",
+    "productStatus": "Status: {{value}}",
+    "noProducts": "No products",
+    "scanForDetails": "Scan for details",
+    "cancel": "Cancel",
+    "print": "Print Label"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "urlPrefix": "The URL",
+    "urlSuffix": "doesn't match any page.",
+    "hint": "Check the URL or use the sidebar to navigate.",
+    "goHome": "Go to Dashboard"
+  },
+  "aiAssist": {
+    "label": "AI Assist",
+    "regenerate": "Regenerate",
+    "suggestedNextAction": "Suggested Next Action",
+    "failed": "AI assist failed"
   }
 }

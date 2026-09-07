@@ -1,3 +1,41 @@
+/**
+ * RMA Configuration — ticket defaults. (Audit finding BUG-027.)
+ *
+ * ── What this screen used to be ─────────────────────────────────────────────
+ *
+ * Three sections, saving three keys: `sla_rules`, `auto_assignment_rules` and
+ * `default_settings`. Nothing anywhere read any of them — this file was the
+ * only reference to all three in the entire repository. An administrator could
+ * set a "Critical tickets, assign to X" rule, save it, see the success toast,
+ * and have every Critical ticket afterwards go unassigned.
+ *
+ * Worse than dead: the first two duplicated features that DO work.
+ *
+ *   SLA targets            -> SLA Policies (`sla_config`, read by
+ *                             slaConfig.computeDueDate when raising a ticket)
+ *   Assignment by condition -> Automation Rules (`assign_technician` action,
+ *                             executed by applyActions in api/db/system.ts)
+ *
+ * So the app had two SLA editors and two assignment-rule editors, one working
+ * and one silently discarded, with no way for an admin to tell which was which.
+ * Both dead copies are removed here. No capability is lost; the working screens
+ * are named on the page so the path is obvious to someone who used to look for
+ * them here.
+ *
+ * ── The third section was worth keeping, so it was made real ────────────────
+ *
+ * Default priority, default status and the auto due-date window are genuinely
+ * useful and cheap to honour, so rather than being deleted they are now read by
+ * the ticket form through `useTicketDefaults`. This is the only section left.
+ *
+ * ── Nothing was lost in the removal ─────────────────────────────────────────
+ *
+ * Checked against production before deleting: `rma_config` held no `sla_rules`
+ * row, no `auto_assignment_rules` row and no `default_settings` row. Nobody has
+ * ever pressed Save on this screen in this installation's history, so there are
+ * no stored settings to migrate or strand.
+ */
+
 import React, { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import i18next from 'i18next'
@@ -6,75 +44,27 @@ import toast from 'react-hot-toast'
 import { toUserMessage } from '../../lib/errorMessage'
 import { MigrationNotice } from './Announcements'
 import { captureException } from '../../lib/sentry'
-import { TICKET_STATUS, TICKET_STATUS_LIST, PRIORITY_LIST } from '../../lib/constants'
-
-const DEFAULT_SLA = {
-  Low: { response: 72, resolution: 168 },
-  Medium: { response: 24, resolution: 72 },
-  High: { response: 4, resolution: 24 },
-  Critical: { response: 1, resolution: 4 },
-}
-const DEFAULT_RULES = []
-// default_status was 'New', which is not one of the app's statuses and never
-// has been — TICKET_STATUS_LIST has no such member, so nothing downstream could
-// render, filter or transition it. The two legacy tickets carrying 'New' were
-// invisible on the kanban board until BUG #25 was fixed. Defaults now come from
-// the same constants every other screen reads.
-const DEFAULT_SETTINGS = {
-  default_priority: 'Medium',
-  default_status: TICKET_STATUS.OPEN,
-  auto_due_days: 7,
-}
-const PRIORITY_COLORS = {
-  Low: 'bg-gray-100 dark:bg-[#1a2230] text-gray-700 dark:text-[#9aa4b2]',
-  Medium: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
-  High: 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300',
-  Critical: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
-}
+import { TICKET_STATUS_LIST, PRIORITY_LIST } from '../../lib/constants'
+import { TICKET_DEFAULTS, TICKET_DEFAULTS_KEY, normaliseTicketDefaults } from '../../lib/ticketDefaults'
 
 export default function RMAConfig({ currentUserEmail }) {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(true)
   const [missing, setMissing] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [sla, setSla] = useState(DEFAULT_SLA)
-  const [rules, setRules] = useState(DEFAULT_RULES)
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
-  const [users, setUsers] = useState([])
+  const [settings, setSettings] = useState(TICKET_DEFAULTS)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [cfgResult, usersData] = await Promise.all([
-        db.rmaConfig.getAll(),
-        db.userRoles.listAllRoles(),
-      ])
+      const cfgResult = await db.rmaConfig.getAll()
       if (cfgResult.missing) {
         setMissing(true)
         setLoading(false)
         return
       }
-      setUsers(usersData)
-      const byKey = Object.fromEntries(cfgResult.data.map((r) => [r.config_key, r.config_value]))
-      if (byKey.sla_rules) setSla(byKey.sla_rules)
-      if (byKey.auto_assignment_rules) setRules(byKey.auto_assignment_rules)
-      if (byKey.default_settings) {
-        // A previously-saved default may name a status or priority this build no
-        // longer has — 'New' is the live example. A <select> whose value is not
-        // among its options renders blank and then silently saves whichever
-        // option the user's next edit lands on, so fall back to a known-good
-        // value rather than showing an empty control.
-        const saved = byKey.default_settings
-        setSettings({
-          ...saved,
-          default_status: TICKET_STATUS_LIST.includes(saved.default_status)
-            ? saved.default_status
-            : DEFAULT_SETTINGS.default_status,
-          default_priority: PRIORITY_LIST.includes(saved.default_priority)
-            ? saved.default_priority
-            : DEFAULT_SETTINGS.default_priority,
-        })
-      }
+      const row = cfgResult.data.find((r) => r.config_key === TICKET_DEFAULTS_KEY)
+      if (row) setSettings(normaliseTicketDefaults(row.config_value))
     } catch (err) {
       captureException(err)
       toast.error(i18next.t('cp.rmaConfig.loadFailed'))
@@ -90,18 +80,10 @@ export default function RMAConfig({ currentUserEmail }) {
   const save = async () => {
     setSaving(true)
     try {
-      await Promise.all([
-        db.rmaConfig.set('sla_rules', sla, currentUserEmail),
-        db.rmaConfig.set('auto_assignment_rules', rules, currentUserEmail),
-        db.rmaConfig.set('default_settings', settings, currentUserEmail),
-      ])
+      await db.rmaConfig.set(TICKET_DEFAULTS_KEY, settings, currentUserEmail)
       toast.success(t('cp.rmaConfig.saved'))
       db.auditLog
-        .log(
-          currentUserEmail,
-          'rma_config_updated',
-          'Updated RMA configuration (SLA rules, assignment rules, default settings)'
-        )
+        .log(currentUserEmail, 'rma_config_updated', 'Updated default ticket settings')
         .catch(() => {})
     } catch (err) {
       captureException(err)
@@ -110,15 +92,6 @@ export default function RMAConfig({ currentUserEmail }) {
       setSaving(false)
     }
   }
-
-  const addRule = () =>
-    setRules([
-      ...rules,
-      { condition_field: 'priority', condition_value: 'Critical', assign_to: '' },
-    ])
-  const removeRule = (i) => setRules(rules.filter((_, idx) => idx !== i))
-  const updateRule = (i, key, val) =>
-    setRules(rules.map((r, idx) => (idx === i ? { ...r, [key]: val } : r)))
 
   const inp =
     'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600'
@@ -153,13 +126,15 @@ export default function RMAConfig({ currentUserEmail }) {
 
       {/* Default Settings */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-        <h3 className="text-base font-semibold text-gray-900 mb-4">{t('cp.rmaConfig.defaultSettings')}</h3>
+        <h3 className="text-base font-semibold text-gray-900 mb-1">{t('cp.rmaConfig.defaultSettings')}</h3>
+        <p className="text-sm text-gray-500 mb-4">{t('cp.rmaConfig.defaultSettingsDesc')}</p>
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5" htmlFor="cfg-default-priority">
               {t('cp.rmaConfig.defaultPriority')}
             </label>
             <select
+              id="cfg-default-priority"
               value={settings.default_priority}
               onChange={(e) => setSettings({ ...settings, default_priority: e.target.value })}
               className={sel}
@@ -170,8 +145,11 @@ export default function RMAConfig({ currentUserEmail }) {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">{t('cp.rmaConfig.defaultStatus')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5" htmlFor="cfg-default-status">
+              {t('cp.rmaConfig.defaultStatus')}
+            </label>
             <select
+              id="cfg-default-status"
               value={settings.default_status}
               onChange={(e) => setSettings({ ...settings, default_status: e.target.value })}
               className={sel}
@@ -182,16 +160,20 @@ export default function RMAConfig({ currentUserEmail }) {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5" htmlFor="cfg-auto-due-days">
               {t('cp.rmaConfig.autoDueDays')}
             </label>
             <input
+              id="cfg-auto-due-days"
               type="number"
               min={1}
               max={365}
               value={settings.auto_due_days}
               onChange={(e) =>
-                setSettings({ ...settings, auto_due_days: parseInt(e.target.value) || 7 })
+                setSettings({
+                  ...settings,
+                  auto_due_days: parseInt(e.target.value) || TICKET_DEFAULTS.auto_due_days,
+                })
               }
               className={inp}
             />
@@ -199,167 +181,12 @@ export default function RMAConfig({ currentUserEmail }) {
         </div>
       </div>
 
-      {/* SLA Rules */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-        <h3 className="text-base font-semibold text-gray-900 mb-1">{t('cp.rmaConfig.slaRules')}</h3>
-        <p className="text-sm text-gray-500 mb-4">
-          {t('cp.rmaConfig.slaDesc')}
-        </p>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                {[
-                  t('cp.rmaConfig.priorityCol'),
-                  t('cp.rmaConfig.responseCol'),
-                  t('cp.rmaConfig.resolutionCol'),
-                ].map((h, i) => (
-                  <th
-                    key={i}
-                    className="px-4 py-3 text-start text-xs font-semibold text-gray-500 uppercase"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {Object.keys(sla).map((priority) => (
-                <tr key={priority} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-semibold ${PRIORITY_COLORS[priority]}`}
-                    >
-                      {priority}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      min={1}
-                      value={sla[priority].response}
-                      onChange={(e) =>
-                        setSla({
-                          ...sla,
-                          [priority]: { ...sla[priority], response: parseInt(e.target.value) || 1 },
-                        })
-                      }
-                      className="w-28 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      min={1}
-                      value={sla[priority].resolution}
-                      onChange={(e) =>
-                        setSla({
-                          ...sla,
-                          [priority]: {
-                            ...sla[priority],
-                            resolution: parseInt(e.target.value) || 1,
-                          },
-                        })
-                      }
-                      className="w-28 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Auto-Assignment Rules */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-base font-semibold text-gray-900">{t('cp.rmaConfig.autoAssignment')}</h3>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {t('cp.rmaConfig.autoAssignDesc')}
-            </p>
-          </div>
-          <button
-            onClick={addRule}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-              />
-            </svg>
-            {t('cp.rmaConfig.addRule')}
-          </button>
-        </div>
-        {rules.length === 0 && (
-          <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
-            {t('cp.rmaConfig.noRules')}
-          </div>
-        )}
-        <div className="space-y-3">
-          {rules.map((rule, i) => (
-            <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <span className="text-sm text-gray-500 whitespace-nowrap">{t('cp.rmaConfig.when')}</span>
-              <select
-                value={rule.condition_field}
-                onChange={(e) => updateRule(i, 'condition_field', e.target.value)}
-                className={`${sel} flex-1`}
-              >
-                <option value="priority">Priority</option>
-                <option value="customer_name">Customer Name</option>
-              </select>
-              <span className="text-sm text-gray-500">{t('cp.rmaConfig.is')}</span>
-              {rule.condition_field === 'priority' ? (
-                <select
-                  value={rule.condition_value}
-                  onChange={(e) => updateRule(i, 'condition_value', e.target.value)}
-                  className={`${sel} flex-1`}
-                >
-                  {['Low', 'Medium', 'High', 'Critical'].map((p) => (
-                    <option key={p}>{p}</option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  value={rule.condition_value}
-                  onChange={(e) => updateRule(i, 'condition_value', e.target.value)}
-                  placeholder={t('cp.rmaConfig.customerNamePlaceholder')}
-                  className={`${inp} flex-1`}
-                />
-              )}
-              <span className="text-sm text-gray-500 whitespace-nowrap">{t('cp.rmaConfig.assignTo')}</span>
-              <select
-                value={rule.assign_to}
-                onChange={(e) => updateRule(i, 'assign_to', e.target.value)}
-                className={`${sel} flex-1`}
-              >
-                <option value="">{t('cp.rmaConfig.selectUser')}</option>
-                {users.map((u) => (
-                  <option key={u.user_email} value={u.user_email}>
-                    {u.user_email}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => removeRule(i)}
-                className="text-red-400 hover:text-red-600 flex-shrink-0"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-          ))}
-        </div>
+      {/* Where the two removed sections went. Named rather than silently
+          dropped: an admin who used to look for them here needs to know the
+          working equivalents exist. */}
+      <div className="bg-gray-50 rounded-xl border border-gray-200 p-6">
+        <h3 className="text-base font-semibold text-gray-900 mb-1">{t('cp.rmaConfig.movedTitle')}</h3>
+        <p className="text-sm text-gray-500">{t('cp.rmaConfig.movedBody')}</p>
       </div>
     </div>
   )

@@ -17,11 +17,11 @@
 | Critical | 4 |
 | High | 16 |
 | Medium | 32 |
-| Low | 22 |
+| Low | 23 |
 | Informational | 6 |
-| **Total** | **80** |
+| **Total** | **81** |
 
-Of the 80 findings, 24 are **confirmed by execution** (a command, query or rolled-back probe produced the evidence), 53 are **confirmed by code reading** (the defect is unambiguous in source or live catalog text), and 3 are **suspected** (design recommendations or settings the tooling could not read).
+Of the 81 findings, 25 are **confirmed by execution** (a command, query or rolled-back probe produced the evidence), 53 are **confirmed by code reading** (the defect is unambiguous in source or live catalog text), and 3 are **suspected** (design recommendations or settings the tooling could not read).
 
 ### Top 10 to fix first
 
@@ -311,6 +311,14 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: the Integrations/Webhooks features are advertised but inert.
 * Suggested fix: move dispatch to a database trigger + `pg_net`, or an Edge Function invoked by the client; keep secrets server-side; delete the browser fetch.
 * Confidence: Confirmed by code reading
+* **Status: FIXED — applied, deployed and verified end-to-end 2026-09-06.** Delivery moved into a new `dispatch-webhook` Edge Function (deployed, v2, `verify_jwt: true`); database half in `20260825_webhook_secrets_server_side.sql`. Calling a Supabase Function is permitted by the same CSP that blocked the direct `fetch`, which is why this shape works where the old one could not — and delivery now completes server-side, so closing the tab no longer aborts it.
+* **Three defects, not the two originally filed.** Alongside the CSP block and the browser-held secrets, there were **three different signing schemes** — `dispatch` sent an HMAC as `X-Signature-256`, the Control Panel's Test button sent the secret in *plaintext* as `X-Webhook-Secret`, and the deleted second screen used `X-myRMA-Secret`. No receiver could have verified all three. Only the HMAC survives; a plaintext secret in a header proves nothing about the body and hands the secret to anyone who can see the request.
+* **The secret is now unreadable by any client role, which is the part a client-side fix could not achieve.** `admin_all` grants administrators the whole row, so an admin could have requested `?select=secret_key` regardless of what our code selected. The table-level SELECT grant was replaced with an explicit column list omitting `secret_key`, and a generated `has_secret` column lets the Control Panel show *whether* a secret is set without being able to read it. Probed live as a real admin: `SELECT *` → 42501, reading `secret_key` → 42501, reading the safe columns → succeeds, writing a new secret → still allowed (4 passed, 0 failed).
+* **A column-level REVOKE alone did nothing, and the migration's own guard caught it.** Postgres treats a table-level SELECT grant as covering every column, so `REVOKE SELECT (secret_key)` against it is silently a no-op. The first apply was refused by the post-condition check rather than appearing to succeed. Recorded in the migration so the next person does not repeat it.
+* **Verified end-to-end against production, not just by unit test** — which matters here, because the original defect was precisely that nobody noticed the feature never fired. Unauthenticated call → gateway 401; anon key with no real user → function 401; `GET` → 405; `OPTIONS` → 200. A disposable webhook was created **through the Control Panel form**, then: pointed at `https://127.0.0.1/hook` → `"Refused: the URL points at a private address"`, `delivered: 0`, no outbound request; repointed at `https://example.com/hook` → a genuine POST left Supabase's network and returned **`HTTP 405`**, reported honestly with `delivered: 0` rather than claimed as success. The probe webhook was deleted afterwards; `webhooks` is back to 0 rows.
+* **Two real bugs were found by that end-to-end pass and would not have been caught by mocks.** (1) `webhooks.create()` and `update()` chained a bare `.select()`, which compiles to `INSERT/UPDATE … RETURNING` and is checked against SELECT privileges — so creating a webhook broke with "permission denied for table webhooks" the moment the column grant landed (the same RETURNING mechanism as BUG-079). Both now name their columns. (2) The function's CORS preflight allowed only `authorization, content-type`, but `supabase-js` always sends `x-client-info`, so the browser failed the preflight and the call never left the page — the identical failure shape this finding is about, reintroduced by the fix. Now matches the header list every other function in the project uses.
+* **A server-side request forgery guard was added, which the original finding did not call for.** This function POSTs to an administrator-supplied URL from the service role's network position, so without a check it is an SSRF primitive. It requires https and refuses localhost, `.local`/`.internal`, and private, loopback and link-local IPv4 literals (the cloud metadata address 169.254.169.254 falls under link-local). Redirects are `redirect: 'manual'` so a redirect cannot land somewhere the check cleared. **Known limit, stated rather than implied away:** this cannot defeat DNS rebinding, which would need resolution-time checking that Deno's fetch does not expose.
+* Also bounded: a 10s per-delivery timeout, at most 20 webhooks per event, and `last_triggered_at` updated only for deliveries that actually returned 2xx. Tests: `src/test/webhookDispatch.test.js` (8 cases — delivery goes through the function not a fetch, a failure never breaks the caller's ticket save, errors reach Sentry, the Test button reports real failures instead of success, and `list()` never selects `secret_key`). Full suite **50 files, 1249 tests passing**; build and `lint:ci` clean.
 
 #### [HIGH] Non-viewer staff can rewrite inventory units directly, un-reserving stock held by sales orders without a ledger entry
 
@@ -404,6 +412,9 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * **Ordering was checked, not assumed.** The extended versions still sort correctly between neighbouring dates (`20260524` < `20260524000001` < `20260526`), and in each collision the files are functionally independent — product/company document tables versus the payment-lockdown policies, and the four unrelated 20260604 notification/template migrations — so the order within a shared date does not matter for a rebuild. That independence is an assumption worth re-checking if any of those files are ever edited to depend on each other.
 * **This session's own drift was corrected at the same time.** The nine migrations applied today had been recorded under generated timestamps (`20260904063824`, `20260906092058` …) with the filename only in `name`, so `db push` would have tried to re-run `20260808_*.sql` through `20260824_*.sql`. Those nine rows were deleted and replaced by their file versions.
 * **Supporting evidence for treating the historical files as applied:** a sampled verification across the whole timeline — 14 durable objects (tables and functions) from `00000000_baseline_schema` through `20260815` — found **all 14 live**. Note the limit of that evidence: per-object checking is strong when objects are present and weak when absent, since a later migration may legitimately have dropped one.
+* **It drifted again, in the opposite direction, and was repaired 2026-09-07.** The ledger was fine; the *repository* was not. Four migrations applied on 2026-09-06 — `20260833_issue_credit_note_closes_ticket`, `20260834_drop_old_issue_credit_note_overload`, `20260835_deal_status_follows_stage`, `20260836_consolidate_preference_policies` — were recorded in `schema_migrations` but their `.sql` files were **never written to `supabase/migrations/`**. So the BUG-048, BUG-033 and BUG-050 fixes existed only in the production database: a rebuilt environment would have silently lacked all three. The four files were recovered verbatim from the ledger's own `statements` column and written to the repository, each carrying a provenance header saying where it came from. 171 files, ledger consistent.
+* Related hygiene, same day: the three migrations applied on 2026-09-07 had been recorded under bare names (`real_session_management`) rather than the `20260837_real_session_management` convention every other row uses. Renamed in the ledger so it stays greppable by filename.
+* **The lesson is the one this finding keeps teaching:** `apply_migration` records a row whether or not a file exists, so applying and committing are two separate acts and neither implies the other. Enforcing `db diff` in CI — still open below — is what would catch this class automatically.
 * **Still open, and deliberately not done here:** enforcing `supabase db diff` in CI, which is what would stop this drifting again. It needs the Supabase CLI plus a database password in CI secrets, which is a repository-settings change rather than a code one.
 
 #### [HIGH] The Webhooks control-panel page calls a method that does not exist
@@ -532,6 +543,9 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: MFA bypass under network faults or a targeted request block.
 * Suggested fix: check `error` and refuse to call `finishLogin` until the level is known.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-06** (ships with the next front-end deploy). The check was extracted to `src/lib/mfaGate.js` and now fails **closed**: only a definite “no second factor required” admits, and anything else — including not being able to tell — refuses, with the caller signing the session out rather than leaving it half-authenticated.
+* **There were two fail-open points, not the one filed.** Besides the ignored error from `getLevel()`, the line immediately after it had the same shape: when `getLevel()` *did* report a second factor was owed but `listFactors()` then failed, `totp` was `undefined` and control fell through to the same `finishLogin` call. A third, subtler case is now also refused — `nextLevel === 'aal2'` with no verified TOTP found is a contradiction, not a green light.
+* Extracted from `App.jsx` deliberately: a security check that nothing exercises is how this survived. `src/test/mfaGate.test.js` covers 11 cases, including every failure path asserting it never returns `ok`. Confirmed still latent before changing anything — `auth.mfa_factors` holds **zero rows**, so nobody is locked out by the stricter behaviour.
 
 #### [MEDIUM] Edge functions accept suspended users and expose provider errors; `ai-assist` is unrestricted
 
@@ -579,6 +593,12 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: phishing links inside the staff UI; comment spam on any ticket; weak brute-force protection on RMA numbers.
 * Suggested fix: as above; also `rel="noopener noreferrer"` plus URL-origin check before rendering any attachment link.
 * Confidence: Confirmed by code reading
+* **Status: FIXED (attachment, email and threading) — deployed and verified against production 2026-09-07** (`public-track` redeployed; client changes ship with the next front-end deploy). Fixed in **two halves**, because hardening the writer does nothing about what is already stored or about any other path that writes an attachment.
+* **Write side.** `sanitiseAttachments()` keeps only the five fields the UI reads and requires `url` to be https on this project's own storage **origin** — compared as an origin, never as a substring. `authorEmail` is validated instead of stored raw. `parentCommentId` is now looked up and rejected unless it belongs to the same ticket, closing the cross-ticket threading.
+* **Read side.** `src/lib/attachmentUrl.js` (`safeAttachmentUrl`/`safeAttachmentHref`) is applied at all **9** render sites across 5 files, so an unsafe value yields no `href` at all rather than a clickable link.
+* **Verified by running the finding's own exploit against production.** A single anonymous POST carrying three attachments returned: `javascript:alert(1)` — **dropped**; `https://evil.example/?x=<project>.supabase.co`, which *contains* the expected origin as text — **dropped**, which is precisely why this is an origin comparison and not a substring test; the genuine storage URL — **kept**, with an extra `evil` field stripped. `authorEmail: "not-an-email"` stored as `null`. A reply threaded onto a comment belonging to a different ticket was refused with 400. The probe comments were deleted afterwards (0 remain).
+* Tests: `src/test/attachmentUrl.test.js`, 12 cases — `javascript:`, `data:`, `vbscript:`, a foreign host, a host merely containing the origin as text, a lookalike subdomain, plain http on the right host, relative paths, and non-string values; plus the genuine URLs that must pass.
+* **Not fixed, and still open:** the endpoint still accepts any ticket UUID without proof the caller knows the RMA number, and the rate limiter is still per-instance rather than backed by a table. Comment spam on a known ticket id remains possible; the phishing vector is what has been closed.
 
 #### [MEDIUM] The service worker caches authenticated API responses and never clears them on logout
 
@@ -592,6 +612,10 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: data leakage on shared devices; confusing stale views.
 * Suggested fix: remove Supabase REST from `runtimeCaching` (keep only static assets), or scope caching to public endpoints and call `caches.delete('supabase-api')` on sign-out.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-06** (ships with the next front-end deploy), in two parts, both needed.
+* **Part one — stop caching.** The `runtimeCaching` rule is gone from `vite.config.js`. It matched `/^https:\/\/.*\.supabase\.co\/.*​/i`, which covers REST, Auth and Storage alike, so every authenticated GET was written to Cache Storage under `supabase-api`. The offline benefit did not justify it: `NetworkFirst` serves the network whenever it is reachable, so the cache only mattered when offline — and offline access to someone else's customer list is the problem, not the feature. Static assets are still precached, which is the part that makes this a PWA. Verified in the built artefact: `dist/sw.js` now contains exactly one `registerRoute`, the navigation fallback, and no `NetworkFirst` handler or `supabase-api` cache.
+* **Part two — purge what is already there.** Removing the rule only prevents *new* caching; a browser that already holds a populated `supabase-api` cache keeps it until something deletes it. `src/lib/purgeApiCaches()` is called from both `auth.signOut()` and `auth.signOutAll()`. This is the half that actually remediates the existing exposure rather than just preventing more of it — without it, every machine that has ever used the app keeps the data.
+* Best-effort by design: Cache Storage is unavailable in private windows and blocked-site-data contexts, and a purge failure must never stop someone signing out. `src/test/purgeCaches.test.js`, 7 cases — deletes the API cache, leaves the static precache alone, deletes every match not just the first, survives a missing Cache Storage, a rejecting `keys()`, and one `delete` failing mid-way.
 
 #### [MEDIUM] Backup export contains password hashes, permission maps and webhook secrets; restore is not transactional
 
@@ -605,6 +629,12 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: credential exposure via backup files; partial restores.
 * Suggested fix: add `user_roles`/`webhooks` column allowlists like `EMAIL_SETTINGS_SAFE_COLUMNS`; implement restore as a SECURITY DEFINER RPC wrapping the upserts in one transaction.
 * Confidence: Confirmed by code reading
+* **Status: PARTLY FIXED 2026-09-06** (ships with the next front-end deploy). Column allowlists added for `user_roles` and `webhooks`, following the `EMAIL_SETTINGS_SAFE_COLUMNS` pattern already in the file.
+* `webhooks.secret_key` — the HMAC key a receiver uses to verify a delivery genuinely came from us — is excluded, and the table is marked `restore: false` for the same reason `email_settings` is: restoring it would overwrite live secrets with nothing.
+* **This also repairs a regression I introduced earlier today.** Migration 20260825 (BUG-009) replaced `authenticated`'s table-wide SELECT on `webhooks` with a column grant omitting `secret_key`, so the backup's bare `select('*')` began failing with “permission denied for table webhooks”. The per-table error handling meant it degraded rather than killed the export, but webhooks would have been absent from every backup and listed under `failed`. Naming the columns is now required, not merely tidier.
+* For `user_roles`, `permissions` is deliberately **kept** — it is the permission map, configuration rather than a secret, and a restore that dropped it would put everyone back on default access, a worse outcome than the risk. `notes` and `suspended_reason` are excluded: free text written *about a person* does not belong in a file that circulates on laptops. `suspended_by`/`suspended_date` are kept as facts about the account rather than commentary about the human. `password_hash` is simply gone (BUG-039).
+* **The non-transactional restore is NOT fixed.** `importEnvelope` still upserts table by table, so a failure at table 20 leaves 19 at backup state and the rest live. Making it atomic needs a SECURITY DEFINER RPC wrapping the upserts, which is a separate piece of work and is left open rather than implied closed.
+* **Old backup files remain a live exposure.** Any export taken before today still contains the webhook secret and the legacy password hash. Those files should be deleted; nothing in this fix reaches them.
 
 #### [MEDIUM] Upload validation is inconsistent and trusts the client; object paths include unsanitised identifiers
 
@@ -618,6 +648,10 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: stored content injection on the storage domain; path confusion.
 * Suggested fix: bucket `allowed_mime_types`; `encodeURIComponent`/slugify path segments; validate SVG or disallow it.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-07** — in two parts, one of which was already done.
+* **The server-enforced MIME allowlist already existed**, added with BUG-003 part 1 and confirmed live: the `rma-attachments` bucket carries `file_size_limit` 26,214,400 (25 MB) and a 15-type `allowed_mime_types` list with **SVG deliberately excluded**, so the “logo containing `<script>`” route in this finding is already refused by the storage API regardless of what the client checks.
+* **What remained was path construction**, and that is now fixed. `pathSegment()` and `safeExtension()` in `src/api/storage.js` are applied to all **7** interpolated object paths. The sharp cases were `products/${productSku}/…` and `brands/${brandName.toLowerCase()}/…`, both free text a manager types: a SKU containing `/` wrote into a different folder and one containing `..` walked out of the products tree entirely. Anything outside `[A-Za-z0-9._-]` is replaced, leading dots are stripped so `..` and `.hidden` cannot survive, and an empty result falls back rather than producing a `//`. File extensions are derived safely too.
+* **Still open:** `validateAttachment` continues to trust `file.type`, a client-supplied string. That now matters much less, since the bucket enforces its own allowlist server-side and is the thing that actually decides.
 
 #### [MEDIUM] Control-panel RMA Config writes settings nothing reads; custom fields are never rendered; SLA "pause on hold" is unused
 
@@ -631,6 +665,13 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: administrators configure controls that silently do nothing; two SLA editors disagree.
 * Suggested fix: delete `RMAConfig.jsx`'s unused sections (keep one SLA editor), remove Custom Fields until implemented, implement or drop `pauseOnHold`.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-07** (no DB change; ships with the next front-end deploy). Each of the five dead controls was decided on its own evidence rather than deleted wholesale.
+* **The two dead editors were duplicates of features that WORK, which the finding did not say.** SLA targets are really set in **SLA Policies** (`sla_config`, read by `slaConfig.computeDueDate` when a ticket is raised), and conditional assignment is really done by **Automation Rules** (the `assign_technician` action, executed by `applyActions` in `api/db/system.ts`). So the app carried two SLA editors and two assignment editors, one live and one silently discarded, with nothing to tell an admin which was which. Both dead copies are removed; no capability is lost, and the page now names where each one lives.
+* **Nothing was stranded by the removal.** Checked in production first: `rma_config` holds no `sla_rules` row, no `auto_assignment_rules` row and no `default_settings` row. Nobody has ever pressed Save on that screen in this installation's history.
+* **`default_settings` was worth keeping, so it was made real rather than deleted.** Default priority, default status and the auto due-date window are now read by the ticket form through `useTicketDefaults`, and the key is renamed to `ticket_defaults` (free, since no row existed). Applied in an effect rather than as initial state: the config query has not resolved on the first render, so seeding from the hook would bake in the fallbacks and leave the configured values unused, which is the same defect wearing a different hat. Each field is only overwritten while it still holds the built-in fallback, so a value the user already chose is never yanked away when the config lands a moment later.
+* **`pauseOnHold` is dropped, not implemented.** `computeDueDate` sets a due date once, from priority, and never revisits it, so the clock could not be paused. Honouring the toggle means accumulating per-ticket on-hold time and somewhere to store it, which is a feature rather than a fix. The toggle and the `SlaConfig.pauseOnHold` field are gone; a stored value on an existing row is ignored.
+* **Custom Fields is left standing but no longer silent, and the build-or-drop choice is the owner's.** The screen manages `custom_field_definitions` correctly; what it cannot do is make a field appear, because no form reads the table and **neither `rma_tickets` nor `customers` has any column to store a value in** - so even a rendered field would have nowhere to write. Finishing it means a values column, rendering six field types across three forms, `is_required` validation, then display, export and PDF. The page now says plainly that definitions do not yet reach any form, which removes the harm: an admin defining a required field and finding no trace of it. Production has **zero** definitions, so building it or deleting the screen both lose nothing.
+* Tests: `src/test/ticketDefaults.test.js`, 8 cases. One of them caught a bug in this fix: `Number(null)` is 0 and finite, so a missing `auto_due_days` clamped to 1 and would have made every new ticket due tomorrow. The same trap `money.js` guards against in `toBase()`.
 
 #### [MEDIUM] Converting a sales order to an invoice is a check-then-insert race
 
@@ -644,6 +685,9 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: double billing.
 * Suggested fix: `CREATE UNIQUE INDEX … ON crm_invoices(so_id) WHERE doc_status <> 'cancelled'` and move conversion into an RPC.
 * Confidence: Confirmed by code reading
+* **Status: FIXED — applied and verified in production 2026-09-06** (`20260827_one_live_invoice_per_sales_order.sql`). A partial unique index, `crm_invoices(so_id) WHERE so_id IS NOT NULL AND doc_status <> 'cancelled'`. The client's check-then-insert stays as the friendly error; the index is the actual guarantee, and indexes do not have race conditions.
+* Cancelled invoices are excluded so an order can still be re-invoiced after a cancelled attempt — the rule the application already intended. Existing data checked first: zero orders had more than one live invoice (27 invoices, 20 linked to an order, 7 cancelled), so nothing needed repairing.
+* Verified by rolled-back probe (**7 passed, 0 failed**, shared with BUG-030): a first draft is accepted, a second for the same order is refused with 23505, and cancelling the first frees the slot again. Incidentally confirmed on real data — the probe's first attempt used an order that already had a live invoice and was refused by the new index.
 
 #### [MEDIUM] Manufacturer batch numbers are derived from a row count and the batch/unit writes are not atomic
 
@@ -657,6 +701,11 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: intermittent "batch create failed"; orphan batches.
 * Suggested fix: use `nextval_for_type('batch')` or a DB default; do both writes in an RPC.
 * Confidence: Confirmed by code reading
+* **Status: FIXED — applied and verified in production 2026-09-06** (`20260830_manufacturer_batch_rpcs.sql`, plus `src/api/db/inventory.ts` wired to the RPCs, shipping with the next front-end deploy). Numbering moved to the existing `nextval_for_type()` / `document_sequences` mechanism every other document code already uses, giving `BATCH-2026-00001`.
+* The format change from `BATCH-<yyyymmdd>-<nnn>` is free: there are **zero** `manufacturer_batches` rows and zero units carrying a `manufacturer_batch_id`, so no existing identifier is invalidated. Checked before changing it.
+* **The unchecked second write was the worse half and is also fixed.** `createBatch` linked the units in a separate statement whose error was never captured, so a failure left a batch claiming `unit_count` units with none attached. All three actions (`create_manufacturer_batch`, `mark_batch_sent`, `mark_batch_resolved`) are now one transaction each. The RPCs also reject a unit id that does not exist and one already belonging to another batch — checked as a set before anything is written.
+* Verified by rolled-back probe (**7 passed, 0 failed**): two consecutive creates produced `BATCH-2026-00001` then `-00002`; **deleting a batch and creating another no longer collides**, which is the original defect; an unknown unit id is refused; a unit cannot be put in two batches; units really are linked in the same transaction; and `mark_batch_sent` moves the units with the batch. The `document_sequences` row was confirmed back at `last_value = 0` afterwards, so the probe left nothing behind.
+* **Not changed, deliberately:** `mark_batch_resolved` still sets every unit to `closed` whatever the resolution was, so a repaired unit and a scrapped one end up identical. That is a business rule I cannot settle from the code; the semantics were carried over unchanged and the question is recorded against BUG-032 rather than guessed at.
 
 #### [MEDIUM] Parts consumption is non-atomic and silently clamps at zero
 
@@ -670,6 +719,9 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: parts stock drifts from reality.
 * Suggested fix: raise in `adjust_part_quantity` when the result would be negative; wrap add/remove in an RPC.
 * Confidence: Confirmed by code reading
+* **Status: HALF FIXED — applied and verified in production 2026-09-06** (`20260828_parts_reject_negative_stock.sql`). `adjust_part_quantity` no longer clamps: `GREATEST(0, quantity + p_delta)` is gone and the function raises when the balance would go below zero, naming the part and both quantities. It also now raises when the part id does not exist, where it previously returned an empty result the caller read as success. A `FOR UPDATE` lock was added so two technicians consuming the last unit at the same moment cannot both pass the check.
+* **The atomicity half is NOT fixed and is deliberately left open.** `ticketParts.add()` still calls the RPC and *then* inserts into `ticket_parts` as two separate statements, so a failed insert still decrements stock with no consumption record, and `remove()` has the mirror problem. Closing that needs a single RPC doing both writes, which changes the client contract — a larger change than this migration, and the report says so rather than implying the finding is closed.
+* Verified by rolled-back probe: consuming 5 of a part with 3 in stock is refused (“Not enough PROBE PART in stock: 3 available, 5 requested”), the stock is left untouched at 3 after the refusal, consuming exactly the 3 on hand still works, and adjusting a non-existent part raises.
 
 #### [MEDIUM] `restore_units` restores any unit ids without checking they belong to the document or were delivered
 
@@ -683,6 +735,11 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: stock double-counted; reservations broken.
 * Suggested fix: derive unit ids inside the RPC from `stock_moves` for the source invoice, reject others.
 * Confidence: Confirmed by code reading
+* **Status: FIXED — applied and verified in production 2026-09-06** (`20260829_restore_units_verify_ownership.sql`). A unit may now be restored only by the document that actually delivered it, and only while it is still in a delivered state. All-or-nothing: if any id in the batch fails, the whole call is refused, because a partial restore leaves a ledger nobody can reconcile.
+* **The ownership chain had to be derived from the data, not assumed.** Delivery is recorded against the **sales order**, not the invoice — `stock_moves` holds 25 rows of `move_type='deliver', doc_type='sales_order'` and none against an invoice — so the check follows `credit_note → source_invoice_id → crm_invoices.so_id → deliver moves`. Checking against the invoice id directly, which the finding's wording suggests, would have matched nothing and refused every legitimate restore.
+* **A second defect in the same function is also fixed.** `from_status` was the literal `'delivered'` regardless of the unit's real state, so a unit pulled out of `reserved` was written into the ledger as though it had been delivered and returned — the audit trail agreed with the corruption. It is now read from the unit.
+* An unrecognised `p_doc_type` is now refused rather than waved through, so the function fails closed on anything it cannot verify.
+* Verified by rolled-back probe (**7 passed, 0 failed**): a unit the document never delivered is refused; a mixed batch is refused entirely; an unverifiable `doc_type` is refused; the genuine restore still works and leaves the unit available; the ledger records the true `from_status`; and restoring the same unit twice is now refused because it is no longer in a delivered state.
 
 #### [MEDIUM] Legacy direct-mutation inventory paths are still used by four screens and bypass the ledger
 
@@ -696,6 +753,10 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: inconsistent stock history; broken reservations.
 * Suggested fix: route the four screens through the RPCs and delete the deprecated helpers (already planned as "R2").
 * Confidence: Confirmed by code reading
+* **Status: HALF FIXED — applied and verified in production 2026-09-06** (`20260831_guard_direct_warehouse_moves.sql`). The two behaviours that actually corrupt state are closed: a direct client transfer can no longer move a unit that is **reserved** for a sales order, and can no longer move one **into a protected system location**. Verified by rolled-back probe (**5 passed, 0 failed**), including that ordinary transfers of free units still work, that non-warehouse edits on a reserved unit are unaffected, and that server-side callers pass through so the RMA RPCs keep working.
+* **The ledger half remains open and is not claimed as fixed.** These transfers still write no `stock_moves` row, so the Warehouse Dashboard and margin reporting cannot see them. Closing that means routing ByProductTab / CompanyStockTab / ProductDetailModal / WarehousesTab through `transfer_stock` / `move_rma_units` / `promote_rma_unit` — the “Warehouse Module R2” consolidation. The code comment on `transferUnits` warns explicitly that *“the feature sets differ; don't merge blindly”* (the RPC path has no equivalent of the System Pool / null-warehouse case), so that is a design decision for the owner rather than something to settle inside a migration.
+* Also still open, inherited from BUG-029: `mark_batch_resolved` closes every unit in a batch regardless of the resolution outcome.
+* **A test-fixture trap worth recording.** The first probe reported that a reserved unit *was* moved. It had not been: both reserved units already sat in the warehouse the probe was moving them to, so `warehouse_id` never changed and the guard correctly skipped. Re-run against a genuinely different destination, it refuses. A no-op relocation is not a bypass — check the fixture before believing the failure.
 
 #### [MEDIUM] Deal stage/status can diverge: bulk moves are two writes, terminal stages do not set status, arbitrary status writes are allowed
 
@@ -709,6 +770,10 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: pipeline analytics and deal-value rules drift.
 * Suggested fix: `move_deal_stage` RPC + check trigger (`status='won' ⇔ stage.is_won`).
 * Confidence: Confirmed by code reading
+* **Status: FIXED — applied and verified in production 2026-09-06** (`20260835_deal_status_follows_stage.sql`). A `BEFORE INSERT OR UPDATE` trigger derives `status`, `won_at`, `lost_at` and `probability` from the target stage's `is_won`/`is_lost` flags, so the pair cannot come apart however the row is written.
+* **It derives rather than refuses, deliberately.** Raising on a mismatch would break the pipeline board: `moveStage`/`bulkMoveStage` legitimately write only `stage`, and dragging a deal into the Won column *is* the user saying they won it. So the stage is the source of truth and the rest follows. A direct `status='won'` written against a non-won stage is normalised back to follow the stage rather than silently accepted.
+* Existing data was checked first: all 56 deals already agreed with their stage, so nothing was rewritten.
+* Verified by rolled-back probe (**5 passed, 0 failed**): a stage-only move to Won now sets `status='won'`, `won_at` and `probability=100`; moving back to an open stage resets to `open` and clears both timestamps; the Lost stage sets `lost_at` and `probability=0`; a contradictory `status='won'` on an open stage is normalised; and `markWon`'s combined write is unaffected.
 
 #### [MEDIUM] Sales-document state machine is unenforced and inconsistent between screens
 
@@ -737,6 +802,10 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: sporadic save failures; misleading preview.
 * Suggested fix: DB-side generation in a `BEFORE INSERT` trigger or RPC.
 * Confidence: Confirmed by code reading
+* **Status: FIXED — applied and verified in production 2026-09-06** (`20260832_server_assigned_rma_numbers.sql`; client changes ship with the next front-end deploy). A `BEFORE INSERT` trigger assigns `rma_number`, always, ignoring whatever the client sent. The `RMA-DDMMYYYY-NNNN` format is unchanged because it is printed on work orders and QR codes.
+* Races are settled with a **transaction-scoped advisory lock keyed on the date**, so two concurrent inserts on the same day queue behind it and each reads a maximum that already includes the other. A sequence would not fit: the serial restarts daily and `document_sequences` resets yearly, so locking on the day and taking max+1 preserves the existing numbering exactly.
+* Verified by rolled-back probe (**4 passed, 0 failed**): two inserts *both claiming* `RMA-01011999-0001` — the exact collision two users hit — came out as consecutive numbers for today; the bogus 1999 date was overridden; a garbage value was replaced and the run continued.
+* **The browser still generates a provisional number**, and that is deliberate: the form uploads attachments before the row exists, under a folder named after the number, so it needs *a* string up front. That value is now only a folder name — `TicketForm` uses `newTicket.rma_number` from the saved row for the audit entry, the side effects and anything the customer sees. Keying attachments by ticket id instead belongs to BUG-026.
 
 #### [MEDIUM] Ticket resolutions default to USD with a hard-coded currency list while the base currency is EGP
 
@@ -750,6 +819,11 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: financial amounts recorded in the wrong currency.
 * Suggested fix: use `useBaseCurrency`/`useCurrencyOptions` hooks already present in `src/hooks`.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-07** (ships with the next front-end deploy).
+* Both forms now default the resolution currency to the installation's base currency and take their options from the `currencies` table, through the existing `useBaseCurrency` / `useCurrencyOptions` hooks. The hardcoded `['USD','EUR','GBP','AED','SAR','EGP']` list is gone from both files, and `'USD'` no longer appears as a currency literal anywhere in `src/`.
+* **The currency is resolved late, not seeded early, and that matters.** The state still starts empty and becomes `baseCurrency` at render and at save. Seeding the initial state from the hook would freeze whatever it returned on the first render, which is the EGP fallback because the config query has not resolved yet; an installation whose base currency is not EGP would then record every resolution in EGP. That is the same defect with a different wrong answer.
+* The drawer's read-only view also went through `formatMoney`, so an amount now prints as `E£ 1,234.00` rather than `EGP 1234.00`.
+* **No data repair was needed, checked rather than assumed:** `ticket_resolutions` holds 2 rows, both `currency = 'USD'`, and **both have a null amount**. No financial value is mislabelled, so there is nothing to correct.
 
 #### [MEDIUM] Reports pipeline and sales sections hard-code a dollar sign
 
@@ -763,6 +837,10 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: management reports state the wrong currency.
 * Suggested fix: replace `fmt$` with `formatMoney` and `useBaseCurrency`.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-07** (ships with the next front-end deploy).
+* All three `fmt$` helpers in `Reports.jsx` are replaced by `formatMoney(value, baseCurrency)` across 16 call sites. The finding listed two; there was **a third** in `FinancialTab` (total invoiced, total paid, outstanding, quotation value, and the per-invoice rows), fixed with them.
+* **A fourth site the finding did not list:** `CustomerDetails.jsx:1313` rendered deal value with a hardcoded dollar sign. Same defect, same fix.
+* Amounts now read `E£ 1,234.00`, using the currency's own decimal count via `money.js` - the module that exists precisely to stop this and was already used elsewhere.
 
 #### [MEDIUM] Date handling mixes UTC and local time; due dates and overdue flags are off by up to a day
 
@@ -776,6 +854,12 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: SLA/overdue statistics and customer overdue emails (`queue_overdue_ticket_emails` uses `CURRENT_DATE` in the DB timezone, a *third* convention) disagree.
 * Suggested fix: centralise date helpers; treat `date` columns as inclusive end-of-day in the business timezone.
 * Confidence: Confirmed by code reading
+* **Status: FIXED (browser side) 2026-09-06** (ships with the next front-end deploy). New `src/lib/dates.js` centralises the conversions; `DEFAULT_DUE`, `slaConfig.computeDueDate` and the Dashboard's overdue comparisons now use it.
+* **Two distinct mistakes, both from mixing local arithmetic with UTC formatting.** *Writing*: `d.setDate(d.getDate() + 7)` followed by `toISOString().split('T')[0]` — local arithmetic, UTC formatting — so at 01:00 Cairo it is still the previous day in UTC and “seven days from today” came out as six. *Reading*: `new Date(t.due_date) < new Date()`, where `new Date('2026-09-06')` is parsed by the spec as **UTC midnight**, so a ticket due today became overdue at 02:00–03:00 Cairo — the dashboard called work late while the person doing it still had the whole day.
+* A `date` column carries no time. “Due 6 September” means the *end* of the 6th, so `isPastDueLocal()` compares against end-of-day in the reader's timezone, and `parseDateOnlyLocal()` uses `parseISO`, which treats a bare `yyyy-MM-dd` as local where `new Date()` does not.
+* **The third convention is left alone, on purpose.** `queue_overdue_ticket_emails` uses `CURRENT_DATE`, and the database's timezone is **UTC** (verified: `current_setting('TimeZone')` = `'UTC'`). Reconciling that means deciding the business timezone and setting it in one place — an owner decision, not something to hard-code. These helpers make the browser self-consistent, which it was not; the browser-versus-cron difference remains for the first two or three hours of a Cairo morning and is recorded here rather than quietly closed.
+* Tests: `src/test/dates.test.js`, 15 cases with the clock pinned to specific local wall-clock times — including the 01:00 case that was wrong, a loop asserting a positive offset never returns yesterday at any hour, and “due today is not overdue” at both 03:00 and 23:30. **Two of my own implementations were wrong and the tests caught them**: `daysUntilDueLocal` used `Math.ceil` on a raw interval, so “due today at 09:00” reported 1 day remaining and “due in 3 days” reported 4. Both now use calendar-day differences.
+* Not changed: the sort comparator at `Dashboard.jsx:716` compares two due dates to each other, so both sides parse identically and the ordering is correct regardless of timezone.
 
 #### [MEDIUM] Legacy `user_roles.password_hash` column still holds a value and is readable by admins
 
@@ -789,6 +873,10 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: credential exposure if the hash is weak or reused.
 * Suggested fix: `ALTER TABLE user_roles DROP COLUMN password_hash`.
 * Confidence: Confirmed by execution
+* **Status: FIXED — applied and verified in production 2026-09-06** (`20260826_drop_legacy_password_hash.sql`). The column is gone; all 17 `user_roles` rows intact.
+* **The one stored value was an unsalted SHA-256** (64 hex characters), belonging to `bika.qds@gmail.com` — cheap to attack offline, and a risk beyond this application because people reuse passwords. Nothing in `src/**` or `supabase/functions/**` read the column; the only mention was a comment marking it legacy.
+* **The migration's first guard was too strict and refused to run, which was the right outcome.** It demanded a Supabase Auth account for every active row and found 10 without one. Those are the `@test.com` seed fixtures from 20260706 whose purge is deferred, and **none of them carried a hash** — so they cannot authenticate by any route and the column was irrelevant to them. Narrowed to the condition that actually matters: refuse only if a row that *holds* a hash has no auth account. Measured before narrowing, not assumed.
+* Deliberately irreversible — destroying the hash is the point, so no rollback restores it. **Old backup files taken before today still contain it** and should be deleted rather than kept; that is BUG-025's remaining work.
 
 #### [MEDIUM] Customer detail "related tickets" matches by display name, leaking tickets between same-named customers
 
@@ -802,6 +890,10 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: wrong history shown; customer PII cross-exposure.
 * Suggested fix: drop the name query once the single legacy ticket is linked.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-06** (ships with the next front-end deploy). `getRelatedTickets` matches on the `customer_id` foreign key only; the second query matching `customer_name` against a list of names is gone.
+* **Verified that the fallback protected nothing before removing it.** It existed for tickets predating the FK. There is exactly **one** ticket without a `customer_id` today — `RMA-06082026-0001`, “QA Walk-in No CRM Link” — a deliberate walk-in with no customer record, which should not appear under anybody. So the name query could never return a legitimately-owned ticket and could only ever produce cross-exposure.
+* The impact was not merely a wrong count: with 14 duplicate mobile numbers already in the data, two customers sharing a contact name each saw the other's RMA history, including fault descriptions and the products involved. Renaming a customer also detached history linked only by name.
+* The `customerNames` parameter is kept in the signature and ignored, so `CustomerDetails.jsx` needs no coordinated change and cannot silently start passing something that matters again.
 
 #### [MEDIUM] Live data already violates ledger and stock invariants
 
@@ -815,6 +907,13 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: wrong AR balances and aging for the affected customers; misleading stock history.
 * Suggested fix: after the fixture purge (deferred by decision), add a scheduled integrity check (`amount_paid` vs applications; delivered SO ⇒ moves) and fix or void the rows.
 * Confidence: Confirmed by execution
+* **Status: PARTLY FIXED 2026-09-07** - the detection half is applied and verified in production (`20260839_data_integrity_checks.sql`); the repair half is blocked on a decision that is already made and deferred.
+* **Re-confirmed against live data today, and the numbers are unchanged:** 6 invoices with `amount_paid` unbacked by any application, 15 of 20 delivered sales orders with no `stock_moves`, 8 inventory units with a blank serial, 3 posted invoices with no due date. 32 violating rows.
+* **Nothing was repaired, on purpose.** Most of these rows are the seed/fixture data whose purge the owner explicitly deferred until after launch. Rewriting or voiding financial rows on that basis would turn a reporting problem into a data-loss one, and the decision is not mine to make.
+* **What was added is the half that does not depend on the purge:** `rma_data_integrity_issues()` returns one row per violation (check, severity, entity, reference, human-readable detail) and `rma_data_integrity_summary()` the grouped counts, admin-only via `rma_is_admin()`. Surfaced in Control Panel -> Data Cleanup behind an explicit "Run checks" button, because the scan touches every invoice, order and unit while that screen is opened to tidy tickets far more often than to audit the books. The value is not in counting today's known-bad 32; it is that the 33rd, in real trading data after launch, stops being invisible until someone disbelieves a customer statement.
+* The migration's own guard refuses to finish if `unbacked_amount_paid` returns nothing, because a check that reports a clean database while six invoices are known bad is worse than no check: it gets believed.
+* **A trap worth recording: reversal rows carry a NEGATIVE `amount_applied` AND set `is_reversal`.** My first version of this query subtracted reversals as well, double-counted them, and reported two perfectly healthy invoices (INV-2026-00019, INV-2026-00020) as violations with applications at twice their total. Caught by inspecting the individual rows before drawing any conclusion. The net applied is a plain `SUM`; a rolled-back probe now asserts specifically that a reversed-to-zero invoice is **not** flagged.
+* Verified by rolled-back probe (**4 passed, 0 failed**): an admin sees all four checks; the counts are exactly 6/15/8/3; a reversed-to-zero invoice is not flagged; a manager is refused with `insufficient_privilege`.
 
 #### [MEDIUM] Untranslated UI strings (2,398) and locale key drift break the Arabic experience
 
@@ -828,6 +927,13 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: inconsistent Arabic UI; CI red (BUG-016).
 * Suggested fix: translate the flagged strings; add a locale-parity test.
 * Confidence: Confirmed by execution
+* **Status: FIXED 2026-09-07** (ships with the next front-end deploy). Both halves are closed, and **both of the finding's numbers were wrong** - verified rather than taken on trust.
+* **"2,398 hardcoded strings" was the total `no-restricted-syntax` count, not the i18n one.** That rule carries two messages, and 2,391 of those warnings are the *design-token* rule complaining about raw hex colours (UX-GLOBAL-001). The actual count of hardcoded user-visible text (UX-GLOBAL-003) was **36**, not 2,398 - a tractable number, and now **7**.
+* Translated: `ErrorBoundary` (6 strings), `PrintLabel` (17), `NotFoundPage` (5), `RMATracker` (7, including the `alert('Failed to send message...')` the finding named, now a toast and the last native dialog on that page), `AIAssist` (4), `BrandingTab` (13), `EmailSettingsTab` (12), `TemplatesTab` (2), `SLAPolicies` (2), plus the customer bulk-status options, the Login forgot-password intro and the ticket drawer's "Customer" badge.
+* `ErrorBoundary` is a class, so it uses the i18next singleton - and every lookup passes a `defaultValue`. This is the screen that renders when something has already gone wrong, and a failed i18n init is one of those things; without a default it would paint the raw key at the user on the one screen where legibility matters most.
+* **The 7 left are deliberate**, each a case where translating would be wrong rather than merely undone: `resend.com` and the `Resend` provider option (a URL and a product name); two strings inside `PDFLayout`'s live *preview of the generated PDF*, which is produced in a fixed language, so translating the preview alone would misrepresent the artifact; the WhatsApp/Email/SMS channel identifiers in `WALogs`; an admin diagnostic line in `WATestCenter`; and a button label inside a test fixture.
+* **The "missing 7 keys / 47 extras" drift is gone, and the extras were never drift.** `ar.json` is now missing **0** English keys. Of its 207 English-absent keys, **all 207** are Arabic CLDR plural categories (`_zero`, `_two`, `_few`, `_many`) that English does not have - correct translation, not leftovers. A naive set comparison would have failed on correct Arabic.
+* Tests: `src/test/localeParity.test.js`, 5 cases - every English key exists in Arabic; no orphaned Arabic key survives a rename (plural variants exempted, with a separate case asserting that exemption still matches something so it cannot quietly decay into a plain set comparison); no Arabic string is blank where English has text (two keys are blank in *both* on purpose and stay allowed); and interpolation placeholders match, except `{{count}}` inside a plural form - Arabic's `_one` and `_two` mean exactly one and exactly two, and idiomatic Arabic names the thing rather than repeating the numeral, so demanding it would force unnatural Arabic to keep a test green.
 
 #### [MEDIUM] Overdue-ticket emails are re-queued daily forever and will flood customers when the drain is repaired
 
@@ -855,6 +961,11 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: CSV injection on staff workstations.
 * Suggested fix: a shared `csvSafe()` applied in every exporter.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-06** (ships with the next front-end deploy). One shared encoder in `src/lib/csv.js` (`csvCell`, `toCsv`, `downloadCsvText`) replaces **three** hand-rolled copies — `Inventory/_shared.jsx`, `Reports.jsx` and `cp/AuditLog.jsx`. A leading `=`, `+`, `-`, `@`, tab or CR is prefixed with `'`, which spreadsheets consume as “treat the rest as text”.
+* **A third exporter was found that the finding did not list, and it was the worst of them.** `cp/AuditLog.jsx` built its CSV by hand and escaped only `action_details` — `user_email` and `action_type` were interpolated raw, so a comma in either shifted every later column. `action_details` is free text written by whoever created the log entry.
+* **Numbers are deliberately exempt.** Blanket-prefixing anything starting `-` would turn every negative amount in a financial export into the text `'-1234.50` and break the sums the export exists for. A value that parses as a plain number cannot carry a formula, so it is left alone; `-2+3+cmd|x` still is not.
+* **XLSX exports were checked and left alone, on evidence.** SheetJS writes strings as string cells (`t:'s'`) unless given an `f` property, so a leading `=` renders literally in Excel rather than evaluating. The CSV path was the reachable one.
+* Tests: `src/test/csv.test.js`, 16 cases — the classic `=cmd|' /C calc'!A0` and `=HYPERLINK` payloads, tab-prefixed formulas, negative numbers left intact, RFC 4180 quoting preserved, and the comma-shift the Audit Log exporter had. Two of my own expectations were wrong on first run (a tab is not a CSV delimiter, so those values need the prefix but no quoting); the code was right and the tests were corrected.
 
 #### [MEDIUM] Bulk CSV imports skip validation and insert row by row
 
@@ -868,6 +979,13 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: dirty data; slow imports; partial state.
 * Suggested fix: run `customerSchema`/`leadSchema` per row; use `bulkCreate`.
 * Confidence: Confirmed by code reading
+* **Status: PARTLY FIXED 2026-09-07** (ships with the next front-end deploy). Two of the three problems are closed; the third is a deliberate non-change, explained below.
+* **Dirty data.** `src/lib/importValidation.js` is now applied per row in the Customers and Leads importers, and a row with a malformed address is rejected with a reason rather than stored. The finding's own repro — `email = "notanemail"` — no longer reaches the database.
+* **2,000 rows, 2,000 requests.** True of Leads only, and now fixed: `db.leads.bulkCreate()` inserts in chunks of 200 (chunked rather than one statement so a large file cannot exceed the request size limit). Customers and Products already used a `bulkCreate`, so the finding was stale on those two — checked before changing them.
+* **Partial imports are now reported.** A failing chunk carries `insertedBefore`, so the screen can say how many leads actually landed instead of showing a bare failure after writing several hundred rows.
+* **Full schema parity was deliberately NOT applied, and this is the part worth a decision.** Running `customerSchema` per row would change which rows are *accepted*, not merely validate them: the schema requires both a contact person and a mobile, while the importer permits a B2B row with neither. Silently rejecting rows that import successfully today would be a worse failure than the one being fixed, so validation was scoped to the fields where a bad value actually corrupts data. Aligning the importer with the form's rules is an owner decision about import policy.
+* Also unchanged: the three hand-rolled `parseCSVLine` implementations, and duplicate detection still comparing against the ≤5,000 rows the page has loaded.
+* Tests: `src/test/importValidation.test.js`, 10 cases — the finding's exact value, other malformed addresses, blank treated as allowed because the column is optional, over-length addresses and phone numbers, and clean rows reporting nothing.
 
 #### [MEDIUM] Announcements ignore their target roles and expiry is evaluated client-side only
 
@@ -881,6 +999,11 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: wrong audience for internal notices.
 * Suggested fix: filter in `AnnouncementBanner` by `effectiveUserRole`; stack the banners.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-06** (ships with the next front-end deploy) — but the finding was wrong about the cause, and the real defect was worse.
+* **There is no `target_roles` column on `announcements` at all.** The table is `id, title, message, type, is_active, start_date, end_date, created_by, created_date, updated_date`, and the admin screen offers no targeting field. So “an announcement targeted at technician is shown to everyone” cannot happen as described — nothing can be targeted. Role targeting would be a new feature, not a fix, and is not built here.
+* **What was actually broken: the whole feature had never worked.** `listActive()` filtered on `a.starts_at` / `a.ends_at` and the admin screen wrote the same names — columns that do not exist. Proved directly: `INSERT … (starts_at, ends_at)` fails with *column “starts_at” of relation “announcements” does not exist*, while the same insert with `start_date`/`end_date` succeeds. So **every attempt to create or edit an announcement failed outright**, which is why the table holds zero rows and nobody had reported it. On the read side both values were always `undefined`, so the scheduling window was never enforced either.
+* Fixed by using the real column names in `src/api/db/system.ts` and `src/pages/cp/Announcements.jsx` (18 occurrences). `src/test/announcementsWindow.test.js`, 8 cases: shows inside the window, hides after `end_date`, hides before `start_date`, treats missing dates as always-on, respects `is_active`, ignores the old names, tolerates an unparseable date, and returns empty on a query error.
+* Not addressed: the banner still overlaps the permission-preview banner (both `fixed top-0 z-50`). Cosmetic, and untestable until an announcement can exist — which, until today, one could not.
 
 #### [MEDIUM] Login/logout activity entries are wrong or lost
 
@@ -894,6 +1017,9 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: misleading audit data.
 * Suggested fix: return the role from `finishLogin`; log logout first.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-06** (ships with the next front-end deploy). `finishLogin` now returns the role it resolved, and `handleLogin` logs that instead of `currentUserRole` — which is the *previous* render's state and on a fresh sign-in is always null, so every entry read “Signed in as user” whoever signed in. `handleMfaVerify` records the role too.
+* A sign-in is now only recorded when access was actually granted: `finishLogin`'s denial paths return undefined, and “signed in” is not what happened there.
+* The logout half of this finding was already fixed with BUG-019 — `handleLogout` logs before `auth.signOut()` rather than after, so the insert still has a session to be authorised by.
 
 #### [MEDIUM] Credit-note-from-ticket flow closes the ticket in a second, unguarded write
 
@@ -907,6 +1033,11 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: inconsistent ticket/CN state.
 * Suggested fix: extend `issue_credit_note` with an optional `p_close_ticket` step.
 * Confidence: Confirmed by code reading
+* **Status: FIXED — applied and verified in production 2026-09-06** (`20260833_issue_credit_note_closes_ticket.sql` + `20260834_drop_old_issue_credit_note_overload.sql`; client changes ship with the next front-end deploy). `issue_credit_note` gained an optional `p_close_ticket`, so the note is issued, applied to the invoice and the ticket closed in **one transaction**. Both call sites — `TicketDrawer.jsx` and `SalesDocumentDetail.jsx` — now make a single call.
+* **The ticket id is taken from the credit note server-side, never from a caller parameter**, so the flag cannot be used to close an unrelated ticket — the same lesson as BUG-031.
+* **This got sharper after BUG-008.** Now that `rmaTickets.update` throws on a zero-row result instead of returning `undefined`, the old two-write sequence would show the user “issue credit note failed” for an operation whose credit note *had* been issued and applied. Visible, but still unrecoverable — retrying could not help, because the RPC refuses a non-draft note.
+* **A second migration was needed, and the probe is the only reason it was caught before users were.** Adding the 3-argument form left the original 2-argument function in place, so `issue_credit_note(uuid, text)` matched both and Postgres refused every call with 42725 “function is not unique”. The client invokes it with exactly two named arguments, so **credit-note issuing would have been broken outright**. `20260834` drops the old overload; the surviving function defaults `p_close_ticket` to false, so a two-argument call behaves exactly as before. Its guard asserts there is exactly one function of that name.
+* Verified by rolled-back probe (**3 passed, 0 failed**): the 2-argument call resolves and leaves the ticket open; the 3-argument call issues and closes in one transaction; re-issuing a non-draft note is still refused.
 
 #### [MEDIUM] Session management screen lists only the current session and cannot revoke
 
@@ -920,6 +1051,15 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: false sense of control; lingering access after suspension.
 * Suggested fix: implement `revoke`; call `auth.admin.signOut(user.id, 'global')` from an admin function when status changes.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-07** - applied and verified in production (`20260837_real_session_management.sql`, `20260838_revoke_sessions_by_email.sql`); the Edge Function is deployed; the UI ships with the next front-end deploy.
+* **Confirmed the screen was structurally incapable of the truth:** the live database held **7 sessions across 2 users** while Account Settings -> Security showed exactly one, always, because it decoded the caller's own JWT and returned it as an array of one. `revoke`, documented in the function's own header comment since it was written, answered "Unknown action", 400.
+* Sessions live in `auth.sessions`, which PostgREST does not expose - that is why the original settled for the JWT. Three SECURITY DEFINER functions now cross that boundary: `rma_list_my_sessions()`, `rma_revoke_my_session(uuid)` and `rma_revoke_user_sessions(uuid)` / `_by_email(text)`. Ownership is `user_id = auth.uid()` inside the DELETE itself, not a check before it, so there is no window between them.
+* **The Edge Function uses the ANON key with the caller's own Authorization header, not the service-role key.** With service-role, `auth.uid()` would be null and every session in the installation would be reachable, leaving this file's request parsing as the only thing between a user and someone else's devices.
+* **Suspension now actually ends access.** `updateUserStatus` calls `rma_revoke_user_sessions_by_email` when a user is suspended or locked; previously nothing signed them out, so every device kept a valid refresh token and a suspended account went on working anywhere not guarded by `rma_user_role()`, Edge Functions included (BUG-021). Best-effort by design: the status change has already committed and must not be rolled back, so a failed revoke is reported to Sentry rather than surfaced as a failed suspension, which would invite an admin to retry an action that already worked.
+* **The UI no longer overstates what revocation does.** Each session renders its own row with a device name derived from the User-Agent (`describeUserAgent`), last-active time and IP; only the row matching the caller's `session_id` carries the "this device" badge; every other row gets a Sign out button. The panel states that a signed-out device keeps its current access token until it expires: deleting the session cascades to `refresh_tokens` and `mfa_amr_claims` (both FKs verified ON DELETE CASCADE) and stops renewal, but an already-issued JWT is valid to its `exp` regardless of server state. That is a property of JWT auth, not something the fix can change, and the screen should not imply otherwise.
+* No Sign-out button on the current device: signing yourself out from a row you are reading is a surprise, and "Sign Out All Devices" and normal sign-out already cover it.
+* Verified by rolled-back probes (**10 passed, 0 failed** across two runs): the list returns all 6 of a user's sessions rather than 1; another user's session never appears in it; revoking an id you do not own returns false and deletes nothing; revoking your own works and the cascade removes its refresh tokens; `anon` has no EXECUTE grant. The first run's non-admin case was **mis-designed** - it impersonated the super_admin, so the refusal it expected correctly did not happen; re-run as the manager, a non-admin is refused and the admin path revokes as intended.
+* Tests: `src/test/userAgent.test.js`, 7 cases - Edge is not reported as Chrome and Chrome is not reported as Safari despite carrying each other's tokens, Android is not reported as Linux, and an unrecognisable agent returns null so the caller shows its own wording instead of "Unknown on Unknown".
 
 #### [MEDIUM] Multiple-permissive-policy overlap and legacy duplicates on `notification_preferences`, `user_preferences`, `customers`
 
@@ -933,9 +1073,25 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: hard-to-reason authorisation; per-row function calls (performance); preference row hijack.
 * Suggested fix: drop the legacy policies; add `WITH CHECK (user_email = rma_current_user_email())`.
 * Confidence: Confirmed by code reading (live catalog)
+* **Status: FIXED — applied and verified in production 2026-09-06** (`20260836_consolidate_preference_policies.sql`). Nine overlapping permissive policies reduced to two, one per table, each with an **explicit** `WITH CHECK`. Verified by rolled-back probe (**6 passed, 0 failed**): own row readable and updatable, only own row visible, another user's row untouchable, row reassignment still refused, and an admin retains the wider access `user_own` granted.
+* **The headline claim in this finding was wrong, and I checked before acting.** It said `users_own_prefs` (ALL, `USING` only) allowed an UPDATE reassigning `user_email` to another user, hijacking their preference row. It does not: Postgres reuses a policy's `USING` expression as its implicit `WITH CHECK`, so the NEW row is tested too. Probed live as a technician against an admin's address — `UPDATE user_preferences SET user_email='<admin>'` → **42501, new row violates row-level security policy**, while an ordinary self-update succeeded. **No hole was closed here.** This is the same misreading the report already corrected once for BUG-002, repeated.
+* **What was real is the overlap.** `user_preferences` carried five permissive policies saying the same thing and `notification_preferences` four, all OR-ed and all evaluated per row — three of them calling bare `auth.email()`, which is what the `auth_rls_initplan` advisor flags (re-evaluated per row rather than once per query). Redundant permissive policies cannot tighten anything, only widen it, so the cost bought nothing: more work per row, and an authorisation model needing four policies to reason about instead of one. `WITH CHECK` is now written out rather than left implicit, so the intent no longer depends on knowing that rule.
 
 ### 4.4 Low
 
+#### [LOW] `appearanceScope.test.jsx` fails intermittently under the full parallel suite
+
+* ID: BUG-081
+* Category: Testing
+* Location: `src/test/appearanceScope.test.jsx:187-188` (`await waitFor(() => expect(api.fontFamily).toBe('poppins'))` then `expect(api.darkMode).toBe(false)`)
+* Description: One assertion failed during a full `vitest run` and could not be reproduced afterwards. The `waitFor` covers `fontFamily` only; `darkMode` is asserted immediately after it on the same settled state, so if the two updates land in separate ticks under load the second assertion can read the earlier value.
+* How to reproduce: intermittent. Observed once in a full 54-file run; the immediately following full run passed, and the file passed **5 of 5** times in isolation.
+* Expected: deterministic.
+* Actual: one failure in roughly a dozen full runs.
+* Impact: low in itself, but corrosive — a suite that fails occasionally for no reason trains people to re-run rather than read, which is the same habit BUG-016 was about.
+* Suggested fix: bring `darkMode` inside the `waitFor` so both values are asserted against the same settled state.
+* Confidence: Confirmed by execution (observed once; not reproduced in 5 isolated runs plus 1 further full run)
+* **Found 2026-09-06** while verifying the BUG-024/025/046 batch. **Not caused by that work** — none of those changes touch appearance, and the same suite passed immediately before and after. Not fixed: I did not want to edit an assertion I could not first make fail on demand.
 #### [LOW] TypeScript is not type-checked anywhere; `tsc` reports 83 errors
 
 * ID: BUG-051

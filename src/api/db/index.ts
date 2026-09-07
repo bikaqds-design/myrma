@@ -16,6 +16,7 @@ import {
   slaConfig,
   automationRules,
   currencies,
+  dataIntegrity,
 } from './system.js'
 import { inventory, warehouses, warehouseStock, stockMoves, parts, ticketParts, timeEntries, invoices } from './inventory.js'
 import { notifications } from './notifications.js'
@@ -79,6 +80,7 @@ export const db = {
   slaConfig,
   automationRules,
   currencies,
+  dataIntegrity,
 
   // Inventory & parts
   inventory,

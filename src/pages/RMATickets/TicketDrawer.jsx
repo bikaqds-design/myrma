@@ -13,6 +13,10 @@ import { captureException } from '../../lib/sentry'
 import { CreateStandaloneCreditNoteModal } from '../SalesDocuments/_modals'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
+import { safeAttachmentHref } from '../../lib/attachmentUrl'
+import { formatMoney } from '../../lib/money'
+import { useBaseCurrency } from '../../hooks/useBaseCurrency'
+import { useCurrencyOptions } from '../../hooks/useCurrencyOptions'
 import {
   getStatusColor,
   getPriorityColor,
@@ -78,8 +82,13 @@ export function TicketDrawer({
   const [resolutionLoading, setResolutionLoading] = useState(false)
   const [resolutionEditing, setResolutionEditing] = useState(false)
   const [resolutionSaving, setResolutionSaving] = useState(false)
-  const EMPTY_RES = { type: 'replacement', replacement_product_name: '', replacement_serial: '', amount: '', currency: 'USD', reason: '', reference_number: '' }
+  // Empty rather than 'USD', resolved to the base currency at render and save.
+  // See the note in TicketForm.jsx for why it is not seeded with the hook's
+  // value. (Audit finding BUG-036.)
+  const EMPTY_RES = { type: 'replacement', replacement_product_name: '', replacement_serial: '', amount: '', currency: '', reason: '', reference_number: '' }
   const [resForm, setResForm] = useState(EMPTY_RES)
+  const baseCurrency = useBaseCurrency()
+  const currencyOptions = useCurrencyOptions(baseCurrency)
 
   // Credit note (RMA return) state
   const [showIssueCNModal, setShowIssueCNModal] = useState(false)
@@ -94,9 +103,14 @@ export function TicketDrawer({
   const handleIssueCNFromTicket = async (cn) => {
     setIssuingCN(true)
     try {
-      const cnCode = await db.creditNotes.issue(cn.id, userEmail)
       const previousStatus = ticket.ticket_status
-      await db.rmaTickets.update(ticket.id, { ticket_status: TICKET_STATUS.CLOSED })
+      // Issue AND close in one transaction (BUG-048). This used to be two
+      // independent writes: if the ticket update failed -- an RLS refusal for a
+      // technician who is not the assignee, or a dropped connection -- the
+      // credit note was already issued and applied while the ticket stayed
+      // open, and retrying could not help because the RPC refuses a non-draft
+      // note. There was no route back to a consistent state from the interface.
+      const cnCode = await db.creditNotes.issue(cn.id, userEmail, true)
       logActivity('credit_note_created', `${cnCode} issued — ${cn.reason}`)
       // The close was happening without a status_changed row, so the timeline
       // showed the credit note and then a ticket that had silently become
@@ -206,7 +220,7 @@ export function TicketDrawer({
         replacement_product_name: resForm.replacement_product_name?.trim() || null,
         replacement_serial: resForm.replacement_serial?.trim() || null,
         amount: resForm.amount !== '' ? parseFloat(resForm.amount) : null,
-        currency: resForm.currency || 'USD',
+        currency: resForm.currency || baseCurrency,
         reason: resForm.reason?.trim() || null,
         reference_number: resForm.reference_number?.trim() || null,
         created_by: userEmail,
@@ -804,7 +818,7 @@ export function TicketDrawer({
                       replacement_product_name: resolution.replacement_product_name || '',
                       replacement_serial: resolution.replacement_serial || '',
                       amount: resolution.amount != null ? String(resolution.amount) : '',
-                      currency: resolution.currency || 'USD',
+                      currency: resolution.currency || '',
                       reason: resolution.reason || '',
                       reference_number: resolution.reference_number || '',
                     } : EMPTY_RES)
@@ -844,7 +858,7 @@ export function TicketDrawer({
                 {resolution.amount != null && (
                   <p className="text-xs text-gray-700 dark:text-[#e8ebf0]">
                     <span className="text-gray-500 dark:text-[#9aa4b2]">Amount: </span>
-                    <span className="font-semibold">{resolution.currency} {Number(resolution.amount).toFixed(2)}</span>
+                    <span className="font-semibold">{formatMoney(resolution.amount, resolution.currency || baseCurrency)}</span>
                   </p>
                 )}
                 {resolution.reason && <p className="text-xs text-gray-600 dark:text-[#9aa4b2] italic">"{resolution.reason}"</p>}
@@ -906,11 +920,12 @@ export function TicketDrawer({
                       <div className="w-24">
                         <label className="block text-xs font-medium text-gray-600 dark:text-[#9aa4b2] mb-1">{t('ticketDrawer.currency')}</label>
                         <select
-                          value={resForm.currency}
+                          aria-label={t('ticketDrawer.currency')}
+                          value={resForm.currency || baseCurrency}
                           onChange={(e) => setResForm(f => ({ ...f, currency: e.target.value }))}
                           className="w-full px-2 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0]"
                         >
-                          {['USD','EUR','GBP','AED','SAR','EGP'].map(c => <option key={c}>{c}</option>)}
+                          {currencyOptions.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
                         </select>
                       </div>
                       <div className="flex-1">
@@ -981,14 +996,14 @@ export function TicketDrawer({
                 {ticket.attachments.map((att, i) => (
                   <a
                     key={i}
-                    href={att.url}
+                    href={safeAttachmentHref(att.url)}
                     target="_blank"
                     rel="noreferrer"
                     className="flex flex-col items-center p-3 border border-gray-200 dark:border-[#212a38] rounded-xl hover:bg-indigo-50 dark:hover:bg-[#1a2230] hover:border-indigo-300 transition-colors group"
                   >
                     {isImage(att.type) ? (
                       <img
-                        src={att.url}
+                        src={safeAttachmentHref(att.url)}
                         alt={att.name}
                         className="w-full h-24 object-cover rounded-lg mb-2"
                       />
@@ -1102,7 +1117,7 @@ export function TicketDrawer({
                                 {comment.attachments.map((att, i) => (
                                   <a
                                     key={i}
-                                    href={att.url}
+                                    href={safeAttachmentHref(att.url)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-[#121823] border border-gray-200 dark:border-[#212a38] rounded-lg text-xs text-indigo-600 hover:text-indigo-800 hover:border-indigo-300 transition-colors"
@@ -1200,7 +1215,7 @@ export function TicketDrawer({
                                       )}
                                       {reply.is_customer_comment && (
                                         <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">
-                                          Customer
+                                          {t('ticketDrawer.customerBadge')}
                                         </span>
                                       )}
                                       <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">
@@ -1223,7 +1238,7 @@ export function TicketDrawer({
                                         {reply.attachments.map((att, i) => (
                                           <a
                                             key={i}
-                                            href={att.url}
+                                            href={safeAttachmentHref(att.url)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="inline-flex items-center gap-1 px-2 py-1 bg-white dark:bg-[#121823] border border-gray-200 dark:border-[#212a38] rounded-lg text-xs text-indigo-600 hover:text-indigo-800 hover:border-indigo-300 transition-colors"

@@ -167,10 +167,16 @@ export const creditNotes = {
    *   1. UI resolves inventory_units.id values for the returned items.
    *   2. Call restoreUnits() with those IDs.
    */
-  async issue(cnId: string, actorEmail: string): Promise<string> {
+  /**
+   * @param closeTicket close the credit note's own ticket in the same
+   *   transaction. The ticket id is taken from the credit note server-side, not
+   *   passed in, so this cannot close an unrelated ticket (BUG-048).
+   */
+  async issue(cnId: string, actorEmail: string, closeTicket = false): Promise<string> {
     const { data, error } = await supabase.rpc('issue_credit_note', {
       p_cn_id: cnId,
       p_actor_email: actorEmail,
+      p_close_ticket: closeTicket,
     })
     if (error) throw error
     return data as string

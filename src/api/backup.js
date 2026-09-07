@@ -57,6 +57,43 @@ const EMAIL_SETTINGS_SAFE_COLUMNS =
 const EMAIL_SETTINGS_SECRET_FIELDS = ['api_key', 'smtp_password', 'smtp_user', 'webhook_secret']
 
 /**
+ * Columns of `webhooks` that are safe to write to a backup file (BUG-025).
+ *
+ * `secret_key` is the HMAC key a receiver uses to verify that a delivery really
+ * came from us. It was going into every backup JSON an administrator downloads
+ * to their laptop, in clear text.
+ *
+ * Naming the columns is also now REQUIRED, not merely tidier: migration
+ * 20260825 replaced `authenticated`'s table-wide SELECT on `webhooks` with a
+ * column grant that omits `secret_key`, so a bare `select('*')` is refused
+ * outright with "permission denied for table webhooks". Until this allowlist
+ * landed, webhooks failed on every export and was reported in the file's
+ * `failed` list.
+ */
+const WEBHOOKS_SAFE_COLUMNS =
+  'id, name, url, events, is_active, last_triggered_at, created_by, created_date, updated_date, has_secret'
+
+/**
+ * Columns of `user_roles` that are safe to write to a backup file (BUG-025).
+ *
+ * `permissions` is deliberately INCLUDED: it is the permission map, it is
+ * configuration rather than a secret, and a restore that dropped it would put
+ * everyone back on default access — a worse outcome than the risk it carries.
+ *
+ * `notes` and `suspended_reason` are excluded. They are free text written about
+ * a person — why someone was suspended, what a manager thought — and a backup
+ * file that circulates on laptops and in email is not where that belongs.
+ * `suspended_by` and `suspended_date` are kept: they are facts about the
+ * account, not commentary about the human.
+ *
+ * `password_hash` is absent because the column no longer exists (BUG-039).
+ * Backup files taken before 2026-09-06 still contain it and should be deleted.
+ */
+const USER_ROLES_SAFE_COLUMNS =
+  'id, user_email, role, role_type, permissions, status, created_date, last_login, ' +
+  'expiration_date, access_expires_at, suspended_by, suspended_date'
+
+/**
  * Every table, in foreign-key order.
  *
  * `restore: false` means the table is exported for the record but never written
@@ -94,11 +131,20 @@ export const BACKUP_TABLES = [
   { table: 'parts' },
   { table: 'custom_field_definitions' },
   { table: 'custom_roles' },
-  { table: 'user_roles' },
+  {
+    table: 'user_roles',
+    select: USER_ROLES_SAFE_COLUMNS,
+    why: 'free-text notes and suspension reasons are about people and are excluded from the file',
+  },
   { table: 'user_preferences' },
   { table: 'announcements' },
   { table: 'kb_articles' },
-  { table: 'webhooks' },
+  {
+    table: 'webhooks',
+    select: WEBHOOKS_SAFE_COLUMNS,
+    restore: false,
+    why: 'the signing secret is excluded from the export, so restoring would overwrite live secrets with nothing',
+  },
   { table: 'branding_settings' },
   { table: 'email_templates' },
   { table: 'whatsapp_templates' },

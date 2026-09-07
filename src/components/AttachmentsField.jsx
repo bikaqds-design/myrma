@@ -1,5 +1,6 @@
 import React from 'react'
 import toast from 'react-hot-toast'
+import { safeAttachmentHref } from '../lib/attachmentUrl'
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25 MB
 
@@ -57,7 +58,7 @@ export default function AttachmentsField({
             <ClipIcon />
           </span>
           <a
-            href={att.url}
+            href={safeAttachmentHref(att.url)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-indigo-600 hover:underline flex-1 truncate"

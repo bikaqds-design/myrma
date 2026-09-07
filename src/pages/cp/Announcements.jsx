@@ -10,8 +10,8 @@ const EMPTY_FORM = {
   message: '',
   type: 'info',
   is_active: true,
-  starts_at: '',
-  ends_at: '',
+  start_date: '',
+  end_date: '',
 }
 
 const TYPE_STYLES = {
@@ -79,8 +79,8 @@ export default function Announcements({ currentUserEmail }) {
       message: a.message,
       type: a.type,
       is_active: a.is_active,
-      starts_at: a.starts_at?.slice(0, 16) || '',
-      ends_at: a.ends_at?.slice(0, 16) || '',
+      start_date: a.start_date?.slice(0, 16) || '',
+      end_date: a.end_date?.slice(0, 16) || '',
     })
     setShowModal(true)
   }
@@ -95,8 +95,8 @@ export default function Announcements({ currentUserEmail }) {
     try {
       const payload = {
         ...form,
-        starts_at: form.starts_at || null,
-        ends_at: form.ends_at || null,
+        start_date: form.start_date || null,
+        end_date: form.end_date || null,
         updated_date: new Date().toISOString(),
       }
       if (editing) {
@@ -274,8 +274,8 @@ export default function Announcements({ currentUserEmail }) {
                       />
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-500">{fmt(a.starts_at)}</td>
-                  <td className="px-4 py-3 text-xs text-gray-500">{fmt(a.ends_at)}</td>
+                  <td className="px-4 py-3 text-xs text-gray-500">{fmt(a.start_date)}</td>
+                  <td className="px-4 py-3 text-xs text-gray-500">{fmt(a.end_date)}</td>
                   <td className="px-4 py-3 relative action-menu">
                     <button
                       onClick={(e) => {
@@ -427,8 +427,8 @@ export default function Announcements({ currentUserEmail }) {
                   </label>
                   <input
                     type="datetime-local"
-                    value={form.starts_at}
-                    onChange={(e) => setForm({ ...form, starts_at: e.target.value })}
+                    value={form.start_date}
+                    onChange={(e) => setForm({ ...form, start_date: e.target.value })}
                     className={inp}
                   />
                 </div>
@@ -438,8 +438,8 @@ export default function Announcements({ currentUserEmail }) {
                   </label>
                   <input
                     type="datetime-local"
-                    value={form.ends_at}
-                    onChange={(e) => setForm({ ...form, ends_at: e.target.value })}
+                    value={form.end_date}
+                    onChange={(e) => setForm({ ...form, end_date: e.target.value })}
                     className={inp}
                   />
                 </div>
@@ -508,8 +508,8 @@ const ANNOUNCEMENTS_SQL = `CREATE TABLE IF NOT EXISTS announcements (
   message TEXT NOT NULL,
   type TEXT DEFAULT 'info' CHECK (type IN ('info','warning','success','error')),
   is_active BOOLEAN DEFAULT true,
-  starts_at TIMESTAMPTZ,
-  ends_at TIMESTAMPTZ,
+  start_date TIMESTAMPTZ,
+  end_date TIMESTAMPTZ,
   created_by TEXT,
   created_date TIMESTAMPTZ DEFAULT NOW(),
   updated_date TIMESTAMPTZ DEFAULT NOW()

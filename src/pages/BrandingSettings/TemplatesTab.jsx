@@ -1,9 +1,12 @@
+import { useTranslation } from 'react-i18next'
+
 export default function TemplatesTab({ templates, onEdit, onSendTest }) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Email Templates</h3>
-        <p className="text-sm text-gray-600">Customize email notification templates</p>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('branding.emailTemplatesTitle')}</h3>
+        <p className="text-sm text-gray-600">{t('branding.emailTemplatesDesc')}</p>
       </div>
 
       <div className="space-y-4">

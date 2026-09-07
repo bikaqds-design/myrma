@@ -105,6 +105,59 @@ function maskStaffIdentity(c: Record<string, unknown>) {
 // shared mutable corsHeaders would risk one request's response carrying
 // another request's Origin. A closure captured fresh per invocation avoids
 // that race while keeping every json(...) call site below unchanged.
+/**
+ * Whitelist a customer-supplied attachment list. (Audit finding BUG-023.)
+ *
+ * `attachments` was stored as whatever JSON arrived: `Array.isArray(c.attachments)
+ * ? c.attachments : []`. Staff then render each entry as `<a href={att.url}>`
+ * with the attacker's own `name` as the link text (TicketDrawer.jsx:989), so an
+ * anonymous poster could put `javascript:` or a lookalike host behind text
+ * reading "invoice.pdf" — inside the staff interface, on a ticket staff trust.
+ *
+ * Only the five fields the UI actually reads survive, and `url` must sit on
+ * this project's own storage origin. Anything else is dropped rather than
+ * rejected, so a malformed entry cannot block a genuine comment.
+ */
+function sanitiseAttachments(input: unknown, storageOrigin: string): Array<Record<string, unknown>> {
+  if (!Array.isArray(input)) return []
+  const out: Array<Record<string, unknown>> = []
+
+  for (const raw of input.slice(0, 10)) {
+    if (!raw || typeof raw !== 'object') continue
+    const a = raw as Record<string, unknown>
+
+    const url = typeof a.url === 'string' ? a.url : ''
+    let parsed: URL
+    try {
+      parsed = new URL(url)
+    } catch {
+      continue // not a URL at all — and this is what rejects `javascript:alert(1)`
+    }
+    // Origin check, not a substring test: "https://evil.com/?x=<project>.supabase.co"
+    // contains the expected text but is not the expected host.
+    if (parsed.origin !== storageOrigin) continue
+    if (parsed.protocol !== 'https:') continue
+
+    out.push({
+      name: typeof a.name === 'string' ? a.name.slice(0, 200) : 'attachment',
+      url: parsed.toString(),
+      path: typeof a.path === 'string' ? a.path.slice(0, 400) : null,
+      size: typeof a.size === 'number' && Number.isFinite(a.size) ? a.size : null,
+      type: typeof a.type === 'string' ? a.type.slice(0, 100) : null,
+    })
+  }
+  return out
+}
+
+/** A plausible email, or null. Stored as-is before, unchecked (BUG-023). */
+function sanitiseEmail(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const v = value.trim().slice(0, 320)
+  if (!v) return null
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? v : null
+}
+
+
 Deno.serve(async (req) => {
   const corsHeaders = {
     ...corsOriginHeaders(req),
@@ -199,15 +252,33 @@ Deno.serve(async (req) => {
       if (c.commentText.length > 5000) return json({ error: 'comment too long (max 5000 chars)' }, 400)
       if (c.authorName.length > 120) return json({ error: 'authorName too long' }, 400)
 
+      // A reply must belong to the same ticket. `parent_comment_id` was passed
+      // straight through, so a comment on ticket A could be threaded under a
+      // comment on ticket B (BUG-023).
+      let parentId: string | null = null
+      if (c.parentCommentId) {
+        const { data: parent } = await admin
+          .from('ticket_comments')
+          .select('id, ticket_id')
+          .eq('id', c.parentCommentId)
+          .maybeSingle()
+        if (!parent || parent.ticket_id !== c.ticketId) {
+          return json({ error: 'parentCommentId does not belong to this ticket' }, 400)
+        }
+        parentId = parent.id as string
+      }
+
+      const storageOrigin = new URL(supabaseUrl).origin
+
       const payload = {
         ticket_id: c.ticketId,
         comment_text: c.commentText.trim(),
-        user_email: c.authorEmail?.trim() || null,
+        user_email: sanitiseEmail(c.authorEmail),
         author_name: c.authorName.trim(),
         is_internal: false,
         is_customer_comment: true,
-        parent_comment_id: c.parentCommentId || null,
-        attachments: Array.isArray(c.attachments) ? c.attachments : [],
+        parent_comment_id: parentId,
+        attachments: sanitiseAttachments(c.attachments, storageOrigin),
         created_date: new Date().toISOString(),
       }
 

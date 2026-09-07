@@ -13,6 +13,9 @@ import { useURLTab } from '../hooks/useURLTab'
 import { ROLES, TICKET_STATUS } from '../lib/constants'
 import { captureException } from '../lib/sentry'
 import { EMPTY_ARRAY } from '../lib/stableEmpty'
+import { safeAttachmentHref } from '../lib/attachmentUrl'
+import { formatMoney } from '../lib/money'
+import { useBaseCurrency } from '../hooks/useBaseCurrency'
 
 export default function CustomerDetails({
   customerId,
@@ -25,6 +28,9 @@ export default function CustomerDetails({
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  // Deal values are base-currency amounts; they used to render with a '$'.
+  // (Audit finding BUG-037, a fourth site the finding did not list.)
+  const baseCurrency = useBaseCurrency()
   const { data: customerPageData, isLoading: loading } = useQuery({
     queryKey: ['customer-details', customerId],
     queryFn: async () => {
@@ -913,7 +919,7 @@ export default function CustomerDetails({
                           {customer.attachments.map((att, i) => (
                             <a
                               key={i}
-                              href={att.url}
+                              href={safeAttachmentHref(att.url)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-indigo-50 hover:border-indigo-300 transition-colors group"
@@ -1309,7 +1315,7 @@ export default function CustomerDetails({
                             </td>
                             <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{deal.stage || '—'}</td>
                             <td className="px-4 py-3 font-medium text-gray-900 dark:text-[#e8ebf0]">
-                              {deal.value != null ? `$${Number(deal.value).toLocaleString()}` : '—'}
+                              {deal.value != null ? formatMoney(deal.value, baseCurrency) : '—'}
                             </td>
                             <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] truncate max-w-[140px]">{deal.assigned_rep || '—'}</td>
                             <td className="px-4 py-3">

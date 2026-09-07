@@ -63,7 +63,7 @@ export default function SLAPolicies({ currentUserEmail }) {
           <div>
             <h3 className="text-sm font-semibold text-gray-900 dark:text-[#e8ebf0]">{t('cp.slaPolicies.header')}</h3>
             <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5">
-              Auto-set ticket due dates based on priority when a new ticket is created.
+              {t('cp.slaPolicies.autoSetDesc')}
             </p>
           </div>
           <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -114,21 +114,14 @@ export default function SLAPolicies({ currentUserEmail }) {
             )
           })}
 
-          <div className="flex items-center gap-3 pt-2">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <button
-                onClick={() => setLocalConfig((c) => ({ ...c, pauseOnHold: !c.pauseOnHold }))}
-                className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${localConfig.pauseOnHold ? 'bg-indigo-600' : 'bg-gray-300'}`}
-              >
-                <span
-                  className={`absolute top-0.5 start-0.5 w-4 h-4 rounded-full bg-white dark:bg-[#121823] shadow transition-transform ${localConfig.pauseOnHold ? 'translate-x-4' : 'translate-x-0'}`}
-                />
-              </button>
-              <span className="text-sm text-gray-600 dark:text-[#9aa4b2]">
-                Pause SLA clock when ticket is "On Hold"
-              </span>
-            </label>
-          </div>
+          {/* The "Pause SLA clock when ticket is On Hold" toggle was removed
+              here. (Audit finding BUG-027.) It stored a flag nothing read:
+              computeDueDate sets a due date once, from priority, when the
+              ticket is raised, and never revisits it — so the clock could not
+              be paused, and the toggle claimed a behaviour the app did not
+              have. Honouring it means accumulating on-hold time per ticket and
+              recomputing the due date from it, which is a feature rather than
+              a fix, and needs somewhere to store that total. */}
         </div>
 
         <div className="pt-3 border-t border-gray-100 dark:border-[#212a38]">
@@ -143,9 +136,7 @@ export default function SLAPolicies({ currentUserEmail }) {
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-700">
-        <strong>{t('cp.slaPolicies.howItWorks')}</strong> When SLA is enabled, creating a new ticket will automatically
-        set its due date based on the priority selected. The due date can always be overridden
-        manually in the ticket form.
+        <strong>{t('cp.slaPolicies.howItWorks')}</strong> {t('cp.slaPolicies.howItWorksBody')}
       </div>
     </div>
   )

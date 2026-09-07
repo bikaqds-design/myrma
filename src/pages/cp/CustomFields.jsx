@@ -1,3 +1,27 @@
+/**
+ * Custom Fields — definitions only, not yet rendered on any form.
+ * (Audit finding BUG-027.)
+ *
+ * This screen creates, edits and deletes rows in `custom_field_definitions`,
+ * and it does that correctly. What it cannot do is make those fields appear
+ * anywhere: no ticket or customer form reads the table (grep finds no reference
+ * outside `cp/` and the backup manifest), and there is nowhere to put a value
+ * even if one did — neither `rma_tickets` nor `customers` has a column for
+ * custom field values, so adding a field and filling it in would have nothing
+ * to write to.
+ *
+ * The screen is therefore left in place, but it now says so on the page. The
+ * defect worth fixing today is the silence: an administrator would define a
+ * required field, save it, get a success toast, open a ticket form and find no
+ * trace of it, with nothing to explain why.
+ *
+ * Finishing the feature means a values column, form rendering for six field
+ * types across three forms, validation for `is_required`, plus display, export
+ * and PDF. That is a feature to schedule, not something to infer inside a bug
+ * fix — and whether to build it or drop the screen is the owner's call. There
+ * are zero definitions in production, so neither choice loses data.
+ */
+
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { db } from '../../api/supabaseClient'
@@ -200,6 +224,12 @@ export default function CustomFields({ currentUserEmail }) {
           </svg>
           {t('cp.customFields.addField')}
         </button>
+      </div>
+
+      {/* Stated rather than implied — see the note at the top of this file. */}
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <p className="text-sm font-medium text-amber-900">{t('cp.customFields.notWiredTitle')}</p>
+        <p className="text-sm text-amber-800 mt-1">{t('cp.customFields.notWiredBody')}</p>
       </div>
 
       <div className="flex items-center gap-3">

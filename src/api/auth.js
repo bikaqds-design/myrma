@@ -1,4 +1,5 @@
 import { supabase } from './client.js'
+import { purgeApiCaches } from '../lib/purgeCaches'
 
 // Helper: invoke the admin-reset-password Edge Function (handles set + create-if-missing).
 // The Edge Function validates the caller's JWT and confirms super_admin role server-side.
@@ -56,6 +57,10 @@ export const auth = {
   async signOut() {
     const { error } = await supabase.auth.signOut()
     if (error) throw error
+    // Remove any API responses a previous build's service worker cached, so
+    // the next person on this browser cannot read them (BUG-024). Best-effort
+    // by design: a purge failure must not stop someone signing out.
+    await purgeApiCaches()
   },
   async getCurrentUser() {
     const {
@@ -203,6 +208,7 @@ export const auth = {
   async signOutAll() {
     const { error } = await supabase.auth.signOut({ scope: 'global' })
     if (error) throw error
+    await purgeApiCaches()
   },
   onAuthStateChange(callback) {
     return supabase.auth.onAuthStateChange(callback)
@@ -219,6 +225,23 @@ export const auth = {
         currentSessionId: data.currentSessionId ?? null,
         activity: data.activity ?? [],
       }
+    },
+    /**
+     * Sign one device out. (Audit finding BUG-049 — the action the function's
+     * own header comment has always documented but never implemented.)
+     *
+     * Revoking deletes the session and its refresh tokens, so the device
+     * cannot renew. The access token it already holds stays valid until it
+     * expires, which is a property of JWT auth rather than something this call
+     * can change — the UI says so rather than implying instant lockout.
+     */
+    async revoke(sessionId) {
+      const { data, error } = await supabase.functions.invoke('manage-sessions', {
+        body: { action: 'revoke', sessionId },
+      })
+      if (error) throw new Error(error.message)
+      if (data?.error) throw new Error(data.error)
+      return { revoked: Boolean(data?.revoked), wasCurrent: Boolean(data?.wasCurrent) }
     },
   },
   mfa: {

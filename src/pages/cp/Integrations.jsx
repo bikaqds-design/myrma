@@ -60,7 +60,9 @@ export default function Integrations({ currentUserEmail }) {
       url: w.url,
       events: w.events || [],
       is_active: w.is_active,
-      secret_key: w.secret_key || '',
+      // Blank on purpose: the signing secret is not readable by any client
+      // role any more (BUG-009). Blank on save means "keep the existing one".
+      secret_key: '',
     })
     setShowModal(true)
   }
@@ -82,6 +84,11 @@ export default function Integrations({ currentUserEmail }) {
     setSaving(true)
     try {
       const payload = { ...form, updated_date: new Date().toISOString() }
+      // A blank secret field means "leave the existing secret alone", not
+      // "clear it". The field starts blank on every edit because the value is
+      // no longer readable (BUG-009), so sending it through would silently
+      // unsign every future delivery for this hook.
+      if (editing && !form.secret_key.trim()) delete payload.secret_key
       if (editing) {
         await db.webhooks.update(editing.id, payload)
         toast.success(t('cp.integrations.updated'))
@@ -125,25 +132,23 @@ export default function Integrations({ currentUserEmail }) {
     }
   }
 
+  // Delivered by the dispatch-webhook Edge Function, not from this page. A
+  // fetch to the webhook's own URL is blocked by the Content-Security-Policy
+  // and always was (BUG-009) -- this button reported success regardless,
+  // because the old code only caught the throw and never checked a response.
   const handleTest = async (w) => {
     setTesting(w.id)
     try {
-      const payload = {
-        event: 'webhook.test',
-        timestamp: new Date().toISOString(),
-        data: { message: 'Test webhook from myCRM Control Panel' },
+      const result = await db.webhooks.test(w.id)
+      if (result.ok) {
+        toast.success(t('cp.integrations.testSent'))
+      } else {
+        toast.error(result.error || t('cp.integrations.testFailed'))
       }
-      await fetch(w.url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(w.secret_key ? { 'X-Webhook-Secret': w.secret_key } : {}),
-        },
-        body: JSON.stringify(payload),
-      })
-      toast.success(t('cp.integrations.testSent'))
-    } catch {
-      toast.error(t('cp.integrations.testFailed'))
+      load()
+    } catch (err) {
+      captureException(err, { context: 'webhooks.test' })
+      toast.error(toUserMessage(err))
     } finally {
       setTesting(null)
     }
@@ -412,11 +417,20 @@ export default function Integrations({ currentUserEmail }) {
                   {t('cp.integrations.secretLabel')}
                 </label>
                 <input
+                  type="password"
+                  autoComplete="new-password"
                   value={form.secret_key}
                   onChange={(e) => setForm({ ...form, secret_key: e.target.value })}
                   className={inp}
-                  placeholder="Sent as X-Webhook-Secret header"
+                  placeholder={
+                    editing?.has_secret
+                      ? t('cp.integrations.secretSetPlaceholder')
+                      : t('cp.integrations.secretPlaceholder')
+                  }
                 />
+                <p className="mt-1 text-xs text-gray-500 dark:text-[#8e8b82]">
+                  {t('cp.integrations.secretHelp')}
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

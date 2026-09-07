@@ -345,13 +345,13 @@ export default function BrandingTab({
         </div>
 
         <div className="py-4 border-b border-gray-100">
-          <p className="text-sm font-medium text-gray-900 mb-1">Table Density</p>
-          <p className="text-xs text-gray-500 mb-3">Controls row height in all data tables</p>
+          <p className="text-sm font-medium text-gray-900 mb-1">{t('branding.tableDensity')}</p>
+          <p className="text-xs text-gray-500 mb-3">{t('branding.tableDensityDesc')}</p>
           <div className="grid grid-cols-3 gap-2">
             {[
-              { id: 'spacious', label: 'Spacious', desc: 'More breathing room' },
-              { id: 'comfortable', label: 'Comfortable', desc: 'Balanced (default)' },
-              { id: 'compact', label: 'Compact', desc: 'More rows visible' },
+              { id: 'spacious', label: t('branding.densitySpacious'), desc: t('branding.densitySpaciousDesc') },
+              { id: 'comfortable', label: t('branding.densityComfortable'), desc: t('branding.densityComfortableDesc') },
+              { id: 'compact', label: t('branding.densityCompact'), desc: t('branding.densityCompactDesc') },
             ].map((d) => (
               <button
                 key={d.id}
@@ -475,9 +475,9 @@ export default function BrandingTab({
       >
         {/* Tab Title */}
         <div className="py-4 border-b border-gray-100">
-          <p className="text-sm font-medium text-gray-900 mb-1">Browser Tab Title</p>
+          <p className="text-sm font-medium text-gray-900 mb-1">{t('branding.tabTitleLabel')}</p>
           <p className="text-xs text-gray-500 mb-3">
-            Text shown in the browser tab — updates instantly
+            {t('branding.tabTitleDesc')}
           </p>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg border border-gray-200 flex-1">
@@ -503,9 +503,9 @@ export default function BrandingTab({
 
         {/* Favicon */}
         <div className="py-4 border-b border-gray-100">
-          <p className="text-sm font-medium text-gray-900 mb-1">Browser Favicon</p>
+          <p className="text-sm font-medium text-gray-900 mb-1">{t('branding.faviconLabel')}</p>
           <p className="text-xs text-gray-500 mb-3">
-            Icon shown in the browser tab · PNG, ICO, SVG · Max 1MB · Recommended: 32×32 or 64×64 px
+            {t('branding.faviconDesc')}
           </p>
 
           {/* Browser tab preview */}
@@ -655,7 +655,7 @@ export default function BrandingTab({
       </BCard>
 
       <p className="text-xs text-gray-500 text-center pb-2">
-        Display settings apply immediately for all users · Branding requires Save
+        {t('branding.saveFootnote')}
       </p>
     </div>
   )

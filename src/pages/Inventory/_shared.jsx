@@ -1,3 +1,4 @@
+import { toCsv, downloadCsvText } from '../../lib/csv'
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react'
 import { useTranslation } from 'react-i18next'
@@ -142,22 +143,12 @@ export function downloadCSV(rows, filename) {
     toast('No data to export')
     return
   }
+  // Encoding lives in src/lib/csv.js. The local escape here handled quoting
+  // but not formula injection, so a customer named `=HYPERLINK(...)` executed
+  // when a manager opened the export (BUG-044).
   const headers = Object.keys(rows[0])
-  const escape = (v) => {
-    const s = String(v ?? '').replace(/"/g, '""')
-    return s.includes(',') || s.includes('\n') || s.includes('"') ? `"${s}"` : s
-  }
-  const csv = [
-    headers.join(','),
-    ...rows.map((r) => headers.map((h) => escape(r[h])).join(',')),
-  ].join('\r\n')
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = Object.assign(document.createElement('a'), { href: url, download: filename })
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  const csv = toCsv(headers, rows.map((r) => headers.map((h) => r[h])))
+  downloadCsvText(csv, filename)
   toast.success(i18next.t('inventory.exportedRows', { count: rows.length }))
 }
 

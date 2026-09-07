@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { db, storage, branding as brandingAPI } from '../api/supabaseClient'
 import { safeStorage } from '../lib/safeStorage'
+import { safeAttachmentHref } from '../lib/attachmentUrl'
+import toast from 'react-hot-toast'
 
 // ── Client-side brute-force protection ──────────────────────────────────────
 // Tracks "not found" attempts in localStorage. After MAX_FAILS failures within
@@ -244,7 +246,7 @@ export default function RMATracker() {
       setCommentFiles([])
       setReplyingTo(null)
     } catch {
-      alert('Failed to send message. Please try again.')
+      toast.error(t('tracker.sendFailed'))
     } finally {
       setSubmitting(false)
       setUploadingFiles(false)
@@ -505,7 +507,7 @@ export default function RMATracker() {
             {ticket.general_description && (
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                  Issue Description
+                  {t('tracker.issueDescription')}
                 </h2>
                 <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
                   {ticket.general_description}
@@ -578,7 +580,7 @@ export default function RMATracker() {
             {/* Messages */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-5">
-                Messages{' '}
+                {t('tracker.messages')}{' '}
                 {comments.length > 0 && (
                   <span className="ms-1 text-gray-500">({comments.length})</span>
                 )}
@@ -587,7 +589,7 @@ export default function RMATracker() {
               {/* Thread */}
               {comments.length === 0 ? (
                 <div className="text-center py-6 text-gray-500 text-sm">
-                  No messages yet. Send a message below to contact our team.
+                  {t('tracker.noMessages')}
                 </div>
               ) : (
                 <div className="space-y-4 mb-6">
@@ -608,12 +610,12 @@ export default function RMATracker() {
                 <div className="text-sm font-semibold text-gray-700">
                   {replyingTo ? (
                     <div className="flex items-center justify-between">
-                      <span>Replying to message</span>
+                      <span>{t('tracker.replyingToMessage')}</span>
                       <button
                         onClick={() => setReplyingTo(null)}
                         className="text-xs text-indigo-600 hover:underline"
                       >
-                        Cancel reply
+                        {t('tracker.cancelReply')}
                       </button>
                     </div>
                   ) : (
@@ -739,7 +741,7 @@ export default function RMATracker() {
                               d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
                             />
                           </svg>
-                          Send Message
+                          {t('tracker.sendMessage')}
                         </>
                       )}
                     </button>
@@ -836,7 +838,7 @@ function CommentBubble({
             {attachments.map((att, i) => (
               <a
                 key={i}
-                href={att.url}
+                href={safeAttachmentHref(att.url)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs text-indigo-600 hover:bg-indigo-50 transition-colors"

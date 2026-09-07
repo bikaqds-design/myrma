@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ai } from '../api/supabaseClient'
 
 function StarIcon({ className = '' }) {
@@ -10,6 +11,7 @@ function StarIcon({ className = '' }) {
 }
 
 export default function AIAssist({ contextType, data, className = '' }) {
+  const { t } = useTranslation()
   const [state, setState] = useState('idle')
   const [result, setResult] = useState(null)
   const [errMsg, setErrMsg] = useState('')
@@ -22,7 +24,7 @@ export default function AIAssist({ contextType, data, className = '' }) {
       setResult(res)
       setState('done')
     } catch (err) {
-      setErrMsg(err.message || 'AI assist failed')
+      setErrMsg(err.message || t('aiAssist.failed'))
       setState('error')
     }
   }
@@ -34,7 +36,7 @@ export default function AIAssist({ contextType, data, className = '' }) {
         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#eef2ff] dark:bg-[#1e1b4b] text-[#4338ca] dark:text-[#a5b4fc] hover:bg-[#e0e7ff] dark:hover:bg-[#252060] transition-colors ${className}`}
       >
         <StarIcon className="w-3 h-3" />
-        AI Assist
+        {t('aiAssist.label')}
       </button>
     )
   }
@@ -56,13 +58,13 @@ export default function AIAssist({ contextType, data, className = '' }) {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">
           <StarIcon className="w-3.5 h-3.5 text-[#4338ca] dark:text-[#a5b4fc]" />
-          <span className="text-xs font-semibold text-[#4338ca] dark:text-[#a5b4fc]">AI Assist</span>
+          <span className="text-xs font-semibold text-[#4338ca] dark:text-[#a5b4fc]">{t('aiAssist.label')}</span>
         </div>
         <button
           onClick={run}
           className="text-[11px] text-[#746f65] dark:text-[#a4acb7] hover:text-[#4338ca] dark:hover:text-[#a5b4fc] transition-colors"
         >
-          Regenerate
+          {t('aiAssist.regenerate')}
         </button>
       </div>
 
@@ -80,7 +82,7 @@ export default function AIAssist({ contextType, data, className = '' }) {
           </div>
           <div className="border-t border-[#c7d2fe] dark:border-[#2e3a8c] pt-3">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-[#6c6760] dark:text-[#9aa4b2] mb-1.5">
-              Suggested Next Action
+              {t('aiAssist.suggestedNextAction')}
             </p>
             <div className="flex items-start gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-[#4338ca] dark:bg-[#a5b4fc] flex-shrink-0 mt-[5px]" />

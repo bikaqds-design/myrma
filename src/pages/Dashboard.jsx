@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, supabase } from '../api/supabaseClient'
 import { safeStorage } from '../lib/safeStorage'
+import { isPastDueLocal, daysPastDueLocal, daysUntilDueLocal } from '../lib/dates'
 import {
   WIDGET_CATALOG,
   WIDGET_SIZES,
@@ -587,7 +588,10 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
   const overdueList = useMemo(
     () => rangedTickets.filter((t) => {
       if (!t.due_date || TICKET_STATUS_RESOLVED.includes(t.ticket_status)) return false
-      return new Date(t.due_date) < new Date()
+      // Inclusive to the end of the local day: `new Date('2026-09-06')`
+      // parses as UTC midnight, so a ticket due today used to read as
+      // overdue from 02:00 Cairo (BUG-038).
+      return isPastDueLocal(t.due_date)
     }),
     [rangedTickets]
   )
@@ -622,7 +626,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
   const { slaPercent, resolutionPercent, trackedCount, onScheduleCount } = useMemo(() => {
     const ticketsWithDue = rangedTickets.filter((t) => t.due_date && t.ticket_status !== TICKET_STATUS.CANCELLED)
     const overdueActive = ticketsWithDue.filter(
-      (t) => !TICKET_STATUS_RESOLVED.includes(t.ticket_status) && new Date(t.due_date) < new Date()
+      (t) => !TICKET_STATUS_RESOLVED.includes(t.ticket_status) && isPastDueLocal(t.due_date)
     ).length
     return {
       slaPercent: ticketsWithDue.length > 0
@@ -1024,7 +1028,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
               <div style={{ fontSize: 11.5, color: tk.textMuted }}>{a.assigned_rep ?? '—'}</div>
             </div>
             <span style={{ flexShrink: 0, marginLeft: 8, padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, color: tk.bad, background: tk.bad + '1a' }}>
-              {Math.ceil((new Date() - new Date(a.due_date)) / 86400000)}d
+              {daysPastDueLocal(a.due_date)}d
             </span>
           </div>
         ))}
@@ -1196,10 +1200,10 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
           <CardHead title={t('dashboard.myOpenTickets')} action={`${myOpenTickets.length} ${t('common.open')}`} tk={tk} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {myOpenTickets.slice(0, 6).map((ticket) => {
-              const isDue = ticket.due_date && new Date(ticket.due_date) < new Date()
-              const dueInDays = ticket.due_date
-                ? Math.ceil((new Date(ticket.due_date) - new Date()) / 86400000)
-                : null
+              const isDue = isPastDueLocal(ticket.due_date)
+              // Whole days remaining, counted to the END of the due day so
+              // "due today" reads as 0 rather than -1 (BUG-038).
+              const dueInDays = daysUntilDueLocal(ticket.due_date)
               return (
                 <div key={ticket.id}
                   onClick={() => onNavigate?.(`/rma-tickets?ticket=${ticket.id}`)}

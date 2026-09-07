@@ -1,6 +1,19 @@
+import { addDaysLocalISO } from '../../lib/dates'
 // Pure helper functions and constants shared across the RMATickets module.
 // (No React components here — kept in _shared.jsx to satisfy react-refresh rules.)
 
+/**
+ * A PROVISIONAL RMA number, used only for the preview in the form header and
+ * as the folder name attachments are uploaded under before the row exists.
+ *
+ * It is no longer the identifier. Since migration 20260832 the database assigns
+ * `rma_number` on insert and ignores whatever the client sends (BUG-035) —
+ * this max-of-what-the-browser-holds approach gave two concurrent users the
+ * same number, and the second save failed on the unique index after the whole
+ * form had been filled in. It also counted from a list capped at 5,000 rows.
+ *
+ * Anything the user or a customer actually sees must come from the saved row.
+ */
 export const generateRmaNumber = (existingTickets = []) => {
   const now = new Date()
   const dd = String(now.getDate()).padStart(2, '0')
@@ -19,11 +32,10 @@ export const generateRmaNumber = (existingTickets = []) => {
   return `${prefix}${String(nextSerial).padStart(4, '0')}`
 }
 
-export const DEFAULT_DUE = () => {
-  const d = new Date()
-  d.setDate(d.getDate() + 7)
-  return d.toISOString().split('T')[0]
-}
+// Local calendar, not UTC. Was `d.setDate(d.getDate() + 7)` followed by
+// `toISOString().split('T')[0]` — local arithmetic formatted as UTC, so at
+// 01:00 Cairo "seven days from today" came out as six (BUG-038).
+export const DEFAULT_DUE = () => addDaysLocalISO(7)
 
 export const EMPTY_PRODUCT = {
   // Set when the product is picked from the catalog dropdown; null for a typed

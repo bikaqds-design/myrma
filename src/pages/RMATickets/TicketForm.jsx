@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
+import { safeAttachmentHref } from '../../lib/attachmentUrl'
 const BarcodeScannerModule = lazy(() => import('../../components/BarcodeScanner'))
 const BarcodeScanner = (props) => (
   <Suspense fallback={null}><BarcodeScannerModule {...props} /></Suspense>
@@ -27,6 +28,10 @@ import {
   isImage,
 } from './_utils'
 import { ProductSearchInput } from './_shared'
+import { useBaseCurrency } from '../../hooks/useBaseCurrency'
+import { useCurrencyOptions } from '../../hooks/useCurrencyOptions'
+import { useTicketDefaults } from '../../hooks/useTicketDefaults'
+import { addDaysLocalISO } from '../../lib/dates'
 
 const inputClass =
   'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm bg-white placeholder-gray-400 transition-colors'
@@ -423,8 +428,20 @@ export function TicketForm({
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
   const [scanningProductIdx, setScanningProductIdx] = useState(null)
 
-  const EMPTY_RES = { type: '', replacement_product_name: '', replacement_serial: '', amount: '', currency: 'USD', reason: '', reference_number: '' }
+  // Currency is left EMPTY here rather than defaulted, and resolved to the base
+  // currency at the point of render and save. (Audit finding BUG-036.)
+  //
+  // Seeding it with `baseCurrency` would freeze whatever the hook returned on
+  // the first render — which is the EGP fallback, because the config query has
+  // not resolved yet. An installation whose base currency is not EGP would then
+  // record every resolution in EGP, which is the same defect with a different
+  // wrong answer. Resolving late means the value always follows the loaded
+  // config.
+  const EMPTY_RES = { type: '', replacement_product_name: '', replacement_serial: '', amount: '', currency: '', reason: '', reference_number: '' }
   const [resForm, setResForm] = useState(EMPTY_RES)
+  const ticketDefaults = useTicketDefaults()
+  const baseCurrency = useBaseCurrency()
+  const currencyOptions = useCurrencyOptions(baseCurrency)
   const [productSearches, setProductSearches] = useState(() => {
     if (editingTicket) {
       const prods = editingTicket.products?.length ? editingTicket.products : [{ ...EMPTY_PRODUCT }]
@@ -452,6 +469,31 @@ export function TicketForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userEmail])
 
+  // Apply the Control Panel's ticket defaults once the config query resolves.
+  // (Audit finding BUG-027 — the screen saved these three values and nothing
+  // read them.)
+  //
+  // Applied in an effect rather than as the initial state because the config
+  // has not loaded on the first render; seeding from the hook there would bake
+  // in the built-in fallbacks and leave the configured values unused, which is
+  // the defect being fixed.
+  //
+  // Each field is only overwritten while it still holds the built-in fallback,
+  // so a value the user has already chosen is never pulled out from under them
+  // when the config arrives a moment later. Editing an existing ticket is
+  // untouched — its stored values are the point.
+  useEffect(() => {
+    if (editingTicket) return
+    setFormData((prev) => {
+      const next = { ...prev }
+      if (prev.priority === 'Medium') next.priority = ticketDefaults.default_priority
+      if (prev.ticket_status === 'Open') next.ticket_status = ticketDefaults.default_status
+      if (prev.due_date === DEFAULT_DUE()) next.due_date = addDaysLocalISO(ticketDefaults.auto_due_days)
+      return next
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticketDefaults.default_priority, ticketDefaults.default_status, ticketDefaults.auto_due_days])
+
   // Load existing resolution when editing
   useEffect(() => {
     if (!editingTicket?.id) return
@@ -462,7 +504,7 @@ export function TicketForm({
           replacement_product_name: res.replacement_product_name || '',
           replacement_serial: res.replacement_serial || '',
           amount: res.amount != null ? String(res.amount) : '',
-          currency: res.currency || 'USD',
+          currency: res.currency || '',
           reason: res.reason || '',
           reference_number: res.reference_number || '',
         })
@@ -689,9 +731,17 @@ export function TicketForm({
           created_by: userEmail,
           created_date: new Date().toISOString(),
         })
-        dispatchCreateSideEffects(newTicket, ticketData, rmaNumber, userEmail, resolvedCustomerEmail, t)
+        // Use the number the DATABASE assigned, not the one this browser
+        // guessed. Since 20260832 the server assigns rma_number on insert
+        // (BUG-035): two people creating a ticket at once used to compute the
+        // same value and the second save failed on the unique index. The local
+        // value is now only the folder name the attachments were uploaded
+        // under, so everything the user or the customer sees must come from the
+        // saved row.
+        const savedRmaNumber = newTicket?.rma_number || rmaNumber
+        dispatchCreateSideEffects(newTicket, ticketData, savedRmaNumber, userEmail, resolvedCustomerEmail, t)
         db.userActivity
-          .create(userEmail, 'ticket_created', `Created ticket ${rmaNumber} for ${ticketData.customer_name}`)
+          .create(userEmail, 'ticket_created', `Created ticket ${savedRmaNumber} for ${ticketData.customer_name}`)
           .catch(() => {})
         if (newTicket?.id)
           db.ticketActivity.log(newTicket.id, 'ticket_created', `Created for ${ticketData.customer_name} · ${ticketData.priority} priority · ${ticketData.ticket_status}`, userEmail)
@@ -707,7 +757,7 @@ export function TicketForm({
             replacement_product_name: resForm.replacement_product_name?.trim() || null,
             replacement_serial: resForm.replacement_serial?.trim() || null,
             amount: resForm.amount !== '' ? parseFloat(resForm.amount) : null,
-            currency: resForm.currency || 'USD',
+            currency: resForm.currency || baseCurrency,
             reason: resForm.reason?.trim() || null,
             reference_number: resForm.reference_number?.trim() || null,
             created_by: userEmail,
@@ -1233,7 +1283,7 @@ export function TicketForm({
                     >
                       {isImage(att.type) ? (
                         <img
-                          src={att.url}
+                          src={safeAttachmentHref(att.url)}
                           alt={att.name}
                           className="w-10 h-10 object-cover rounded flex-shrink-0"
                         />
@@ -1256,7 +1306,7 @@ export function TicketForm({
                       )}
                       <div className="flex-1 min-w-0">
                         <a
-                          href={att.url}
+                          href={safeAttachmentHref(att.url)}
                           target="_blank"
                           rel="noreferrer"
                           className="text-sm font-medium text-indigo-600 hover:underline truncate block"
@@ -1426,11 +1476,12 @@ export function TicketForm({
                     <label className={labelClass}>{t('ticketForm.amount')}</label>
                     <div className="flex gap-2">
                       <select
-                        value={resForm.currency}
+                        aria-label={t('ticketDrawer.currency')}
+                        value={resForm.currency || baseCurrency}
                         onChange={(e) => setResForm(f => ({ ...f, currency: e.target.value }))}
                         className="w-20 px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600"
                       >
-                        {['USD','EUR','GBP','AED','SAR','EGP'].map(c => <option key={c}>{c}</option>)}
+                        {currencyOptions.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
                       </select>
                       <input
                         type="number" min="0" step="0.01"

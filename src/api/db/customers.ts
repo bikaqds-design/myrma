@@ -120,45 +120,36 @@ export const customers = {
       .in('id', ids)
     if (error) throw error
   },
-  async getRelatedTickets(customerId: string, customerNames: string[] = []): Promise<unknown[]> {
-    // Tickets may be linked by UUID FK (customer_id) OR by name string (customer_name).
+  /**
+   * Tickets belonging to a customer, matched by the foreign key ONLY.
+   *
+   * This used to run a second query matching `customer_name` against a list of
+   * the customer's names and merge the results (BUG-040). Names are not
+   * identities: two customers called "Ahmed Ali" — and there are already 14
+   * duplicate mobile numbers in this data — each saw the other's RMA history,
+   * including the description of the fault and the products involved. Renaming
+   * a customer also detached the history that was linked only by name.
+   *
+   * The fallback existed for tickets predating the FK. There is exactly one
+   * ticket without a `customer_id` today, RMA-06082026-0001 "QA Walk-in No CRM
+   * Link" — a deliberate walk-in with no customer record, which should not
+   * appear under anybody. So the name query matched nothing legitimate and
+   * could only ever produce cross-exposure.
+   *
+   * The `customerNames` parameter is kept in the signature and ignored, so the
+   * call site in CustomerDetails.jsx needs no coordinated change.
+   */
+  async getRelatedTickets(customerId: string, _customerNames: string[] = []): Promise<unknown[]> {
     try {
-      const cols =
-        'id, rma_number, customer_name, customer_id, ticket_status, priority, general_description, created_date, due_date, products, assigned_technician'
-      const queries = [
-        supabase
-          .from('rma_tickets')
-          .select(cols)
-          .eq('customer_id', customerId)
-          .order('created_date', { ascending: false }),
-      ]
-      const uniqueNames = [...new Set(customerNames.filter(Boolean))]
-      if (uniqueNames.length > 0) {
-        queries.push(
-          supabase
-            .from('rma_tickets')
-            .select(cols)
-            .in('customer_name', uniqueNames)
-            .order('created_date', { ascending: false })
+      const { data, error } = await supabase
+        .from('rma_tickets')
+        .select(
+          'id, rma_number, customer_name, customer_id, ticket_status, priority, general_description, created_date, due_date, products, assigned_technician'
         )
-      }
-      const results = await Promise.all(queries)
-      const seen = new Set<string>()
-      const merged: unknown[] = []
-      for (const { data, error } of results) {
-        if (error) throw error
-        for (const ticket of data || []) {
-          if (!seen.has(ticket.id)) {
-            seen.add(ticket.id)
-            merged.push(ticket)
-          }
-        }
-      }
-      return merged.sort(
-        (a, b) =>
-          new Date((b as { created_date: string }).created_date).getTime() -
-          new Date((a as { created_date: string }).created_date).getTime()
-      )
+        .eq('customer_id', customerId)
+        .order('created_date', { ascending: false })
+      if (error) throw error
+      return data || []
     } catch (err) {
       if ((err as { code?: string })?.code === '42P01') return []
       throw err

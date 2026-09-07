@@ -51,6 +51,30 @@ export const leads = {
     if (error) throw error
     return data[0]
   },
+  /**
+   * Insert many leads in chunks rather than one request per row (BUG-045).
+   *
+   * The CSV importer ran `for (const lead of toImport) await db.leads.create(lead)`,
+   * so a 2,000-row file made 2,000 sequential round trips — slow, and a failure
+   * part-way left an unreported partial import. Chunked rather than one giant
+   * statement so a large file does not exceed the request size limit.
+   *
+   * Returns what was inserted; throws on the first failing chunk, so the caller
+   * can report how many rows landed before it stopped.
+   */
+  async bulkCreate(leads: Array<Partial<LeadRow>>, chunkSize = 200): Promise<LeadRow[]> {
+    const created: LeadRow[] = []
+    for (let i = 0; i < leads.length; i += chunkSize) {
+      const chunk = leads.slice(i, i + chunkSize)
+      const { data, error } = await supabase.from('leads').insert(chunk).select()
+      if (error) {
+        ;(error as { insertedBefore?: number }).insertedBefore = created.length
+        throw error
+      }
+      created.push(...((data ?? []) as LeadRow[]))
+    }
+    return created
+  },
   async update(id: string, lead: Partial<LeadRow>): Promise<LeadRow> {
     const { data: existing, error: fetchError } = await supabase
       .from('leads')

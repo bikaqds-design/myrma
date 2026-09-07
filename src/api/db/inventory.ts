@@ -356,24 +356,29 @@ export const inventory = {
     }
   },
 
+  /**
+   * One transaction, and a real sequence for the number.
+   *
+   * This used to derive `BATCH-<yyyymmdd>-<count+1>` from `SELECT count(*)`.
+   * `batch_number` is UNIQUE and a count is not a sequence, so deleting any
+   * batch made the next create re-derive a number already in use, and two
+   * people creating at once derived the same one — both surfacing as an
+   * unexplained failure. It then linked the units in a *second* statement whose
+   * error was never captured, so a failure there left a batch claiming
+   * `unit_count` units with none attached (BUG-029).
+   */
   async createBatch(
     unitIds: string[],
     manufacturerName: string,
     userEmail: string
   ): Promise<ManufacturerBatchRow> {
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-    const { count } = await supabase
-      .from('manufacturer_batches')
-      .select('*', { count: 'exact', head: true })
-    const batchNumber = `BATCH-${dateStr}-${String((count || 0) + 1).padStart(3, '0')}`
-    const { data: batch, error: batchErr } = await supabase
-      .from('manufacturer_batches')
-      .insert([{ batch_number: batchNumber, manufacturer_name: manufacturerName, status: 'draft', unit_count: unitIds.length, created_date: new Date().toISOString(), created_by: userEmail }])
-      .select()
-    if (batchErr) throw batchErr
-    const batchId = batch[0].id
-    await supabase.from('inventory_units').update({ manufacturer_batch_id: batchId }).in('id', unitIds)
-    return batch[0]
+    const { data, error } = await supabase.rpc('create_manufacturer_batch', {
+      p_unit_ids: unitIds,
+      p_manufacturer_name: manufacturerName,
+      p_actor_email: userEmail,
+    })
+    if (error) throw error
+    return data as ManufacturerBatchRow
   },
 
   async markBatchSent(
@@ -381,14 +386,14 @@ export const inventory = {
     sentDate: string,
     trackingNumber: string
   ): Promise<ManufacturerBatchRow | undefined> {
-    const { data, error } = await supabase
-      .from('manufacturer_batches')
-      .update({ status: 'sent', sent_date: sentDate, tracking_number: trackingNumber })
-      .eq('id', batchId)
-      .select()
+    // Batch and units move together, or not at all (BUG-029).
+    const { data, error } = await supabase.rpc('mark_batch_sent', {
+      p_batch_id: batchId,
+      p_sent_date: sentDate,
+      p_tracking_number: trackingNumber,
+    })
     if (error) throw error
-    await supabase.from('inventory_units').update({ status: 'sent_to_manufacturer' }).eq('manufacturer_batch_id', batchId)
-    return data?.[0]
+    return data as ManufacturerBatchRow
   },
 
   async markBatchResolved(
@@ -397,14 +402,18 @@ export const inventory = {
     resolutionDate: string,
     notes?: string
   ): Promise<ManufacturerBatchRow | undefined> {
-    const { data, error } = await supabase
-      .from('manufacturer_batches')
-      .update({ status: 'resolved', resolution_type: resolutionType, resolution_date: resolutionDate, resolution_notes: notes })
-      .eq('id', batchId)
-      .select()
+    // Batch and units move together (BUG-029). NOTE the semantics are carried
+    // over unchanged: every unit becomes 'closed' whatever the resolution was,
+    // so a repaired unit and a scrapped one end up identical. That is an open
+    // question recorded against BUG-032, not something changed here.
+    const { data, error } = await supabase.rpc('mark_batch_resolved', {
+      p_batch_id: batchId,
+      p_resolution_type: resolutionType,
+      p_resolution_date: resolutionDate,
+      p_notes: notes ?? null,
+    })
     if (error) throw error
-    await supabase.from('inventory_units').update({ status: 'closed' }).eq('manufacturer_batch_id', batchId)
-    return data?.[0]
+    return data as ManufacturerBatchRow
   },
 
   async getStats(): Promise<InventoryStatsRow | null> {

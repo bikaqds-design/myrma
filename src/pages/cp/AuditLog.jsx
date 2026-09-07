@@ -7,6 +7,7 @@ import { Table, Pagination } from '../../components/ui'
 import toast from 'react-hot-toast'
 import { captureException } from '../../lib/sentry'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
+import { toCsv, downloadCsvText } from '../../lib/csv'
 
 export default function AuditLog() {
   const { t } = useTranslation()
@@ -52,23 +53,20 @@ export default function AuditLog() {
   }, [logs, search, filterUser, filterAction, filterFrom, filterTo])
 
   const handleExport = () => {
-    const csv = [
-      'Date,User,Action,Details',
-      ...filtered.map((l) =>
-        [
-          new Date(l.created_date).toLocaleString(),
-          l.user_email || '',
-          l.action_type || '',
-          `"${(l.action_details || '').replace(/"/g, '""')}"`,
-        ].join(',')
-      ),
-    ].join('\n')
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    a.download = `audit-log-${new Date().toISOString().split('T')[0]}.csv`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
+    // A third hand-rolled CSV encoder, and the riskiest of them: action_details
+    // is free text supplied by whoever wrote the log entry, and user_email and
+    // action_type were not escaped at all -- a comma in either shifted every
+    // later column (BUG-044).
+    const csv = toCsv(
+      ['Date', 'User', 'Action', 'Details'],
+      filtered.map((l) => [
+        new Date(l.created_date).toLocaleString(),
+        l.user_email || '',
+        l.action_type || '',
+        l.action_details || '',
+      ]),
+    )
+    downloadCsvText(csv, `audit-log-${new Date().toISOString().split('T')[0]}.csv`)
     toast.success(t('cp.auditLog.exported', { count: filtered.length }))
   }
 

@@ -17,6 +17,7 @@ import { captureException } from '../../lib/sentry'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { EMPTY_FORM } from './_constants'
 import { AddCustomerModal, BulkUploadCustomersModal } from './_modals'
+import { contactFieldProblems } from '../../lib/importValidation'
 
 const generateCustomerCode = () => `CB-${Math.floor(10000000 + Math.random() * 90000000)}`
 
@@ -806,6 +807,15 @@ export default function Customers({
           continue
         }
 
+        // The forms run customerSchema, the importer never did, so a value the
+        // single-record form refuses went straight in from a spreadsheet
+        // (BUG-045). Checked here rather than silently stored.
+        const problems = contactFieldProblems(row)
+        if (problems.length) {
+          errors.push(`Row ${i + 1}: ${problems.join('; ')}`)
+          continue
+        }
+
         const status = ['Active', 'Inactive'].includes(row.customer_status)
           ? row.customer_status
           : 'Active'
@@ -1231,9 +1241,9 @@ export default function Customers({
                 className="text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg px-2 py-1.5 bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent"
               >
                 <option value="">{t('customers.changeStatus')}</option>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-                <option value="Suspended">Suspended</option>
+                <option value="Active">{t('customers.statusActive')}</option>
+                <option value="Inactive">{t('customers.statusInactive')}</option>
+                <option value="Suspended">{t('customers.statusSuspended')}</option>
               </select>
               {canDo('delete') && (
                 <button

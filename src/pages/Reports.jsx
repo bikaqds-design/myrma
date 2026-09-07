@@ -11,6 +11,9 @@ import { captureException } from '../lib/sentry'
 import { Spinner, PageHeader } from '../components/ui'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { ROLES } from '../lib/constants'
+import { toCsv, downloadCsvText } from '../lib/csv'
+import { formatMoney } from '../lib/money'
+import { useBaseCurrency } from '../hooks/useBaseCurrency'
 
 // ─── CSV Utility ──────────────────────────────────────────────────────────────
 function downloadCSV(rows, columns, filename, t) {
@@ -18,22 +21,11 @@ function downloadCSV(rows, columns, filename, t) {
     toast(t ? t('reports.noDataExport') : 'No data to export')
     return
   }
+  // Encoding lives in src/lib/csv.js — the second copy of the same unsafe
+  // escape, fixed with the first (BUG-044).
   const headers = columns.map((c) => c.label)
-  const escape = (v) => {
-    const s = String(v ?? '').replace(/"/g, '""')
-    return s.includes(',') || s.includes('\n') || s.includes('"') ? `"${s}"` : s
-  }
-  const csv = [
-    headers.join(','),
-    ...rows.map((r) => columns.map((c) => escape(r[c.key] ?? '')).join(',')),
-  ].join('\r\n')
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = Object.assign(document.createElement('a'), { href: url, download: filename })
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  const csv = toCsv(headers, rows.map((r) => columns.map((c) => r[c.key] ?? '')))
+  downloadCsvText(csv, filename)
   toast.success(t ? t('reports.exportedRows', { count: rows.length }) : `Exported ${rows.length} rows`)
 }
 
@@ -847,8 +839,10 @@ function PipelineTab({ deals, leads, pipelines }) {
   const { t } = useTranslation()
 
   const num = (v) => Number(v) || 0
-  const fmt$ = (v) =>
-    `$${num(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`
+  // Amounts here are stored in the base currency, so they are labelled with it
+  // rather than with a dollar sign. (Audit finding BUG-037.)
+  const baseCurrency = useBaseCurrency()
+  const fmtMoney = (v) => formatMoney(num(v), baseCurrency)
   const pct = (a, b) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '—')
 
   const open = deals.filter((d) => d.status === 'open')
@@ -959,7 +953,7 @@ function PipelineTab({ deals, leads, pipelines }) {
         <KpiCard
           label={t('reports.kpiOpenDeals')}
           value={String(open.length)}
-          sub={fmt$(openValue)}
+          sub={fmtMoney(openValue)}
           color="indigo"
           icon="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
         />
@@ -1006,7 +1000,7 @@ function PipelineTab({ deals, leads, pipelines }) {
                     <div className="flex items-center justify-between text-xs mb-1">
                       <span className="text-gray-700 dark:text-[#e8ebf0]">{st.name}</span>
                       <span className="text-gray-600 dark:text-[#9aa4b2] tabular-nums">
-                        {st.count} · {fmt$(st.value)}
+                        {st.count} · {fmtMoney(st.value)}
                       </span>
                     </div>
                     <div className="h-2 rounded-full bg-gray-100 dark:bg-[#1a2230] overflow-hidden">
@@ -1127,9 +1121,9 @@ function PipelineTab({ deals, leads, pipelines }) {
                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-[#e8ebf0] tabular-nums">
                       {pct(r.won, r.won + r.lost)}
                     </td>
-                    <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] tabular-nums">{fmt$(r.openValue)}</td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] tabular-nums">{fmtMoney(r.openValue)}</td>
                     <td className="px-4 py-3 font-semibold text-gray-900 dark:text-[#e8ebf0] tabular-nums">
-                      {fmt$(r.wonValue)}
+                      {fmtMoney(r.wonValue)}
                     </td>
                   </tr>
                 ))}
@@ -1165,8 +1159,10 @@ function SalesTab({ quotations, salesOrders, invoices, payments, allSalesOrders,
   const { t } = useTranslation()
 
   const num = (v) => Number(v) || 0
-  const fmt$ = (v) =>
-    `$${num(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`
+  // Amounts here are stored in the base currency, so they are labelled with it
+  // rather than with a dollar sign. (Audit finding BUG-037.)
+  const baseCurrency = useBaseCurrency()
+  const fmtMoney = (v) => formatMoney(num(v), baseCurrency)
   const pct = (a, b) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '—')
 
   // A quotation is "won" once it has been converted or accepted; declined and
@@ -1270,7 +1266,7 @@ function SalesTab({ quotations, salesOrders, invoices, payments, allSalesOrders,
         <KpiCard
           label={t('reports.kpiQuotationsRaised')}
           value={String(quotations.length)}
-          sub={fmt$(qtValue)}
+          sub={fmtMoney(qtValue)}
           color="indigo"
           icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
         />
@@ -1283,14 +1279,14 @@ function SalesTab({ quotations, salesOrders, invoices, payments, allSalesOrders,
         />
         <KpiCard
           label={t('reports.kpiInvoiced')}
-          value={fmt$(invValue)}
+          value={fmtMoney(invValue)}
           sub={t('reports.docCount', { count: liveInvoices.length })}
           color="blue"
           icon="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
         />
         <KpiCard
           label={t('reports.kpiCollected')}
-          value={fmt$(collected)}
+          value={fmtMoney(collected)}
           sub={t('reports.docCount', { count: livePayments.length })}
           color="purple"
           icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 9v1"
@@ -1310,7 +1306,7 @@ function SalesTab({ quotations, salesOrders, invoices, payments, allSalesOrders,
                 <div className="flex items-center justify-between text-xs mb-1">
                   <span className="font-medium text-gray-700 dark:text-[#e8ebf0]">{st.label}</span>
                   <span className="text-gray-600 dark:text-[#9aa4b2] tabular-nums">
-                    {st.count} · {fmt$(st.value)}
+                    {st.count} · {fmtMoney(st.value)}
                     {prev && (
                       <span className="ms-2 text-gray-500 dark:text-[#9aa4b2]">
                         ({pct(st.count, prev.count)} {t('reports.ofPrevious')})
@@ -1382,9 +1378,9 @@ function SalesTab({ quotations, salesOrders, invoices, payments, allSalesOrders,
                     <td className="px-4 py-3 tabular-nums font-medium text-gray-900 dark:text-[#e8ebf0]">
                       {pct(r.won, r.won + r.lost)}
                     </td>
-                    <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] tabular-nums">{fmt$(r.value)}</td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] tabular-nums">{fmtMoney(r.value)}</td>
                     <td className="px-4 py-3 font-semibold text-gray-900 dark:text-[#e8ebf0] tabular-nums">
-                      {fmt$(r.wonValue)}
+                      {fmtMoney(r.wonValue)}
                     </td>
                   </tr>
                 ))}
@@ -1448,10 +1444,10 @@ function FinancialTab({ invoices, quotations, customers, formatDate }) {
     .filter((q) => !['cancelled', 'declined', 'expired'].includes(q.status))
     .reduce((s, q) => s + num(q.total), 0)
 
-  const fmt$ = (v) =>
-    `$${Number(v)
-      .toFixed(2)
-      .replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`
+  // Third copy of the same hardcoded dollar sign, in a tab the finding did not
+  // list. Fixed with the other two. (Audit finding BUG-037.)
+  const baseCurrency = useBaseCurrency()
+  const fmtMoney = (v) => formatMoney(Number(v) || 0, baseCurrency)
 
   const handleExport = () => {
     const columns = [
@@ -1501,25 +1497,25 @@ function FinancialTab({ invoices, quotations, customers, formatDate }) {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <KpiCard
           label={t('reports.kpiTotalInvoiced')}
-          value={fmt$(totalInvoiced)}
+          value={fmtMoney(totalInvoiced)}
           color="indigo"
           icon="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
         />
         <KpiCard
           label={t('reports.kpiTotalPaid')}
-          value={fmt$(totalPaid)}
+          value={fmtMoney(totalPaid)}
           color="green"
           icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
         />
         <KpiCard
           label={t('reports.kpiOutstanding')}
-          value={fmt$(outstanding)}
+          value={fmtMoney(outstanding)}
           color="amber"
           icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
         />
         <KpiCard
           label={t('reports.kpiQuotesValue')}
-          value={fmt$(quotesVal)}
+          value={fmtMoney(quotesVal)}
           color="blue"
           icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
         />
@@ -1581,10 +1577,10 @@ function FinancialTab({ invoices, quotations, customers, formatDate }) {
                       </span>
                     </td>
                     <td className="px-4 py-3 font-semibold text-gray-900 dark:text-[#e8ebf0] tabular-nums">
-                      {fmt$(inv.total)}
+                      {fmtMoney(inv.total)}
                     </td>
                     <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] tabular-nums">
-                      {fmt$(inv.amount_paid)}
+                      {fmtMoney(inv.amount_paid)}
                     </td>
                     <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs whitespace-nowrap">
                       {inv.due_date ? (

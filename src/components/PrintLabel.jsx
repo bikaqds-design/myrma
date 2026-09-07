@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import QRCode from 'qrcode'
 
 export default function PrintLabel({ ticket, onClose }) {
+  const { t } = useTranslation()
   const qrRef = useRef(null)
 
   useEffect(() => {
@@ -38,28 +40,28 @@ export default function PrintLabel({ ticket, onClose }) {
 
         <div className="print-content border-4 border-gray-800 p-8 rounded-lg">
           <div className="text-center mb-6">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">RMA LABEL</h1>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">{t('printLabel.title')}</h1>
             <div className="text-6xl font-bold text-indigo-600 mb-4">{ticket.rma_number}</div>
           </div>
 
           <div className="grid grid-cols-2 gap-8 mb-6">
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b-2 border-gray-300 pb-2">
-                CUSTOMER INFO
+                {t('printLabel.customerInfo')}
               </h3>
               <div className="space-y-2">
                 <div>
-                  <p className="text-sm text-gray-600">Customer Name:</p>
+                  <p className="text-sm text-gray-600">{t('printLabel.customerName')}</p>
                   <p className="text-lg font-semibold text-gray-900">{ticket.customer_name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Created Date:</p>
+                  <p className="text-sm text-gray-600">{t('printLabel.createdDate')}</p>
                   <p className="text-lg font-semibold text-gray-900">
                     {new Date(ticket.created_date).toLocaleDateString()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Priority:</p>
+                  <p className="text-sm text-gray-600">{t('printLabel.priority')}</p>
                   <p className="text-lg font-semibold text-gray-900">{ticket.priority}</p>
                 </div>
               </div>
@@ -67,22 +69,22 @@ export default function PrintLabel({ ticket, onClose }) {
 
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b-2 border-gray-300 pb-2">
-                TICKET INFO
+                {t('printLabel.ticketInfo')}
               </h3>
               <div className="space-y-2">
                 <div>
-                  <p className="text-sm text-gray-600">Status:</p>
+                  <p className="text-sm text-gray-600">{t('printLabel.status')}</p>
                   <p className="text-lg font-semibold text-gray-900">{ticket.ticket_status}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Technician:</p>
+                  <p className="text-sm text-gray-600">{t('printLabel.technician')}</p>
                   <p className="text-lg font-semibold text-gray-900">
-                    {ticket.assigned_technician || 'Unassigned'}
+                    {ticket.assigned_technician || t('printLabel.unassigned')}
                   </p>
                 </div>
                 {ticket.due_date && (
                   <div>
-                    <p className="text-sm text-gray-600">Due Date:</p>
+                    <p className="text-sm text-gray-600">{t('printLabel.dueDate')}</p>
                     <p className="text-lg font-semibold text-gray-900">
                       {new Date(ticket.due_date).toLocaleDateString()}
                     </p>
@@ -94,7 +96,7 @@ export default function PrintLabel({ ticket, onClose }) {
 
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-3 border-b-2 border-gray-300 pb-2">
-              PRODUCTS
+              {t('printLabel.products')}
             </h3>
             <div className="space-y-2">
               {Array.isArray(ticket.products) && ticket.products.length > 0 ? (
@@ -102,13 +104,13 @@ export default function PrintLabel({ ticket, onClose }) {
                   <div key={idx} className="bg-gray-50 p-3 rounded">
                     <p className="font-semibold text-gray-900">{product.product_name}</p>
                     {product.serial_number && (
-                      <p className="text-sm text-gray-600">Serial: {product.serial_number}</p>
+                      <p className="text-sm text-gray-600">{t('printLabel.serial', { value: product.serial_number })}</p>
                     )}
-                    <p className="text-sm text-gray-600">Status: {product.product_status}</p>
+                    <p className="text-sm text-gray-600">{t('printLabel.productStatus', { value: product.product_status })}</p>
                   </div>
                 ))
               ) : (
-                <p className="text-gray-500">No products</p>
+                <p className="text-gray-500">{t('printLabel.noProducts')}</p>
               )}
             </div>
           </div>
@@ -116,7 +118,7 @@ export default function PrintLabel({ ticket, onClose }) {
           <div className="flex justify-center border-t-2 border-gray-300 pt-6">
             <div className="text-center">
               <canvas ref={qrRef} className="mx-auto mb-2"></canvas>
-              <p className="text-sm text-gray-600">Scan for details</p>
+              <p className="text-sm text-gray-600">{t('printLabel.scanForDetails')}</p>
             </div>
           </div>
         </div>
@@ -126,7 +128,7 @@ export default function PrintLabel({ ticket, onClose }) {
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
           >
-            Cancel
+            {t('printLabel.cancel')}
           </button>
           <button
             onClick={handlePrint}
@@ -140,7 +142,7 @@ export default function PrintLabel({ ticket, onClose }) {
                 d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
               />
             </svg>
-            Print Label
+            {t('printLabel.print')}
           </button>
         </div>
       </div>

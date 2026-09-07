@@ -23,12 +23,43 @@ function validateAttachment(file) {
     throw new Error(`File type not allowed: ${file.type}`)
 }
 
+/**
+ * Make a value safe to use as one segment of a storage object path.
+ * (Audit finding BUG-026.)
+ *
+ * Paths were built by interpolating identifiers straight in — most sharply
+ * `products/${productSku}/…` and `brands/${brandName.toLowerCase()}/…`, both of
+ * which are free text a manager types. A SKU containing `/` writes into a
+ * different folder, and one containing `..` walks out of the products tree
+ * entirely, so an object can land somewhere the rest of the app does not expect
+ * and another product's folder can be written into.
+ *
+ * Anything outside [A-Za-z0-9._-] becomes '-', leading dots are stripped so
+ * '..' and '.hidden' cannot survive, and an empty result falls back rather than
+ * producing a '//' in the path.
+ */
+function pathSegment(value, fallback = 'unknown') {
+  const cleaned = String(value ?? '')
+    .trim()
+    .replace(/[^A-Za-z0-9._-]+/g, '-')
+    .replace(/^\.+/, '')
+    .replace(/-{2,}/g, '-')
+    .slice(0, 80)
+  return cleaned || fallback
+}
+
+/** A file extension safe to append; falls back when the name has none. */
+function safeExtension(fileName, fallback = 'bin') {
+  const raw = String(fileName ?? '').split('.').pop() ?? ''
+  const cleaned = raw.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10)
+  return cleaned || fallback
+}
+
 export const storage = {
   async uploadFile(file, rmaNumber) {
     file = await resizeImage(file) // P-3: downscale images to ≤1200px before upload
     validateAttachment(file)
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${rmaNumber}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+    const fileName = `${pathSegment(rmaNumber, 'unfiled')}/${Date.now()}_${Math.random().toString(36).substring(7)}.${safeExtension(file.name)}`
     const { error } = await supabase.storage.from('rma-attachments').upload(fileName, file)
     if (error) throw error
     const {
@@ -88,8 +119,7 @@ export const storage = {
 
   async uploadProductImage(file, productSku) {
     file = await resizeImage(file) // P-3
-    const fileExt = file.name.split('.').pop()
-    const fileName = `products/${productSku}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+    const fileName = `products/${pathSegment(productSku, 'no-sku')}/${Date.now()}_${Math.random().toString(36).substring(7)}.${safeExtension(file.name)}`
     const { error } = await supabase.storage.from('rma-attachments').upload(fileName, file)
     if (error) throw error
     const {
@@ -102,8 +132,7 @@ export const storage = {
     if (file.size > MAX_AVATAR_SIZE) throw new Error('Avatar too large (max 5 MB)')
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type))
       throw new Error('Avatar must be an image (JPEG, PNG, WebP, or GIF)')
-    const fileExt = file.name.split('.').pop()
-    const fileName = `avatars/${userId}/avatar.${fileExt}`
+    const fileName = `avatars/${pathSegment(userId)}/avatar.${safeExtension(file.name)}`
     const { error } = await supabase.storage
       .from('rma-attachments')
       .upload(fileName, file, { upsert: true })
@@ -114,8 +143,7 @@ export const storage = {
     return publicUrl
   },
   async uploadBrandLogo(file, brandName) {
-    const fileExt = file.name.split('.').pop()
-    const fileName = `brands/${brandName.toLowerCase()}/${Date.now()}.${fileExt}`
+    const fileName = `brands/${pathSegment(String(brandName).toLowerCase(), 'no-brand')}/${Date.now()}.${safeExtension(file.name)}`
     const { error } = await supabase.storage
       .from('rma-attachments')
       .upload(fileName, file, { cacheControl: '3600', upsert: false })
@@ -128,8 +156,7 @@ export const storage = {
   async uploadCommentAttachment(file, ticketId) {
     file = await resizeImage(file) // P-3
     validateAttachment(file)
-    const fileExt = file.name.split('.').pop()
-    const fileName = `comments/${ticketId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+    const fileName = `comments/${pathSegment(ticketId)}/${Date.now()}_${Math.random().toString(36).substring(7)}.${safeExtension(file.name)}`
     const { error } = await supabase.storage.from('rma-attachments').upload(fileName, file)
     if (error) throw error
     const {
@@ -140,8 +167,7 @@ export const storage = {
   async uploadCustomerAttachment(file, folderId) {
     file = await resizeImage(file) // P-3
     validateAttachment(file)
-    const fileExt = file.name.split('.').pop()
-    const fileName = `customers/${folderId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+    const fileName = `customers/${pathSegment(folderId)}/${Date.now()}_${Math.random().toString(36).substring(7)}.${safeExtension(file.name)}`
     const { error } = await supabase.storage.from('rma-attachments').upload(fileName, file)
     if (error) throw error
     const {
@@ -153,8 +179,7 @@ export const storage = {
   async uploadActivityAttachment(file, relatedType, relatedId) {
     file = await resizeImage(file) // P-3
     validateAttachment(file)
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${relatedType}s/${relatedId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+    const fileName = `${pathSegment(relatedType, 'item')}s/${pathSegment(relatedId)}/${Date.now()}_${Math.random().toString(36).substring(7)}.${safeExtension(file.name)}`
     const { error } = await supabase.storage.from('rma-attachments').upload(fileName, file)
     if (error) throw error
     const {

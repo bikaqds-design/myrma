@@ -24,6 +24,7 @@ import * as XLSX from 'xlsx'
 import { useURLTab } from '../../hooks/useURLTab'
 import LeadsKanbanView from './LeadsKanbanView'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
+import { contactFieldProblems } from '../../lib/importValidation'
 
 const STATUS_BADGE = {
   new:          'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
@@ -777,6 +778,12 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
           errors.push(`Row ${i + 1}: full_name is required`)
           continue
         }
+        const problems = contactFieldProblems(row)
+        if (problems.length) {
+          errors.push(`Row ${i + 1}: ${problems.join('; ')}`)
+          continue
+        }
+
         const source = validSources.has(row.source) ? row.source : 'website'
         const status = validStatuses.has(row.status) ? row.status : 'new'
         toImport.push({
@@ -796,10 +803,21 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
         if (errors.length > 0) captureException(new Error('Lead CSV import errors'), { errors })
         return
       }
-      for (const lead of toImport) {
-        await db.leads.create(lead)
+      // Chunked insert instead of one request per row (BUG-045): a 2,000-row
+      // file used to make 2,000 sequential round trips, and a failure part-way
+      // left a partial import nobody was told about.
+      let importedCount = 0
+      try {
+        const created = await db.leads.bulkCreate(toImport)
+        importedCount = created.length
+      } catch (err) {
+        const landed = err?.insertedBefore ?? 0
+        captureException(err, { context: 'leads/csvImport', landed })
+        toast.error(t('leads.importPartial', { count: landed }), { duration: 8000 })
+        queryClient.invalidateQueries({ queryKey: ['leads'] })
+        return
       }
-      toast.success(t('leads.importedSuccess', { count: toImport.length }))
+      toast.success(t('leads.importedSuccess', { count: importedCount }))
       db.auditLog.log(currentUserEmail, 'leads_imported', `Imported ${toImport.length} leads from CSV`).catch(() => {})
       if (errors.length > 0) {
         toast.error(t('leads.importRowErrors', { count: errors.length }))

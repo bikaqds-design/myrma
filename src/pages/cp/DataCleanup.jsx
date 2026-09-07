@@ -16,6 +16,14 @@ export default function DataCleanup() {
   const [cancelledDays, setCancelledDays] = useState(30)
   const [preview, setPreview] = useState(null)
 
+  // Data integrity. (Audit finding BUG-041.) Run on demand rather than on
+  // mount: the checks scan every invoice, order and unit, and this screen is
+  // opened to tidy tickets far more often than to audit the books.
+  const [integrity, setIntegrity] = useState(null) // null = not run yet
+  const [integrityRows, setIntegrityRows] = useState(null)
+  const [integrityLoading, setIntegrityLoading] = useState(false)
+  const [expandedCheck, setExpandedCheck] = useState(null)
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -33,6 +41,25 @@ export default function DataCleanup() {
   useEffect(() => {
     load()
   }, [load])
+
+  const runIntegrityChecks = async () => {
+    setIntegrityLoading(true)
+    try {
+      const [summary, rows] = await Promise.all([
+        db.dataIntegrity.summary(),
+        db.dataIntegrity.issues(),
+      ])
+      setIntegrity(summary)
+      setIntegrityRows(rows)
+    } catch (err) {
+      captureException(err, { page: 'cp/DataCleanup', context: 'integrityChecks' })
+      toast.error(t('cp.dataCleanup.integrityFailed', { error: toUserMessage(err) }))
+      setIntegrity([])
+      setIntegrityRows([])
+    } finally {
+      setIntegrityLoading(false)
+    }
+  }
 
   const cutoff = (days) => {
     const d = new Date()
@@ -318,6 +345,71 @@ export default function DataCleanup() {
           </p>
         </div>
       )}
+
+      {/* Data integrity (BUG-041) */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">{t('cp.dataCleanup.integrityHeader')}</h3>
+            <p className="text-sm text-gray-500 mt-0.5">{t('cp.dataCleanup.integrityDesc')}</p>
+          </div>
+          <button
+            onClick={runIntegrityChecks}
+            disabled={integrityLoading}
+            className="shrink-0 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+          >
+            {integrityLoading ? t('cp.dataCleanup.integrityRunning') : t('cp.dataCleanup.integrityRun')}
+          </button>
+        </div>
+
+        {integrity !== null && integrity.length === 0 && !integrityLoading && (
+          <p className="text-sm text-gray-500">{t('cp.dataCleanup.integrityClean')}</p>
+        )}
+
+        {integrity !== null && integrity.length > 0 && (
+          <div className="space-y-2">
+            {integrity.map((group) => {
+              const open = expandedCheck === group.check_name
+              const rows = (integrityRows || []).filter((r) => r.check_name === group.check_name)
+              return (
+                <div key={group.check_name} className="border border-gray-200 rounded-lg">
+                  <div className="flex items-center gap-3 p-3">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      group.severity === 'high' ? 'bg-red-100 text-red-700'
+                        : group.severity === 'medium' ? 'bg-amber-100 text-amber-700'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {t(`cp.dataCleanup.severity_${group.severity}`)}
+                    </span>
+                    <span className="text-sm text-gray-800 flex-1">
+                      {/* Falls back to the raw check name so a check added in a
+                          later migration still reads sensibly on an older build. */}
+                      {t(`cp.dataCleanup.check_${group.check_name}`, { defaultValue: group.check_name })}
+                    </span>
+                    <span className="text-sm font-semibold text-gray-900 tabular-nums">{group.issue_count}</span>
+                    <button
+                      onClick={() => setExpandedCheck(open ? null : group.check_name)}
+                      className="text-xs text-indigo-600 hover:underline whitespace-nowrap"
+                    >
+                      {open ? t('cp.dataCleanup.integrityHideRows') : t('cp.dataCleanup.integrityShowRows')}
+                    </button>
+                  </div>
+                  {open && rows.length > 0 && (
+                    <div className="border-t border-gray-100 divide-y divide-gray-100 max-h-64 overflow-y-auto">
+                      {rows.map((r) => (
+                        <div key={r.entity_id} className="px-3 py-2 text-xs">
+                          <span className="font-mono text-gray-700">{r.reference}</span>
+                          <span className="text-gray-500"> — {r.detail}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

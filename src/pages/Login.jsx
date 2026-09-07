@@ -184,7 +184,7 @@ export default function Login({ onLogin }) {
             {!forgotSent ? (
               <form onSubmit={forgotHandleSubmit(onForgotSubmit)} className="space-y-6" noValidate>
                 <p className="text-sm text-gray-600">
-                  Enter your email address and we'll send you a link to reset your password.
+                  {t('login.forgotIntro')}
                 </p>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t('login.email')}</label>

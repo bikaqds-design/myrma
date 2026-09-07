@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { resolveMfaGate } from './lib/mfaGate'
 import { Toaster, toast } from 'react-hot-toast'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { auth, db, branding as brandingAPI, supabase } from './api/supabaseClient'
@@ -549,17 +550,27 @@ export default function App() {
       const done = safeStorage.get(`mrma_onboarding_v1_${user.email}`, null)
       if (!done) setShowOnboarding(true)
     }
+    // Returned so handleLogin can record the role it actually resolved. It used
+    // to log `currentUserRole` from the previous render, which on a fresh
+    // sign-in is always null — so every entry read "Signed in as user"
+    // regardless of who signed in (BUG-047).
+    return role
   }
 
   const checkAuth = async () => {
     try {
       const user = await auth.getCurrentUser()
       if (user) {
-        const { data: aalData } = await auth.mfa.getLevel()
-        if (aalData?.nextLevel === 'aal2' && aalData?.currentLevel !== 'aal2') {
-          const { data: factors } = await auth.mfa.listFactors()
-          const totp = factors?.all?.find((f) => f.factor_type === 'totp' && f.status === 'verified')
-          if (totp) { setMfaPending({ user, factorId: totp.id }); return }
+        const gate = await resolveMfaGate(auth)
+        if (gate.status === 'challenge') { setMfaPending({ user, factorId: gate.factorId }); return }
+        if (gate.status === 'unavailable') {
+          // Cannot establish whether a second factor is owed, so end the
+          // session rather than restore it unverified (BUG-020).
+          captureException(gate.reason ?? new Error('MFA level unavailable'), {
+            page: 'App', context: 'checkAuth/resolveMfaGate',
+          })
+          await auth.signOut()
+          return
         }
         await finishLogin(user)
       }
@@ -754,14 +765,22 @@ export default function App() {
   const handleLogin = async (email, password) => {
     const data = await auth.signIn(email, password)
     const user = data?.user || data
-    const { data: aalData } = await auth.mfa.getLevel()
-    if (aalData?.nextLevel === 'aal2' && aalData?.currentLevel !== 'aal2') {
-      const { data: factors } = await auth.mfa.listFactors()
-      const totp = factors?.all?.find((f) => f.factor_type === 'totp' && f.status === 'verified')
-      if (totp) { setMfaPending({ user, factorId: totp.id }); return }
+    const gate = await resolveMfaGate(auth)
+    if (gate.status === 'challenge') { setMfaPending({ user, factorId: gate.factorId }); return }
+    if (gate.status === 'unavailable') {
+      // Refuse the sign-in instead of completing it unverified (BUG-020).
+      captureException(gate.reason ?? new Error('MFA level unavailable'), {
+        page: 'App', context: 'handleLogin/resolveMfaGate',
+      })
+      await auth.signOut()
+      throw new Error(i18n.t('login.mfaUnavailable'))
     }
-    await finishLogin(user)
-    db.userActivity.create(user.email, 'login', `Signed in as ${currentUserRole || 'user'}`).catch(() => {})
+    const role = await finishLogin(user)
+    // Only record a sign-in that actually granted access: the denial paths in
+    // finishLogin return undefined, and "signed in" is not what happened there.
+    if (role) {
+      db.userActivity.create(user.email, 'login', `Signed in as ${role}`).catch(() => {})
+    }
   }
 
   const handleMfaVerify = async (code) => {
@@ -769,8 +788,10 @@ export default function App() {
     if (error) throw error
     const user = mfaPending.user
     setMfaPending(null)
-    await finishLogin(user)
-    db.userActivity.create(user.email, 'login', 'Signed in with 2FA').catch(() => {})
+    const role = await finishLogin(user)
+    if (role) {
+      db.userActivity.create(user.email, 'login', `Signed in with 2FA as ${role}`).catch(() => {})
+    }
   }
 
   const handleSignup = async (email, password) => {
