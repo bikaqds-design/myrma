@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { useTranslation } from 'react-i18next'
+import { useTranslation, Trans } from 'react-i18next'
 import { db, storage, branding as brandingAPI } from '../api/supabaseClient'
 import { safeStorage } from '../lib/safeStorage'
 import { safeAttachmentHref } from '../lib/attachmentUrl'
@@ -288,7 +288,7 @@ export default function RMATracker() {
           )}
           <div>
             <div className="font-bold text-gray-900 text-lg leading-tight">{companyName}</div>
-            <div className="text-xs text-gray-500">Service Request Tracker</div>
+            <div className="text-xs text-gray-500">{t('tracker.headerSubtitle')}</div>
           </div>
         </div>
       </header>
@@ -307,10 +307,8 @@ export default function RMATracker() {
 
         {/* Search hero */}
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-gray-900">Track Your Service Request</h1>
-          <p className="text-gray-500">
-            Enter your RMA number to check the current status and communicate with our team.
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900">{t('tracker.title')}</h1>
+          <p className="text-gray-500">{t('tracker.subtitle')}</p>
           <a href="/kb" className="inline-block text-sm text-indigo-600 hover:text-indigo-700 font-medium">
             {t('kb.needHelpLink')}
           </a>
@@ -326,7 +324,7 @@ export default function RMATracker() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="e.g. RMA-15052025-0001"
+            placeholder={t('tracker.searchPlaceholder')}
             className="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent shadow-sm"
             disabled={rlLocked}
           />
@@ -339,7 +337,7 @@ export default function RMATracker() {
             {loading ? (
               <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
             ) : (
-              'Track'
+              t('tracker.track')
             )}
           </button>
         </form>
@@ -347,13 +345,15 @@ export default function RMATracker() {
         {/* Rate-limit lockout banner */}
         {rlLocked && (
           <div className="max-w-xl mx-auto bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 text-center space-y-1">
-            <p className="font-semibold">Too many failed lookups</p>
+            <p className="font-semibold">{t('tracker.rateLimitTitle')}</p>
             <p>
-              Please wait{' '}
-              <span className="font-mono font-bold">
-                {Math.floor(rlSecsLeft / 60)}:{String(rlSecsLeft % 60).padStart(2, '0')}
-              </span>{' '}
-              before trying again.
+              <Trans
+                i18nKey="tracker.rateLimitWait"
+                values={{
+                  time: `${Math.floor(rlSecsLeft / 60)}:${String(rlSecsLeft % 60).padStart(2, '0')}`,
+                }}
+                components={{ timer: <bdi className="font-mono font-bold" /> }}
+              />
             </p>
           </div>
         )}
@@ -363,11 +363,14 @@ export default function RMATracker() {
           <div className="text-center py-10 space-y-2">
             <div className="text-5xl">🔍</div>
             <p className="text-gray-700 font-medium">
-              No ticket found for <span className="font-mono text-indigo-600">"{query}"</span>
+              <Trans
+                i18nKey="tracker.notFound"
+                values={{ query }}
+                shouldUnescape
+                components={{ query: <bdi className="font-mono text-indigo-600" /> }}
+              />
             </p>
-            <p className="text-gray-500 text-sm">
-              Please double-check your RMA number and try again.
-            </p>
+            <p className="text-gray-500 text-sm">{t('tracker.notFoundHint')}</p>
           </div>
         )}
 
@@ -379,7 +382,7 @@ export default function RMATracker() {
               <div className="flex items-start justify-between flex-wrap gap-3">
                 <div>
                   <div className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">
-                    RMA Number
+                    {t('tracker.rmaNumber')}
                   </div>
                   <div className="text-2xl font-bold text-gray-900 font-mono">
                     {ticket.rma_number}
@@ -388,21 +391,21 @@ export default function RMATracker() {
                 <span
                   className={`px-4 py-1.5 rounded-full text-sm font-semibold text-white ${STATUS_COLORS[ticket.ticket_status] || 'bg-gray-400'}`}
                 >
-                  {ticket.ticket_status}
+                  {t(`statusValues.${ticket.ticket_status}`, { defaultValue: ticket.ticket_status })}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
                 <div>
                   <div className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">
-                    Received
+                    {t('tracker.received')}
                   </div>
                   <div className="font-medium text-gray-800">{fmtDate(ticket.created_date)}</div>
                 </div>
                 {ticket.due_date && (
                   <div>
                     <div className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">
-                      Estimated Completion
+                      {t('tracker.estimatedCompletion')}
                     </div>
                     <div className="font-medium text-gray-800">{fmtDate(ticket.due_date)}</div>
                   </div>
@@ -410,9 +413,11 @@ export default function RMATracker() {
                 {ticket.priority && (
                   <div>
                     <div className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">
-                      Priority
+                      {t('tracker.priority')}
                     </div>
-                    <div className="font-medium text-gray-800">{ticket.priority}</div>
+                    <div className="font-medium text-gray-800">
+                      {t(`priorityValues.${ticket.priority}`, { defaultValue: ticket.priority })}
+                    </div>
                   </div>
                 )}
               </div>
@@ -421,7 +426,7 @@ export default function RMATracker() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">
-                    Progress
+                    {t('tracker.progress')}
                   </div>
                   <button
                     onClick={() => handleSearch(ticket.rma_number)}
@@ -440,7 +445,7 @@ export default function RMATracker() {
                         d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                       />
                     </svg>
-                    Refresh
+                    {t('tracker.refresh')}
                   </button>
                 </div>
                 {/* 7-step progress bar — scrollable on mobile so labels aren't crushed */}
@@ -481,7 +486,7 @@ export default function RMATracker() {
                             <span className={`text-[9px] sm:text-[10px] font-medium leading-tight text-center w-full px-0.5 ${
                               active ? colors.text : done ? 'text-green-600' : 'text-gray-400'
                             }`}>
-                              {step}
+                              {t(`statusValues.${step}`)}
                             </span>
                           </div>
                           {!isLast && (
@@ -497,7 +502,7 @@ export default function RMATracker() {
                 {/* Cancelled note below the bar */}
                 {isCancelled && (
                   <p className="text-xs text-red-500 mt-2 text-center">
-                    This request has been cancelled — no further action will be taken.
+                    {t('tracker.cancelledNote')}
                   </p>
                 )}
               </div>
@@ -519,7 +524,7 @@ export default function RMATracker() {
             {products.length > 0 && (
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                  Items ({products.length})
+                  {t('tracker.items', { total: products.length })}
                 </h2>
                 <div className="space-y-3">
                   {products.map((p, i) => (
@@ -544,11 +549,11 @@ export default function RMATracker() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-gray-900 text-sm">
-                          {p.product_name || `Item ${i + 1}`}
+                          {p.product_name || t('tracker.itemFallback', { number: i + 1 })}
                         </div>
                         {p.serial_number && (
                           <div className="text-xs text-gray-500 mt-0.5 font-mono">
-                            S/N: {p.serial_number}
+                            {t('tracker.serialNumber', { serial: p.serial_number })}
                           </div>
                         )}
                         {p.issue_description && (
@@ -559,14 +564,14 @@ export default function RMATracker() {
                             <span
                               className={`px-2 py-0.5 text-xs rounded-full font-medium ${PRODUCT_STATUS_COLORS[p.product_status] || 'bg-gray-100 text-gray-600'}`}
                             >
-                              {p.product_status}
+                              {t(`productStatusValues.${p.product_status}`, { defaultValue: p.product_status })}
                             </span>
                           )}
                           {p.warranty_status && (
                             <span
                               className={`px-2 py-0.5 text-xs rounded-full font-medium ${p.warranty_status === 'In Warranty' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
                             >
-                              {p.warranty_status}
+                              {t(`warrantyValues.${p.warranty_status}`, { defaultValue: p.warranty_status })}
                             </span>
                           )}
                         </div>
@@ -619,7 +624,7 @@ export default function RMATracker() {
                       </button>
                     </div>
                   ) : (
-                    'Send a Message'
+                    t('tracker.composeTitle')
                   )}
                 </div>
                 <form onSubmit={handleSubmitComment} className="space-y-3">
@@ -629,7 +634,7 @@ export default function RMATracker() {
                         value={authorName}
                         onChange={(e) => setAuthorName(e.target.value)}
                         required
-                        placeholder="Your name *"
+                        placeholder={t('tracker.namePlaceholder')}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 bg-white"
                       />
                     </div>
@@ -638,7 +643,7 @@ export default function RMATracker() {
                         type="email"
                         value={authorEmail}
                         onChange={(e) => setAuthorEmail(e.target.value)}
-                        placeholder="Email (optional)"
+                        placeholder={t('tracker.emailPlaceholder')}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 bg-white"
                       />
                     </div>
@@ -648,7 +653,7 @@ export default function RMATracker() {
                     onChange={(e) => setMessageText(e.target.value)}
                     required
                     rows={3}
-                    placeholder="Write your message..."
+                    placeholder={t('tracker.messagePlaceholder')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 resize-none bg-white"
                   />
 
@@ -706,7 +711,7 @@ export default function RMATracker() {
                           d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
                         />
                       </svg>
-                      Attach file
+                      {t('tracker.attachFile')}
                     </button>
                     <input
                       ref={fileInputRef}
@@ -724,7 +729,7 @@ export default function RMATracker() {
                       {submitting ? (
                         <>
                           <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-                          {uploadingFiles ? 'Uploading…' : 'Sending…'}
+                          {uploadingFiles ? t('tracker.uploading') : t('tracker.sending')}
                         </>
                       ) : (
                         <>
@@ -754,16 +759,19 @@ export default function RMATracker() {
       </main>
 
       <footer className="border-t border-gray-200 mt-10 py-5 text-center text-xs text-gray-500">
-        Powered by <span className="font-semibold text-gray-500">myCRM</span> — Secure service
-        request tracking
+        <Trans
+          i18nKey="tracker.footer"
+          components={{ brand: <span className="font-semibold text-gray-500" /> }}
+        />
       </footer>
     </div>
   )
 }
 
 function CommentThread({ comment, replies, replyingTo, onReply }) {
+  const { t } = useTranslation()
   const isTeam = !comment.is_customer_comment
-  const displayName = comment.author_name || comment.user_email || 'Team'
+  const displayName = comment.author_name || comment.user_email || t('tracker.team')
   const initials = displayName[0]?.toUpperCase() || '?'
   const attachments = comment.attachments || []
 
@@ -783,7 +791,7 @@ function CommentThread({ comment, replies, replyingTo, onReply }) {
         <div className="ms-8 mt-2 space-y-2 ps-4 border-l-2 border-gray-100">
           {replies.map((reply) => {
             const rIsTeam = !reply.is_customer_comment
-            const rName = reply.author_name || reply.user_email || 'Team'
+            const rName = reply.author_name || reply.user_email || t('tracker.team')
             return (
               <CommentBubble
                 key={reply.id}
@@ -811,6 +819,7 @@ function CommentBubble({
   isReplying,
   onReply,
 }) {
+  const { t } = useTranslation()
   return (
     <div
       className={`flex gap-3 p-4 rounded-xl border ${isTeam ? 'bg-indigo-50 border-indigo-100' : 'bg-gray-50 border-gray-100'}`}
@@ -825,7 +834,7 @@ function CommentBubble({
           <span className="text-sm font-semibold text-gray-900">{displayName}</span>
           {isTeam && (
             <span className="px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-full">
-              Support Team
+              {t('tracker.supportTeam')}
             </span>
           )}
           <span className="text-xs text-gray-500 ms-auto">{fmtDateTime(comment.created_date)}</span>
@@ -861,7 +870,7 @@ function CommentBubble({
             onClick={onReply}
             className={`mt-2 text-xs font-medium transition-colors ${isReplying ? 'text-indigo-600' : 'text-gray-500 hover:text-indigo-500'}`}
           >
-            {isReplying ? '↩ Cancel reply' : '↩ Reply'}
+            ↩ {isReplying ? t('tracker.cancelReply') : t('tracker.reply')}
           </button>
         )}
       </div>

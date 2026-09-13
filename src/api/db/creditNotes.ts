@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { assertAffected } from './_assertUpdated.js'
 import { computeDocumentTotals } from './_documentTotals.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -154,6 +155,7 @@ export const creditNotes = {
       .select()
       .single()
     if (error) throw error
+    assertAffected(data, 'Credit note')
     return data as CreditNoteRow
   },
 
@@ -200,10 +202,18 @@ export const creditNotes = {
     })
     if (error) throw error
 
-    await supabase
+    // This write used to ignore its result entirely, so if it failed the units
+    // were back in stock while the credit note still read as not restocked —
+    // and nothing said so. By this point the units are already restored, so the
+    // error cannot undo that; what it does is stop a silent mismatch from
+    // passing as success. (BUG-074.)
+    const { data, error: markError } = await supabase
       .from('credit_notes')
       .update({ restock_status: 'restocked' })
       .eq('id', cnId)
+      .select('id')
+    if (markError) throw markError
+    assertAffected(data, 'Credit note')
   },
 
   /**

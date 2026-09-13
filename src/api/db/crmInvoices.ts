@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { assertAffected } from './_assertUpdated.js'
 import { computeDocumentTotals } from './_documentTotals.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -138,6 +139,7 @@ export const crmInvoices = {
       .select()
       .single()
     if (error) throw error
+    assertAffected(data, 'Invoice')
     return data as CrmInvoiceRow
   },
 
@@ -204,6 +206,7 @@ export const crmInvoices = {
       .select()
       .single()
     if (error) throw error
+    assertAffected(data, 'Invoice')
 
     void actorEmail // audit trail hook, mirrors void_/post
     return data as CrmInvoiceRow
