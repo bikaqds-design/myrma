@@ -268,3 +268,25 @@ $do$;
 --   DROP TRIGGER trg_crm_invoices_due_date ON public.crm_invoices;
 --   DROP FUNCTION public.rma_fill_invoice_due_date();
 --   -- and re-apply 20260839 to restore the four-case check.
+
+-- ─── Added 2026-09-13, after investigating the two largest check results ─────
+--
+-- The baseline lives on the function itself (\df+ or obj_description) so that
+-- anyone querying the database sees it without reading this file. Recorded
+-- because a check with a permanent non-zero result teaches people to ignore it;
+-- naming the known cohort is what keeps the NEXT finding meaningful.
+--
+-- Applied to production on 2026-09-13. Reproduced here so the repository and
+-- the database agree.
+
+COMMENT ON FUNCTION public.rma_data_integrity_issues() IS
+'One row per violated invariant. Known baseline as of 2026-09-13, so a new finding is distinguishable from the seed data:
+
+ - delivered_without_stock_moves: 15 rows, ALL carrying updated_at = 2026-07-05. One script pass flipped a June seed cohort to "delivered"; every total matches a June invoice, no units were ever reserved and no stock moved, so inventory is correct. A 16th such order, or any without that timestamp, is a real problem.
+ - unbacked_amount_paid: 0. Six seeded invoices (INV-2026-00010..15) claimed payments with nothing behind them and were cleared on 2026-09-13; the payments table has never held a row for those customers. Any reappearance here is genuine.
+ - role_without_account: 10, all suspended on 2026-09-13 and therefore inert. Rated high only while such a row is active AND administrative.
+ - unit_without_serial: 8, all active_rma — a customer handed over an item whose serial was never recorded. Reported, never blocked: a constraint here would refuse real intake.
+ - duplicate_customer_mobile: 14 of 888 real customers. Not always wrong (a household or switchboard repeats), which is why there is no unique index.
+ - posted_invoice_without_due_date: 3 historical rows. New ones are impossible since the trigger added in 20260843.
+
+Note for anyone extending this: warehouse_stock and inventory_units do NOT reconcile against each other and must not be compared. products.stock_tracking_mode splits the catalogue into 405 serialized products (tracked as units) and 1 bulk product (tracked as a quantity), with zero overlap.';
