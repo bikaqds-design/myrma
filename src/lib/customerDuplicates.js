@@ -124,3 +124,44 @@ export function mobileKeysOf(rows, getter = (r) => r.mobile) {
   }
   return [...keys]
 }
+
+/**
+ * Whether a number is dialable as an Egyptian mobile.
+ *
+ * The SQL twin is rma_is_egyptian_mobile(); keep the two in step. Deliberately
+ * narrow — 01[0125] plus eight digits, locally or with the 20 country code.
+ *
+ * Narrow because the point is to catch damage, not to police the field. 186 of
+ * the 470 numbers in the live book failed this on 2026-09-13, and 28 of those
+ * had simply lost a leading zero on import: `01091768465` stored as
+ * `+1091768465`. That number cannot be found by anyone typing the real one, and
+ * the mobile is what RMA intake searches by.
+ */
+export function isEgyptianMobile(value) {
+  const digits = String(value ?? '').replace(/\D+/g, '')
+  return /^01[0125]\d{8}$/.test(digits) || /^201[0125]\d{8}$/.test(digits)
+}
+
+/**
+ * A short reason this number looks wrong, or '' when there is nothing to say.
+ *
+ * A reason rather than a boolean, because this is shown to a person who has to
+ * decide whether it matters. A landline in the mobile field is a real thing
+ * somebody meant to do; a value with no digits in it is not.
+ *
+ * Never a hard rejection: a foreign customer has a foreign number.
+ */
+export function mobileFormatWarning(value) {
+  const raw = String(value ?? '').trim()
+  if (!raw) return ''
+  if (isEgyptianMobile(raw)) return ''
+  const digits = raw.replace(/\D+/g, '')
+  if (!digits) return 'contains no digits'
+  if (/^1[0125]\d{8}$/.test(digits)) return 'looks like a mobile missing its leading 0'
+  // Egyptian landlines run 9-10 digits: a 2-3 digit governorate code and a 6-8
+  // digit subscriber number, so Cairo's 02 2345 6789 is ten. Naming that rather
+  // than calling it malformed, because a landline in the mobile field is
+  // something a person meant to do — 43 of the live records are exactly this.
+  if (digits.length <= 10) return `${digits.length} digits — a landline?`
+  return `${digits.length} digits, not an Egyptian mobile (01[0125] + 8)`
+}

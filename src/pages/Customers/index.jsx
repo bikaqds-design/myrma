@@ -18,7 +18,12 @@ import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { EMPTY_FORM } from './_constants'
 import { AddCustomerModal, BulkUploadCustomersModal } from './_modals'
 import { contactFieldProblems } from '../../lib/importValidation'
-import { mobileKey, mobileKeysOf, partitionByMobile } from '../../lib/customerDuplicates'
+import {
+  mobileKey,
+  mobileKeysOf,
+  partitionByMobile,
+  mobileFormatWarning,
+} from '../../lib/customerDuplicates'
 
 const generateCustomerCode = () => `CB-${Math.floor(10000000 + Math.random() * 90000000)}`
 
@@ -400,6 +405,25 @@ export default function Customers({
         openConfirm(
           t('customers.duplicateMobileTitle'),
           t('customers.duplicateMobileMessage', { mobile: customerForm.mobile, names }),
+          () => {
+            closeConfirm()
+            handleSaveCustomer(true)
+          }
+        )
+        return
+      }
+    }
+
+    // A number that cannot be dialled is a customer the counter cannot find at
+    // intake, which is the one moment this field matters. Asked, never refused:
+    // a foreign customer has a foreign number. Only raised when there is no
+    // duplicate question already on screen, so a save is never two dialogs.
+    if (allowDuplicate !== true) {
+      const formatWhy = mobileFormatWarning(customerForm.mobile)
+      if (formatWhy) {
+        openConfirm(
+          t('customers.oddMobileTitle'),
+          t('customers.oddMobileMessage', { mobile: customerForm.mobile, why: formatWhy }),
           () => {
             closeConfirm()
             handleSaveCustomer(true)
@@ -899,6 +923,29 @@ export default function Customers({
         }
         toImport.length = 0
         toImport.push(...accepted)
+
+        // Damaged numbers are reported and still imported. A foreign customer
+        // has a foreign number, and a landline in the mobile field is something
+        // somebody meant to do — but 40% of the live book could not be dialled
+        // before this existed, so silence was not working either. (BUG-085.)
+        const malformed = toImport
+          .map((rec) => ({ rec, why: mobileFormatWarning(rec.mobile) }))
+          .filter((m) => m.why)
+        if (malformed.length > 0) {
+          console.warn(
+            [
+              'Customer CSV import — imported, but these phone numbers look wrong:',
+              ...malformed.map(
+                (m) =>
+                  `${m.rec.contact_person || m.rec.company_name || '(unnamed)'} — ${m.rec.mobile} (${m.why})`
+              ),
+            ].join('\n')
+          )
+          toast(t('customers.importMobileWarnings', { count: malformed.length }), {
+            icon: '\u26a0\ufe0f',
+            duration: 8000,
+          })
+        }
       }
 
       if (toImport.length === 0) {

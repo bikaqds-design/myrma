@@ -4,6 +4,8 @@ import {
   groupByMobile,
   partitionByMobile,
   mobileKeysOf,
+  isEgyptianMobile,
+  mobileFormatWarning,
 } from '../lib/customerDuplicates'
 
 describe('mobileKey', () => {
@@ -109,5 +111,59 @@ describe('mobileKeysOf', () => {
         { mobile: '01119998888' },
       ]).sort()
     ).toEqual(['001234567', '119998888'])
+  })
+})
+
+describe('isEgyptianMobile', () => {
+  it('accepts the four live prefixes, local and international', () => {
+    for (const p of ['010', '011', '012', '015']) {
+      expect(isEgyptianMobile(`${p}12345678`)).toBe(true)
+      expect(isEgyptianMobile(`+20${p.slice(1)}12345678`)).toBe(true)
+    }
+  })
+
+  it('accepts a number written with spaces and brackets', () => {
+    expect(isEgyptianMobile('(0100) 123-4567')).toBe(true)
+  })
+
+  it('rejects a prefix that is not a mobile', () => {
+    expect(isEgyptianMobile('01312345678')).toBe(false)
+    expect(isEgyptianMobile('0223456789')).toBe(false)
+  })
+
+  // The exact damage found in the live book: the leading 0 became a +.
+  it('rejects the "+1…" shape that 27 live records had', () => {
+    expect(isEgyptianMobile('+1091768465')).toBe(false)
+    expect(isEgyptianMobile('01091768465')).toBe(true)
+  })
+
+  it('rejects nothing-at-all', () => {
+    for (const v of [null, undefined, '', '+', '   ']) expect(isEgyptianMobile(v)).toBe(false)
+  })
+})
+
+describe('mobileFormatWarning', () => {
+  it('says nothing about a good number, or about a blank field', () => {
+    expect(mobileFormatWarning('01091768465')).toBe('')
+    expect(mobileFormatWarning('+20 100 123 4567')).toBe('')
+    expect(mobileFormatWarning('')).toBe('')
+    expect(mobileFormatWarning(null)).toBe('')
+  })
+
+  it('names the leading-zero case specifically, since it is repairable', () => {
+    expect(mobileFormatWarning('+1091768465')).toMatch(/leading 0/)
+    expect(mobileFormatWarning('1061661466')).toMatch(/leading 0/)
+  })
+
+  it('calls out a value with no digits', () => {
+    expect(mobileFormatWarning('+')).toBe('contains no digits')
+  })
+
+  it('suggests a landline for a short number', () => {
+    expect(mobileFormatWarning('0223456789')).toMatch(/landline/)
+  })
+
+  it('reports the digit count for anything else', () => {
+    expect(mobileFormatWarning('0123456789012345')).toMatch(/16 digits/)
   })
 })

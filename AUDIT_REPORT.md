@@ -551,6 +551,27 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 
 ### 4.3 Medium
 
+
+#### [MEDIUM] 40% of the customer phone numbers cannot be dialled
+
+* ID: BUG-085
+* Category: Data Integrity
+* Location: `public.customers.mobile` (live data); `src/lib/customerDuplicates.js`; `rma_data_integrity_issues()` case 5
+* Description: found while examining BUG-063's 14 "duplicate" mobiles, six of whose seven pairs turned out not to be duplicates at all. The numbers themselves are the problem. Of 470 customers holding a mobile (418 of 888 have none), **186 could not be dialled as an Egyptian mobile** — and 28 of those had simply lost their leading zero, 27 of them replaced by a `+`, so `01091768465` was stored as `+1091768465`.
+* How to reproduce: `SELECT count(*) FROM customers WHERE btrim(coalesce(mobile,'')) <> '' AND NOT rma_is_egyptian_mobile(mobile);` — or read `malformed_customer_mobile` in `rma_data_integrity_summary()`.
+* Expected: a stored mobile can be dialled, and can be found by someone typing the number they were given.
+* Actual: a customer whose number is stored as `+1091768465` is invisible to anyone searching `01091768465`. RMA intake finds a customer by phone, so this is the one moment the field matters.
+* Impact: the counter cannot find the customer, so a new record gets created — which is how the duplicates the audit noticed came to exist in the first place. A quiet feedback loop rather than a one-off.
+* Suggested fix: repair the mechanically certain ones, report the rest, and warn at both entry points so the book stops degrading.
+* Confidence: Confirmed. Every count measured against production on 2026-09-13, before and after.
+* **Status: PARTLY FIXED 2026-09-13** — the certain repairs are done, the judgement calls are reported rather than guessed at.
+* **28 repaired, and the reading is certain rather than inferred.** A number beginning `+1 0…` cannot be North American either: NANP area codes never begin with 0 or 1. So `+1091768465` has exactly one possible meaning. All 28 were listed before the write and each carries its previous value in the customer's `notes`. Well-formed local numbers went **276 → 304**; not-dialable went **186 → 158**.
+* **Repairing them immediately proved the wider point.** The duplicate check jumped from 14 to 16 the moment the formats were normalised — two pairs had been the same number all along, spelled differently. Formatting damage was hiding duplicates, not just breaking search.
+* **The two checks were asking different questions.** The front end compares the last nine digits (`mobileKey`); the database compared trimmed strings. So the database missed five records the app would catch, and flagged two unrelated companies whose entire "mobile" is the character `+`. `20260845` adds `rma_mobile_key()` and `rma_is_egyptian_mobile()` as the SQL twins, `20260846` rewrites the check to use them, and the count is now **17** — the honest number — with the junk pair gone.
+* **New check `malformed_customer_mobile` (low), 158 rows.** Low because a landline in the mobile field is something a person meant to do. Reported anyway, because the field is what intake searches. The remainder — 43 landline-length, 7 too long, 1 too short, 2 holding no digits, and a `+116777789` that is genuinely ambiguous — need someone who knows the customer, not a rule.
+* **Both entry points now warn without refusing.** The single-record form names the specific problem ("looks like a mobile missing its leading 0") and asks; the CSV importer imports the row, lists every bad number in the console and says how many. Never a rejection: a foreign customer has a foreign number.
+* **The seven pairs, for the record, since this closes BUG-063's live-data half too:** Mega Top Albostan / Almansoura and Dream Group 6 October / Mall Technology are branch locations; Micro Laps / Micro Laps USD and Emak / Emak USD are currency twins of one account; one pair is the owner's own test records; one was the `+` junk. Only Acs For Computers / ECS Computer System (same contact person, two company names) is genuinely ambiguous. **Nothing was merged, and nothing should be** — sharing a number is ordinary here, which is why there is no unique index.
+
 #### [MEDIUM] The WhatsApp queue's cancel buttons have never worked — notification_queue had no UPDATE policy
 
 * ID: BUG-080
