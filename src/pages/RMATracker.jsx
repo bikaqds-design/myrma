@@ -84,21 +84,28 @@ ALTER TABLE ticket_comments ADD COLUMN IF NOT EXISTS parent_comment_id UUID REFE
 ALTER TABLE ticket_comments ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]';
 ALTER TABLE ticket_comments ADD COLUMN IF NOT EXISTS is_customer_comment BOOLEAN DEFAULT false;`
 
-function fmtDate(iso) {
+// Arabic gets Arabic month names but Western digits (-u-nu-latn); plain 'ar'
+// would render Arabic-Indic digits, which customers find harder to match
+// against RMA numbers and invoices.
+function dateLocale(language) {
+  return language?.startsWith('ar') ? 'ar-EG-u-nu-latn' : 'en-US'
+}
+function fmtDate(iso, language) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-US', {
+  return new Date(iso).toLocaleDateString(dateLocale(language), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
   })
 }
-function fmtDateTime(iso) {
+function fmtDateTime(iso, language) {
   if (!iso) return '—'
   const d = new Date(iso)
+  const locale = dateLocale(language)
   return (
-    d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
+    d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) +
     ' · ' +
-    d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
   )
 }
 function fileSize(bytes) {
@@ -109,7 +116,7 @@ function fileSize(bytes) {
 }
 
 export default function RMATracker() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [branding, setBranding] = useState(null)
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
@@ -400,14 +407,14 @@ export default function RMATracker() {
                   <div className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">
                     {t('tracker.received')}
                   </div>
-                  <div className="font-medium text-gray-800">{fmtDate(ticket.created_date)}</div>
+                  <div className="font-medium text-gray-800">{fmtDate(ticket.created_date, i18n.language)}</div>
                 </div>
                 {ticket.due_date && (
                   <div>
                     <div className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">
                       {t('tracker.estimatedCompletion')}
                     </div>
-                    <div className="font-medium text-gray-800">{fmtDate(ticket.due_date)}</div>
+                    <div className="font-medium text-gray-800">{fmtDate(ticket.due_date, i18n.language)}</div>
                   </div>
                 )}
                 {ticket.priority && (
@@ -819,7 +826,7 @@ function CommentBubble({
   isReplying,
   onReply,
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   return (
     <div
       className={`flex gap-3 p-4 rounded-xl border ${isTeam ? 'bg-indigo-50 border-indigo-100' : 'bg-gray-50 border-gray-100'}`}
@@ -837,7 +844,7 @@ function CommentBubble({
               {t('tracker.supportTeam')}
             </span>
           )}
-          <span className="text-xs text-gray-500 ms-auto">{fmtDateTime(comment.created_date)}</span>
+          <span className="text-xs text-gray-500 ms-auto">{fmtDateTime(comment.created_date, i18n.language)}</span>
         </div>
         <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
           {comment.comment_text}
