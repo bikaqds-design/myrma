@@ -156,50 +156,10 @@ export const crmInvoices = {
     return data as string
   },
 
-  /**
-   * recordPayment: records a partial or full payment.
-   * Updates amount_paid and derives payment_status automatically.
-   */
-  async recordPayment(
-    id: string,
-    amountPaid: number,
-    actorEmail: string
-  ): Promise<CrmInvoiceRow> {
-    const inv = await crmInvoices.get(id)
-    if (!inv) throw new Error('Invoice not found')
-    if (inv.doc_status !== 'posted') {
-      throw new Error('Can only record payment against a posted invoice')
-    }
-
-    const newPaid = Math.min(inv.amount_paid + amountPaid, inv.total)
-    let paymentStatus: CrmInvoiceRow['payment_status']
-    if (newPaid >= inv.total) {
-      paymentStatus = 'paid'
-    } else if (newPaid > 0) {
-      paymentStatus = 'partial'
-    } else {
-      paymentStatus = 'unpaid'
-    }
-
-    const updates: Record<string, unknown> = {
-      amount_paid: newPaid,
-      payment_status: paymentStatus,
-    }
-    if (paymentStatus === 'paid') {
-      updates.paid_at = new Date().toISOString()
-    }
-
-    const { data, error } = await supabase
-      .from('crm_invoices')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single()
-    if (error) throw error
-
-    void actorEmail // used for audit trail in the future
-    return data as CrmInvoiceRow
-  },
+  // recordPayment() used to live here: a client-side read-modify-write of
+  // amount_paid with no role check and no caller. Payments are recorded through
+  // payments.record() and the application RPCs, which lock the invoice row.
+  // Removed rather than left for a future caller to find. (BUG-062)
 
   /**
    * void_: delegates to void_invoice RPC which blocks if any payments or

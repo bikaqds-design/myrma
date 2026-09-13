@@ -6,11 +6,14 @@
 //   - comments:   list non-internal comments for a ticket
 //   - addComment: post a customer comment
 //
-// Rate limiting:
-//   - In-memory per-IP token bucket (15 reqs / minute per IP).
-//   - Survives within a single function instance; cold start resets the bucket.
-//     Good enough for casual abuse; harder protection requires a Redis-backed
-//     rate limiter (Upstash, etc.) — defer until needed.
+// Rate limiting (15 requests / minute per caller):
+//   - The count lives in the database, so it survives a cold start and is
+//     shared by every instance. This is the limit that actually holds.
+//   - An in-memory bucket still runs in front of it, purely to avoid a database
+//     round trip on an obvious flood.
+//   - The browser also locks itself after 10 failed lookups. That one is a
+//     courtesy — clearing site data resets it — and was the only limit that
+//     really worked until 2026-09-13. (BUG-067.)
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsOriginHeaders } from '../_shared/cors.ts'
@@ -31,6 +34,63 @@ function checkRateLimit(ip: string): { ok: boolean; resetIn?: number } {
   }
   bucket.count += 1
   return { ok: true }
+}
+
+/**
+ * The database key for a caller: a SHA-256 of the address and a secret salt.
+ *
+ * The salt is what makes this non-reversible. A bare hash of an IP address is
+ * theatre — the whole IPv4 space is four billion digests, which is minutes of
+ * work — so without a secret the table would be a list of who looked up what.
+ * With one it can only say "this same unknown caller again", which is all a
+ * rate limiter needs to know. The tracker is public and its users are customers
+ * who never agreed to anything, so that distinction is the point.
+ *
+ * RATE_LIMIT_SALT if set; otherwise the service role key, which is a secret
+ * this function already holds. Rotating either rotates the keys, which costs
+ * one window of counting and nothing else.
+ */
+async function rateLimitKey(ip: string): Promise<string> {
+  const salt = Deno.env.get('RATE_LIMIT_SALT') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+  const bytes = new TextEncoder().encode(`${salt}:${ip}`)
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+/**
+ * The limit that holds across instances.
+ *
+ * Fails OPEN. If the database cannot be reached the public tracker keeps
+ * working on the in-memory bucket alone, which is where it stood before this
+ * existed. Failing closed would mean a database hiccup returns 429 to every
+ * customer checking a repair — turning a degraded dependency into an outage of
+ * the one page that exists to save them a phone call.
+ */
+async function checkRateLimitDurable(
+  admin: ReturnType<typeof createClient>,
+  ip: string
+): Promise<{ ok: boolean; resetIn?: number }> {
+  try {
+    const { data, error } = await admin.rpc('rma_public_track_hit', {
+      p_ip_hash: await rateLimitKey(ip),
+      p_limit: RATE_LIMIT_PER_MINUTE,
+      p_window_seconds: 60,
+    })
+    if (error) {
+      console.error('public-track: rate limit unavailable, allowing', error.message)
+      return { ok: true }
+    }
+    const row = Array.isArray(data) ? data[0] : data
+    if (row && row.allowed === false) {
+      return { ok: false, resetIn: row.reset_in ?? 60 }
+    }
+    return { ok: true }
+  } catch (err) {
+    console.error('public-track: rate limit threw, allowing', err)
+    return { ok: true }
+  }
 }
 
 function getClientIp(req: Request): string {
@@ -177,8 +237,21 @@ Deno.serve(async (req) => {
     return json({ error: 'Method not allowed' }, 405)
   }
 
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const admin = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+
+  // Two gates, cheapest first. The in-memory one turns a flood that happens to
+  // hit a warm instance away without a database round trip; the durable one is
+  // what a caller cannot escape by waiting for a cold start.
   const ip = getClientIp(req)
-  const rl = checkRateLimit(ip)
+  const memoryRl = checkRateLimit(ip)
+  if (!memoryRl.ok) {
+    return json({ error: 'Too many requests', resetIn: memoryRl.resetIn }, 429)
+  }
+  const rl = await checkRateLimitDurable(admin, ip)
   if (!rl.ok) {
     return json({ error: 'Too many requests', resetIn: rl.resetIn }, 429)
   }
@@ -190,12 +263,6 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: 'Invalid JSON body' }, 400)
   }
-
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
 
   switch (body.action) {
     case 'lookup': {

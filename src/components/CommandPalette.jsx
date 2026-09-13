@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../api/supabaseClient'
 import { useTranslation } from 'react-i18next'
+import { orIlike, containsPattern } from '../lib/searchPattern'
 
 const STATUS_COLORS = {
   Open: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
@@ -38,25 +39,28 @@ export default function CommandPalette({ onSelectTicket, onSelectProduct, inputR
     if (!q.trim() || q.length < 2) { setResults([]); setLoading(false); return }
     setLoading(true)
     try {
-      const safe = q.replace(/[%,()]/g, ' ').trim()
+      // The term reaches the database literally: LIKE wildcards escaped and
+      // the value quoted for PostgREST's .or() (BUG-060). This used to turn
+      // % , ( ) into spaces and leave _ as a wildcard.
+      const term = q.trim()
 
       // Run tickets + brand lookup in parallel
       const [ticketsRes, brandsRes] = await Promise.all([
         supabase
           .from('rma_tickets')
           .select('id,rma_number,ticket_status,customer_name,priority')
-          .or(`rma_number.ilike.%${safe}%,customer_name.ilike.%${safe}%,ticket_status.ilike.%${safe}%`)
+          .or(orIlike(['rma_number', 'customer_name', 'ticket_status'], term))
           .limit(6),
         supabase
           .from('brands')
           .select('id')
-          .ilike('brand_name', `%${safe}%`)
+          .ilike('brand_name', containsPattern(term))
           .limit(20),
       ])
 
       // Build products OR including any matching brand IDs
       const brandIds = (brandsRes.data || []).map((b) => b.id)
-      const orParts = [`product_name.ilike.%${safe}%`, `sku.ilike.%${safe}%`]
+      const orParts = [orIlike(['product_name', 'sku'], term)]
       if (brandIds.length) orParts.push(`brand_id.in.(${brandIds.join(',')})`)
 
       const productsRes = await supabase

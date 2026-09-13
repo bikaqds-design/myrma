@@ -40,3 +40,9 @@ lerna-debug.log*
 # Misc
 .cache
 eslint-ui.json
+
+# Generated reports and local tool state (BUG-070). eslint-report.json was
+# committed at 1.4 MB; supabase/.temp holds CLI cache and project metadata that
+# differs per machine.
+eslint-report.json
+supabase/.temp/

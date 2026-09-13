@@ -1,6 +1,7 @@
 import { supabase } from '../client.js'
 import type { TableResult, PagedResult, CountedResult } from './types.js'
 import { assertAffected } from './_assertUpdated.js'
+import { orIlike } from '../../lib/searchPattern.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -182,9 +183,9 @@ export const notificationLogs = {
     if (ticketId) query = query.eq('ticket_id', ticketId)
     if (dateFrom) query = query.gte('sent_at', dateFrom)
     if (dateTo)   query = query.lte('sent_at', dateTo)
-    if (search)   query = query.or(
-      `recipient.ilike.%${search}%,recipient_name.ilike.%${search}%,event_type.ilike.%${search}%`
-    )
+    // Quoted and LIKE-escaped (BUG-060): a comma in this box used to return
+    // HTTP 400 and fail the whole log page.
+    if (search)   query = query.or(orIlike(['recipient', 'recipient_name', 'event_type'], search))
     query = query.range(page * pageSize, page * pageSize + pageSize - 1)
 
     const { data, count, error } = await query

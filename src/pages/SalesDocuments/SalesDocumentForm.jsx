@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
+import { computeDocumentTotals } from '../../api/db/_documentTotals'
 import { Button, Input, Select, Textarea, Label } from '../../components/ui'
 import { ProductSearchInput } from '../Pipeline/_shared'
 
@@ -65,15 +66,18 @@ export default function SalesDocumentForm({ docType, initial = null, customers =
   const addLine = () => setLines((prev) => [...prev, { ...EMPTY_LINE }])
   const removeLine = (i) => setLines((prev) => (prev.length === 1 ? prev : prev.filter((_, idx) => idx !== i)))
 
+  // The same function the writers use, so the preview cannot disagree with what
+  // is stored. This was a fifth copy of the formula and the only one that did
+  // not round each total, so a preview could sit a cent away from the saved
+  // document. (BUG-068)
   const totals = useMemo(() => {
-    let subtotal = 0, discount = 0, tax = 0
-    for (const l of lines) {
-      const base = (Number(l.qty) || 0) * (Number(l.unit_price) || 0)
-      const disc = base * ((Number(l.discount_pct) || 0) / 100)
-      const net = base - disc
-      subtotal += base; discount += disc; tax += net * ((Number(l.tax_pct) || 0) / 100)
+    const sums = computeDocumentTotals(lines)
+    return {
+      subtotal: sums.subtotal,
+      discount: sums.discount_amount,
+      tax: sums.tax_amount,
+      grand: sums.total,
     }
-    return { subtotal, discount, tax, grand: subtotal - discount + tax }
   }, [lines])
 
   // A draft invoice's only route forward is the Activities approval pool — the

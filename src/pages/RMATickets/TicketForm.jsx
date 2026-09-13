@@ -28,6 +28,7 @@ import {
   isImage,
 } from './_utils'
 import { ProductSearchInput } from './_shared'
+import { canEditTicket } from '../../lib/ticketPermissions'
 import { useBaseCurrency } from '../../hooks/useBaseCurrency'
 import { useCurrencyOptions } from '../../hooks/useCurrencyOptions'
 import { useTicketDefaults } from '../../hooks/useTicketDefaults'
@@ -625,7 +626,9 @@ export function TicketForm({
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (editingTicket && !canDo('edit_all') && !canDo('edit_assigned')) {
+    // The same rule the list and the drawer use: edit_assigned covers your
+    // own tickets only, which is what the database enforces. (BUG-071)
+    if (editingTicket && !canEditTicket(canDo, editingTicket, userEmail)) {
       toast.error(t('ticketForm.noPermissionEdit'))
       return
     }

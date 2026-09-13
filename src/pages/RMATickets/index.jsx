@@ -14,6 +14,7 @@ import ExportMenu from '../../components/ExportMenu'
 import * as XLSX from 'xlsx'
 import { ROLES, TICKET_STATUS_RESOLVED, TICKET_STATUS_LIST, PRIORITY_LIST, PRODUCT_STATUS_LIST } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
+import { canEditTicket, canChangeTicketStatus, partitionTickets } from '../../lib/ticketPermissions'
 import { dispatchRmaStageMoves } from '../../lib/rmaStageMoves'
 import { SortableHeader, ShortcutsHelp } from './_shared'
 import { getStatusColor, getPriorityColor, formatDate } from './_utils'
@@ -410,7 +411,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       toast.error(t('tickets.noPermissionEdit'))
       return
     }
-    if (canDo('edit_assigned') && !canDo('edit_all') && ticket.assigned_technician !== userEmail) {
+    if (!canEditTicket(canDo, ticket, userEmail)) {
       toast.error(t('tickets.editAssignedOnly'))
       return
     }
@@ -505,41 +506,75 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       toast.error(t('tickets.noPermissionChangeStatus'))
       return
     }
+    // Act only on the tickets this person may actually change. The database lets
+    // a technician update their own assignments and nothing else, so sending the
+    // rest earned a refusal that failed the whole batch — after an activity entry
+    // had already been written for every selected ticket. (BUG-071)
+    const selected = selectedTickets.map((id) => tickets.find((row) => row.id === id))
+    const { permitted, skipped } = partitionTickets(selected, (ticket) =>
+      canChangeTicketStatus(canDo, ticket, userEmail)
+    )
+    if (permitted.length === 0) {
+      toast.error(t('tickets.bulkNoneAssigned'))
+      return
+    }
     setBulkProcessing(true)
     try {
-      await Promise.all(
-        selectedTickets.map((id) => {
-          const prev = tickets.find((t) => t.id === id)
-          db.ticketActivity.log(id, 'status_changed', `${prev?.ticket_status || '?'} → ${bulkTicketStatus} (bulk)`, userEmail)
-          return db.rmaTickets.update(id, {
-            ticket_status: bulkTicketStatus,
-            updated_by: userEmail,
-            updated_date: new Date().toISOString(),
-          })
-        })
-      )
-      db.notifications
-        .create({
-          type: 'ticket_status_changed',
-          title: 'Bulk Status Update',
-          message: `${selectedTickets.length} ticket(s) status changed to "${bulkTicketStatus}" by ${userEmail}`,
-          entityType: 'ticket',
-          entityId: null,
-          createdBy: userEmail,
-          targetRoles: ['admin', 'super_admin'],
-          targetEmails: [],
-        })
-        .catch(() => {})
-      toast.success(t('tickets.bulkStatusUpdated', { status: bulkTicketStatus, count: selectedTickets.length }))
-      db.auditLog
-        .log(
-          userEmail,
-          'ticket_bulk_status_changed',
-          `Changed ${selectedTickets.length} tickets to "${bulkTicketStatus}"`
+      const results = await Promise.allSettled(
+        permitted.map((ticket) =>
+          db.rmaTickets
+            .update(ticket.id, {
+              ticket_status: bulkTicketStatus,
+              updated_by: userEmail,
+              updated_date: new Date().toISOString(),
+            })
+            .then(() => ticket)
         )
-        .catch(() => {})
-      setSelectedTickets([])
-      setBulkTicketStatus('')
+      )
+      const updated = results.filter((r) => r.status === 'fulfilled').map((r) => r.value)
+      const failed = results.filter((r) => r.status === 'rejected')
+      failed.forEach((r) =>
+        captureException(r.reason, { page: 'RMATickets', context: 'bulkUpdateStatus' })
+      )
+      // Written only for tickets that actually changed.
+      updated.forEach((ticket) =>
+        Promise.resolve(
+          db.ticketActivity.log(
+            ticket.id,
+            'status_changed',
+            `${ticket.ticket_status || '?'} → ${bulkTicketStatus} (bulk)`,
+            userEmail
+          )
+        ).catch(() => {})
+      )
+      if (updated.length) {
+        db.notifications
+          .create({
+            type: 'ticket_status_changed',
+            title: 'Bulk Status Update',
+            message: `${updated.length} ticket(s) status changed to "${bulkTicketStatus}" by ${userEmail}`,
+            entityType: 'ticket',
+            entityId: null,
+            createdBy: userEmail,
+            targetRoles: ['admin', 'super_admin'],
+            targetEmails: [],
+          })
+          .catch(() => {})
+        toast.success(
+          t('tickets.bulkStatusUpdated', { status: bulkTicketStatus, count: updated.length })
+        )
+        db.auditLog
+          .log(
+            userEmail,
+            'ticket_bulk_status_changed',
+            `Changed ${updated.length} tickets to "${bulkTicketStatus}"`
+          )
+          .catch(() => {})
+        setSelectedTickets([])
+        setBulkTicketStatus('')
+      }
+      if (skipped.length) toast(t('tickets.bulkSkippedNotAssigned', { n: skipped.length }))
+      if (failed.length) toast.error(t('tickets.bulkSomeFailed', { n: failed.length }))
       queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
     } catch (err) {
       captureException(err, { page: 'RMATickets', context: 'bulkUpdateStatus' })
@@ -555,33 +590,45 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       toast.error(t('tickets.noPermissionEdit2'))
       return
     }
+    const selected = selectedTickets.map((id) => tickets.find((row) => row.id === id))
+    const { permitted, skipped } = partitionTickets(selected, (ticket) =>
+      canEditTicket(canDo, ticket, userEmail)
+    )
+    if (permitted.length === 0) {
+      toast.error(t('tickets.bulkNoneAssigned'))
+      return
+    }
     setBulkProcessing(true)
     try {
-      const updates = selectedTickets
-        .map((id) => {
-          const ticket = tickets.find((t) => t.id === id)
-          if (!ticket) return null
-          const updatedProducts = (ticket.products || []).map((p) => ({
-            ...p,
-            product_status: bulkProductStatus,
-            status_date: new Date().toISOString(),
-          }))
-          return { id, updatedProducts }
-        })
-        .filter(Boolean)
+      const updates = permitted.map((ticket) => ({
+        id: ticket.id,
+        updatedProducts: (ticket.products || []).map((p) => ({
+          ...p,
+          product_status: bulkProductStatus,
+          status_date: new Date().toISOString(),
+        })),
+      }))
 
-      await Promise.all(
-        updates.map(({ id, updatedProducts }) =>
-          db.rmaTickets.update(id, {
-            products: updatedProducts,
-            updated_by: userEmail,
-            updated_date: new Date().toISOString(),
-          })
+      const results = await Promise.allSettled(
+        updates.map((u) =>
+          db.rmaTickets
+            .update(u.id, {
+              products: u.updatedProducts,
+              updated_by: userEmail,
+              updated_date: new Date().toISOString(),
+            })
+            .then(() => u)
         )
       )
+      const updated = results.filter((r) => r.status === 'fulfilled').map((r) => r.value)
+      const failed = results.filter((r) => r.status === 'rejected')
+      failed.forEach((r) =>
+        captureException(r.reason, { page: 'RMATickets', context: 'bulkUpdateProductStatus' })
+      )
 
+      // Stock moves follow only the tickets that were actually written.
       const moveResults = await Promise.allSettled(
-        updates.map(({ id, updatedProducts }) => dispatchRmaStageMoves(id, updatedProducts, userEmail))
+        updated.map((u) => dispatchRmaStageMoves(u.id, u.updatedProducts, userEmail))
       )
       const moveFailures = moveResults.filter((r) => r.status === 'rejected')
       if (moveFailures.length) {
@@ -591,16 +638,22 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         toast.error(t('inventory.autoMoveFailed'))
       }
 
-      toast.success(t('tickets.bulkProductStatusUpdated', { status: bulkProductStatus, count: selectedTickets.length }))
-      db.auditLog
-        .log(
-          userEmail,
-          'ticket_bulk_product_status_changed',
-          `Changed product status to "${bulkProductStatus}" for ${selectedTickets.length} tickets`
+      if (updated.length) {
+        toast.success(
+          t('tickets.bulkProductStatusUpdated', { status: bulkProductStatus, count: updated.length })
         )
-        .catch(() => {})
-      setSelectedTickets([])
-      setBulkProductStatus('')
+        db.auditLog
+          .log(
+            userEmail,
+            'ticket_bulk_product_status_changed',
+            `Changed product status to "${bulkProductStatus}" for ${updated.length} tickets`
+          )
+          .catch(() => {})
+        setSelectedTickets([])
+        setBulkProductStatus('')
+      }
+      if (skipped.length) toast(t('tickets.bulkSkippedNotAssigned', { n: skipped.length }))
+      if (failed.length) toast.error(t('tickets.bulkSomeFailed', { n: failed.length }))
       queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
     } catch (err) {
       captureException(err, { page: 'RMATickets', context: 'bulkUpdateProductStatus' })
@@ -1268,9 +1321,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           tickets={filteredTickets}
           onViewDetails={handleViewDetails}
           onQuickStatusChange={(ticket, newStatus) => handleInlineUpdate(ticket, 'ticket_status', newStatus)}
-          canQuickEdit={(ticket) =>
-            canDo('edit_all') || (canDo('edit_assigned') && ticket.assigned_technician === userEmail)
-          }
+          canQuickEdit={(ticket) => canChangeTicketStatus(canDo, ticket, userEmail)}
         />
       )}
 
@@ -1459,6 +1510,11 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
+            {/* `t` below is the TICKET, not the translator: translations inside
+                this map must use `tr` (which is the same function, aliased at the
+                top of the file). Five calls here did not, and called the ticket
+                object as a function — the row action menu threw every time it
+                opened. (BUG-083) */}
             {paginatedTickets.map((t, idx) => (
               <tr
                 key={t.id}
@@ -1486,7 +1542,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-900">{t.customer_name}</td>
                 <td className="px-4 py-3">
-                  {(canDo('edit_all') || (canDo('edit_assigned') && t.assigned_technician === userEmail)) ? (
+                  {canChangeTicketStatus(canDo, t, userEmail) ? (
                     <div className="relative inline-block inline-pill">
                       <button
                         onClick={(e) => { e.stopPropagation(); setInlineEdit(inlineEdit.ticketId === t.id && inlineEdit.field === 'ticket_status' ? { ticketId: null, field: null } : { ticketId: t.id, field: 'ticket_status' }) }}
@@ -1511,7 +1567,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  {(canDo('edit_all') || (canDo('edit_assigned') && t.assigned_technician === userEmail)) ? (
+                  {canEditTicket(canDo, t, userEmail) ? (
                     <div className="relative inline-block inline-pill">
                       <button
                         onClick={(e) => { e.stopPropagation(); setInlineEdit(inlineEdit.ticketId === t.id && inlineEdit.field === 'priority' ? { ticketId: null, field: null } : { ticketId: t.id, field: 'priority' }) }}
@@ -1536,7 +1592,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   )}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
-                  {t.assigned_technician || t('common.unassigned')}
+                  {t.assigned_technician || tr('common.unassigned')}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">{formatDate(t.created_date)}</td>
                 <td className="px-4 py-3 relative action-menu">
@@ -1584,9 +1640,9 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                             d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                           />
                         </svg>
-                        {t('common.view')}
+                        {tr('common.view')}
                       </button>
-                      {(canDo('edit_all') || canDo('edit_assigned')) && (
+                      {canEditTicket(canDo, t, userEmail) && (
                         <button
                           onClick={() => {
                             handleEdit(t)
@@ -1607,7 +1663,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                               d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                             />
                           </svg>
-                          {t('common.edit')}
+                          {tr('common.edit')}
                         </button>
                       )}
                       <button
@@ -1630,7 +1686,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                             d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                           />
                         </svg>
-                        {t('tickets.exportPDF')}
+                        {tr('tickets.exportPDF')}
                       </button>
                       {canDo('delete') && (
                         <button
@@ -1653,7 +1709,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                               d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                             />
                           </svg>
-                          {t('common.delete')}
+                          {tr('common.delete')}
                         </button>
                       )}
                     </div>

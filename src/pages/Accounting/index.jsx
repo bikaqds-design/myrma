@@ -11,6 +11,7 @@ import { RecordPaymentModal } from './_modals'
 import { VoidModal } from '../SalesDocuments/_modals'
 import { RecordVendorPaymentModal } from '../Purchasing/_modals'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
+import { AGING_BUCKETS, emptyAgingTotals } from '../../lib/aging'
 
 const METHOD_LABEL_KEY = {
   cash: 'accounting.methodCash',
@@ -25,12 +26,16 @@ const STATUS_PILL = {
   voided: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
 }
 
-const BUCKET_KEYS = ['current', 'd31_60', 'd61_90', 'd90_plus']
+// Keys and column order come from src/lib/aging.js, so this page and the two
+// ledgers cannot disagree about which buckets exist (BUG-065).
+const BUCKET_KEYS = AGING_BUCKETS
 const BUCKET_LABEL_KEY = {
-  current: 'accounting.bucketCurrent',
+  not_due: 'accounting.bucketNotDue',
+  d1_30: 'accounting.bucket1_30',
   d31_60: 'accounting.bucket31_60',
   d61_90: 'accounting.bucket61_90',
   d90_plus: 'accounting.bucket90Plus',
+  no_due_date: 'accounting.bucketNoDueDate',
 }
 
 const fmtMoney = (n) => (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -106,14 +111,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
   const agingByCustomer = useMemo(() => {
     const map = new Map()
     for (const row of aging) {
-      const cur = map.get(row.customer_id) || {
-        customer_id: row.customer_id,
-        current: 0,
-        d31_60: 0,
-        d61_90: 0,
-        d90_plus: 0,
-        total: 0,
-      }
+      const cur = map.get(row.customer_id) || { customer_id: row.customer_id, ...emptyAgingTotals() }
       cur[row.bucket] += row.remaining
       cur.total += row.remaining
       map.set(row.customer_id, cur)
@@ -125,14 +123,11 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
     () =>
       agingByCustomer.reduce(
         (acc, r) => {
-          acc.current += r.current
-          acc.d31_60 += r.d31_60
-          acc.d61_90 += r.d61_90
-          acc.d90_plus += r.d90_plus
+          for (const b of BUCKET_KEYS) acc[b] += r[b]
           acc.total += r.total
           return acc
         },
-        { current: 0, d31_60: 0, d61_90: 0, d90_plus: 0, total: 0 }
+        emptyAgingTotals()
       ),
     [agingByCustomer]
   )
@@ -153,16 +148,17 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
   const apAgingByVendor = useMemo(() => {
     const map = new Map()
     for (const row of apAging) {
-      const cur = map.get(row.vendor_id) || {
-        vendor_id: row.vendor_id,
-        current: 0,
-        d31_60: 0,
-        d61_90: 0,
-        d90_plus: 0,
-        total: 0,
-      }
-      cur[row.bucket] += row.remaining
-      cur.total += row.remaining
+      const cur = map.get(row.vendor_id) || { vendor_id: row.vendor_id, ...emptyAgingTotals() }
+      // remaining_base, NOT remaining. A vendor invoice carries its own
+      // currency and these buckets sum across every invoice, so adding
+      // `remaining` put a USD balance into an EGP total as though the digits
+      // were the same money. Measured in production when this was fixed: one
+      // approved USD 3,750 invoice at 48.5, so payables showed E£4,540 against
+      // a true E£182,665 — understated about forty-fold. vendorLedger.ts
+      // computed remaining_base for exactly this and warned about it on the
+      // type; this reducer was the one place that ignored it.
+      cur[row.bucket] += row.remaining_base
+      cur.total += row.remaining_base
       map.set(row.vendor_id, cur)
     }
     return Array.from(map.values()).sort((a, b) => b.total - a.total)
@@ -172,14 +168,11 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
     () =>
       apAgingByVendor.reduce(
         (acc, r) => {
-          acc.current += r.current
-          acc.d31_60 += r.d31_60
-          acc.d61_90 += r.d61_90
-          acc.d90_plus += r.d90_plus
+          for (const b of BUCKET_KEYS) acc[b] += r[b]
           acc.total += r.total
           return acc
         },
-        { current: 0, d31_60: 0, d61_90: 0, d90_plus: 0, total: 0 }
+        emptyAgingTotals()
       ),
     [apAgingByVendor]
   )
@@ -380,7 +373,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
 
       {tab === 'aging' && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
             <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] p-3">
               <div className="text-[10px] uppercase text-[#6c6760] dark:text-[#9aa4b2] mb-0.5">{t('accounting.totalOutstanding')}</div>
               <div className="font-bold text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(agingTotals.total)}</div>
@@ -388,7 +381,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
             {BUCKET_KEYS.map((b) => (
               <div key={b} className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] p-3">
                 <div className="text-[10px] uppercase text-[#6c6760] dark:text-[#9aa4b2] mb-0.5">{t(BUCKET_LABEL_KEY[b])}</div>
-                <div className={`font-bold ${b === 'd90_plus' ? 'text-red-600 dark:text-red-400' : 'text-[#211f1b] dark:text-[#e8ebf0]'}`}>
+                <div className={`font-bold ${b === 'd90_plus' ? 'text-red-600 dark:text-red-400' : b === 'no_due_date' ? 'text-amber-700 dark:text-amber-400' : 'text-[#211f1b] dark:text-[#e8ebf0]'}`}>
                   {fmtMoney(agingTotals[b])}
                 </div>
               </div>
@@ -502,7 +495,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
 
       {tab === 'ap_aging' && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
             <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] p-3">
               <div className="text-[10px] uppercase text-[#6c6760] dark:text-[#9aa4b2] mb-0.5">{t('accounting.totalOutstanding')}</div>
               <div className="font-bold text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(apAgingTotals.total)}</div>
@@ -510,7 +503,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
             {BUCKET_KEYS.map((b) => (
               <div key={b} className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] p-3">
                 <div className="text-[10px] uppercase text-[#6c6760] dark:text-[#9aa4b2] mb-0.5">{t(BUCKET_LABEL_KEY[b])}</div>
-                <div className={`font-bold ${b === 'd90_plus' ? 'text-red-600 dark:text-red-400' : 'text-[#211f1b] dark:text-[#e8ebf0]'}`}>
+                <div className={`font-bold ${b === 'd90_plus' ? 'text-red-600 dark:text-red-400' : b === 'no_due_date' ? 'text-amber-700 dark:text-amber-400' : 'text-[#211f1b] dark:text-[#e8ebf0]'}`}>
                   {fmtMoney(apAgingTotals[b])}
                 </div>
               </div>
@@ -531,7 +524,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
               <tbody>
                 {apAgingByVendor.length === 0 ? (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={BUCKET_KEYS.length + 2}>
                       <div className="py-16 flex flex-col items-center text-center">
                         <svg className="w-12 h-12 text-[#746f65] dark:text-[#a4acb7] mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.4} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

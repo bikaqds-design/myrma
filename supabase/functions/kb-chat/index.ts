@@ -290,7 +290,11 @@ Deno.serve(async (req: Request) => {
     .limit(MAX_DOCUMENTS)
 
   if (searchError) {
-    return json({ error: 'search_failed', message: searchError.message }, 500)
+    // Logged, not returned. The database's own error text names tables, columns
+    // and query internals, and the chat panel prints `message` verbatim under
+    // its heading. (Audit finding BUG-064.)
+    console.error('[kb-chat] search failed:', searchError.code, searchError.message)
+    return json({ error: 'search_failed', message: 'Searching the documents failed. Please try again.' }, 500)
   }
 
   const terms = question
@@ -412,9 +416,6 @@ Deno.serve(async (req: Request) => {
       }
 
       if (!upstream.ok || !upstream.body) {
-        // The provider's own message is passed through: "model not found" and
-        // "quota exceeded" need completely different responses from a person,
-        // and collapsing both into "the AI failed" wastes their afternoon.
         // BUG-021: the provider's response body was passed straight to the
         // browser. It can carry request ids, quota details and account
         // identifiers; the person who needs it is whoever reads the function
@@ -456,8 +457,14 @@ Deno.serve(async (req: Request) => {
         }
         controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'done' })}${NL}`))
       } catch (err) {
+        // The raw exception text went to the browser, which printed it under the
+        // chat's error heading. Log it; tell the person what happened, not how.
+        // (Audit finding BUG-064.)
+        console.error('[kb-chat] stream failed:', err)
         controller.enqueue(
-          encoder.encode(`${JSON.stringify({ type: 'error', message: String(err) })}${NL}`)
+          encoder.encode(
+            `${JSON.stringify({ type: 'error', message: 'The answer stopped unexpectedly. Please try again.' })}${NL}`
+          )
         )
       } finally {
         controller.close()

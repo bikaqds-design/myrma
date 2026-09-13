@@ -18,7 +18,7 @@ import {
   currencies,
   dataIntegrity,
 } from './system.js'
-import { inventory, warehouses, warehouseStock, stockMoves, parts, ticketParts, timeEntries, invoices } from './inventory.js'
+import { inventory, warehouses, warehouseStock, stockMoves, parts, ticketParts, timeEntries } from './inventory.js'
 import { notifications } from './notifications.js'
 import {
   whatsappTemplates,
@@ -90,7 +90,6 @@ export const db = {
   parts,
   ticketParts,
   timeEntries,
-  invoices,
 
   // In-app notifications
   notifications,
@@ -145,7 +144,7 @@ export type { CustomerRow, CustomerNoteRow } from './customers.js'
 export type { BrandRow, CategoryRow, SubcategoryRow, ProductRow } from './catalog.js'
 export type {
   InventoryUnitRow, ManufacturerBatchRow, WarehouseRow,
-  PartRow, TicketPartRow, TimeEntryRow, InvoiceRow, InventoryStatsRow,
+  PartRow, TicketPartRow, TimeEntryRow, InventoryStatsRow,
   WarehouseStockRow, StockMoveRow, ProductStockSummary,
   CreateUnitsResult, FailedUnitInsert,
 } from './inventory.js'

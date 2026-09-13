@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { containsPattern } from '../../lib/searchPattern.js'
 
 /**
  * Product documents — the Knowledge Center's contents (20260801).
@@ -177,7 +178,7 @@ export const productDocuments = {
 
     // A literal % or _ in the query is a plausible thing to type (a part
     // number, a percentage) and must not act as an ilike wildcard.
-    const pattern = `%${q.replace(/[%_\\]/g, (c) => `\\${c}`)}%`
+    const pattern = containsPattern(q)
 
     const [textRes, skuRes, nameRes] = await Promise.all([
       applyFilters(

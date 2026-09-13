@@ -21,14 +21,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev            # start dev server (Vite, port 5173)
 npm run build          # production build
 npm run preview        # preview production build
-npm test               # Vitest unit tests (305 tests, 9 suites) — run before every push
+npm test               # Vitest unit tests — run before every push
 npm run test:watch     # Vitest in watch mode
 npm run test:coverage  # test with coverage report
 npm run lint           # ESLint (0 errors target)
 npm run lint:ci        # ESLint strict for CI (blocks on warnings too)
 npm run lint:fix       # ESLint auto-fix
 npm run format         # Prettier write
-npm run format:check   # Prettier check (used in CI)
+npm run format:check   # Prettier check (NOT run in CI; formatting is not enforced)
 npm run test:db        # DB test tier: supabase start (applies all migrations) + runs supabase/tests/audit_hardening.sql — requires Docker + psql locally
 ```
 

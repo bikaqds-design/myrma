@@ -105,8 +105,12 @@ afterEach(cleanup)
 describe('resolving settings', () => {
   it('inherits the company setting when the person has none', async () => {
     mount()
-    await waitFor(() => expect(api.fontFamily).toBe('poppins'))
-    expect(api.dateFormat).toBe('DD/MM/YYYY')
+    // Asserted together against one settled state (BUG-081): read after the
+    // waitFor, the second value could still be the earlier one under a loaded run.
+    await waitFor(() => {
+      expect(api.fontFamily).toBe('poppins')
+      expect(api.dateFormat).toBe('DD/MM/YYYY')
+    })
   })
 
   it('lets a personal preference win over the company one', async () => {
@@ -184,8 +188,12 @@ describe('degrading safely', () => {
   it('falls back to company settings when there is no personal row', async () => {
     state.personal = null
     mount()
-    await waitFor(() => expect(api.fontFamily).toBe('poppins'))
-    expect(api.darkMode).toBe(false)
+    // Asserted together against one settled state (BUG-081): read after the
+    // waitFor, the second value could still be the earlier one under a loaded run.
+    await waitFor(() => {
+      expect(api.fontFamily).toBe('poppins')
+      expect(api.darkMode).toBe(false)
+    })
   })
 
   it('still resolves when the company row is absent', async () => {
@@ -212,8 +220,12 @@ describe('following the operating system', () => {
     state.osDark = false
     state.personal = null
     mount()
-    await waitFor(() => expect(api.fontFamily).toBe('poppins'))
-    expect(api.darkMode).toBe(false)
+    // Asserted together against one settled state (BUG-081): read after the
+    // waitFor, the second value could still be the earlier one under a loaded run.
+    await waitFor(() => {
+      expect(api.fontFamily).toBe('poppins')
+      expect(api.darkMode).toBe(false)
+    })
   })
 
   /**
@@ -224,8 +236,12 @@ describe('following the operating system', () => {
     state.osDark = true
     state.personal = { appearance: { darkMode: false } }
     mount()
-    await waitFor(() => expect(api.fontFamily).toBe('poppins'))
-    expect(api.darkMode).toBe(false)
+    // Asserted together against one settled state (BUG-081): read after the
+    // waitFor, the second value could still be the earlier one under a loaded run.
+    await waitFor(() => {
+      expect(api.fontFamily).toBe('poppins')
+      expect(api.darkMode).toBe(false)
+    })
   })
 
   /**
@@ -239,8 +255,12 @@ describe('following the operating system', () => {
     state.osDark = false
     state.personal = null
     mount()
-    await waitFor(() => expect(api.fontFamily).toBe('poppins'))
-    expect(api.darkMode).toBe(false)
+    // Asserted together against one settled state (BUG-081): read after the
+    // waitFor, the second value could still be the earlier one under a loaded run.
+    await waitFor(() => {
+      expect(api.fontFamily).toBe('poppins')
+      expect(api.darkMode).toBe(false)
+    })
   })
 
   it('ignores darkMode in the company row when the OS says dark', async () => {

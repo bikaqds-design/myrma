@@ -15,13 +15,13 @@
 | Severity | Count |
 |---|---|
 | Critical | 4 |
-| High | 16 |
-| Medium | 32 |
+| High | 17 |
+| Medium | 33 |
 | Low | 23 |
 | Informational | 6 |
-| **Total** | **81** |
+| **Total** | **83** |
 
-Of the 81 findings, 25 are **confirmed by execution** (a command, query or rolled-back probe produced the evidence), 53 are **confirmed by code reading** (the defect is unambiguous in source or live catalog text), and 3 are **suspected** (design recommendations or settings the tooling could not read).
+Of the 83 findings, 26 are **confirmed by execution** (a command, query or rolled-back probe produced the evidence), 54 are **confirmed by code reading** (the defect is unambiguous in source or live catalog text), and 3 are **suspected** (design recommendations or settings the tooling could not read).
 
 ### Top 10 to fix first
 
@@ -498,6 +498,22 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Confidence: Confirmed by execution
 * **Found 2026-09-06** while verifying the BUG-011 fix; **pre-existing and not caused by it** — both `user_read_targeted` and the `.select()` predate that change, and the behaviour reproduces identically against the old `rma_is_staff()` insert policy. Not yet fixed.
 * **Status: FIXED (client) 2026-09-06, ships with the next front-end deploy.** `src/api/db/notifications.ts` no longer chains `.select()` onto the insert, so the statement is a plain INSERT and the SELECT policy is never consulted. Verified against the live database first: the same insert targeting `['admin','manager']` as a technician succeeds **without** `RETURNING` and is refused with 42501 **with** it. `user_read_targeted` was deliberately left alone — not being able to read other roles' notifications is correct. The return type became `Promise<void>`, which is safe because no call site uses the value (every one is `db.notifications.create({…}).catch(…)`); a genuine insert error is now reported to Sentry instead of being swallowed.
+#### [HIGH] The RMA ticket table's row menu crashes the page: the row map shadows the translation function
+
+* ID: BUG-083
+* Category: Logic / UX
+* Location: `src/pages/RMATickets/index.jsx` — `const { t } = useTranslation()` (line 26) and `const tr = t` (line 32), with table rows rendered by `paginatedTickets.map((t, idx) => …)`; inside that callback `t` is the **ticket**, and five calls used `t('…')`: `common.unassigned`, `common.view`, `common.edit`, `tickets.exportPDF`, `common.delete`
+* Description: the `tr` alias exists precisely because the row map shadows the translator — the rest of the row already uses it. Five calls did not. Calling the ticket object as a function raises `TypeError: t is not a function` during render, and the error boundary replaces the page with the crash screen.
+* How to reproduce: RMA Tickets → table view → open any row's ⋯ action menu. View, Edit, Export PDF and Delete all sit inside it, so the menu cannot open at all.
+* Expected: the menu opens.
+* Actual: the page crashes.
+* Impact: row actions are unusable in table view. The fifth call, `common.unassigned`, throws for any row with no assignee — production has 0 unassigned tickets of 13 today, so that one is latent rather than active.
+* Suggested fix: use `tr` inside the map, or rename the map parameter.
+* Confidence: Confirmed by code reading — `git blame` dates the lines to dedda598 (2026-06-05) and ed8215de (2026-06-06), and the working tree matches HEAD, so this is in the deployed build. Not reproduced in a browser.
+* Found: 2026-09-13, while applying BUG-071 to the same rows. Neither the audit nor the lint rules caught it: no rule flags a call to a shadowed identifier.
+* **Status: FIXED 2026-09-13** (ships with the next front-end deploy). The five calls now use `tr`, and a comment at the top of the map says plainly that `t` there is the ticket.
+* Verified by parsing rather than grepping: an espree pass over every file in `src/` finds **48** functions with a parameter named `t` and **0** calls of such a parameter as a function. A text scan was tried first and was wrong twice — it mis-detected where the callback ended and reported three correct calls in the empty-state block as broken.
+
 #### [HIGH] The audit log can be forged by any authenticated user
 
 * ID: BUG-019
@@ -515,6 +531,24 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * **Interim behaviour, stated rather than left to be discovered:** until the client half deploys, a queued entry replayed by a different user is attributed to the replayer instead of the original actor. Both the old and new behaviour are wrong in that case — the old one recorded a name the session did not belong to — and neither is now forgeable, which is what this finding is about.
 * **Test coverage added.** `src/test/audit.test.js` had no coverage of `auditFlushQueue` at all and its Supabase mock had no `auth` object, so the existing tests passed regardless of what the flush did. Six tests added (own entries flushed; foreign entries dropped without insert; mixed queue flushes only the caller's; case-insensitive address match; queue preserved when there is no session; queue preserved when the insert fails). Full suite: **47 files, 1224 tests, all passing.**
 
+
+#### [HIGH] A role waiting for whoever registers the address
+
+* ID: BUG-084
+* Category: Security / Access Control
+* Location: `public.user_roles` (live data) — 10 rows created 2026-06-24, all on `@test.com`, all `status = 'active'`, none ever signed in; one holds `super_admin` and one `admin`. Resolution path: `src/api/db/users.ts` `userRoles.getUserRole(email)`.
+* Description: a role is resolved by matching `user_roles.user_email` against the signed-in address. Nothing ties the row to an account — the row simply waits. So each of these is a standing grant to whoever first creates an account with that address, and the project has `disable_signup = false` (read from `/auth/v1/settings`, 2026-09-13).
+* How to reproduce: `SELECT role, user_email FROM user_roles ur WHERE NOT EXISTS (SELECT 1 FROM auth.users u WHERE lower(u.email) = lower(ur.user_email));` — or run `rma_data_integrity_summary()`, where these now appear as `role_without_account`.
+* Expected: a role row names somebody who exists, and a new account starts with no access.
+* Actual: registering one of those addresses signs you in as an administrator.
+* Impact: what stands in the way is only that sign-up requires confirming the email and `test.com` is a domain the company does not own — that is a stranger's mail server, not a control. Two of the ten are administrative.
+* Suggested fix: turn off public sign-up (dashboard, and already on the owner list), and suspend the orphaned rows — the exact `UPDATE` is written at the foot of `supabase/migrations/20260843_integrity_identity_and_due_dates.sql`. Suspension rather than deletion keeps the fixture rows visible and is one statement to undo; any status other than `active` denies in both the database (`rma_access_is_current`) and the app (`accessDenialReason`).
+* Confidence: Confirmed. Counts and roles read from production today; `disable_signup` read from the live auth settings endpoint. Not exploited — establishing that would mean registering one of those addresses.
+* **Status: PARTLY FIXED 2026-09-13.** The waiting grants are closed; the mechanism that made them dangerous is an owner action.
+* **All 10 rows suspended, on the owner's instruction.** `status = 'suspended'`, reason recorded on each row. Suspension rather than deletion: the fixture rows stay visible for demonstrations and one `UPDATE` undoes it. Verified afterwards — 0 orphaned rows left active, `rma_access_is_current()` returns **false** for the former `super_admin`, and all 7 rows belonging to real accounts were untouched and still active. The check that found them now reports 0 high-severity rows.
+* **Still open, and only the owner can do it: public sign-up is still enabled.** Suspending these rows closes today's ten grants; it does not stop the eleventh. While `disable_signup = false`, any address that acquires a `user_roles` row before its account exists is the same hazard again, and someone registering with no role at all can still create an account.
+* `role_without_account` stays in `rma_data_integrity_issues()` permanently, rated **high** whenever an administrative grant is waiting, so a recurrence surfaces instead of sitting.
+
 ### 4.3 Medium
 
 #### [MEDIUM] The WhatsApp queue's cancel buttons have never worked — notification_queue had no UPDATE policy
@@ -531,6 +565,21 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Confidence: Confirmed by execution
 * **Found 2026-09-06** while scoping BUG-008 — it is the same failure shape (an RLS-filtered write reported as success), which is how it surfaced.
 * **Status: FIXED — applied and verified in production 2026-09-06** (`20260823_allow_admin_cancel_notification_queue.sql`; probe: **2 passed, 0 failed** — admin can now update a queued job, technician still cannot). Deliberately not narrowed to `status = 'cancelled'`: an admin managing a stuck queue also needs to requeue a failed job, and a policy permitting only cancellation would produce the next silent no-op the moment that button is added. Queue draining is unaffected — the notification-worker uses the service role and bypasses RLS. The caller now also throws on a zero-row result via BUG-008's `assertAffected`, so a future policy regression here fails loudly instead of silently.
+#### [MEDIUM] Accounts-payable aging adds foreign-currency balances into the base-currency totals
+
+* ID: BUG-082
+* Category: Logic / Financial reporting
+* Location: `src/pages/Accounting/index.jsx` `apAgingByVendor` (`cur[row.bucket] += row.remaining`, `cur.total += row.remaining`), fed by `src/api/db/vendorLedger.ts` `apAgingReport`, which computes both `remaining` (in the invoice's own currency) and `remaining_base`, and documents on its type that bucket totals must use the latter
+* Description: Vendor invoices can be raised in a foreign currency (20260792). The payables aging reducer summed `remaining` — each balance in its own currency — into totals presented in the base currency, so a USD balance was added to EGP balances digit for digit.
+* How to reproduce: open the payables aging on the Accounting page with an approved foreign-currency vendor invoice carrying a balance; compare its total with `SELECT sum((total - amount_paid) * exchange_rate) FROM vendor_invoices WHERE status IN ('approved','partially_received','received')`.
+* Expected: every bucket and the total in base currency.
+* Actual: measured in production on 2026-09-10 — one approved USD 3,750 invoice at 48.5 — the page showed **E£4,540** owed to suppliers against a true **E£182,665**, understating payables about forty-fold.
+* Impact: the payables figure used to plan cash is wrong by E£178,125 today, and by more with each foreign invoice.
+* Suggested fix: sum `remaining_base`.
+* Confidence: Confirmed by execution
+* Found: 2026-09-10, while fixing BUG-065, which rewrote the same reducer.
+* **Status: FIXED 2026-09-10** (ships with the next front-end deploy). The reducer sums `remaining_base` for every bucket and the total. Receivables were checked and are unaffected: sales documents are always raised in the base currency, so `remaining` is already base there.
+
 #### [MEDIUM] MFA challenge is skipped when the assurance-level lookup fails
 
 * ID: BUG-020
@@ -1092,6 +1141,8 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Suggested fix: bring `darkMode` inside the `waitFor` so both values are asserted against the same settled state.
 * Confidence: Confirmed by execution (observed once; not reproduced in 5 isolated runs plus 1 further full run)
 * **Found 2026-09-06** while verifying the BUG-024/025/046 batch. **Not caused by that work** — none of those changes touch appearance, and the same suite passed immediately before and after. Not fixed: I did not want to edit an assertion I could not first make fail on demand.
+* **Status: FIXED 2026-09-10.** **The same race was at five sites, not one.** Each test waited for `fontFamily` to settle and then asserted a second value — `darkMode` in four tests, `dateFormat` in one — outside that wait, so under a loaded parallel run the second read could see the earlier state. All five now assert both values inside a single `waitFor`.
+* **A limit on the evidence:** an intermittent failure cannot be proven gone by runs that pass, and this one never reproduced in isolation. What can be shown is that no assertion in the file now reads state outside the wait that settles it.
 #### [LOW] TypeScript is not type-checked anywhere; `tsc` reports 83 errors
 
 * ID: BUG-051
@@ -1104,6 +1155,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: latent type bugs; a dead module with a broken import ships in the bundle.
 * Suggested fix: add `typescript` + `supabase gen types`, fix the 83 errors, gate in CI.
 * Confidence: Confirmed by execution
+* **Not attempted 2026-09-13, and the reason is a blocker rather than a choice.** Closing this means adding `typescript`, fixing the 83 errors and gating CI on it — and the errors cannot be fixed without running `tsc`, which means installing the dependency first. This machine currently has about half a gigabyte of memory free; `npm install` and the production build both fail on it today. Adding the dependency and the CI gate *without* fixing the errors would turn CI red on HEAD, which is the state BUG-016 was raised to get out of. It needs a machine that can run the compiler.
 
 #### [LOW] Formatting drift and CI/documentation mismatch
 
@@ -1117,6 +1169,9 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: noisy diffs; false confidence.
 * Suggested fix: add `format:check` and `typecheck` to CI or update the docs.
 * Confidence: Confirmed by execution
+* **Status: FIXED 2026-09-13** (documentation only). The mismatch was narrower than filed, and the difference matters: README documents `format:check` as a script that exists, which is accurate. What was untrue was **CLAUDE.md calling it "used in CI"**, and **README describing `db-tests` as one of two required jobs** when that job carries `if: false` — Docker was ruled out and the `integration` job replaced it. Both now describe the pipeline that runs, including that `lint:ui` reports without gating.
+* **Formatting is still not enforced, and that is stated rather than papered over.** `npx prettier --check src` reports hundreds of files. Adding `format:check` to CI before a formatting sweep would turn the job red on HEAD, and the sweep is a commit of its own — mixing several hundred reformatted files into unrelated work is how a real change becomes unreviewable.
+* Two stale claims fixed alongside: both files advertised "305 tests, 9 suites" (the suite is roughly four times that), and README described the service worker as caching Supabase responses `NetworkFirst` — **BUG-024 removed that caching**, precisely because it left one person's records readable on a shared machine after sign-out. The test counts are now gone rather than corrected: a number in prose goes stale again.
 
 #### [LOW] React hook dependency warnings and unused test variables
 
@@ -1130,6 +1185,8 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: minor UX; lint noise.
 * Suggested fix: include the deps or use `useResetOnFilterChange` consistently.
 * Confidence: Confirmed by execution (lint) / code reading
+* **Status: FIXED (before this pass) — confirmed 2026-09-10; no code change made.** Both halves were already resolved by earlier remediation. The RMA Tickets page-reset effect now lists `filterOverdue` in its dependencies, with a comment recording that the signature and the dependency list had drifted — exactly the empty-page bug this finding describes. Customers lists `setCurrentPage`. And `lint:ci` runs with `--max-warnings 0` and passes, so no `react-hooks/exhaustive-deps` or `no-unused-vars` warning remains anywhere in `src/`.
+* Optional, not done: both pages still carry inline copies of the value-compared reset rather than calling `useResetOnFilterChange`. They are correct as they stand.
 
 #### [LOW] Chunk-load failure triggers an unbounded reload loop
 
@@ -1143,6 +1200,10 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: browser tab thrashes; user cannot read an error.
 * Suggested fix: `sessionStorage` flag keyed by chunk URL.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-10** (ships with the next front-end deploy). `src/lib/chunkReload.js` gives each session one automatic reload. A second chunk failure in the same session is thrown to the ErrorBoundary, which offers a Reload button the user controls, instead of reloading forever. The flag clears as soon as any chunk loads, so a long-lived tab that outlives a second deploy still gets its silent recovery.
+* **No storage means no automatic reload.** sessionStorage can be blocked, or — in older Safari private windows — accept a write and silently drop it. Either way nothing can remember that a reload was tried, and an unremembered reload is exactly the loop being removed. The flag is read back after writing to catch the silent-drop case.
+* **A gap the finding did not mention:** only Chromium's and Safari's wording was recognised. Firefox reports `error loading dynamically imported module`, so on Firefox a chunk replaced by a deploy skipped the recovery reload entirely and went straight to the crash screen. Now recognised.
+* Tests: `src/test/chunkReload.test.js`, 7 cases — one reload then refusal; re-granted after a successful load; refused with no storage, with throwing storage, and with storage that drops writes; each engine's wording recognised; a genuine module error not treated as a chunk failure.
 
 #### [LOW] Error boundary shows raw error messages in production
 
@@ -1156,6 +1217,10 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: minor information disclosure.
 * Suggested fix: route through `toUserMessage`; keep details in the copy action only.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-10** (ships with the next front-end deploy). In production the crash screen routes the message through `toUserMessage`, which turns Postgres/PostgREST errors into a sentence and drops anything carrying schema vocabulary. The raw message and full stack remain one click away in "Copy error details", which is where diagnosis happens. Development still shows the raw message.
+* `toUserMessage` looks its translations up without a default, so if i18n is what broke it returns its own key. The crash screen falls back to plain English rather than printing `errors.generic`.
+* **A judgment worth recording:** a JavaScript error with no database vocabulary — `Cannot read properties of undefined` — still shows as-is in production. It reveals no schema, and hiding it would make the reports users paste back less useful.
+* Tests: `src/test/errorBoundary.test.jsx`, 4 cases, switching production and development with `vi.stubEnv`. One of my own assertions was initially wrong — development renders the message twice (message box and dev-only stack) — and was corrected; the code was right.
 
 #### [LOW] CSP allows `unsafe-inline`/`unsafe-eval`; function CORS defaults to `*`
 
@@ -1169,6 +1234,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: reduced defence in depth.
 * Suggested fix: set `ALLOWED_ORIGINS`; remove `unsafe-eval` (check jsPDF/html2canvas need), move the inline dark-mode bootstrap in `index.html` to a hashed script.
 * Confidence: Confirmed by code reading
+* **Not attempted 2026-09-13.** Two of the three parts are not safely doable from here. Removing `unsafe-eval` needs a production build plus a runtime check of jsPDF/html2canvas to see whether anything still needs it, and the build does not run on this machine at present; replacing `unsafe-inline` with a hash needs the built output to hash. Setting `ALLOWED_ORIGINS` is a Supabase **secret**, which is an owner action in the dashboard — and until it is set, the shared CORS helper falls back to `*` by design. One part is already done: `kb-chat` no longer hardcodes `*`, so setting that secret will now harden every function at once.
 
 #### [LOW] `anon` still holds full DML grants on ~25 tables and can execute trigger and helper functions
 
@@ -1182,6 +1248,16 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: reduced margin for error.
 * Suggested fix: as above; enable HIBP checks; move `pg_net` to `extensions`.
 * Confidence: Confirmed by execution
+* **Status: FIXED — applied and verified in production 2026-09-10** (`20260841_revoke_anon_grants.sql`). Database only; nothing waits on a deploy.
+* **Measured scope was wider than written:** `anon` — anyone holding the public API key, which ships in every page load — held SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES and TRIGGER on **26 tables and all 6 views**, and EXECUTE on **44 functions**, 22 of them SECURITY DEFINER.
+* **Checked not exploitable before changing anything:** every one of those tables has RLS on with no policy admitting anon; all six views are `security_invoker`, so they run under anon's own RLS; and the four business RPCs anon could call each refuse a non-staff caller in their first lines. Three of those four — `create_manufacturer_batch`, `mark_batch_sent`, `mark_batch_resolved` — were added during this remediation on 2026-09-06, and their bodies were read to confirm that before going further.
+* **Root cause, which the finding did not name:** default privileges. For objects `postgres` creates in `public`, the project granted anon full table rights and EXECUTE on every new function — which is exactly how the remediation's own RPCs came out anon-executable. Revoking the existing grants alone would have lasted until the next migration, so the defaults were changed too. **Consequence for future work:** a table or RPC meant for signed-out visitors now needs an explicit `GRANT ... TO anon` in its migration.
+* **What anon keeps:** SELECT on `kb_articles`, nothing else. Traced rather than assumed — the public pages are Login and Reset Password (Auth only), the RMA tracker (the `public-track` Edge Function on the service role, plus storage policies scoped to comment attachments) and the public Knowledge Base. Every Edge Function either uses the service role or forwards the caller's own token, so the WhatsApp functions are untouched. PostgREST has no pre-request hook, pg_graphql is not installed, and anon held no sequence grants.
+* **No collateral on other roles.** Removing anon's EXECUTE meant revoking PUBLIC, so before each revoke EXECUTE was granted explicitly to every other role that held it (authenticated, service_role and the Supabase service roles); a guard refused to finish unless every one kept exactly its access. EXECUTE on the 13 **trigger** functions was also removed from `authenticated`, after a probe confirmed a trigger fires without it. **That probe's first run was invalid** — the default privileges had left EXECUTE in place, so its pass proved nothing — and was redone with the privilege verified absent.
+* **Verified from inside, rolled back — 11 passed, 0 failed:** the admin still gets `rma_is_admin() = true`; UPDATEs on `rma_tickets`, `deals` and `inventory_units` succeed with their triggers firing; `create_manufacturer_batch` is still callable by signed-in staff; anon reads published `kb_articles`; anon is refused at the grant for `payments` and for `rma_is_admin()`; the default ACL no longer grants anon anything.
+* **Verified from outside, over the real API with the anon key:** the Knowledge Base loads (200); reading `payments`, `vendor_payments` and `v_customer_ledger`, a DELETE on payments, an INSERT into leads, `rma_is_admin` and `create_manufacturer_batch` are all refused with 42501. A ninth check — a trigger function via `/rpc` — returned 404 PGRST202 instead of the expected 42501. Since `rma_is_admin`, equally non-executable, returned 42501, the difference is the function kind: **PostgREST does not expose trigger functions as RPCs at all**, so the advisor's "callable via /rest/v1/rpc" wording overstated those. The expectation was too narrow, not the fix.
+* **Security advisor, before → after:** `anon_security_definer_function_executable` 22 → **0** (the lint no longer appears); `authenticated_security_definer_function_executable` 69 → 56. The remaining 56 are the app's intended RPC surface, each doing its own role check, and are not what this finding is about.
+* **Not done, each for a stated reason:** `pg_net` stays in `public` — it is not relocatable (`extrelocatable = false`), its functions live in `net` regardless, and moving it means dropping and recreating it under the cron-driven notification drain. **Leaked-password protection is still off** — it is an Auth setting reached only through the Supabase dashboard, so it is an owner action. Default privileges for objects created by `supabase_admin` cannot be altered from the `postgres` role; in `public` that role creates only extension objects.
 
 #### [LOW] Missing foreign-key indexes and unused indexes
 
@@ -1195,6 +1271,13 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: latency as data grows; slow cascades.
 * Suggested fix: add the indexes; drop the unused ones after confirming with `pg_stat_user_indexes`.
 * Confidence: Confirmed by execution
+* **Status: FIXED — applied and verified in production 2026-09-10** (`20260840_index_foreign_keys_drop_redundant.sql`). Database only.
+* **15 foreign keys indexed** — the relationships the code actually filters and cascades on: a ticket's units, warehouse breakdowns, ticket timelines, customer notes, reply threads, deals by pipeline and contact, vendor purchase orders and invoices, lead conversions, and `reverses_application_id` on all three application tables, which every reversal RPC looks up.
+* **10 deliberately left unindexed:** the currency and country-code keys point at fixed reference lists that are never deleted from, the only case such an index serves; `rma_tickets.product_id` is never written (every row is null); `user_permissions.linked_customer_id` is on an empty legacy table; and `notification_logs`' two keys belong to the WhatsApp notification subsystem, left alone under the current instruction.
+* **8 redundant indexes dropped, which the finding did not list.** Found by querying for indexes whose columns are the leading columns of a unique index: four exact duplicates (`idx_products_sku`, `idx_customers_code`, `idx_rma_tickets_number`, `idx_user_permissions_email`) and four single-column prefixes of a composite unique index (`idx_categories_brand`, `idx_subcategories_category`, `country_area_codes_country_idx`, `warehouse_stock_product_idx`). Every write to those tables was maintaining two indexes for one lookup. The migration refuses to drop any whose covering unique index is missing or no longer covers it.
+* **The 17 "unused" indexes were NOT dropped, against the finding's suggestion.** Zero scans since 2026-05-07 on tables of at most 888 rows means the planner reads the table instead of any index — evidence the tables are small, not that the indexes are useless. Two are the full-text GIN indexes document search will need once there is much to search.
+* **Verified:** unindexed foreign keys **25 → 10**, and the ten remaining are exactly the deliberate ones — confirmed both by a catalog query and by the performance advisor's own list. 15 new indexes present, 0 redundant indexes left. The advisor now reports the 15 new indexes as "unused", which is expected on tables this size and not a reason to remove them.
+* **Honest scale:** no measurable speed-up today. This is for growth and for deletes on referenced rows, not a fix for anything currently slow.
 
 #### [LOW] Resend API key is stored in a table readable by every admin browser
 
@@ -1208,6 +1291,12 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: key theft.
 * Suggested fix: move to `RESEND_API_KEY` secret; drop the column (the backup allowlist already excludes it).
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-10 — migration written and verified but deliberately NOT applied yet; it ships with the next front-end deploy** (`20260842_email_api_key_server_side.sql` plus `src/api/email.js` and the Email Settings tab).
+* **Confirmed live:** one `email_settings` row with a 36-character Resend key, readable by any administrator session through `admin_all`, loaded with `select('*')` and rendered into an input — beside help text saying the key is "never exposed to the frontend".
+* **Design — the BUG-009 webhook-secret pattern:** a stored generated `has_api_key` column; authenticated's table-level SELECT replaced by a column list that omits `api_key` (a column-level REVOKE alone is a silent no-op against a table grant); INSERT and UPDATE left in place so an administrator can still set a new key without being able to read one back; `send-email` keeps reading it with the service role. The backup export already names safe columns and skips restoring this table, so it is unaffected.
+* **Why it is not applied yet — measured, not assumed.** A rolled-back probe applied the change inside a transaction and ran both old and new client queries as the live administrator — **7 passed, 0 failed**: settings readable with `has_api_key = true`; `SELECT api_key` refused; **the production front-end's `select('*')` refused**; saving without a key succeeds and the key survives; the administrator can replace the key; `RETURNING *` refused; `service_role` can still read it. Applying now would break the live Email Settings screen until the new client ships, so the migration is applied immediately after that deploy; its header says so in capitals.
+* **Client changes:** reads name their columns and return `api_key` as an empty "type a new key" field; saving writes only the fields the form edits and includes the key only when one was typed. **Two traps avoided:** spreading the loaded settings into the write would have sent `has_api_key`, a generated column, and failed every save; and it would have sent a blank `api_key`, erasing a key the form cannot see. Writes name their returned columns, because a bare `.select()` after a write is `RETURNING *` and is refused. The field shows "Saved — type a new key to replace it" and uses `autocomplete="new-password"` so a password manager does not fill it.
+* Tests: `src/test/emailSettings.test.js`, 6 cases — the key is never selected and neither is `*`; no row reports no key; saving without a key leaves it out of the payload, never writes `has_api_key` or `id`, and names its returned columns; whitespace is not a key; a typed key is saved trimmed; the first save inserts without a blank key.
 
 #### [LOW] Search inputs leave the `_` LIKE wildcard unescaped
 
@@ -1221,6 +1310,12 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: minor.
 * Suggested fix: shared `escapeLike()`.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-10** (ships with the next front-end deploy). **The finding understated it, and the evidence is measured rather than inferred.** PostgREST's `.or()` takes a text language, not parameters. Probed against the live API using the anon key on the anon-readable `kb_articles`: because `id` is a uuid, the cast error echoes back exactly what PostgREST forwarded to the database, with no rows and no session involved.
+* Measured: a **bare** value containing a comma → `HTTP 400 failed to parse logic tree`; bare `(x)` → the database received `(x` (a parenthesis silently eaten); bare backslashes pass through. A **double-quoted** value keeps commas and parentheses, and inside it a backslash escapes the next character (`\\` → `\`, `\"` → `"`).
+* **So real searches were broken, not just surprising:** on the notification-logs screen, which spliced the term in raw, a search containing a comma failed the page with a 400. The catalog search avoided that by deleting `( ) , "` — so "Dell, HP" silently searched for "Dell HP" — and the command palette turned `% , ( )` into spaces and left `_` as a wildcard.
+* `src/lib/searchPattern.js` does both encodings in one place: `escapeLike` (the three characters ILIKE treats specially), `containsPattern` for plain `.ilike()`, and `orIlike` for `.or()`, which LIKE-escapes then quotes. Applied at all four call sites: `catalog.search`, the command palette, `productDocuments.search` (already correct, now shared) and the notification-logs search. That last screen is shared by WhatsApp, email and SMS logs; the only change there is this escape, in line with the instruction to leave WhatsApp work alone.
+* **Verified end to end against production:** the real helper, run through node, produced the value for seven awkward terms (a comma, brackets, `_`, `%`, double quotes, a backslash, plain text); every one reached the database as exactly the intended literal pattern — **7 passed, 0 failed**. Postgres's own escape semantics were confirmed separately by a SQL truth table (`'a_b' ILIKE '%\_%'` true, `'ab' ILIKE '%\_%'` false, and likewise for `%` and `\`, with `standard_conforming_strings = on`).
+* Tests: `src/test/searchPattern.test.js`, 15 cases, including a round-trip through PostgREST's unquoting rule as measured above.
 
 #### [LOW] Integration test asserts on a table that does not exist
 
@@ -1234,6 +1329,11 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: misleading coverage.
 * Suggested fix: fix the name; assert `error.code === '42501'`; add signed-in role fixtures against a staging project.
 * Confidence: Confirmed by code reading
+* **Status: PARTLY FIXED 2026-09-13.** The broken assertion is fixed; the coverage gap it sat next to is a provisioning decision, not a code change.
+* `PROTECTED_TABLES` listed `purchase_documents`, which has never existed — the relation is the view `v_purchase_documents`. Corrected.
+* **The reason nobody noticed is the more important half.** The test counted *any* error as "correctly denied", so PostgREST's 404 for an unknown relation passed exactly like a real refusal: a green assertion pinning a name. It now fails when the relation is missing (PGRST205 from PostgREST, 42P01 from Postgres) and names it, so a typo can never read as protection again.
+* The finding's second claim was already addressed: `rpc-auth.test.ts` explicitly rejects PGRST202 as proof, with a comment saying why.
+* **Still open, deliberately:** nothing covers the authenticated-role bypasses behind BUG-001/002/010/011. Those need signed-in fixtures writing to a database, and doing that against the live project would create real records — the suite already gates its writing tier behind `SUPABASE_TEST_ALLOW_WRITES` for that reason. Closing it needs a second hosted project to point at, which is an owner decision about provisioning.
 
 #### [LOW] Dead, deprecated or unsafe exports remain in the data layer
 
@@ -1247,6 +1347,14 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: maintenance hazard.
 * Suggested fix: delete.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-13** (ships with the next front-end deploy). Every removal was checked for callers across `src/` including the tests; all four had none.
+* `crmInvoices.recordPayment` removed — a client-side read-modify-write of `amount_paid` with no role check. A four-line note stands where it was, naming `payments.record()` and the application RPCs as the only paths, so it is not reintroduced by someone who finds the gap. Two comments still claimed it was in use: `customerLedger.agingReport`'s said payments and credit notes "both write through crmInvoices.recordPayment()", which was simply untrue; both now describe the RPCs.
+* `quotations.getByDeal` removed (its own JSDoc deprecated it for hiding all but the most recent quotation).
+* The sign-up path removed — `auth.signUp`, `App.handleSignup` and the `onSignup` prop. The login screen never rendered a sign-up control, so the handler was unreachable from the interface.
+* **A residual the finding does not mention, and removing code does not close:** whether new accounts can be created is a Supabase **Auth setting**, not client code. If it is on, anyone with the public key can call sign-up directly. The consequence is bounded — a new account has no `user_roles` row, cannot create one (`admin_write` requires `rma_is_admin()`), and is refused by RLS and by the access-denied screen — so it yields an unusable account rather than access. Worth switching off in the dashboard; an owner action.
+* The legacy `invoices` module and its `InvoiceRow` type removed from `api/db/inventory.ts`, along with the import, the export and the type re-export in `api/db/index.ts`. It carried its own client-side `generateNumber` (max + 1). `Reports.jsx` already documented that it reads `crmInvoices` instead. The `invoices` **table** is untouched — that is a data decision, not a dead export.
+* Two items in the finding needed no work: the internal `_reverse_*` RPC wrappers were already gone, and `src/lib/messaging/providers/WhatsAppProvider.ts` (unused, with a broken import) is **left in place** under the standing instruction to skip WhatsApp work. It is imported by nothing, so it costs only its own bytes.
+* Verified: ESLint clean on every touched file, and the backup, backup-resilience, backup-coverage and margin suites pass (86 tests) — they reference the `invoices` **table name**, which the removal does not touch.
 
 #### [LOW] Data-quality issues visible in production
 
@@ -1260,6 +1368,13 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: minor reporting errors; confusing user list.
 * Suggested fix: constraints + one-off cleanup after the fixture purge.
 * Confidence: Confirmed by execution
+* **Status: PARTLY FIXED 2026-09-13.** Every count re-measured against production today and every one reproduces exactly: 14 customers sharing a mobile, 8 live units with a blank serial, 3 posted invoices with no due date, 10 `user_roles` rows with no account, 1 account with no role.
+* **What was added — 20260843.** `rma_data_integrity_issues()` covered two of the four; it now covers all of them plus the mirror case, so the whole finding is one query an administrator can run. New checks: `duplicate_customer_mobile`, `role_without_account`, `account_without_role`.
+* **The duplicate-mobile guard was worse than filed, in a way worth stating.** The importer built a Set of known mobiles and skipped matches — but it never added the file's own rows to that Set, so a spreadsheet carrying the same number twice imported it twice; nothing in the file was compared against the rest of the file. It also compared `trim().toLowerCase()` strings, so `+20 100 123 4567` and `0100 123 4567` read as two different people. Both fixed: `src/lib/customerDuplicates.js` compares the last nine digits (identical in every spelling of an Egyptian mobile), `db.customers.findByMobileKeys()` asks the database instead of the page's capped in-memory list, and the single-record form — which never checked at all — now names the existing customer and asks before saving. It asks rather than refuses: a household shares a landline and a switchboard is on every contact.
+* **Posted invoices can no longer be created without a due date.** Every invoice carrying payment terms has one and every invoice missing one has no terms, so the gap is a blank field rather than a decision. A trigger now fills it at post time from the terms, or the posting date when there are none — an invoice with no stated terms is due on receipt. Probe-verified 6/6 and rolled back: terms parsed, explicit dates never overwritten, drafts left alone, and a draft posted later gets one on the way through.
+* **Blank serials are reported, not prevented, deliberately.** All 8 are `active_rma` units — a customer handed over an item whose serial was never recorded, which is an ordinary thing at a service counter. A NOT NULL constraint there would refuse real intake.
+* **Not repaired, and not mine to repair:** the 14 duplicate customers, the 3 existing invoices and the 8 serials are live business records. Backfilling three due dates moves those invoices into overdue buckets on the AR aging report, and changing what a financial report says is the owner's call. The check now names every row so the repair can be made deliberately.
+* **One part of this finding is not a small inconsistency — see BUG-084.**
 
 #### [LOW] `kb-chat` and `ai-assist` pass provider detail and user text through without limits
 
@@ -1273,6 +1388,11 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: minor disclosure.
 * Suggested fix: log and return a code.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-13** — `kb-chat` redeployed to production; no front-end change needed.
+* **Mostly stale, and checked rather than assumed.** The finding's two headline items were already fixed during the BUG-021 work and are live: both functions log the provider's response body server-side and return a generic sentence, `ai-assist` answers 502/500 instead of its old HTTP 200, chat history is bounded to the last 6 messages at 4,000 characters each, and questions are capped at 2,000. Confirmed by reading the **deployed** source of both functions, not the repository copy.
+* **Two raw passthroughs did remain in `kb-chat`, and this is what mattered:** `search_failed` returned `searchError.message` — the database's own error text, which names tables and columns — and the streaming handler's `catch` sent `String(err)`. The Knowledge Center chat panel prints `message` verbatim beneath its heading, so both reached the screen. Each is now logged and replaced with a sentence a person can act on.
+* Also removed a comment directly above the provider-error branch claiming "the provider's own message is passed through" — left behind by the earlier fix, and the opposite of what the code does.
+* Not behaviour-tested end to end: reaching those branches needs a signed-in session and a provider or database failure. The change is a message substitution plus a `console.error`, and the function deployed cleanly.
 
 #### [LOW] Aging buckets mislabel overdue invoices and undated invoices
 
@@ -1286,6 +1406,14 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: understated overdue receivables.
 * Suggested fix: add a `not_due` bucket and flag `due_date IS NULL`.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-10** (ships with the next front-end deploy). Buckets are now **Not yet due**, **1–30**, 31–60, 61–90, 90+, and **No due date**, defined once in `src/lib/aging.js` and used by both ledgers and the Accounting page, which previously carried identical copies.
+* "Current" is gone because it was the defect: it held everything up to 30 days *past* due, so the first month of lateness — the window in which a reminder is still cheap — never appeared as late. Due today counts as not yet due, matching the convention `src/lib/dates.js` already applies elsewhere.
+* **Undated invoices get their own column** instead of sitting in Current forever. Production has 3 posted invoices with no due date (BUG-041), and they are now visible as such.
+* **The day count was still carrying the BUG-038 mistake:** `(Date.now() - new Date(due_date)) / 86_400_000`, where `new Date("2026-09-10")` is UTC midnight, so the count was a day out for part of every Cairo morning. Both ledgers now use `daysPastDueLocal`.
+* The page now shows seven summary tiles (total plus six buckets), and the payables table's empty-state `colSpan` is derived from the bucket list instead of a hard-coded 6, which the new columns would have broken.
+* **Found while fixing this: BUG-082**, the payables reducer adding foreign-currency balances into base-currency totals. Filed separately and fixed in the same change.
+* Tests: `src/test/aging.test.js`, 11 cases — the finding's 29-days-past-due case; due today; each boundary at 30/31, 60/61 and 90/91 (day counts computed independently with Python's `datetime`); missing and unparseable dates; late-evening calendar-day counting; totals keyed exactly as the report renders.
+* Not checked in a running app. The page change is mechanical — its columns now come from the shared list — and it builds and lints clean; the bucketing logic is what the tests cover.
 
 #### [LOW] Whole-table client-side lists capped at 5,000 rows
 
@@ -1299,6 +1427,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: scalability ceiling; wrong totals after growth.
 * Suggested fix: adopt `listPaged` + server filters (plan already noted in code comments).
 * Confidence: Confirmed by code reading
+* **Not attempted 2026-09-13.** This is a server-side pagination and filtering change across seven screens, not a small fix — the code comments already sketch the `listPaged` plan. It is also not yet urgent: the largest table the cap applies to holds 888 rows against a 5,000-row limit, so nothing is being truncated today. It should be done before that number grows, not after.
 
 #### [LOW] Public tracker uses `alert()` and a client-side lockout that the caller controls
 
@@ -1312,6 +1441,13 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: minor.
 * Suggested fix: as in BUG-023.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-13** (deployed). The `alert()` half was already gone: the page uses toast and state-driven UI, and there is no `alert(` left in the file.
+* **The real half was that neither limit was a limit.** The browser's 15-minute lockout resets by clearing site data, as the finding says and the code's own comment admitted. But the server-side bucket behind it was a module-level `Map` in the Edge Function — edge functions are many short-lived instances, so the bucket was empty on every cold start and two concurrent instances each granted the full allowance. The only thing throttling RMA-number enumeration was how often a request happened to land on a warm instance.
+* **20260844 moves the counter into the database** the function is already talking to — no Redis, no second system to operate. One fixed window per caller, incremented by a single atomic upsert so two instances racing cannot both read 14 and both write 15.
+* **Addresses are not stored.** The key is a SHA-256 of the address and a secret salt (`RATE_LIMIT_SALT`, falling back to the service role key). Hashing alone would be theatre — four billion IPv4 digests is minutes of work — so the salt is what makes it non-reversible. The table can say "this same unknown caller again" and nothing else, which matters on a page whose users are customers who never agreed to anything.
+* **It fails open.** If the database cannot be reached the tracker keeps working on the in-memory bucket alone, which is where it stood before. Failing closed would turn a database hiccup into a 429 for every customer checking a repair — an outage of the one page that exists to save them a phone call.
+* **Verified against the live endpoint after deploying:** 18 requests → 15×200 then 3×429 with `resetIn`, and the stored row shows `request_count = 18`. That number is the proof: the code returns *before* the database call when the in-memory bucket refuses, so a count of 18 means all 18 reached the durable check and the refusals came from it. The stored key is 64 hex characters; no address appears in the table. A real lookup still returns its whitelisted columns.
+* The browser lockout stays, now honestly labelled a courtesy layer rather than a defence.
 
 #### [LOW] Sales-document form previews unrounded totals that can differ from the stored, rounded ones
 
@@ -1325,6 +1461,11 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: cosmetic cent differences; drift risk.
 * Suggested fix: extract to `src/lib/money.js`.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-13** (ships with the next front-end deploy). The form's preview now calls `computeDocumentTotals` — the single definition introduced for BUG-013 — instead of its own copy.
+* The preview was the **fifth** copy of the formula and the only one that did not round each aggregate, which is exactly the cent of drift the finding describes: every writer rounds subtotal, discount and tax to two places before storing, and the preview summed unrounded floats.
+* The copies in `quotations.ts` and `salesOrders.ts` were byte-for-byte the same arithmetic and are now the shared function too, so five copies are one.
+* `purchasing.ts` keeps its own: it computes from `qty_ordered × unit_cost` with different field names, and folding it in would mean pretending two different document shapes are one. The finding's related note — that the client preview of "tax in cost" ignores the `purchase_tax_in_cost` config the form never reads — is untouched and remains open.
+* Verified: the existing `documentTotals` and `money` suites pass (31 tests), and ESLint is clean on the form.
 
 #### [LOW] Vercel installs with `npm install` rather than `npm ci`
 
@@ -1338,6 +1479,10 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: non-reproducible builds.
 * Suggested fix: `npm ci`; resolve the peer conflicts that required the flag.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-13** (takes effect on the next Vercel build). `vercel.json` now installs with `npm ci --legacy-peer-deps`, exactly what CI already ran — production was the only place that could drift from the lockfile.
+* **The lockfile is in sync**, so `npm ci` will not fail on it: `lockfileVersion` 3, zero specification mismatches between `package.json` and the lock's root entry, and every declared dependency resolved.
+* **`legacy-peer-deps` stays, and the reason is measured rather than assumed.** Exactly two real peer conflicts exist: `eslint-plugin-react@7.37.5` accepts eslint up to 9.x while the project is on 10.4.0, and `@apideck/better-ajv-errors` (reached through the workbox chain inside vite-plugin-pwa) wants `ajv >= 8` but resolves to 6.15.0. A third apparent conflict, `tailwindcss-animate`, is an artifact of the check — its range `>=3.0.0 || insiders` is not valid semver, and 3.4.19 satisfies it. Removing the flag means moving those dependencies, which is a different change from this finding.
+* Not verified by running `npm ci` locally: it would delete and reinstall `node_modules`, and this machine is currently short of memory. The next Vercel build is the check, and a failed install fails that build without touching the running site.
 
 #### [LOW] Repository hygiene: generated and unrelated files in the tree
 
@@ -1351,6 +1496,9 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: confusion.
 * Suggested fix: gitignore and delete; correct or scope the root CLAUDE.md.
 * Confidence: Confirmed by execution
+* **Status: PARTLY FIXED 2026-09-13.** Eleven files are no longer tracked: `eslint-report.json` (1.4 MB of generated output) and the ten files under `supabase/.temp/` (CLI cache and per-machine project metadata). `.gitignore` now covers both, with a note saying why. `dist/` and `coverage/` were already ignored.
+* **Not done, and not mine to do:** the stray `MyCRM Manual Test 05-07-2026.xlsx` and the untracked `claude/` directory in the repository root are the owner's files — ignoring or deleting them is their call, so both were left exactly as they are.
+* **The misleading root-level `CLAUDE.md` is outside this repository.** It lives in the user profile directory and describes a Base44 architecture this project does not use, so any tool reading it starts from a false picture. It is a user-level instruction file rather than project content; flagged here, deliberately not edited.
 
 #### [LOW] `edit_assigned` and `change_status` permissions are not honoured consistently across the RMA screens
 
@@ -1364,6 +1512,12 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: confusing UX; contributes to BUG-008.
 * Suggested fix: a single `canEditTicket(ticket)` helper.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-13** (ships with the next front-end deploy). One rule now lives in `src/lib/ticketPermissions.js`, mirroring the database's `staff_update` policy: `edit_all` covers any ticket, `edit_assigned` covers your own, and `change_status` covers the status of your own.
+* Brought to that rule: the bulk status change, the bulk product-status change, the row menu's Edit, the drawer's Edit button and the ticket form's save — each previously checked only that the permission existed. The row pills, the kanban board and `handleEdit` already checked assignment and now call the same helper, so there is one definition rather than four.
+* **Bulk actions now partition the selection before acting.** They update only what the caller may change and report what was skipped and what failed, instead of sending everything and turning the database's refusal into a failure of the whole batch.
+* **A worse habit fixed alongside it:** the old bulk handler wrote a `status_changed` activity entry for every selected ticket *before* attempting any update, so a refused update still left a false entry on that ticket's timeline. Activity is now written only for tickets that actually changed, and the stock-move dispatch likewise follows only tickets that were written.
+* Tests: `src/test/ticketPermissions.test.js`, 10 cases — `edit_all` on someone else's ticket; `edit_assigned` limited to your own; `change_status` scoped the same way; a viewer refused; case-insensitive assignee matching (all 13 assigned tickets in production store lower-case); an empty assignee never matching an empty identity; and the partition keeping order while dropping missing rows.
+* Left as it was: the bulk controls still appear for anyone holding the permission flags. Hiding them per selection would be a larger interface change, and the handler now explains itself.
 
 #### [LOW] `activities` route permission differs between the route table and the inline check
 
@@ -1377,6 +1531,10 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: minor.
 * Suggested fix: make `ROUTE_PERMISSIONS` accept an OR list.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-10** (ships with the next front-end deploy) — the mismatch this finding names. `src/lib/routePermissions.js` lets a route list alternatives, and Activities now admits `deals.view` **or** `leads.view`, matching its own `<Route>` element, which the guard used to overrule. Every other route keeps exactly the single permission it had, locked by a test that compares the table against its previous contents.
+* The table moved out of App.jsx so it can be tested without mounting the app. A comment above it described the table as a source of truth shared with the nav items; grep shows nothing but the route guard ever read it, so that claim was dropped rather than carried over, and the new module says plainly that a route added there still needs its nav entry checked by hand.
+* **Left as a decision, not a bug:** the second observation in this finding — a viewer can open the Knowledge Center and see its chat and upload buttons, because the route is gated on `products.view`. Uploads are refused by RLS for non-managers. Whether viewers should see that page at all is a product choice about the role, not two checks disagreeing.
+* Tests: `src/test/routePermissions.test.js`, 8 cases — the finding's leads-only role reaching Activities; leads-only still refused at the Pipeline; admins always admitted; unguarded routes open; whole-segment prefix matching (`/products-archive` is not `/products`); every other route unchanged.
 
 ### 4.5 Informational
 

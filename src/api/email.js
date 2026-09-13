@@ -2,6 +2,14 @@
 // This is exported as `notifications` from supabaseClient.js for backward compatibility.
 import { supabase, supabaseUrl } from './client.js'
 
+/**
+ * The email_settings columns an administrator's browser may read. `api_key` is
+ * deliberately absent — see getEmailSettings. Keep in step with the column grant
+ * in supabase/migrations/20260842_email_api_key_server_side.sql.
+ */
+const EMAIL_SETTINGS_COLUMNS =
+  'id, provider, from_email, from_name, is_active, updated_by, updated_date, has_api_key'
+
 export const notifications = {
   async getPreferences(userEmail) {
     const { data, error } = await supabase
@@ -79,36 +87,70 @@ export const notifications = {
     if (error) throw error
     return data?.[0]
   },
+  /**
+   * Email provider settings, without the provider's API key. (Audit finding BUG-059.)
+   *
+   * This used to `select('*')` and hand the Resend key to the settings form, so
+   * the live key sat in every administrator's browser. Migration 20260842
+   * revokes the column, after which `select('*')` is refused outright — so the
+   * columns are named, and `has_api_key` reports whether a key is saved.
+   *
+   * `api_key` is returned as '' on purpose: it is the form field for typing a
+   * NEW key, and an empty field on save means "keep the saved one".
+   */
   async getEmailSettings() {
-    const { data, error } = await supabase.from('email_settings').select('*').single()
+    const { data, error } = await supabase.from('email_settings').select(EMAIL_SETTINGS_COLUMNS).single()
     if (error) {
       if (error.code === 'PGRST116')
         return {
           provider: 'resend',
           api_key: '',
+          has_api_key: false,
           from_email: 'noreply@yourdomain.com',
           from_name: 'myCRM System',
           is_active: false,
         }
       throw error
     }
-    return data
+    return { ...data, api_key: '' }
   },
+  /**
+   * Saves only the fields the form edits.
+   *
+   * It used to spread the whole settings object into the write. That now fails
+   * twice over: `has_api_key` is a generated column and cannot be written, and
+   * spreading an empty `api_key` would ERASE the saved key — which the form cannot
+   * see, so it cannot know it is sending a blank. The key is written only when one
+   * was actually typed.
+   *
+   * Every write names its returned columns: a bare `.select()` after a write is
+   * `RETURNING *`, which includes the revoked column and is refused (the BUG-009
+   * regression, not repeated here).
+   */
   async updateEmailSettings(settings, userEmail) {
-    const { data: existing } = await supabase.from('email_settings').select('*').single()
+    const payload = {
+      provider: settings.provider,
+      from_email: settings.from_email,
+      from_name: settings.from_name,
+      is_active: settings.is_active,
+    }
+    const newKey = typeof settings.api_key === 'string' ? settings.api_key.trim() : ''
+    if (newKey) payload.api_key = newKey
+
+    const { data: existing } = await supabase.from('email_settings').select('id').single()
     if (existing) {
       const { data, error } = await supabase
         .from('email_settings')
-        .update({ ...settings, updated_by: userEmail, updated_date: new Date().toISOString() })
+        .update({ ...payload, updated_by: userEmail, updated_date: new Date().toISOString() })
         .eq('id', existing.id)
-        .select()
+        .select(EMAIL_SETTINGS_COLUMNS)
       if (error) throw error
       return data?.[0]
     } else {
       const { data, error } = await supabase
         .from('email_settings')
-        .insert([{ ...settings, updated_by: userEmail }])
-        .select()
+        .insert([{ ...payload, updated_by: userEmail }])
+        .select(EMAIL_SETTINGS_COLUMNS)
       if (error) throw error
       return data?.[0]
     }

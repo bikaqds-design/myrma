@@ -67,12 +67,15 @@ export default function EmailSettingsTab({ settings, setSettings, saving, onSave
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">{t('branding.resendApiKeyLabel')}</label>
         <div className="relative">
+          {/* Empty unless a NEW key is being typed: the saved key is never sent to
+              the browser (BUG-059), and leaving this blank keeps it. */}
           <Input
             type={showApiKey ? 'text' : 'password'}
-            value={settings.api_key}
+            value={settings.api_key || ''}
             onChange={(e) => setSettings({ ...settings, api_key: e.target.value })}
             className="pe-12 font-mono"
-            placeholder="re_xxxxxxxxxxxxxxxxxxxx"
+            autoComplete="new-password"
+            placeholder={settings.has_api_key ? t('branding.apiKeySavedPlaceholder') : 're_xxxxxxxxxxxxxxxxxxxx'}
           />
           <button
             type="button"
@@ -84,7 +87,7 @@ export default function EmailSettingsTab({ settings, setSettings, saving, onSave
           </button>
         </div>
         <p className="text-xs text-gray-500 mt-1">
-          {t('branding.apiKeyStoredNote')}
+          {settings.has_api_key ? t('branding.apiKeySavedNote') : t('branding.apiKeyStoredNote')}
         </p>
       </div>
 

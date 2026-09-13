@@ -15,6 +15,7 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { safeAttachmentHref } from '../../lib/attachmentUrl'
 import { formatMoney } from '../../lib/money'
+import { canEditTicket } from '../../lib/ticketPermissions'
 import { useBaseCurrency } from '../../hooks/useBaseCurrency'
 import { useCurrencyOptions } from '../../hooks/useCurrencyOptions'
 import {
@@ -1518,7 +1519,7 @@ export function TicketDrawer({
         </div>
 
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-[#212a38]">
-          {(canDo('edit_all') || canDo('edit_assigned')) && (
+          {canEditTicket(canDo, ticket, userEmail) && (
             <Button
               onClick={() => {
                 onClose()

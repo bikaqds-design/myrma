@@ -50,6 +50,7 @@ export default function BrandingSettings({
   const [emailSettings, setEmailSettings] = useState({
     provider: 'resend',
     api_key: '',
+    has_api_key: false,
     from_email: 'noreply@yourdomain.com',
     from_name: 'myCRM System',
     is_active: false,

@@ -347,7 +347,7 @@ export default function SalesDocumentDetail({
 
   // ── Invoice lifecycle ─────────────────────────────────────────────────────
 
-  // Routed through payments.record() (not crmInvoices.recordPayment() directly)
+  // Routed through payments.record() — there is no direct write to amount_paid —
   // so every payment made from the invoice page also lands in the payments
   // ledger — otherwise the Accounting page / customer statement would be
   // incomplete for payments recorded here.

@@ -1,5 +1,6 @@
 ﻿import React from 'react'
 import { captureException } from '../lib/sentry.js'
+import { toUserMessage } from '../lib/errorMessage.js'
 import i18next from 'i18next'
 
 /**
@@ -75,7 +76,21 @@ export default class ErrorBoundary extends React.Component {
     if (!this.state.error) return this.props.children
 
     const isDev = import.meta.env.DEV
-    const message = this.state.error?.message || String(this.state.error)
+    const raw = this.state.error?.message || String(this.state.error)
+    // Production routes the message through toUserMessage, which turns
+    // Postgres/PostgREST errors into a sentence and drops anything carrying
+    // schema vocabulary. A render crash caused by a failed query used to put
+    // constraint and table names on screen verbatim. The raw text and stack
+    // are still one click away in "Copy error details", which is where
+    // diagnosis actually happens. (Audit finding BUG-055.)
+    //
+    // toUserMessage looks up translations without a default, so if i18n is
+    // the thing that broke it returns its own key; fall back to plain
+    // English rather than print "errors.generic" on the crash screen.
+    const friendly = isDev ? raw : toUserMessage(this.state.error)
+    const message = !friendly || friendly.startsWith('errors.')
+      ? tr('subtitle', 'The page crashed unexpectedly.')
+      : friendly
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0b0f17] p-6">
@@ -106,8 +121,8 @@ export default class ErrorBoundary extends React.Component {
             </div>
           </div>
 
-          {/* Error message is shown in production too — it's safe and makes the
-              crash diagnosable. The full stack stays dev-only. */}
+          {/* User-facing in production, raw in development; the full report is
+              always available through the copy action below. */}
           <div className="mt-4 mb-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 p-3">
             <p className="text-sm font-mono text-red-700 dark:text-red-300 break-words">
               {message}

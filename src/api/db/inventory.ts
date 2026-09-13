@@ -171,25 +171,6 @@ export interface TimeEntryRow {
   created_date: string
 }
 
-export interface InvoiceRow {
-  id: string
-  type: 'invoice' | 'quote'
-  invoice_number: string
-  customer_name: string
-  customer_email: string | null
-  rma_number_ref: string | null
-  ticket_id: string | null
-  lineItems: unknown[]
-  labour_hours: number | null
-  labour_rate: number | null
-  tax_pct: number | null
-  notes: string | null
-  due_date: string | null
-  status: string
-  created_date: string
-  updated_date: string | null
-}
-
 export interface InventoryStatsRow {
   active_rma: number
   company_stock: number
@@ -1092,63 +1073,5 @@ export const timeEntries = {
     } catch {
       return 0
     }
-  },
-}
-
-// ── Invoices / Quotes ─────────────────────────────────────────────────────────
-
-export const invoices = {
-  async list(): Promise<TableResult<InvoiceRow[]>> {
-    try {
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('*')
-        .order('created_date', { ascending: false })
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
-    } catch {
-      return { missing: true, data: [] }
-    }
-  },
-  async get(id: string): Promise<InvoiceRow> {
-    const { data, error } = await supabase.from('invoices').select('*').eq('id', id).single()
-    if (error) throw error
-    return data
-  },
-  async create(invoice: Partial<InvoiceRow>): Promise<InvoiceRow | undefined> {
-    const now = new Date().toISOString()
-    const { data, error } = await supabase
-      .from('invoices')
-      .insert([{ ...invoice, created_date: now, updated_date: now }])
-      .select()
-    if (error) throw error
-    return data?.[0]
-  },
-  async update(id: string, updates: Partial<InvoiceRow>): Promise<InvoiceRow | undefined> {
-    const { data, error } = await supabase
-      .from('invoices')
-      .update({ ...updates, updated_date: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-    if (error) throw error
-    return data?.[0]
-  },
-  async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('invoices').delete().eq('id', id)
-    if (error) throw error
-  },
-  async generateNumber(existingInvoices: Array<{ invoice_number: string }> = []): Promise<string> {
-    const now = new Date()
-    const prefix = `INV-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-`
-    const serials = existingInvoices
-      .map((i) => i.invoice_number)
-      .filter((n) => n?.startsWith(prefix))
-      .map((n) => parseInt(n.replace(prefix, ''), 10))
-      .filter((n) => !isNaN(n))
-    const next = serials.length > 0 ? Math.max(...serials) + 1 : 1
-    return `${prefix}${String(next).padStart(4, '0')}`
   },
 }

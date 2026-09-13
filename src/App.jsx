@@ -88,6 +88,8 @@ import AccessDenied from './components/AccessDenied'
 import ResetPassword from './pages/ResetPassword'
 import RMATracker from './pages/RMATracker'
 import KnowledgeBasePublic from './pages/KnowledgeBasePublic'
+import { isChunkLoadError, claimChunkReload, clearChunkReload } from './lib/chunkReload'
+import { deniedModuleFor } from './lib/routePermissions'
 
 // When Vite redeploys, content-hashed chunk filenames change. A user who still
 // has the old index.html cached will try to fetch old chunk URLs that no longer
@@ -95,15 +97,23 @@ import KnowledgeBasePublic from './pages/KnowledgeBasePublic'
 // specific error so the browser picks up the new index.html and correct chunks.
 function lazyWithReload(importFn) {
   return React.lazy(() =>
-    importFn().catch((err) => {
-      // Only reload for chunk-fetch failures, not genuine module errors
-      if (err?.message?.includes('Failed to fetch dynamically imported module') ||
-          err?.message?.includes('Importing a module script failed')) {
-        window.location.reload()
-        return new Promise(() => {}) // suspend forever — reload takes over
-      }
-      throw err
-    })
+    importFn()
+      .then((mod) => {
+        // A chunk loaded, so the build is reachable; restore the one reload.
+        clearChunkReload()
+        return mod
+      })
+      .catch((err) => {
+        // One silent reload for a chunk a deploy replaced. A second failure in
+        // the same session reaches the ErrorBoundary instead of reloading
+        // forever — the loop a CDN outage or a stripped file used to cause.
+        // See src/lib/chunkReload.js. (Audit finding BUG-054.)
+        if (isChunkLoadError(err) && claimChunkReload()) {
+          window.location.reload()
+          return new Promise(() => {}) // suspend — the reload takes over
+        }
+        throw err
+      })
   )
 }
 
@@ -324,57 +334,18 @@ function MfaChallenge({ onVerify, onCancel }) {
 }
 
 // ── Main app ──────────────────────────────────────────────────────────────────
-/**
- * Route-level permission gate.
- *
- * Until this existed, only five of fifteen routes checked anything: the rest
- * were protected by the nav filter alone, so the link was hidden but the URL
- * still worked. Hiding a link is a courtesy, not a guard.
- *
- * The map is deliberately the single source of truth shared with the nav
- * items below — if a route and its nav entry ever disagreed about who may see
- * a page, the disagreement would be invisible until someone typed a URL. Prefix
- * matching covers the detail routes (/sales/:type/:id and friends) without
- * needing an entry each, and the longest match wins so /purchasing/vendor/:id
- * cannot accidentally resolve against a shorter, laxer prefix.
- *
- * Not listed = no permission required. That is only `/` and `/account`: the
- * dashboard is the universal landing page, and account settings are the user's
- * own. `/control-panel` keeps its own role check at the route.
- */
-const ROUTE_PERMISSIONS = [
-  ['/products', ['products', 'view']],
-  ['/customers', ['customers', 'view']],
-  ['/leads', ['leads', 'view']],
-  ['/pipeline', ['deals', 'view']],
-  ['/activities', ['deals', 'view']],
-  ['/sales', ['sales', 'view']],
-  ['/accounting', ['accounting', 'view']],
-  ['/purchasing', ['purchasing', 'view']],
-  ['/rma-tickets', ['rma_tickets', 'view_all']],
-  ['/inventory', ['inventory', 'view']],
-  ['/calendar', ['calendar', 'view']],
-  ['/reports', ['reports', 'view']],
-  ['/knowledge-center', ['products', 'view']],
-]
-
-function requiredPermissionFor(pathname) {
-  let best = null
-  for (const [prefix, perm] of ROUTE_PERMISSIONS) {
-    if (pathname === prefix || pathname.startsWith(prefix + '/')) {
-      if (!best || prefix.length > best[0].length) best = [prefix, perm]
-    }
-  }
-  return best?.[1] ?? null
-}
-
+// The route -> permission table and its matching rules live in
+// src/lib/routePermissions.js, where they can be tested without mounting the
+// app. A route may list alternatives: Activities admits deals.view OR
+// leads.view, matching its own <Route> element, which the guard used to
+// contradict by demanding deals.view alone (BUG-072).
 function RouteGuard({ role, permissions, children }) {
   const { pathname } = useLocation()
-  const required = requiredPermissionFor(pathname)
-  if (required && !canDo(role, permissions, ...required)) {
+  const deniedModule = deniedModuleFor(role, permissions, pathname)
+  if (deniedModule) {
     // Explain rather than redirect (UX-GLOBAL-014). Silently landing the user
     // on the dashboard looked identical to the feature being broken.
-    return <NoModuleAccess module={required[0]} role={role} />
+    return <NoModuleAccess module={deniedModule} role={role} />
   }
   return children
 }
@@ -794,20 +765,6 @@ export default function App() {
     }
   }
 
-  const handleSignup = async (email, password) => {
-    const data = await auth.signUp(email, password)
-    const user = data?.user || data
-    setCurrentUser(user)
-    // A new signup has no user_roles row and cannot create one — the
-    // admin_write policy requires rma_is_admin(). So it has no access until an
-    // administrator provisions it, and the database already behaves that way.
-    // This used to set 'technician', which granted a nav and a dashboard on
-    // the client while every query behind them was refused.
-    setCurrentUserRole(null)
-    setCurrentUserPermissions(null)
-    setAccessDenied({ reason: ACCESS_DENIED.NO_ROLE, email: user?.email || email, row: null })
-  }
-
   const handleLogout = async () => {
     const email = currentUser?.email
     // Log BEFORE signing out. After signOut() there is no session, so RLS
@@ -1153,7 +1110,7 @@ export default function App() {
   if (!currentUser) {
     return (
       <>
-        <Login onLogin={handleLogin} onSignup={handleSignup} />
+        <Login onLogin={handleLogin} />
         <Toaster position={toastPosition} toastOptions={toastOptions} />
       </>
     )

@@ -18,6 +18,7 @@ import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { EMPTY_FORM } from './_constants'
 import { AddCustomerModal, BulkUploadCustomersModal } from './_modals'
 import { contactFieldProblems } from '../../lib/importValidation'
+import { mobileKey, mobileKeysOf, partitionByMobile } from '../../lib/customerDuplicates'
 
 const generateCustomerCode = () => `CB-${Math.floor(10000000 + Math.random() * 90000000)}`
 
@@ -361,12 +362,51 @@ export default function Customers({
     }
   }
 
-  const handleSaveCustomer = async () => {
+  // `allowDuplicate` is passed as `true` only by the confirmation below. It is
+  // never wired to an event handler, so a click event landing here reads as
+  // false rather than silently waving the check through.
+  const handleSaveCustomer = async (allowDuplicate) => {
     // F-1: zod schema validation — single source of truth for field rules
     const validation = customerSchema.safeParse(customerForm)
     if (!validation.success) {
       toast.error(getFirstError(validation))
       return
+    }
+
+    // ── Is this phone number already somebody's? ───────────────────────────
+    // Asked, not enforced. A household shares a landline and a company
+    // switchboard is on every one of its contacts, so a match is a question
+    // rather than a refusal — but it has to be asked, because RMA intake finds
+    // a customer by phone and two matching records split one person's repair
+    // history in half. 14 of the live records are already in that state.
+    // (BUG-063.)
+    const mobileMatchKey = mobileKey(customerForm.mobile)
+    if (allowDuplicate !== true && mobileMatchKey) {
+      let clashes
+      try {
+        const found = await db.customers.findByMobileKeys([mobileMatchKey])
+        // Editing a record is not colliding with itself.
+        clashes = (found.get(mobileMatchKey) || []).filter((c) => c.id !== editingCustomer?.id)
+      } catch {
+        // A lookup that fails must not block the save. The point is to warn,
+        // and a warning that cannot be produced is not a reason to refuse work.
+        clashes = []
+      }
+      if (clashes.length > 0) {
+        const names = clashes
+          .map((c) => c.contact_person || c.company_name || c.customer_code)
+          .filter(Boolean)
+          .join(', ')
+        openConfirm(
+          t('customers.duplicateMobileTitle'),
+          t('customers.duplicateMobileMessage', { mobile: customerForm.mobile, names }),
+          () => {
+            closeConfirm()
+            handleSaveCustomer(true)
+          }
+        )
+        return
+      }
     }
 
     // Upload pending files
@@ -756,9 +796,6 @@ export default function Customers({
         return
       }
 
-      const existingMobiles = new Set(
-        customers.map((c) => c.mobile?.trim().toLowerCase()).filter(Boolean)
-      )
       const existingCompanies = new Set(
         customers.map((c) => c.company_name?.trim().toLowerCase()).filter(Boolean)
       )
@@ -790,14 +827,12 @@ export default function Customers({
           continue
         }
 
-        const mobile = row.mobile?.trim().toLowerCase()
+        // Only used below to decide whether the company/contact rules
+        // apply; the duplicate check itself happens after the loop.
+        const mobile = mobileKey(row.mobile)
         const company = row.company_name?.trim().toLowerCase()
         const contact = row.contact_person?.trim().toLowerCase()
 
-        if (mobile && existingMobiles.has(mobile)) {
-          skippedCount++
-          continue
-        }
         if (!mobile && type === 'B2B' && company && existingCompanies.has(company)) {
           skippedCount++
           continue
@@ -838,6 +873,32 @@ export default function Customers({
           created_date: new Date().toISOString(),
           updated_date: new Date().toISOString(),
         })
+      }
+
+      // ── Duplicate phone numbers ─────────────────────────────────────────
+      // The old check compared each row against the customer list this page had
+      // in memory and never against the rest of the file, so a spreadsheet
+      // holding the same number twice imported it twice. This asks the database
+      // — which knows about rows the page never loaded — and then walks the
+      // file in order, so the second occurrence of a number is caught exactly
+      // like one that was already stored. (BUG-063.)
+      if (toImport.length > 0) {
+        const existing = await db.customers.findByMobileKeys(mobileKeysOf(toImport))
+        const { accepted, duplicates } = partitionByMobile(toImport, new Set(existing.keys()))
+        if (duplicates.length > 0) {
+          skippedCount += duplicates.length
+          console.warn(
+            [
+              'Customer CSV import — rows skipped as duplicate phone numbers:',
+              ...duplicates.map(
+                (d) =>
+                  `${d.row.contact_person || d.row.company_name || '(unnamed)'} — ${d.row.mobile} (already in the ${d.against})`
+              ),
+            ].join('\n')
+          )
+        }
+        toImport.length = 0
+        toImport.push(...accepted)
       }
 
       if (toImport.length === 0) {

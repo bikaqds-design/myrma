@@ -1,5 +1,8 @@
 import { supabase } from '../client.js'
 import { vendorInvoices } from './purchasing'
+import type { AgingBucket } from './customerLedger'
+import { agingBucket } from '../../lib/aging.js'
+import { daysPastDueLocal } from '../../lib/dates.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 // AP mirror of customerLedger.ts — reads v_vendor_ledger
@@ -23,7 +26,8 @@ export interface VendorLedgerEntryRow {
   created_at: string
 }
 
-export type ApAgingBucket = 'current' | 'd31_60' | 'd61_90' | 'd90_plus'
+// Same buckets as receivables — one definition in src/lib/aging.js.
+export type ApAgingBucket = AgingBucket
 
 export interface ApAgingInvoiceRow {
   vendor_id: string
@@ -41,13 +45,6 @@ export interface ApAgingInvoiceRow {
   remaining_base: number
   daysPastDue: number
   bucket: ApAgingBucket
-}
-
-function bucketFor(daysPastDue: number): ApAgingBucket {
-  if (daysPastDue <= 30) return 'current'
-  if (daysPastDue <= 60) return 'd31_60'
-  if (daysPastDue <= 90) return 'd61_90'
-  return 'd90_plus'
 }
 
 const PAYABLE_STATUSES = ['approved', 'partially_received', 'received']
@@ -80,16 +77,14 @@ export const vendorLedger = {
    */
   async apAgingReport(): Promise<ApAgingInvoiceRow[]> {
     const invoices = await vendorInvoices.list()
-    const today = Date.now()
     return invoices
       .filter((inv) => PAYABLE_STATUSES.includes(inv.status))
       .map((inv) => {
         const remaining = Math.round(((inv.total ?? 0) - (inv.amount_paid ?? 0)) * 100) / 100
         if (remaining <= 0.001) return null
         const rate = Number(inv.exchange_rate) || 1
-        const daysPastDue = inv.due_date
-          ? Math.floor((today - new Date(inv.due_date).getTime()) / 86_400_000)
-          : 0
+        // Local calendar days — see customerLedger.agingReport.
+        const daysPastDue = daysPastDueLocal(inv.due_date)
         return {
           vendor_id: inv.vendor_id,
           invoice_id: inv.id,
@@ -99,7 +94,7 @@ export const vendorLedger = {
           currency: inv.currency,
           remaining_base: Math.round(remaining * rate * 100) / 100,
           daysPastDue,
-          bucket: bucketFor(daysPastDue),
+          bucket: agingBucket(inv.due_date) as ApAgingBucket,
         } as ApAgingInvoiceRow
       })
       .filter((row): row is ApAgingInvoiceRow => row !== null)

@@ -19,12 +19,21 @@ describeIntegration(`RLS — anonymous access (${skipReason})`, () => {
     const { data, error } = await supabase.from(table).select('*').limit(1)
 
     // Two shapes count as correctly denied:
-    //   - an explicit error (RLS refusal, or the table not exposed at all)
-    //   - success with zero rows, which is what a SELECT policy that matches
-    //     nothing returns for an anonymous caller
+    //   - a refusal: no grant (42501) or a SELECT policy that admits nothing
+    //   - success with zero rows
     // What must never happen is rows coming back.
+    //
+    // A MISSING relation is not a pass, and used to be treated as one: the
+    // suite listed `purchase_documents`, which does not exist, and the 404 was
+    // read as "correctly denied" — a green test pinning nothing. PGRST205 is
+    // PostgREST's "not in the schema cache"; 42P01 is Postgres's "relation does
+    // not exist". (BUG-061)
     if (error) {
-      expect(error).toBeTruthy()
+      const missing = error.code === 'PGRST205' || error.code === '42P01'
+      expect(
+        missing,
+        `${table} does not exist, so this test proves nothing about it (${error.code}: ${error.message})`
+      ).toBe(false)
       return
     }
     expect(

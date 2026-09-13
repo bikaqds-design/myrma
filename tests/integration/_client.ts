@@ -86,7 +86,9 @@ export const PROTECTED_TABLES = [
   'user_roles',
   'crm_invoices',
   'sales_orders',
-  'purchase_documents',
+  // The view; there has never been a purchase_documents table, so this line
+  // asserted nothing until 2026-09-13. (BUG-061)
+  'v_purchase_documents',
   'user_activity_log',
 ] as const
 

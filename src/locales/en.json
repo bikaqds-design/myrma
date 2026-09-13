@@ -370,7 +370,10 @@
     "exportSelected": "Export Selected",
     "exportSelectedDesc": "{{count}} selected tickets",
     "exportEmpty": "Nothing to export",
-    "unassigned": "Unassigned"
+    "unassigned": "Unassigned",
+    "bulkNoneAssigned": "None of the selected tickets are assigned to you.",
+    "bulkSkippedNotAssigned": "Skipped {{n}} ticket(s) that are not assigned to you.",
+    "bulkSomeFailed": "{{n}} ticket(s) could not be updated."
   },
   "customers": {
     "title": "Customers",
@@ -451,7 +454,9 @@
     "bulkDeleteBlockedByTickets_other": "Cannot delete these {{count}} customers: {{tickets}} RMA tickets reference them. The delete is all-or-nothing, so deselect those customers or clear the tickets first.",
     "statusActive": "Active",
     "statusInactive": "Inactive",
-    "statusSuspended": "Suspended"
+    "statusSuspended": "Suspended",
+    "duplicateMobileTitle": "This phone number is already in use",
+    "duplicateMobileMessage": "{{mobile}} is already on the record for {{names}}. Two customers sharing a number means a repair can be filed against the wrong one. Save anyway?"
   },
   "leads": {
     "title": "Leads",
@@ -2500,7 +2505,9 @@
     "fromNameLabel": "From Name",
     "verifiedDomainNote": "Use a verified domain in Resend",
     "emailTemplatesTitle": "Email Templates",
-    "emailTemplatesDesc": "Customize email notification templates"
+    "emailTemplatesDesc": "Customize email notification templates",
+    "apiKeySavedPlaceholder": "Saved — type a new key to replace it",
+    "apiKeySavedNote": "A key is saved and can't be displayed. Leave this blank to keep it."
   },
   "backup": {
     "title": "Backup & Restore",
@@ -3813,10 +3820,12 @@
     "allocated": "Allocated",
     "unapplied": "Unapplied",
     "totalOutstanding": "Total Outstanding",
-    "bucketCurrent": "Current",
+    "bucketNotDue": "Not yet due",
+    "bucket1_30": "1-30 Days",
     "bucket31_60": "31-60 Days",
     "bucket61_90": "61-90 Days",
-    "bucket90Plus": "90+ Days"
+    "bucket90Plus": "90+ Days",
+    "bucketNoDueDate": "No due date"
   },
   "purchasing": {
     "title": "Purchasing",

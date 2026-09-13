@@ -1,5 +1,7 @@
 import { supabase } from '../client.js'
 import { assertUpdated } from './_assertUpdated.js'
+import { orIlike } from '../../lib/searchPattern.js'
+import { mobileKey } from '../../lib/customerDuplicates.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -81,6 +83,47 @@ export const customers = {
     const { data, error } = await supabase.from('customers').insert([customer]).select()
     if (error) throw error
     return data?.[0]
+  },
+  /**
+   * Which of these phone numbers already belong to somebody.
+   *
+   * Asked of the database rather than of the list a page happens to hold. That
+   * list is capped at 5 000 rows, so a check built from it is correct only
+   * while the table stays under the cap, and then goes quiet without saying so.
+   *
+   * Matching is on the last nine digits (see mobileKey), so `+20 100 123 4567`
+   * and `0100 123 4567` meet. The database cannot compute that key, so this
+   * asks for a substring match on each key and compares the tails here.
+   * `orIlike` does the escaping: a stored number containing a comma or bracket
+   * would otherwise break the filter string outright (BUG-060).
+   *
+   * Sent in chunks, because the whole filter goes into a URL.
+   *
+   * @returns a Map from mobile key to the customers holding it
+   */
+  async findByMobileKeys(keys: string[]): Promise<Map<string, Partial<CustomerRow>[]>> {
+    const found = new Map<string, Partial<CustomerRow>[]>()
+    const unique = [...new Set(keys.filter(Boolean))]
+    const CHUNK = 25
+    for (let i = 0; i < unique.length; i += CHUNK) {
+      const chunk = unique.slice(i, i + CHUNK)
+      const filter = chunk.map((key) => orIlike(['mobile'], key)).join(',')
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, customer_code, contact_person, company_name, mobile')
+        .or(filter)
+      if (error) throw error
+      for (const row of (data || []) as Partial<CustomerRow>[]) {
+        // A substring match is not yet a match: those nine digits also appear
+        // inside longer numbers that are not the same phone. The key decides.
+        const key = mobileKey(row.mobile)
+        if (!key || !chunk.includes(key)) continue
+        const bucket = found.get(key)
+        if (bucket) bucket.push(row)
+        else found.set(key, [row])
+      }
+    }
+    return found
   },
   async bulkCreate(customersData: Partial<CustomerRow>[]): Promise<CustomerRow[]> {
     const { data, error } = await supabase.from('customers').insert(customersData).select()

@@ -1,5 +1,6 @@
 import { supabase } from '../client.js'
 import { assertUpdated } from './_assertUpdated.js'
+import { orIlike } from '../../lib/searchPattern.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -283,13 +284,14 @@ export const products = {
     if (error) throw error
   },
   async search(query: string): Promise<ProductRow[]> {
-    const safe = query.replace(/[%_\\]/g, '\\$&').replace(/[(),"]/g, '')
     const { data, error } = await supabase
       .from('products')
       .select(
         '*, brand:brands(id, brand_name, brand_logo_url), category:categories(id, category_name), subcategory:subcategories(id, subcategory_name)'
       )
-      .or(`product_name.ilike.%${safe}%,sku.ilike.%${safe}%,product_description.ilike.%${safe}%`)
+      // Quoted and LIKE-escaped (BUG-060). This used to delete ( ) , and " from the
+      // query, so "Dell, HP" silently searched for "Dell HP".
+      .or(orIlike(['product_name', 'sku', 'product_description'], query))
       .order('created_date', { ascending: false })
     if (error) throw error
     return data || []

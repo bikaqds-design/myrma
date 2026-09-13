@@ -44,11 +44,9 @@ async function invokeAdminUserOp(targetEmail, newPassword, role) {
 }
 
 export const auth = {
-  async signUp(email, password) {
-    const { data, error } = await supabase.auth.signUp({ email, password })
-    if (error) throw error
-    return data
-  },
+  // No signUp(): accounts are created by invitation (admin-invite-user). The
+  // login screen never offered sign-up, so this was reachable only by a caller
+  // that should not exist. (BUG-062)
   async signIn(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error

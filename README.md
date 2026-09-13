@@ -193,7 +193,7 @@ npm run dev
 npm run dev                    # Vite dev server (hot reload, port 5173)
 npm run build                  # Production build → dist/
 npm run preview                # Preview production build locally
-npm test                       # Vitest unit tests (305 tests, 9 suites)
+npm test                       # Vitest unit tests
 npm run test:watch             # Vitest in watch mode
 npm run test:coverage          # Coverage report (HTML + text)
 npm run lint                   # ESLint check
@@ -399,19 +399,32 @@ Tests run in under 5 seconds via Vitest with jsdom environment (serialised — `
 
 ## CI/CD
 
-GitHub Actions runs automatically on every push to `main` and `test`, plus every PR. Two required jobs:
+GitHub Actions runs automatically on every push to `main` and `test`, plus every PR.
 
 ```
-ci job:
-  1. npm test              → 305 tests must pass
-  2. npm run lint:ci       → zero ESLint warnings allowed
-  3. npm run build         → production build must succeed
+ci job (gates the build):
+  1. npm ci --legacy-peer-deps
+  2. npm test              → the unit suite must pass
+  3. npm run lint:ci       → zero ESLint warnings allowed
+  4. npm run lint:ui       → untranslated-string report; does NOT gate
+  5. npm run build         → production build must succeed
+
+integration job:
+  npm run test:integration, against the HOSTED project: RLS refuses an
+  anonymous caller, SECURITY DEFINER RPCs reject unauthorized callers, and
+  every column the app selects still exists. Skips itself — staying green —
+  when the VITE_SUPABASE_* secrets are absent, as on a fork.
 
 db-tests job:
-  supabase start (applies every migration from scratch) then runs the
-  supabase/tests/*.sql assertion files via psql — money + inventory +
-  warehouse RPC invariants. No Supabase account needed (local Postgres).
+  DISABLED (`if: false`). It required `supabase start`, and Docker has been
+  ruled out; the integration job replaced it. The supabase/tests/*.sql files
+  remain the reference for the assertions still to be ported.
 ```
+
+`npm run format:check` is **not** run by CI, and formatting is therefore not
+enforced: `npx prettier --check src` currently reports hundreds of files, and
+bringing them into line belongs in a commit of its own rather than mixed into
+unrelated work. (BUG-052.)
 
 The build step uses Supabase placeholder values from GitHub Secrets (falls back gracefully in CI).
 
@@ -424,7 +437,9 @@ The app is installable as a Progressive Web App:
 - **Manifest:** defined in `vite.config.js` — name, icons (`64×64`, `192×192`, `512×512`, maskable), theme color `#4f46e5`
 - **Service worker:** Workbox `generateSW` strategy (auto-registered)
 - **Pre-cached:** all static assets emitted by Vite
-- **Supabase API:** `NetworkFirst` with 10s timeout, falls back to cache
+- **Supabase API:** deliberately **not** cached. The worker used to store every
+  authenticated API response, which left one person's records readable from a
+  shared machine after they signed out (BUG-024).
 - **Offline shell:** `/index.html` served for all navigation fallbacks
 
 ---
