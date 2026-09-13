@@ -44,7 +44,7 @@
 // browser that has not caught up. The response reports `roleCreated` so the
 // caller knows which of the two happened.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.116.0'
 import { corsOriginHeaders } from '../_shared/cors.ts'
 
 /**

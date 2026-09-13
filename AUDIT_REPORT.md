@@ -576,6 +576,21 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * **Not written back.** A worksheet grouping all 158 with a suggestion, a confidence rating and a verification step was handed to the owner; it holds customer names and numbers, so it is deliberately not in this repository. The classifier behind it was checked against 25 real shapes from the data before it was run. Nothing changes in production until the confirmed column comes back.
 * **The seven pairs, for the record, since this closes BUG-063's live-data half too:** Mega Top Albostan / Almansoura and Dream Group 6 October / Mall Technology are branch locations; Micro Laps / Micro Laps USD and Emak / Emak USD are currency twins of one account; one pair is the owner's own test records; one was the `+` junk. Only Acs For Computers / ECS Computer System (same contact person, two company names) is genuinely ambiguous. **Nothing was merged, and nothing should be** — sharing a number is ordinary here, which is why there is no unique index.
 
+
+#### [MEDIUM] Invoices and credit notes can be edited by roles that cannot see them
+
+* ID: BUG-086
+* Category: Security / Access Control
+* Location: live policies on `public.crm_invoices` and `public.credit_notes` (UPDATE), compared with the same tables' SELECT policies and with `quotations` / `sales_orders`
+* Description: found while checking which tables were safe for BUG-074's write guard. Every sibling document table gates its update branch on role — `quotations` and `sales_orders` allow `manager_or_above OR (sales_rep AND (assigned_rep = me OR created_by = me))`. `crm_invoices` and `credit_notes` drop the `sales_rep AND`, so their UPDATE policy is `manager_or_above OR assigned_rep = me OR created_by = me` **for any role** — while their SELECT policy admits only managers, sales reps and accountants.
+* How to reproduce: `SELECT cmd, qual FROM pg_policies WHERE tablename IN ('crm_invoices','credit_notes','quotations','sales_orders') AND cmd IN ('SELECT','UPDATE');`
+* Expected: whoever may change a financial document may also see it, and a technician or viewer may do neither.
+* Actual: a technician or viewer recorded as `created_by` or `assigned_rep` on an invoice may update it but not read it. **Live today: an active technician is linked to 8 invoices.**
+* Impact: an authorization gap on money documents, narrowed but not closed by the settled-document and transition triggers (BUG-002), which stop edits to posted or settled documents. It also blocks BUG-074's guard on these two tables: the guard reads back the written row, which this policy forbids.
+* Suggested fix: align both UPDATE policies with `quotations`/`sales_orders`. One decision is needed first — whether an accountant who created an invoice should still be able to edit it, since the aligned policy would remove that.
+* Confidence: Confirmed from the live catalog and live data on 2026-09-13. Not exploited.
+* **Status: OPEN — deliberately not changed.** A finance permission change that removes an ability from a role is the owner's decision; the exact fix and the one question it hinges on are above.
+
 #### [MEDIUM] The WhatsApp queue's cancel buttons have never worked — notification_queue had no UPDATE policy
 
 * ID: BUG-080
@@ -1590,6 +1605,10 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: n/a
 * Suggested fix: as described; add a `supabase/manual/*_probe_roles.sql` run to CI once a staging project exists.
 * Confidence: Suspected (design recommendation)
+* **Status: PARTLY FIXED 2026-09-13** — measured, not assumed. The trigger half is in place; the RPC-only half is an architecture decision that has not been made.
+* **Locked by trigger:** every document table carries a status-transition guard, and the money documents a settled-document lock — `crm_invoices` and `credit_notes` (`*_assert_transition`, `*_lock_settled`), `quotations`, `sales_orders`, `purchase_orders` and `vendor_invoices` (transition plus FX-rate guards). `stock_moves` accepts no client writes at all (BUG-010).
+* **Still client-writable with no guard trigger:** `payments`, `payment_applications`, `credit_note_applications`, `vendor_payment_applications` and `warehouse_stock`. Since BUG-001 those policies admit administrators only, so this is a narrower exposure than when filed — but it is the class the finding describes, and BUG-086 below is a live example of how a client-writable policy drifts away from its siblings unnoticed.
+* Closing it means making the RPCs the only writers of those tables, which changes how drafts and corrections are made. Recorded as a decision to take, not a fix to slip in.
 
 #### [INFORMATIONAL] Add a row-count guard to every update/delete helper
 
@@ -1599,6 +1618,11 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Description: A tiny `expectOne(data)` helper would turn the silent 0-row class (BUG-008) into a thrown error everywhere at once.
 * Suggested fix: as described.
 * Confidence: Suspected (design recommendation)
+* **Status: PARTLY FIXED 2026-09-13.** The helper the finding asks for already existed — `assertUpdated` / `assertAffected`, added for BUG-008 — but only 25 of 107 write sites used it. **56 more are guarded now.**
+* **Why not all of them, and why not blindly.** The guard reads the row back through `RETURNING`, which PostgreSQL evaluates against the SELECT policy. On a table where someone may write a row they may not read, it would throw on a successful save. So every table was checked against production first: for 32 tables the read policy covers the write policy (admin ⊆ manager ⊆ staff, confirmed from the function definitions) and `id` is readable. Only those were touched, by a script that refused any site whose table was not on that list or whose shape it did not recognise.
+* **Two tables failed that check, and that is BUG-086:** `crm_invoices` and `credit_notes` let a role update a document it cannot read. They are deliberately left unguarded until the policy is fixed.
+* **Left unguarded on purpose:** 12 bulk writes (`.in(...)`), where zero-of-N and part-of-N need a different contract; the automation-rule ticket updates, which run in the background and do not check errors at all; `contacts.clearExistingPrimary`, where affecting zero rows is the normal case; the two dynamic `setArchived` helpers, one of which can target `crm_invoices`; and the WhatsApp helpers, out of scope.
+* Verified: lint clean and the full suite green (69 files, 1,435 tests). Every changed diff was the intended shape; `updateUserStatus` still revokes sessions only after the status write is confirmed.
 
 #### [INFORMATIONAL] Supabase Auth settings could not be verified from the audit tooling
 
@@ -1608,6 +1632,10 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Description: Whether public sign-ups are disabled (the app has no sign-up UI, but `auth.signUp` is wired and 1 auth user has no role), password policy, OTP/recovery-link expiry, refresh-token rotation, "require current password", and MFA enforcement are dashboard settings not exposed to SQL. `auth_leaked_password_protection` is reported disabled by the advisor.
 * Suggested fix: confirm sign-ups are off (or that new sign-ups cannot obtain a session), enable HIBP, set session lifetimes, and document them in the repo.
 * Confidence: Suspected (unverified)
+* **Status: PARTLY FIXED 2026-09-13** — everything readable from outside the dashboard has been read and is recorded here; the remaining changes are owner actions.
+* **Read from production:** `disable_signup = false` (public sign-up is **on**), `mailer_autoconfirm = false` (sign-up requires confirming the email), email provider enabled — all from `/auth/v1/settings`. Leaked-password protection is **disabled**, per the security advisor. `ALLOWED_ORIGINS` is set (see BUG-056).
+* **Not readable without the dashboard:** session lifetimes, refresh-token rotation, OTP and recovery-link expiry, MFA enforcement.
+* **Why sign-up matters more than it looks:** BUG-084 showed a `user_roles` row is a standing grant to whoever registers that address. The ten waiting rows are suspended, but while sign-up is on, the mechanism is intact. The dashboard toggle is the fix.
 
 #### [INFORMATIONAL] `ownershipScope` is documented as "not a security boundary" — and is currently the only boundary for several screens
 
@@ -1616,6 +1644,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Location: `src/lib/permissions.ts` `ownershipScope`; Sales Documents / Pipeline / Leads pages
 * Description: The comment is accurate: RLS is meant to be the boundary. This audit found RLS *reads* for `sales_rep` are correctly scoped (own rows), so the UI filter is cosmetic as intended. Listed so the assumption is on record.
 * Confidence: Confirmed by code reading
+* **Status: FIXED 2026-09-13 — closed as confirmed; nothing needed changing.** Re-checked against the live policies rather than the earlier audit: for `sales_rep`, reads on `deals`, `leads`, `activities`, `quotations` and `sales_orders` are scoped to rows the rep is assigned to or created. The UI's `ownershipScope` filter is cosmetic, exactly as its comment says, and the database is the boundary.
 
 #### [INFORMATIONAL] Deno `serve` import from `std@0.168.0` in four functions
 
@@ -1625,6 +1654,10 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Description: Floating versions make deploys non-reproducible; `std/http/server.ts` is deprecated.
 * Suggested fix: `Deno.serve` everywhere; pin `@supabase/supabase-js@2.x.y`.
 * Confidence: Confirmed by code reading
+* **Status: PARTLY FIXED 2026-09-13** — every function except the two WhatsApp ones, which stay untouched under the standing instruction to leave WhatsApp work for later.
+* `std@0.168.0` replaced with `Deno.serve` in `manage-sessions` and `notification-worker` as filed — and in **`ai-assist`**, a third copy the original finding missed because it uses double quotes. All three redeployed with JWT verification unchanged (read back from the platform before and after).
+* **Proven to boot, not just to deploy:** without a token the gateway refuses with its own body (`UNAUTHORIZED_NO_AUTH_HEADER`); with the anon key each function answers from its own code — `x-served-by: supabase-edge-runtime`, an execution id, and the function's own `Unauthorized` check. A function that failed to start would return a 5xx instead.
+* `supabase-js` pinned to **2.116.0** in nine functions — the exact version `@2` resolves to today, so the next deploy of each gets what it would have got anyway, only reproducibly. The six that changed only their pin were not redeployed: pinning is about future deploys, and redeploying working auth functions for no behavioural change is risk without benefit. `kb-chat` keeps its existing `2.45.0` pin.
 
 #### [INFORMATIONAL] Bundle size warning and PWA precache of 5 MB
 
@@ -1634,6 +1667,13 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Description: First load and SW install are heavy; `xlsx`, `jspdf`, `html2canvas`, `pdfjs-dist`, `recharts` are candidates for lazy loading (pdfjs already is).
 * Suggested fix: dynamic-import the export/PDF libraries; exclude large chunks from precache.
 * Confidence: Confirmed by execution
+* **Status: PARTLY FIXED 2026-09-13.** The main chunk is a third smaller; the precache is deliberately unchanged.
+* **The finding's premise had gone stale.** `xlsx` (430 KB) and the charting library (385 KB) were already in their own lazy chunks, and every route was already lazy — 68 dynamic chunks. Measured from the live bundle rather than assumed.
+* **The actual cause was not on the list: both translation files were imported statically** — 483 KB of JSON, every visitor downloading Arabic and English and using one. English stays bundled, because it is the fallback; Arabic is now fetched by an i18next backend the first time it is needed, so `changeLanguage` waits for the file and no call site changed. First render waits for the saved language, so an Arabic user never sees a flash of English and a layout flipping to right-to-left; an English user waits for nothing.
+* **Measured on a production build:** entry chunk **1,125,641 → 750,919 bytes (−33%)**; over the wire **305 → 199 KB gzipped**. Arabic is absent from the entry chunk, English present, and the Arabic chunk is still in the service-worker precache, so Arabic keeps working offline.
+* **Verified in a browser:** English loads with only `en.json` requested; with Arabic saved, `ar.json` is fetched, the document is `dir=rtl lang=ar`, and translated text renders. Five new tests pin the behaviour the app relies on, including that a saved Arabic preference is already translated when the app first renders.
+* **Not changed: the precache.** Excluding large chunks from it would break those routes offline, which is a product decision rather than a size optimisation.
+* **Found alongside, filed separately:** the public tracker's heading, subtitle and Track button are hardcoded English, so they stay English for Arabic customers. Never translated — not caused by this change.
 
 ---
 

@@ -342,18 +342,22 @@ export const vendorInvoices = {
     return assertUpdated(data, 'Vendor invoice')
   },
   async submitForApproval(id: string): Promise<void> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('vendor_invoices')
       .update({ status: 'pending_approval' })
       .eq('id', id)
+      .select('id')
     if (error) throw error
+    assertAffected(data, 'Vendor invoice')
   },
   async approve(id: string): Promise<void> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('vendor_invoices')
       .update({ status: 'approved', approved_at: new Date().toISOString() })
       .eq('id', id)
+      .select('id')
     if (error) throw error
+    assertAffected(data, 'Vendor invoice')
   },
   /** rejectToDraft — sends a pending-approval VI back to draft, editable and resubmittable. */
   async rejectToDraft(id: string): Promise<void> {
@@ -507,8 +511,9 @@ export const vendorInvoiceCharges = {
   },
 
   async remove(id: string): Promise<void> {
-    const { error } = await supabase.from('vendor_invoice_charges').delete().eq('id', id)
+    const { data, error } = await supabase.from('vendor_invoice_charges').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Charge')
   },
 }
 

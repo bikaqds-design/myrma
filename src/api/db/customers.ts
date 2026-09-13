@@ -1,5 +1,5 @@
 import { supabase } from '../client.js'
-import { assertUpdated } from './_assertUpdated.js'
+import { assertUpdated, assertAffected } from './_assertUpdated.js'
 import { orIlike } from '../../lib/searchPattern.js'
 import { mobileKey } from '../../lib/customerDuplicates.js'
 
@@ -233,7 +233,8 @@ export const customerNotes = {
     return assertUpdated(data, 'Customer note')
   },
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('customer_notes').delete().eq('id', id)
+    const { data, error } = await supabase.from('customer_notes').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Note')
   },
 }

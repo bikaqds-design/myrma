@@ -10,7 +10,7 @@ import './index.css'
 import './styles/tokens.css'
 import './styles/appearance.css'
 import './styles/rtl.css'
-import './lib/i18n.js'
+import { i18nReady } from './lib/i18n.js'
 
 initSentry() // no-op if VITE_SENTRY_DSN is not set
 
@@ -29,16 +29,22 @@ const queryClient = new QueryClient({
   },
 })
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <BrowserRouter>
-        <QueryClientProvider client={queryClient}>
-          <AppearanceProvider>
-            <App />
-          </AppearanceProvider>
-        </QueryClientProvider>
-      </BrowserRouter>
-    </ErrorBoundary>
-  </React.StrictMode>
-)
+// Render once the saved language is ready. Only a non-English choice fetches
+// anything; an English visitor renders on the next tick, exactly as before. A
+// language file that fails to load still renders, in English. (BUG-078.)
+const render = () =>
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <BrowserRouter>
+          <QueryClientProvider client={queryClient}>
+            <AppearanceProvider>
+              <App />
+            </AppearanceProvider>
+          </QueryClientProvider>
+        </BrowserRouter>
+      </ErrorBoundary>
+    </React.StrictMode>
+  )
+
+i18nReady.then(render, render)

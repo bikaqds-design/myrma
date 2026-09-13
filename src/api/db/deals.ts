@@ -1,7 +1,7 @@
 import { supabase } from '../client.js'
 import { activities } from './activities.js'
 import type { PipelineStage } from './pipelines.js'
-import { assertUpdated } from './_assertUpdated.js'
+import { assertUpdated, assertAffected } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -142,6 +142,7 @@ export const deals = {
       .eq('id', id)
       .select()
     if (error) throw error
+    assertAffected(data, 'Deal')
     if (current.stage !== stage) {
       activities
         .logSystem('deal', id, `stage_changed|${stageName(stages, current.stage)}|${stageName(stages, stage)}`, actorEmail)
@@ -183,6 +184,7 @@ export const deals = {
       .eq('id', id)
       .select()
     if (error) throw error
+    assertAffected(data, 'Deal')
 
     if (current.pipeline_id !== pipelineId) {
       const fromStages = await getPipelineStages(current.pipeline_id).catch(() => [])
@@ -215,6 +217,7 @@ export const deals = {
       .eq('id', id)
       .select()
     if (error) throw error
+    assertAffected(data, 'Deal')
     activities.logSystem('deal', id, 'won', actorEmail).catch(() => {})
     return data[0]
   },
@@ -236,6 +239,7 @@ export const deals = {
       .eq('id', id)
       .select()
     if (error) throw error
+    assertAffected(data, 'Deal')
     activities.logSystem('deal', id, `lost|${reason}`, actorEmail).catch(() => {})
     return data[0]
   },
@@ -309,6 +313,7 @@ export const deals = {
       .eq('id', id)
       .select()
     if (error) throw error
+    assertAffected(data, 'Deal')
     activities
       .logSystem('deal', id, `reopened|${current.status}|${stageName(stages, stageId)}`, actorEmail)
       .catch(() => {})

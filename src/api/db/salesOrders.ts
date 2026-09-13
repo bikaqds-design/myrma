@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { assertAffected } from './_assertUpdated.js'
 import { computeDocumentTotals } from './_documentTotals.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -140,6 +141,7 @@ export const salesOrders = {
       .select()
       .single()
     if (error) throw error
+    assertAffected(data, 'Sales order')
     return data as SalesOrderRow
   },
 
@@ -151,6 +153,7 @@ export const salesOrders = {
       .select()
       .single()
     if (error) throw error
+    assertAffected(data, 'Sales order')
     return data as SalesOrderRow
   },
 

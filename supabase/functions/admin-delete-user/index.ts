@@ -23,7 +23,7 @@
 // locking the business out of its own system. Role first, then auth: if the
 // trigger objects, nothing has been destroyed.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.116.0'
 import { corsOriginHeaders } from '../_shared/cors.ts'
 
 Deno.serve(async (req) => {

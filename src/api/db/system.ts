@@ -2,7 +2,7 @@ import { supabase } from '../client.js'
 import type { TableResult } from './types.js'
 import { auditInsert, auditFlushQueue } from './audit.js'
 import { PRIORITY, CONFIG_KEY, AUTOMATION_ACTION } from '../../lib/constants.js'
-import { assertUpdated } from './_assertUpdated.js'
+import { assertUpdated, assertAffected } from './_assertUpdated.js'
 import { captureException } from '../../lib/sentry.js'
 import { addHoursLocalISO } from '../../lib/dates'
 
@@ -149,8 +149,9 @@ export const announcements = {
     return assertUpdated(data, 'Announcement')
   },
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('announcements').delete().eq('id', id)
+    const { data, error } = await supabase.from('announcements').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Announcement')
   },
 }
 
@@ -217,11 +218,12 @@ export const customFields = {
       .eq('id', id)
       .select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'Custom field')
   },
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('custom_field_definitions').delete().eq('id', id)
+    const { data, error } = await supabase.from('custom_field_definitions').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Custom field')
   },
 }
 
@@ -275,8 +277,9 @@ export const webhooks = {
     return assertUpdated(data, 'Webhook')
   },
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('webhooks').delete().eq('id', id)
+    const { data, error } = await supabase.from('webhooks').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Webhook')
   },
   /**
    * Fire an outbound webhook event.

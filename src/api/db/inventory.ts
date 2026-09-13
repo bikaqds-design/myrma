@@ -3,7 +3,7 @@ import { buildTicketUnits } from '../../lib/rmaUnitCreate.js'
 import type { TicketProductInput, CatalogProduct } from '../../lib/rmaUnitCreate.js'
 import { summarizeSerializedUnits } from '../../lib/stockSummary.js'
 import type { TableResult } from './types.js'
-import { assertUpdated } from './_assertUpdated.js'
+import { assertUpdated, assertAffected } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -759,8 +759,9 @@ export const warehouses = {
     return assertUpdated(data, 'Warehouse')
   },
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('warehouses').delete().eq('id', id)
+    const { data, error } = await supabase.from('warehouses').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Warehouse')
   },
   /**
    * archive — soft-delete via the archive_warehouse RPC (Sprint 8 Phase 8a).
@@ -954,11 +955,12 @@ export const parts = {
       .eq('id', id)
       .select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'Part')
   },
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('parts').delete().eq('id', id)
+    const { data, error } = await supabase.from('parts').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Part')
   },
   async adjustQuantity(id: string, delta: number): Promise<PartRow | undefined> {
     // Atomic RPC — no read-modify-write race condition (H-3 fix)
@@ -1005,8 +1007,9 @@ export const ticketParts = {
   },
   async remove(id: string, partId: string, quantity: number): Promise<void> {
     await parts.adjustQuantity(partId, quantity)
-    const { error } = await supabase.from('ticket_parts').delete().eq('id', id)
+    const { data, error } = await supabase.from('ticket_parts').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Ticket part')
   },
 }
 
@@ -1058,8 +1061,9 @@ export const timeEntries = {
     return assertUpdated(data, 'Time entry')
   },
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('time_entries').delete().eq('id', id)
+    const { data, error } = await supabase.from('time_entries').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Time entry')
   },
   async getTotalMinutes(ticketId: string): Promise<number> {
     try {

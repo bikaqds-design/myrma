@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { assertAffected } from './_assertUpdated.js'
 
 /**
  * Company documents — reference material that belongs to the business as a
@@ -127,24 +128,29 @@ export const companyDocuments = {
 
   /** The hard-delete primitive. Only the purge sweep calls this directly. */
   async remove(id: string): Promise<void> {
-    const { error } = await supabase.from('company_documents').delete().eq('id', id)
+    const { data, error } = await supabase.from('company_documents').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Document')
   },
 
   async trash(id: string, deletedBy: string): Promise<void> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('company_documents')
       .update({ deleted_at: new Date().toISOString(), deleted_by: deletedBy })
       .eq('id', id)
+      .select('id')
     if (error) throw error
+    assertAffected(data, 'Document')
   },
 
   async restore(id: string): Promise<void> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('company_documents')
       .update({ deleted_at: null, deleted_by: null })
       .eq('id', id)
+      .select('id')
     if (error) throw error
+    assertAffected(data, 'Document')
   },
 
   async listTrash(): Promise<CompanyDocumentRow[]> {

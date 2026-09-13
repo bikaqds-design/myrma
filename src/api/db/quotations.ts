@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { assertAffected } from './_assertUpdated.js'
 import { computeDocumentTotals } from './_documentTotals.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -137,6 +138,7 @@ export const quotations = {
       .select()
       .single()
     if (error) throw error
+    assertAffected(data, 'Quotation')
     return data as QuotationRow
   },
 
@@ -148,6 +150,7 @@ export const quotations = {
       .select()
       .single()
     if (error) throw error
+    assertAffected(data, 'Quotation')
     return data as QuotationRow
   },
 
@@ -159,6 +162,7 @@ export const quotations = {
       .select()
       .single()
     if (error) throw error
+    assertAffected(data, 'Quotation')
     return data as QuotationRow
   },
 
@@ -170,6 +174,7 @@ export const quotations = {
       .select()
       .single()
     if (error) throw error
+    assertAffected(data, 'Quotation')
     return data as QuotationRow
   },
 
@@ -181,6 +186,7 @@ export const quotations = {
       .select()
       .single()
     if (error) throw error
+    assertAffected(data, 'Quotation')
     return data as QuotationRow
   },
 
@@ -192,6 +198,7 @@ export const quotations = {
       .select()
       .single()
     if (error) throw error
+    assertAffected(data, 'Quotation')
     return data as QuotationRow
   },
 

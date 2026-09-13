@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { assertAffected } from './_assertUpdated.js'
 import { containsPattern } from '../../lib/searchPattern.js'
 
 /**
@@ -266,7 +267,7 @@ export const productDocuments = {
   },
 
   async update(id: string, patch: { title?: string; docType?: DocType; description?: string | null }) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('product_documents')
       .update({
         ...(patch.title !== undefined ? { title: patch.title.trim() } : {}),
@@ -274,13 +275,16 @@ export const productDocuments = {
         ...(patch.description !== undefined ? { description: patch.description?.trim() || null } : {}),
       })
       .eq('id', id)
+      .select('id')
     if (error) throw error
+    assertAffected(data, 'Document')
   },
 
   /** The hard-delete primitive. Only the purge sweep calls this directly. */
   async remove(id: string): Promise<void> {
-    const { error } = await supabase.from('product_documents').delete().eq('id', id)
+    const { data, error } = await supabase.from('product_documents').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Document')
   },
 
   /**
@@ -290,19 +294,23 @@ export const productDocuments = {
    * happened to be rewritten for it.
    */
   async trash(id: string, deletedBy: string): Promise<void> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('product_documents')
       .update({ deleted_at: new Date().toISOString(), deleted_by: deletedBy })
       .eq('id', id)
+      .select('id')
     if (error) throw error
+    assertAffected(data, 'Document')
   },
 
   async restore(id: string): Promise<void> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('product_documents')
       .update({ deleted_at: null, deleted_by: null })
       .eq('id', id)
+      .select('id')
     if (error) throw error
+    assertAffected(data, 'Document')
   },
 
   /**

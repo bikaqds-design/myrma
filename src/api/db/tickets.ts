@@ -1,7 +1,7 @@
 import { supabase } from '../client.js'
 import type { TableResult } from './types.js'
 import { captureException } from '../../lib/sentry.js'
-import { assertUpdated } from './_assertUpdated.js'
+import { assertUpdated, assertAffected } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -115,8 +115,9 @@ export const rmaTickets = {
   async delete(id: string): Promise<void> {
     // Cascade is enforced by ON DELETE CASCADE FKs on inventory_units,
     // ticket_comments, ticket_activity → rma_tickets (migration 20260528).
-    const { error } = await supabase.from('rma_tickets').delete().eq('id', id)
+    const { data, error } = await supabase.from('rma_tickets').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Ticket')
   },
   // One statement instead of N, so a bulk cleanup either applies or fails as a
   // unit rather than part-way through. Data Cleanup previously fanned out N
@@ -213,8 +214,9 @@ export const ticketComments = {
     return data?.[0]
   },
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('ticket_comments').delete().eq('id', id)
+    const { data, error } = await supabase.from('ticket_comments').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Comment')
   },
 }
 
@@ -324,7 +326,8 @@ export const ticketResolutions = {
   },
 
   async remove(id: string): Promise<void> {
-    const { error } = await supabase.from('ticket_resolutions').delete().eq('id', id)
+    const { data, error } = await supabase.from('ticket_resolutions').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Resolution')
   },
 }

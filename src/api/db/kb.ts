@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { assertUpdated, assertAffected } from './_assertUpdated.js'
 import type { TableResult } from './types.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -96,11 +97,12 @@ export const kbArticles = {
       .eq('id', id)
       .select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'Article')
   },
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('kb_articles').delete().eq('id', id)
+    const { data, error } = await supabase.from('kb_articles').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Article')
   },
 }

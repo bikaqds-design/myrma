@@ -26,8 +26,7 @@
 // thing standing between a user and someone else's devices.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.116.0'
 import { corsOriginHeaders } from '../_shared/cors.ts'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -35,7 +34,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // CORS and json() are per-request closures, not module-level — Deno can
 // interleave concurrent requests within one isolate, so a shared mutable
 // CORS constant would risk one request's response carrying another's Origin.
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   const CORS = {
     ...corsOriginHeaders(req),
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',

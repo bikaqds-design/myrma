@@ -43,7 +43,7 @@
 //
 // Verify by recomputing over the raw body before parsing it.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.116.0'
 import { corsOriginHeaders } from '../_shared/cors.ts'
 import { currentAccess, canAct } from '../_shared/access.ts'
 

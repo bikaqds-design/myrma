@@ -16,8 +16,7 @@
 //   WHATSAPP_API_VERSION
 // ─────────────────────────────────────────────────────────────────────────
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.116.0'
 import { corsOriginHeaders } from '../_shared/cors.ts'
 import { currentAccess, canAct } from '../_shared/access.ts'
 
@@ -48,7 +47,7 @@ interface WAResponse {
   error?: { message: string; code: number }
 }
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   const CORS = {
     ...corsOriginHeaders(req),
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-worker-secret, x-trigger-source',

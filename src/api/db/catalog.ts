@@ -1,5 +1,5 @@
 import { supabase } from '../client.js'
-import { assertUpdated } from './_assertUpdated.js'
+import { assertUpdated, assertAffected } from './_assertUpdated.js'
 import { orIlike } from '../../lib/searchPattern.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -90,8 +90,9 @@ export const brands = {
     return assertUpdated(data, 'Brand')
   },
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('brands').delete().eq('id', id)
+    const { data, error } = await supabase.from('brands').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Brand')
   },
 }
 
@@ -126,8 +127,9 @@ export const categories = {
     return assertUpdated(data, 'Category')
   },
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('categories').delete().eq('id', id)
+    const { data, error } = await supabase.from('categories').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Category')
   },
 }
 
@@ -163,11 +165,12 @@ export const subcategories = {
       .eq('id', id)
       .select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'Subcategory')
   },
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('subcategories').delete().eq('id', id)
+    const { data, error } = await supabase.from('subcategories').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Subcategory')
   },
 }
 
@@ -269,8 +272,9 @@ export const products = {
     return assertUpdated(data, 'Product')
   },
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('products').delete().eq('id', id)
+    const { data, error } = await supabase.from('products').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Product')
   },
   async bulkDelete(ids: string[]): Promise<void> {
     const { error } = await supabase.from('products').delete().in('id', ids)

@@ -1,5 +1,5 @@
 import { supabase } from '../client.js'
-import { assertUpdated } from './_assertUpdated.js'
+import { assertUpdated, assertAffected } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -135,6 +135,7 @@ export const activities = {
       .eq('id', id)
       .select()
     if (error) throw error
+    assertAffected(data, 'Activity')
     return data[0]
   },
   // reschedule — change a planned activity's due date.
@@ -145,11 +146,13 @@ export const activities = {
       .eq('id', id)
       .select()
     if (error) throw error
+    assertAffected(data, 'Activity')
     return data[0]
   },
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from('activities').delete().eq('id', id)
+    const { data, error } = await supabase.from('activities').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Activity')
   },
   /**
    * deleteForRelated — remove every activity belonging to deleted parents.

@@ -110,8 +110,9 @@ export const geo = {
   },
 
   async removeAreaCode(id: string): Promise<void> {
-    const { error } = await supabase.from('country_area_codes').delete().eq('id', id)
+    const { data, error } = await supabase.from('country_area_codes').delete().eq('id', id).select('id')
     if (error) throw error
+    assertAffected(data, 'Area code')
   },
 
   /**

@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { assertUpdated, assertAffected } from './_assertUpdated.js'
 import type { PrefsResult, SetPrefsResult } from './types.js'
 import { auditInsert } from './audit.js'
 import { captureException } from '../../lib/sentry.js'
@@ -94,7 +95,7 @@ export const userRoles = {
       .eq('user_email', email)
       .select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'User')
   },
   async updateUserStatus(
     email: string,
@@ -118,6 +119,7 @@ export const userRoles = {
       .eq('user_email', email)
       .select()
     if (error) throw error
+    assertAffected(data, 'User')
 
     // Suspension has to end the sessions too, or it is only half a suspension.
     // (Audit finding BUG-049.) Writing the status left every device the user
@@ -157,7 +159,7 @@ export const userRoles = {
       .eq('user_email', email)
       .select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'User')
   },
   async updateUserPermissions(
     email: string,
@@ -169,7 +171,7 @@ export const userRoles = {
       .eq('user_email', email)
       .select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'User')
   },
   async updateUserNotes(email: string, notes: string | null): Promise<UserRoleRow | undefined> {
     const { data, error } = await supabase
@@ -178,11 +180,12 @@ export const userRoles = {
       .eq('user_email', email)
       .select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'User')
   },
   async deleteUser(email: string): Promise<void> {
-    const { error } = await supabase.from('user_roles').delete().eq('user_email', email)
+    const { data, error } = await supabase.from('user_roles').delete().eq('user_email', email).select('id')
     if (error) throw error
+    assertAffected(data, 'User')
   },
   async getCustomRoles(): Promise<unknown[]> {
     const { data, error } = await supabase
@@ -235,11 +238,12 @@ export const userRoles = {
       .eq('id', roleId)
       .select()
     if (error) throw error
-    return data?.[0]
+    return assertUpdated(data, 'Role')
   },
   async deleteCustomRole(roleId: string): Promise<void> {
-    const { error } = await supabase.from('custom_roles').delete().eq('id', roleId)
+    const { data, error } = await supabase.from('custom_roles').delete().eq('id', roleId).select('id')
     if (error) throw error
+    assertAffected(data, 'Role')
   },
 }
 

@@ -19,7 +19,7 @@
 // user and then tell them what it is, out of band. That hands a working
 // credential to a chat app. An invitation lets the person set their own.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.116.0'
 import { corsOriginHeaders } from '../_shared/cors.ts'
 
 /** Roles that may be granted. Mirrors ROLES in src/lib/constants.ts. */

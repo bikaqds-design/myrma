@@ -15,7 +15,7 @@
 //     courtesy — clearing site data resets it — and was the only limit that
 //     really worked until 2026-09-13. (BUG-067.)
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.116.0'
 import { corsOriginHeaders } from '../_shared/cors.ts'
 
 // ─── Rate limiter (per-instance, in-memory) ──────────────────────────────────

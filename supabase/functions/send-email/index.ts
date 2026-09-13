@@ -32,7 +32,7 @@
 // newlines turned into <br>. So escaping the values changes nothing about how
 // the mail renders and closes the injection.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.116.0'
 import { corsOriginHeaders } from '../_shared/cors.ts'
 
 /** Escape a value being interpolated into the HTML body or the subject. */
