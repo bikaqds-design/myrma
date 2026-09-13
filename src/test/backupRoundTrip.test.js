@@ -23,7 +23,9 @@ const state = {
   missing: new Set(), // tables that answer 42P01
   failWrites: new Set(),
   reads: [],         // { table, from, to }
-  writes: [],        // { table, count }
+  writes: [],        // { table, count } — one per uploaded chunk
+  applied: [],       // tables the database actually wrote, all-or-nothing
+  discarded: false,
 }
 
 vi.mock('../api/client.js', () => ({
@@ -31,8 +33,35 @@ vi.mock('../api/client.js', () => ({
     // document_sequences refuses client SELECT, so the export reads the
     // counters through rma_document_counters(). Without this the fake database
     // has no such function and the table drops out of the backup.
-    rpc(fn) {
+    rpc(fn, args) {
       state.rpcs.push(fn)
+      // The restore path (BUG-025): upload in chunks, then one apply that
+      // writes everything or nothing — modelled on rma_restore_apply.
+      if (fn === 'rma_restore_begin') return Promise.resolve({ data: 'session-1', error: null })
+      if (fn === 'rma_restore_stage') {
+        state.writes.push({ table: args.p_table, count: args.p_rows.length })
+        return Promise.resolve({ data: args.p_rows.length, error: null })
+      }
+      if (fn === 'rma_restore_apply') {
+        const tables = [...new Set(state.writes.map((w) => w.table))]
+        const failing = tables.find((t) => state.failWrites.has(t))
+        if (failing) {
+          return Promise.resolve({ data: null, error: { message: `Restore stopped at ${failing}: write refused` } })
+        }
+        state.applied = tables
+        const results = tables.map((t) => {
+          const n = state.writes.filter((w) => w.table === t).reduce((a, w) => a + w.count, 0)
+          return { table: t, count: n, attempted: n }
+        })
+        return Promise.resolve({
+          data: { tables: results.length, rows: results.reduce((a, r) => a + r.count, 0), results },
+          error: null,
+        })
+      }
+      if (fn === 'rma_restore_discard') {
+        state.discarded = true
+        return Promise.resolve({ data: null, error: null })
+      }
       if (state.missing.has(fn)) {
         return Promise.resolve({ data: null, error: { code: 'PGRST202', message: 'no function' } })
       }
@@ -76,6 +105,8 @@ beforeEach(() => {
   state.reads = []
   state.writes = []
   state.rpcs = []
+  state.applied = []
+  state.discarded = false
 })
 
 describe('exportAll', () => {
@@ -187,10 +218,11 @@ describe('importAll', () => {
     for (const r of skipped) expect(r.why).toBeTruthy()
   })
 
-  // A restore that dies halfway has still written everything before the
-  // failure. Reporting only "failed" invites a second restore on top of
-  // half-written data.
-  it('preserves what landed when a table fails', async () => {
+  // BUG-025: a restore that fails part-way used to leave every earlier table
+  // written. It is now one transaction, so a failure changes nothing — and the
+  // error has to say so, or the user restores again on top of a state that
+  // does not exist.
+  it('changes nothing when a later table fails, and says so', async () => {
     state.failWrites.add('customers')
     let caught
     try {
@@ -200,8 +232,22 @@ describe('importAll', () => {
     }
     expect(caught).toBeDefined()
     expect(caught.message).toContain('customers')
-    expect(caught.summary.tablesRestored).toBe(1)
-    expect(caught.summary.rowsRestored).toBe(1)
+    expect(caught.message).toMatch(/nothing was changed/)
+    expect(state.applied).toEqual([])            // brands did NOT land either
+    expect(caught.summary.nothingChanged).toBe(true)
+    expect(caught.summary.tablesRestored).toBe(0)
+    expect(state.discarded).toBe(true)           // the upload is thrown away
+  })
+
+  it('uploads everything before applying anything', async () => {
+    await backup.importAll(payload({ brands: [{ id: 1 }], products: [{ id: 2 }] }))
+    const calls = state.rpcs.filter((f) => f.startsWith('rma_restore_'))
+    expect(calls).toEqual(['rma_restore_begin', 'rma_restore_stage', 'rma_restore_stage', 'rma_restore_apply'])
+  })
+
+  it('does not open a restore session when there is nothing to write', async () => {
+    await backup.importAll(payload({ notification_queue: [{ id: 1 }] }))
+    expect(state.rpcs.filter((f) => f.startsWith('rma_restore_'))).toEqual([])
   })
 
   it('reports tables and rows restored on success', async () => {

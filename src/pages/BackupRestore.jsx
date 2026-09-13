@@ -185,16 +185,12 @@ export default function BackupRestore({ currentUserRole, currentUserEmail }) {
         } catch (error) {
           captureException(error)
           toast.error(t('backupRestore.failedRestoreData', { error: error.message }))
-          // A restore that fails halfway has still written everything before
-          // the failure. Saying so matters: the alternative is a user who
-          // assumes nothing landed and restores again on top of partial data.
-          if (error.summary?.tablesRestored) {
-            toast(
-              t('backupRestore.restorePartialSummary', {
-                tables: error.summary.tablesRestored,
-                rows: error.summary.rowsRestored,
-              })
-            )
+          // A restore is applied in one transaction, so a failure leaves the
+          // database exactly as it was. Saying so matters: without it, a user
+          // reasonably assumes part of the backup landed and either works on
+          // top of a state they misunderstand or restores again. (BUG-025.)
+          if (error.summary?.nothingChanged) {
+            toast(t('backupRestore.restoreNothingChanged'), { duration: 8000 })
           }
         } finally {
           setRestoring(false)

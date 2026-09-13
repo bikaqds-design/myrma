@@ -432,14 +432,21 @@ export const backup = {
   },
 
   /**
-   * Restore from an export.
+   * Restore from an export — all of it, or none of it.
    *
-   * Upserts in foreign-key order, so parents exist before their children. Rows
-   * are written in chunks; a single request carrying an entire table is how
-   * large restores fail.
+   * The file is uploaded to the database in chunks (a single request carrying
+   * an entire table is how large restores fail), then applied in ONE database
+   * transaction by rma_restore_apply. If any table fails, the database is left
+   * exactly as it was before the restore began. (BUG-025.)
    *
-   * Overwrites by primary key. It does not delete anything: a row that exists
-   * now but not in the backup survives.
+   * It used to write table by table from the browser, each request committing
+   * on its own, so a failure at the twentieth table left nineteen restored and
+   * the rest live — a state matching no moment that ever existed.
+   *
+   * The database, not this file, decides what may be written: administrators
+   * only, only restorable tables, only writable columns, in foreign-key order.
+   * Overwrites by primary key and deletes nothing — a row that exists now but
+   * not in the backup survives.
    *
    * The same path reads a complete backup and a module export, because they are
    * the same file format — only the set of tables inside differs.
@@ -523,47 +530,67 @@ async function importEnvelope(backupData) {
       byTable[LEGACY_KEYS[key] || key] = value
     }
 
-    const results = []
+    const skipped = new Map()
+    const toStage = []
     for (const spec of BACKUP_TABLES) {
       const rows = byTable[spec.table]
       if (!rows?.length) continue
       if (spec.restore === false) {
-        results.push({ table: spec.table, skipped: true, why: spec.why, count: rows.length })
+        skipped.set(spec.table, { table: spec.table, skipped: true, why: spec.why, count: rows.length })
         continue
       }
+      toStage.push({ table: spec.table, rows })
+    }
 
-      let written = 0
-      let error = null
-      for (let i = 0; i < rows.length; i += CHUNK) {
-        const { error: chunkError } = await supabase
-          .from(spec.table)
-          .upsert(rows.slice(i, i + CHUNK))
-        if (chunkError) {
-          error = chunkError.message
-          break
+    // Results in manifest order, whatever order they were learned in.
+    const ordered = (applied) =>
+      BACKUP_TABLES.map((s) => skipped.get(s.table) || applied.get(s.table)).filter(Boolean)
+
+    if (!toStage.length) {
+      return { success: true, results: ordered(new Map()), tablesRestored: 0, rowsRestored: 0 }
+    }
+
+    const { data: session, error: beginError } = await supabase.rpc('rma_restore_begin')
+    if (beginError) throw new Error(beginError.message)
+
+    try {
+      for (const { table, rows } of toStage) {
+        for (let i = 0; i < rows.length; i += CHUNK) {
+          const { error } = await supabase.rpc('rma_restore_stage', {
+            p_session: session,
+            p_table: table,
+            p_rows: rows.slice(i, i + CHUNK),
+          })
+          if (error) throw new Error(`${table}: ${error.message}`)
         }
-        written += Math.min(CHUNK, rows.length - i)
       }
-      results.push({ table: spec.table, count: written, attempted: rows.length, error })
-    }
 
-    const failures = results.filter((r) => r.error)
-    const restored = results.filter((r) => !r.error && !r.skipped)
-    const summary = {
-      results,
-      tablesRestored: restored.length,
-      rowsRestored: restored.reduce((a, r) => a + r.count, 0),
-    }
+      const { data: outcome, error: applyError } = await supabase.rpc('rma_restore_apply', {
+        p_session: session,
+      })
+      if (applyError) throw new Error(applyError.message)
 
-    if (failures.length) {
-      // Reported rather than swallowed, and the partial success is preserved so
-      // the screen can say what did land. An earlier failure used to abort the
-      // rest silently.
-      const msg = failures.map((f) => `${f.table}: ${f.error}`).join('; ')
-      const err = new Error(`Restore partially failed — ${msg}`)
-      err.summary = summary
+      const applied = new Map(
+        (outcome?.results || []).map((r) => [
+          r.table,
+          { table: r.table, count: r.count, attempted: r.attempted, error: null },
+        ])
+      )
+      return {
+        success: true,
+        results: ordered(applied),
+        tablesRestored: outcome?.tables ?? applied.size,
+        rowsRestored: outcome?.rows ?? 0,
+      }
+    } catch (cause) {
+      // Nothing was applied: either the upload never finished, or the apply
+      // rolled back as a whole. Throw away what was uploaded, and say plainly
+      // that the database is unchanged — so nobody restores again on top of a
+      // half-written state that does not exist. A failed discard is harmless;
+      // abandoned uploads are cleared on the next begin.
+      await supabase.rpc('rma_restore_discard', { p_session: session })
+      const err = new Error(`Restore failed and nothing was changed — ${cause.message}`)
+      err.summary = { results: ordered(new Map()), tablesRestored: 0, rowsRestored: 0, nothingChanged: true }
       throw err
     }
-
-    return { success: true, ...summary }
 }

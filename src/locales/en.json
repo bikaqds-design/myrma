@@ -3421,7 +3421,6 @@
     "step3": "Wait for the restore process to complete",
     "step4": "Refresh the page to see restored data",
     "restoreSuccessTables": "Restored {{rows}} rows across {{tables}} tables",
-    "restorePartialSummary": "{{tables}} tables ({{rows}} rows) were restored before the failure — check the data before retrying",
     "tip4": "Restoring overwrites rows with the same ID and never deletes anything",
     "warn5": "Document numbering (document_sequences) is NOT restored — an administrator must reinstate it in SQL, or the next invoice will reuse a number that already exists",
     "exportAllPartial": "Backup is INCOMPLETE — these tables failed and are missing from the file: {{tables}}",
@@ -3440,7 +3439,8 @@
     "module_comms": "Knowledge & notifications",
     "moduleTableCount": "{{count}} tables",
     "moduleExported": "{{module}} exported — {{rows}} rows",
-    "moduleNotStandalone": "A module file restores into a system that still has its other data. Only the complete backup can rebuild an empty database on its own."
+    "moduleNotStandalone": "A module file restores into a system that still has its other data. Only the complete backup can rebuild an empty database on its own.",
+    "restoreNothingChanged": "Your data was not changed. The restore is all-or-nothing, so nothing from this backup was applied — fix the problem above and try again."
   },
   "preview": {
     "banner": "Previewing as {{email}} ({{role}})",

@@ -119,37 +119,42 @@ describe('a module export', () => {
 })
 
 describe('restoring a module file', () => {
-  it('goes through the same path as a complete backup', async () => {
-    const writes = []
-    from.mockImplementation((table) => ({
-      select: () => ({ range: async () => ({ data: [{ id: `${table}-1` }], error: null }) }),
-      upsert: async (rows) => {
-        writes.push({ table, count: rows.length })
-        return { error: null }
-      },
-    }))
+  // Restores upload through rma_restore_stage and apply in one transaction
+  // (BUG-025), so "written" means "uploaded for the atomic apply".
+  function captureRestore() {
+    const staged = []
+    rpc.mockImplementation(async (fn, args) => {
+      if (fn === 'rma_restore_begin') return { data: 'session-1', error: null }
+      if (fn === 'rma_restore_stage') {
+        staged.push({ table: args.p_table, count: args.p_rows.length })
+        return { data: args.p_rows.length, error: null }
+      }
+      if (fn === 'rma_restore_apply') {
+        const results = staged.map((w) => ({ table: w.table, count: w.count, attempted: w.count }))
+        return { data: { tables: results.length, rows: staged.length, results }, error: null }
+      }
+      if (fn === 'rma_restore_discard') return { data: null, error: null }
+      return { data: [{ seq_type: 'invoice', last_value: 1 }], error: null }
+    })
+    return staged
+  }
 
+  it('goes through the same path as a complete backup', async () => {
+    const staged = captureRestore()
     const file = await backup.exportModule('catalogue')
     const summary = await backup.importAll(file)
 
     expect(summary.success).toBe(true)
-    // Every catalogue table is restorable, so all of them should be written.
+    // Every catalogue table is restorable, so all of them should be uploaded.
     const catalogue = BACKUP_MODULES.find((m) => m.id === 'catalogue').tables
-    expect(writes.map((w) => w.table).sort()).toEqual([...catalogue].sort())
+    expect(staged.map((w) => w.table).sort()).toEqual([...catalogue].sort())
   })
 
   it('does not touch tables outside the file', async () => {
-    const writes = []
-    from.mockImplementation((table) => ({
-      select: () => ({ range: async () => ({ data: [{ id: `${table}-1` }], error: null }) }),
-      upsert: async () => {
-        writes.push(table)
-        return { error: null }
-      },
-    }))
-
+    const staged = captureRestore()
     await backup.importAll(await backup.exportModule('rma'))
-    expect(writes).not.toContain('customers')
-    expect(writes).not.toContain('products')
+    const tables = staged.map((w) => w.table)
+    expect(tables).not.toContain('customers')
+    expect(tables).not.toContain('products')
   })
 })
