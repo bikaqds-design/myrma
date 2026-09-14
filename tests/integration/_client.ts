@@ -100,7 +100,8 @@ export const PROTECTED_TABLES = [
 export const EXPECTED_COLUMNS: Record<string, string[]> = {
   customers: ['id', 'customer_code', 'company_name', 'contact_person', 'email', 'customer_type'],
   products: ['id', 'sku', 'product_name', 'stock_tracking_mode', 'status', 'brand_id'],
-  rma_tickets: ['id', 'rma_number', 'customer_id', 'ticket_status', 'priority', 'products'],
+  // customer_name: Inventory's unit detail reads it by RMA number.
+  rma_tickets: ['id', 'rma_number', 'customer_id', 'customer_name', 'ticket_status', 'priority', 'products'],
   inventory_units: [
     'id',
     'product_id',
