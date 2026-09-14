@@ -58,15 +58,19 @@ const PRODUCT_STATUS_COLORS = {
 // All 7 ticket statuses shown in the progress bar in order.
 const PROGRESS_STEPS = ['Open', 'In Progress', 'Pending', 'On Hold', 'Completed', 'Closed', 'Cancelled']
 
+// The status badge puts white text-sm on these fills, which needs 4.5:1. Every
+// -500 fill failed (On Hold was 1.92:1); the -700 shades range from 4.92
+// (yellow) to 7.90 (indigo). They are fixed hex, not theme tokens, so the
+// ratio holds in dark mode too.
 const STATUS_COLORS = {
-  Open: 'bg-blue-500',
-  'In Progress': 'bg-indigo-500',
-  Pending: 'bg-orange-500',
-  'On Hold': 'bg-yellow-500',
-  Completed: 'bg-teal-500',
-  Closed: 'bg-green-500',
-  Cancelled: 'bg-red-500',
-  New: 'bg-blue-500',
+  Open: 'bg-blue-700',
+  'In Progress': 'bg-indigo-700',
+  Pending: 'bg-orange-700',
+  'On Hold': 'bg-yellow-700',
+  Completed: 'bg-teal-700',
+  Closed: 'bg-green-700',
+  Cancelled: 'bg-red-700',
+  New: 'bg-blue-700',
 }
 
 const STATUS_STEP_COLORS = {
@@ -383,7 +387,7 @@ export default function RMATracker() {
                   </div>
                 </div>
                 <span
-                  className={`px-4 py-1.5 rounded-full text-sm font-semibold text-white ${STATUS_COLORS[ticket.ticket_status] || 'bg-gray-400'}`}
+                  className={`px-4 py-1.5 rounded-full text-sm font-semibold text-white ${STATUS_COLORS[ticket.ticket_status] || 'bg-gray-600'}`}
                 >
                   {t(`statusValues.${ticket.ticket_status}`, { defaultValue: ticket.ticket_status })}
                 </span>
