@@ -7,7 +7,7 @@
  * into the database when it arrived in a spreadsheet instead.
  */
 import { describe, it, expect } from 'vitest'
-import { isImportableEmail, contactFieldProblems } from '../lib/importValidation'
+import { isImportableEmail, contactFieldProblems, missingCustomerFields } from '../lib/importValidation'
 
 describe('isImportableEmail', () => {
   it('rejects the value from the finding', () => {
@@ -60,5 +60,24 @@ describe('contactFieldProblems', () => {
 
   it('does not truncate a short bad value into something confusing', () => {
     expect(contactFieldProblems({ email: 'x@' })[0]).toContain('x@')
+  })
+})
+
+// BUG-045: rows the add-customer form would refuse are imported, and named.
+describe('missingCustomerFields', () => {
+  it('reports nothing for a complete row', () => {
+    expect(missingCustomerFields({ contact_person: 'Mona', mobile: '01001234567' })).toEqual([])
+  })
+
+  it('names a missing mobile', () => {
+    expect(missingCustomerFields({ contact_person: 'Mona', mobile: '' })).toEqual(['mobile'])
+  })
+
+  it('names a missing contact person — allowed on a B2B import, required by the form', () => {
+    expect(missingCustomerFields({ company_name: 'Acme', mobile: '01001234567' })).toEqual(['contact person'])
+  })
+
+  it('treats whitespace as missing and names both when both are absent', () => {
+    expect(missingCustomerFields({ contact_person: '   ', mobile: null })).toEqual(['contact person', 'mobile'])
   })
 })

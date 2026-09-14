@@ -37,3 +37,24 @@ export function contactFieldProblems(row) {
   if (phone && phone.length > 50) problems.push('phone number too long')
   return problems
 }
+
+/**
+ * What an imported customer is missing that the add-customer form would demand.
+ * (Audit finding BUG-045.)
+ *
+ * The form requires a contact person and a mobile for every customer; the
+ * importer only requires a company name for B2B and a contact person for B2C.
+ * Enforcing the form's rules on import would refuse rows wholesale — 418 of the
+ * 888 customers in the current book have no mobile — so the owner chose to
+ * import them and say which ones need completing instead. RMA intake finds a
+ * customer by phone, so a customer with no mobile is one the counter cannot
+ * look up until someone adds it.
+ *
+ * @returns {string[]} field names the form requires that this row lacks
+ */
+export function missingCustomerFields(row) {
+  const missing = []
+  if (!String(row?.contact_person ?? '').trim()) missing.push('contact person')
+  if (!String(row?.mobile ?? '').trim()) missing.push('mobile')
+  return missing
+}

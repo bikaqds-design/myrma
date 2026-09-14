@@ -17,7 +17,7 @@ import { captureException } from '../../lib/sentry'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { EMPTY_FORM } from './_constants'
 import { AddCustomerModal, BulkUploadCustomersModal } from './_modals'
-import { contactFieldProblems } from '../../lib/importValidation'
+import { contactFieldProblems, missingCustomerFields } from '../../lib/importValidation'
 import {
   mobileKey,
   mobileKeysOf,
@@ -928,28 +928,6 @@ export default function Customers({
         toImport.length = 0
         toImport.push(...accepted)
 
-        // Damaged numbers are reported and still imported. A foreign customer
-        // has a foreign number, and a landline in the mobile field is something
-        // somebody meant to do — but 40% of the live book could not be dialled
-        // before this existed, so silence was not working either. (BUG-085.)
-        const malformed = toImport
-          .map((rec) => ({ rec, why: mobileFormatWarning(rec.mobile) }))
-          .filter((m) => m.why)
-        if (malformed.length > 0) {
-          console.warn(
-            [
-              'Customer CSV import — imported, but these phone numbers look wrong:',
-              ...malformed.map(
-                (m) =>
-                  `${m.rec.contact_person || m.rec.company_name || '(unnamed)'} — ${m.rec.mobile} (${m.why})`
-              ),
-            ].join('\n')
-          )
-          toast(t('customers.importMobileWarnings', { count: malformed.length }), {
-            icon: '\u26a0\ufe0f',
-            duration: 8000,
-          })
-        }
       }
 
       if (toImport.length === 0) {
@@ -963,6 +941,47 @@ export default function Customers({
       }
 
       await db.customers.bulkCreate(toImport)
+
+      // Reported only now that the rows are really in the database. The phone
+      // warning used to run before the insert and said "imported" even when the
+      // insert then failed.
+      //
+      // Damaged numbers (BUG-085) and customers missing what the add-customer
+      // form would require (BUG-045) are both imported, never dropped: a foreign
+      // number is still a number, and refusing every row without a mobile would
+      // turn away half a real customer book. What matters is that nobody has to
+      // discover the gaps later at the counter, so each one is named here.
+      const who = (rec) => rec.contact_person || rec.company_name || '(unnamed)'
+      const malformed = toImport
+        .map((rec) => ({ rec, why: mobileFormatWarning(rec.mobile) }))
+        .filter((m) => m.why)
+      if (malformed.length > 0) {
+        console.warn(
+          [
+            'Customer CSV import — imported, but these phone numbers look wrong:',
+            ...malformed.map((m) => `${who(m.rec)} — ${m.rec.mobile} (${m.why})`),
+          ].join('\n')
+        )
+        toast(t('customers.importMobileWarnings', { count: malformed.length }), {
+          icon: '\u26a0\ufe0f',
+          duration: 8000,
+        })
+      }
+      const incomplete = toImport
+        .map((rec) => ({ rec, missing: missingCustomerFields(rec) }))
+        .filter((m) => m.missing.length)
+      if (incomplete.length > 0) {
+        console.warn(
+          [
+            'Customer CSV import — imported, but these customers are missing details the form requires:',
+            ...incomplete.map((m) => `${who(m.rec)} — no ${m.missing.join(', no ')}`),
+          ].join('\n')
+        )
+        toast(t('customers.importMissingDetails', { count: incomplete.length }), {
+          icon: '\u26a0\ufe0f',
+          duration: 8000,
+        })
+      }
       // Rows rejected by validation used to vanish here: the toast reported
       // `skippedCount` (duplicates) but never `errors`, so a 500-row file with
       // 40 missing company names reported "460 imported" and the operator had
