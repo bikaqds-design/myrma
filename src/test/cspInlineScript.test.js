@@ -1,15 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { resolve } from 'node:path'
 
 // BUG-056: scripts are allowed by hash, not by 'unsafe-inline'. A hash is exact
 // to the byte, so editing the inline script in index.html without updating
 // vercel.json would silently block it in production — dark mode would stop
 // applying before first paint, and nothing else would say why.
-const root = resolve(__dirname, '../..')
-const html = readFileSync(resolve(root, 'index.html'), 'utf8')
-const vercel = JSON.parse(readFileSync(resolve(root, 'vercel.json'), 'utf8'))
+// Paths are relative to the repository root, where vitest runs.
+const html = readFileSync('index.html', 'utf8')
+const vercel = JSON.parse(readFileSync('vercel.json', 'utf8'))
 
 const csp = vercel.headers
   .flatMap((h) => h.headers)
