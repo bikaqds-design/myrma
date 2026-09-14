@@ -321,7 +321,6 @@
     "ticketStatusPlaceholder": "Ticket Status…",
     "productStatusPlaceholder": "Product Status…",
     "showingRange": "Showing {{from}}–{{to}} of {{total}} tickets",
-    "capWarning": "Showing first {{shown}} of {{total}} tickets. Use filters or search to find specific tickets.",
     "allCustomers": "All customers...",
     "noPermissionEdit": "You do not have permission to edit tickets",
     "editAssignedOnly": "You can only edit tickets assigned to you",
@@ -374,7 +373,9 @@
     "unassigned": "Unassigned",
     "bulkNoneAssigned": "None of the selected tickets are assigned to you.",
     "bulkSkippedNotAssigned": "Skipped {{n}} ticket(s) that are not assigned to you.",
-    "bulkSomeFailed": "{{n}} ticket(s) could not be updated."
+    "bulkSomeFailed": "{{n}} ticket(s) could not be updated.",
+    "kanbanShowMore": "Show {{next}} more ({{shown}} of {{total}})",
+    "failedExport": "Could not prepare the export: {{error}}"
   },
   "customers": {
     "title": "Customers",

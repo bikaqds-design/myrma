@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
-import { TICKET_STATUS, TICKET_STATUS_LIST } from '../../lib/constants'
+import { TICKET_STATUS } from '../../lib/constants'
 import { getStatusColor, getPriorityColor, formatDate } from './_utils'
 
 // Happy-path "next step" for the swipe quick action. Pending/On Hold/Closed/Cancelled
@@ -116,33 +116,22 @@ function KanbanCard({ ticket, onViewDetails, onQuickStatusChange, canQuickEdit, 
   )
 }
 
-export function KanbanView({ tickets, onViewDetails, onQuickStatusChange, canQuickEdit }) {
+/**
+ * The board. Each column is loaded on its own by the page (BUG-066): its first
+ * cards plus the exact number of tickets in that status, so a header count is
+ * true even when only some cards are on screen, and "Show more" fetches the
+ * next batch.
+ *
+ * The page also decides which columns exist. Statuses the database holds that
+ * TICKET_STATUS_LIST does not know get their own column rather than vanishing:
+ * 20260531 removed the ticket_status CHECK so deployments can configure their
+ * own statuses, and during QA two legacy tickets carrying 'New' left the board
+ * showing 12 of 14 while the list showed all 14.
+ *
+ * @param {{status: string, tickets: object[], count: number, loading: boolean}[]} columns
+ */
+export function KanbanView({ columns, pageSize, onLoadMore, onViewDetails, onQuickStatusChange, canQuickEdit }) {
   const { t } = useTranslation()
-
-  // Any status the data actually uses that TICKET_STATUS_LIST does not know
-  // about. Without these, such tickets match no column and the board silently
-  // drops them — they stay visible in the list view, so the two views disagree
-  // with no indication why. Found during QA: two legacy tickets carry 'New',
-  // leaving the board showing 12 of 14.
-  //
-  // Not a hypothetical to guard against, either: 20260531 deliberately removed
-  // the ticket_status CHECK constraint so deployments can configure their own
-  // statuses, which makes unknown values an expected condition rather than
-  // corruption. The board has to show them, and showing them under their own
-  // heading is what makes the drift noticeable enough to clean up.
-  const knownStatuses = new Set(TICKET_STATUS_LIST)
-  const unknownStatuses = [
-    ...new Set(
-      tickets
-        .map((tk) => tk.ticket_status)
-        .filter((s) => s && !knownStatuses.has(s))
-    ),
-  ].sort()
-
-  const columns = [...TICKET_STATUS_LIST, ...unknownStatuses].map((status) => ({
-    status,
-    tickets: tickets.filter((tk) => tk.ticket_status === status),
-  }))
 
   // Dropping a card on another column is just a status change, so it reuses the
   // same handler the swipe quick-action calls. Reordering within a column means
@@ -151,7 +140,7 @@ export function KanbanView({ tickets, onViewDetails, onQuickStatusChange, canQui
   const handleDragEnd = (result) => {
     const { source, destination, draggableId } = result
     if (!destination || destination.droppableId === source.droppableId) return
-    const ticket = tickets.find((tk) => tk.id === draggableId)
+    const ticket = columns.flatMap((col) => col.tickets).find((tk) => tk.id === draggableId)
     if (!ticket || !canQuickEdit?.(ticket)) return
     onQuickStatusChange?.(ticket, destination.droppableId)
   }
@@ -163,13 +152,13 @@ export function KanbanView({ tickets, onViewDetails, onQuickStatusChange, canQui
     // fit every column at its minimum width — no JS breakpoint logic needed.
     <DragDropContext onDragEnd={handleDragEnd}>
       <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-2" style={{ minHeight: '400px' }}>
-        {columns.map(({ status, tickets: colTickets }) => (
+        {columns.map(({ status, tickets: colTickets, count, loading }) => (
           <div key={status} className="flex-1 min-w-[200px] flex flex-col snap-start">
             <div className="flex items-center justify-between px-1 py-2 mb-2">
               <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full truncate ${getStatusColor(status)}`}>
                 {t(`statusValues.${status}`, status)}
               </span>
-              <span className="text-xs text-[#9aa4b2] font-medium tabular-nums ms-1 flex-shrink-0">{colTickets.length}</span>
+              <span className="text-xs text-[#9aa4b2] font-medium tabular-nums ms-1 flex-shrink-0">{count}</span>
             </div>
             <Droppable droppableId={status}>
               {(provided, snapshot) => (
@@ -182,8 +171,8 @@ export function KanbanView({ tickets, onViewDetails, onQuickStatusChange, canQui
                   style={{ maxHeight: 'calc(100vh - 340px)' }}
                 >
                   {colTickets.length === 0 && !snapshot.isDraggingOver ? (
-                    <p className="text-[11px] text-[#746f65] dark:text-[#a4acb7] text-center py-6">
-                      {t('tickets.kanbanNoTickets')}
+                    <p className="text-[11px] text-[#746f65] dark:text-[#a4acb7] text-center py-6" aria-live="polite">
+                      {loading ? t('common.loading') : t('tickets.kanbanNoTickets')}
                     </p>
                   ) : (
                     colTickets.map((tk, index) => (
@@ -213,6 +202,16 @@ export function KanbanView({ tickets, onViewDetails, onQuickStatusChange, canQui
                     ))
                   )}
                   {provided.placeholder}
+                  {colTickets.length < count && (
+                    <button
+                      type="button"
+                      onClick={() => onLoadMore?.(status)}
+                      disabled={loading}
+                      className="w-full py-2 text-[11px] font-medium text-[#4338ca] dark:text-[#a5b4fc] hover:underline disabled:opacity-50 disabled:cursor-wait"
+                    >
+                      {t('tickets.kanbanShowMore', { shown: colTickets.length, total: count, next: Math.min(pageSize, count - colTickets.length) })}
+                    </button>
+                  )}
                 </div>
               )}
             </Droppable>

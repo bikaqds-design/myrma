@@ -321,7 +321,6 @@
     "ticketStatusPlaceholder": "حالة التذكرة…",
     "productStatusPlaceholder": "حالة المنتج…",
     "showingRange": "عرض {{from}}–{{to}} من أصل {{total}} تذكرة",
-    "capWarning": "عرض أول {{shown}} من أصل {{total}} تذكرة. استخدم الفلاتر أو البحث للعثور على تذاكر محددة.",
     "allCustomers": "كل العملاء...",
     "noPermissionEdit": "ليس لديك صلاحية لتعديل التذاكر",
     "editAssignedOnly": "يمكنك فقط تعديل التذاكر المسندة إليك",
@@ -382,7 +381,9 @@
     "unassigned": "غير مُعيَّن",
     "bulkNoneAssigned": "لا توجد بين التذاكر المحددة أي تذكرة مُسندة إليك.",
     "bulkSkippedNotAssigned": "تم تخطي {{n}} تذكرة غير مُسندة إليك.",
-    "bulkSomeFailed": "تعذّر تحديث {{n}} تذكرة."
+    "bulkSomeFailed": "تعذّر تحديث {{n}} تذكرة.",
+    "kanbanShowMore": "عرض {{next}} أخرى ({{shown}} من {{total}})",
+    "failedExport": "تعذّر تجهيز التصدير: {{error}}"
   },
   "customers": {
     "title": "العملاء",

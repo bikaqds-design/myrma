@@ -7,7 +7,7 @@ const BarcodeScanner = (props) => (
   <Suspense fallback={null}><BarcodeScannerModule {...props} /></Suspense>
 )
 const CAMERA_SUPPORTED = typeof window !== 'undefined' && 'BarcodeDetector' in window
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { db, storage, notifications } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -370,7 +370,6 @@ export function TicketForm({
   customers = [],
   products = [],
   users = [],
-  tickets = [],
   userEmail,
   userRole,
   userPermissions,
@@ -458,7 +457,17 @@ export function TicketForm({
     return [false]
   })
   const [pendingFiles, setPendingFiles] = useState([])
-  const [previewRmaNumber] = useState(() => (editingTicket ? null : generateRmaNumber(tickets)))
+  // The number this ticket will probably get, asked of the database. It was
+  // computed from the ticket list the page had loaded, which pages now
+  // (BUG-066) — and was capped before that — so it could show a number already
+  // taken. The insert trigger (20260832) still assigns the real one on save.
+  const { data: peekedRmaNumber } = useQuery({
+    queryKey: ['rma-tickets', 'next-number'],
+    queryFn: () => db.rmaTickets.peekNextNumber(),
+    enabled: !editingTicket,
+    staleTime: 0,
+  })
+  const previewRmaNumber = editingTicket ? null : peekedRmaNumber || generateRmaNumber([])
 
   const fileInputRef = useRef(null)
   const customerDropdownRef = useRef(null)
@@ -668,7 +677,9 @@ export function TicketForm({
 
     setUploading(true)
     try {
-      const rmaNumber = editingTicket ? editingTicket.rma_number : generateRmaNumber(tickets)
+      // Only the folder the attachments upload under; the saved number comes back
+      // from the insert (see below).
+      const rmaNumber = editingTicket ? editingTicket.rma_number : previewRmaNumber
       const newAttachments = await uploadPendingAttachments(pendingFiles, rmaNumber, t)
       const allAttachments = [...(formData.attachments || []), ...newAttachments]
 
