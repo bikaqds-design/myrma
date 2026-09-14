@@ -460,7 +460,9 @@
     "oddMobileTitle": "This phone number looks wrong",
     "oddMobileMessage": "{{mobile}} — {{why}}. RMA intake finds a customer by phone, so a number that cannot be dialled is a customer the counter cannot find. Save it anyway?",
     "importMobileWarnings_one": "{{count}} imported record has a phone number that looks wrong — see the browser console for the list.",
-    "importMobileWarnings_other": "{{count}} imported records have phone numbers that look wrong — see the browser console for the list."
+    "importMobileWarnings_other": "{{count}} imported records have phone numbers that look wrong — see the browser console for the list.",
+    "importMissingDetails_one": "{{count}} imported customer is missing a contact person or mobile — see the browser console for the list.",
+    "importMissingDetails_other": "{{count}} imported customers are missing a contact person or mobile — see the browser console for the list."
   },
   "leads": {
     "title": "Leads",
@@ -4416,7 +4418,8 @@
     "footer": "Powered by <brand>myCRM</brand> — Secure service request tracking",
     "fileSizeBytes": "{{size}} B",
     "fileSizeKB": "{{size}} KB",
-    "fileSizeMB": "{{size}} MB"
+    "fileSizeMB": "{{size}} MB",
+    "searching": "Searching…"
   },
   "errorBoundary": {
     "title": "Something went wrong",
