@@ -948,7 +948,7 @@ function WarehouseDetailModal({
                       key={i}
                       className={`px-3 py-2.5 text-start font-semibold text-gray-600 border-b border-r border-gray-200 ${h.cls || ''}`}
                     >
-                      {t(`inventory:${h.key}`)}
+                      {t(`inventory.${h.key}`)}
                     </th>
                   ))}
                 </tr>
