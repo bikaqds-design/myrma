@@ -4172,6 +4172,7 @@
       "notProvisionedHint": "Apply migration 20260809_company_documents.sql."
     },
     "explorer": {
+      "showMore": "Show {{count}} more",
       "allDocuments": "All Documents",
       "browse": "Browse",
       "recent": "Recent",

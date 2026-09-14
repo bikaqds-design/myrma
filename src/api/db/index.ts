@@ -46,6 +46,7 @@ import { vendorLedger } from './vendorLedger.js'
 import { margin } from './margin.js'
 import { geo } from './geo.js'
 import { productDocuments } from './documents.js'
+import { knowledgeLists } from './knowledgeLists.js'
 import { companyDocuments } from './companyDocuments.js'
 
 export const db = {
@@ -133,6 +134,7 @@ export const db = {
   margin,
   geo,
   productDocuments,
+  knowledgeLists,
   companyDocuments,
 }
 
