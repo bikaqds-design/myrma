@@ -3454,6 +3454,7 @@
     "exit": "Exit preview"
   },
   "kb": {
+    "showMore": "Show {{count}} more",
     "needHelpLink": "Need help? Browse FAQs →",
     "headerSubtitle": "Help Center",
     "title": "Frequently Asked Questions",

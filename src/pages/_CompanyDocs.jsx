@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../api/supabaseClient'
 import { Table, Pagination, Button, Label, Input, Textarea } from '../components/ui'
@@ -58,27 +58,33 @@ export default function CompanyDocs({ currentUserEmail, currentUserRole, current
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canEdit])
 
-  const { data: libraryRes, isLoading } = useQuery({
-    queryKey: ['company-documents', 'library'],
-    queryFn: () => db.companyDocuments.listAll(),
+  // Provisioning without reading the library. (BUG-066.)
+  const { data: provisioned, isLoading } = useQuery({
+    queryKey: ['company-documents', 'provisioned'],
+    queryFn: () => db.companyDocuments.isProvisioned(),
+    staleTime: 10 * 60_000,
   })
-  const allDocs = libraryRes?.data ?? EMPTY_ARRAY
 
   const { data: trashDocs = EMPTY_ARRAY, isFetching: trashLoading } = useQuery({
     queryKey: ['company-documents', 'trash'],
     queryFn: () => db.companyDocuments.listTrash(),
   })
 
-  const { data: searchRes, isFetching } = useQuery({
-    queryKey: ['company-documents', 'search', q],
-    queryFn: () => db.companyDocuments.search(q),
-    enabled: Boolean(q),
+  // One page of the list, or of the search, from the database. The list used
+  // to load every document and the search to stop at 100, both then paged
+  // here — past the Data API's row cap, silently incomplete. (BUG-066.)
+  const { data: pageResult, isFetching } = useQuery({
+    queryKey: ['company-documents', 'page', q, page, itemsPerPage],
+    queryFn: () => db.companyDocuments.listPage(q, page, itemsPerPage),
+    enabled: provisioned === true && view !== 'trash',
+    placeholderData: keepPreviousData,
   })
-
-  const rows = q ? searchRes?.data ?? EMPTY_ARRAY : allDocs
-  const total = rows.length
-  const pageStart = (page - 1) * itemsPerPage
-  const pageRows = rows.slice(pageStart, pageStart + itemsPerPage)
+  const pageRows = pageResult?.data ?? EMPTY_ARRAY
+  const total = pageResult?.count ?? 0
+  useEffect(() => {
+    const totalPages = Math.ceil(total / itemsPerPage)
+    if (pageResult && totalPages >= 1 && page > totalPages) setPage(totalPages)
+  }, [pageResult, total, page, itemsPerPage])
 
   const runSearch = (e) => {
     e?.preventDefault()
@@ -192,7 +198,7 @@ export default function CompanyDocs({ currentUserEmail, currentUserRole, current
     return <div className="py-16 text-center text-sm text-gray-500">{t('common.loading')}</div>
   }
 
-  if (libraryRes?.missing) {
+  if (provisioned === false) {
     return (
       <EmptyState
         title={t('knowledgeCenter.companyDocs.notProvisioned')}

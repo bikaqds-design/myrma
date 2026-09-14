@@ -1,5 +1,8 @@
 import { supabase } from '../client.js'
 import { assertAffected } from './_assertUpdated.js'
+import { fetchPage, fetchAllRows } from './_paging.js'
+import type { RangeResponse } from './_paging.js'
+import type { PagedResult } from './types.js'
 
 /**
  * Company documents — reference material that belongs to the business as a
@@ -61,35 +64,34 @@ const WITH_TEXT = `${DOC_COLUMNS}, extracted_text`
 export const TRASH_RETENTION_DAYS = 5
 
 export const companyDocuments = {
-  async listAll(): Promise<{ data: CompanyDocumentRow[]; missing: boolean }> {
-    const { data, error } = await supabase
-      .from('company_documents')
-      .select(DOC_COLUMNS)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-    if (error) {
-      if (NOT_PROVISIONED.includes(error.code)) return { data: [], missing: true }
-      throw error
-    }
-    return { data: (data ?? []) as unknown as CompanyDocumentRow[], missing: false }
+  /** Whether the table is provisioned, without reading it. */
+  async isProvisioned(): Promise<boolean> {
+    const { error } = await supabase.from('company_documents').select('id', { count: 'exact', head: true })
+    if (!error) return true
+    if (NOT_PROVISIONED.includes(error.code ?? '')) return false
+    throw error
   },
 
-  /** Full-text search across title, description and the document body. */
-  async search(query: string): Promise<{ data: CompanyDocumentRow[]; missing: boolean }> {
-    const q = query.trim()
-    if (!q) return companyDocuments.listAll()
-
-    const { data, error } = await supabase
-      .from('company_documents')
-      .select(WITH_TEXT)
-      .is('deleted_at', null)
-      .textSearch('search_vector', q, { type: 'websearch', config: 'simple' })
-      .limit(100)
-    if (error) {
-      if (NOT_PROVISIONED.includes(error.code)) return { data: [], missing: true }
-      throw error
-    }
-    return { data: (data ?? []) as unknown as CompanyDocumentRow[], missing: false }
+  /**
+   * One page of live documents, newest first, with the exact count — or, with a
+   * query, of those whose title, description or body match it (websearch
+   * syntax), with the body back for the result. The list used to load every
+   * document, and the search to stop at 100, both then paged in the browser;
+   * the Data API caps a read at 1 000 rows. (BUG-066.)
+   */
+  async listPage(query: string | null | undefined, page: number, pageSize: number): Promise<PagedResult<CompanyDocumentRow>> {
+    const q = query?.trim()
+    return fetchPage<CompanyDocumentRow>((from, to): PromiseLike<RangeResponse> => {
+      const base = supabase
+        .from('company_documents')
+        .select(q ? WITH_TEXT : DOC_COLUMNS, { count: 'exact' })
+        .is('deleted_at', null)
+      const matching = q ? base.textSearch('search_vector', q, { type: 'websearch', config: 'simple' }) : base
+      return matching
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to) as unknown as PromiseLike<RangeResponse>
+    }, page, pageSize)
   },
 
   async create(input: {
@@ -153,33 +155,44 @@ export const companyDocuments = {
     assertAffected(data, 'Document')
   },
 
+  /** Everything in Trash within its retention window, newest first — all of it, in chunks. (BUG-066.) */
   async listTrash(): Promise<CompanyDocumentRow[]> {
     const cutoff = new Date(Date.now() - TRASH_RETENTION_DAYS * 86_400_000).toISOString()
-    const { data, error } = await supabase
-      .from('company_documents')
-      .select(DOC_COLUMNS)
-      .not('deleted_at', 'is', null)
-      .gt('deleted_at', cutoff)
-      .order('deleted_at', { ascending: false })
-    if (error) {
-      if (NOT_PROVISIONED.includes(error.code)) return []
+    try {
+      return await fetchAllRows<CompanyDocumentRow>((from, to): PromiseLike<RangeResponse> =>
+        supabase
+          .from('company_documents')
+          .select(DOC_COLUMNS)
+          .not('deleted_at', 'is', null)
+          .gt('deleted_at', cutoff)
+          .order('deleted_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to) as unknown as PromiseLike<RangeResponse>
+      )
+    } catch (error) {
+      if (NOT_PROVISIONED.includes((error as { code?: string })?.code ?? '')) return []
       throw error
     }
-    return (data ?? []) as unknown as CompanyDocumentRow[]
   },
 
   /** Trashed past the retention window. See src/lib/documentTrash.js for the sweep. */
   async listExpiredTrash(): Promise<CompanyDocumentRow[]> {
     const cutoff = new Date(Date.now() - TRASH_RETENTION_DAYS * 86_400_000).toISOString()
-    const { data, error } = await supabase
-      .from('company_documents')
-      .select(DOC_COLUMNS)
-      .not('deleted_at', 'is', null)
-      .lte('deleted_at', cutoff)
-    if (error) {
-      if (NOT_PROVISIONED.includes(error.code)) return []
+    // All of them: a purge that stopped at the row cap would leave the rest in
+    // Trash past their date. (BUG-066.)
+    try {
+      return await fetchAllRows<CompanyDocumentRow>((from, to): PromiseLike<RangeResponse> =>
+        supabase
+          .from('company_documents')
+          .select(DOC_COLUMNS)
+          .not('deleted_at', 'is', null)
+          .lte('deleted_at', cutoff)
+          .order('id', { ascending: true })
+          .range(from, to) as unknown as PromiseLike<RangeResponse>
+      )
+    } catch (error) {
+      if (NOT_PROVISIONED.includes((error as { code?: string })?.code ?? '')) return []
       throw error
     }
-    return (data ?? []) as unknown as CompanyDocumentRow[]
   },
 }

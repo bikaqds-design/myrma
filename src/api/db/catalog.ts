@@ -380,6 +380,28 @@ export const products = {
   },
 
   /**
+   * Every product whose SKU could match at least one of these normalised
+   * filename bases: exact, or contained when the SKU has 4+ characters
+   * (rma_product_sku_candidates, 20260856). Bulk upload runs src/lib/skuMatch.js
+   * over this list; any product that could win a file is in it, so the result
+   * is the same as matching against the whole catalogue — which it used to load
+   * into the browser, capped by the Data API at 1 000 rows. (BUG-066.)
+   */
+  async skuCandidates(bases: string[]): Promise<Pick<ProductRow, 'id' | 'sku' | 'product_name'>[]> {
+    if (!bases.some(Boolean)) return []
+    const rows = await fetchAllRows<{ base_index: number; id: string; sku: string; product_name: string }>((from, to) =>
+      supabase
+        .rpc('rma_product_sku_candidates', { p_bases: bases })
+        .order('base_index', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
+    const byId = new Map<string, Pick<ProductRow, 'id' | 'sku' | 'product_name'>>()
+    for (const r of rows) if (!byId.has(r.id)) byId.set(r.id, { id: r.id, sku: r.sku, product_name: r.product_name })
+    return [...byId.values()]
+  },
+
+  /**
    * Products by exact name, as `{ [name]: product }`. Where names repeat, the
    * most recently created wins — what `.find()` over the old newest-first list
    * returned, so a lookup by name resolves to the same product it did.
