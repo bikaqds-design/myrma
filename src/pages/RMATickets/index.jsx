@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueries, useQueryClient, keepPreviousData } from '@tanstack/react-query'
+import { useDebouncedValue } from '../../lib/useDebouncedValue'
 import { supabase, db, branding as brandingAPI, notifications } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
 import { useUrlState } from '../../lib/useUrlState'
@@ -12,7 +13,7 @@ import { Button, PageHeader } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
 import ExportMenu from '../../components/ExportMenu'
 import * as XLSX from 'xlsx'
-import { ROLES, TICKET_STATUS_RESOLVED, TICKET_STATUS_LIST, PRIORITY_LIST, PRODUCT_STATUS_LIST } from '../../lib/constants'
+import { ROLES, TICKET_STATUS_LIST, PRIORITY_LIST, PRODUCT_STATUS_LIST } from '../../lib/constants'
 import { captureException } from '../../lib/sentry'
 import { canEditTicket, canChangeTicketStatus, partitionTickets } from '../../lib/ticketPermissions'
 import { dispatchRmaStageMoves } from '../../lib/rmaStageMoves'
@@ -33,14 +34,6 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const tr = t
   const queryClient = useQueryClient()
 
-  // P-1: TanStack Query — cached fetch; stale data renders instantly on re-visit
-  // `= EMPTY_ARRAY`, not `= []`: `tickets` is listed in two effect dependency
-  // arrays below, and a fresh `[]` each render looped both until data arrived.
-  const { data: tickets = EMPTY_ARRAY, isLoading: loading } = useQuery({
-    queryKey: ['rma-tickets'],
-    queryFn: () => db.rmaTickets.list(),
-    staleTime: 60_000,
-  })
   const { data: customers = EMPTY_ARRAY } = useQuery({
     queryKey: ['customers'],
     queryFn: () => db.customers.list(),
@@ -56,16 +49,21 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     queryFn: () => db.userRoles.directory(),
     staleTime: 5 * 60_000,
   })
+  // How many tickets exist at all, ignoring search and filters. Tells an empty
+  // table apart from an empty search, and sizes "Export all".
   const { data: ticketsTotalCount = null } = useQuery({
     queryKey: ['rma-tickets-count'],
-    queryFn: async () => {
-      const r = await db.rmaTickets.listPaged(0, 1)
-      return r.count
-    },
+    queryFn: () => db.rmaTickets.count(),
+    staleTime: 60_000,
+  })
+  // Statuses and technicians in use, from the database. The technician filter
+  // and the Kanban's extra columns used to be derived from the loaded list.
+  const { data: filterOptions = { statuses: EMPTY_ARRAY, technicians: EMPTY_ARRAY } } = useQuery({
+    queryKey: ['rma-tickets', 'filter-options'],
+    queryFn: () => db.rmaTickets.filterOptions(),
     staleTime: 60_000,
   })
 
-  const [filteredTickets, setFilteredTickets] = useState([])
   // Two-way URL state. status and overdue were already read from the URL on
   // mount — inbound links exist — but never written back, so changing a filter
   // here produced a view nobody could link to. The param names are unchanged,
@@ -92,6 +90,13 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const [filterCustomer, setFilterCustomer] = useState('')
   const [filterCustomerSearch, setFilterCustomerSearch] = useState('')
   const [showFilterCustomerDropdown, setShowFilterCustomerDropdown] = useState(false)
+  const debouncedCustomerSearch = useDebouncedValue(filterCustomerSearch)
+  const { data: customerNameOptions = EMPTY_ARRAY } = useQuery({
+    queryKey: ['rma-tickets', 'customer-names', debouncedCustomerSearch],
+    queryFn: () => db.rmaTickets.customerNames(debouncedCustomerSearch, 50),
+    enabled: showFilterCustomerDropdown,
+    staleTime: 60_000,
+  })
 
   const [showModal, setShowModal] = useState(false)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
@@ -123,19 +128,92 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const [bulkProductStatus, setBulkProductStatus] = useState('')
   const [bulkProcessing, setBulkProcessing] = useState(false)
 
-  useEffect(() => {
-    handleSearchAndSort()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    searchTerm,
-    tickets,
-    sortConfig,
-    filterStatus,
-    filterOverdue,
-    filterPriority,
-    filterAssigned,
-    filterCustomer,
-  ])
+  // ── Tickets, from the database (BUG-066) ───────────────────────────────────
+  // This screen loaded every ticket and searched, filtered, sorted and paged in
+  // the browser. The Data API returns at most 1 000 rows per request, so past
+  // that tickets silently disappeared from the list and the board. Now the
+  // database does all of it and only what is on screen is fetched: one page in
+  // the table, the first cards of each column on the board.
+  const debouncedSearch = useDebouncedValue(searchTerm)
+  const listFilters = {
+    search: debouncedSearch,
+    status: filterStatus,
+    priority: filterPriority,
+    assigned: filterAssigned,
+    customer: filterCustomer,
+    overdue: Boolean(filterOverdue),
+  }
+  const listSort = { column: sortConfig.key, ascending: sortConfig.direction === 'asc' }
+  const pageKey = ['rma-tickets', 'page', { ...listFilters, sort: listSort, page: currentPage, pageSize: itemsPerPage }]
+  const {
+    data: pageResult,
+    isLoading: pageLoading,
+    isFetching: fetchingPage,
+  } = useQuery({
+    queryKey: pageKey,
+    queryFn: () =>
+      db.rmaTickets.listPage({ ...listFilters, sort: listSort, page: currentPage, pageSize: itemsPerPage }),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+    enabled: viewMode === 'table',
+  })
+  const paginatedTickets = pageResult?.data ?? EMPTY_ARRAY
+  const matchingCount = pageResult?.count ?? 0
+
+  // The board: one query per column, each returning its first cards and the
+  // column's full count. Statuses the database holds that TICKET_STATUS_LIST
+  // does not know still get a column (see KanbanView for why). A status filter
+  // leaves every other column empty, as it did when the board was fed the
+  // filtered list.
+  const [columnLimits, setColumnLimits] = useState({})
+  const KANBAN_PAGE = 50
+  const kanbanStatuses = [
+    ...TICKET_STATUS_LIST,
+    ...filterOptions.statuses.filter((st) => !TICKET_STATUS_LIST.includes(st)),
+  ]
+  const kanbanQueries = useQueries({
+    queries: kanbanStatuses.map((status) => {
+      const limit = columnLimits[status] ?? KANBAN_PAGE
+      return {
+        queryKey: ['rma-tickets', 'kanban', status, { ...listFilters, limit }],
+        queryFn: () =>
+          filterStatus && filterStatus !== status
+            ? { data: [], count: 0 }
+            : db.rmaTickets.listColumn(status, listFilters, limit),
+        placeholderData: keepPreviousData,
+        staleTime: 60_000,
+        enabled: viewMode === 'kanban',
+      }
+    }),
+  })
+  const kanbanColumns = kanbanStatuses.map((status, i) => {
+    const result = kanbanQueries[i]?.data
+    return {
+      status,
+      tickets: result?.data ?? EMPTY_ARRAY,
+      count: result?.count ?? 0,
+      loading: kanbanQueries[i]?.isFetching ?? false,
+    }
+  })
+  // The full-page skeleton is for the first visit only. Switching to the board
+  // must not blank the toolbar and filters while its columns load; each column
+  // says it is loading instead.
+  const loading = viewMode === 'table' && pageLoading && ticketsTotalCount === null
+  const loadMoreColumn = (status) =>
+    setColumnLimits((prev) => ({ ...prev, [status]: (prev[status] ?? KANBAN_PAGE) + KANBAN_PAGE }))
+
+  /**
+   * Apply a change to one ticket wherever it is cached: this screen's pages and
+   * board columns, and the Dashboard's list, which still holds a plain array
+   * under ['rma-tickets'].
+   */
+  const patchCachedTickets = (patch) =>
+    queryClient.setQueriesData({ queryKey: ['rma-tickets'] }, (old) => {
+      if (Array.isArray(old)) return patch(old)
+      if (old && Array.isArray(old.data)) return { ...old, data: patch(old.data) }
+      return old
+    })
+
   useEffect(() => {
     safeStorage.set('rmaTicketsViewMode', viewMode)
   }, [viewMode])
@@ -151,7 +229,16 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   // would drop the page from a shared link locally but not in production.
   const lastFilters = useRef(null)
   useEffect(() => {
-    const signature = JSON.stringify([searchTerm, filterStatus, filterPriority, filterOverdue, itemsPerPage])
+    const signature = JSON.stringify([
+      searchTerm,
+      filterStatus,
+      filterPriority,
+      filterOverdue,
+      filterAssigned,
+      filterCustomer,
+      sortConfig,
+      itemsPerPage,
+    ])
     if (lastFilters.current === null) {
       lastFilters.current = signature
       return
@@ -163,10 +250,23 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     // Dependencies must mirror `signature` exactly. They had drifted:
     // filterOverdue was in the signature but not here, so toggling the overdue
     // filter never reset the page — you stayed on page 7 of a now-shorter list
-    // and saw an empty table. filterAssigned, filterCustomer and sortConfig
-    // were here but not in the signature, so they re-ran the effect only to hit
-    // the early return.
-  }, [searchTerm, filterStatus, filterPriority, filterOverdue, itemsPerPage, setCurrentPage, setSelectedTickets])
+    // and saw an empty table. Assigned, customer and sort are in the signature
+    // now that the database orders the rows: page 3 under a different filter
+    // or order is a different set of tickets, and a selection made on the old
+    // one must not survive onto rows nobody ticked. (BUG-066.)
+    setColumnLimits({})
+  }, [
+    searchTerm,
+    filterStatus,
+    filterPriority,
+    filterOverdue,
+    filterAssigned,
+    filterCustomer,
+    sortConfig,
+    itemsPerPage,
+    setCurrentPage,
+    setSelectedTickets,
+  ])
 
   useEffect(() => {
     const handler = (e) => {
@@ -231,9 +331,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     if (oldValue === newValue) { setInlineEdit({ ticketId: null, field: null }); return }
     const updateData = { [field]: newValue, updated_by: userEmail, updated_date: new Date().toISOString() }
     // Optimistic update
-    queryClient.setQueryData(['rma-tickets'], (old = []) =>
-      old.map((t) => (t.id === ticket.id ? { ...t, ...updateData } : t))
-    )
+    patchCachedTickets((rows) => rows.map((t) => (t.id === ticket.id ? { ...t, ...updateData } : t)))
     setInlineEdit({ ticketId: null, field: null })
     try {
       await db.rmaTickets.update(ticket.id, updateData)
@@ -254,24 +352,40 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       toast.success(t('tickets.fieldUpdated', { field: field === 'ticket_status' ? t('common.status') : t('common.priority') }))
     } catch {
       // Rollback
-      queryClient.setQueryData(['rma-tickets'], (old = []) =>
-        old.map((t) => (t.id === ticket.id ? { ...t, [field]: oldValue } : t))
-      )
+      patchCachedTickets((rows) => rows.map((t) => (t.id === ticket.id ? { ...t, [field]: oldValue } : t)))
       toast.error(t('tickets.failedUpdate'))
     }
   }
 
+  // A link to a ticket opens it by id. It used to look the id up in the loaded
+  // list, so a ticket past the cap could not be opened from a link at all.
   useEffect(() => {
-    if (!tickets.length) return
     const urlTicketId = new URLSearchParams(window.location.search).get('ticket')
     const targetId = initialTicketId || urlTicketId
     if (!targetId) return
-    const t = tickets.find((tk) => tk.id === targetId)
-    if (t) {
-      setSelectedTicket(t)
-      setShowDetailsModal(true)
+    let cancelled = false
+    db.rmaTickets
+      .get(targetId)
+      .then((found) => {
+        if (cancelled || !found) return
+        setSelectedTicket(found)
+        setShowDetailsModal(true)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
     }
-  }, [initialTicketId, tickets])
+  }, [initialTicketId])
+
+  // The open ticket, kept current after edits. Starts from the row that was
+  // clicked, so the drawer never waits on a request to appear.
+  const { data: drawerTicket } = useQuery({
+    queryKey: ['rma-tickets', 'one', selectedTicket?.id],
+    queryFn: () => db.rmaTickets.get(selectedTicket.id),
+    enabled: Boolean(showDetailsModal && selectedTicket?.id),
+    placeholderData: selectedTicket ?? undefined,
+    staleTime: 30_000,
+  })
 
   useEffect(() => {
     const onPop = () => {
@@ -285,63 +399,6 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
-  const handleSearchAndSort = () => {
-    let filtered = [...tickets]
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase()
-      filtered = filtered.filter(
-        (t) =>
-          t.rma_number?.toLowerCase().includes(q) ||
-          t.customer_name?.toLowerCase().includes(q) ||
-          t.ticket_status?.toLowerCase().includes(q) ||
-          t.priority?.toLowerCase().includes(q) ||
-          t.assigned_technician?.toLowerCase().includes(q) ||
-          // Serial number is how an RMA desk actually identifies a return: the
-          // caller has the device in hand and reads the serial off it, not the
-          // RMA number off an email they cannot find. Product name matters for
-          // the same reason ("the ASRock board I sent back").
-          //
-          // No extra query — rma_tickets.products is jsonb carrying
-          // product_name and serial_number per line, and the full list is
-          // already in memory for the client-side filtering above.
-          (t.products || []).some(
-            (p) =>
-              p?.serial_number?.toLowerCase().includes(q) ||
-              p?.product_name?.toLowerCase().includes(q)
-          )
-      )
-    }
-    if (filterStatus) filtered = filtered.filter((t) => t.ticket_status === filterStatus)
-    if (filterOverdue) {
-      const now = new Date()
-      filtered = filtered.filter(
-        (t) => t.due_date && new Date(t.due_date) < now && !TICKET_STATUS_RESOLVED.includes(t.ticket_status)
-      )
-    }
-    if (filterPriority) filtered = filtered.filter((t) => t.priority === filterPriority)
-    if (filterAssigned) filtered = filtered.filter((t) => t.assigned_technician === filterAssigned)
-    if (filterCustomer) filtered = filtered.filter((t) => t.customer_name === filterCustomer)
-    filtered.sort((a, b) => {
-      let aVal = a[sortConfig.key] || ''
-      let bVal = b[sortConfig.key] || ''
-      if (
-        sortConfig.key === 'created_date' ||
-        sortConfig.key === 'due_date' ||
-        sortConfig.key === 'updated_date'
-      ) {
-        aVal = new Date(aVal || 0).getTime()
-        bVal = new Date(bVal || 0).getTime()
-      } else {
-        aVal = aVal.toString().toLowerCase()
-        bVal = bVal.toString().toLowerCase()
-      }
-      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
-      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
-      return 0
-    })
-    setFilteredTickets(filtered)
-  }
-
   const handleSort = (key) => {
     setSortConfig((prev) => ({
       key,
@@ -349,10 +406,15 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     }))
   }
 
-  const totalPages = Math.ceil(filteredTickets.length / itemsPerPage)
+  const totalPages = Math.ceil(matchingCount / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = Math.min(startIndex + itemsPerPage, filteredTickets.length)
-  const paginatedTickets = filteredTickets.slice(startIndex, endIndex)
+  const endIndex = Math.min(startIndex + paginatedTickets.length, matchingCount)
+
+  // A page that no longer exists — its last ticket was deleted, or a shared
+  // link points past the end — steps back to the last one that does.
+  useEffect(() => {
+    if (pageResult && totalPages >= 1 && currentPage > totalPages) setCurrentPage(totalPages)
+  }, [pageResult, totalPages, currentPage, setCurrentPage])
 
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
@@ -426,9 +488,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     }
     openConfirm(t('tickets.deleteTicketTitle'), t('tickets.deleteTicketConfirm'), async () => {
       closeConfirm()
-      // UX-6 optimistic: remove from list immediately; rollback on error
-      const previousTickets = queryClient.getQueryData(['rma-tickets'])
-      queryClient.setQueryData(['rma-tickets'], (old) => old?.filter((t) => t.id !== id) ?? [])
+      // UX-6 optimistic: remove from every cached list immediately; refetch on error
+      patchCachedTickets((rows) => rows.filter((t) => t.id !== id))
       try {
         await db.rmaTickets.delete(id)
         db.userActivity
@@ -452,7 +513,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         queryClient.invalidateQueries({ queryKey: ['rma-tickets-count'] })
       } catch (err) {
         captureException(err, { page: 'RMATickets', context: 'deleteTicket' })
-        queryClient.setQueryData(['rma-tickets'], previousTickets) // rollback on error
+        queryClient.invalidateQueries({ queryKey: ['rma-tickets'] }) // restore from the server
         toast.error(t('tickets.failedDelete'))
       }
     })
@@ -510,7 +571,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     // a technician update their own assignments and nothing else, so sending the
     // rest earned a refusal that failed the whole batch — after an activity entry
     // had already been written for every selected ticket. (BUG-071)
-    const selected = selectedTickets.map((id) => tickets.find((row) => row.id === id))
+    const selected = paginatedTickets.filter((row) => selectedTickets.includes(row.id))
     const { permitted, skipped } = partitionTickets(selected, (ticket) =>
       canChangeTicketStatus(canDo, ticket, userEmail)
     )
@@ -590,7 +651,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       toast.error(t('tickets.noPermissionEdit2'))
       return
     }
-    const selected = selectedTickets.map((id) => tickets.find((row) => row.id === id))
+    const selected = paginatedTickets.filter((row) => selectedTickets.includes(row.id))
     const { permitted, skipped } = partitionTickets(selected, (ticket) =>
       canEditTicket(canDo, ticket, userEmail)
     )
@@ -939,6 +1000,21 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
    * had never been noticed. A real sheet writer removes the whole class of
    * problem rather than adding quoting rules to string concatenation.
    */
+  /**
+   * The rows for an export scope, read from the database: "all" and "filtered"
+   * in chunks with no cap. "Selected" is on screen already — a selection never
+   * outlives its page.
+   */
+  const loadExportRows = async (scope) => {
+    if (scope === 'selected') return paginatedTickets.filter((tk) => selectedTickets.includes(tk.id))
+    try {
+      return await db.rmaTickets.listAllMatching(scope === 'filtered' ? listFilters : {}, listSort)
+    } catch (err) {
+      toast.error(t('tickets.failedExport', { error: err?.message || '' }))
+      throw err
+    }
+  }
+
   const handleExport = (rows, scope) => {
     if (!canDo('export')) {
       toast.error(t('tickets.noPermissionExport'))
@@ -1122,9 +1198,10 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           </div>
           {canDo('export') && (
             <ExportMenu
-              allRows={tickets}
-              filteredRows={filteredTickets}
-              selectedRows={tickets.filter((tk) => selectedTickets.includes(tk.id))}
+              allCount={ticketsTotalCount ?? 0}
+              filteredCount={viewMode === 'table' ? matchingCount : ticketsTotalCount ?? 0}
+              selectedCount={selectedTickets.length}
+              loadRows={loadExportRows}
               ns="tickets"
               onExport={handleExport}
             />
@@ -1198,8 +1275,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
             >
               <option value="">{t('common.all')}</option>
-              {[...new Set(tickets.map((t) => t.assigned_technician).filter(Boolean))]
-                .sort()
+              {filterOptions.technicians
                 .map((email) => (
                   <option key={email} value={email}>
                     {email}
@@ -1253,19 +1329,10 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               </div>
               {showFilterCustomerDropdown &&
                 (() => {
-                  const q = filterCustomerSearch.toLowerCase()
-                  const dbNames = customers
-                    .map((c) =>
-                      c.customer_type === 'B2B' && c.company_name
-                        ? c.company_name
-                        : c.contact_person
-                    )
-                    .filter(Boolean)
-                  const ticketNames = tickets.map((t) => t.customer_name).filter(Boolean)
-                  const allNames = [...new Set([...dbNames, ...ticketNames])].sort()
-                  const filtered = q
-                    ? allNames.filter((n) => n.toLowerCase().includes(q))
-                    : allNames
+                  // Names on tickets, matched in the database. The filter
+                  // compares ticket.customer_name exactly, so a customer with
+                  // no tickets could only ever produce an empty list.
+                  const filtered = customerNameOptions
                   return filtered.length > 0 ? (
                     <div className="absolute z-30 start-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-xl max-h-52 overflow-y-auto">
                       {filtered.map((name) => (
@@ -1305,20 +1372,12 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
         </div>
       )}
 
-      {/* Cap warning banner (H-4) */}
-      {ticketsTotalCount !== null && ticketsTotalCount > tickets.length && (
-        <div className="mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex items-center gap-2">
-          <span>⚠️</span>
-          <span>
-            {t('tickets.capWarning', { shown: tickets.length, total: ticketsTotalCount })}
-          </span>
-        </div>
-      )}
-
       {/* Kanban view */}
       {viewMode === 'kanban' && (
         <KanbanView
-          tickets={filteredTickets}
+          columns={kanbanColumns}
+          pageSize={KANBAN_PAGE}
+          onLoadMore={loadMoreColumn}
           onViewDetails={handleViewDetails}
           onQuickStatusChange={(ticket, newStatus) => handleInlineUpdate(ticket, 'ticket_status', newStatus)}
           canQuickEdit={(ticket) => canChangeTicketStatus(canDo, ticket, userEmail)}
@@ -1329,7 +1388,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       {viewMode === 'table' && (<>
       <div className="flex items-center justify-between text-sm text-gray-600">
         <div>
-          {t('tickets.showingRange', { from: filteredTickets.length === 0 ? 0 : startIndex + 1, to: endIndex, total: filteredTickets.length })}
+          {t('tickets.showingRange', { from: matchingCount === 0 ? 0 : startIndex + 1, to: endIndex, total: matchingCount })}
         </div>
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-600">{t('common.itemsPerPage')}:</label>
@@ -1509,7 +1568,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody aria-busy={fetchingPage} className="bg-white divide-y divide-gray-200">
             {/* `t` below is the TICKET, not the translator: translations inside
                 this map must use `tr` (which is the same function, aliased at the
                 top of the file). Five calls here did not, and called the ticket
@@ -1723,11 +1782,11 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
                   <EmptyState
                     preset="tickets"
                     description={
-                      tickets.length > 0
+                      (ticketsTotalCount ?? 0) > 0
                         ? t('tickets.adjustFilters')
                         : t('tickets.createFirstHint')
                     }
-                    action={canDo('create') && tickets.length === 0 ? handleAddNew : undefined}
+                    action={canDo('create') && ticketsTotalCount === 0 ? handleAddNew : undefined}
                     actionLabel={t('tickets.createFirstTicket')}
                   />
                 </td>
@@ -1743,8 +1802,8 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           <div className="text-sm text-gray-600">
             {t('common.showingRange', {
               start: startIndex + 1,
-              end: Math.min(startIndex + itemsPerPage, filteredTickets.length),
-              total: filteredTickets.length,
+              end: endIndex,
+              total: matchingCount,
             })}
           </div>
           <div className="flex items-center gap-2">
@@ -1803,7 +1862,6 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
           customers={customers}
           products={products}
           users={users}
-          tickets={tickets}
           userEmail={userEmail}
           userRole={userRole}
           userPermissions={userPermissions}
@@ -1813,7 +1871,7 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       {/* ─── DETAILS MODAL ─── */}
       {showDetailsModal && selectedTicket && (
         <TicketDrawer
-          ticket={tickets.find((t) => t.id === selectedTicket.id) || selectedTicket}
+          ticket={drawerTicket ?? selectedTicket}
           onClose={() => {
             handleCloseDetails()
             setSelectedTicket(null)
