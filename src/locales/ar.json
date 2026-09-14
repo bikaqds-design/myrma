@@ -4627,7 +4627,8 @@
     "footer": "مقدَّم من <brand>myCRM</brand> — تتبّع آمن لطلبات الخدمة",
     "fileSizeBytes": "{{size}} بايت",
     "fileSizeKB": "{{size}} كيلوبايت",
-    "fileSizeMB": "{{size}} ميجابايت"
+    "fileSizeMB": "{{size}} ميجابايت",
+    "searching": "جارٍ البحث…"
   },
   "errorBoundary": {
     "title": "حدث خطأ ما",

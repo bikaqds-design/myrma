@@ -4416,7 +4416,8 @@
     "footer": "Powered by <brand>myCRM</brand> — Secure service request tracking",
     "fileSizeBytes": "{{size}} B",
     "fileSizeKB": "{{size}} KB",
-    "fileSizeMB": "{{size}} MB"
+    "fileSizeMB": "{{size}} MB",
+    "searching": "Searching…"
   },
   "errorBoundary": {
     "title": "Something went wrong",

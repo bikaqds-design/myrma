@@ -323,7 +323,13 @@ export default function RMATracker() {
             style={{ backgroundColor: primaryColor }}
           >
             {loading ? (
-              <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+              <>
+                <div
+                  aria-hidden="true"
+                  className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                />
+                <span className="sr-only">{t('tracker.searching')}</span>
+              </>
             ) : (
               t('tracker.track')
             )}
