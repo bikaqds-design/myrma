@@ -37,4 +37,4 @@
  * replacement for the `[]` literal it replaces.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const EMPTY_ARRAY: any[] = Object.freeze([]) as any[]
+export const EMPTY_ARRAY: any[] = Object.freeze([]) as unknown as any[]

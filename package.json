@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint src",
     "lint:ci": "eslint src --rule \"{'no-restricted-syntax':'off'}\" --max-warnings 0",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint:fix": "eslint src --fix",
     "lint:ui": "eslint src -f json -o eslint-ui.json && node scripts/ui-guard-report.mjs",
     "format": "prettier --write src",
@@ -95,6 +96,7 @@
     "postcss": "^8.5.28",
     "prettier": "^3.8.3",
     "tailwindcss": "^3.4.17",
+    "typescript": "7.0.2",
     "vite": "^6.4.3",
     "vite-plugin-pwa": "^1.3.0",
     "vitest": "^4.1.7"

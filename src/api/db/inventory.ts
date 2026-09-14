@@ -407,7 +407,7 @@ export const inventory = {
       }
       const counts: InventoryStatsRow = { active_rma: 0, company_stock: 0, sent_to_manufacturer: 0, closed: 0, total: 0 }
       data.forEach((u: { status: string }) => {
-        if (u.status in counts) (counts as Record<string, number>)[u.status]++
+        if (u.status in counts) counts[u.status as keyof InventoryStatsRow]++
       })
       counts.total = data.length
       return counts

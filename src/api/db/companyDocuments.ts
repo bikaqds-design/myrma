@@ -71,7 +71,7 @@ export const companyDocuments = {
       if (NOT_PROVISIONED.includes(error.code)) return { data: [], missing: true }
       throw error
     }
-    return { data: (data ?? []) as CompanyDocumentRow[], missing: false }
+    return { data: (data ?? []) as unknown as CompanyDocumentRow[], missing: false }
   },
 
   /** Full-text search across title, description and the document body. */
@@ -89,7 +89,7 @@ export const companyDocuments = {
       if (NOT_PROVISIONED.includes(error.code)) return { data: [], missing: true }
       throw error
     }
-    return { data: (data ?? []) as CompanyDocumentRow[], missing: false }
+    return { data: (data ?? []) as unknown as CompanyDocumentRow[], missing: false }
   },
 
   async create(input: {
@@ -165,7 +165,7 @@ export const companyDocuments = {
       if (NOT_PROVISIONED.includes(error.code)) return []
       throw error
     }
-    return (data ?? []) as CompanyDocumentRow[]
+    return (data ?? []) as unknown as CompanyDocumentRow[]
   },
 
   /** Trashed past the retention window. See src/lib/documentTrash.js for the sweep. */
@@ -180,6 +180,6 @@ export const companyDocuments = {
       if (NOT_PROVISIONED.includes(error.code)) return []
       throw error
     }
-    return (data ?? []) as CompanyDocumentRow[]
+    return (data ?? []) as unknown as CompanyDocumentRow[]
   },
 }

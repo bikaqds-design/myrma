@@ -9,6 +9,7 @@
 
 import { db } from '../api/supabaseClient.js'
 import { RMA_STAGE_LOCATION, SYSTEM_WAREHOUSE_CODES } from './constants.js'
+import type { SystemWarehouseCode } from './constants.js'
 import type { InventoryUnitRow } from '../api/db/inventory.js'
 
 export interface RmaMove {
@@ -69,7 +70,11 @@ export function buildRmaMoves(
     }
 
     const statusText = match?.product_status || ''
-    const toCode = RMA_STAGE_LOCATION[statusText] || SYSTEM_WAREHOUSE_CODES.RMA_RECEIVED
+    // product_status is free text on the ticket, so an unknown value is real and
+    // looks up nothing, which the fallback already handles.
+    const toCode =
+      (RMA_STAGE_LOCATION as Record<string, SystemWarehouseCode | undefined>)[statusText] ||
+      SYSTEM_WAREHOUSE_CODES.RMA_RECEIVED
 
     moves.push({ unit_id: unit.id, to_code: toCode })
   }
