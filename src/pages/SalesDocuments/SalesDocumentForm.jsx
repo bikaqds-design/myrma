@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
+import { useCustomerSearch, useCustomer } from '../../lib/useLookups'
 import { computeDocumentTotals } from '../../api/db/_documentTotals'
 import { Button, Input, Select, Textarea, Label } from '../../components/ui'
 import { ProductSearchInput } from '../Pipeline/_shared'
@@ -26,7 +27,7 @@ function lineTotal(l) {
  * Free-form product names (no product_id) are allowed on quotations only;
  * SO/Invoice lines must resolve to a catalog product.
  */
-export default function SalesDocumentForm({ docType, initial = null, customers = [], products = [], salesReps = [], currentUserEmail, onCancel, onSaved }) {
+export default function SalesDocumentForm({ docType, initial = null, salesReps = [], currentUserEmail, onCancel, onSaved }) {
   const { t } = useTranslation()
   const isQuotation = docType === 'quotation'
   const isEdit = !!initial
@@ -53,13 +54,10 @@ export default function SalesDocumentForm({ docType, initial = null, customers =
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const customerMatches = useMemo(() => {
-    const q = customerQuery.trim().toLowerCase()
-    if (!q) return []
-    return customers
-      .filter((c) => (c.company_name || c.contact_person || '').toLowerCase().includes(q) || (c.customer_code || '').toLowerCase().includes(q))
-      .slice(0, 8)
-  }, [customerQuery, customers])
+  // Matches come from the database; this filtered the whole customer list,
+  // which the Data API caps at 1 000 rows. (BUG-066.)
+  const { results: customerMatches } = useCustomerSearch(customerQuery, { limit: 8, enabled: customerOpen })
+  const selectedCustomer = useCustomer(customerId)
 
   const updateLine = (i, patch) => setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
   const selectProduct = (i, product) => updateLine(i, { product_id: product.id, product_name: product.product_name })
@@ -88,7 +86,8 @@ export default function SalesDocumentForm({ docType, initial = null, customers =
   // to click. Quotations/SOs don't need it — they have an explicit "Send for
   // Approval" action of their own.
   const createInvoiceApprovalActivity = (invoice) => {
-    const customer = customers.find((c) => c.id === invoice.customer_id)
+    // The invoice was just saved for the customer picked in this form.
+    const customer = selectedCustomer?.id === invoice.customer_id ? selectedCustomer : null
     const customerName = customer?.company_name || customer?.contact_person || '—'
     // No inv_code exists yet (post() assigns it), so the code slot carries the
     // customer's own code to keep the pool row searchable.
@@ -168,7 +167,6 @@ export default function SalesDocumentForm({ docType, initial = null, customers =
     }
   }
 
-  const selectedCustomer = customers.find((c) => c.id === customerId)
   const inputCls = 'w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none'
 
   return (
@@ -250,7 +248,6 @@ export default function SalesDocumentForm({ docType, initial = null, customers =
                   value={l.product_name}
                   onChange={(text) => updateLine(i, { product_name: text, product_id: null })}
                   onSelectProduct={(p) => selectProduct(i, p)}
-                  products={products}
                   placeholder={t('salesDocuments.productPlaceholder')}
                   aria-label={t('salesDocuments.fProduct')}
                   className="flex-1"

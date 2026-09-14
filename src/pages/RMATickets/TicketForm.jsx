@@ -10,6 +10,8 @@ const CAMERA_SUPPORTED = typeof window !== 'undefined' && 'BarcodeDetector' in w
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { db, storage, notifications } from '../../api/supabaseClient'
+import { useCustomerSearch, useProductSearch, useProductsById } from '../../lib/useLookups'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import toast from 'react-hot-toast'
 import { notificationEventBus } from '../../lib/events/NotificationEventBus.js'
 import Modal from '../../components/Modal'
@@ -367,8 +369,6 @@ export function TicketForm({
   editingTicket,
   onClose,
   onSaved,
-  customers = [],
-  products = [],
   users = [],
   userEmail,
   userRole,
@@ -532,14 +532,14 @@ export function TicketForm({
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const filteredCustomersList = customers.filter((c) => {
-    const q = customerSearch.toLowerCase()
-    return (
-      !q ||
-      c.contact_person?.toLowerCase().includes(q) ||
-      c.company_name?.toLowerCase().includes(q) ||
-      c.mobile?.includes(q)
-    )
+  // From the database (BUG-066). This filtered the whole customer list, which
+  // the Data API caps at 1 000 rows, so a customer past the cap could not be
+  // picked. With nothing typed it lists the first 50 alphabetically; typing
+  // narrows.
+  const { results: filteredCustomersList } = useCustomerSearch(customerSearch, {
+    limit: 50,
+    minLength: 0,
+    enabled: showCustomerDropdown,
   })
 
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -550,13 +550,17 @@ export function TicketForm({
     overscan: 3,
   })
 
-  const filteredProductsList = (search) => {
-    if (!search) return products.slice(0, 8)
-    const q = search.toLowerCase()
-    return products
-      .filter((p) => p.product_name?.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q))
-      .slice(0, 6)
-  }
+  // One product dropdown is open at a time, so one database search follows it.
+  // This filtered the whole catalogue in the browser. (BUG-066.)
+  const activeProductIdx = showProductDropdowns.findIndex(Boolean)
+  const { results: activeProductMatches } = useProductSearch(productSearches[activeProductIdx] ?? '', {
+    limit: 8,
+    minLength: 0,
+    enabled: activeProductIdx >= 0,
+  })
+  const filteredProductsList = (idx) => (idx === activeProductIdx ? activeProductMatches : EMPTY_ARRAY)
+  // Catalogue rows for the products already on the form, for their tracking mode.
+  const lineProducts = useProductsById(formData.products.map((line) => line.product_id))
 
   const addProduct = () => {
     setFormData({ ...formData, products: [...formData.products, { ...EMPTY_PRODUCT }] })
@@ -601,7 +605,7 @@ export function TicketForm({
    */
   const isSerialRequired = (line) => {
     if (!line?.product_id) return true
-    const cat = products.find((p) => p.id === line.product_id)
+    const cat = lineProducts[line.product_id]
     return cat?.stock_tracking_mode !== 'bulk'
   }
 
@@ -697,7 +701,7 @@ export function TicketForm({
       // (covers existing tickets that have customer_id but customer_email was never stored)
       const resolvedCustomerEmail =
         formData.customer_email ||
-        customers.find((c) => c.id === formData.customer_id)?.email ||
+        (formData.customer_id ? (await db.customers.get(formData.customer_id).catch(() => null))?.email : null) ||
         editingTicket?.customer_email ||
         null
 
@@ -1061,9 +1065,9 @@ export function TicketForm({
                           required
                         />
                         {showProductDropdowns[idx] &&
-                          filteredProductsList(productSearches[idx]).length > 0 && (
+                          filteredProductsList(idx).length > 0 && (
                             <div className="absolute z-30 w-full bg-white border border-gray-200 rounded-lg shadow-xl mt-1 max-h-40 overflow-y-auto">
-                              {filteredProductsList(productSearches[idx]).map((p) => (
+                              {filteredProductsList(idx).map((p) => (
                                 <button
                                   key={p.id}
                                   type="button"
@@ -1467,7 +1471,6 @@ export function TicketForm({
                     <ProductSearchInput
                       value={resForm.replacement_product_name}
                       onChange={(v) => setResForm(f => ({ ...f, replacement_product_name: v }))}
-                      products={products}
                       placeholder="Search or type product…"
                       inputClassName="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-600"
                     />

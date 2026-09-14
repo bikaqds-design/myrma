@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
+import { useCustomersById } from '../../lib/useLookups'
 import { useURLTab } from '../../hooks/useURLTab'
 import { canDo, ownershipScope } from '../../lib/permissions'
 import { Button, PageHeader } from '../../components/ui'
@@ -145,17 +146,6 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
         : allDocuments,
     [allDocuments, ownScope]
   )
-  const { data: customers = EMPTY_ARRAY } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => db.customers.list(),
-    staleTime: 60_000,
-  })
-  const { data: products = EMPTY_ARRAY } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => db.products.list(),
-    staleTime: 60_000,
-    enabled: canCreate,
-  })
   const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
     queryFn: () => db.userRoles.directory(),
@@ -167,7 +157,8 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
     [usersList]
   )
 
-  const customerMap = useMemo(() => Object.fromEntries(customers.map((c) => [c.id, c])), [customers])
+  // Only the customers the documents name, by id. (BUG-066.)
+  const customerMap = useCustomersById(allDocuments.map((d) => d.customer_id))
   const customerName = React.useCallback((id) => {
     const c = customerMap[id]
     return c ? (c.company_name || c.contact_person || '—') : '—'
@@ -423,8 +414,6 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
       {createType && createType !== 'credit_note' && (
         <CreateDocumentModal
           docType={createType}
-          customers={customers}
-          products={products}
           salesReps={salesReps}
           currentUserEmail={currentUserEmail}
           onClose={() => setCreateType(null)}
@@ -434,8 +423,6 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
 
       {createType === 'credit_note' && (
         <CreateStandaloneCreditNoteModal
-          customers={customers}
-          products={products}
           currentUserEmail={currentUserEmail}
           onClose={() => setCreateType(null)}
           onCreated={() => {

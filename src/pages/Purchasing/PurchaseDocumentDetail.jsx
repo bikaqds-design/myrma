@@ -153,12 +153,6 @@ export default function PurchaseDocumentDetail({
     queryFn: () => db.warehouses.list().then((r) => (r.missing ? [] : r.data)),
     enabled: isVI,
   })
-  const { data: products = EMPTY_ARRAY } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => db.products.list(),
-    staleTime: 60_000,
-    enabled: isVI,
-  })
 
   // The movement ledger this invoice wrote. Only receipts are read, so a PO —
   // which never moves stock itself — does not query at all.
@@ -377,7 +371,6 @@ export default function PurchaseDocumentDetail({
         <ReceiveVendorInvoiceModal
           vi={doc}
           warehouses={warehouses}
-          products={products}
           onClose={() => setShowReceive(false)}
           canReceive={canReceive}
           userEmail={currentUserEmail}
@@ -722,7 +715,7 @@ function ReceiptHistory({ moves, warehouses }) {
   )
 }
 
-function ReceiveVendorInvoiceModal({ vi, warehouses, products, onClose, userEmail, onSuccess, canReceive }) {
+function ReceiveVendorInvoiceModal({ vi, warehouses, onClose, userEmail, onSuccess, canReceive }) {
   const { t } = useTranslation()
   const [warehouseId, setWarehouseId] = useState('')
   const [entries, setEntries] = useState({})
@@ -732,8 +725,16 @@ function ReceiveVendorInvoiceModal({ vi, warehouses, products, onClose, userEmai
     .map((line, i) => ({ ...line, index: i }))
     .filter((line) => (line.qty_received || 0) < line.qty_ordered)
 
+  // The products these lines name, looked up by name in the database rather
+  // than found in the whole catalogue, which the Data API caps. (BUG-066.)
+  const { data: productsByName = {} } = useQuery({
+    queryKey: ['products', 'by-names', pendingLines.map((l) => l.product_name).sort()],
+    queryFn: () => db.products.findByNames(pendingLines.map((l) => l.product_name)),
+    enabled: pendingLines.length > 0,
+    staleTime: 60_000,
+  })
   function productFor(productName) {
-    return products.find((p) => p.product_name === productName)
+    return productsByName[productName]
   }
 
   async function handleSubmit() {

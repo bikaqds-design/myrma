@@ -159,6 +159,33 @@ export const customers = {
     })
   },
 
+  /**
+   * Customers for a picker: matching `term` (name, company, email, mobile,
+   * landline, code), alphabetical, at most `limit`. A blank term returns the
+   * first `limit` alphabetically. Pickers used to filter the whole customer
+   * list in the browser, which the Data API caps at 1 000 rows. (BUG-066.)
+   */
+  async search(term = '', limit = 20): Promise<CustomerRow[]> {
+    const page = await customers.listPage({
+      search: term,
+      page: 1,
+      pageSize: limit,
+      sort: { column: 'contact_person', ascending: true },
+    })
+    return page.data
+  },
+
+  /** These customers, by id, in one request per 100 ids. Missing ids are simply absent. */
+  async getMany(ids: string[]): Promise<CustomerRow[]> {
+    const rows: CustomerRow[] = []
+    for (const chunk of chunksOf([...new Set(ids.filter(Boolean))], 100)) {
+      const { data, error } = await supabase.from('customers').select('*').in('id', chunk)
+      if (error) throw error
+      rows.push(...((data || []) as CustomerRow[]))
+    }
+    return rows
+  },
+
   /** How many customers exist, without reading any. */
   async count(): Promise<number> {
     const { count, error } = await supabase.from('customers').select('id', { count: 'exact', head: true })

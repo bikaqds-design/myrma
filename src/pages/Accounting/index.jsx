@@ -4,6 +4,7 @@ import { canDo } from '../../lib/permissions'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
+import { useCustomersById } from '../../lib/useLookups'
 import { useURLTab } from '../../hooks/useURLTab'
 import { Button, PageHeader, Table } from '../../components/ui'
 import { PageSkeleton } from '../../components/Skeleton'
@@ -67,11 +68,6 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
     staleTime: 30_000,
     enabled: tab === 'aging',
   })
-  const { data: customers = EMPTY_ARRAY } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => db.customers.list(),
-    staleTime: 60_000,
-  })
   const { data: vendorPayments = EMPTY_ARRAY, isLoading: vendorPaymentsLoading } = useQuery({
     queryKey: ['vendor-payments'],
     queryFn: () => db.vendorPayments.list(),
@@ -90,7 +86,9 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
     staleTime: 60_000,
   })
 
-  const customerMap = useMemo(() => Object.fromEntries(customers.map((c) => [c.id, c])), [customers])
+  // Only the customers the payments name, by id — not the whole table, which
+  // the Data API caps at 1 000 rows. (BUG-066.)
+  const customerMap = useCustomersById(payments.map((p) => p.customer_id))
   const customerName = (id) => customerMap[id]?.company_name || customerMap[id]?.contact_person || '—'
   const vendorMap = useMemo(() => Object.fromEntries(vendors.map((v) => [v.id, v])), [vendors])
   const vendorName = (id) => vendorMap[id]?.brand_name || '—'
@@ -247,7 +245,6 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
 
       {showRecordModal && (
         <RecordPaymentModal
-          customers={customers}
           currentUserEmail={currentUserEmail}
           onClose={() => setShowRecordModal(false)}
           onRecorded={handleRecorded}

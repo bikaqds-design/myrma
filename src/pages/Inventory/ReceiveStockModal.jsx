@@ -12,7 +12,7 @@ import { destinationWarehouses } from '../../lib/warehouseDestinations.js'
 // Branches by the selected product's stock_tracking_mode: serial entry
 // (multi-line, one receive_stock call per serial) for serialized products;
 // quantity + warehouse for bulk-tracked ones.
-export function ReceiveStockModal({ open, onClose, products, warehouses, userEmail, onSuccess }) {
+export function ReceiveStockModal({ open, onClose, warehouses, userEmail, onSuccess }) {
   const { t } = useTranslation()
   const [productQuery, setProductQuery] = useState('')
   const [selectedProduct, setSelectedProduct] = useState(null)
@@ -21,7 +21,6 @@ export function ReceiveStockModal({ open, onClose, products, warehouses, userEma
   const [qty, setQty] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const nonServiceProducts = products.filter((p) => p.product_type !== 'service')
   const isBulk = selectedProduct?.stock_tracking_mode === 'bulk'
 
   function reset() {
@@ -107,7 +106,9 @@ export function ReceiveStockModal({ open, onClose, products, warehouses, userEma
               setSelectedProduct(p)
               setProductQuery(p.product_name)
             }}
-            products={nonServiceProducts}
+            // Service products never hold stock; the search leaves them out.
+            // It filtered the whole loaded catalogue before. (BUG-066.)
+            excludeService
             placeholder={t('inventory.typeProductName')}
             className="mt-1"
           />

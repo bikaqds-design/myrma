@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
+import { useCustomer, useCustomerSearch } from '../../lib/useLookups'
 import { PageSkeleton } from '../../components/Skeleton'
 import { Button, Input, Spinner } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
@@ -90,20 +91,10 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     queryFn: () => db.pipelines.list(),
     staleTime: 5 * 60_000,
   })
-  const { data: customers = EMPTY_ARRAY } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => db.customers.list(),
-    staleTime: 60_000,
-  })
   const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
     queryFn: () => db.userRoles.directory(),
     staleTime: 5 * 60_000,
-  })
-  const { data: products = EMPTY_ARRAY } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => db.products.list(),
-    staleTime: 60_000,
   })
   // A deal can hold any number of quotations, each independent: each converts to
   // its own SO, and approving one does not affect the others.
@@ -131,7 +122,8 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
   const salesReps = usersList.filter((u) =>
     u.role === 'sales_rep' || u.role === 'manager' || u.role === 'admin' || u.role === 'super_admin'
   )
-  const customer = useMemo(() => customers.find((c) => c.id === deal?.customer_id), [customers, deal])
+  // The deal's customer, by id. (BUG-066.)
+  const customer = useCustomer(deal?.customer_id)
   const pipeline = useMemo(() => pipelines.find((p) => p.id === deal?.pipeline_id), [pipelines, deal])
   const stages = pipeline ? [...pipeline.stages].sort((a, b) => a.order - b.order) : []
   const activeStages = stages.filter((s) => !s.is_won && !s.is_lost)
@@ -218,14 +210,13 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
     return () => document.removeEventListener('mousedown', handler)
   }, [editingCustomer])
 
-  const filteredCustomers = useMemo(() => {
-    const q = customerSearch.toLowerCase()
-    return customers
-      .filter((c) =>
-        !q || c.company_name?.toLowerCase().includes(q) || c.contact_person?.toLowerCase().includes(q)
-      )
-      .slice(0, 10)
-  }, [customers, customerSearch])
+  // From the database: with nothing typed, the first ten alphabetically, as the
+  // whole-list version showed. (BUG-066.)
+  const { results: filteredCustomers } = useCustomerSearch(customerSearch, {
+    limit: 10,
+    minLength: 0,
+    enabled: editingCustomer,
+  })
 
   // Mirrors LeadDetails' FIELD_KEY_MAP so the deal log records field edits, not
   // just stage/quotation events. ActivityChatter renders 'field_updated|key|value'
@@ -750,7 +741,6 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
               value={l.product_name}
               onChange={(text) => updateQtLine(i, 'product_name', text)}
               onSelectProduct={(p) => selectQtProduct(i, p)}
-              products={products}
               placeholder={t('pipeline.lineProductPlaceholder')}
               className="flex-1"
               inputClassName="w-full px-2 py-1.5 border border-gray-300 dark:border-[#212a38] dark:bg-[#0f1520] dark:text-[#e8ebf0] rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm bg-white placeholder-gray-400 transition-colors"
@@ -1418,7 +1408,6 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
         <CreateDealModal
           form={dealForm}
           setForm={setDealForm}
-          customers={customers}
           contacts={dealContacts}
           pipeline={pipeline}
           pipelines={pipelines}

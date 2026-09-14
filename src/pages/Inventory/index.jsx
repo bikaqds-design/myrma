@@ -242,7 +242,6 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
       <ReceiveStockModal
         open={showReceiveStock}
         onClose={() => setShowReceiveStock(false)}
-        products={products}
         warehouses={warehouses}
         userEmail={userEmail}
         onSuccess={invalidateInventory}
