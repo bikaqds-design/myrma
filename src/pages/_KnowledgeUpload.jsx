@@ -1,14 +1,15 @@
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db, storage } from '../api/supabaseClient'
 import { Button, Label, Select } from '../components/ui'
 import { captureException } from '../lib/sentry'
-import { EMPTY_ARRAY } from '../lib/stableEmpty'
+import { toUserMessage } from '../lib/errorMessage'
+import { ProductSearchInput } from './Pipeline/_shared'
 import { extractText } from '../lib/pdfText'
 import { DOC_TYPES } from '../lib/documentTypes'
-import { matchFiles } from '../lib/skuMatch'
+import { matchFiles, normalise, baseName } from '../lib/skuMatch'
 
 /**
  * Attaching a folder of vendor datasheets in one pass.
@@ -39,30 +40,32 @@ export default function KnowledgeUpload({ currentUserEmail }) {
   const [rows, setRows] = useState([])
   const [docType, setDocType] = useState('datasheet')
   const [busy, setBusy] = useState(false)
+  const [matching, setMatching] = useState(false)
 
-  const { data: products = EMPTY_ARRAY } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => db.products.list(),
-    staleTime: 5 * 60_000,
-  })
-
-  // Sorted for the manual picker: someone hunting for a product scans by SKU.
-  const productOptions = useMemo(
-    () => [...products].sort((a, b) => String(a.sku ?? '').localeCompare(String(b.sku ?? ''))),
-    [products]
-  )
-
-  const onPick = (e) => {
+  // The matcher runs over the products whose SKU could match one of these
+  // files, read from the database — not over the whole catalogue loaded into
+  // the browser, which the Data API caps at 1 000 rows. Every product that
+  // could win a file is in that list, so the matches are the same. (BUG-066.)
+  const onPick = async (e) => {
     const files = [...(e.target.files ?? [])]
     if (files.length === 0) return
-    setRows(
-      matchFiles(files, products).map((m) => ({
-        ...m,
-        productId: m.product?.id ?? '',
-        status: m.product ? 'ready' : 'unmatched',
-        error: null,
-      }))
-    )
+    setMatching(true)
+    try {
+      const candidates = await db.products.skuCandidates(files.map((f) => normalise(baseName(f.name))))
+      setRows(
+        matchFiles(files, candidates).map((m) => ({
+          ...m,
+          productId: m.product?.id ?? '',
+          status: m.product ? 'ready' : 'unmatched',
+          error: null,
+        }))
+      )
+    } catch (err) {
+      captureException(err)
+      toast.error(toUserMessage(err))
+    } finally {
+      setMatching(false)
+    }
   }
 
   const reset = () => {
@@ -70,11 +73,12 @@ export default function KnowledgeUpload({ currentUserEmail }) {
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  const setRowProduct = (index, productId) =>
+  // A manual pick carries the product itself, so the upload needs no lookup.
+  const setRowProduct = (index, product) =>
     setRows((rs) =>
       rs.map((r, i) =>
         i === index
-          ? { ...r, productId, status: productId ? 'ready' : 'unmatched', reason: 'manual' }
+          ? { ...r, product, productId: product?.id ?? '', status: product ? 'ready' : 'unmatched', reason: 'manual' }
           : r
       )
     )
@@ -100,7 +104,7 @@ export default function KnowledgeUpload({ currentUserEmail }) {
       const row = rows[i]
       if (row.status !== 'ready' || !row.productId) continue
 
-      const product = products.find((p) => p.id === row.productId)
+      const product = row.product
       if (!product) {
         update(i, { status: 'failed', error: t('bulkUpload.errorNoProduct') })
         failed++
@@ -181,7 +185,7 @@ export default function KnowledgeUpload({ currentUserEmail }) {
               type="file"
               multiple
               onChange={onPick}
-              disabled={busy}
+              disabled={busy || matching}
               accept=".pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,image/*"
               aria-label={t('bulkUpload.chooseFiles')}
               className="block w-full text-sm text-gray-600 dark:text-[#9aa4b2] file:me-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50"
@@ -262,19 +266,28 @@ export default function KnowledgeUpload({ currentUserEmail }) {
                       )}
                     </td>
                     <td className="px-4 py-2.5 align-top min-w-[240px]">
-                      <Select
-                        value={row.productId}
-                        disabled={busy || row.status === 'done'}
-                        aria-label={`${t('bulkUpload.product')} ${row.fileName}`}
-                        onChange={(e) => setRowProduct(i, e.target.value)}
-                      >
-                        <option value="">{t('bulkUpload.chooseProduct')}</option>
-                        {productOptions.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.sku} — {p.product_name}
-                          </option>
-                        ))}
-                      </Select>
+                      {/* A search, not a <select> of the whole catalogue. */}
+                      {busy || row.status === 'done' ? (
+                        <p className="text-sm text-gray-900 dark:text-[#e8ebf0]">
+                          {row.product ? `${row.product.sku} — ${row.product.product_name}` : '—'}
+                        </p>
+                      ) : (
+                        <>
+                          <ProductSearchInput
+                            value={row.product?.product_name ?? ''}
+                            onChange={(text) => {
+                              if (!text.trim() && row.product) setRowProduct(i, null)
+                            }}
+                            onSelectProduct={(product) => setRowProduct(i, product)}
+                            placeholder={t('bulkUpload.chooseProduct')}
+                            aria-label={`${t('bulkUpload.product')} ${row.fileName}`}
+                            inputClassName="w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm"
+                          />
+                          {row.product?.sku && (
+                            <p className="mt-1 text-[11px] font-mono text-gray-400 dark:text-[#9aa4b2]">{row.product.sku}</p>
+                          )}
+                        </>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 align-top whitespace-nowrap">
                       <span className={`text-xs ${statusStyles[row.status] ?? ''}`}>

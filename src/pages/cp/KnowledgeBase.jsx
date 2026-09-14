@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
+import Pagination from '../../components/Pagination'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import toast from 'react-hot-toast'
 import { toUserMessage } from '../../lib/errorMessage'
 import { captureException } from '../../lib/sentry'
@@ -17,18 +20,15 @@ const CATEGORIES = ['general', 'shipping', 'warranty', 'billing', 'account']
 
 export default function KnowledgeBase({ currentUserEmail }) {
   const { t } = useTranslation()
-  const [articles, setArticles] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [missing, setMissing] = useState(false)
+  const queryClient = useQueryClient()
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [openMenuId, setOpenMenuId] = useState(null)
 
-  useEffect(() => {
-    load()
-  }, [])
   useEffect(() => {
     const handler = (e) => {
       if (!e.target.closest('.action-menu')) setOpenMenuId(null)
@@ -37,13 +37,21 @@ export default function KnowledgeBase({ currentUserEmail }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const load = async () => {
-    setLoading(true)
-    const result = await db.kbArticles.list()
-    setMissing(result.missing)
-    setArticles(result.data)
-    setLoading(false)
-  }
+  // One page of articles from the database. This loaded every article, which
+  // the Data API caps at 1 000 rows. (BUG-066.)
+  const { data: pageResult, isLoading: loading } = useQuery({
+    queryKey: ['kb-articles', 'admin', page, pageSize],
+    queryFn: () => db.kbArticles.listPage({}, page, pageSize),
+    placeholderData: keepPreviousData,
+  })
+  const articles = pageResult?.data ?? EMPTY_ARRAY
+  const missing = pageResult?.missing ?? false
+  const total = pageResult?.count ?? 0
+  useEffect(() => {
+    const totalPages = Math.ceil(total / pageSize)
+    if (pageResult && totalPages >= 1 && page > totalPages) setPage(totalPages)
+  }, [pageResult, total, page, pageSize])
+  const load = () => queryClient.invalidateQueries({ queryKey: ['kb-articles'] })
 
   const openCreate = () => {
     setEditing(null)
@@ -262,6 +270,10 @@ export default function KnowledgeBase({ currentUserEmail }) {
           </tbody>
         </table>
       </div>
+
+      {total > 0 && (
+        <Pagination total={total} page={page} itemsPerPage={pageSize} setItemsPerPage={setPageSize} onPage={setPage} />
+      )}
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

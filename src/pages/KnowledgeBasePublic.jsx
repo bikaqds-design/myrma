@@ -1,37 +1,42 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { db, branding as brandingAPI } from '../api/supabaseClient'
+import { useDebouncedValue } from '../lib/useDebouncedValue'
+import { EMPTY_ARRAY } from '../lib/stableEmpty'
+
+/** Articles shown at first, and added by each "Show more". */
+const BATCH = 50
 
 export default function KnowledgeBasePublic() {
   const { t } = useTranslation()
   const [branding, setBranding] = useState(null)
-  const [articles, setArticles] = useState([])
-  const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [openId, setOpenId] = useState(null)
+  const [limit, setLimit] = useState(BATCH)
 
   useEffect(() => {
     brandingAPI
       .getBranding()
       .then(setBranding)
       .catch(() => {})
-    db.kbArticles
-      .listPublished()
-      .then((result) => setArticles(result.data))
-      .catch(() => {})
-      .finally(() => setLoading(false))
   }, [])
+
+  // Published articles matching the search, read from the database a batch at
+  // a time. The page loaded every published article and filtered here, which
+  // the Data API caps at 1 000 rows. (BUG-066.)
+  const search = useDebouncedValue(query)
+  useEffect(() => setLimit(BATCH), [search])
+  const { data: result, isLoading: loading } = useQuery({
+    queryKey: ['kb-articles', 'public', search, limit],
+    queryFn: () => db.kbArticles.listPage({ search, publishedOnly: true }, 1, limit),
+    placeholderData: keepPreviousData,
+  })
+  const filtered = result?.data ?? EMPTY_ARRAY
+  const remaining = (result?.count ?? 0) - filtered.length
 
   const primaryColor = branding?.primary_color || '#4F46E5'
   const companyName = branding?.company_name || 'myCRM'
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return articles
-    return articles.filter(
-      (a) => a.title.toLowerCase().includes(q) || a.body.toLowerCase().includes(q)
-    )
-  }, [articles, query])
 
   const grouped = useMemo(() => {
     const buckets = new Map()
@@ -134,6 +139,18 @@ export default function KnowledgeBasePublic() {
               </div>
             </div>
           ))}
+
+        {!loading && remaining > 0 && (
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => setLimit((n) => n + BATCH)}
+              className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+            >
+              {t('kb.showMore', { count: remaining })}
+            </button>
+          </div>
+        )}
 
         <div className="text-center pt-4">
           <a href="/tracker" className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">

@@ -1,6 +1,8 @@
 import { supabase } from '../client.js'
 import { assertUpdated, assertAffected } from './_assertUpdated.js'
-import type { TableResult } from './types.js'
+import type { PagedResult } from './types.js'
+import { fetchPage } from './_paging.js'
+import { orIlike } from '../../lib/searchPattern.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -26,40 +28,37 @@ function slugify(title: string): string {
 }
 
 export const kbArticles = {
-  /** Admin: every article, published or draft. */
-  async list(): Promise<TableResult<KBArticleRow[]>> {
+  /**
+   * One page of articles, by category then sort order, with the exact count.
+   * `publishedOnly` is the public /kb page (anon and authenticated alike);
+   * `search` matches title or body. Both screens used to load every article and
+   * filter in the browser, capped by the Data API at 1 000 rows. (BUG-066.)
+   *
+   * `missing` is true when the table is not provisioned.
+   */
+  async listPage(
+    { search, publishedOnly = false }: { search?: string | null; publishedOnly?: boolean },
+    page: number,
+    pageSize: number
+  ): Promise<PagedResult<KBArticleRow>> {
     try {
-      const { data, error } = await supabase
-        .from('kb_articles')
-        .select('*')
-        .order('category', { ascending: true })
-        .order('sort_order', { ascending: true })
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
+      return await fetchPage<KBArticleRow>((from, to) => {
+        let q = supabase.from('kb_articles').select('*', { count: 'exact' })
+        if (publishedOnly) q = q.eq('is_published', true)
+        const term = search?.trim()
+        if (term) q = q.or(orIlike(['title', 'body'], term))
+        return q
+          .order('category', { ascending: true })
+          .order('sort_order', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to)
+      }, page, pageSize)
+    } catch (error) {
+      const code = (error as { code?: string })?.code
+      if (code === '42P01' || code === 'PGRST205') {
+        return { missing: true, data: [], count: 0, page: 1, pageSize, totalPages: 0 }
       }
-      return { missing: false, data: data || [] }
-    } catch {
-      return { missing: true, data: [] }
-    }
-  },
-
-  /** Public /kb page: only published articles. Works for anon and authenticated. */
-  async listPublished(): Promise<TableResult<KBArticleRow[]>> {
-    try {
-      const { data, error } = await supabase
-        .from('kb_articles')
-        .select('*')
-        .eq('is_published', true)
-        .order('category', { ascending: true })
-        .order('sort_order', { ascending: true })
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
-    } catch {
-      return { missing: true, data: [] }
+      throw error
     }
   },
 
