@@ -17,9 +17,15 @@
 -- #  out, All Units grouping and brand-by-name, the Stock Movements label,
 -- #  bulk reservations netted per document, per-warehouse counts, and access.
 -- #
--- #  Same shape as the other files: collect failures, RAISE naming each, so
--- #  `psql -v ON_ERROR_STOP=1` fails the job. Own throwaway fixtures, removed
--- #  at the end.
+-- #  Same shape as the other files: collect failures, RAISE naming each. Own
+-- #  throwaway fixtures, removed at the end.
+-- #
+-- #  NOT in CI: the db-tests job that ran these files is disabled (it needs
+-- #  Docker; see .github/workflows/ci.yml). On 2026-09-14 this block was run
+-- #  against the hosted project with the cleanup replaced by an unconditional
+-- #  RAISE, so the transaction rolled back and no fixture row was kept — all
+-- #  10 checks passed (after correcting CHECK 1d's expected value to 11). Run
+-- #  it the same way after changing the views.
 -- ############################################################################
 
 DO $$
@@ -141,9 +147,10 @@ BEGIN
     IF r.reserved <> 1 OR r.delivered <> 1 THEN v_failures := array_append(v_failures, format('CHECK 1b: reserved/delivered %s/%s, expected 1/1', r.reserved, r.delivered)); END IF;
     -- Main: 4 in the main warehouse + the untyped warehouse + the unit with no warehouse.
     IF r.main_qty <> 6 THEN v_failures := array_append(v_failures, format('CHECK 1c: main_qty %s, expected 6', r.main_qty)); END IF;
-    -- Physical: 9 company stock not in SCRAP + 3 RMA units at non-SCRAP system locations.
-    -- Not the RMA unit parked in a normal warehouse, not SCRAP, not closed.
-    IF r.physical_total <> 12 THEN v_failures := array_append(v_failures, format('CHECK 1d: physical_total %s, expected 12', r.physical_total)); END IF;
+    -- Physical: the 8 company-stock units outside SCRAP + the 3 RMA units at
+    -- non-SCRAP system locations. Not the RMA unit parked in a normal
+    -- warehouse, nothing in SCRAP, nothing closed.
+    IF r.physical_total <> 11 THEN v_failures := array_append(v_failures, format('CHECK 1d: physical_total %s, expected 11', r.physical_total)); END IF;
     IF r.branches <> jsonb_build_array(jsonb_build_object('warehouse_id', v_branch, 'name', 'CI LV Branch ' || v_tag, 'code', 'CI-LV-BR-' || v_tag, 'qty', 2))
        OR r.branch_total <> 2 THEN
       v_failures := array_append(v_failures, format('CHECK 1e: branches %s / %s, expected the one branch with 2', r.branches, r.branch_total));
