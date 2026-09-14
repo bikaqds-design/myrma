@@ -46,12 +46,24 @@ describeIntegration(`RLS — anonymous access (${skipReason})`, () => {
     const supabase = anonClient()
     // The public tracker leaked these once already (fixed in d7439f6); this
     // pins the underlying table rather than the edge function that wraps it.
+    //
+    // This selected `author_email`, which has never been a column — the email
+    // is `user_email`. PostgREST answered 400 (42703), and the old assertion
+    // only looked at the rows when there was NO error, so every run passed
+    // without reading the table at all. Found 2026-09-14 from the 400s in the
+    // API log that lined up with CI runs. (BUG-061.)
     const { data, error } = await supabase
       .from('ticket_comments')
-      .select('author_email')
+      .select('user_email')
       .limit(1)
 
-    if (!error) expect(data).toEqual([])
+    if (error) {
+      // Refused is the right answer. Anything else — a missing column, a
+      // missing table, a malformed request — means this probe tested nothing.
+      expect(error.code, `expected a refusal, got ${error.code}: ${error.message}`).toBe('42501')
+      return
+    }
+    expect(data, 'ticket_comments returned staff email addresses to an anonymous client').toEqual([])
   })
 
   it('anon cannot insert a customer', async () => {
@@ -68,5 +80,11 @@ describeIntegration(`RLS — anonymous access (${skipReason})`, () => {
       error,
       `anonymous insert succeeded and created ${JSON.stringify(data)} — delete it and fix the policy`
     ).toBeTruthy()
+    // Any error used to pass, so a payload the table rejects for another reason
+    // (a NOT NULL column, a CHECK, a typo in a column name) would read as "RLS
+    // refused it" while proving nothing about RLS. Only a refusal counts.
+    // 42501 is a missing grant; 42501 is also what an RLS WITH CHECK violation
+    // raises, so either layer doing its job passes. (BUG-061.)
+    expect(error?.code, `expected a refusal, got ${error?.code}: ${error?.message}`).toBe('42501')
   })
 })
