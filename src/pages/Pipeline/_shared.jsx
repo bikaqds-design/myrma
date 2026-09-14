@@ -5,17 +5,20 @@
 // form's copy to add this).
 
 import React, { useState, useEffect, useRef } from 'react'
+import { useProductSearch } from '../../lib/useLookups'
 
-export function ProductSearchInput({ value, onChange, onSelectProduct, products = [], placeholder = '', className = '', inputClassName = '', 'aria-label': ariaLabel }) {
+export function ProductSearchInput({ value, onChange, onSelectProduct, brandId, excludeService = false, searchEnabled = true, placeholder = '', className = '', inputClassName = '', 'aria-label': ariaLabel }) {
   const [query, setQuery] = useState(value || '')
   const [open, setOpen] = useState(false)
   const containerRef = useRef(null)
 
   useEffect(() => setQuery(value || ''), [value])
 
-  const filtered = query.trim().length >= 1
-    ? products.filter((p) => p.product_name?.toLowerCase().includes(query.toLowerCase())).slice(0, 8)
-    : []
+  // Matches come from the database (BUG-066). This filtered a `products` array
+  // the caller passed in — the whole catalogue, loaded by every screen that had
+  // a product field, and capped by the Data API at 1 000 rows. `brandId` and
+  // `excludeService` narrow the search where the caller used to pre-filter.
+  const { results: filtered } = useProductSearch(query, { limit: 8, brandId, excludeService, enabled: open && searchEnabled })
 
   useEffect(() => {
     const handler = (e) => {

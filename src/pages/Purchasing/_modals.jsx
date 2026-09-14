@@ -5,7 +5,6 @@ import { db } from '../../api/supabaseClient'
 import Modal from '../../components/Modal'
 import { ModalOverlay, ModalCard, Button, Label, Select, Input, Textarea } from '../../components/ui'
 import { ProductSearchInput } from '../Pipeline/_shared'
-import { captureException } from '../../lib/sentry'
 import { useDocumentCurrency } from '../../hooks/useDocumentCurrency'
 import { CurrencyRateFields } from '../../components/CurrencyRateFields'
 import { PhoneNote, EmailNote } from '../../components/ContactValidation'
@@ -76,7 +75,11 @@ function computeLineTotals(lines) {
 // ─── Shared line-item editor (product search, qty, unit cost, disc/tax) ────────
 // Mirrors the line-item card layout in SalesDocumentForm.jsx: label + "add
 // line" in a header row, each line as its own inset card.
-function LineItemsEditor({ lines, setLines, products, t }) {
+// Products come from the database, one vendor's (= one brand's) at a time —
+// a purchase is placed with a single vendor. The forms used to load the whole
+// catalogue and filter it here, and the Data API caps that load. No vendor
+// chosen, no suggestions, as before. (BUG-066.)
+function LineItemsEditor({ lines, setLines, vendorId, t }) {
   function addLine() {
     setLines([...lines, { product_id: '', product_name: '', qty_ordered: 1, unit_cost: 0, discount_pct: 0, tax_pct: 0 }])
   }
@@ -103,7 +106,8 @@ function LineItemsEditor({ lines, setLines, products, t }) {
                 value={line.product_name}
                 onChange={(v) => updateLine(i, { product_name: v })}
                 onSelectProduct={(p) => updateLine(i, { product_id: p.id, product_name: p.product_name })}
-                products={products}
+                brandId={vendorId || undefined}
+                searchEnabled={Boolean(vendorId)}
                 placeholder={t('inventory.typeProductName')}
                 className="flex-1"
               />
@@ -314,29 +318,8 @@ export function CreatePurchaseOrderModal({ mode = 'create', initial, onClose, ve
   const [termsConditions, setTermsConditions] = useState(initial?.terms_conditions || '')
   const [notes, setNotes] = useState(initial?.notes || '')
   const [saving, setSaving] = useState(false)
-  const [products, setProducts] = useState([])
-
-  // A failed load used to leave products as [], which renders as an empty
-  // product picker — indistinguishable from a vendor that genuinely has no
-  // products, so the user concludes the catalogue is empty rather than that
-  // something broke.
-  useEffect(() => {
-    db.products
-      .list()
-      .then(setProducts)
-      .catch((err) => {
-        captureException(err, { page: 'Purchasing', context: 'modal/products.list' })
-        toast.error(t('purchasing.productsLoadFailed'))
-      })
-    // Mount only. Including t would refetch the whole catalogue every time the
-    // interface language changes, which the picker does not need.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const vendorName = useMemo(() => vendors?.find((v) => v.id === vendorId)?.brand_name, [vendors, vendorId])
-  // Purchase Orders are placed with one vendor (= one Brand) — only offer
-  // that brand's own products, not the whole catalog.
-  const vendorProducts = useMemo(() => products.filter((p) => p.brand_id === vendorId), [products, vendorId])
 
   async function handleSave() {
     if (!vendorId || lines.length === 0) {
@@ -422,7 +405,7 @@ export function CreatePurchaseOrderModal({ mode = 'create', initial, onClose, ve
           </div>
 
           {/* Line items */}
-          <LineItemsEditor lines={lines} setLines={setLines} products={vendorProducts} t={t} />
+          <LineItemsEditor lines={lines} setLines={setLines} vendorId={vendorId} t={t} />
 
           {/* Totals */}
           <div className="flex justify-end">
@@ -487,28 +470,8 @@ export function VendorInvoiceFormModal({ mode, initial, vendors, userEmail, onCl
   const cur = useDocumentCurrency(initial)
   const [notes, setNotes] = useState(initial?.notes || '')
   const [saving, setSaving] = useState(false)
-  const [products, setProducts] = useState([])
-
-  // A failed load used to leave products as [], which renders as an empty
-  // product picker — indistinguishable from a vendor that genuinely has no
-  // products, so the user concludes the catalogue is empty rather than that
-  // something broke.
-  useEffect(() => {
-    db.products
-      .list()
-      .then(setProducts)
-      .catch((err) => {
-        captureException(err, { page: 'Purchasing', context: 'modal/products.list' })
-        toast.error(t('purchasing.productsLoadFailed'))
-      })
-    // Mount only. Including t would refetch the whole catalogue every time the
-    // interface language changes, which the picker does not need.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const vendorName = useMemo(() => vendors?.find((v) => v.id === vendorId)?.brand_name, [vendors, vendorId])
-  // Same scoping as the PO form: only this vendor's (= this brand's) products.
-  const vendorProducts = useMemo(() => products.filter((p) => p.brand_id === vendorId), [products, vendorId])
 
   async function handleSave() {
     if (!vendorId || lines.length === 0) {
@@ -559,7 +522,7 @@ export function VendorInvoiceFormModal({ mode, initial, vendors, userEmail, onCl
             </Select>
           )}
         </div>
-        <LineItemsEditor lines={lines} setLines={setLines} products={vendorProducts} t={t} />
+        <LineItemsEditor lines={lines} setLines={setLines} vendorId={vendorId} t={t} />
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>{t('purchasing.invoiceDate')}</Label>

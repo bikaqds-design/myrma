@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { useCustomerSearch } from '../../lib/useLookups'
 import { useTranslation } from 'react-i18next'
 import { ModalOverlay, ModalCard, Input, Select, Textarea, Label, Button } from '../../components/ui'
 import { associateFieldId } from '../../lib/fieldAssociation'
@@ -37,7 +38,7 @@ function Field({ label, required, children }) {
 
 // ─── CUSTOMER SEARCH INPUT (lightweight — top 8 matches, no virtualization) ──
 
-function CustomerSearchField({ customers, value, label, onSelect, id }) {
+function CustomerSearchField({ value, label, onSelect, id }) {
   const { t } = useTranslation()
   const [query, setQuery] = useState(label || '')
   const [open, setOpen] = useState(false)
@@ -53,18 +54,9 @@ function CustomerSearchField({ customers, value, label, onSelect, id }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const matches = !query.trim()
-    ? []
-    : customers
-        .filter((c) => {
-          const q = query.toLowerCase()
-          return (
-            c.contact_person?.toLowerCase().includes(q) ||
-            c.company_name?.toLowerCase().includes(q) ||
-            c.mobile?.includes(q)
-          )
-        })
-        .slice(0, 8)
+  // Matches come from the database; this filtered the whole customer list,
+  // which the Data API caps at 1 000 rows. (BUG-066.)
+  const { results: matches } = useCustomerSearch(query, { limit: 8, enabled: open })
 
   return (
     <div ref={wrapRef} className="relative">
@@ -124,7 +116,7 @@ function CustomerSearchField({ customers, value, label, onSelect, id }) {
 
 // ─── CREATE DEAL MODAL ──────────────────────────────────────────────────────
 
-export function CreateDealModal({ form, setForm, dealCode, customers, contacts = [], pipeline, pipelines = [], salesReps, editing, hasProductLines, onSave, onClose }) {
+export function CreateDealModal({ form, setForm, dealCode, contacts = [], pipeline, pipelines = [], salesReps, editing, hasProductLines, onSave, onClose }) {
   const { t } = useTranslation()
   const set = (key, val) => setForm((prev) => ({ ...prev, [key]: val }))
 
@@ -178,7 +170,6 @@ export function CreateDealModal({ form, setForm, dealCode, customers, contacts =
 
           <Field label={t('pipeline.customer')} required>
             <CustomerSearchField
-              customers={customers}
               value={form.customer_id}
               label={form.customer_label}
               onSelect={(c) => {

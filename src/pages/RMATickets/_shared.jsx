@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useProductSearch } from '../../lib/useLookups'
 
 const SHORTCUTS = [
   { key: 'N', descKey: 'shortcuts.newTicket' },
@@ -59,7 +60,7 @@ export function ShortcutsHelp({ onClose }) {
 // and carries the whole product so the caller can keep its id. Typing instead
 // fires onChange alone — the caller treats that as "no longer a catalog
 // product" and clears any id it was holding.
-export function ProductSearchInput({ value, onChange, onSelectProduct, products = [], placeholder = 'Search or type product name…', className = '', inputClassName = '', 'aria-label': ariaLabel }) {
+export function ProductSearchInput({ value, onChange, onSelectProduct, brandId, excludeService = false, searchEnabled = true, placeholder = 'Search or type product name…', className = '', inputClassName = '', 'aria-label': ariaLabel }) {
   const [query, setQuery] = useState(value || '')
   const [open, setOpen] = useState(false)
   const containerRef = useRef(null)
@@ -67,9 +68,11 @@ export function ProductSearchInput({ value, onChange, onSelectProduct, products 
   // Sync external value changes (e.g. reset)
   useEffect(() => { setQuery(value || '') }, [value])
 
-  const filtered = query.trim().length >= 1
-    ? products.filter((p) => p.product_name?.toLowerCase().includes(query.toLowerCase())).slice(0, 8)
-    : []
+  // Matches come from the database (BUG-066). This filtered a `products` array
+  // the caller passed in — the whole catalogue, loaded by every screen that had
+  // a product field, and capped by the Data API at 1 000 rows. `brandId` and
+  // `excludeService` narrow the search where the caller used to pre-filter.
+  const { results: filtered } = useProductSearch(query, { limit: 8, brandId, excludeService, enabled: open && searchEnabled })
 
   useEffect(() => {
     const handler = (e) => { if (!containerRef.current?.contains(e.target)) setOpen(false) }

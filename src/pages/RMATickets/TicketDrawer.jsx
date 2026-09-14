@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { db, storage, notifications } from '../../api/supabaseClient'
 import { ProductSearchInput } from './_shared'
 import ActivityTimeline from './ActivityTimeline'
@@ -12,7 +12,6 @@ import { nameFromEmail } from '../../lib/utils'
 import { captureException } from '../../lib/sentry'
 import { CreateStandaloneCreditNoteModal } from '../SalesDocuments/_modals'
 import ConfirmDialog from '../../components/ConfirmDialog'
-import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { safeAttachmentHref } from '../../lib/attachmentUrl'
 import { formatMoney } from '../../lib/money'
 import { canEditTicket } from '../../lib/ticketPermissions'
@@ -39,7 +38,6 @@ export function TicketDrawer({
 }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
-  const products = queryClient.getQueryData(['products']) || []
 
   const canDo = (action) => {
     if (userRole === ROLES.ADMIN || userRole === ROLES.SUPER_ADMIN) return true
@@ -94,12 +92,6 @@ export function TicketDrawer({
   // Credit note (RMA return) state
   const [showIssueCNModal, setShowIssueCNModal] = useState(false)
   const [issuingCN, setIssuingCN] = useState(false)
-  const { data: cnCustomers = EMPTY_ARRAY } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => db.customers.list(),
-    enabled: showIssueCNModal,
-    staleTime: 60_000,
-  })
 
   const handleIssueCNFromTicket = async (cn) => {
     setIssuingCN(true)
@@ -898,7 +890,6 @@ export function TicketDrawer({
                       <ProductSearchInput
                         value={resForm.replacement_product_name}
                         onChange={(v) => setResForm(f => ({ ...f, replacement_product_name: v }))}
-                        products={products}
                         placeholder="Search or type product name…"
                         inputClassName="w-full px-3 py-1.5 border border-gray-300 dark:border-[#212a38] rounded-lg text-sm bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] placeholder-gray-400 dark:placeholder-[#a4acb7] outline-none focus:border-indigo-400"
                       />
@@ -1545,8 +1536,6 @@ export function TicketDrawer({
 
       {showIssueCNModal && (
         <CreateStandaloneCreditNoteModal
-          customers={cnCustomers}
-          products={products}
           currentUserEmail={userEmail}
           initialCustomerId={ticket.customer_id}
           initialType="rma_return"

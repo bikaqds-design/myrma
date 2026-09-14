@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
+import { useCustomerSearch, useCustomer } from '../../lib/useLookups'
 import { ModalOverlay, ModalCard, Button, Label, Input, Select, Textarea } from '../../components/ui'
 
 function ModalHeader({ title, onClose }) {
@@ -41,7 +42,7 @@ const todayStr = () => new Date().toISOString().slice(0, 10)
  * (oldest due_date first, suggested via "Auto-allocate"), with leftover
  * staying as unapplied_amount on the payment for later use.
  */
-export function RecordPaymentModal({ customers = [], currentUserEmail, initialCustomerId = '', lockCustomer = false, onClose, onRecorded }) {
+export function RecordPaymentModal({ currentUserEmail, initialCustomerId = '', lockCustomer = false, onClose, onRecorded }) {
   const { t } = useTranslation()
   const [customerId, setCustomerId] = useState(initialCustomerId)
   const [customerQuery, setCustomerQuery] = useState('')
@@ -63,15 +64,11 @@ export function RecordPaymentModal({ customers = [], currentUserEmail, initialCu
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const customerMatches = useMemo(() => {
-    const q = customerQuery.trim().toLowerCase()
-    if (!q) return []
-    return customers
-      .filter((c) => (c.company_name || c.contact_person || '').toLowerCase().includes(q) || (c.customer_code || '').toLowerCase().includes(q))
-      .slice(0, 8)
-  }, [customerQuery, customers])
+  // Matches come from the database; this filtered the whole customer list,
+  // which the Data API caps at 1 000 rows. (BUG-066.)
+  const { results: customerMatches } = useCustomerSearch(customerQuery, { limit: 8, enabled: customerOpen })
 
-  const selectedCustomer = customers.find((c) => c.id === customerId)
+  const selectedCustomer = useCustomer(customerId)
 
   useEffect(() => {
     setOpenInvoices([])

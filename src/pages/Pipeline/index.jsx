@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { db } from '../../api/supabaseClient'
+import { useCustomersById } from '../../lib/useLookups'
 import { PageSkeleton } from '../../components/Skeleton'
 import { PageHeader, Button } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
@@ -263,18 +264,12 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
     queryFn: () => db.pipelines.list(),
     staleTime: 5 * 60_000,
   })
-  const { data: customers = EMPTY_ARRAY } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => db.customers.list(),
-    staleTime: 60_000,
-  })
   const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
     queryFn: () => db.userRoles.directory(),
     staleTime: 5 * 60_000,
   })
   const salesReps = usersList.filter((u) => u.role === 'sales_rep' || u.role === 'manager')
-  const customerMap = useMemo(() => Object.fromEntries(customers.map((c) => [c.id, c])), [customers])
 
   // Which pipeline the board is showing. Kept in the URL (?pipeline=<id>) so the
   // choice survives a reload and can be shared, matching how `view` works above.
@@ -308,6 +303,8 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
     enabled: !!pipelineId,
   })
 
+  // Only the customers the deals name, by id. (BUG-066.)
+  const customerMap = useCustomersById(deals.map((d) => d.customer_id))
   const dealIds = useMemo(() => deals.map((d) => d.id), [deals])
   const { data: openActivities = EMPTY_ARRAY } = useQuery({
     queryKey: ['activities', 'deal', 'bulk', dealIds],
@@ -872,7 +869,6 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
           form={dealForm}
           setForm={setDealForm}
           dealCode={pendingDealCode}
-          customers={customers}
           pipeline={activePipeline}
           salesReps={salesReps}
           onSave={handleSaveDeal}

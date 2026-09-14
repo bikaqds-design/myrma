@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
+import { useCustomer } from '../../lib/useLookups'
 import { PageHeader, Spinner, Button } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
 import { downloadQuotationPDF } from '../../lib/quotationPdf'
@@ -151,17 +152,6 @@ export default function SalesDocumentDetail({
     queryFn: () => adapter.fetch(docId),
     enabled: !!adapter && !!docId,
   })
-  const { data: customers = EMPTY_ARRAY } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => db.customers.list(),
-    staleTime: 60_000,
-  })
-  const { data: products = EMPTY_ARRAY } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => db.products.list(),
-    staleTime: 60_000,
-    enabled: isQuotation || isSO || isInvoice,
-  })
   const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
     queryFn: () => db.userRoles.directory(),
@@ -172,7 +162,9 @@ export default function SalesDocumentDetail({
     () => usersList.filter((u) => ['sales_rep', 'manager', 'admin', 'super_admin'].includes(u.role)),
     [usersList]
   )
-  const customer = useMemo(() => customers.find((c) => c.id === doc?.customer_id), [customers, doc])
+  // The document's customer, by id — not searched for in the whole customer
+  // list, which the Data API caps at 1 000 rows. (BUG-066.)
+  const customer = useCustomer(doc?.customer_id)
 
   // Linked-from queries — fetch the source document (lazy, only when relevant).
   const { data: linkedQuotation } = useQuery({
@@ -607,8 +599,6 @@ export default function SalesDocumentDetail({
         <DocumentFormModal
           docType={docType}
           initial={doc}
-          customers={customers}
-          products={products}
           salesReps={salesReps}
           currentUserEmail={currentUserEmail}
           onClose={() => setEditing(false)}

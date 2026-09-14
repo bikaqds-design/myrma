@@ -200,6 +200,10 @@ export interface ProductFilters {
   status?: string
   /** One category, by id (the Hierarchy tab). */
   categoryId?: string
+  /** One brand, by id (Purchasing: a vendor's products). */
+  brandId?: string
+  /** Leave out service products (they never hold stock). */
+  excludeService?: boolean
 }
 
 export interface ProductSort {
@@ -251,6 +255,8 @@ interface ResolvedProductFilters {
   categoryIds: string[] | null
   status: string | null
   categoryId: string | null
+  brandId: string | null
+  excludeService: boolean
 }
 
 async function resolveProductFilters(filters: ProductFilters): Promise<ResolvedProductFilters> {
@@ -276,12 +282,15 @@ async function resolveProductFilters(filters: ProductFilters): Promise<ResolvedP
     categoryIds,
     status: filters.status || null,
     categoryId: filters.categoryId || null,
+    brandId: filters.brandId || null,
+    excludeService: Boolean(filters.excludeService),
   }
 }
 
 interface ProductFilterable<Q> {
   or(filters: string): Q
   eq(column: string, value: unknown): Q
+  neq(column: string, value: unknown): Q
   in(column: string, values: unknown[]): Q
 }
 
@@ -294,6 +303,9 @@ function applyProductFilters<Q extends ProductFilterable<Q>>(query: Q, f: Resolv
   if (f.categoryIds) q = q.in('category_id', f.categoryIds)
   if (f.status) q = q.eq('status', f.status)
   if (f.categoryId) q = q.eq('category_id', f.categoryId)
+  if (f.brandId) q = q.eq('brand_id', f.brandId)
+  // A product with no type is not a service; neq alone would drop it.
+  if (f.excludeService) q = q.or('product_type.is.null,product_type.neq.service')
   return q
 }
 
@@ -334,6 +346,58 @@ export const products = {
         .order('id', { ascending: true })
         .range(from, to)
     })
+  },
+
+  /**
+   * Products for a picker: matching `term` (name, SKU, description, brand or
+   * category name), alphabetical, at most `limit`. Pickers used to filter the
+   * whole product list in the browser, which the Data API caps. (BUG-066.)
+   */
+  async search(
+    term = '',
+    { limit = 8, brandId, excludeService }: { limit?: number; brandId?: string; excludeService?: boolean } = {}
+  ): Promise<ProductRow[]> {
+    const page = await products.listPage({
+      search: term,
+      brandId,
+      excludeService,
+      page: 1,
+      pageSize: limit,
+      sort: { column: 'product_name', ascending: true },
+    })
+    return page.data
+  },
+
+  /** These products, by id, in one request per 100 ids. */
+  async getMany(ids: string[]): Promise<ProductRow[]> {
+    const rows: ProductRow[] = []
+    for (const chunk of chunksOf([...new Set(ids.filter(Boolean))], 100)) {
+      const { data, error } = await supabase.from('products').select(PRODUCT_SELECT).in('id', chunk)
+      if (error) throw error
+      rows.push(...((data || []) as ProductRow[]))
+    }
+    return rows
+  },
+
+  /**
+   * Products by exact name, as `{ [name]: product }`. Where names repeat, the
+   * most recently created wins — what `.find()` over the old newest-first list
+   * returned, so a lookup by name resolves to the same product it did.
+   */
+  async findByNames(names: string[]): Promise<Record<string, ProductRow>> {
+    const byName: Record<string, ProductRow> = {}
+    for (const chunk of chunksOf([...new Set(names.filter(Boolean))], 50)) {
+      const { data, error } = await supabase
+        .from('products')
+        .select(PRODUCT_SELECT)
+        .in('product_name', chunk)
+        .order('created_date', { ascending: false })
+      if (error) throw error
+      for (const row of (data || []) as ProductRow[]) {
+        if (row.product_name && !byName[row.product_name]) byName[row.product_name] = row
+      }
+    }
+    return byName
   },
 
   /** How many products exist, without reading any. */
@@ -492,19 +556,6 @@ export const products = {
       .select('id')
     if (error) throw error
     assertAllAffected(data, ids, 'product')
-  },
-  async search(query: string): Promise<ProductRow[]> {
-    const { data, error } = await supabase
-      .from('products')
-      .select(
-        '*, brand:brands(id, brand_name, brand_logo_url), category:categories(id, category_name), subcategory:subcategories(id, subcategory_name)'
-      )
-      // Quoted and LIKE-escaped (BUG-060). This used to delete ( ) , and " from the
-      // query, so "Dell, HP" silently searched for "Dell HP".
-      .or(orIlike(['product_name', 'sku', 'product_description'], query))
-      .order('created_date', { ascending: false })
-    if (error) throw error
-    return data || []
   },
   /**
    * Tickets that returned this product.

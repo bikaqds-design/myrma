@@ -34,16 +34,6 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
   const tr = t
   const queryClient = useQueryClient()
 
-  const { data: customers = EMPTY_ARRAY } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => db.customers.list(),
-    staleTime: 60_000,
-  })
-  const { data: products = EMPTY_ARRAY } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => db.products.list(),
-    staleTime: 5 * 60_000,
-  })
   const { data: users = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
     queryFn: () => db.userRoles.directory(),
@@ -336,7 +326,11 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
     try {
       await db.rmaTickets.update(ticket.id, updateData)
       queryClient.invalidateQueries({ queryKey: ['rma-tickets'] })
-      const customerEmail = ticket.customer_email || customers.find((c) => c.id === ticket.customer_id)?.email
+      // The customer's email by id when the ticket did not store one — not looked
+      // up in the whole customer list, which the Data API caps. (BUG-066.)
+      const customerEmail =
+        ticket.customer_email ||
+        (ticket.customer_id ? (await db.customers.get(ticket.customer_id).catch(() => null))?.email : null)
       if (field === 'ticket_status') {
         db.notifications.create({ type: 'ticket_status_changed', title: 'Status Updated', message: `Ticket ${ticket.rma_number} moved from "${oldValue}" to "${newValue}"`, entityType: 'ticket', entityId: ticket.id, targetRoles: ['admin', 'manager'] }).catch(() => {})
         if (customerEmail) {
@@ -1859,8 +1853,6 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
             setShowModal(false)
             setEditingTicket(null)
           }}
-          customers={customers}
-          products={products}
           users={users}
           userEmail={userEmail}
           userRole={userRole}

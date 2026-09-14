@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
+import { useCustomerSearch, useCustomer } from '../../lib/useLookups'
 import { ModalOverlay, ModalCard, Button, Label, Input } from '../../components/ui'
 import SalesDocumentForm from './SalesDocumentForm'
 import { ProductSearchInput } from '../Pipeline/_shared'
@@ -39,7 +40,7 @@ const fmtMoney = (n) => (Number(n) || 0).toLocaleString(undefined, { minimumFrac
  * The card height is left to grow with content; the overlay (items-start +
  * py-8 + overflow-y-auto) handles scrolling, so the title is never clipped.
  */
-export function DocumentFormModal({ docType, initial = null, customers, products, salesReps, currentUserEmail, onClose, onSaved }) {
+export function DocumentFormModal({ docType, initial = null, salesReps, currentUserEmail, onClose, onSaved }) {
   const { t } = useTranslation()
   const titleKey = initial ? `salesDocuments.editTitle_${docType}` : `salesDocuments.createTitle_${docType}`
   return (
@@ -53,8 +54,6 @@ export function DocumentFormModal({ docType, initial = null, customers, products
           <SalesDocumentForm
             docType={docType}
             initial={initial}
-            customers={customers}
-            products={products}
             salesReps={salesReps}
             currentUserEmail={currentUserEmail}
             onCancel={onClose}
@@ -390,8 +389,6 @@ const ALL_CN_TYPES = ['rma_return', 'rebate', 'discount', 'correction']
 const EMPTY_CN_LINE = { product_id: null, product_name: '', qty: 1, unit_price: 0 }
 
 export function CreateStandaloneCreditNoteModal({
-  customers = [],
-  products = [],
   currentUserEmail,
   initialCustomerId = '',
   initialType = 'discount',
@@ -421,15 +418,11 @@ export function CreateStandaloneCreditNoteModal({
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const customerMatches = useMemo(() => {
-    const q = customerQuery.trim().toLowerCase()
-    if (!q) return []
-    return customers
-      .filter((c) => (c.company_name || c.contact_person || '').toLowerCase().includes(q) || (c.customer_code || '').toLowerCase().includes(q))
-      .slice(0, 8)
-  }, [customerQuery, customers])
+  // Matches come from the database; this filtered the whole customer list,
+  // which the Data API caps at 1 000 rows. (BUG-066.)
+  const { results: customerMatches } = useCustomerSearch(customerQuery, { limit: 8, enabled: customerOpen })
 
-  const selectedCustomer = customers.find((c) => c.id === customerId)
+  const selectedCustomer = useCustomer(customerId)
 
   useEffect(() => {
     setInvoiceId('')
@@ -575,7 +568,6 @@ export function CreateStandaloneCreditNoteModal({
                       value={l.product_name}
                       onChange={(text) => updateLine(i, { product_name: text, product_id: null })}
                       onSelectProduct={(p) => selectProduct(i, p)}
-                      products={products}
                       placeholder={t('salesDocuments.productPlaceholder')}
                   aria-label={t('salesDocuments.fProduct')}
                       className="flex-1"

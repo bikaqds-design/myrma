@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
+import { useCustomersById } from '../../lib/useLookups'
 import { useURLTab } from '../../hooks/useURLTab'
 import { canDo, ownershipScope } from '../../lib/permissions'
 import { PageHeader } from '../../components/ui'
@@ -197,15 +198,16 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
     queryFn: () => db.deals.list(),
     staleTime: 60_000,
   })
-  const { data: customers = EMPTY_ARRAY } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => db.customers.list(),
-    staleTime: 60_000,
-  })
 
   const leadMap     = useMemo(() => Object.fromEntries(leads.map((l) => [l.id, l])),     [leads])
   const dealMap     = useMemo(() => Object.fromEntries(deals.map((d) => [d.id, d])),     [deals])
-  const customerMap = useMemo(() => Object.fromEntries(customers.map((c) => [c.id, c])), [customers])
+  // Only the customers the rows name — through their deal, or directly — by id.
+  // (BUG-066.)
+  const customerMap = useCustomersById([
+    ...deals.map((d) => d.customer_id),
+    ...allActivities.filter((a) => a.related_type === 'customer').map((a) => a.related_id),
+    ...allCompleted.filter((a) => a.related_type === 'customer').map((a) => a.related_id),
+  ])
 
   // ── Name resolution ───────────────────────────────────────────────────────
   const getCustomerName = React.useCallback((a) => {
