@@ -36,6 +36,13 @@ export class WhatsAppProvider implements IMessagingProvider {
     }
 
     // Dynamic import keeps supabase out of this TS file (avoids circular dep)
+    //
+    // KNOWN BROKEN, deliberately left: from src/lib/messaging/providers this path
+    // resolves to src/lib/api/client.js, which does not exist. It should be
+    // '../../../api/client.js', so a send through this provider fails at runtime.
+    // Not fixed because WhatsApp work is on hold (BUG-006). When the path is
+    // corrected, tsc reports this directive as unused and forces its removal.
+    // @ts-expect-error TS2307: wrong relative path, see above (BUG-006 hold)
     const { supabase } = await import('../../api/client.js')
 
     try {

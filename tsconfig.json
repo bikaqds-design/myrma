@@ -10,6 +10,11 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    /* The .ts files import the project's own JavaScript (client.js, sentry.js,
+       dates.js …). allowJs lets TypeScript read their types; checkJs stays off,
+       so the JavaScript is not itself type-checked. (BUG-051.) */
+    "allowJs": true,
+    "checkJs": false,
     "noEmit": true,
 
     /* Strict checks */
@@ -19,10 +24,10 @@
     "noFallthroughCasesInSwitch": true,
 
     /* React */
-    "jsx": "react-jsx",
+    "jsx": "react-jsx"
 
-    /* Path aliases (none yet — add here when needed) */
-    "baseUrl": "."
+    /* Path aliases: none. TypeScript 7 removed "baseUrl"; if aliases are ever
+       needed, use "paths" with paths relative to this file. */
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]

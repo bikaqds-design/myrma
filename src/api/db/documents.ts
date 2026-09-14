@@ -105,8 +105,17 @@ export interface DocumentFilters {
   notSearchableOnly?: boolean
 }
 
-/** Apply the filter set to a query. Kept in one place so browse and search agree. */
-function applyFilters(query: ReturnType<typeof supabase.from>, filters?: DocumentFilters) {
+/**
+ * Apply the filter set to a query. Kept in one place so browse and search agree.
+ *
+ * Typed by what it uses. Every caller passes a query after `.select()`; the old
+ * `ReturnType<typeof supabase.from>` is the builder before select, on which none
+ * of these filter methods exist as far as the type checker can tell. (BUG-051.)
+ */
+function applyFilters<Q extends { eq(column: string, value: unknown): Q; neq(column: string, value: unknown): Q }>(
+  query: Q,
+  filters?: DocumentFilters
+): Q {
   let q = query
   if (filters?.brandId) q = q.eq('product.brand_id', filters.brandId)
   if (filters?.categoryId) q = q.eq('product.category_id', filters.categoryId)
@@ -133,7 +142,7 @@ export const productDocuments = {
       if (NOT_PROVISIONED.includes(error.code)) return []
       throw error
     }
-    return (data ?? []) as ProductDocumentRow[]
+    return (data ?? []) as unknown as ProductDocumentRow[]
   },
 
   async listAll(
@@ -147,7 +156,7 @@ export const productDocuments = {
       if (NOT_PROVISIONED.includes(error.code)) return { data: [], missing: true }
       throw error
     }
-    return { data: (data ?? []) as ProductDocumentRow[], missing: false }
+    return { data: (data ?? []) as unknown as ProductDocumentRow[], missing: false }
   },
 
   /**
@@ -208,7 +217,7 @@ export const productDocuments = {
     // Merge by id — a document whose product AND body both matched must not
     // appear twice.
     const byId = new Map<string, ProductDocumentRow>()
-    for (const d of (textRes.data ?? []) as ProductDocumentRow[]) byId.set(d.id, d)
+    for (const d of (textRes.data ?? []) as unknown as ProductDocumentRow[]) byId.set(d.id, d)
 
     if (matchedProductIds.length > 0) {
       const { data: byProduct, error } = await applyFilters(
@@ -220,7 +229,7 @@ export const productDocuments = {
         filters
       )
       if (error) throw error
-      for (const d of (byProduct ?? []) as ProductDocumentRow[]) {
+      for (const d of (byProduct ?? []) as unknown as ProductDocumentRow[]) {
         if (!byId.has(d.id)) byId.set(d.id, d)
       }
     }
@@ -330,7 +339,7 @@ export const productDocuments = {
       if (NOT_PROVISIONED.includes(error.code)) return []
       throw error
     }
-    return (data ?? []) as ProductDocumentRow[]
+    return (data ?? []) as unknown as ProductDocumentRow[]
   },
 
   /**
@@ -352,7 +361,7 @@ export const productDocuments = {
       if (NOT_PROVISIONED.includes(error.code)) return []
       throw error
     }
-    return (data ?? []) as ProductDocumentRow[]
+    return (data ?? []) as unknown as ProductDocumentRow[]
   },
 
   /**

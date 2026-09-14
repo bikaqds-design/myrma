@@ -35,6 +35,12 @@ jobs:
         # red on HEAD (BUG-016).
         run: npm run lint:ci
 
+      # The TypeScript files were never type-checked anywhere: tsc was not even
+      # installed, and it reported 96 errors the first time it ran. This gates
+      # the build on zero, so they cannot come back unnoticed. (BUG-051.)
+      - name: Type check (zero errors)
+        run: npm run typecheck
+
       - name: Untranslated UI strings (report only)
         continue-on-error: true
         run: npm run lint:ui
