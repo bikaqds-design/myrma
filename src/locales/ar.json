@@ -100,7 +100,8 @@
     "selectAll": "تحديد الكل",
     "archive": "أرشفة",
     "restore": "استعادة",
-    "confirm": "تأكيد"
+    "confirm": "تأكيد",
+    "preparingExport": "جارٍ تجهيز التصدير…"
   },
   "shortcuts": {
     "title": "اختصارات لوحة المفاتيح",
@@ -407,7 +408,6 @@
     "changeStatus": "تغيير الحالة…",
     "filterPlaceholder": "اكتب للتصفية…",
     "showingRange": "عرض {{from}}–{{to}} من أصل {{total}} عميل",
-    "capWarning": "عرض أول {{shown}} من أصل {{total}} عميل. استخدم الفلاتر أو البحث للعثور على سجلات محددة.",
     "deleteCustomersTitle": "حذف العملاء",
     "deleteCustomersConfirm_one": "هل تريد حذف {{count}} عميل؟ لا يمكن التراجع.",
     "deleteCustomersConfirm_zero": "هل تريد حذف {{count}} عملاء؟ لا يمكن التراجع.",
@@ -494,7 +494,8 @@
     "importMissingDetails_two": "عميلان تم استيرادهما ينقصهما اسم جهة الاتصال أو رقم الموبايل — القائمة في وحدة تحكم المتصفح.",
     "importMissingDetails_few": "{{count}} عملاء تم استيرادهم ينقصهم اسم جهة الاتصال أو رقم الموبايل — القائمة في وحدة تحكم المتصفح.",
     "importMissingDetails_many": "{{count}} عميلاً تم استيرادهم ينقصهم اسم جهة الاتصال أو رقم الموبايل — القائمة في وحدة تحكم المتصفح.",
-    "importMissingDetails_other": "{{count}} عميل تم استيرادهم ينقصهم اسم جهة الاتصال أو رقم الموبايل — القائمة في وحدة تحكم المتصفح."
+    "importMissingDetails_other": "{{count}} عميل تم استيرادهم ينقصهم اسم جهة الاتصال أو رقم الموبايل — القائمة في وحدة تحكم المتصفح.",
+    "failedExport": "تعذّر تجهيز التصدير: {{error}}"
   },
   "leads": {
     "title": "العملاء المحتملون",

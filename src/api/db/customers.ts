@@ -1,5 +1,7 @@
 import { supabase } from '../client.js'
 import { assertUpdated, assertAffected, assertAllAffected } from './_assertUpdated.js'
+import { fetchPage, fetchAllRows, chunksOf } from './_paging.js'
+import type { PagedResult as ServerPage } from './types.js'
 import { orIlike } from '../../lib/searchPattern.js'
 import { mobileKey } from '../../lib/customerDuplicates.js'
 
@@ -43,13 +45,173 @@ export interface PagedResult<T> {
   totalPages: number
 }
 
+/**
+ * What the Customers list is narrowed by. Every field is optional; all given
+ * ones must hold (AND). Text matches are case-insensitive substrings, taken
+ * literally (see searchPattern).
+ */
+export interface CustomerFilters {
+  /** Matched against name, company, email, mobile, landline and code. */
+  search?: string
+  status?: string
+  type?: string
+  /** Matched against contact person and company name only. */
+  contactOrCompany?: string
+}
+
+/** Columns the list may be sorted by. Anything else falls back to newest first. */
+export const CUSTOMER_SORT_COLUMNS = [
+  'customer_code',
+  'contact_person',
+  'company_name',
+  'customer_type',
+  'mobile',
+  'email',
+  'customer_status',
+  'created_date',
+] as const
+export type CustomerSortColumn = (typeof CUSTOMER_SORT_COLUMNS)[number]
+
+export interface CustomerSort {
+  column: string
+  ascending: boolean
+}
+
+export interface CustomerPageQuery extends CustomerFilters {
+  /** 1-based. */
+  page: number
+  pageSize: number
+  sort?: CustomerSort
+}
+
+const SEARCH_COLUMNS = ['contact_person', 'company_name', 'email', 'mobile', 'customer_code', 'landline']
+
+/** The filter methods used here; PostgREST builders return themselves from each. */
+interface Filterable<Q> {
+  or(filters: string): Q
+  eq(column: string, value: unknown): Q
+}
+
+function applyCustomerFilters<Q extends Filterable<Q>>(query: Q, filters: CustomerFilters): Q {
+  let q = query
+  const search = filters.search?.trim()
+  if (search) q = q.or(orIlike(SEARCH_COLUMNS, search))
+  if (filters.status) q = q.eq('customer_status', filters.status)
+  if (filters.type) q = q.eq('customer_type', filters.type)
+  const who = filters.contactOrCompany?.trim()
+  // A second .or() is a separate query parameter, which PostgREST ANDs with the
+  // first — so search and this filter narrow together rather than widening.
+  if (who) q = q.or(orIlike(['company_name', 'contact_person'], who))
+  return q
+}
+
+/**
+ * A sort the database can apply. Unknown columns fall back to newest first:
+ * the column name reaches the query string, so it is checked, not trusted.
+ *
+ * Empty values sort first ascending and last descending, which is where the
+ * old in-browser sort put them (it compared a missing value as '').
+ */
+export function resolveCustomerSort(sort?: CustomerSort): { column: CustomerSortColumn; ascending: boolean } {
+  const column = (CUSTOMER_SORT_COLUMNS as readonly string[]).includes(sort?.column ?? '')
+    ? (sort!.column as CustomerSortColumn)
+    : 'created_date'
+  const ascending = column === (sort?.column ?? '') ? Boolean(sort?.ascending) : false
+  return { column, ascending }
+}
+
 // ── Customers ─────────────────────────────────────────────────────────────────
 
 export const customers = {
+  /**
+   * One page of customers, filtered and sorted in the database, with the exact
+   * number that match. What the Customers screen shows. (BUG-066.)
+   */
+  async listPage(query: CustomerPageQuery): Promise<ServerPage<CustomerRow>> {
+    const { column, ascending } = resolveCustomerSort(query.sort)
+    return fetchPage<CustomerRow>(
+      (from, to) => {
+        const base = supabase.from('customers').select('*', { count: 'exact' })
+        return applyCustomerFilters(base, query)
+          .order(column, { ascending, nullsFirst: ascending })
+          .order('id', { ascending: true })
+          .range(from, to)
+      },
+      query.page,
+      query.pageSize
+    )
+  },
+
+  /**
+   * Every customer matching the filters, in the list's sort order. For export,
+   * where "all" has to mean all — read in chunks, never capped.
+   */
+  async listAllMatching(filters: CustomerFilters = {}, sort?: CustomerSort): Promise<CustomerRow[]> {
+    const { column, ascending } = resolveCustomerSort(sort)
+    return fetchAllRows<CustomerRow>((from, to) => {
+      // Built in two steps: inlining the select into the generic filter call
+      // sends the type checker into TS2589 on supabase-js's builder types.
+      const base = supabase.from('customers').select('*')
+      return applyCustomerFilters(base, filters)
+        .order(column, { ascending, nullsFirst: ascending })
+        .order('id', { ascending: true })
+        .range(from, to)
+    })
+  },
+
+  /** How many customers exist, without reading any. */
+  async count(): Promise<number> {
+    const { count, error } = await supabase.from('customers').select('id', { count: 'exact', head: true })
+    if (error) throw error
+    return count ?? 0
+  },
+
+  /**
+   * Which of these company names and contact names are already in use,
+   * compared trimmed and case-insensitively — how the CSV importer decides a
+   * row with no mobile is a duplicate.
+   *
+   * The importer used to build these sets from the list the page had loaded,
+   * which is capped (BUG-066), so past the cap a name already on file was
+   * imported again. This asks the database. A substring match fetches
+   * candidates and the exact comparison happens here, because the database
+   * cannot trim a value inside a PostgREST filter.
+   *
+   * @returns the matching names, lower-cased and trimmed
+   */
+  async findExistingNames(
+    companies: string[],
+    contacts: string[]
+  ): Promise<{ companies: Set<string>; contacts: Set<string> }> {
+    const norm = (v: string | null | undefined) => String(v ?? '').trim().toLowerCase()
+    const found = { companies: new Set<string>(), contacts: new Set<string>() }
+    const lookups: Array<[keyof typeof found, string[]]> = [
+      ['companies', [...new Set(companies.map(norm).filter(Boolean))]],
+      ['contacts', [...new Set(contacts.map(norm).filter(Boolean))]],
+    ]
+    for (const [kind, names] of lookups) {
+      const column = kind === 'companies' ? 'company_name' : 'contact_person'
+      for (const chunk of chunksOf(names, 25)) {
+        const wanted = new Set(chunk)
+        const filter = chunk.map((name) => orIlike([column], name)).join(',')
+        const rows = await fetchAllRows<Record<string, string | null>>((from, to) =>
+          supabase.from('customers').select(`id, ${column}`).or(filter).order('id', { ascending: true }).range(from, to)
+        )
+        for (const row of rows) {
+          const name = norm(row[column])
+          if (wanted.has(name)) found[kind].add(name)
+        }
+      }
+    }
+    return found
+  },
+
+  /**
+   * @deprecated Loads the whole table, and the Data API returns at most 1 000
+   * rows, so past that it is silently incomplete (BUG-066). Still used by the
+   * screens not yet moved to server-side paging; do not add callers.
+   */
   async list(): Promise<CustomerRow[]> {
-    // 5 000-row cap — the Customers page filters/sorts client-side so all rows
-    // must be in memory. If the dataset ever exceeds 5 000, switch the page to
-    // server-side pagination using listPaged().
     const { data, error } = await supabase
       .from('customers')
       .select('*')
