@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../api/supabaseClient'
 import { Table, Pagination, Button, Label, Input, Select, Textarea } from '../components/ui'
@@ -17,13 +17,8 @@ import { purgeExpiredTrash } from '../lib/documentTrash'
 import { toUserMessage } from '../lib/errorMessage'
 import { captureException } from '../lib/sentry'
 import { useUrlState, useResetOnFilterChange } from '../lib/useUrlState'
-import {
-  buildTree,
-  pathTo,
-  descendantDocuments,
-  formatBytes,
-  ROOT_ID,
-} from '../lib/knowledgeTree'
+import { formatBytes } from '../lib/knowledgeTree'
+import { KNOWLEDGE_ROOT as ROOT_ID } from '../api/db/knowledgeLists'
 
 /**
  * The Search tab, redesigned as a folder explorer (2026-09-03).
@@ -37,28 +32,23 @@ import {
  *
  * ── The tree mirrors the whole catalogue, not just the folders with files ───
  *
- * Decided deliberately: today that is 14 brands and 406 product folders around
- * 2 documents. A brand with nothing uploaded still appears and reads as a gap
- * — which is the point, the same reasoning that put the unsearchable count on
- * screen in the first place. `src/lib/knowledgeTree.js` carries the placement
- * rules and is unit-tested there; this file is the view over it.
+ * Decided deliberately: a brand with nothing uploaded still appears and reads
+ * as a gap — which is the point, the same reasoning that put the unsearchable
+ * count on screen in the first place.
  *
- * ── Why browsing and searching share one query, not two code paths ─────────
+ * ── One folder at a time, from the database (BUG-066) ──────────────────────
  *
- * Every folder maps onto exactly one of `DocumentFilters`' existing fields —
- * a brand folder is `{ brandId }`, a product folder is `{ productId }` — so
- * "search inside this folder" is just the existing search/listAll call with
- * the scope folder's filter added in. No new backend shape, and Coverage's
- * counts and this screen's counts can never disagree about what a brand
- * contains.
+ * This screen used to load every brand, category, product and document and
+ * build the tree here. The Data API returns at most 1 000 rows per request, so
+ * past that products — and the documents filed under them — silently went
+ * missing from browsing while search still found them. The placement and
+ * roll-up rules now live in `20260855_knowledge_explorer_views.sql`
+ * (`v_knowledge_nodes`, `v_knowledge_documents`), and this file reads the
+ * current folder's page, its path, its counts and the sidebar branches the
+ * user opens — nothing else.
  *
- * ── Why plain browsing does not issue a second network request ─────────────
- *
- * The tree is already built from every document's metadata (needed for the
- * folder sizes), so a folder with no active search or filter renders straight
- * from that in-memory tree. The `search`/`listAll(applied)` query only runs
- * once something is actually narrowing the view — a query, a file type, or a
- * searchable/unsearchable toggle.
+ * Browsing and searching share one notion of scope: a folder is every document
+ * whose path contains it, for the page, the counts and the search alike.
  */
 export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, currentUserPermissions }) {
   const { t, i18n } = useTranslation()
@@ -109,48 +99,56 @@ export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, c
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canEdit])
 
-  const { data: brands = EMPTY_ARRAY } = useQuery({
-    queryKey: ['brands'],
-    queryFn: () => db.brands.list(),
-    staleTime: 10 * 60_000,
+  // The folder in the URL, read from the database. An id that is not a folder
+  // (deleted since the link was made) falls back to the root.
+  const atRoot = folder === ROOT_ID
+  const { data: folderNode, isFetched: folderFetched } = useQuery({
+    queryKey: ['knowledge-center', 'folder', folder],
+    queryFn: () => db.knowledgeLists.folder(folder),
+    enabled: !atRoot,
   })
-  const { data: categories = EMPTY_ARRAY } = useQuery({
-    queryKey: ['categories'],
-    queryFn: () => db.categories.list(),
-    staleTime: 10 * 60_000,
-  })
-  const { data: subcategories = EMPTY_ARRAY } = useQuery({
-    queryKey: ['subcategories'],
-    queryFn: () => db.subcategories.list(),
-    staleTime: 10 * 60_000,
-  })
-  const { data: products = EMPTY_ARRAY } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => db.products.list(),
-    staleTime: 5 * 60_000,
-  })
-  // Same key the parent page probes for provisioning, so this is cache, not a
-  // second request.
-  const { data: libraryRes } = useQuery({
-    queryKey: ['knowledge-center', 'library'],
-    queryFn: () => db.productDocuments.listAll(),
-  })
-  const allDocs = libraryRes?.data ?? EMPTY_ARRAY
+  const currentNode = atRoot || (folderFetched && !folderNode) ? null : folderNode ?? null
+  const folderId = currentNode?.id ?? ROOT_ID
+  const currentKind = currentNode?.kind ?? 'root'
 
-  // Unconditional, not just while Trash is open — the sidebar badge needs an
-  // accurate count at all times, and the list itself is never large.
-  const { data: trashDocs = EMPTY_ARRAY, isFetching: trashLoading } = useQuery({
-    queryKey: ['knowledge-center', 'trash'],
-    queryFn: () => db.productDocuments.listTrash(),
+  const { data: pathNodes = EMPTY_ARRAY } = useQuery({
+    queryKey: ['knowledge-center', 'path', currentNode?.path],
+    queryFn: () => db.knowledgeLists.foldersOnPath(currentNode.path),
+    enabled: Boolean(currentNode),
+    placeholderData: keepPreviousData,
   })
-
-  const { root, byId } = useMemo(
-    () => buildTree({ brands, categories, subcategories, products, documents: allDocs }),
-    [brands, categories, subcategories, products, allDocs]
+  const crumbs = useMemo(
+    () => [{ id: ROOT_ID, kind: 'root', name: '' }, ...(currentNode ? pathNodes : EMPTY_ARRAY)],
+    [currentNode, pathNodes]
   )
 
-  const currentNode = byId.get(folder) ?? root
-  const crumbs = useMemo(() => pathTo(byId, currentNode.id), [byId, currentNode])
+  const { data: brands = EMPTY_ARRAY } = useQuery({
+    queryKey: ['knowledge-center', 'brands'],
+    queryFn: () => db.knowledgeLists.allChildFolders(ROOT_ID, 'brand'),
+    staleTime: 10 * 60_000,
+  })
+
+  // Unconditional, not just while Trash is open — the sidebar badge needs an
+  // accurate count at all times.
+  const { data: trashDocs = EMPTY_ARRAY, isFetching: trashLoading } = useQuery({
+    queryKey: ['knowledge-center', 'trash'],
+    queryFn: () => db.knowledgeLists.trash(),
+  })
+
+  const { data: recentDocs = EMPTY_ARRAY } = useQuery({
+    queryKey: ['knowledge-center', 'recent'],
+    queryFn: () => db.knowledgeLists.recent(6),
+  })
+
+  // Counts for everything beneath the current folder, whatever the search.
+  const { data: stats } = useQuery({
+    queryKey: ['knowledge-center', 'stats', folderId],
+    queryFn: () => db.knowledgeLists.folderStats(folderId),
+    placeholderData: keepPreviousData,
+  })
+  const scopedTotal = stats?.total ?? 0
+  const unsearchableHere = stats?.unsearchable ?? 0
+  const typeCounts = stats?.by_type ?? {}
 
   // Auto-expand the path to wherever navigation lands (a breadcrumb click, a
   // Recent jump) so the highlighted folder is not hidden in a collapsed tree.
@@ -160,7 +158,7 @@ export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, c
       const next = new Set(prev)
       let changed = false
       for (const c of crumbs) {
-        if (!next.has(c.id)) {
+        if (c.id !== folderId && !next.has(c.id)) {
           next.add(c.id)
           changed = true
         }
@@ -168,37 +166,12 @@ export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, c
       return changed ? next : prev
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentNode.id])
+  }, [crumbs])
 
   const goTo = (id) => {
     setView('')
     setFolder(id)
   }
-
-  const scopeFilters = useMemo(() => {
-    switch (currentNode.kind) {
-      case 'brand':
-        return { brandId: currentNode.id }
-      case 'category':
-        return { categoryId: currentNode.id }
-      case 'subcategory':
-        return { subcategoryId: currentNode.id }
-      case 'product':
-        return { productId: currentNode.id }
-      default:
-        return {}
-    }
-  }, [currentNode])
-
-  const applied = useMemo(
-    () => ({
-      ...scopeFilters,
-      docType: docType || null,
-      searchableOnly: status === 'searchable',
-      notSearchableOnly: status === 'unsearchable',
-    }),
-    [scopeFilters, docType, status]
-  )
 
   // A document with no readable text can never match a text search, so
   // combining the two would always return nothing. Treat "not searchable" as
@@ -207,32 +180,42 @@ export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, c
   const filtered = Boolean(docType) || status !== ''
   const flatMode = searchActive || filtered
 
-  const { data: flatRes, isFetching } = useQuery({
-    queryKey: ['knowledge-center', 'view', folder, q, applied],
-    queryFn: () => (searchActive ? db.productDocuments.search(q, applied) : db.productDocuments.listAll(applied)),
-    enabled: flatMode,
+  const vaultFilters = useMemo(
+    () => ({
+      folderId,
+      query: searchActive ? q : null,
+      docType: docType || null,
+      searchableOnly: status === 'searchable',
+      notSearchableOnly: status === 'unsearchable',
+    }),
+    [folderId, searchActive, q, docType, status]
+  )
+
+  const { data: pageResult, isFetching } = useQuery({
+    queryKey: flatMode
+      ? ['knowledge-center', 'documents', vaultFilters, page, itemsPerPage]
+      : ['knowledge-center', 'browse', folderId, page, itemsPerPage],
+    queryFn: () =>
+      flatMode
+        ? db.knowledgeLists.documentsPage(vaultFilters, page, itemsPerPage)
+        : db.knowledgeLists.browsePage(folderId, page, itemsPerPage),
+    enabled: view === '',
+    placeholderData: keepPreviousData,
   })
-
-  const scopedDocs = useMemo(() => descendantDocuments(currentNode), [currentNode])
-  const unsearchableHere = useMemo(
-    () => scopedDocs.filter((d) => d.extraction_status !== 'ok').length,
-    [scopedDocs]
-  )
-  const typeCounts = useMemo(() => {
-    const counts = {}
-    for (const d of scopedDocs) counts[d.doc_type] = (counts[d.doc_type] ?? 0) + 1
-    return counts
-  }, [scopedDocs])
-
-  const recentDocs = useMemo(
+  const total = pageResult?.count ?? 0
+  const pageRows = useMemo(
     () =>
-      [...allDocs]
-        .sort((a, b) =>
-          String(b.updated_at ?? b.created_at ?? '').localeCompare(String(a.updated_at ?? a.created_at ?? ''))
-        )
-        .slice(0, 6),
-    [allDocs]
+      flatMode
+        ? (pageResult?.data ?? EMPTY_ARRAY).map((doc) => ({ id: doc.id, kind: 'document', doc }))
+        : pageResult?.data ?? EMPTY_ARRAY,
+    [flatMode, pageResult]
   )
+  // The last page can empty under the user (a delete, a narrower filter): step back.
+  useEffect(() => {
+    const totalPages = Math.ceil(total / itemsPerPage)
+    if (pageResult && totalPages >= 1 && page > totalPages) setPage(totalPages)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageResult, total, page, itemsPerPage])
 
   const runSearch = (e) => {
     e?.preventDefault()
@@ -246,28 +229,12 @@ export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, c
     setStatus('')
   }
 
-  const browseRows = useMemo(
-    () => [
-      ...currentNode.folders.map((node) => ({ id: node.id, kind: 'folder', node })),
-      ...currentNode.documents.map((doc) => ({ id: doc.id, kind: 'document', doc })),
-    ],
-    [currentNode]
-  )
-  const flatRows = useMemo(
-    () => (flatRes?.data ?? EMPTY_ARRAY).map((doc) => ({ id: doc.id, kind: 'document', doc })),
-    [flatRes]
-  )
-  const allRows = flatMode ? flatRows : browseRows
-  const total = allRows.length
-  const pageStart = (page - 1) * itemsPerPage
-  const pageRows = allRows.slice(pageStart, pageStart + itemsPerPage)
-
   const brandCrumb = useMemo(() => crumbs.find((c) => c.kind === 'brand'), [crumbs])
   const categoryCrumb = useMemo(() => crumbs.find((c) => c.kind === 'category'), [crumbs])
   const subcategoryCrumb = useMemo(() => crumbs.find((c) => c.kind === 'subcategory'), [crumbs])
 
-  const canCreateFolder = currentNode.kind !== 'product' && view === ''
-  const isProductFolder = currentNode.kind === 'product' && view === ''
+  const canCreateFolder = currentKind !== 'product' && view === ''
+  const isProductFolder = currentKind === 'product' && view === ''
 
   const openNewFolder = () =>
     navigate('/products', {
@@ -285,10 +252,12 @@ export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, c
   // replaced them. Picking either just navigates there; there is only ever
   // one notion of "where you are", the folder, not a second filter layer
   // that could disagree with it.
-  const categoryOptions = useMemo(
-    () => (brandCrumb ? categories.filter((c) => c.brand_id === brandCrumb.id) : EMPTY_ARRAY),
-    [categories, brandCrumb]
-  )
+  const { data: categoryOptions = EMPTY_ARRAY } = useQuery({
+    queryKey: ['knowledge-center', 'categories', brandCrumb?.id],
+    queryFn: () => db.knowledgeLists.allChildFolders(brandCrumb.id, 'category'),
+    enabled: Boolean(brandCrumb),
+    staleTime: 10 * 60_000,
+  })
 
   const toggleExpanded = (id) =>
     setExpanded((prev) => {
@@ -344,19 +313,9 @@ export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, c
     }
   }
 
-  const trashCrumbPath = (doc) => {
-    if (!doc.product) return doc.title
-    const path = pathTo(byId, doc.product.id)
-    // The product itself may not have resolved into the tree yet (a
-    // just-loaded page, or a product deleted since); fall back to naming it
-    // directly rather than showing an empty trail.
-    return path.length > 1
-      ? path
-          .slice(1)
-          .map((n) => n.name)
-          .join(' / ')
-      : `${doc.product.product_name} (${doc.product.sku})`
-  }
+  // Where a trashed document was filed, named by the database.
+  const trashCrumbPath = (doc) =>
+    doc.folder_path || (doc.product ? `${doc.product.product_name} (${doc.product.sku})` : doc.title)
 
   const columns = [
     {
@@ -412,7 +371,7 @@ export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, c
       numeric: true,
       cell: (row) =>
         row.kind === 'folder'
-          ? t('knowledgeCenter.explorer.itemCount', { count: row.node.docCount })
+          ? t('knowledgeCenter.explorer.itemCount', { count: row.node.doc_count })
           : formatBytes(row.doc.file_size),
     },
     {
@@ -494,7 +453,7 @@ export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, c
               type="button"
               onClick={() => goTo(ROOT_ID)}
               className={`flex-1 min-w-0 flex items-center gap-1.5 py-1.5 pe-2 text-start truncate ${
-                currentNode.id === ROOT_ID && view === ''
+                folderId === ROOT_ID && view === ''
                   ? 'text-indigo-700 dark:text-[#a5b4fc] font-medium'
                   : 'text-gray-700 dark:text-[#e8ebf0]'
               }`}
@@ -506,19 +465,16 @@ export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, c
 
           {expanded.has(ROOT_ID) && (
             <div className="max-h-72 overflow-y-auto">
-              {root.folders.map((node) => (
-                <TreeRow
-                  key={node.id}
-                  node={node}
-                  depth={1}
-                  isRtl={isRtl}
-                  currentId={currentNode.id}
-                  expanded={expanded}
-                  onToggle={toggleExpanded}
-                  onSelect={goTo}
-                  t={t}
-                />
-              ))}
+              <TreeChildren
+                parentId={ROOT_ID}
+                depth={1}
+                isRtl={isRtl}
+                currentId={folderId}
+                expanded={expanded}
+                onToggle={toggleExpanded}
+                onSelect={goTo}
+                t={t}
+              />
             </div>
           )}
 
@@ -569,11 +525,11 @@ export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, c
         <div className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-3">
           <SidebarHeading>{t('knowledgeCenter.explorer.status')}</SidebarHeading>
           <div className="space-y-0.5">
-            <SidebarChip active={status === ''} label={t('knowledgeCenter.explorer.statusAll')} count={scopedDocs.length} onClick={() => setStatus('')} />
+            <SidebarChip active={status === ''} label={t('knowledgeCenter.explorer.statusAll')} count={scopedTotal} onClick={() => setStatus('')} />
             <SidebarChip
               active={status === 'searchable'}
               label={t('knowledgeCenter.explorer.statusSearchable')}
-              count={scopedDocs.length - unsearchableHere}
+              count={scopedTotal - unsearchableHere}
               onClick={() => setStatus(status === 'searchable' ? '' : 'searchable')}
             />
             <SidebarChip
@@ -589,7 +545,7 @@ export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, c
         <div className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-3">
           <SidebarHeading>{t('knowledgeCenter.explorer.fileType')}</SidebarHeading>
           <div className="space-y-0.5">
-            <SidebarChip active={docType === ''} label={t('knowledgeCenter.allTypes')} count={scopedDocs.length} onClick={() => setDocType('')} />
+            <SidebarChip active={docType === ''} label={t('knowledgeCenter.allTypes')} count={scopedTotal} onClick={() => setDocType('')} />
             {DOC_TYPES.filter((d) => typeCounts[d] > 0).map((d) => (
               <SidebarChip
                 key={d}
@@ -662,7 +618,7 @@ export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, c
 
         {isProductFolder && uploadOpen && (
           <InlineUpload
-            product={{ id: currentNode.id, sku: currentNode.sku, name: currentNode.name }}
+            product={{ id: currentNode.id, sku: currentNode.sku ?? '', name: currentNode.name }}
             currentUserEmail={currentUserEmail}
             onDone={() => {
               setUploadOpen(false)
@@ -684,7 +640,7 @@ export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, c
               >
                 <option value="">{t('knowledgeCenter.allBrands')}</option>
                 {brands.map((b) => (
-                  <option key={b.id} value={b.id}>{b.brand_name}</option>
+                  <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
               <select
@@ -696,7 +652,7 @@ export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, c
               >
                 <option value="">{t('knowledgeCenter.allCategories')}</option>
                 {categoryOptions.map((c) => (
-                  <option key={c.id} value={c.id}>{c.category_name}</option>
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
             </div>
@@ -766,7 +722,7 @@ export default function KnowledgeExplorer({ currentUserEmail, currentUserRole, c
             </div>
 
             {flatMode ? (
-              pageRows.length === 0 && !isFetching ? (
+              pageRows.length === 0 && !isFetching && pageResult ? (
                 <div className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px]">
                   <EmptyStateBlock {...emptyProps} />
                 </div>
@@ -870,9 +826,11 @@ function SidebarChip({ active, label, count, warn, onClick }) {
  * does not redefine the component (and drop its state) on every parent
  * re-render — a `TreeRow` folded 20 levels deep re-mounting itself on each
  * keystroke in the search box would be exactly that bug.
+ *
+ * A branch's children are read when it is opened, not up front (BUG-066).
  */
 function TreeRow({ node, depth, isRtl, currentId, expanded, onToggle, onSelect, t }) {
-  const hasChildren = node.folders.length > 0
+  const hasChildren = node.child_count > 0
   const isOpen = expanded.has(node.id)
   const isActive = node.id === currentId
 
@@ -908,21 +866,70 @@ function TreeRow({ node, depth, isRtl, currentId, expanded, onToggle, onSelect, 
         </button>
       </div>
       {hasChildren && isOpen && (
-        <div>
-          {node.folders.map((child) => (
-            <TreeRow
-              key={child.id}
-              node={child}
-              depth={depth + 1}
-              isRtl={isRtl}
-              currentId={currentId}
-              expanded={expanded}
-              onToggle={onToggle}
-              onSelect={onSelect}
-              t={t}
-            />
-          ))}
-        </div>
+        <TreeChildren
+          parentId={node.id}
+          depth={depth + 1}
+          isRtl={isRtl}
+          currentId={currentId}
+          expanded={expanded}
+          onToggle={onToggle}
+          onSelect={onSelect}
+          t={t}
+        />
+      )}
+    </div>
+  )
+}
+
+/** How many child folders a branch shows before "Show more". */
+const TREE_BATCH = 100
+
+/**
+ * The child folders of one branch, read from the database a batch at a time —
+ * a category can hold more products than any sidebar should list at once.
+ */
+function TreeChildren({ parentId, depth, isRtl, currentId, expanded, onToggle, onSelect, t }) {
+  const [limit, setLimit] = useState(TREE_BATCH)
+  const { data, isLoading } = useQuery({
+    queryKey: ['knowledge-center', 'children', parentId, limit],
+    queryFn: () => db.knowledgeLists.childFolders(parentId, limit),
+    placeholderData: keepPreviousData,
+  })
+  const children = data?.data ?? EMPTY_ARRAY
+  const remaining = (data?.count ?? 0) - children.length
+
+  if (isLoading) {
+    return (
+      <p className="py-1 text-xs text-gray-400 dark:text-[#9aa4b2]" style={{ paddingInlineStart: 8 + depth * 16 }}>
+        {t('common.loading')}
+      </p>
+    )
+  }
+
+  return (
+    <div>
+      {children.map((child) => (
+        <TreeRow
+          key={child.id}
+          node={child}
+          depth={depth}
+          isRtl={isRtl}
+          currentId={currentId}
+          expanded={expanded}
+          onToggle={onToggle}
+          onSelect={onSelect}
+          t={t}
+        />
+      ))}
+      {remaining > 0 && (
+        <button
+          type="button"
+          onClick={() => setLimit((n) => n + TREE_BATCH)}
+          className="py-1 text-xs text-indigo-600 dark:text-[#a5b4fc] hover:underline"
+          style={{ paddingInlineStart: 8 + depth * 16 + 20 }}
+        >
+          {t('knowledgeCenter.explorer.showMore', { count: remaining })}
+        </button>
       )}
     </div>
   )

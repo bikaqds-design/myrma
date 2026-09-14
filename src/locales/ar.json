@@ -4380,6 +4380,7 @@
       "notProvisionedHint": "طبِّق الترحيل 20260809_company_documents.sql."
     },
     "explorer": {
+      "showMore": "عرض {{count}} أخرى",
       "allDocuments": "كل المستندات",
       "browse": "تصفح",
       "recent": "الأخيرة",

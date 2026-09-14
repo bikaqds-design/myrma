@@ -546,59 +546,24 @@ describe('sources are not gated behind the model', () => {
 })
 
 describe('the search filters', () => {
-  const docs = readFileSync('src/api/db/documents.ts', 'utf8')
-  const page = readFileSync('src/pages/KnowledgeCenter.jsx', 'utf8')
-  // The Search tab's own layout moved here in the 2026-09-03 redesign — a
-  // folder tree over the catalogue instead of flat brand/category dropdowns.
   const explorer = readFileSync('src/pages/_KnowledgeExplorer.jsx', 'utf8')
+  const page = readFileSync('src/pages/KnowledgeCenter.jsx', 'utf8')
 
-  // Without !inner PostgREST does a LEFT join, and a filter on a product column
-  // silently returns everything instead of narrowing — a filter that appears to
-  // work and does nothing.
-  it('joins products with !inner so a product filter actually filters', () => {
-    expect(docs).toContain('products!inner(')
+  // BUG-066: the explorer used to build its tree from every product and
+  // document loaded into the browser. What it filters and counts is now pinned
+  // request by request in knowledgeLists.test.js, and the placement rules in
+  // supabase/tests/knowledge_explorer_views.sql. These keep the screen from
+  // drifting back to whole-library reads.
+  it('reads folders, pages and counts from the database, not a tree built in the browser', () => {
+    expect(explorer).toContain('db.knowledgeLists.browsePage(')
+    expect(explorer).toContain('db.knowledgeLists.documentsPage(')
+    expect(explorer).toContain('db.knowledgeLists.folderStats(')
+    expect(explorer).not.toContain('buildTree(')
+    expect(explorer).not.toContain('db.products.list(')
   })
 
-  it('filters browse and search through the same helper, so they agree', () => {
-    expect(docs).toContain('function applyFilters')
-    expect((docs.match(/applyFilters\(/g) || []).length).toBeGreaterThanOrEqual(3)
-  })
-
-  it.each([
-    ['brand', "eq('product.brand_id'"],
-    ['category', "eq('product.category_id'"],
-    ['document type', "eq('doc_type'"],
-    ['searchable only', "eq('extraction_status', 'ok')"],
-  ])('filters by %s', (_name, needle) => {
-    expect(docs).toContain(needle)
-  })
-
-  // An empty select would otherwise become .eq('brand_id', '') and match
-  // nothing. The tree-based explorer that replaced the dropdowns does not
-  // need the `|| null` guard the old code did — browsing to the root folder
-  // supplies no brandId/categoryId key at all, rather than an empty one.
-  it('turns "no folder selected" into no filter, not an empty-string filter', () => {
-    expect(explorer).toContain("case 'brand':")
-    expect(explorer).toContain('return { brandId: currentNode.id }')
-    expect(explorer).toContain('docType: docType || null')
-  })
-
-  // The old flat <select> could show "Monitors" under a brand you had not
-  // chosen, and needed an explicit `categoryId: ''` reset when the brand
-  // changed. The tree removes the combination instead of resetting it: a
-  // category only ever renders nested under its own brand's node (see
-  // knowledgeTree.js's placement rules, and knowledgeTree.test.js's "falls
-  // back to the brand when the category belongs to a different brand"), so
-  // there is no control through which a mismatched pair could be chosen.
-  it('browses the catalogue through the folder tree, not independent dropdowns', () => {
-    expect(explorer).toContain("from '../lib/knowledgeTree'")
-    expect(explorer).toContain('buildTree(')
-  })
-
-  // A count that moved with the filters would suggest filtering had fixed
-  // something. It describes the library, so it is queried unfiltered.
-  it('counts unsearchable documents across the whole library, not the view', () => {
-    expect(page).toContain("queryKey: ['knowledge-center', 'library']")
-    expect(page).toContain('db.productDocuments.listAll()')
+  it('checks the library is provisioned without reading it', () => {
+    expect(page).toContain('db.knowledgeLists.isProvisioned()')
+    expect(page).not.toContain('listAll(')
   })
 })

@@ -35,18 +35,19 @@ export default function KnowledgeCenter({ currentUserEmail, currentUserRole, cur
   // part number should not be made to converse about it.
   const [mode, setMode] = useState('search')
 
-  // Whether the table is provisioned at all — shared with KnowledgeExplorer's
-  // own query of the same key, so this is not a second request.
-  const { data: libraryRes, isLoading } = useQuery({
-    queryKey: ['knowledge-center', 'library'],
-    queryFn: () => db.productDocuments.listAll(),
+  // Whether the table is provisioned at all — a count with no rows, not a read
+  // of the whole library (which the Data API caps anyway). (BUG-066.)
+  const { data: provisioned, isLoading } = useQuery({
+    queryKey: ['knowledge-center', 'provisioned'],
+    queryFn: () => db.knowledgeLists.isProvisioned(),
+    staleTime: 10 * 60_000,
   })
 
   if (isLoading) {
     return <div className="py-16 text-center text-sm text-gray-500">{t('common.loading')}</div>
   }
 
-  if (libraryRes?.missing) {
+  if (provisioned === false) {
     return (
       <div className="p-6">
         <PageHeader title={t('knowledgeCenter.title')} subtitle={t('knowledgeCenter.subtitle')} />
