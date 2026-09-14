@@ -108,11 +108,11 @@ function fmtDateTime(iso, language) {
     d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
   )
 }
-function fileSize(bytes) {
+function fileSize(bytes, t) {
   if (!bytes) return ''
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  if (bytes < 1024) return t('tracker.fileSizeBytes', { size: bytes })
+  if (bytes < 1024 * 1024) return t('tracker.fileSizeKB', { size: (bytes / 1024).toFixed(1) })
+  return t('tracker.fileSizeMB', { size: (bytes / (1024 * 1024)).toFixed(1) })
 }
 
 export default function RMATracker() {
@@ -686,7 +686,7 @@ export default function RMATracker() {
                             />
                           </svg>
                           <span className="max-w-[120px] truncate">{f.name}</span>
-                          <span className="text-gray-500">({fileSize(f.size)})</span>
+                          <span className="text-gray-500">({fileSize(f.size, t)})</span>
                           <button
                             type="button"
                             onClick={() => removeFile(i)}

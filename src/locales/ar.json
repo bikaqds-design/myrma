@@ -4624,7 +4624,10 @@
     "team": "الفريق",
     "supportTeam": "فريق الدعم",
     "reply": "رد",
-    "footer": "مقدَّم من <brand>myCRM</brand> — تتبّع آمن لطلبات الخدمة"
+    "footer": "مقدَّم من <brand>myCRM</brand> — تتبّع آمن لطلبات الخدمة",
+    "fileSizeBytes": "{{size}} بايت",
+    "fileSizeKB": "{{size}} كيلوبايت",
+    "fileSizeMB": "{{size}} ميجابايت"
   },
   "errorBoundary": {
     "title": "حدث خطأ ما",

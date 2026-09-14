@@ -4413,7 +4413,10 @@
     "team": "Team",
     "supportTeam": "Support Team",
     "reply": "Reply",
-    "footer": "Powered by <brand>myCRM</brand> — Secure service request tracking"
+    "footer": "Powered by <brand>myCRM</brand> — Secure service request tracking",
+    "fileSizeBytes": "{{size}} B",
+    "fileSizeKB": "{{size}} KB",
+    "fileSizeMB": "{{size}} MB"
   },
   "errorBoundary": {
     "title": "Something went wrong",
