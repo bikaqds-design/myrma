@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { supabase, db, storage } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
 import { useUrlState, useResetOnFilterChange } from '../../lib/useUrlState'
+import { useDebouncedValue } from '../../lib/useDebouncedValue'
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 import ConfirmDialog from '../../components/ConfirmDialog'
@@ -29,23 +30,19 @@ export default function Products({
   const searchRef = useRef(null)
   const [activeTab, setActiveTab] = useURLTab('tab', 'products')
   const queryClient = useQueryClient()
+  // Brands, categories and subcategories: small lookup tables the filters and
+  // the Hierarchy tab need whole. Products are no longer loaded here (BUG-066).
   const { data: productsPageData, isLoading: loading } = useQuery({
-    queryKey: ['products-page'],
+    queryKey: ['products-page', 'lookups'],
     queryFn: async () => {
-      const [productsData, brandsData, categoriesData, subcategoriesData] = await Promise.all([
-        db.products.list(),
+      const [brandsData, categoriesData, subcategoriesData] = await Promise.all([
         db.brands.list(),
         db.categories.list(),
         db.subcategories.list(),
       ])
-      return { productsData, brandsData, categoriesData, subcategoriesData }
+      return { brandsData, categoriesData, subcategoriesData }
     },
   })
-
-  // `?? EMPTY_ARRAY`, not `?? []`: `products` is a dependency of the filter
-  // effect below, and a fresh `[]` each render looped it until data arrived.
-  const products = productsPageData?.productsData ?? EMPTY_ARRAY
-  const [filteredProducts, setFilteredProducts] = useState([])
   // Filters live in the URL so a view can be shared and survives a refresh
   // (UX-SEARCH-001).
   const [searchQuery, setSearchQuery] = useUrlState('q', '')
@@ -65,6 +62,42 @@ export default function Products({
   const [sortConfig, setSortConfig] = useState(() =>
     safeStorage.get('productsSortConfig', { key: 'created_date', direction: 'desc' })
   )
+
+  // ── Products, from the database (BUG-066) ──────────────────────────────────
+  // The screen loaded every product and searched, filtered, sorted and paged in
+  // the browser. The Data API returns at most 1 000 rows per request, so past
+  // that products silently disappeared. Now the database does it and only the
+  // page on screen is fetched. Keyed under 'products-page' so every existing
+  // invalidation of that key refreshes it.
+  const debouncedSearch = useDebouncedValue(searchQuery)
+  const listFilters = {
+    search: debouncedSearch,
+    brandName: filterBrand,
+    categoryName: filterCategory,
+    status: filterStatus,
+  }
+  const listSort = { column: sortConfig.key, ascending: sortConfig.direction === 'asc' }
+  const {
+    data: pageResult,
+    isFetching: fetchingPage,
+    isError: pageFailed,
+  } = useQuery({
+    queryKey: ['products-page', 'list', { ...listFilters, sort: listSort, page: currentPage, pageSize: itemsPerPage }],
+    queryFn: () =>
+      db.products.listPage({ ...listFilters, sort: listSort, page: currentPage, pageSize: itemsPerPage }),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+    enabled: activeTab === 'products',
+  })
+  const paginatedProducts = pageResult?.data ?? EMPTY_ARRAY
+  const matchingCount = pageResult?.count ?? 0
+  // Totals overall and per brand and category, for "Export all" and the
+  // Hierarchy tab, which used to count the loaded list.
+  const { data: productCounts = { total: 0, byBrand: {}, byCategory: {} } } = useQuery({
+    queryKey: ['products-page', 'counts'],
+    queryFn: () => db.products.hierarchyCounts(),
+    staleTime: 60_000,
+  })
 
   // Same stable placeholder — these are not effect dependencies today, but the
   // next hook that lists one would reintroduce the loop above.
@@ -176,10 +209,6 @@ export default function Products({
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  useEffect(() => {
-    handleSearchAndSort()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, filterBrand, filterCategory, filterStatus, products, sortConfig])
 
   // Real-time: refresh when products table changes
   useEffect(() => {
@@ -231,8 +260,14 @@ export default function Products({
   }, [sortConfig])
 
   // Reset to page one only when a filter really changes, never on mount —
-  // otherwise a shared link like ?q=acme&page=3 lands on page 1.
-  useResetOnFilterChange([searchQuery, itemsPerPage], () => setCurrentPage(1))
+  // otherwise a shared link like ?q=acme&page=3 lands on page 1. Brand,
+  // category, status and sort were missing, so changing them left you on a page
+  // of a different result set. The selection goes too: the ticked rows are no
+  // longer on screen, and a bulk action must not act on rows nobody can see.
+  useResetOnFilterChange([searchQuery, filterBrand, filterCategory, filterStatus, sortConfig, itemsPerPage], () => {
+    setCurrentPage(1)
+    setSelectedProducts([])
+  })
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -247,77 +282,6 @@ export default function Products({
     return () => document.removeEventListener('click', handleClickOutside)
   }, [showAddDropdown, openBrandMenu])
 
-  const handleSearchAndSort = () => {
-    let filtered = [...products]
-
-    // Apply search
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(
-        (product) =>
-          product.product_name?.toLowerCase().includes(query) ||
-          product.sku?.toLowerCase().includes(query) ||
-          product.brand?.brand_name?.toLowerCase().includes(query) ||
-          product.category?.category_name?.toLowerCase().includes(query) ||
-          product.product_description?.toLowerCase().includes(query)
-      )
-    }
-
-    if (filterBrand) filtered = filtered.filter((p) => p.brand?.brand_name === filterBrand)
-    if (filterCategory) filtered = filtered.filter((p) => p.category?.category_name === filterCategory)
-    if (filterStatus) filtered = filtered.filter((p) => p.status === filterStatus)
-
-    // Apply sorting
-    filtered.sort((a, b) => {
-      let aValue, bValue
-
-      switch (sortConfig.key) {
-        case 'sku':
-          aValue = a.sku || ''
-          bValue = b.sku || ''
-          break
-        case 'product_name':
-          aValue = a.product_name || ''
-          bValue = b.product_name || ''
-          break
-        case 'brand':
-          aValue = a.brand?.brand_name || ''
-          bValue = b.brand?.brand_name || ''
-          break
-        case 'category':
-          aValue = a.category?.category_name || ''
-          bValue = b.category?.category_name || ''
-          break
-        case 'product_type':
-          aValue = a.product_type || ''
-          bValue = b.product_type || ''
-          break
-        case 'status':
-          aValue = a.status || ''
-          bValue = b.status || ''
-          break
-        case 'created_date':
-          aValue = new Date(a.created_date || 0).getTime()
-          bValue = new Date(b.created_date || 0).getTime()
-          break
-        default:
-          aValue = a[sortConfig.key] || ''
-          bValue = b[sortConfig.key] || ''
-      }
-
-      if (typeof aValue === 'string') {
-        aValue = aValue.toLowerCase()
-        bValue = bValue.toLowerCase()
-      }
-
-      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1
-      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1
-      return 0
-    })
-
-    setFilteredProducts(filtered)
-  }
-
   const handleSort = (key) => {
     setSortConfig((prev) => ({
       key,
@@ -326,10 +290,14 @@ export default function Products({
   }
 
   // Pagination calculations
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage)
+  const totalPages = Math.ceil(matchingCount / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = Math.min(startIndex + itemsPerPage, filteredProducts.length)
-  const paginatedProducts = filteredProducts.slice(startIndex, endIndex)
+  const endIndex = Math.min(startIndex + paginatedProducts.length, matchingCount)
+
+  // A page that no longer exists steps back to the last one that does.
+  useEffect(() => {
+    if (pageResult && totalPages >= 1 && currentPage > totalPages) setCurrentPage(totalPages)
+  }, [pageResult, totalPages, currentPage, setCurrentPage])
 
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
@@ -648,7 +616,9 @@ export default function Products({
         return
       }
 
-      const existingSkus = new Set(products.map((p) => p.sku?.toLowerCase()))
+      // Asked of the database: the loaded list was capped, so an existing SKU
+      // past the cap was imported again. (BUG-066.)
+      const existingSkus = await db.products.findExistingSkus(productsToImport.map((p) => p.sku))
       const newProducts = productsToImport.filter((p) => !existingSkus.has(p.sku?.toLowerCase()))
       const skippedCount = productsToImport.length - newProducts.length
 
@@ -1235,19 +1205,30 @@ export default function Products({
     return categories.filter((c) => c.brand_id === brandId)
   }
 
-  const getCategoryProducts = (categoryId) => {
-    return products.filter((p) => p.category_id === categoryId)
-  }
+  const getCategoryProductCount = (categoryId) => productCounts.byCategory[categoryId] ?? 0
 
-  const getBrandProductCount = (brandId) => {
-    return products.filter((p) => p.brand_id === brandId).length
+  const getBrandProductCount = (brandId) => productCounts.byBrand[brandId] ?? 0
+
+  /** The rows for an export scope: all/filtered read from the database, uncapped; selected are on screen. */
+  const loadExportRows = async (scope) => {
+    if (scope === 'selected') return paginatedProducts.filter((p) => selectedProducts.includes(p.id))
+    try {
+      return await db.products.listAllMatching(scope === 'filtered' ? listFilters : {}, listSort)
+    } catch (err) {
+      toast.error(t('products.failedExport', { error: err?.message || '' }))
+      throw err
+    }
   }
 
   const getCategoryCount = (brandId) => {
     return categories.filter((c) => c.brand_id === brandId).length
   }
 
-  if (loading) return <PageSkeleton cols={6} />
+  // Until the first page arrives the list would show "no products yet", which
+  // is a claim, not a loading state.
+  // A failed request must not leave the skeleton up forever: the list renders
+  // (empty) and the query retries on the next change.
+  if (loading || (activeTab === 'products' && !pageResult && !pageFailed)) return <PageSkeleton cols={6} />
 
   return (
     <div className="space-y-6">
@@ -1285,9 +1266,10 @@ export default function Products({
           {activeTab === 'products' && (
             <ProductsListTab
               products={paginatedProducts}
-              totalProducts={filteredProducts.length}
-              allProducts={products}
-              filteredProducts={filteredProducts}
+              totalProducts={matchingCount}
+              allCount={productCounts.total}
+              loadExportRows={loadExportRows}
+              fetchingPage={fetchingPage}
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
               brands={brands}
@@ -1339,13 +1321,13 @@ export default function Products({
             <HierarchyTab
               brands={brands}
               categories={categories}
-              products={products}
+              totalProducts={productCounts.total}
               expandedBrands={expandedBrands}
               expandedCategories={expandedCategories}
               toggleBrandExpand={toggleBrandExpand}
               toggleCategoryExpand={toggleCategoryExpand}
               getBrandCategories={getBrandCategories}
-              getCategoryProducts={getCategoryProducts}
+              getCategoryProductCount={getCategoryProductCount}
               getBrandProductCount={getBrandProductCount}
               getCategoryCount={getCategoryCount}
               setShowAddBrand={setShowAddBrand}

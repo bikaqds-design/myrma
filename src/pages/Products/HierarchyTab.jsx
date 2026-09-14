@@ -1,12 +1,14 @@
 import React, { useState } from 'react'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import { db } from '../../api/supabaseClient'
 import { useTranslation } from 'react-i18next'
 
 export default function HierarchyTab({
   brands,
   categories,
-  products,
+  totalProducts = 0,
   getBrandCategories,
-  getCategoryProducts,
+  getCategoryProductCount,
   getBrandProductCount,
   getCategoryCount,
   setShowAddBrand,
@@ -27,7 +29,26 @@ export default function HierarchyTab({
   const selectedBrand = brands.find((b) => b.id === selectedBrandId)
   const selectedCategory = categories.find((c) => c.id === selectedCategoryId)
   const visibleCategories = selectedBrandId ? getBrandCategories(selectedBrandId) : []
-  const visibleProducts = selectedCategoryId ? getCategoryProducts(selectedCategoryId) : []
+  // The selected category's products, from the database, a batch at a time.
+  // They were filtered out of the whole loaded product list, which is capped.
+  // (BUG-066.)
+  const CATEGORY_BATCH = 100
+  const [categoryLimit, setCategoryLimit] = useState(CATEGORY_BATCH)
+  const { data: categoryPage, isFetching: loadingCategory } = useQuery({
+    queryKey: ['products-page', 'category', selectedCategoryId, categoryLimit],
+    queryFn: () =>
+      db.products.listPage({
+        categoryId: selectedCategoryId,
+        page: 1,
+        pageSize: categoryLimit,
+        sort: { column: 'product_name', ascending: true },
+      }),
+    enabled: Boolean(selectedCategoryId),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  })
+  const visibleProducts = selectedCategoryId ? categoryPage?.data ?? [] : []
+  const categoryTotal = categoryPage?.count ?? 0
 
   const handleSelectBrand = (brand) => {
     setSelectedBrandId(brand.id)
@@ -37,6 +58,7 @@ export default function HierarchyTab({
 
   const handleSelectCategory = (cat) => {
     setSelectedCategoryId(cat.id)
+    setCategoryLimit(CATEGORY_BATCH)
     setCatMenuId(null)
   }
 
@@ -81,7 +103,7 @@ export default function HierarchyTab({
           },
           {
             label: t('products.productsColumn'),
-            value: products.length,
+            value: totalProducts,
             color: 'bg-emerald-50 text-emerald-700',
             icon: (
               <path
@@ -386,7 +408,7 @@ export default function HierarchyTab({
                       {cat.category_name}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {t('products.itemsCount', { count: getCategoryProducts(cat.id).length })}
+                      {t('products.itemsCount', { count: getCategoryProductCount(cat.id) })}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
@@ -473,7 +495,7 @@ export default function HierarchyTab({
               )}
             </div>
             {selectedCategoryId && (
-              <span className="text-xs text-gray-500">{t('products.itemsCount', { count: visibleProducts.length })}</span>
+              <span className="text-xs text-gray-500">{t('products.itemsCount', { count: categoryTotal })}</span>
             )}
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
@@ -494,6 +516,8 @@ export default function HierarchyTab({
                 </svg>
                 <p className="text-sm text-gray-500">{t('products.selectCategoryPrompt')}</p>
               </div>
+            ) : visibleProducts.length === 0 && loadingCategory ? (
+              <p className="py-12 text-center text-sm text-gray-500" aria-live="polite">{t('common.loading')}</p>
             ) : visibleProducts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 px-4 text-center gap-2">
                 <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
@@ -571,6 +595,16 @@ export default function HierarchyTab({
                   </div>
                 </div>
               ))
+            )}
+            {selectedCategoryId && visibleProducts.length > 0 && visibleProducts.length < categoryTotal && (
+              <button
+                type="button"
+                onClick={() => setCategoryLimit((n) => n + CATEGORY_BATCH)}
+                disabled={loadingCategory}
+                className="w-full py-3 text-xs font-medium text-indigo-600 hover:underline disabled:opacity-50 disabled:cursor-wait"
+              >
+                {t('products.showMoreProducts', { shown: visibleProducts.length, total: categoryTotal })}
+              </button>
             )}
           </div>
         </div>

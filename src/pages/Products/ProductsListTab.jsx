@@ -8,10 +8,11 @@ const cap = (v) => (v ? String(v).charAt(0).toUpperCase() + String(v).slice(1) :
 
 export default function ProductsListTab({
   products,
-  // `products` is only the current page. Export scopes need the whole set and
-  // the filtered set, so those come in separately rather than being inferred.
-  allProducts = [],
-  filteredProducts = [],
+  // `products` is only the current page (fetched from the database, BUG-066).
+  // Export scopes are sized by counts and loaded on demand by the page.
+  allCount = 0,
+  loadExportRows,
+  fetchingPage = false,
   totalProducts,
   searchQuery,
   setSearchQuery,
@@ -223,9 +224,10 @@ export default function ProductsListTab({
 
           {canExport && (
             <ExportMenu
-              allRows={allProducts}
-              filteredRows={filteredProducts}
-              selectedRows={allProducts.filter((p) => selectedProducts.includes(p.id))}
+              allCount={allCount}
+              filteredCount={totalProducts}
+              selectedCount={selectedProducts.length}
+              loadRows={loadExportRows}
               ns="products"
               onExport={handleExport}
             />
@@ -488,7 +490,7 @@ export default function ProductsListTab({
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody aria-busy={fetchingPage} className={`bg-white divide-y divide-gray-200 transition-opacity ${fetchingPage ? 'opacity-60' : ''}`}>
             {products.length === 0 ? (
               <tr>
                 <td colSpan="10">

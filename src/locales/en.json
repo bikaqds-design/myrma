@@ -1534,7 +1534,9 @@
     "deleteCategoryTitle": "Delete Category",
     "deleteCategoryConfirm": "Delete category \"{{name}}\"? This cannot be undone.",
     "deleteCategoryWithProducts_one": "Delete category \"{{name}}\"? {{count}} product will be left with no category. It stays in the catalog but disappears from category views.",
-    "deleteCategoryWithProducts_other": "Delete category \"{{name}}\"? {{count}} products will be left with no category. They stay in the catalog but disappear from category views."
+    "deleteCategoryWithProducts_other": "Delete category \"{{name}}\"? {{count}} products will be left with no category. They stay in the catalog but disappear from category views.",
+    "failedExport": "Could not prepare the export: {{error}}",
+    "showMoreProducts": "Show more ({{shown}} of {{total}})"
   },
   "calendar": {
     "title": "Calendar",

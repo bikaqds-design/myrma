@@ -1646,7 +1646,9 @@
     "deleteCategoryWithProducts_two": "هل تريد حذف الفئة \"{{name}}\"؟ سيبقى {{count}} منتجان بلا فئة. يظلان في الكتالوج لكنهما يختفيان من عروض الفئات.",
     "deleteCategoryWithProducts_few": "هل تريد حذف الفئة \"{{name}}\"؟ ستبقى {{count}} منتجات بلا فئة. تظل في الكتالوج لكنها تختفي من عروض الفئات.",
     "deleteCategoryWithProducts_many": "هل تريد حذف الفئة \"{{name}}\"؟ سيبقى {{count}} منتجاً بلا فئة. يظل في الكتالوج لكنه يختفي من عروض الفئات.",
-    "deleteCategoryWithProducts_other": "هل تريد حذف الفئة \"{{name}}\"؟ سيبقى {{count}} منتج بلا فئة. تظل في الكتالوج لكنها تختفي من عروض الفئات."
+    "deleteCategoryWithProducts_other": "هل تريد حذف الفئة \"{{name}}\"؟ سيبقى {{count}} منتج بلا فئة. تظل في الكتالوج لكنها تختفي من عروض الفئات.",
+    "failedExport": "تعذّر تجهيز التصدير: {{error}}",
+    "showMoreProducts": "عرض المزيد ({{shown}} من {{total}})"
   },
   "calendar": {
     "title": "التقويم",
