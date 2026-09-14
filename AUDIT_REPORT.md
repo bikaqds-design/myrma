@@ -1300,6 +1300,22 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Suggested fix: set `ALLOWED_ORIGINS`; remove `unsafe-eval` (check jsPDF/html2canvas need), move the inline dark-mode bootstrap in `index.html` to a hashed script.
 * Confidence: Confirmed by code reading
 * **Not attempted 2026-09-13.** Two of the three parts are not safely doable from here. Removing `unsafe-eval` needs a production build plus a runtime check of jsPDF/html2canvas to see whether anything still needs it, and the build does not run on this machine at present; replacing `unsafe-inline` with a hash needs the built output to hash. **Correction 2026-09-13: the CORS third is already done.** Measured against the live functions rather than assumed — `ALLOWED_ORIGINS` is set. A preflight carrying `Origin: https://myrma.vercel.app` gets that origin echoed back; one carrying `Origin: https://evil.example` gets **no** `Access-Control-Allow-Origin` header at all, which is the correct failure mode. The helper only falls back to `*` when the secret is empty, so this confirms it is populated. That leaves the two CSP parts, which still need a production build this machine cannot run.
+* **Status: FIXED 2026-09-14 on branch `fix/bug-056-csp`** (reaches production when the branch is merged; `vercel.json` is read at deploy time). `script-src` went from `'self' 'unsafe-inline' 'unsafe-eval'` to `'self' 'sha256-oSV32NokZI7T8OV/6NskF4C1EEGkmwWI9h2wvNRARQw=' 'wasm-unsafe-eval'`. The build this entry was waiting for was not needed: the files production already serves were the input.
+* **`'unsafe-inline'` → a hash.** `index.html` has one inline script, the dark-mode bootstrap that runs before first paint. Its SHA-256 was computed from the page production serves and from `origin/main`; both agree.
+* **`'unsafe-eval'` → `'wasm-unsafe-eval'`.** Every file the site serves was scanned, following lazy chunks down to the pdf.js worker (81 files). There is no `eval(` and no `new Function(` anywhere. Two `Function("return this")` global lookups (lodash, a `globalThis` polyfill) are never reached, because an earlier `self`/`globalThis` check succeeds in any current browser. jsPDF and html2canvas need neither. The only thing that needs more than `'self'` is WebAssembly in pdf.js 6.3.289 (colour management, JPEG 2000, PostScript functions). Each of those already has a JavaScript fallback, and `'wasm-unsafe-eval'` allows WebAssembly without allowing JavaScript eval.
+* **Drift guard.** `src/test/cspInlineScript.test.js` recomputes the hash of every inline script in `index.html` and fails if `vercel.json` does not list it. It also fails if `'unsafe-inline'` or `'unsafe-eval'` returns to `script-src`. It was checked by changing one character of the script, which made the test fail. `index.html` carries a comment beside the script saying the hash must change with it.
+* **Verified on the Vercel preview for the branch**, not only in tests:
+  * The response carries the new header.
+  * The tracker renders, and no inline-script violation is reported.
+  * With dark mode saved in `localStorage`, the page loads with `html.dark` set, which proves the hashed script ran.
+  * Every same-origin script, stylesheet, icon and manifest returns 200.
+* **What the preview console shows, and why none of it counts against the change:**
+  * The one CSP violation is `vercel.live/_next-live/feedback/feedback.js`, the comment toolbar Vercel injects into preview deployments only. The old policy blocked it too.
+  * Three 401s are the tracker's `branding_settings` and `rma_config` reads, made by a signed-out visitor. The same reads return 200 on production for a signed-in session. A request blocked by CSP never reaches the server, so a real 401 status shows the policy let the request through.
+* **Deliberately unchanged:**
+  * `style-src 'unsafe-inline'`: React `style` attributes need it, and injected CSS cannot run code.
+  * `img-src https:`: branding logos and attachments are loaded from storage URLs.
+* **CORS, the finding's third part:** already set, as recorded above. `kb-chat` no longer hardcodes `*`; it uses the shared helper like the other functions.
 
 #### [LOW] `anon` still holds full DML grants on ~25 tables and can execute trigger and helper functions
 
