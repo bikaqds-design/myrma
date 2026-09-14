@@ -19,6 +19,15 @@ import { useTranslation } from 'react-i18next'
  *
  * Callers own the data and the export itself; this component only decides which
  * options make sense and hands back the chosen row set.
+ *
+ * Two ways to supply the rows:
+ *
+ *   Arrays    allRows / filteredRows / selectedRows, for a screen that already
+ *             holds every row.
+ *   Counts    allCount / filteredCount / selectedCount plus loadRows(scope), for
+ *             a screen that pages in the database (BUG-066) and so holds one
+ *             page. The rows are fetched only when an option is chosen, and the
+ *             menu says so while they load.
  */
 export default function ExportMenu({
   /** Every row, ignoring search/filters. */
@@ -27,6 +36,14 @@ export default function ExportMenu({
   filteredRows = null,
   /** Currently checked rows. */
   selectedRows = [],
+  /** Paged screens: how many rows exist, ignoring search/filters. */
+  allCount = null,
+  /** Paged screens: how many rows match search/filters. */
+  filteredCount = null,
+  /** Paged screens: how many rows are checked. */
+  selectedCount = null,
+  /** Paged screens: resolves to the rows for 'all' | 'filtered' | 'selected'. */
+  loadRows = null,
   /** Called with the chosen array and a filename-friendly scope: 'all' | 'filtered' | 'selected'. */
   onExport,
   /** Overrides the button label; defaults to common.export. */
@@ -36,12 +53,17 @@ export default function ExportMenu({
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
   const ref = useRef(null)
 
+  const paged = typeof loadRows === 'function'
   const filtered = filteredRows ?? allRows
+  const counts = paged
+    ? { all: allCount ?? 0, filtered: filteredCount ?? allCount ?? 0, selected: selectedCount ?? 0 }
+    : { all: allRows.length, filtered: filtered.length, selected: selectedRows.length }
   // Only worth offering when it differs from "all" — otherwise it is the same export twice.
-  const showFiltered = filtered.length !== allRows.length
-  const showSelected = selectedRows.length > 0
+  const showFiltered = counts.filtered !== counts.all
+  const showSelected = counts.selected > 0
 
   useEffect(() => {
     if (!open) return
@@ -59,15 +81,31 @@ export default function ExportMenu({
     }
   }, [open])
 
-  if (allRows.length === 0) return null
+  if (counts.all === 0) return null
 
-  const choose = (rows, scope) => {
-    setOpen(false)
-    onExport?.(rows, scope)
+  const choose = async (rows, scope) => {
+    if (!paged) {
+      setOpen(false)
+      onExport?.(rows, scope)
+      return
+    }
+    if (loading) return
+    setLoading(true)
+    try {
+      const loaded = await loadRows(scope)
+      setOpen(false)
+      onExport?.(loaded, scope)
+    } catch {
+      // loadRows reports its own failure (it knows the wording); swallowing the
+      // rejection here only keeps it from surfacing as an unhandled click error.
+      // The menu stays open so the user can try again.
+    } finally {
+      setLoading(false)
+    }
   }
 
   const itemCls =
-    'w-full px-4 py-2.5 text-left hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3'
+    'w-full px-4 py-2.5 text-left hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3 disabled:opacity-50 disabled:cursor-wait'
   const dividerCls = 'border-t border-[#f0f2f6] dark:border-[#1a2230]'
 
   return (
@@ -93,38 +131,44 @@ export default function ExportMenu({
       {open && (
         <div
           role="menu"
+          aria-busy={loading}
           className="absolute end-0 mt-2 w-64 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] z-20 py-1.5"
         >
-          <button role="menuitem" onClick={() => choose(allRows, 'all')} className={itemCls}>
+          {loading && (
+            <div role="status" className="px-4 py-2 text-xs text-[#6c6760] dark:text-[#9aa4b2]">
+              {t('common.preparingExport')}
+            </div>
+          )}
+          <button role="menuitem" onClick={() => choose(allRows, 'all')} disabled={loading} className={itemCls}>
             <svg className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             <div>
               <div className="text-sm font-medium text-[#211f1b] dark:text-[#e8ebf0]">{t(`${ns}.exportAll`)}</div>
-              <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t(`${ns}.exportAllDesc`, { count: allRows.length })}</div>
+              <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t(`${ns}.exportAllDesc`, { count: counts.all })}</div>
             </div>
           </button>
 
           {showFiltered && (
-            <button role="menuitem" onClick={() => choose(filtered, 'filtered')} className={`${itemCls} ${dividerCls}`}>
+            <button role="menuitem" onClick={() => choose(filtered, 'filtered')} disabled={loading} className={`${itemCls} ${dividerCls}`}>
               <svg className="w-4 h-4 text-indigo-500 dark:text-[#a5b4fc] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
               </svg>
               <div>
                 <div className="text-sm font-medium text-[#211f1b] dark:text-[#e8ebf0]">{t(`${ns}.exportFiltered`)}</div>
-                <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t(`${ns}.exportFilteredDesc`, { count: filtered.length })}</div>
+                <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t(`${ns}.exportFilteredDesc`, { count: counts.filtered })}</div>
               </div>
             </button>
           )}
 
           {showSelected && (
-            <button role="menuitem" onClick={() => choose(selectedRows, 'selected')} className={`${itemCls} ${dividerCls}`}>
+            <button role="menuitem" onClick={() => choose(selectedRows, 'selected')} disabled={loading} className={`${itemCls} ${dividerCls}`}>
               <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
               <div>
                 <div className="text-sm font-medium text-[#211f1b] dark:text-[#e8ebf0]">{t(`${ns}.exportSelected`)}</div>
-                <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t(`${ns}.exportSelectedDesc`, { count: selectedRows.length })}</div>
+                <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t(`${ns}.exportSelectedDesc`, { count: counts.selected })}</div>
               </div>
             </button>
           )}

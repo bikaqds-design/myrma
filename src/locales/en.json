@@ -100,7 +100,8 @@
     "selectAll": "Select all",
     "archive": "Archive",
     "restore": "Restore",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "preparingExport": "Preparing the export…"
   },
   "shortcuts": {
     "title": "Keyboard Shortcuts",
@@ -399,7 +400,6 @@
     "changeStatus": "Change Status…",
     "filterPlaceholder": "Type to filter…",
     "showingRange": "Showing {{from}}–{{to}} of {{total}} customers",
-    "capWarning": "Showing first {{shown}} of {{total}} customers. Use filters or search to find specific records.",
     "deleteCustomersTitle": "Delete Customers",
     "deleteCustomersConfirm_one": "Delete {{count}} customer? This cannot be undone.",
     "deleteCustomersConfirm_other": "Delete {{count}} customers? This cannot be undone.",
@@ -462,7 +462,8 @@
     "importMobileWarnings_one": "{{count}} imported record has a phone number that looks wrong — see the browser console for the list.",
     "importMobileWarnings_other": "{{count}} imported records have phone numbers that look wrong — see the browser console for the list.",
     "importMissingDetails_one": "{{count}} imported customer is missing a contact person or mobile — see the browser console for the list.",
-    "importMissingDetails_other": "{{count}} imported customers are missing a contact person or mobile — see the browser console for the list."
+    "importMissingDetails_other": "{{count}} imported customers are missing a contact person or mobile — see the browser console for the list.",
+    "failedExport": "Could not prepare the export: {{error}}"
   },
   "leads": {
     "title": "Leads",

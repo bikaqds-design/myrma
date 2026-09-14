@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { supabase, db, storage } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
 import { useUrlState } from '../../lib/useUrlState'
+import { useDebouncedValue } from '../../lib/useDebouncedValue'
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 import ExportMenu from '../../components/ExportMenu'
@@ -37,29 +38,19 @@ export default function Customers({
   const searchRef = useRef(null)
   const queryClient = useQueryClient()
 
-  // P-1: TanStack Query — cached fetch; returning to this page shows stale data instantly
-  // `= EMPTY_ARRAY`, not `= []`: `customers` is a dependency of the filter effect
-  // below, and a fresh `[]` each render looped it until the data landed.
-  const { data: customers = EMPTY_ARRAY, isLoading: loading } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => db.customers.list(),
-    staleTime: 60_000,
-  })
   const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
     queryFn: () => db.userRoles.directory(),
     staleTime: 5 * 60_000,
   })
+  // How many customers exist at all, ignoring search and filters. Tells an
+  // empty table apart from an empty search, and sizes "Export all".
   const { data: customersTotalCount = null } = useQuery({
     queryKey: ['customers-count'],
-    queryFn: async () => {
-      const r = await db.customers.listPaged(0, 1)
-      return r.count
-    },
+    queryFn: () => db.customers.count(),
     staleTime: 60_000,
   })
 
-  const [filteredCustomers, setFilteredCustomers] = useState([])
   // Filter state lives in the URL so a filtered view can be shared and
   // survives a refresh (UX-SEARCH-001).
   const [searchQuery, setSearchQuery] = useUrlState('q', '')
@@ -88,6 +79,40 @@ export default function Customers({
   const [sortConfig, setSortConfig] = useState(() =>
     safeStorage.get('customersSortConfig', { key: 'created_date', direction: 'desc' })
   )
+
+  // ── One page, from the database (BUG-066) ──────────────────────────────────
+  // This screen used to load every customer and filter, sort and page them in
+  // the browser. The Data API returns at most 1 000 rows per request, so past
+  // that the list silently lost customers — and the table held 888. Now the
+  // database does the filtering, sorting and counting, and only the rows on
+  // screen are fetched.
+  //
+  // Typed text is debounced so a search sends one request, not one per key.
+  // `keepPreviousData` keeps the current page on screen while the next loads,
+  // instead of flashing the loading skeleton on every page turn.
+  const debouncedSearch = useDebouncedValue(searchQuery)
+  const debouncedCompany = useDebouncedValue(filterCompany)
+  const listFilters = {
+    search: debouncedSearch,
+    status: filterStatus,
+    type: filterType,
+    contactOrCompany: debouncedCompany,
+  }
+  const listSort = { column: sortConfig.key, ascending: sortConfig.direction === 'asc' }
+  const pageKey = ['customers', 'page', { ...listFilters, sort: listSort, page: currentPage, pageSize: itemsPerPage }]
+  const {
+    data: pageResult,
+    isLoading: loading,
+    isFetching: fetchingPage,
+  } = useQuery({
+    queryKey: pageKey,
+    queryFn: () =>
+      db.customers.listPage({ ...listFilters, sort: listSort, page: currentPage, pageSize: itemsPerPage }),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  })
+  const paginatedCustomers = pageResult?.data ?? EMPTY_ARRAY
+  const matchingCount = pageResult?.count ?? 0
 
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
@@ -143,10 +168,6 @@ export default function Customers({
     return () => document.removeEventListener('mousedown', handler)
   }, [])
   useEffect(() => {
-    handleSearchAndSort()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, customers, sortConfig, filterStatus, filterType, filterCompany])
-  useEffect(() => {
     safeStorage.set('customersPerPage', itemsPerPage)
   }, [itemsPerPage])
   useEffect(() => {
@@ -161,7 +182,7 @@ export default function Customers({
   // locally and another in production, which is worse than the bug.
   const lastFilters = useRef(null)
   useEffect(() => {
-    const signature = JSON.stringify([searchQuery, itemsPerPage, filterStatus, filterType, filterCompany])
+    const signature = JSON.stringify([searchQuery, itemsPerPage, filterStatus, filterType, filterCompany, sortConfig])
     if (lastFilters.current === null) {
       lastFilters.current = signature
       return
@@ -169,7 +190,7 @@ export default function Customers({
     if (lastFilters.current === signature) return
     lastFilters.current = signature
     setCurrentPage(1)
-  }, [searchQuery, itemsPerPage, filterStatus, filterType, filterCompany, setCurrentPage])
+  }, [searchQuery, itemsPerPage, filterStatus, filterType, filterCompany, sortConfig, setCurrentPage])
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -219,66 +240,21 @@ export default function Customers({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAddCustomer])
 
-  const handleSearchAndSort = () => {
-    let filtered = [...customers]
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      filtered = filtered.filter(
-        (c) =>
-          c.contact_person?.toLowerCase().includes(q) ||
-          c.company_name?.toLowerCase().includes(q) ||
-          c.email?.toLowerCase().includes(q) ||
-          c.mobile?.toLowerCase().includes(q) ||
-          c.customer_code?.toLowerCase().includes(q) ||
-          c.landline?.toLowerCase().includes(q)
-      )
-    }
-    if (filterStatus) filtered = filtered.filter((c) => c.customer_status === filterStatus)
-    if (filterType) filtered = filtered.filter((c) => c.customer_type === filterType)
-    if (filterCompany) {
-      const q = filterCompany.toLowerCase()
-      filtered = filtered.filter(
-        (c) =>
-          c.company_name?.toLowerCase().includes(q) || c.contact_person?.toLowerCase().includes(q)
-      )
-    }
-
-    filtered.sort((a, b) => {
-      let av, bv
-      if (sortConfig.key === 'contact_person') {
-        av = a.contact_person || ''
-        bv = b.contact_person || ''
-      } else if (sortConfig.key === 'company_name') {
-        av = a.company_name || ''
-        bv = b.company_name || ''
-      } else if (sortConfig.key === 'created_date') {
-        av = new Date(a.created_date || 0).getTime()
-        bv = new Date(b.created_date || 0).getTime()
-      } else {
-        av = a[sortConfig.key] || ''
-        bv = b[sortConfig.key] || ''
-      }
-      if (typeof av === 'string') {
-        av = av.toLowerCase()
-        bv = bv.toLowerCase()
-      }
-      if (av < bv) return sortConfig.direction === 'asc' ? -1 : 1
-      if (av > bv) return sortConfig.direction === 'asc' ? 1 : -1
-      return 0
-    })
-    setFilteredCustomers(filtered)
-  }
-
   const handleSort = (key) =>
     setSortConfig((prev) => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
     }))
 
-  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage)
+  const totalPages = Math.ceil(matchingCount / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = Math.min(startIndex + itemsPerPage, filteredCustomers.length)
-  const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex)
+  const endIndex = Math.min(startIndex + paginatedCustomers.length, matchingCount)
+
+  // A page that no longer exists — the last customer on it was deleted, or a
+  // shared link points past the end — steps back to the last one that does.
+  useEffect(() => {
+    if (pageResult && totalPages >= 1 && currentPage > totalPages) setCurrentPage(totalPages)
+  }, [pageResult, totalPages, currentPage, setCurrentPage])
 
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
@@ -299,12 +275,22 @@ export default function Customers({
     setSelectedCustomers((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     )
-  const handleSelectAll = () =>
-    setSelectedCustomers(
-      selectedCustomers.length === paginatedCustomers.length
-        ? []
-        : paginatedCustomers.map((c) => c.id)
-    )
+  const pageIds = paginatedCustomers.map((c) => c.id)
+  const allOnPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedCustomers.includes(id))
+  const handleSelectAll = () => setSelectedCustomers(allOnPageSelected ? [] : pageIds)
+
+  // A selection only ever covers rows on screen. Once the page, search, filters
+  // or sort change, the ticked rows are no longer visible, and a bulk delete or
+  // status change must not act on records nobody can see (the same rule the
+  // shared Table enforces). Paging in the database makes this matter more: the
+  // other rows are not even loaded.
+  const selectionScope = JSON.stringify([currentPage, itemsPerPage, listFilters, listSort])
+  const lastSelectionScope = useRef(selectionScope)
+  useEffect(() => {
+    if (lastSelectionScope.current === selectionScope) return
+    lastSelectionScope.current = selectionScope
+    setSelectedCustomers([])
+  }, [selectionScope])
 
   const handleBulkDelete = async () => {
     // delete_customers_cascade is all-or-nothing: one selected customer with a
@@ -475,12 +461,11 @@ export default function Customers({
     }
 
     // UX-6 optimistic update: reflect the edit in the table immediately (edits only — creates need a server-generated ID)
-    let previousCustomers = null
+    let previousPage = null
     if (editingCustomer) {
-      previousCustomers = queryClient.getQueryData(['customers'])
-      queryClient.setQueryData(
-        ['customers'],
-        (old) => old?.map((c) => (c.id === editingCustomer.id ? { ...c, ...payload } : c)) ?? []
+      previousPage = queryClient.getQueryData(pageKey) ?? null
+      queryClient.setQueryData(pageKey, (old) =>
+        old ? { ...old, data: old.data.map((c) => (c.id === editingCustomer.id ? { ...c, ...payload } : c)) } : old
       )
     }
 
@@ -554,7 +539,7 @@ export default function Customers({
       queryClient.invalidateQueries({ queryKey: ['customers'] })
       queryClient.invalidateQueries({ queryKey: ['customers-count'] })
     } catch (error) {
-      if (previousCustomers !== null) queryClient.setQueryData(['customers'], previousCustomers) // rollback
+      if (previousPage !== null) queryClient.setQueryData(pageKey, previousPage) // rollback
       toast.error(t('customers.failedSave', { error: error.message }))
     }
   }
@@ -603,10 +588,9 @@ export default function Customers({
       async () => {
         closeConfirm()
         // UX-6 optimistic: remove from list immediately; rollback if server call fails
-        const previousCustomers = queryClient.getQueryData(['customers'])
-        queryClient.setQueryData(
-          ['customers'],
-          (old) => old?.filter((c) => c.id !== customer.id) ?? []
+        const previousPage = queryClient.getQueryData(pageKey)
+        queryClient.setQueryData(pageKey, (old) =>
+          old ? { ...old, data: old.data.filter((c) => c.id !== customer.id), count: Math.max(0, old.count - 1) } : old
         )
         try {
           await db.customers.delete(customer.id)
@@ -640,7 +624,7 @@ export default function Customers({
           queryClient.invalidateQueries({ queryKey: ['customers'] })
           queryClient.invalidateQueries({ queryKey: ['customers-count'] })
         } catch (err) {
-          queryClient.setQueryData(['customers'], previousCustomers) // rollback on error
+          queryClient.setQueryData(pageKey, previousPage) // rollback on error
           // The guard raises P0001 with a message that names the customer and
           // the count and says what to do about it. Replacing that with a flat
           // "failed to delete" throws away the only useful part.
@@ -725,6 +709,21 @@ export default function Customers({
       .catch(() => {})
   }
 
+
+  /**
+   * The rows for an export scope. The screen holds one page, so "all" and
+   * "filtered" are read from the database in chunks, with no cap. "Selected" is
+   * already on screen: a selection never outlives its page.
+   */
+  const loadExportRows = async (scope) => {
+    if (scope === 'selected') return paginatedCustomers.filter((c) => selectedCustomers.includes(c.id))
+    try {
+      return await db.customers.listAllMatching(scope === 'filtered' ? listFilters : {}, listSort)
+    } catch (err) {
+      toast.error(t('customers.failedExport', { error: err?.message || '' }))
+      throw err
+    }
+  }
 
   const handleDownloadTemplate = () => {
     const csv = [
@@ -824,12 +823,18 @@ export default function Customers({
         return
       }
 
-      const existingCompanies = new Set(
-        customers.map((c) => c.company_name?.trim().toLowerCase()).filter(Boolean)
-      )
-      const existingContacts = new Set(
-        customers.map((c) => c.contact_person?.trim().toLowerCase()).filter(Boolean)
-      )
+      // Which names are already on file, asked of the database. These sets used
+      // to come from the list this page had loaded, which was capped, so past
+      // the cap a customer already on file was imported a second time. (BUG-066.)
+      const fileRows = lines.slice(1).map((line) => {
+        const values = parseCSVLine(line)
+        return Object.fromEntries(headers.map((h, idx) => [h, values[idx] || '']))
+      })
+      const { companies: existingCompanies, contacts: existingContacts } =
+        await db.customers.findExistingNames(
+          fileRows.map((r) => r.company_name),
+          fileRows.map((r) => r.contact_person)
+        )
 
       const toImport = []
       const errors = []
@@ -1194,9 +1199,10 @@ export default function Customers({
             <div className="flex items-center gap-2 flex-wrap">
               {canDo('export') && (
                 <ExportMenu
-                  allRows={customers}
-                  filteredRows={filteredCustomers}
-                  selectedRows={customers.filter((c) => selectedCustomers.includes(c.id))}
+                  allCount={customersTotalCount ?? 0}
+                  filteredCount={matchingCount}
+                  selectedCount={selectedCustomers.length}
+                  loadRows={loadExportRows}
                   ns="customers"
                   onExport={handleExport}
                 />
@@ -1349,16 +1355,6 @@ export default function Customers({
             </div>
           )}
 
-          {/* Cap warning banner (H-4) */}
-          {customersTotalCount !== null && customersTotalCount > customers.length && (
-            <div className="mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex items-center gap-2">
-              <span>⚠️</span>
-              <span>
-                {t('customers.capWarning', { shown: customers.length, total: customersTotalCount })}
-              </span>
-            </div>
-          )}
-
           {/* Bulk action bar */}
           {selectedCustomers.length > 0 && (
             <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-[#4338ca]/20 dark:border-[#a5b4fc]/20 rounded-[14px] px-4 py-2.5 flex items-center gap-3 flex-wrap">
@@ -1399,7 +1395,7 @@ export default function Customers({
           {/* Count + per-page */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-gray-600 dark:text-[#9aa4b2]">
             <span>
-              {t('customers.showingRange', { from: filteredCustomers.length === 0 ? 0 : startIndex + 1, to: endIndex, total: filteredCustomers.length })}
+              {t('customers.showingRange', { from: matchingCount === 0 ? 0 : startIndex + 1, to: endIndex, total: matchingCount })}
             </span>
             <div className="flex items-center gap-2">
               <label className="text-sm text-gray-600 dark:text-[#9aa4b2]">{t('common.itemsPerPage')}:</label>
@@ -1425,10 +1421,7 @@ export default function Customers({
                   <th className="px-4 py-3 text-start w-10">
                     <input
                       type="checkbox"
-                      checked={
-                        paginatedCustomers.length > 0 &&
-                        selectedCustomers.length === paginatedCustomers.length
-                      }
+                      checked={allOnPageSelected}
                       onChange={handleSelectAll}
                       aria-label={t('common.selectAll')}
                       className="w-4 h-4 text-indigo-600 rounded"
@@ -1460,19 +1453,19 @@ export default function Customers({
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className={`divide-y divide-gray-100 transition-opacity ${fetchingPage && !loading ? 'opacity-60' : ''}`} aria-busy={fetchingPage}>
                 {paginatedCustomers.length === 0 ? (
                   <tr>
                     <td colSpan="9">
                       <EmptyState
                         preset="customers"
                         description={
-                          customers.length > 0
+                          (customersTotalCount ?? 0) > 0
                             ? t('customers.adjustFilters')
                             : t('customers.noCustomersHint')
                         }
                         action={
-                          canDo('create') && customers.length === 0
+                          canDo('create') && customersTotalCount === 0
                             ? () => setShowAddCustomer(true)
                             : undefined
                         }
@@ -1649,8 +1642,8 @@ export default function Customers({
               <div className="text-sm text-gray-600 dark:text-[#9aa4b2]">
                 {t('common.showingRange', {
                   start: startIndex + 1,
-                  end: Math.min(startIndex + itemsPerPage, filteredCustomers.length),
-                  total: filteredCustomers.length,
+                  end: endIndex,
+                  total: matchingCount,
                 })}
               </div>
               <div className="flex items-center gap-2">
