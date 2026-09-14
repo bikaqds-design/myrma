@@ -1,6 +1,8 @@
 import { supabase } from '../client.js'
 import { assertUpdated, assertAffected, assertAllAffected } from './_assertUpdated.js'
-import { orIlike } from '../../lib/searchPattern.js'
+import { orIlike, escapeLike, quoteOrValue, containsPattern } from '../../lib/searchPattern.js'
+import { fetchPage, fetchAllRows, chunksOf } from './_paging.js'
+import type { PagedResult as ServerPage } from './types.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -174,11 +176,212 @@ export const subcategories = {
   },
 }
 
+// ── Server-side product list (BUG-066) ────────────────────────────────────────
+
+const PRODUCT_SELECT =
+  '*, brand:brands(id, brand_name, brand_logo_url), category:categories(id, category_name), subcategory:subcategories(id, subcategory_name)'
+
+/**
+ * What the Products list is narrowed by. All given fields must hold (AND).
+ *
+ * Brand and category are filtered by NAME, as the screen always has — and two
+ * brands can each have a category called "Laptops", so a name can mean several
+ * ids. Names live in their own tables, which PostgREST cannot OR against a
+ * product's columns, so the matching ids are looked up first and products are
+ * filtered by id. Brands and categories are small lookup tables.
+ */
+export interface ProductFilters {
+  /** Matched against name, SKU, description, brand name and category name. */
+  search?: string
+  /** Exact brand name. */
+  brandName?: string
+  /** Exact category name. */
+  categoryName?: string
+  status?: string
+  /** One category, by id (the Hierarchy tab). */
+  categoryId?: string
+}
+
+export interface ProductSort {
+  column: string
+  ascending: boolean
+}
+
+export interface ProductPageQuery extends ProductFilters {
+  /** 1-based. */
+  page: number
+  pageSize: number
+  sort?: ProductSort
+}
+
+/**
+ * Sort keys the screen uses, mapped to what PostgREST orders by. Brand and
+ * category order through the embedded to-one relation — `brand(brand_name)` —
+ * which the live API supports (checked 2026-09-14).
+ */
+const PRODUCT_SORT_COLUMNS: Record<string, string> = {
+  sku: 'sku',
+  product_name: 'product_name',
+  brand: 'brand(brand_name)',
+  category: 'category(category_name)',
+  product_type: 'product_type',
+  status: 'status',
+  created_date: 'created_date',
+}
+
+export function resolveProductSort(sort?: ProductSort): { column: string; ascending: boolean } {
+  const column = sort ? PRODUCT_SORT_COLUMNS[sort.column] : undefined
+  return column ? { column, ascending: Boolean(sort!.ascending) } : { column: 'created_date', ascending: false }
+}
+
+/** Ids in `table` whose `column` matches: exactly (case-sensitive, as the filter always was) or containing `term`. */
+async function idsWhere(table: 'brands' | 'categories', column: string, value: string, mode: 'exact' | 'contains'): Promise<string[]> {
+  const rows = await fetchAllRows<{ id: string }>((from, to) => {
+    const base = supabase.from(table).select('id')
+    const filtered = mode === 'exact' ? base.eq(column, value) : base.ilike(column, containsPattern(value))
+    return filtered.order('id', { ascending: true }).range(from, to)
+  })
+  return rows.map((r) => r.id)
+}
+
+/** The filter set as PostgREST operations, with names already resolved to ids. */
+interface ResolvedProductFilters {
+  searchOr: string | null
+  brandIds: string[] | null
+  categoryIds: string[] | null
+  status: string | null
+  categoryId: string | null
+}
+
+async function resolveProductFilters(filters: ProductFilters): Promise<ResolvedProductFilters> {
+  const term = filters.search?.trim() || ''
+  let searchOr: string | null = null
+  if (term) {
+    const [brandIds, categoryIds] = await Promise.all([
+      idsWhere('brands', 'brand_name', term, 'contains'),
+      idsWhere('categories', 'category_name', term, 'contains'),
+    ])
+    const parts = [orIlike(['product_name', 'sku', 'product_description'], term)]
+    if (brandIds.length) parts.push(`brand_id.in.(${brandIds.join(',')})`)
+    if (categoryIds.length) parts.push(`category_id.in.(${categoryIds.join(',')})`)
+    searchOr = parts.join(',')
+  }
+  const [brandIds, categoryIds] = await Promise.all([
+    filters.brandName ? idsWhere('brands', 'brand_name', filters.brandName, 'exact') : Promise.resolve(null),
+    filters.categoryName ? idsWhere('categories', 'category_name', filters.categoryName, 'exact') : Promise.resolve(null),
+  ])
+  return {
+    searchOr,
+    brandIds,
+    categoryIds,
+    status: filters.status || null,
+    categoryId: filters.categoryId || null,
+  }
+}
+
+interface ProductFilterable<Q> {
+  or(filters: string): Q
+  eq(column: string, value: unknown): Q
+  in(column: string, values: unknown[]): Q
+}
+
+function applyProductFilters<Q extends ProductFilterable<Q>>(query: Q, f: ResolvedProductFilters): Q {
+  let q = query
+  if (f.searchOr) q = q.or(f.searchOr)
+  // An unknown name resolves to no ids, and `in.()` matches nothing — which is
+  // what filtering by a brand nobody has should show.
+  if (f.brandIds) q = q.in('brand_id', f.brandIds)
+  if (f.categoryIds) q = q.in('category_id', f.categoryIds)
+  if (f.status) q = q.eq('status', f.status)
+  if (f.categoryId) q = q.eq('category_id', f.categoryId)
+  return q
+}
+
+export interface ProductHierarchyCounts {
+  total: number
+  byBrand: Record<string, number>
+  byCategory: Record<string, number>
+}
+
 // ── Products ──────────────────────────────────────────────────────────────────
 
 export const products = {
+  /** One page of products, filtered and sorted in the database, with the exact number that match. */
+  async listPage(query: ProductPageQuery): Promise<ServerPage<ProductRow>> {
+    const resolved = await resolveProductFilters(query)
+    const { column, ascending } = resolveProductSort(query.sort)
+    return fetchPage<ProductRow>(
+      (from, to) => {
+        const base = supabase.from('products').select(PRODUCT_SELECT, { count: 'exact' })
+        return applyProductFilters(base, resolved)
+          .order(column, { ascending, nullsFirst: ascending })
+          .order('id', { ascending: true })
+          .range(from, to)
+      },
+      query.page,
+      query.pageSize
+    )
+  },
+
+  /** Every product matching the filters, in the list's order. For export. */
+  async listAllMatching(filters: ProductFilters = {}, sort?: ProductSort): Promise<ProductRow[]> {
+    const resolved = await resolveProductFilters(filters)
+    const { column, ascending } = resolveProductSort(sort)
+    return fetchAllRows<ProductRow>((from, to) => {
+      const base = supabase.from('products').select(PRODUCT_SELECT)
+      return applyProductFilters(base, resolved)
+        .order(column, { ascending, nullsFirst: ascending })
+        .order('id', { ascending: true })
+        .range(from, to)
+    })
+  },
+
+  /** How many products exist, without reading any. */
+  async count(): Promise<number> {
+    const { count, error } = await supabase.from('products').select('id', { count: 'exact', head: true })
+    if (error) throw error
+    return count ?? 0
+  },
+
+  /** Product totals overall, per brand and per category (20260853). */
+  async hierarchyCounts(): Promise<ProductHierarchyCounts> {
+    const { data, error } = await supabase.rpc('rma_product_hierarchy_counts')
+    if (error) throw error
+    const d = (data ?? {}) as { total?: number; by_brand?: Record<string, number>; by_category?: Record<string, number> }
+    return { total: Number(d.total ?? 0), byBrand: d.by_brand ?? {}, byCategory: d.by_category ?? {} }
+  },
+
+  /**
+   * Which of these SKUs already exist, compared case-insensitively — how the
+   * CSV importer skips duplicates. It used to compare against the product list
+   * the page had loaded, which is capped (BUG-066), so past the cap an existing
+   * SKU was imported a second time.
+   *
+   * @returns the existing SKUs, lower-cased
+   */
+  async findExistingSkus(skus: string[]): Promise<Set<string>> {
+    const wanted = [...new Set(skus.map((v) => String(v ?? '').trim().toLowerCase()).filter(Boolean))]
+    const found = new Set<string>()
+    for (const chunk of chunksOf(wanted, 50)) {
+      // Case-insensitive exact match: ILIKE with the value escaped and no wildcards.
+      const filter = chunk.map((sku) => `sku.ilike.${quoteOrValue(escapeLike(sku))}`).join(',')
+      const rows = await fetchAllRows<{ sku: string | null }>((from, to) =>
+        supabase.from('products').select('id, sku').or(filter).order('id', { ascending: true }).range(from, to)
+      )
+      for (const row of rows) {
+        const sku = String(row.sku ?? '').trim().toLowerCase()
+        if (chunk.includes(sku)) found.add(sku)
+      }
+    }
+    return found
+  },
+
+  /**
+   * @deprecated Loads the whole table, and the Data API returns at most 1 000
+   * rows, so past that it is silently incomplete (BUG-066). Still used by
+   * screens not yet moved to server-side paging; do not add callers.
+   */
   async list(): Promise<ProductRow[]> {
-    // 5 000-row cap — Products page filters/sorts client-side.
     const { data, error } = await supabase
       .from('products')
       .select(
