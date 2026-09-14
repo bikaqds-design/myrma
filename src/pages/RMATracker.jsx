@@ -3,6 +3,7 @@ import { useTranslation, Trans } from 'react-i18next'
 import { db, storage, branding as brandingAPI } from '../api/supabaseClient'
 import { safeStorage } from '../lib/safeStorage'
 import { safeAttachmentHref } from '../lib/attachmentUrl'
+import { darken, fillForWhiteText } from '../lib/color'
 import toast from 'react-hot-toast'
 
 // ── Client-side brute-force protection ──────────────────────────────────────
@@ -265,6 +266,13 @@ export default function RMATracker() {
   const getReplies = (id) => comments.filter((c) => c.parent_comment_id === id)
 
   const primaryColor = branding?.primary_color || '#4F46E5'
+  // Text buttons get a fill white text can be read on, even when the brand
+  // colour is light. See src/lib/color.js.
+  const buttonFill = fillForWhiteText(primaryColor)
+  const buttonFillStyle = {
+    '--btn-fill': buttonFill,
+    '--btn-fill-hover': darken(buttonFill, 0.1),
+  }
   const companyName = branding?.company_name || 'myCRM'
 
   return (
@@ -323,8 +331,8 @@ export default function RMATracker() {
           <button
             type="submit"
             disabled={loading || !query.trim() || rlLocked}
-            className="px-6 py-3 rounded-xl text-white text-sm font-semibold shadow-sm disabled:opacity-50 transition-colors hover:opacity-90"
-            style={{ backgroundColor: primaryColor }}
+            className="px-6 py-3 rounded-xl text-white text-sm font-semibold shadow-sm disabled:opacity-50 transition-colors bg-[var(--btn-fill)] enabled:hover:bg-[var(--btn-fill-hover)]"
+            style={buttonFillStyle}
           >
             {loading ? (
               <>
@@ -721,8 +729,8 @@ export default function RMATracker() {
                     <button
                       type="submit"
                       disabled={submitting || !messageText.trim() || !authorName.trim()}
-                      className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 transition-opacity hover:opacity-90"
-                      style={{ backgroundColor: primaryColor }}
+                      className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 transition-colors bg-[var(--btn-fill)] enabled:hover:bg-[var(--btn-fill-hover)]"
+                      style={buttonFillStyle}
                     >
                       {submitting ? (
                         <>
