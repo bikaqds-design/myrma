@@ -12,6 +12,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <!-- Applies dark mode before first paint, so the page does not flash white.
+         The Content-Security-Policy in vercel.json allows this script by its
+         SHA-256 hash, not by 'unsafe-inline'. Changing even one character of
+         it changes the hash: update vercel.json in the same commit. The test
+         src/test/cspInlineScript.test.js fails if the two disagree. (BUG-056) -->
     <script>
       try {
         var s = JSON.parse(localStorage.getItem('mrma_appearance') || '{}');
