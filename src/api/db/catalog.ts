@@ -507,7 +507,7 @@ export const products = {
    * control and explain why, instead of waiting for the trigger to raise.
    *
    * Counts live units only (`company_stock`/`active_rma`) — matching
-   * getStockSummary — so a product whose units are all sold/scrapped is still
+   * v_product_stock_summary — so a product whose units are all sold/scrapped is still
    * free to switch.
    */
   async hasStock(productId: string): Promise<boolean> {

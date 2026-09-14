@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { supabase, db } from '../../api/supabaseClient'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import { db } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { safeStorage } from '../../lib/safeStorage'
+import { useDebouncedValue } from '../../lib/useDebouncedValue'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { Spinner } from '../../components/ui'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import {
@@ -27,21 +30,22 @@ const WAREHOUSE_TYPES = ['main', 'branch', 'service_center', 'rma', 'transit', '
 // ─── Warehouse export helpers ──────────────────────────────────────────────────
 // Note: toast messages in these module-level async functions are left hardcoded
 // because hooks cannot be used at module scope. Pass `t` as a parameter to translate.
-async function exportWarehouseExcel(wh, units, brandMap, ticketMap, t) {
+// `units` are v_inventory_units rows, which carry the brand and ticket fields.
+async function exportWarehouseExcel(wh, units, t) {
   const XLSX = await import('xlsx')
   const rows = units.map((u, i) => ({
     '#': i + 1,
     'Warehouse Code': wh.code || '',
     Warehouse: wh.name || '',
     Product: u.product_name || '',
-    Brand: brandMap[u.product_name] || '',
+    Brand: u.brand_name || '',
     'Serial #': u.serial_number || '',
     Warranty: u.warranty_status || '',
     Status: STATUS_META[u.status]?.label || u.status || '',
     Resolution: RESOLUTION_META[u.resolution_type]?.label || u.resolution_type || '',
     'RMA #': u.rma_number || '',
-    Customer: ticketMap[u.rma_number]?.customer_name || '',
-    'RMA Status': ticketMap[u.rma_number]?.ticket_status || '',
+    Customer: u.ticket_customer_name || '',
+    'RMA Status': u.ticket_status || '',
     'Date Added': u.created_date ? new Date(u.created_date).toLocaleDateString() : '',
     Days: daysSince(u.created_date),
   }))
@@ -52,19 +56,19 @@ async function exportWarehouseExcel(wh, units, brandMap, ticketMap, t) {
   toast.success(t ? t('inventory.exportedExcelRows', { count: rows.length }) : `Exported ${rows.length} rows to Excel`)
 }
 
-async function exportWarehousePDF(wh, units, brandMap, ticketMap, t) {
+async function exportWarehousePDF(wh, units, t) {
   const { default: jsPDF } = await import('jspdf')
   const date = new Date().toLocaleDateString()
   const rows = units.map((u, i) => [
     i + 1,
     u.product_name || '—',
-    brandMap[u.product_name] || '—',
+    u.brand_name || '—',
     u.serial_number || '—',
     u.warranty_status || '—',
     STATUS_META[u.status]?.label || u.status || '—',
     RESOLUTION_META[u.resolution_type]?.label || u.resolution_type || '—',
     u.rma_number || '—',
-    ticketMap[u.rma_number]?.customer_name || '—',
+    u.ticket_customer_name || '—',
     `${daysSince(u.created_date)}d`,
   ])
 
@@ -149,11 +153,9 @@ async function exportWarehousePDF(wh, units, brandMap, ticketMap, t) {
 
 // ─── Warehouses Tab ────────────────────────────────────────────────────────────
 export function WarehousesTab({
-  units,
+  unitCounts,
   warehouses,
   whMissing,
-  brands: _brands,
-  brandMap,
   userEmail,
   canManage,
   canTransfer,
@@ -182,7 +184,9 @@ export function WarehousesTab({
     setConfirmDialog({ open: true, title, message, onConfirm })
   const closeConfirm = () => setConfirmDialog((d) => ({ ...d, open: false }))
 
-  const whUnits = (id) => units.filter((u) => u.warehouse_id === id)
+  // Unit counts per warehouse come from v_warehouse_unit_counts; they were
+  // counted from a load of every unit, which the Data API caps. (BUG-066.)
+  const unitCountOf = (id) => unitCounts?.[id] ?? 0
 
   // Group warehouses (Warehouse Module R1): Sellable (main/branch/legacy-null),
   // Other (non-system service_center/rma/transit/virtual), System (the 8
@@ -263,7 +267,7 @@ export function WarehousesTab({
     )
   }
 
-  const totalUnits = warehouses.reduce((n, w) => n + whUnits(w.id).length, 0)
+  const totalUnits = warehouses.reduce((n, w) => n + unitCountOf(w.id), 0)
 
   return (
     <div className="space-y-4">
@@ -469,7 +473,7 @@ export function WarehousesTab({
                       </tr>
                     )
                   }
-                  const cnt = whUnits(wh.id).length
+                  const cnt = unitCountOf(wh.id)
                   out.push(
                     <tr
                       key={wh.id}
@@ -597,13 +601,7 @@ export function WarehousesTab({
       {selectedWh && (
         <WarehouseDetailModal
           wh={selectedWh}
-          units={
-            selectedWh.isSystem
-              ? units.filter((u) => u.status === selectedWh.status && !u.warehouse_id)
-              : units.filter((u) => u.warehouse_id === selectedWh.id)
-          }
           warehouses={warehouses}
-          brandMap={brandMap}
           canTransfer={canTransfer}
           userEmail={userEmail}
           onClose={() => setSelectedWh(null)}
@@ -660,11 +658,14 @@ export function WarehousesTab({
 }
 
 // ─── Warehouse Detail Modal ────────────────────────────────────────────────────
+// A warehouse's units, one page at a time, searched in the database — product,
+// serial, RMA number, brand and the ticket's customer (v_inventory_units). It
+// used to filter a load of every unit plus a ticket lookup by RMA number, both
+// capped by the Data API. Transfer and export without a selection act on
+// everything the search matches, read in full when used. (BUG-066.)
 function WarehouseDetailModal({
   wh,
-  units,
   warehouses,
-  brandMap,
   canTransfer,
   userEmail,
   onClose,
@@ -672,36 +673,72 @@ function WarehouseDetailModal({
 }) {
   const { t } = useTranslation()
   const [selected, setSelected] = useState([])
-  const [showTransfer, setShowTransfer] = useState(false)
+  const [transferIds, setTransferIds] = useState(null)
   const [search, setSearch] = useState('')
-  const [ticketMap, setTicketMap] = useState({})
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(() => safeStorage.get('invWarehouseUnitsPerPage', 100))
+  const [preparing, setPreparing] = useState(false)
+
+  const scope = useMemo(
+    () => (wh.isSystem ? { unplacedStatus: wh.status } : { warehouseId: wh.id }),
+    [wh.isSystem, wh.status, wh.id]
+  )
+  const scopeKey = wh.isSystem ? `unplaced:${wh.status}` : wh.id
+  const debouncedSearch = useDebouncedValue(search)
+  const { data: pageResult, isLoading } = useQuery({
+    queryKey: ['inventory', 'warehouse-units', scopeKey, { search: debouncedSearch, page, pageSize }],
+    queryFn: () => db.inventoryLists.unitsPage({ ...scope, search: debouncedSearch }, page, pageSize),
+    placeholderData: keepPreviousData,
+  })
+  const { data: totalUnits = 0 } = useQuery({
+    queryKey: ['inventory', 'warehouse-unit-count', scopeKey],
+    queryFn: () => db.inventoryLists.countUnits(scope),
+  })
+  const filtered = pageResult?.data ?? EMPTY_ARRAY
+  const matchingCount = pageResult?.count ?? 0
+  const totalPages = Math.ceil(matchingCount / pageSize)
 
   useEffect(() => {
-    const nums = [...new Set(units.map((u) => u.rma_number).filter(Boolean))]
-    if (!nums.length) return
-    supabase
-      .from('rma_tickets')
-      .select('rma_number,customer_name,ticket_status')
-      .in('rma_number', nums)
-      .then(({ data }) => {
-        const m = {}
-        for (const tk of data || []) m[tk.rma_number] = tk
-        setTicketMap(m)
-      })
-  }, [units])
+    setPage(1)
+    setSelected([])
+  }, [debouncedSearch, pageSize])
+  useEffect(() => {
+    setSelected([])
+  }, [page])
+  useEffect(() => {
+    if (pageResult && totalPages >= 1 && page > totalPages) setPage(totalPages)
+  }, [pageResult, totalPages, page])
+  useEffect(() => {
+    safeStorage.set('invWarehouseUnitsPerPage', pageSize)
+  }, [pageSize])
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return units
-    const q = search.toLowerCase()
-    return units.filter(
-      (u) =>
-        (u.product_name || '').toLowerCase().includes(q) ||
-        (u.serial_number || '').toLowerCase().includes(q) ||
-        (u.rma_number || '').toLowerCase().includes(q) ||
-        (brandMap[u.product_name] || '').toLowerCase().includes(q) ||
-        (ticketMap[u.rma_number]?.customer_name || '').toLowerCase().includes(q)
-    )
-  }, [units, search, brandMap, ticketMap])
+  const allMatching = () => db.inventoryLists.allUnits({ ...scope, search: debouncedSearch })
+
+  const runExport = async (exporter) => {
+    setPreparing(true)
+    try {
+      await exporter(wh, await allMatching(), t)
+    } catch {
+      toast.error(t('common.error'))
+    } finally {
+      setPreparing(false)
+    }
+  }
+
+  const openTransfer = async () => {
+    if (selected.length > 0) {
+      setTransferIds(selected)
+      return
+    }
+    setPreparing(true)
+    try {
+      setTransferIds((await allMatching()).map((u) => u.id))
+    } catch {
+      toast.error(t('common.error'))
+    } finally {
+      setPreparing(false)
+    }
+  }
 
   const toggle = (id) =>
     setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
@@ -709,7 +746,7 @@ function WarehouseDetailModal({
     setSelected(selected.length === filtered.length ? [] : filtered.map((u) => u.id))
 
   const handleTransfer = async (warehouseId) => {
-    const ids = selected.length > 0 ? selected : filtered.map((u) => u.id)
+    const ids = transferIds ?? []
     try {
       await db.inventory.transferUnits(ids, warehouseId)
       toast.success(t('inventory.unitsTransferredCount', { count: ids.length }))
@@ -721,7 +758,7 @@ function WarehouseDetailModal({
         )
         .catch(() => {})
       setSelected([])
-      setShowTransfer(false)
+      setTransferIds(null)
       onReload()
     } catch (err) {
       // A bulk action can change some of the selection and not the rest (BUG-074):
@@ -754,16 +791,17 @@ function WarehouseDetailModal({
               )}
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              {units.length} unit{units.length !== 1 ? 's' : ''}
+              {totalUnits} unit{totalUnits !== 1 ? 's' : ''}
               {wh.location ? ` · ${wh.location}` : ''}
               {wh.description ? ` · ${wh.description}` : ''}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {units.length > 0 && (
+            {matchingCount > 0 && (
               <>
                 <button
-                  onClick={() => exportWarehouseExcel(wh, filtered, brandMap, ticketMap, t)}
+                  onClick={() => runExport(exportWarehouseExcel)}
+                  disabled={preparing}
                   className="flex items-center gap-1.5 px-3 py-1.5 border border-green-300 text-green-700 rounded-lg text-xs font-medium hover:bg-green-50"
                 >
                   <svg
@@ -782,7 +820,8 @@ function WarehouseDetailModal({
                   Excel
                 </button>
                 <button
-                  onClick={() => exportWarehousePDF(wh, filtered, brandMap, ticketMap, t)}
+                  onClick={() => runExport(exportWarehousePDF)}
+                  disabled={preparing}
                   className="flex items-center gap-1.5 px-3 py-1.5 border border-red-300 text-red-700 rounded-lg text-xs font-medium hover:bg-red-50"
                 >
                   <svg
@@ -802,9 +841,10 @@ function WarehouseDetailModal({
                 </button>
               </>
             )}
-            {canTransfer && units.length > 0 && (
+            {canTransfer && matchingCount > 0 && (
               <button
-                onClick={() => setShowTransfer(true)}
+                onClick={openTransfer}
+                disabled={preparing}
                 className="flex items-center gap-1.5 px-3 py-1.5 border border-indigo-300 text-indigo-700 rounded-lg text-xs font-medium hover:bg-indigo-50"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -864,7 +904,11 @@ function WarehouseDetailModal({
 
         {/* Table */}
         <div className="flex-1 overflow-auto">
-          {filtered.length === 0 ? (
+          {isLoading ? (
+            <div className="py-16 flex justify-center">
+              <Spinner />
+            </div>
+          ) : matchingCount === 0 ? (
             <div className="text-center py-16 text-gray-500 text-sm">
               {search
                 ? t('inventory.noUnitsMatchSearch')
@@ -913,7 +957,7 @@ function WarehouseDetailModal({
                 {filtered.map((u, idx) => {
                   const isSelected = selected.includes(u.id)
                   const age = daysSince(u.created_date)
-                  const tk = ticketMap[u.rma_number]
+                  const tk = { customer_name: u.ticket_customer_name, ticket_status: u.ticket_status }
                   return (
                     <tr
                       key={u.id}
@@ -931,7 +975,7 @@ function WarehouseDetailModal({
                         </td>
                       )}
                       <td className="px-2 py-1.5 text-center text-gray-500 tabular-nums border-r border-gray-100">
-                        {idx + 1}
+                        {(page - 1) * pageSize + idx + 1}
                       </td>
                       <td
                         className="px-3 py-1.5 font-medium text-gray-900 border-r border-gray-100 max-w-[160px] truncate"
@@ -940,7 +984,7 @@ function WarehouseDetailModal({
                         {u.product_name || '—'}
                       </td>
                       <td className="px-3 py-1.5 text-gray-500 border-r border-gray-100">
-                        {brandMap[u.product_name] || '—'}
+                        {u.brand_name || '—'}
                       </td>
                       <td className="px-3 py-1.5 font-mono text-gray-600 border-r border-gray-100">
                         {u.serial_number || '—'}
@@ -989,12 +1033,24 @@ function WarehouseDetailModal({
           )}
         </div>
 
+        {matchingCount > 0 && (
+          <div className="px-6 flex-shrink-0">
+            <Pagination
+              total={matchingCount}
+              page={page}
+              itemsPerPage={pageSize}
+              setItemsPerPage={setPageSize}
+              onPage={setPage}
+            />
+          </div>
+        )}
+
         {/* Footer */}
         <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
           <span className="text-xs text-gray-500">
             {search
-              ? t('inventory.footerUnitsOf', { filtered: filtered.length, total: units.length })
-              : t('inventory.footerUnitsTotal', { count: units.length })}
+              ? t('inventory.footerUnitsOf', { filtered: matchingCount, total: totalUnits })
+              : t('inventory.footerUnitsTotal', { count: totalUnits })}
             {selected.length > 0 && (
               <span className="ms-2 text-indigo-600 font-medium">
                 {t('inventory.footerSelected', { count: selected.length })}
@@ -1009,13 +1065,13 @@ function WarehouseDetailModal({
           </button>
         </div>
       </div>
-      {showTransfer && (
+      {transferIds && (
         <TransferModal
-          units={selected.length > 0 ? selected : filtered.map((u) => u.id)}
+          units={transferIds}
           warehouses={warehouses}
           currentWarehouseId={wh.isSystem ? null : wh.id}
           onConfirm={handleTransfer}
-          onClose={() => setShowTransfer(false)}
+          onClose={() => setTransferIds(null)}
         />
       )}
     </div>

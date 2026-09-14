@@ -19,6 +19,7 @@ import {
   dataIntegrity,
 } from './system.js'
 import { inventory, warehouses, warehouseStock, stockMoves, parts, ticketParts, timeEntries } from './inventory.js'
+import { inventoryLists } from './inventoryLists.js'
 import { notifications } from './notifications.js'
 import {
   whatsappTemplates,
@@ -84,6 +85,7 @@ export const db = {
 
   // Inventory & parts
   inventory,
+  inventoryLists,
   warehouses,
   warehouseStock,
   stockMoves,
@@ -148,6 +150,9 @@ export type {
   WarehouseStockRow, StockMoveRow, ProductStockSummary,
   CreateUnitsResult, FailedUnitInsert,
 } from './inventory.js'
+export type {
+  InventoryUnitListRow, InventoryProductGroupRow, StockSummaryRow, StockMoveListRow, BulkReservationRow,
+} from './inventoryLists.js'
 export type {
   WhatsAppTemplateRow, TemplateVariable, NotificationLogRow,
   NotificationSettingRow, NotificationQueueRow,

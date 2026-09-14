@@ -1,11 +1,31 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
+import { db } from '../../api/supabaseClient'
 import { STATUS_META, RESOLUTION_META, BATCH_STATUS_META, downloadCSV, daysSince, fmt } from './_shared'
 
 // ─── Export Menu ───────────────────────────────────────────────────────────────
-export function ExportMenu({ units, batches, warehouses, brandMap }) {
+// Counts are read when the menu opens and rows when an export is chosen, all
+// of them, in chunks. The menu used to export the arrays the page had loaded,
+// which the Data API caps at 1 000 rows — so an "all units" file could quietly
+// be a partial one. (BUG-066.)
+export function ExportMenu({ warehouses, unitCounts }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const { data: counts } = useQuery({
+    queryKey: ['inventory', 'export-counts'],
+    queryFn: async () => {
+      const [units, stock, batches] = await Promise.all([
+        db.inventoryLists.countUnits(),
+        db.inventoryLists.countUnits({ status: 'company_stock' }),
+        db.inventoryLists.countBatches(),
+      ])
+      return { units, stock, batches }
+    },
+    enabled: open,
+  })
   const ref = useRef()
   useEffect(() => {
     const handler = (e) => {
@@ -17,12 +37,26 @@ export function ExportMenu({ units, batches, warehouses, brandMap }) {
 
   const wName = (id) => warehouses.find((w) => w.id === id)?.name || ''
 
-  const exportAll = () => {
+  // Runs one export, closing the menu and saying so if the read fails.
+  const run = (fn) => async () => {
+    setBusy(true)
+    try {
+      await fn()
+    } catch {
+      toast.error(t('common.error'))
+    } finally {
+      setBusy(false)
+      setOpen(false)
+    }
+  }
+
+  const exportAll = run(async () => {
+    const units = await db.inventoryLists.allUnits({})
     downloadCSV(
       units.map((u) => ({
         'RMA #': u.rma_number || '',
         Product: u.product_name || '',
-        Brand: brandMap[u.product_name] || '',
+        Brand: u.brand_name || '',
         'Serial #': u.serial_number || '',
         Warranty: u.warranty_status || '',
         Status: STATUS_META[u.status]?.label || u.status || '',
@@ -33,15 +67,14 @@ export function ExportMenu({ units, batches, warehouses, brandMap }) {
       })),
       `inventory-all-${new Date().toISOString().split('T')[0]}.csv`
     )
-    setOpen(false)
-  }
+  })
 
-  const exportStock = () => {
-    const stock = units.filter((u) => u.status === 'company_stock')
+  const exportStock = run(async () => {
+    const stock = await db.inventoryLists.allUnits({ status: 'company_stock' })
     downloadCSV(
       stock.map((u) => ({
         Product: u.product_name || '',
-        Brand: brandMap[u.product_name] || '',
+        Brand: u.brand_name || '',
         'Serial #': u.serial_number || '',
         Warranty: u.warranty_status || '',
         Resolution: RESOLUTION_META[u.resolution_type]?.label || u.resolution_type || '',
@@ -51,10 +84,10 @@ export function ExportMenu({ units, batches, warehouses, brandMap }) {
       })),
       `company-stock-${new Date().toISOString().split('T')[0]}.csv`
     )
-    setOpen(false)
-  }
+  })
 
-  const exportBatches = () => {
+  const exportBatches = run(async () => {
+    const { data: batches } = await db.inventoryLists.allBatches()
     downloadCSV(
       batches.map((b) => ({
         'Batch #': b.batch_number || '',
@@ -68,8 +101,7 @@ export function ExportMenu({ units, batches, warehouses, brandMap }) {
       })),
       `manufacturer-batches-${new Date().toISOString().split('T')[0]}.csv`
     )
-    setOpen(false)
-  }
+  })
 
   const exportWarehouses = () => {
     const rows = warehouses.map((w) => ({
@@ -80,7 +112,7 @@ export function ExportMenu({ units, batches, warehouses, brandMap }) {
       Location: w.location || '',
       Description: w.description || '',
       Manager: w.manager || '',
-      'Unit Count': units.filter((u) => u.warehouse_id === w.id).length,
+      'Unit Count': unitCounts?.[w.id] ?? 0,
       Active: w.is_active ? 'Yes' : 'No',
       Created: fmt(w.created_date),
     }))
@@ -91,19 +123,19 @@ export function ExportMenu({ units, batches, warehouses, brandMap }) {
   const options = [
     {
       label: t('inventory.exportAllUnits'),
-      sub: t('inventory.countUnits', { count: units.length }),
+      sub: counts ? t('inventory.countUnits', { count: counts.units }) : t('common.loading'),
       fn: exportAll,
       icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
     },
     {
       label: t('inventory.exportCompanyStock'),
-      sub: t('inventory.countUnits', { count: units.filter((u) => u.status === 'company_stock').length }),
+      sub: counts ? t('inventory.countUnits', { count: counts.stock }) : t('common.loading'),
       fn: exportStock,
       icon: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4',
     },
     {
       label: t('inventory.exportMfBatches'),
-      sub: t('inventory.countBatches', { count: batches.length }),
+      sub: counts ? t('inventory.countBatches', { count: counts.batches }) : t('common.loading'),
       fn: exportBatches,
       icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
     },
@@ -143,6 +175,7 @@ export function ExportMenu({ units, batches, warehouses, brandMap }) {
             <button
               key={o.label}
               onClick={o.fn}
+              disabled={busy}
               className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-indigo-50 transition-colors text-start"
             >
               <svg

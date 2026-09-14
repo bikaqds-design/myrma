@@ -6,7 +6,6 @@ import { supabase, db } from '../../api/supabaseClient'
 import { PageSkeleton } from '../../components/Skeleton'
 import { PageHeader, Button } from '../../components/ui'
 import { ROLES } from '../../lib/constants'
-import { groupByProduct } from './_shared'
 import { ExportMenu } from './ExportMenu'
 import { OverviewTab } from './OverviewTab'
 import { ByProductTab } from './ByProductTab'
@@ -30,37 +29,39 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
   const [showReceiveStock, setShowReceiveStock] = useState(false)
 
   const queryClient = useQueryClient()
-  const { data: invData, isLoading: loading } = useQuery({
-    queryKey: ['inventory'],
+  // The shell loads only what every tab shares: the warehouses (a short
+  // configuration list), the brands for the filter, and counts. Each tab reads
+  // its own rows a page at a time. This used to load every unit, stock move,
+  // stock row and product here, which the Data API caps at 1 000 rows. All
+  // keys start with 'inventory', so one invalidation refreshes every tab.
+  // (BUG-066.)
+  const { data: shell, isLoading: loading } = useQuery({
+    queryKey: ['inventory', 'shell'],
     queryFn: async () => {
-      const [ur, br, brandList, productList, whRes, stockSummary, movesRes, wsRes] = await Promise.all([
-        db.inventory.listUnits(),
-        db.inventory.listBatches(),
-        db.brands.list().catch(() => []),
-        db.products.list().catch(() => []),
+      const [whRes, brandList, unitCount, moveCount, unitCounts] = await Promise.all([
         db.warehouses.list().catch(() => ({ missing: true, data: [] })),
-        db.inventory.getStockSummary().catch(() => []),
-        db.stockMoves.list().catch(() => ({ missing: true, data: [] })),
-        db.warehouseStock.list().catch(() => ({ missing: true, data: [] })),
+        db.brands.list().catch(() => []),
+        db.inventoryLists.countUnits().then(
+          (count) => ({ missing: false, count }),
+          (err) => {
+            if (err?.code === '42P01' || err?.code === 'PGRST205') return { missing: true, count: 0 }
+            throw err
+          }
+        ),
+        db.inventoryLists.countMoves().catch(() => 0),
+        db.inventoryLists.warehouseUnitCounts().catch(() => ({})),
       ])
-      const map = {}
-      for (const p of productList || [])
-        if (p.product_name) map[p.product_name] = p.brand?.brand_name || ''
-      return { ur, br, brandList, productList, brandMap: map, whRes, stockSummary, movesRes, wsRes }
+      return { whRes, brandList, unitCount, moveCount, unitCounts }
     },
   })
 
-  const tableMissing = invData?.ur?.missing ?? false
-  const units = invData?.ur?.data ?? []
-  const batches = invData?.br?.missing ? [] : (invData?.br?.data ?? [])
-  const brands = invData?.brandList ?? []
-  const brandMap = invData?.brandMap ?? {}
-  const whMissing = invData?.whRes?.missing ?? false
-  const warehouses = invData?.whRes?.data ?? []
-  const stockSummary = invData?.stockSummary ?? []
-  const stockMoves = invData?.movesRes?.missing ? [] : (invData?.movesRes?.data ?? [])
-  const products = invData?.productList ?? []
-  const warehouseStockRows = invData?.wsRes?.missing ? [] : (invData?.wsRes?.data ?? [])
+  const tableMissing = shell?.unitCount?.missing ?? false
+  const unitTotal = shell?.unitCount?.count ?? 0
+  const moveTotal = shell?.moveCount ?? 0
+  const brands = shell?.brandList ?? []
+  const whMissing = shell?.whRes?.missing ?? false
+  const warehouses = shell?.whRes?.data ?? []
+  const unitCounts = shell?.unitCounts ?? {}
 
   const [tab, setTab] = useURLTab('tab', 'overview')
 
@@ -119,8 +120,6 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
       </div>
     )
 
-  const allGroups = groupByProduct(units, brandMap)
-
   // The 5 RMA-stage tabs (received/under-repair/repaired/cant-repair/rma-stock)
   // were removed in the Warehouse Module R1 redesign — RMA units now live in
   // real system locations (RMA-RECEIVED etc.), surfaced on the Overview
@@ -128,8 +127,8 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
   const TAB_IDS = ['overview', 'by-product', 'stock-movements', 'warehouses']
   const tabs = [
     { id: 'overview', label: t('inventory.overview') },
-    { id: 'by-product', label: `${t('inventory.allUnits')} (${units.length})` },
-    { id: 'stock-movements', label: `${t('inventory.stockMovements')} (${stockMoves.length})` },
+    { id: 'by-product', label: `${t('inventory.allUnits')} (${unitTotal})` },
+    { id: 'stock-movements', label: `${t('inventory.stockMovements')} (${moveTotal})` },
     { id: 'warehouses', label: `${t('inventory.warehouses')} (${warehouses.length})` },
   ]
   // Stale deep links (e.g. ?tab=received from a bookmarked old URL) fall back
@@ -145,7 +144,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
           </Button>
         )}
         {canDo('export') && (
-          <ExportMenu units={units} batches={batches} warehouses={warehouses} brandMap={brandMap} />
+          <ExportMenu warehouses={warehouses} unitCounts={unitCounts} />
         )}
         <button
           onClick={invalidateInventory}
@@ -179,10 +178,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
 
       {activeTab === 'overview' && (
         <OverviewTab
-          stockSummary={stockSummary}
           onNavigate={setBreakdownProductId}
-          units={units}
-          warehouseStockRows={warehouseStockRows}
           warehouses={warehouses}
           userEmail={userEmail}
           isManagerOrAbove={isManagerOrAbove}
@@ -192,7 +188,6 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
       )}
       {activeTab === 'by-product' && (
         <ByProductTab
-          groups={allGroups}
           brands={brands}
           warehouses={warehouses}
           canResolve={canDo('resolve_units')}
@@ -203,21 +198,13 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
         />
       )}
       {activeTab === 'stock-movements' && (
-        <StockMovementsTab
-          moves={stockMoves}
-          units={units}
-          warehouseStockRows={warehouseStockRows}
-          products={products}
-          warehouses={warehouses}
-        />
+        <StockMovementsTab />
       )}
       {activeTab === 'warehouses' && (
         <WarehousesTab
-          units={units}
+          unitCounts={unitCounts}
           warehouses={warehouses}
           whMissing={whMissing}
-          brands={brands}
-          brandMap={brandMap}
           userEmail={userEmail}
           canManage={canDo('manage_warehouses')}
           canTransfer={canDo('transfer')}
@@ -228,12 +215,8 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
       <StockBreakdownModal
         open={!!breakdownProductId}
         onClose={() => setBreakdownProductId(null)}
-        productSummary={stockSummary.find((s) => s.product_id === breakdownProductId) ?? null}
-        product={products.find((p) => p.id === breakdownProductId) ?? null}
-        units={units}
-        warehouseStockRows={warehouseStockRows}
+        productId={breakdownProductId}
         warehouses={warehouses}
-        moves={stockMoves}
         userEmail={userEmail}
         isManagerOrAbove={isManagerOrAbove}
         onRefresh={invalidateInventory}

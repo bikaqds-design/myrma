@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { supabase, db } from '../../api/supabaseClient'
+import { chunksOf } from '../../api/db/_paging'
 import toast from 'react-hot-toast'
 import { Spinner } from '../../components/ui'
 import {
@@ -176,18 +177,21 @@ export function ProductDetailModal({
       setLoadingTickets(false)
       return
     }
-    supabase
-      .from('rma_tickets')
-      .select(
-        'id,rma_number,ticket_status,customer_name,customer_type,product_name,priority,assigned_to,description,created_date,due_date'
+    Promise.all(
+      chunksOf(nums, 100).map((chunk) =>
+        supabase
+          .from('rma_tickets')
+          .select(
+            'id,rma_number,ticket_status,customer_name,customer_type,product_name,priority,assigned_to,description,created_date,due_date'
+          )
+          .in('rma_number', chunk)
       )
-      .in('rma_number', nums)
-      .then(({ data }) => {
-        const m = {}
-        for (const t of data || []) m[t.rma_number] = t
-        setTickets(m)
-        setLoadingTickets(false)
-      })
+    ).then((results) => {
+      const m = {}
+      for (const { data } of results) for (const t of data || []) m[t.rma_number] = t
+      setTickets(m)
+      setLoadingTickets(false)
+    })
   }, [group.units])
 
   const toggleUnit = (id) =>

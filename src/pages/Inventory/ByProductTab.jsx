@@ -1,12 +1,21 @@
 import React, { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
+import { db } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
+import { useDebouncedValue } from '../../lib/useDebouncedValue'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
+import { Spinner } from '../../components/ui'
 import { Pagination, downloadCSV, InvToolbar, InvFilterPanel, InvFilterField, INV_FILTER_SELECT_CLS } from './_shared'
 import { ProductDetailModal } from './ProductDetailModal'
 
 // ─── All Units — By Product ───────────────────────────────────────────────────
+// One page of product groups at a time, grouped, counted, searched and ordered
+// in the database (v_inventory_product_groups). It grouped every unit in the
+// browser, from a load the Data API caps at 1 000 rows. A product's own units
+// are read when its detail opens. (BUG-066.)
 export function ByProductTab({
-  groups,
   brands,
   warehouses,
   canResolve: _canResolve,
@@ -30,22 +39,41 @@ export function ByProductTab({
   const [selectedRows, setSelectedRows] = useState([])
 
   const activeFilterCount = [filterBrand, filterStatus, filterProduct].filter(Boolean).length
-  const filtered = groups.filter((g) => {
-    const matchSearch =
-      !search ||
-      g.product_name.toLowerCase().includes(search.toLowerCase()) ||
-      g.brand?.toLowerCase().includes(search.toLowerCase())
-    const matchBrand = !filterBrand || g.brand === filterBrand
-    const matchStatus = !filterStatus || g[filterStatus] > 0
-    const matchProduct =
-      !filterProduct || g.product_name.toLowerCase().includes(filterProduct.toLowerCase())
-    return matchSearch && matchBrand && matchStatus && matchProduct
+  const debouncedSearch = useDebouncedValue(search)
+  const debouncedProduct = useDebouncedValue(filterProduct)
+  const filters = { search: debouncedSearch, brand: filterBrand, status: filterStatus, product: debouncedProduct }
+  const { data: pageResult, isLoading } = useQuery({
+    queryKey: ['inventory', 'groups-page', { ...filters, page: currentPage, pageSize: itemsPerPage }],
+    queryFn: () => db.inventoryLists.productGroupsPage(filters, currentPage, itemsPerPage),
+    placeholderData: keepPreviousData,
   })
-  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const paginated = pageResult?.data ?? EMPTY_ARRAY
+  const matchingCount = pageResult?.count ?? 0
+  const totalPages = Math.ceil(matchingCount / itemsPerPage)
 
+  // Selection belongs to the page it was made on.
   React.useEffect(() => {
     setCurrentPage(1)
-  }, [search, filterBrand, filterStatus, filterProduct, itemsPerPage])
+    setSelectedRows([])
+  }, [debouncedSearch, filterBrand, filterStatus, debouncedProduct, itemsPerPage])
+  React.useEffect(() => {
+    setSelectedRows([])
+  }, [currentPage])
+  React.useEffect(() => {
+    if (pageResult && totalPages >= 1 && currentPage > totalPages) setCurrentPage(totalPages)
+  }, [pageResult, totalPages, currentPage])
+
+  // The opened product's units, read for that product only.
+  const { data: selectedUnits, isError: unitsFailed } = useQuery({
+    queryKey: ['inventory', 'group-units', selectedProduct?.product_name],
+    queryFn: () => db.inventoryLists.allUnits({ groupName: selectedProduct.product_name }),
+    enabled: Boolean(selectedProduct),
+  })
+  React.useEffect(() => {
+    if (!unitsFailed) return
+    toast.error(t('common.error'))
+    setSelectedProduct(null)
+  }, [unitsFailed, t])
   React.useEffect(() => {
     safeStorage.set('invByProductPerPage', itemsPerPage)
   }, [itemsPerPage])
@@ -73,7 +101,7 @@ export function ByProductTab({
   const handleExportSelected = () => {
     const rows = selectedRows
       .map((name) => {
-        const g = groups.find((x) => x.product_name === name)
+        const g = paginated.find((x) => x.product_name === name)
         if (!g) return null
         return {
           brand: g.brand,
@@ -81,7 +109,7 @@ export function ByProductTab({
           active_rma: g.active_rma,
           company_stock: g.company_stock,
           sent_to_manufacturer: g.sent_to_manufacturer,
-          total: g.units.length,
+          total: g.total,
         }
       })
       .filter(Boolean)
@@ -102,7 +130,7 @@ export function ByProductTab({
         activeFilterCount={activeFilterCount}
         right={
           <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">
-            {t('inventory.productCount', { count: filtered.length })}
+            {t('inventory.productCount', { count: matchingCount })}
           </span>
         }
       />
@@ -179,7 +207,11 @@ export function ByProductTab({
         </InvFilterField>
       </InvFilterPanel>
 
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <div className="py-20 flex justify-center bg-white dark:bg-[#121823] rounded-lg border border-gray-200 dark:border-[#212a38]">
+          <Spinner />
+        </div>
+      ) : matchingCount === 0 ? (
         <div className="text-center py-20 bg-white dark:bg-[#121823] rounded-lg border border-gray-200 dark:border-[#212a38] flex flex-col items-center gap-3">
           <div className="w-12 h-12 bg-gray-100 dark:bg-[#1a2230] rounded-xl flex items-center justify-center">
             <svg
@@ -313,7 +345,7 @@ export function ByProductTab({
                         </td>
 
                         <td className="px-3 py-1.5 text-center font-bold text-gray-800 border-r border-gray-100 dark:border-[#212a38]">
-                          {g.units.length}
+                          {g.total}
                         </td>
                         <td className="px-3 py-1.5 text-center">
                           <span className="text-indigo-500">→</span>
@@ -326,7 +358,7 @@ export function ByProductTab({
             </div>
           </div>
           <Pagination
-            total={filtered.length}
+            total={matchingCount}
             page={currentPage}
             itemsPerPage={itemsPerPage}
             setItemsPerPage={setItemsPerPage}
@@ -334,9 +366,9 @@ export function ByProductTab({
           />
         </>
       )}
-      {selectedProduct && (
+      {selectedProduct && selectedUnits && (
         <ProductDetailModal
-          group={selectedProduct}
+          group={{ ...selectedProduct, units: selectedUnits }}
           mode="view"
           warehouses={warehouses}
           canTransfer={canTransfer}
