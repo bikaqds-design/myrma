@@ -115,6 +115,9 @@ export const EXPECTED_COLUMNS: Record<string, string[]> = {
   crm_invoices: ['id', 'inv_code', 'so_id', 'doc_status', 'payment_status', 'line_items', 'total'],
   sales_orders: ['id', 'so_code', 'customer_id', 'status', 'line_items', 'total'],
   stock_moves: ['id', 'ref_type', 'ref_id', 'doc_type', 'doc_id', 'move_type', 'qty'],
+  // rls.test.ts probes ticket_comments.user_email by name; pinned here so a
+  // rename fails as drift instead of quietly emptying that probe. (BUG-061.)
+  ticket_comments: ['id', 'ticket_id', 'user_email', 'comment_text', 'is_internal'],
 }
 
 export const skipReason =
