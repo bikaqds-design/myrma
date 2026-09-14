@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { assertAffected } from './_assertUpdated.js'
 
 // ── Row type ────────────────────────────────────────────────────────────────
 // Mirrors the v_sales_documents view (20260720_sales_documents_view.sql):
@@ -65,7 +66,7 @@ export const salesDocuments = {
   async setArchived(docType: SalesDocType, id: string, archived: boolean, actorEmail: string): Promise<void> {
     const table = DOC_TABLE[docType]
     if (!table) throw new Error(`Unknown document type: ${docType}`)
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from(table)
       .update({
         archived,
@@ -73,6 +74,8 @@ export const salesDocuments = {
         archived_by: archived ? actorEmail : null,
       })
       .eq('id', id)
+      .select('id')
     if (error) throw error
+    assertAffected(data, 'Document')
   },
 }

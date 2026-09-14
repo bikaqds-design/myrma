@@ -79,11 +79,6 @@ const STATUS_STEP_COLORS = {
   Cancelled:    { active: 'border-red-500 bg-red-500',      done: 'border-red-500 bg-red-500',     text: 'text-red-600' },
 }
 
-const SCHEMA_SQL = `-- Run these in your Supabase SQL editor:
-ALTER TABLE ticket_comments ADD COLUMN IF NOT EXISTS parent_comment_id UUID REFERENCES ticket_comments(id) ON DELETE SET NULL;
-ALTER TABLE ticket_comments ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]';
-ALTER TABLE ticket_comments ADD COLUMN IF NOT EXISTS is_customer_comment BOOLEAN DEFAULT false;`
-
 // Arabic gets Arabic month names but Western digits (-u-nu-latn); plain 'ar'
 // would render Arabic-Indic digits, which customers find harder to match
 // against RMA numbers and invoices.
@@ -123,7 +118,6 @@ export default function RMATracker() {
   const [ticket, setTicket] = useState(null)
   const [notFound, setNotFound] = useState(false)
   const [comments, setComments] = useState([])
-  const [schemaOk, setSchemaOk] = useState(true)
   // Rate-limit state
   const [rlLocked, setRlLocked] = useState(() => checkRateLimit().locked)
   const [rlSecsLeft, setRlSecsLeft] = useState(0)
@@ -210,8 +204,6 @@ export default function RMATracker() {
         setTicket(found)
         const c = await db.rmaTracker.getPublicComments(found.id)
         setComments(c)
-        // Check if schema has new columns
-        if (c.length > 0 && !('parent_comment_id' in c[0])) setSchemaOk(false)
       } finally {
         setLoading(false)
       }
@@ -301,17 +293,6 @@ export default function RMATracker() {
       </header>
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-10 space-y-8">
-        {/* Schema notice (dev-only — never shown to customers) */}
-        {!schemaOk && import.meta.env.DEV && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-            <strong>Database migration required.</strong> Run this SQL in your Supabase editor to
-            enable replies and attachments:
-            <pre className="mt-2 text-xs bg-amber-100 rounded p-3 overflow-x-auto whitespace-pre">
-              {SCHEMA_SQL}
-            </pre>
-          </div>
-        )}
-
         {/* Search hero */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold text-gray-900">{t('tracker.title')}</h1>

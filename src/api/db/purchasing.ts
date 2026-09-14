@@ -433,7 +433,7 @@ export const purchaseDocuments = {
   ): Promise<void> {
     const table = DOC_TABLE[docType]
     if (!table) throw new Error(`Unknown document type: ${docType}`)
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from(table)
       .update({
         archived,
@@ -441,7 +441,9 @@ export const purchaseDocuments = {
         archived_by: archived ? actorEmail : null,
       })
       .eq('id', id)
+      .select('id')
     if (error) throw error
+    assertAffected(data, 'Document')
   },
 }
 

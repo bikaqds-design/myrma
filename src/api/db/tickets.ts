@@ -1,7 +1,7 @@
 import { supabase } from '../client.js'
 import type { TableResult } from './types.js'
 import { captureException } from '../../lib/sentry.js'
-import { assertUpdated, assertAffected } from './_assertUpdated.js'
+import { assertUpdated, assertAffected, assertAllAffected } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -124,8 +124,9 @@ export const rmaTickets = {
   // individual deletes and did not await them (BUG-012).
   async bulkDelete(ids: string[]): Promise<void> {
     if (!ids.length) return
-    const { error } = await supabase.from('rma_tickets').delete().in('id', ids)
+    const { data, error } = await supabase.from('rma_tickets').delete().in('id', ids).select('id')
     if (error) throw error
+    assertAllAffected(data, ids, 'ticket')
   },
 }
 

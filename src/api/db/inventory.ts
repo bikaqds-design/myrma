@@ -3,7 +3,7 @@ import { buildTicketUnits } from '../../lib/rmaUnitCreate.js'
 import type { TicketProductInput, CatalogProduct } from '../../lib/rmaUnitCreate.js'
 import { summarizeSerializedUnits } from '../../lib/stockSummary.js'
 import type { TableResult } from './types.js'
-import { assertUpdated, assertAffected } from './_assertUpdated.js'
+import { assertUpdated, assertAffected, assertAllAffected } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -318,6 +318,7 @@ export const inventory = {
       .in('id', ids)
       .select()
     if (error) throw error
+    assertAllAffected(data, ids, 'inventory unit')
     return data || []
   },
 
@@ -426,11 +427,13 @@ export const inventory = {
    */
   async transferUnits(unitIds: string[], warehouseId: string | null): Promise<void> {
     if (!unitIds.length) throw new Error('No unit IDs provided')
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('inventory_units')
       .update({ warehouse_id: warehouseId || null })
       .in('id', unitIds)
+      .select('id')
     if (error) throw error
+    assertAllAffected(data, unitIds, 'inventory unit')
   },
 
   // ── Sprint 8 Phase 8a RPC wrappers — dual-mode (serialized + bulk) ────────────

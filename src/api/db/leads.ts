@@ -1,6 +1,6 @@
 import { supabase } from '../client.js'
 import { activities } from './activities.js'
-import { assertUpdated } from './_assertUpdated.js'
+import { assertUpdated, assertAllAffected } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -120,8 +120,9 @@ export const leads = {
     // Same polymorphic-parent problem as deals.bulkDelete: no foreign key
     // protects activities.related_id, so the logs have to go explicitly.
     await activities.deleteForRelated('lead', ids)
-    const { error } = await supabase.from('leads').delete().in('id', ids)
+    const { data, error } = await supabase.from('leads').delete().in('id', ids).select('id')
     if (error) throw error
+    assertAllAffected(data, ids, 'lead')
   },
   /**
    * bulkUpdate — apply status/source to many leads at once.
@@ -155,8 +156,9 @@ export const leads = {
     if (converted.length > 0) {
       throw new Error(`Cannot bulk-edit ${converted.length} converted lead(s)`)
     }
-    const { error } = await supabase.from('leads').update(fields).in('id', ids)
+    const { data: updated, error } = await supabase.from('leads').update(fields).in('id', ids).select('id')
     if (error) throw error
+    assertAllAffected(updated, ids, 'lead')
 
     if (fields.status) {
       const changed = (existing ?? []).filter((r) => r.status !== fields.status)

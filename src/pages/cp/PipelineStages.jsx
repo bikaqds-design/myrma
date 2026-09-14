@@ -235,6 +235,7 @@ function PipelineCard({ pipeline, stageCounts, currentUserEmail, onSaved, confir
         } catch (e) {
           captureException(e, { page: 'ControlPanel', context: 'repairOrphanStage' })
           toast.error(e?.message || t('cp.pipelineStages.repairFailed'))
+          onSaved() // some deals may have moved before the failure (BUG-074)
         }
       },
     })

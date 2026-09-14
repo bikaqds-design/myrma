@@ -50,3 +50,48 @@ export function assertUpdated<T>(data: T[] | null | undefined, entity: string): 
 export function assertAffected(data: unknown[] | null | undefined, entity: string): void {
   if (!data?.length) throw new NotUpdatedError(entity)
 }
+
+/**
+ * A bulk write reached some of the selected rows but not all of them.
+ *
+ * Carries what a screen needs to say something true: how many were selected,
+ * and which ones did not change. The rest did change — which is why the caller
+ * should refresh rather than assume nothing happened.
+ */
+export class NotAllUpdatedError extends Error {
+  readonly code = 'RMA_NOT_ALL_UPDATED'
+  constructor(
+    entity: string,
+    readonly total: number,
+    readonly unchangedIds: string[]
+  ) {
+    super(
+      unchangedIds.length === total
+        ? `None of the ${total} selected ${entity} records were changed. They may have been deleted, or you may not have permission to change them.`
+        : `${unchangedIds.length} of the ${total} selected ${entity} records were not changed — they may have been deleted, or you may not have permission to change them. The other ${total - unchangedIds.length} were.`
+    )
+    this.name = 'NotAllUpdatedError'
+  }
+}
+
+/**
+ * The bulk version of assertAffected. (BUG-074.)
+ *
+ * PostgREST applies RLS as a filter, so an UPDATE or DELETE over a list of ids
+ * quietly skips the rows the caller may not touch and still answers 200. The
+ * screen then reported "10 updated" when 3 were not. Chain `.select('id')` onto
+ * the write and pass its result here with the ids you asked for.
+ *
+ * Same policy caveat as the single-row guards: only for tables whose SELECT
+ * policy covers their UPDATE/DELETE policy, or a successful write looks unread.
+ */
+export function assertAllAffected(
+  data: Array<{ id: string }> | null | undefined,
+  ids: string[],
+  entity: string
+): void {
+  const wanted = [...new Set(ids)]
+  const got = new Set((data ?? []).map((r) => r.id))
+  const unchanged = wanted.filter((id) => !got.has(id))
+  if (unchanged.length) throw new NotAllUpdatedError(entity, wanted.length, unchanged)
+}

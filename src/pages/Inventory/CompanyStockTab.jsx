@@ -131,7 +131,11 @@ export function CompanyStockTab({
       onReload()
     } catch (err) {
       captureException(err)
-      toast.error(t('inventory.transferFailed'))
+      // A bulk action can change some of the selection and not the rest (BUG-074):
+      // say how many did not change, and refresh so the rows that did are not shown stale.
+      if (err?.code === 'RMA_NOT_ALL_UPDATED') toast.error(err.message)
+      else toast.error(t('inventory.transferFailed'))
+      onReload()
     } finally {
       setBulkProcessing(false)
     }

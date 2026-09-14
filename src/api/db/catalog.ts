@@ -1,5 +1,5 @@
 import { supabase } from '../client.js'
-import { assertUpdated, assertAffected } from './_assertUpdated.js'
+import { assertUpdated, assertAffected, assertAllAffected } from './_assertUpdated.js'
 import { orIlike } from '../../lib/searchPattern.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -277,15 +277,18 @@ export const products = {
     assertAffected(data, 'Product')
   },
   async bulkDelete(ids: string[]): Promise<void> {
-    const { error } = await supabase.from('products').delete().in('id', ids)
+    const { data, error } = await supabase.from('products').delete().in('id', ids).select('id')
     if (error) throw error
+    assertAllAffected(data, ids, 'product')
   },
   async bulkUpdateStatus(ids: string[], status: string): Promise<void> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('products')
       .update({ status, updated_date: new Date().toISOString() })
       .in('id', ids)
+      .select('id')
     if (error) throw error
+    assertAllAffected(data, ids, 'product')
   },
   async search(query: string): Promise<ProductRow[]> {
     const { data, error } = await supabase

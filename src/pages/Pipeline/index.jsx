@@ -395,6 +395,7 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
       toast.success(t('pipeline.bulkStageChanged', { count: ids.length }))
     } catch (e) {
       toast.error(e.message)
+      refresh() // part of the selection may have moved (BUG-074)
     }
   }
 
@@ -405,6 +406,7 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
       toast.success(t('pipeline.bulkDeleted', { count: ids.length }))
     } catch (e) {
       toast.error(e.message)
+      refresh() // part of the selection may have been deleted (BUG-074)
     }
   }
 

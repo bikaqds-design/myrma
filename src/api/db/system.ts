@@ -418,44 +418,60 @@ function evaluateConditions(conditions: AutomationCondition[], ticket: Record<st
 }
 
 async function applyActions(actions: AutomationAction[], ticket: Record<string, unknown>): Promise<void> {
+  // Automation runs after the user's own save has succeeded, so a failure here
+  // must not surface as an error on their action. It must not vanish either:
+  // every write used to ignore its result, and a rule the current user's role
+  // was not allowed to apply "ran" and changed nothing, with no trace. (BUG-074.)
+  const report = (action: string, detail: unknown) =>
+    captureException(new Error(`Automation action "${action}" did not apply to ticket ${String(ticket.id)}`), {
+      context: 'automationRules:applyActions',
+      detail,
+    })
+
+  const updateTicket = async (action: string, fields: Record<string, unknown>) => {
+    const { data, error } = await supabase
+      .from('rma_tickets')
+      .update({ ...fields, updated_date: new Date().toISOString() })
+      .eq('id', ticket.id as string)
+      .select('id')
+    if (error) return report(action, error.message)
+    if (!data?.length) report(action, 'no row changed — the ticket is gone or this user may not change it')
+  }
+
   for (const a of actions) {
     try {
       if (a.type === 'change_status') {
-        await supabase
-          .from('rma_tickets')
-          .update({ ticket_status: a.value, updated_date: new Date().toISOString() })
-          .eq('id', ticket.id as string)
+        await updateTicket(a.type, { ticket_status: a.value })
       } else if (a.type === 'change_priority') {
-        await supabase
-          .from('rma_tickets')
-          .update({ priority: a.value, updated_date: new Date().toISOString() })
-          .eq('id', ticket.id as string)
+        await updateTicket(a.type, { priority: a.value })
       } else if (a.type === 'assign_technician') {
-        await supabase
-          .from('rma_tickets')
-          .update({ assigned_technician: a.value, updated_date: new Date().toISOString() })
-          .eq('id', ticket.id as string)
+        await updateTicket(a.type, { assigned_technician: a.value })
       } else if (a.type === AUTOMATION_ACTION.CREATE_NOTIFICATION) {
-        await supabase
-          .from('notifications')
-          .insert([
-            {
-              type: 'custom_alert',
-              title: a.title || 'Automation',
-              message: a.value,
-              entity_type: null,
-              entity_id: null,
-              entity_ref: null,
-              created_by: 'system',
-              created_date: new Date().toISOString(),
-              target_roles: ['admin', 'super_admin'],
-              target_emails: [],
-              read_by: [],
-            },
-          ])
-          .catch(() => {})
+        // This used to end in a `.catch(...)` call. A Supabase query builder has
+        // `then` but no `catch`, so the call threw a TypeError before sending
+        // anything, the surrounding catch swallowed it, and this action never
+        // created a single notification. No `.select()`: the creator may not be
+        // able to read a notification aimed at admins (BUG-079).
+        const { error } = await supabase.from('notifications').insert([
+          {
+            type: 'custom_alert',
+            title: a.title || 'Automation',
+            message: a.value,
+            entity_type: null,
+            entity_id: null,
+            entity_ref: null,
+            created_by: 'system',
+            created_date: new Date().toISOString(),
+            target_roles: ['admin', 'super_admin'],
+            target_emails: [],
+            read_by: [],
+          },
+        ])
+        if (error) report(a.type, error.message)
       }
-    } catch {}
+    } catch (err) {
+      report(a.type, err instanceof Error ? err.message : String(err))
+    }
   }
 }
 

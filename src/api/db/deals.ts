@@ -1,7 +1,7 @@
 import { supabase } from '../client.js'
 import { activities } from './activities.js'
 import type { PipelineStage } from './pipelines.js'
-import { assertUpdated, assertAffected } from './_assertUpdated.js'
+import { assertUpdated, assertAffected, assertAllAffected } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -249,8 +249,9 @@ export const deals = {
     // foreign key protects it and the logs would otherwise survive as rows
     // pointing at a deal that no longer exists.
     await activities.deleteForRelated('deal', ids)
-    const { error } = await supabase.from('deals').delete().in('id', ids)
+    const { data, error } = await supabase.from('deals').delete().in('id', ids).select('id')
     if (error) throw error
+    assertAllAffected(data, ids, 'deal')
   },
   async bulkMoveStage(ids: string[], stageId: string): Promise<void> {
     if (!ids.length) return
@@ -272,19 +273,23 @@ export const deals = {
         throw new Error(`Stage "${stageId}" is not valid for all selected deals' pipelines`)
       }
     }
-    const { error } = await supabase
+    const { data: moved, error } = await supabase
       .from('deals')
       .update({ stage: stageId, updated_at: new Date().toISOString() })
       .in('id', ids)
+      .select('id')
     if (error) throw error
+    assertAllAffected(moved, ids, 'deal')
     // Reset won/lost terminal fields for any deals that were in a terminal state.
     const terminalIds = dealList.filter((d) => d.status === 'won' || d.status === 'lost').map((d) => d.id)
     if (terminalIds.length > 0) {
-      const { error: termErr } = await supabase
+      const { data: reopened, error: termErr } = await supabase
         .from('deals')
         .update({ status: 'open', won_at: null, lost_at: null, lost_reason: null })
         .in('id', terminalIds)
+        .select('id')
       if (termErr) throw termErr
+      assertAllAffected(reopened, terminalIds, 'deal')
     }
   },
   async reopen(id: string, stageId: string, actorEmail: string | null = null): Promise<DealRow> {

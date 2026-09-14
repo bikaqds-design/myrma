@@ -705,6 +705,8 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
           queryClient.invalidateQueries({ queryKey: ['leads'] })
         } catch (err) {
           toast.error(toUserMessage(err))
+          // Part of the selection may have changed (BUG-074): show the real state.
+          queryClient.invalidateQueries({ queryKey: ['leads'] })
         }
       }
     )
@@ -719,6 +721,8 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
       queryClient.invalidateQueries({ queryKey: ['leads'] })
     } catch (err) {
       toast.error(toUserMessage(err))
+      // Part of the selection may have changed (BUG-074): show the real state.
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
     }
   }
 
@@ -731,6 +735,8 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
       queryClient.invalidateQueries({ queryKey: ['leads'] })
     } catch (err) {
       toast.error(toUserMessage(err))
+      // Part of the selection may have changed (BUG-074): show the real state.
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
     }
   }
 

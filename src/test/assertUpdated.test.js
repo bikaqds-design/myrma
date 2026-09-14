@@ -7,7 +7,13 @@
  * a write that never happened.
  */
 import { describe, it, expect } from 'vitest'
-import { assertUpdated, assertAffected, NotUpdatedError } from '../api/db/_assertUpdated'
+import {
+  assertUpdated,
+  assertAffected,
+  assertAllAffected,
+  NotUpdatedError,
+  NotAllUpdatedError,
+} from '../api/db/_assertUpdated'
 
 describe('assertUpdated', () => {
   it('returns the row when the write affected one', () => {
@@ -50,5 +56,37 @@ describe('assertAffected', () => {
   it('throws when nothing was touched', () => {
     expect(() => assertAffected([], 'Purchase order')).toThrow(NotUpdatedError)
     expect(() => assertAffected(null, 'Vendor invoice')).toThrow(NotUpdatedError)
+  })
+})
+
+// BUG-074: a bulk write over a list of ids silently skips the rows RLS filters
+// out. "10 updated" when 3 were not is the bulk form of BUG-008.
+describe('assertAllAffected', () => {
+  it('passes when every selected row came back', () => {
+    expect(() => assertAllAffected([{ id: 'a' }, { id: 'b' }], ['a', 'b'], 'deal')).not.toThrow()
+  })
+
+  it('names how many of the selection did not change', () => {
+    let caught
+    try {
+      assertAllAffected([{ id: 'a' }], ['a', 'b', 'c'], 'deal')
+    } catch (e) {
+      caught = e
+    }
+    expect(caught).toBeInstanceOf(NotAllUpdatedError)
+    expect(caught.code).toBe('RMA_NOT_ALL_UPDATED')
+    expect(caught.total).toBe(3)
+    expect(caught.unchangedIds).toEqual(['b', 'c'])
+    expect(caught.message).toMatch(/2 of the 3 selected deal records were not changed/)
+    expect(caught.message).toMatch(/other 1 were/)
+  })
+
+  it('says none changed when nothing came back', () => {
+    expect(() => assertAllAffected([], ['a', 'b'], 'lead')).toThrow(/None of the 2 selected lead records/)
+    expect(() => assertAllAffected(null, ['a'], 'lead')).toThrow(NotAllUpdatedError)
+  })
+
+  it('counts a duplicated id once', () => {
+    expect(() => assertAllAffected([{ id: 'a' }], ['a', 'a'], 'ticket')).not.toThrow()
   })
 })

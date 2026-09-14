@@ -362,8 +362,12 @@ export default function Customers({
         .catch(() => {})
       setSelectedCustomers([])
       queryClient.invalidateQueries({ queryKey: ['customers'] })
-    } catch {
-      toast.error(t('customers.failedUpdateStatus'))
+    } catch (err) {
+      // A bulk action can change some of the selection and not the rest (BUG-074):
+      // say how many did not change, and refresh so the rows that did are not shown stale.
+      if (err?.code === 'RMA_NOT_ALL_UPDATED') toast.error(err.message)
+      else toast.error(t('customers.failedUpdateStatus'))
+      queryClient.invalidateQueries({ queryKey: ['customers'] })
     }
   }
 

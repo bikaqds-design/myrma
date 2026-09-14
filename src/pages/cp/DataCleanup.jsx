@@ -119,6 +119,8 @@ export default function DataCleanup() {
     } catch (err) {
       captureException(err)
       toast.error(toUserMessage(err))
+      // Some of the tickets may already be gone (BUG-074): reload the counts.
+      await load()
     } finally {
       setWorking(false)
     }

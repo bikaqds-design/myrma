@@ -1,5 +1,5 @@
 import { supabase } from '../client.js'
-import { assertUpdated, assertAffected } from './_assertUpdated.js'
+import { assertUpdated, assertAffected, assertAllAffected } from './_assertUpdated.js'
 import { orIlike } from '../../lib/searchPattern.js'
 import { mobileKey } from '../../lib/customerDuplicates.js'
 
@@ -157,11 +157,13 @@ export const customers = {
     }
   },
   async bulkUpdateStatus(ids: string[], status: string): Promise<void> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('customers')
       .update({ customer_status: status, updated_date: new Date().toISOString() })
       .in('id', ids)
+      .select('id')
     if (error) throw error
+    assertAllAffected(data, ids, 'customer')
   },
   /**
    * Tickets belonging to a customer, matched by the foreign key ONLY.
