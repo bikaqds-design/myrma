@@ -1,6 +1,11 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import { db } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
+import { useDebouncedValue } from '../../lib/useDebouncedValue'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
+import { Spinner } from '../../components/ui'
 import {
   downloadCSV,
   Pagination,
@@ -20,15 +25,14 @@ const TRACKING_BADGE = {
 
 // ─── Overview — the Warehouse Module R1 dashboard ──────────────────────────
 // Product | Tracking | Available | Reserved | Physical Total | Main |
-// Branches(n) -> drawer | RMA(n) -> drawer. Counts are derived server-side by
-// getStockSummary() from reservation_status/warehouse location, never from
-// the RMA-lifecycle ticket JSONB — see Sprint 7.6 (audit A1) and the
-// Warehouse Module R1 redesign notes in CLAUDE.md.
+// Branches(n) -> drawer | RMA(n) -> drawer. Counts come from the
+// v_product_stock_summary view (reservation_status and warehouse location,
+// never the RMA-lifecycle ticket JSONB — see Sprint 7.6 (audit A1) and the
+// Warehouse Module R1 redesign notes in CLAUDE.md). One page at a time, with
+// the search, filters and order applied in the database: this used to filter
+// a summary built from whole tables, which the Data API caps. (BUG-066.)
 export function OverviewTab({
-  stockSummary,
   onNavigate,
-  units,
-  warehouseStockRows,
   warehouses,
   userEmail,
   isManagerOrAbove,
@@ -50,49 +54,46 @@ export function OverviewTab({
 
   const activeFilterCount = [filterTracking, filterStock].filter(Boolean).length
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    const rows = stockSummary.filter((r) => {
-      const matchSearch = !q || r.product_name.toLowerCase().includes(q)
-      const matchTracking = !filterTracking || r.stock_tracking_mode === filterTracking
-      const rmaTotal = r.rma.reduce((sum, x) => sum + x.count, 0)
-      const matchStock =
-        !filterStock ||
-        (filterStock === 'available' && r.available > 0) ||
-        (filterStock === 'reserved' && r.reserved > 0) ||
-        (filterStock === 'rma' && rmaTotal > 0) ||
-        (filterStock === 'out' && r.physical_total === 0)
-      return matchSearch && matchTracking && matchStock
-    })
-    return [...rows].sort((a, b) => b.physical_total - a.physical_total)
-  }, [stockSummary, search, filterTracking, filterStock])
+  const debouncedSearch = useDebouncedValue(search)
+  const filters = { search: debouncedSearch, tracking: filterTracking, stock: filterStock }
+  const { data: pageResult, isLoading } = useQuery({
+    queryKey: ['inventory', 'summary-page', { ...filters, page: currentPage, pageSize: itemsPerPage }],
+    queryFn: () => db.inventoryLists.stockSummaryPage(filters, currentPage, itemsPerPage),
+    placeholderData: keepPreviousData,
+  })
+  const paginated = pageResult?.data ?? EMPTY_ARRAY
+  const matchingCount = pageResult?.count ?? 0
+  const totalPages = Math.ceil(matchingCount / itemsPerPage)
 
-  const paginated = useMemo(
-    () => filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
-    [filtered, currentPage, itemsPerPage]
-  )
-
+  // A selection belongs to the page it was made on: bulk actions act on what
+  // is on screen, never on rows the user can no longer see.
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, filterTracking, filterStock, itemsPerPage])
+    setSelected(new Set())
+  }, [debouncedSearch, filterTracking, filterStock, itemsPerPage])
+  useEffect(() => {
+    setSelected(new Set())
+  }, [currentPage])
+  // The last page can disappear under the user (a filter, a transfer): step back.
+  useEffect(() => {
+    if (pageResult && totalPages >= 1 && currentPage > totalPages) setCurrentPage(totalPages)
+  }, [pageResult, totalPages, currentPage])
   useEffect(() => {
     safeStorage.set('invOverviewPerPage', itemsPerPage)
   }, [itemsPerPage])
 
-  const selectableSummary = useMemo(() => stockSummary.filter((s) => s.in_catalog), [stockSummary])
+  const selectableOnPage = useMemo(() => paginated.filter((r) => r.in_catalog), [paginated])
   const selectedSummaries = useMemo(
-    () => selectableSummary.filter((s) => selected.has(s.product_id)),
-    [selectableSummary, selected]
+    () => selectableOnPage.filter((s) => selected.has(s.product_id)),
+    [selectableOnPage, selected]
   )
-
-  const selectableFiltered = useMemo(() => filtered.filter((r) => r.in_catalog), [filtered])
-  const allSelected = selectableFiltered.length > 0 && selectableFiltered.every((r) => selected.has(r.product_id))
+  const allSelected = selectableOnPage.length > 0 && selectableOnPage.every((r) => selected.has(r.product_id))
 
   function toggleAll() {
     if (allSelected) {
       setSelected(new Set())
     } else {
-      setSelected(new Set(selectableFiltered.map((r) => r.product_id)))
+      setSelected(new Set(selectableOnPage.map((r) => r.product_id)))
     }
   }
 
@@ -113,8 +114,8 @@ export function OverviewTab({
         Delivered: r.delivered,
         PhysicalTotal: r.physical_total,
         Main: r.main_qty,
-        Branches: r.branches.reduce((sum, b) => sum + b.qty, 0),
-        RMA: r.rma.reduce((sum, x) => sum + x.count, 0),
+        Branches: r.branch_total,
+        RMA: r.rma_total,
       })),
       `inventory-stock-${new Date().toISOString().split('T')[0]}.csv`
     )
@@ -139,8 +140,8 @@ export function OverviewTab({
       r.reserved,
       r.physical_total,
       r.main_qty,
-      r.branches.reduce((sum, b) => sum + b.qty, 0),
-      r.rma.reduce((sum, x) => sum + x.count, 0),
+      r.branch_total,
+      r.rma_total,
     ])
     let y = 90
     doc.setFontSize(9)
@@ -225,7 +226,7 @@ export function OverviewTab({
         activeFilterCount={activeFilterCount}
         right={
           <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">
-            {t('inventory.productCount', { count: filtered.length })}
+            {t('inventory.productCount', { count: matchingCount })}
           </span>
         }
       />
@@ -256,7 +257,11 @@ export function OverviewTab({
         </InvFilterField>
       </InvFilterPanel>
 
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <div className="py-20 flex justify-center bg-white dark:bg-[#121823] rounded-[14px] border border-[#e6e9ef] dark:border-[#212a38]">
+          <Spinner />
+        </div>
+      ) : matchingCount === 0 ? (
         <div className="text-center py-20 bg-white dark:bg-[#121823] rounded-[14px] border border-[#e6e9ef] dark:border-[#212a38]">
           <p className="text-[#6c6760] dark:text-[#9aa4b2] text-sm">{t('inventory.noStockData')}</p>
         </div>
@@ -295,8 +300,8 @@ export function OverviewTab({
               </thead>
               <tbody className="divide-y divide-[#f0f2f6] dark:divide-[#1a2230]">
                 {paginated.map((row) => {
-                  const branchTotal = row.branches.reduce((sum, b) => sum + b.qty, 0)
-                  const rmaTotal = row.rma.reduce((sum, r) => sum + r.count, 0)
+                  const branchTotal = row.branch_total
+                  const rmaTotal = row.rma_total
                   return (
                     <tr key={row.product_id} className="hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230] transition-colors">
                       <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
@@ -374,9 +379,9 @@ export function OverviewTab({
         </div>
       )}
 
-      {filtered.length > 0 && (
+      {matchingCount > 0 && (
         <Pagination
-          total={filtered.length}
+          total={matchingCount}
           page={currentPage}
           itemsPerPage={itemsPerPage}
           setItemsPerPage={setItemsPerPage}
@@ -390,8 +395,6 @@ export function OverviewTab({
           onClose={() => setBulkAction(null)}
           action={bulkAction}
           selectedSummaries={selectedSummaries}
-          units={units}
-          warehouseStockRows={warehouseStockRows}
           warehouses={warehouses}
           userEmail={userEmail}
           onSuccess={() => {
@@ -415,7 +418,6 @@ export function OverviewTab({
         open={!!rmaTarget}
         onClose={() => setRmaTarget(null)}
         productSummary={rmaTarget}
-        units={units}
         warehouses={warehouses}
         isManagerOrAbove={isManagerOrAbove}
         userEmail={userEmail}

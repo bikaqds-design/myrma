@@ -31,13 +31,16 @@ import { destinationWarehouses } from '../../lib/warehouseDestinations.js'
 //     always a live COUNT, nothing to recalculate) — re-sums
 //     reserved_quantity across every warehouse_stock row of each selected
 //     product.
+//
+// Each product's stock rows / units are read when the action runs, for that
+// product only. They used to come from whole-table loads the Data API caps at
+// 1 000 rows, so a unit past the cap was silently left out of a transfer.
+// (BUG-066.)
 export function BulkStockActionModal({
   open,
   onClose,
   action,
   selectedSummaries,
-  units,
-  warehouseStockRows,
   warehouses,
   userEmail,
   onSuccess,
@@ -64,8 +67,8 @@ export function BulkStockActionModal({
     let fail = 0
     for (const summary of selectedSummaries) {
       if (summary.stock_tracking_mode === 'bulk') {
-        const rows = warehouseStockRows.filter(
-          (w) => w.product_id === summary.product_id && w.quantity > 0 && w.warehouse_id !== destWarehouseId
+        const rows = (await db.warehouseStock.listByProduct(summary.product_id)).filter(
+          (w) => w.quantity > 0 && w.warehouse_id !== destWarehouseId
         )
         for (const row of rows) {
           try {
@@ -82,14 +85,14 @@ export function BulkStockActionModal({
           }
         }
       } else {
-        const available = units.filter(
-          (u) =>
-            u.product_id === summary.product_id &&
-            u.status === 'company_stock' &&
-            u.reservation_status === 'available' &&
-            u.warehouse_id &&
-            u.warehouse_id !== destWarehouseId
-        )
+        const available = (
+          await db.inventoryLists.allUnits({
+            productId: summary.product_id,
+            status: 'company_stock',
+            reservationStatus: 'available',
+            placed: true,
+          })
+        ).filter((u) => u.warehouse_id !== destWarehouseId)
         for (const unit of available) {
           try {
             await db.inventory.transferStock({
@@ -135,7 +138,7 @@ export function BulkStockActionModal({
     let fail = 0
     const bulkOnly = selectedSummaries.filter((s) => s.stock_tracking_mode === 'bulk')
     for (const summary of bulkOnly) {
-      const rows = warehouseStockRows.filter((w) => w.product_id === summary.product_id)
+      const rows = await db.warehouseStock.listByProduct(summary.product_id)
       for (const row of rows) {
         try {
           await db.inventory.recalculateStock(summary.product_id, row.warehouse_id, userEmail)

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
 import { captureException } from '../../lib/sentry'
@@ -7,6 +8,7 @@ import Modal from '../../components/Modal'
 import { Select } from '../../components/ui'
 import { SYSTEM_WAREHOUSE_CODES, warehouseCapabilities } from '../../lib/constants'
 import { locationI18nKey, WarrantyBadge, daysSince, fmt } from './_shared'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 
 const MOVE_CODE_ORDER = [
   SYSTEM_WAREHOUSE_CODES.RMA_RECEIVED,
@@ -26,7 +28,6 @@ export function RmaDrawer({
   open,
   onClose,
   productSummary,
-  units,
   warehouses,
   isManagerOrAbove,
   userEmail,
@@ -36,14 +37,18 @@ export function RmaDrawer({
   const { t } = useTranslation()
   const [busyUnitId, setBusyUnitId] = useState(null)
 
-  const rmaUnits = useMemo(() => {
-    if (!productSummary) return []
-    return units.filter((u) => {
-      if (u.status !== 'active_rma') return false
-      if (productSummary.in_catalog) return u.product_id === productSummary.product_id
-      return !u.product_id && u.product_name === productSummary.product_name
-    })
-  }, [productSummary, units])
+  // This product's RMA units, read when the drawer opens — not filtered out of
+  // every unit in the system, which the Data API caps. (BUG-066.)
+  const { data: rmaUnits = EMPTY_ARRAY, isLoading: loadingUnits } = useQuery({
+    queryKey: ['inventory', 'rma-units', productSummary?.product_id],
+    queryFn: () =>
+      db.inventoryLists.allUnits(
+        productSummary.in_catalog
+          ? { productId: productSummary.product_id, status: 'active_rma' }
+          : { unmatchedName: productSummary.product_name, status: 'active_rma' }
+      ),
+    enabled: Boolean(open && productSummary),
+  })
 
   const systemWarehouses = useMemo(() => warehouses.filter((w) => w.is_system), [warehouses])
   const sellableWarehouses = useMemo(
@@ -107,7 +112,9 @@ export function RmaDrawer({
       className="max-w-2xl"
     >
       <div className="space-y-5">
-        {grouped.length === 0 ? (
+        {loadingUnits ? (
+          <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('common.loading')}</p>
+        ) : grouped.length === 0 ? (
           <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('inventory.noRmaActivity')}</p>
         ) : (
           grouped.map((group) => (

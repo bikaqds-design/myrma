@@ -1,9 +1,9 @@
 import { supabase } from '../client.js'
 import { buildTicketUnits } from '../../lib/rmaUnitCreate.js'
 import type { TicketProductInput, CatalogProduct } from '../../lib/rmaUnitCreate.js'
-import { summarizeSerializedUnits } from '../../lib/stockSummary.js'
 import type { TableResult } from './types.js'
 import { assertUpdated, assertAffected, assertAllAffected } from './_assertUpdated.js'
+import { chunksOf } from './_paging.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -290,22 +290,6 @@ export const inventory = {
     return data || []
   },
 
-  async listUnits(): Promise<TableResult<InventoryUnitRow[]>> {
-    try {
-      const { data, error } = await supabase
-        .from('inventory_units')
-        .select('*')
-        .order('created_date', { ascending: false })
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
-    } catch {
-      return { missing: true, data: [] }
-    }
-  },
-
   async resolveUnits(
     ids: string[],
     resolutionType: string,
@@ -320,22 +304,6 @@ export const inventory = {
     if (error) throw error
     assertAllAffected(data, ids, 'inventory unit')
     return data || []
-  },
-
-  async listBatches(): Promise<TableResult<ManufacturerBatchRow[]>> {
-    try {
-      const { data, error } = await supabase
-        .from('manufacturer_batches')
-        .select('*')
-        .order('created_date', { ascending: false })
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
-    } catch {
-      return { missing: true, data: [] }
-    }
   },
 
   /**
@@ -427,13 +395,20 @@ export const inventory = {
    */
   async transferUnits(unitIds: string[], warehouseId: string | null): Promise<void> {
     if (!unitIds.length) throw new Error('No unit IDs provided')
-    const { data, error } = await supabase
-      .from('inventory_units')
-      .update({ warehouse_id: warehouseId || null })
-      .in('id', unitIds)
-      .select('id')
-    if (error) throw error
-    assertAllAffected(data, unitIds, 'inventory unit')
+    // The ids go into the URL; a whole warehouse's worth in one request is too
+    // long to send. (BUG-066.) What did not change is reported once, over all
+    // of them, so the message counts the whole selection.
+    const changed: { id: string }[] = []
+    for (const chunk of chunksOf(unitIds, 100)) {
+      const { data, error } = await supabase
+        .from('inventory_units')
+        .update({ warehouse_id: warehouseId || null })
+        .in('id', chunk)
+        .select('id')
+      if (error) throw error
+      changed.push(...(data ?? []))
+    }
+    assertAllAffected(changed, unitIds, 'inventory unit')
   },
 
   // ── Sprint 8 Phase 8a RPC wrappers — dual-mode (serialized + bulk) ────────────
@@ -584,156 +559,6 @@ export const inventory = {
     if (error) throw error
   },
 
-  /**
-   * getStockSummary — per-product Available/Reserved/Delivered PLUS the
-   * Warehouse Module R1 dashboard fields: Physical Total, Main, per-branch
-   * and per-RMA-location breakdowns. Follows the same
-   * fetch-raw-rows-then-aggregate-in-JS pattern as getStats() rather than a
-   * DB view — matches existing convention in this file, and product/unit
-   * counts at this system's scale don't warrant a server-side aggregate yet.
-   *
-   * "Main" = warehouses of type 'main' OR legacy NULL-type warehouses
-   * (every warehouse created before the warehouse_type column existed) —
-   * treated as the default sellable location, never more restrictive than
-   * before this model. "Branches" = warehouse_type='branch' only.
-   * physical_total excludes the SCRAP location and 'closed'-status units.
-   *
-   * Units whose product_id is NULL (created from a ticket whose product
-   * doesn't match any catalog product by name) surface as synthetic
-   * in_catalog:false rows, grouped by product_name — RMA counts only, no
-   * available/reserved/delivered/branches/main (there is no catalog product
-   * to attach those to).
-   */
-  async getStockSummary(): Promise<ProductStockSummary[]> {
-    const [productsRes, unitsRes, stockRes, warehousesRes] = await Promise.all([
-      supabase
-        .from('products')
-        .select('id, product_name, stock_tracking_mode')
-        .neq('product_type', 'service'),
-      supabase
-        .from('inventory_units')
-        .select('product_id, product_name, status, reservation_status, warehouse_id')
-        .in('status', ['company_stock', 'active_rma']),
-      supabase.from('warehouse_stock').select('product_id, warehouse_id, quantity, reserved_quantity'),
-      supabase.from('warehouses').select('id, name, code, warehouse_type, is_system'),
-    ])
-    if (productsRes.error) throw productsRes.error
-    if (unitsRes.error) throw unitsRes.error
-    if (stockRes.error && stockRes.error.code !== '42P01') throw stockRes.error
-    if (warehousesRes.error && warehousesRes.error.code !== '42P01') throw warehousesRes.error
-
-    const products = productsRes.data || []
-    const units = unitsRes.data || []
-    const stockRows = stockRes.data || []
-    const warehouseList = warehousesRes.data || []
-    const whById = new Map(warehouseList.map((w) => [w.id, w]))
-
-    const isMainOrLegacy = (w: (typeof warehouseList)[number] | undefined) =>
-      !w || !w.warehouse_type || w.warehouse_type === 'main'
-    const isBranch = (w: (typeof warehouseList)[number] | undefined) => w?.warehouse_type === 'branch'
-
-    function branchBreakdown(rowsWithWarehouse: { warehouse_id: string | null; qty: number }[]) {
-      const map = new Map<string, WarehouseQtyBreakdown>()
-      for (const row of rowsWithWarehouse) {
-        const w = row.warehouse_id ? whById.get(row.warehouse_id) : undefined
-        if (!isBranch(w) || !w) continue
-        const entry = map.get(w.id) || { warehouse_id: w.id, name: w.name, code: w.code, qty: 0 }
-        entry.qty += row.qty
-        map.set(w.id, entry)
-      }
-      return [...map.values()]
-    }
-
-    function rmaBreakdown(rmaUnits: { warehouse_id: string | null }[]) {
-      const map = new Map<string, RmaLocationBreakdown>()
-      for (const u of rmaUnits) {
-        const w = u.warehouse_id ? whById.get(u.warehouse_id) : undefined
-        if (!w?.is_system) continue // unplaced (pre-backfill) or a non-system warehouse — not a real RMA location
-        const entry = map.get(w.id) || { warehouse_id: w.id, code: w.code || '', name: w.name, count: 0 }
-        entry.count += 1
-        map.set(w.id, entry)
-      }
-      return [...map.values()]
-    }
-
-    const summaries: ProductStockSummary[] = products.map((p) => {
-      if (p.stock_tracking_mode === 'bulk') {
-        const rows = stockRows.filter((s) => s.product_id === p.id)
-        const totalQty = rows.reduce((sum, s) => sum + s.quantity, 0)
-        const totalReserved = rows.reduce((sum, s) => sum + s.reserved_quantity, 0)
-        const mainQty = rows
-          .filter((r) => isMainOrLegacy(whById.get(r.warehouse_id)))
-          .reduce((sum, r) => sum + r.quantity, 0)
-        const branches = branchBreakdown(rows.map((r) => ({ warehouse_id: r.warehouse_id, qty: r.quantity })))
-        const physicalTotal = rows
-          .filter((r) => whById.get(r.warehouse_id)?.code !== 'SCRAP')
-          .reduce((sum, r) => sum + r.quantity, 0)
-        return {
-          product_id: p.id,
-          product_name: p.product_name,
-          stock_tracking_mode: 'bulk',
-          available: totalQty - totalReserved,
-          reserved: totalReserved,
-          delivered: 0,
-          physical_total: physicalTotal,
-          main_qty: mainQty,
-          branches,
-          rma: [], // bulk products don't get RMA-ticket units in R1 (createUnitsFromTicket is serialized-only)
-          in_catalog: true,
-        }
-      }
-
-      // All the arithmetic lives in src/lib/stockSummary.ts so it can be tested
-      // without a Supabase mock — see src/test/stockSummary.test.js, which
-      // locks down the rule that RMA units are physically present but never
-      // sellable.
-      const counts = summarizeSerializedUnits(units.filter((u) => u.product_id === p.id), whById)
-
-      return {
-        product_id: p.id,
-        product_name: p.product_name,
-        stock_tracking_mode: 'serialized',
-        available: counts.available,
-        reserved: counts.reserved,
-        delivered: counts.delivered,
-        physical_total: counts.physical_total,
-        main_qty: counts.main_qty,
-        branches: counts.branches,
-        rma: counts.rma,
-        in_catalog: true,
-      }
-    })
-
-    // Synthetic rows for active_rma units whose product_id is NULL (no catalog
-    // match at ticket-creation time) — grouped by product_name so they're still
-    // visible on the dashboard instead of silently disappearing.
-    const unmatchedByName = new Map<string, typeof units>()
-    for (const u of units) {
-      if (u.product_id || u.status !== 'active_rma') continue
-      const key = u.product_name || 'Unknown Product'
-      const list = unmatchedByName.get(key) || []
-      list.push(u)
-      unmatchedByName.set(key, list)
-    }
-    for (const [name, rmaUnits] of unmatchedByName) {
-      const rma = rmaBreakdown(rmaUnits)
-      summaries.push({
-        product_id: `unmatched:${name}`,
-        product_name: name,
-        stock_tracking_mode: 'serialized',
-        available: 0,
-        reserved: 0,
-        delivered: 0,
-        physical_total: rma.filter((r) => r.code !== 'SCRAP').reduce((sum, r) => sum + r.count, 0),
-        main_qty: 0,
-        branches: [],
-        rma,
-        in_catalog: false,
-      })
-    }
-
-    return summaries
-  },
 }
 
 // ── Warehouses ────────────────────────────────────────────────────────────────
@@ -784,19 +609,9 @@ export const warehouses = {
 
 // ── Warehouse stock (bulk-quantity tracking, Sprint 8 Phase 8a) ─────────────────
 
+// Paged and per-product reads for the Inventory screen live in inventoryLists.ts
+// (BUG-066): whole-table reads of units, stock rows and moves were removed.
 export const warehouseStock = {
-  async list(): Promise<TableResult<WarehouseStockRow[]>> {
-    try {
-      const { data, error } = await supabase.from('warehouse_stock').select('*')
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
-    } catch {
-      return { missing: true, data: [] }
-    }
-  },
   async listByProduct(productId: string): Promise<WarehouseStockRow[]> {
     const { data, error } = await supabase
       .from('warehouse_stock')
@@ -810,22 +625,6 @@ export const warehouseStock = {
 // ── Stock moves (append-only movement ledger) ───────────────────────────────────
 
 export const stockMoves = {
-  async list(filters?: { refType?: string; refIds?: string[] }): Promise<TableResult<StockMoveRow[]>> {
-    try {
-      let query = supabase.from('stock_moves').select('*').order('created_at', { ascending: false })
-      if (filters?.refType) query = query.eq('ref_type', filters.refType)
-      if (filters?.refIds?.length) query = query.in('ref_id', filters.refIds)
-      const { data, error } = await query
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
-    } catch {
-      return { missing: true, data: [] }
-    }
-  },
-
   /**
    * receiptsForDocument — every ledger row one purchase document produced,
    * enriched with the serial / product / warehouse the stock_moves row does not

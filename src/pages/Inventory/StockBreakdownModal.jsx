@@ -1,6 +1,10 @@
 import React, { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { db } from '../../api/supabaseClient'
+import { useProductsById } from '../../lib/useLookups'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import Modal from '../../components/Modal'
 import { TransferStockModal } from './TransferStockModal'
 import { AdjustStockModal } from './AdjustStockModal'
@@ -12,22 +16,45 @@ const NAVIGABLE_DOC_TYPES = new Set(['sales_order', 'invoice', 'credit_note'])
 // Built on the existing Modal (Radix Dialog) rather than a bespoke slide-over —
 // reuses the accessible focus-trap/escape/aria pattern already established for
 // every other detail overlay in this codebase instead of inventing a new one.
+//
+// Everything here is read for this one product when the modal opens. It was
+// filtered out of whole-table loads of units, stock rows and the movement
+// ledger, which the Data API caps at 1 000 rows — so a product's units past the
+// cap were missing from its own breakdown. (BUG-066.)
 export function StockBreakdownModal({
   open,
   onClose,
-  productSummary,
-  product,
-  units,
-  warehouseStockRows,
+  productId,
   warehouses,
-  moves,
   userEmail,
   isManagerOrAbove,
   onRefresh,
 }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const enabled = Boolean(open && productId)
+  const { data: productSummary = null } = useQuery({
+    queryKey: ['inventory', 'summary-one', productId],
+    queryFn: () => db.inventoryLists.stockSummaryFor(productId),
+    enabled,
+  })
+  const product = useProductsById(enabled ? [productId] : EMPTY_ARRAY)[productId] ?? null
   const isBulk = productSummary?.stock_tracking_mode === 'bulk'
+  const { data: warehouseStockRows = EMPTY_ARRAY } = useQuery({
+    queryKey: ['inventory', 'warehouse-stock', productId],
+    queryFn: () => db.warehouseStock.listByProduct(productId),
+    enabled: enabled && isBulk,
+  })
+  const { data: bulkReservations = EMPTY_ARRAY } = useQuery({
+    queryKey: ['inventory', 'bulk-reservations', productId],
+    queryFn: () => db.inventoryLists.bulkReservations(productId),
+    enabled: enabled && isBulk,
+  })
+  const { data: units = EMPTY_ARRAY } = useQuery({
+    queryKey: ['inventory', 'product-units', productId],
+    queryFn: () => db.inventoryLists.allUnits({ productId }),
+    enabled: enabled && Boolean(productSummary) && !isBulk,
+  })
   const [transferTarget, setTransferTarget] = useState(null)
   const [adjustTarget, setAdjustTarget] = useState(null)
 
@@ -35,7 +62,6 @@ export function StockBreakdownModal({
     if (!productSummary) return []
     if (isBulk) {
       return warehouseStockRows
-        .filter((w) => w.product_id === productSummary.product_id)
         .map((w) => ({
           key: w.warehouse_id,
           warehouseId: w.warehouse_id,
@@ -43,9 +69,7 @@ export function StockBreakdownModal({
           quantity: w.quantity,
         }))
     }
-    const productUnits = units.filter(
-      (u) => u.product_id === productSummary.product_id && u.status === 'company_stock'
-    )
+    const productUnits = units.filter((u) => u.status === 'company_stock')
     const byWarehouse = {}
     for (const u of productUnits) {
       const key = u.warehouse_id || 'unassigned'
@@ -71,12 +95,7 @@ export function StockBreakdownModal({
   // still act on freely").
   const availableUnits = useMemo(() => {
     if (!productSummary || isBulk) return []
-    return units.filter(
-      (u) =>
-        u.product_id === productSummary.product_id &&
-        u.status === 'company_stock' &&
-        u.reservation_status === 'available'
-    )
+    return units.filter((u) => u.status === 'company_stock' && u.reservation_status === 'available')
   }, [productSummary, isBulk, units])
 
   // Units parked outside stock by an Adjust — 'sent_to_manufacturer', 'closed',
@@ -91,33 +110,16 @@ export function StockBreakdownModal({
   // company_stock unit and would reject them anyway.
   const offStockUnits = useMemo(() => {
     if (!productSummary || isBulk) return []
-    return units.filter(
-      (u) =>
-        u.product_id === productSummary.product_id &&
-        u.status !== 'company_stock' &&
-        u.status !== 'active_rma'
-    )
+    return units.filter((u) => u.status !== 'company_stock' && u.status !== 'active_rma')
   }, [productSummary, isBulk, units])
 
   const reservedRows = useMemo(() => {
     if (!productSummary) return []
     if (isBulk) {
-      const wsIds = new Set(
-        warehouseStockRows.filter((w) => w.product_id === productSummary.product_id).map((w) => w.id)
-      )
-      const byDoc = {}
-      for (const m of moves) {
-        if (m.ref_type !== 'warehouse_stock' || !wsIds.has(m.ref_id)) continue
-        const key = `${m.doc_type}|${m.doc_id}`
-        if (!byDoc[key]) byDoc[key] = { docType: m.doc_type, docId: m.doc_id, qty: 0 }
-        if (m.move_type === 'reserve') byDoc[key].qty += m.qty
-        if (m.move_type === 'release' || m.move_type === 'deliver') byDoc[key].qty -= m.qty
-      }
-      return Object.values(byDoc).filter((r) => r.qty > 0)
+      // Netted per document in the database (v_bulk_stock_reservations).
+      return bulkReservations.map((r) => ({ docType: r.doc_type, docId: r.doc_id, qty: r.qty }))
     }
-    const reservedUnits = units.filter(
-      (u) => u.product_id === productSummary.product_id && u.reservation_status === 'reserved'
-    )
+    const reservedUnits = units.filter((u) => u.reservation_status === 'reserved')
     const byDoc = {}
     for (const u of reservedUnits) {
       const key = `${u.reserved_by_doc_type}|${u.reserved_by_doc_id}`
@@ -125,12 +127,12 @@ export function StockBreakdownModal({
       byDoc[key].qty += 1
     }
     return Object.values(byDoc)
-  }, [productSummary, isBulk, warehouseStockRows, moves, units])
+  }, [productSummary, isBulk, bulkReservations, units])
 
   // RMA distribution — reads real inventory_units locations (Warehouse Module
   // R1) instead of the old ticket-JSONB product_status derivation. Single
-  // source of truth: getStockSummary() already groups active_rma units per
-  // system location.
+  // source of truth: v_product_stock_summary already groups active_rma units
+  // per system location.
   const rmaRows = productSummary?.rma || []
 
   if (!productSummary) return null

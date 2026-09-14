@@ -110,34 +110,6 @@ export function fmt(iso) {
     year: 'numeric',
   })
 }
-export function groupByProduct(units, brandMap) {
-  const map = {}
-  for (const u of units) {
-    const key = u.product_name || 'Unknown Product'
-    if (!map[key])
-      map[key] = {
-        product_name: key,
-        brand: brandMap[key] || '',
-        units: [],
-        active_rma: 0,
-        company_stock: 0,
-        sent_to_manufacturer: 0,
-        closed: 0,
-        replacement: 0,
-        credit_note: 0,
-      }
-    map[key].units.push(u)
-    if (map[key][u.status] !== undefined) map[key][u.status]++
-    if (u.status === 'company_stock') {
-      if (u.resolution_type === 'replacement') map[key].replacement++
-      else map[key].credit_note++
-    }
-  }
-  return Object.values(map).sort((a, b) => {
-    const bc = (a.brand || '').localeCompare(b.brand || '')
-    return bc !== 0 ? bc : a.product_name.localeCompare(b.product_name)
-  })
-}
 export function downloadCSV(rows, filename) {
   if (!rows.length) {
     toast('No data to export')

@@ -124,7 +124,7 @@ export function resolveProductId(
  * Product entries with neither a name nor a serial are dropped — they are
  * empty rows left behind by the form's "add product" button.
  *
- * `product_id` matters more than it looks: `getStockSummary` groups units by
+ * `product_id` matters more than it looks: `v_product_stock_summary` groups units by
  * it, so a unit without one can never count toward a catalog product's RMA
  * column and shows up as "Not in catalog" instead (checklist §2 note, §8).
  *

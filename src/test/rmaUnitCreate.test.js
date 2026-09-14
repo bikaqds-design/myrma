@@ -167,7 +167,7 @@ describe('describeFailedUnits', () => {
   })
 })
 
-// product_id decides whether a unit is visible to getStockSummary's per-product
+// product_id decides whether a unit is visible to v_product_stock_summary's per-product
 // grouping. Without it the unit shows as "Not in catalog" and the product's RMA
 // column stays 0 — the defect these tests lock down.
 const CATALOG = [

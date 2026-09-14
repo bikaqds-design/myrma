@@ -1,7 +1,12 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import { db } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
+import { useDebouncedValue } from '../../lib/useDebouncedValue'
+import { EMPTY_ARRAY } from '../../lib/stableEmpty'
+import { Spinner } from '../../components/ui'
 import {
   Pagination,
   InvToolbar,
@@ -32,7 +37,11 @@ function routeForMove(m) {
 }
 
 // ─── Stock Movements — flat audit-trail table over stock_moves (Sprint 8 Phase 8b) ─
-export function StockMovementsTab({ moves, units, warehouseStockRows, products, warehouses }) {
+// One page of the ledger at a time, from v_stock_moves_listing, which also
+// carries the "what moved" label so the search runs in the database. The tab
+// used to load the whole ledger plus every unit, stock row and product to build
+// those labels — all capped by the Data API at 1 000 rows. (BUG-066.)
+export function StockMovementsTab() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const searchRef = useRef(null)
@@ -43,70 +52,25 @@ export function StockMovementsTab({ moves, units, warehouseStockRows, products, 
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(() => safeStorage.get('invMovementsPerPage', 25))
 
-  const unitById = useMemo(() => {
-    const map = {}
-    for (const u of units) map[u.id] = u
-    return map
-  }, [units])
-
-  const wsById = useMemo(() => {
-    const map = {}
-    for (const w of warehouseStockRows) map[w.id] = w
-    return map
-  }, [warehouseStockRows])
-
-  const productNameById = useMemo(() => {
-    const map = {}
-    for (const p of products) map[p.id] = p.product_name
-    return map
-  }, [products])
-
-  const warehouseNameById = useMemo(() => {
-    const map = {}
-    for (const w of warehouses) map[w.id] = w.name
-    return map
-  }, [warehouses])
-
-  function describeRef(move) {
-    if (move.ref_type === 'unit') {
-      const unit = unitById[move.ref_id]
-      if (!unit) return move.ref_id
-      return unit.serial_number ? `${unit.product_name} (${unit.serial_number})` : unit.product_name
-    }
-    if (move.ref_type === 'warehouse_stock') {
-      const ws = wsById[move.ref_id]
-      if (!ws) return move.ref_id
-      const productName = productNameById[ws.product_id] || ws.product_id
-      const warehouseName = warehouseNameById[ws.warehouse_id] || ws.warehouse_id
-      return `${productName} @ ${warehouseName}`
-    }
-    return move.ref_id
-  }
-
   const activeFilterCount = [moveTypeFilter, docTypeFilter].filter(Boolean).length
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return moves.filter((m) => {
-      const matchMove = !moveTypeFilter || m.move_type === moveTypeFilter
-      const matchDoc = !docTypeFilter || m.doc_type === docTypeFilter
-      const matchSearch =
-        !q ||
-        describeRef(m).toLowerCase().includes(q) ||
-        (m.actor_email || '').toLowerCase().includes(q)
-      return matchMove && matchDoc && matchSearch
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [moves, moveTypeFilter, docTypeFilter, search, unitById, wsById, productNameById, warehouseNameById])
-
-  const paginated = useMemo(
-    () => filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
-    [filtered, currentPage, itemsPerPage]
-  )
+  const debouncedSearch = useDebouncedValue(search)
+  const filters = { search: debouncedSearch, moveType: moveTypeFilter, docType: docTypeFilter }
+  const { data: pageResult, isLoading } = useQuery({
+    queryKey: ['inventory', 'moves-page', { ...filters, page: currentPage, pageSize: itemsPerPage }],
+    queryFn: () => db.inventoryLists.movesPage(filters, currentPage, itemsPerPage),
+    placeholderData: keepPreviousData,
+  })
+  const paginated = pageResult?.data ?? EMPTY_ARRAY
+  const matchingCount = pageResult?.count ?? 0
+  const totalPages = Math.ceil(matchingCount / itemsPerPage)
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, moveTypeFilter, docTypeFilter, itemsPerPage])
+  }, [debouncedSearch, moveTypeFilter, docTypeFilter, itemsPerPage])
+  useEffect(() => {
+    if (pageResult && totalPages >= 1 && currentPage > totalPages) setCurrentPage(totalPages)
+  }, [pageResult, totalPages, currentPage])
   useEffect(() => {
     safeStorage.set('invMovementsPerPage', itemsPerPage)
   }, [itemsPerPage])
@@ -123,7 +87,7 @@ export function StockMovementsTab({ moves, units, warehouseStockRows, products, 
         activeFilterCount={activeFilterCount}
         right={
           <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">
-            {t('inventory.movementCount', { count: filtered.length })}
+            {t('inventory.movementCount', { count: matchingCount })}
           </span>
         }
       />
@@ -158,7 +122,11 @@ export function StockMovementsTab({ moves, units, warehouseStockRows, products, 
         </InvFilterField>
       </InvFilterPanel>
 
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <div className="py-20 flex justify-center bg-white dark:bg-[#121823] rounded-[14px] border border-[#e6e9ef] dark:border-[#212a38]">
+          <Spinner />
+        </div>
+      ) : matchingCount === 0 ? (
         <div className="text-center py-20 bg-white dark:bg-[#121823] rounded-[14px] border border-[#e6e9ef] dark:border-[#212a38]">
           <p className="text-[#6c6760] dark:text-[#9aa4b2] text-sm">{t('inventory.noMovementsYet')}</p>
         </div>
@@ -196,7 +164,7 @@ export function StockMovementsTab({ moves, units, warehouseStockRows, products, 
                         {t(`inventory.moveType_${m.move_type}`)}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{describeRef(m)}</td>
+                    <td className="px-5 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{m.ref_label}</td>
                     <td className="px-5 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{m.qty}</td>
                     <td className="px-5 py-3">
                       {NAVIGABLE_DOC_TYPES.has(m.doc_type) && m.doc_id ? (
@@ -221,9 +189,9 @@ export function StockMovementsTab({ moves, units, warehouseStockRows, products, 
         </div>
       )}
 
-      {filtered.length > 0 && (
+      {matchingCount > 0 && (
         <Pagination
-          total={filtered.length}
+          total={matchingCount}
           page={currentPage}
           itemsPerPage={itemsPerPage}
           setItemsPerPage={setItemsPerPage}
