@@ -499,6 +499,7 @@
     "failedExport": "تعذّر تجهيز التصدير: {{error}}"
   },
   "leads": {
+    "kanbanShowMore": "عرض {{count}} أخرى",
     "title": "العملاء المحتملون",
     "subtitle": "تتبع وتحويل العملاء المحتملين",
     "tabActive": "العملاء النشطون",

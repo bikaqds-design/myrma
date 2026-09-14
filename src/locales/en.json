@@ -467,6 +467,7 @@
     "failedExport": "Could not prepare the export: {{error}}"
   },
   "leads": {
+    "kanbanShowMore": "Show {{count}} more",
     "title": "Leads",
     "subtitle": "Track and convert prospective customers",
     "tabActive": "Active Leads",
