@@ -612,6 +612,7 @@
     "pendingApproval": "Pending approval"
   },
   "pipeline": {
+    "kanbanShowMore": "Show {{count}} more",
     "title": "Pipeline",
     "subtitle": "Track deals from open to close",
     "selectPipeline": "Select pipeline",

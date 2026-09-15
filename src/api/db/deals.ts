@@ -2,6 +2,8 @@ import { supabase } from '../client.js'
 import { activities } from './activities.js'
 import type { PipelineStage } from './pipelines.js'
 import { assertUpdated, assertAffected, assertAllAffected } from './_assertUpdated.js'
+import { fetchPage, fetchAllRows, chunksOf } from './_paging.js'
+import type { PagedResult } from './types.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -33,6 +35,110 @@ export interface DealRow {
   created_at: string
   created_by: string | null
   updated_at: string | null
+}
+
+// ── Paged reads (BUG-066) ─────────────────────────────────────────────────────
+// The Pipeline loaded every deal in a pipeline, and every open activity on
+// them, and filtered, sorted, paged, grouped and summed in the browser; past the
+// Data API's 1 000-row cap every view was silently incomplete. These read
+// through 20260858: `rma_deals_matching` (the search, over `v_deals_list`) for
+// rows, and the bucket functions for anything that is a count or a sum.
+
+/** A deal as the Pipeline lists it: the row plus its customer's name and its stage's position. */
+export interface DealListRow extends DealRow {
+  customer_name: string | null
+  stage_order: number | null
+}
+
+export interface DealFilters {
+  pipelineId: string
+  /** Title, deal code, rep or customer name. */
+  search?: string
+  stages?: string[]
+  reps?: string[]
+  /** A rep scoped to their own deals (RLS enforces it too). */
+  ownerEmail?: string | null
+  /** Open deals only (the Activity view). */
+  openOnly?: boolean
+}
+
+/** Sortable list columns → the column ordered on. Each sorts by what the column shows. */
+export const DEAL_SORT_COLUMNS: Record<string, string> = {
+  title: 'title_sort',
+  customer_id: 'customer_sort',
+  stage: 'stage_order',
+  value: 'value_sort',
+  assigned_rep: 'assigned_rep',
+  created_at: 'created_at',
+}
+
+export interface DealSort {
+  key: string
+  direction: 'asc' | 'desc'
+}
+
+export function resolveDealSort(sort?: DealSort): { column: string; ascending: boolean } {
+  const known = !!(sort && DEAL_SORT_COLUMNS[sort.key])
+  return {
+    column: known ? DEAL_SORT_COLUMNS[sort!.key] : 'created_at',
+    ascending: known ? sort!.direction === 'asc' : false,
+  }
+}
+
+interface Filterable<Q> {
+  eq(column: string, value: unknown): Q
+  in(column: string, values: readonly unknown[]): Q
+}
+
+/** The column filters, on deals or on any bucket function's rows (they carry stage and assigned_rep). */
+export function applyDealFilters<Q extends Filterable<Q>>(query: Q, f: Omit<DealFilters, 'pipelineId' | 'search'>): Q {
+  let q = query
+  if (f.ownerEmail) q = q.eq('assigned_rep', f.ownerEmail)
+  if (f.stages?.length) q = q.in('stage', f.stages)
+  if (f.reps?.length) q = q.in('assigned_rep', f.reps)
+  if (f.openOnly) q = q.eq('status', 'open')
+  return q
+}
+
+function searchArgs(f: DealFilters) {
+  return { p_pipeline_id: f.pipelineId, p_term: f.search?.trim() ?? '' }
+}
+
+/** Deal count and value for one combination of stage, rep, status and months. */
+export interface DealBucket {
+  stage: string
+  assigned_rep: string | null
+  status: DealRow['status']
+  /** 'YYYY-MM' in the viewer's time zone. */
+  created_month: string | null
+  /** 'YYYY-MM' of expected_close_date. */
+  close_month: string | null
+  deal_count: number
+  value_sum: number
+}
+
+export interface DealActivityValue {
+  stage: string
+  assigned_rep: string | null
+  activity_state: 'overdue' | 'today' | 'planned'
+  deal_count: number
+  value_sum: number
+}
+
+export interface DealActivityTypeCount {
+  stage: string
+  assigned_rep: string | null
+  activity_type: string
+  activity_count: number
+  done_count: number
+}
+
+function viewerTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  } catch {
+    return 'UTC'
+  }
 }
 
 // ── Deals ─────────────────────────────────────────────────────────────────────
@@ -73,6 +179,128 @@ function stageName(stages: PipelineStage[], stageId: string): string {
 }
 
 export const deals = {
+  /** One page of deals, filtered and sorted in the database, with the exact number that match. */
+  async listPage(filters: DealFilters, sort: DealSort | undefined, page: number, pageSize: number): Promise<PagedResult<DealListRow>> {
+    const { column, ascending } = resolveDealSort(sort)
+    return fetchPage<DealListRow>((from, to) => {
+      const base = supabase.rpc('rma_deals_matching', searchArgs(filters), { count: 'exact' })
+      return applyDealFilters(base, filters)
+        .order(column, { ascending, nullsFirst: ascending })
+        .order('id', { ascending: true })
+        .range(from, to)
+    }, page, pageSize)
+  },
+
+  /**
+   * Every deal matching the filters — for an export. In board order: by stage,
+   * newest first within a stage.
+   */
+  async listAllMatching(filters: DealFilters): Promise<DealListRow[]> {
+    return fetchAllRows<DealListRow>((from, to) => {
+      const base = supabase.rpc('rma_deals_matching', searchArgs(filters))
+      return applyDealFilters(base, filters)
+        .order('stage_order', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+    })
+  },
+
+  /** One Kanban column: the newest `limit` deals in `stage` and how many there are. */
+  async listColumn(stage: string, filters: DealFilters, limit: number): Promise<{ data: DealListRow[]; count: number }> {
+    const result = await fetchPage<DealListRow>((from, to) => {
+      const base = supabase.rpc('rma_deals_matching', searchArgs(filters), { count: 'exact' }).eq('stage', stage)
+      return applyDealFilters(base, filters)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+    }, 1, limit)
+    return { data: result.data, count: result.count }
+  },
+
+  /** Deals by id, in URL-safe chunks, in board order — the rows a selection export needs. */
+  async getMany(ids: string[]): Promise<DealListRow[]> {
+    const unique = [...new Set(ids.filter(Boolean))]
+    const out: DealListRow[] = []
+    for (const chunk of chunksOf(unique, 100)) {
+      const { data, error } = await supabase.from('v_deals_list').select('*').in('id', chunk)
+      if (error) throw error
+      out.push(...((data ?? []) as DealListRow[]))
+    }
+    return out.sort(
+      (a, b) =>
+        (a.stage_order ?? Infinity) - (b.stage_order ?? Infinity) ||
+        String(b.created_at).localeCompare(String(a.created_at))
+    )
+  },
+
+  /** How many deals a pipeline holds, for a rep's own deals or all. */
+  async countInPipeline(pipelineId: string, ownerEmail?: string | null): Promise<number> {
+    const base = supabase.from('deals').select('id', { count: 'exact', head: true }).eq('pipeline_id', pipelineId)
+    const { count, error } = await applyDealFilters(base, { ownerEmail })
+    if (error) throw error
+    return count ?? 0
+  },
+
+  /** Count and value of the matching deals, per stage × rep × status × created month × close month. */
+  async buckets(filters: DealFilters): Promise<DealBucket[]> {
+    const rows = await fetchAllRows<DealBucket>((from, to) => {
+      const base = supabase.rpc('rma_deal_buckets', { ...searchArgs(filters), p_tz: viewerTimeZone() })
+      return applyDealFilters(base, filters)
+        .order('stage', { ascending: true })
+        .order('assigned_rep', { ascending: true })
+        .order('status', { ascending: true })
+        .order('created_month', { ascending: true })
+        .order('close_month', { ascending: true })
+        .range(from, to)
+    })
+    return rows.map((r) => ({ ...r, deal_count: Number(r.deal_count), value_sum: Number(r.value_sum) }))
+  },
+
+  /**
+   * Value of the matching deals by their worst open activity (overdue / today /
+   * planned), per stage × rep. "Today" is the viewer's.
+   */
+  async activityValues(filters: DealFilters): Promise<DealActivityValue[]> {
+    const now = new Date()
+    const todayEnd = new Date(now)
+    todayEnd.setHours(23, 59, 59, 999)
+    const rows = await fetchAllRows<DealActivityValue>((from, to) => {
+      const base = supabase.rpc('rma_deal_activity_values', {
+        ...searchArgs(filters),
+        p_now: now.toISOString(),
+        p_today_end: todayEnd.toISOString(),
+      })
+      return applyDealFilters(base, { ...filters, openOnly: false })
+        .order('stage', { ascending: true })
+        .order('assigned_rep', { ascending: true })
+        .order('activity_state', { ascending: true })
+        .range(from, to)
+    })
+    return rows.map((r) => ({ ...r, deal_count: Number(r.deal_count), value_sum: Number(r.value_sum) }))
+  },
+
+  /** Activities and completed activities per type on the matching open deals, per stage × rep. */
+  async activityTypeCounts(filters: DealFilters): Promise<DealActivityTypeCount[]> {
+    const rows = await fetchAllRows<DealActivityTypeCount>((from, to) => {
+      const base = supabase.rpc('rma_deal_activity_type_counts', searchArgs(filters))
+      return applyDealFilters(base, { ...filters, openOnly: false })
+        .order('stage', { ascending: true })
+        .order('assigned_rep', { ascending: true })
+        .order('activity_type', { ascending: true })
+        .range(from, to)
+    })
+    return rows.map((r) => ({ ...r, activity_count: Number(r.activity_count), done_count: Number(r.done_count) }))
+  },
+
+  /** The reps with deals in a pipeline, for the rep filter. */
+  async repsInPipeline(pipelineId: string): Promise<string[]> {
+    const { data, error } = await supabase.rpc('rma_deal_reps', { p_pipeline_id: pipelineId })
+    if (error) throw error
+    return (data ?? []) as string[]
+  },
+
+  /** @deprecated Loads every deal, silently capped at 1 000 rows. Use listPage / listAllMatching / buckets. */
   async list(filters?: {
     pipelineId?: string
     status?: string

@@ -16,6 +16,7 @@ import {
   Legend,
 } from 'recharts'
 import { useAppearance } from '../../contexts/AppearanceContext'
+import { bucketTotals, groupBuckets, monthLabel } from '../../lib/pipelineBuckets'
 
 const MEASURES = ['count', 'revenue']
 const GROUP_BY = ['stage', 'salesperson', 'month']
@@ -46,7 +47,10 @@ function ChartTypeBtn({ active, onClick, children, title }) {
   )
 }
 
-export default function PipelineGraphView({ deals, stages }) {
+// Drawn from `buckets` — deal count and value per stage, rep, status and month,
+// summed in the database over every matching deal — rather than from a list of
+// deals the Data API caps at 1 000 rows. (BUG-066.)
+export default function PipelineGraphView({ buckets, stages }) {
   const { t } = useTranslation()
   const { darkMode } = useAppearance()
 
@@ -57,32 +61,24 @@ export default function PipelineGraphView({ deals, stages }) {
   const stageMap = useMemo(() => Object.fromEntries(stages.map((s) => [s.id, s])), [stages])
 
   const chartData = useMemo(() => {
-    const groups = {}
-    for (const deal of deals) {
-      let key
-      if (groupBy === 'stage') key = stageMap[deal.stage]?.name ?? t('common.unknown')
-      else if (groupBy === 'salesperson') key = deal.assigned_rep || t('pipeline.unassigned')
-      else if (groupBy === 'month')
-        key = deal.created_at
-          ? new Date(deal.created_at).toLocaleDateString('en', { year: 'numeric', month: 'short' })
-          : t('common.unknown')
-
-      if (!groups[key]) groups[key] = { name: key, count: 0, revenue: 0 }
-      groups[key].count += 1
-      groups[key].revenue += Number(deal.value) || 0
+    const labelOf = (b) => {
+      if (groupBy === 'stage') return stageMap[b.stage]?.name ?? t('common.unknown')
+      if (groupBy === 'salesperson') return b.assigned_rep || t('pipeline.unassigned')
+      return monthLabel(b.created_month) ?? t('common.unknown')
     }
+    const groups = groupBuckets(buckets, labelOf)
 
     if (groupBy === 'stage') {
       const stageOrder = {}
       stages.forEach((s, i) => {
         stageOrder[s.name] = i
       })
-      return Object.values(groups).sort(
+      return groups.sort(
         (a, b) => (stageOrder[a.name] ?? 999) - (stageOrder[b.name] ?? 999)
       )
     }
-    return Object.values(groups).sort((a, b) => b[measure] - a[measure])
-  }, [deals, groupBy, stageMap, stages, measure, t])
+    return groups.sort((a, b) => b[measure] - a[measure])
+  }, [buckets, groupBy, stageMap, stages, measure, t])
 
   const axisColor = darkMode ? '#768292' : '#9aa4b2'
   const gridColor = darkMode ? '#212a38' : '#e6e9ef'
@@ -200,13 +196,12 @@ export default function PipelineGraphView({ deals, stages }) {
     )
   }
 
-  const wonCount = deals.filter((d) => d.status === 'won').length
-  const totalCount = deals.length
+  const totals = bucketTotals(buckets)
+  const wonCount = totals.wonCount
+  const totalCount = totals.count
   const winRate = totalCount > 0 ? ((wonCount / totalCount) * 100).toFixed(0) : 0
-  const totalRevenue = deals.reduce((s, d) => s + (Number(d.value) || 0), 0)
-  const wonRevenue = deals
-    .filter((d) => d.status === 'won')
-    .reduce((s, d) => s + (Number(d.value) || 0), 0)
+  const totalRevenue = totals.value
+  const wonRevenue = totals.wonValue
 
   return (
     <div className="space-y-4">

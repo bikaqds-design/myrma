@@ -1,38 +1,42 @@
 import React, { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { monthLabel } from '../../lib/pipelineBuckets'
 
 const DIMENSIONS = ['stage', 'salesperson', 'created_month', 'close_month']
 const MEASURES = ['count', 'sum_revenue', 'avg_revenue']
 
-function getDimValue(deal, dim, stageMap, t) {
+// The pivot is built from `buckets` — deal count and value per stage, rep,
+// status and month, summed in the database over every matching deal — rather
+// than from a list of deals the Data API caps at 1 000 rows. (BUG-066.)
+function getDimValue(bucket, dim, stageMap, t) {
   switch (dim) {
     case 'stage':
-      return stageMap[deal.stage]?.name ?? t('common.unknown')
+      return stageMap[bucket.stage]?.name ?? t('common.unknown')
     case 'salesperson':
-      return deal.assigned_rep || t('pipeline.unassigned')
+      return bucket.assigned_rep || t('pipeline.unassigned')
     case 'created_month':
-      return deal.created_at
-        ? new Date(deal.created_at).toLocaleDateString('en', { year: 'numeric', month: 'short' })
-        : t('common.unknown')
+      return monthLabel(bucket.created_month) ?? t('common.unknown')
     case 'close_month':
-      return deal.expected_close_date
-        ? new Date(deal.expected_close_date).toLocaleDateString('en', {
-            year: 'numeric',
-            month: 'short',
-          })
-        : t('common.noDate')
+      return monthLabel(bucket.close_month) ?? t('common.noDate')
     default:
       return t('common.unknown')
   }
 }
 
-function calcMeasure(values, measure) {
-  if (!values || values.length === 0) return null
-  if (measure === 'count') return values.length
-  const sum = values.reduce((s, v) => s + v, 0)
-  if (measure === 'sum_revenue') return sum
-  if (measure === 'avg_revenue') return sum / values.length
+/** A cell's measure from its deal count and value sum; null for an empty cell. */
+function calcMeasure(acc, measure) {
+  if (!acc || acc.count === 0) return null
+  if (measure === 'count') return acc.count
+  if (measure === 'sum_revenue') return acc.sum
+  if (measure === 'avg_revenue') return acc.sum / acc.count
   return 0
+}
+
+function add(acc, bucket) {
+  const out = acc ?? { count: 0, sum: 0 }
+  out.count += Number(bucket.deal_count) || 0
+  out.sum += Number(bucket.value_sum) || 0
+  return out
 }
 
 function DimSelect({ value, onChange, exclude, t }) {
@@ -51,11 +55,13 @@ function DimSelect({ value, onChange, exclude, t }) {
   )
 }
 
-export default function PipelinePivotView({ deals, stages }) {
+export default function PipelinePivotView({ buckets, stages }) {
   const { t } = useTranslation()
 
   const [rowDim, setRowDim] = useState('stage')
-  const [colDim, setColDim] = useState('status')
+  // Was 'status', which is not one of the dimensions: the picker showed
+  // "Salesperson" while the grid put every deal in a single "Unknown" column.
+  const [colDim, setColDim] = useState('salesperson')
   const [measure, setMeasure] = useState('count')
 
   const stageMap = useMemo(() => Object.fromEntries(stages.map((s) => [s.id, s])), [stages])
@@ -65,14 +71,15 @@ export default function PipelinePivotView({ deals, stages }) {
     const rowSet = new Set()
     const colSet = new Set()
 
-    for (const deal of deals) {
-      const rk = getDimValue(deal, rowDim, stageMap, t)
-      const ck = getDimValue(deal, colDim, stageMap, t)
+    const all = { count: 0, sum: 0 }
+    for (const bucket of buckets) {
+      const rk = getDimValue(bucket, rowDim, stageMap, t)
+      const ck = getDimValue(bucket, colDim, stageMap, t)
       rowSet.add(rk)
       colSet.add(ck)
       const key = `${rk}\x00${ck}`
-      if (!raw[key]) raw[key] = []
-      raw[key].push(Number(deal.value) || 0)
+      raw[key] = add(raw[key], bucket)
+      add(all, bucket)
     }
 
     // Sort keys (stage order preserved, others alphabetical)
@@ -87,32 +94,26 @@ export default function PipelinePivotView({ deals, stages }) {
     const colKeys = sortKeys(colSet, colDim)
 
     const cells = {}
-    const rowValBuckets = {}
-    const colValBuckets = {}
+    const rowAcc = {}
+    const colAcc = {}
 
     for (const rk of rowKeys) {
-      rowValBuckets[rk] = []
       for (const ck of colKeys) {
         const key = `${rk}\x00${ck}`
-        const vals = raw[key] || []
-        cells[`${rk}\x00${ck}`] = calcMeasure(vals, measure)
-        rowValBuckets[rk] = [...rowValBuckets[rk], ...vals]
-        if (!colValBuckets[ck]) colValBuckets[ck] = []
-        colValBuckets[ck] = [...colValBuckets[ck], ...vals]
+        const acc = raw[key]
+        cells[key] = calcMeasure(acc, measure)
+        if (!acc) continue
+        rowAcc[rk] = add(rowAcc[rk], { deal_count: acc.count, value_sum: acc.sum })
+        colAcc[ck] = add(colAcc[ck], { deal_count: acc.count, value_sum: acc.sum })
       }
     }
 
-    const rowTotals = Object.fromEntries(
-      rowKeys.map((rk) => [rk, calcMeasure(rowValBuckets[rk], measure)])
-    )
-    const colTotals = Object.fromEntries(
-      colKeys.map((ck) => [ck, calcMeasure(colValBuckets[ck], measure)])
-    )
-    const allVals = deals.map((d) => Number(d.value) || 0)
-    const grandTotal = calcMeasure(allVals, measure)
+    const rowTotals = Object.fromEntries(rowKeys.map((rk) => [rk, calcMeasure(rowAcc[rk], measure)]))
+    const colTotals = Object.fromEntries(colKeys.map((ck) => [ck, calcMeasure(colAcc[ck], measure)]))
+    const grandTotal = calcMeasure(all, measure)
 
     return { rowKeys, colKeys, cells, rowTotals, colTotals, grandTotal }
-  }, [deals, rowDim, colDim, measure, stageMap, stages, t])
+  }, [buckets, rowDim, colDim, measure, stageMap, stages, t])
 
   const fmt = (v) => {
     if (v === null || v === undefined) return '—'

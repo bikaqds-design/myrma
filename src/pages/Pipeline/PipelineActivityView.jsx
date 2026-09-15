@@ -2,6 +2,7 @@ import React, { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ACTIVITY_TYPE_SCHEDULABLE } from '../../lib/constants'
+import Pagination from '../../components/Pagination'
 
 const STATE_CELL = {
   overdue: 'bg-red-600 text-white',
@@ -61,28 +62,28 @@ function getActivityState(acts) {
   return best ? { state, activity: best } : null
 }
 
-export default function PipelineActivityView({ deals, stages, customerMap, activitiesByDeal }) {
+// One page of open deals (db.deals.listPage with openOnly), with the open
+// activities of those deals only, and column headers counted in the database
+// over every matching open deal (`colStats`, from db.deals.activityTypeCounts).
+// It used to be handed every deal and every open activity on them — past the
+// Data API's 1 000-row cap, part of the grid — and its "done" count was always
+// 0, because completed activities were never loaded. (BUG-066.)
+export default function PipelineActivityView({
+  deals,
+  totalCount,
+  currentPage,
+  itemsPerPage,
+  onPageChange,
+  onItemsPerPageChange,
+  stages,
+  activitiesByDeal,
+  colStats,
+}) {
   const { t } = useTranslation()
   const navigate = useNavigate()
 
   const stageMap = useMemo(() => Object.fromEntries(stages.map((s) => [s.id, s])), [stages])
-  const activeDeals = useMemo(() => deals.filter((d) => d.status === 'open'), [deals])
-
-  // Column header stats: done/total per activity type
-  const colStats = useMemo(() => {
-    const stats = {}
-    for (const type of ACTIVITY_TYPE_SCHEDULABLE) {
-      let done = 0
-      let total = 0
-      for (const deal of activeDeals) {
-        const acts = (activitiesByDeal[deal.id] || []).filter((a) => a.type === type)
-        total += acts.length
-        done += acts.filter((a) => a.completed_at).length
-      }
-      stats[type] = { done, total }
-    }
-    return stats
-  }, [activeDeals, activitiesByDeal])
+  const activeDeals = deals
 
   const BORDER = 'border-[#e6e9ef] dark:border-[#212a38]'
 
@@ -142,7 +143,6 @@ export default function PipelineActivityView({ deals, stages, customerMap, activ
                 </tr>
               ) : (
                 activeDeals.map((deal, ri) => {
-                  const cust = customerMap[deal.customer_id]
                   const stage = stageMap[deal.stage]
                   return (
                     <tr
@@ -158,7 +158,7 @@ export default function PipelineActivityView({ deals, stages, customerMap, activ
                           {deal.title}
                         </p>
                         <p className="text-[10px] text-[#6c6760] dark:text-[#9aa4b2] mt-0.5 line-clamp-1">
-                          {cust?.company_name || cust?.contact_person || '—'}
+                          {deal.customer_name || '—'}
                         </p>
                         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                           {stage && (
@@ -208,6 +208,18 @@ export default function PipelineActivityView({ deals, stages, customerMap, activ
             </tbody>
           </table>
         </div>
+
+        {totalCount > 0 && (
+          <div className={`px-4 pb-2 border-t ${BORDER}`}>
+            <Pagination
+              total={totalCount}
+              page={currentPage}
+              itemsPerPage={itemsPerPage}
+              setItemsPerPage={onItemsPerPageChange}
+              onPage={onPageChange}
+            />
+          </div>
+        )}
 
         {/* Legend */}
         <div
