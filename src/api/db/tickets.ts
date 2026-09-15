@@ -452,10 +452,11 @@ export const rmaTracker = {
       return null
     }
   },
-  async getPublicComments(ticketId: string): Promise<unknown[]> {
+  /** A ticket's public comments. The RMA number is required with the id (BUG-023). */
+  async getPublicComments(ticketId: string, rmaNumber: string): Promise<unknown[]> {
     try {
       const { data, error } = await supabase.functions.invoke('public-track', {
-        body: { action: 'comments', ticketId },
+        body: { action: 'comments', ticketId, rmaNumber },
       })
       if (error || data?.error) return []
       return data?.comments || []
@@ -464,8 +465,10 @@ export const rmaTracker = {
       return []
     }
   },
+  /** Post a customer comment. The RMA number is required with the id (BUG-023). */
   async addComment(
     ticketId: string,
+    rmaNumber: string,
     authorName: string,
     authorEmail: string,
     commentText: string,
@@ -475,7 +478,7 @@ export const rmaTracker = {
     const { data, error } = await supabase.functions.invoke('public-track', {
       body: {
         action: 'addComment',
-        comment: { ticketId, authorName, authorEmail, commentText, parentCommentId, attachments: attachments || [] },
+        comment: { ticketId, rmaNumber, authorName, authorEmail, commentText, parentCommentId, attachments: attachments || [] },
       },
     })
     if (error) throw new Error(error.message || 'Failed to send message')
