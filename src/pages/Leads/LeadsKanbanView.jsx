@@ -55,17 +55,19 @@ function initials(str) {
   return str?.[0]?.toUpperCase() || '?'
 }
 
-export default function LeadsKanbanView({ leads, onStatusChange, canEdit }) {
+// Each column is read from the database on its own — its first cards and its
+// true count, with "Show more" for the rest — instead of grouping a list of
+// every lead, which the Data API caps at 1 000 rows. Leads whose status is not
+// a known one still land in the first column (db.leads.listColumn). (BUG-066.)
+export default function LeadsKanbanView({ columns, onLoadMore, onStatusChange, canEdit }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
 
-  // Group leads by status
   const byStatus = {}
-  for (const s of LEAD_STATUS_LIST) byStatus[s] = []
-  for (const l of leads) {
-    if (byStatus[l.status]) byStatus[l.status].push(l)
-    // Leads with unknown status fall into the first column
-    else byStatus[LEAD_STATUS_LIST[0]].push(l)
+  const countByStatus = {}
+  for (const c of columns) {
+    byStatus[c.status] = c.leads
+    countByStatus[c.status] = c.count
   }
 
   const handleDragEnd = (result) => {
@@ -95,7 +97,7 @@ export default function LeadsKanbanView({ leads, onStatusChange, canEdit }) {
                     {t(`leadStatus.${status}`)}
                   </span>
                   <span className="text-xs font-semibold text-gray-400 dark:text-[#a4acb7]">
-                    {statusLeads.length}
+                    {countByStatus[status] ?? 0}
                   </span>
                 </div>
               </div>
@@ -198,6 +200,16 @@ export default function LeadsKanbanView({ leads, onStatusChange, canEdit }) {
                     </div>
 
                     {provided.placeholder}
+
+                    {(countByStatus[status] ?? 0) > statusLeads.length && (
+                      <button
+                        type="button"
+                        onClick={() => onLoadMore(status)}
+                        className="w-full mt-2 py-1.5 text-xs font-medium text-indigo-600 dark:text-[#a5b4fc] hover:underline"
+                      >
+                        {t('leads.kanbanShowMore', { count: (countByStatus[status] ?? 0) - statusLeads.length })}
+                      </button>
+                    )}
 
                     {statusLeads.length === 0 && !snapshot.isDraggingOver && (
                       <div className="py-6 text-center text-xs text-gray-400 dark:text-[#a4acb7]">

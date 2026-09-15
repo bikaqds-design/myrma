@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueries, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { ownershipScope } from '../../lib/permissions'
 import toast from 'react-hot-toast'
@@ -25,6 +25,10 @@ import { useURLTab } from '../../hooks/useURLTab'
 import LeadsKanbanView from './LeadsKanbanView'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { contactFieldProblems } from '../../lib/importValidation'
+import { useDebouncedValue } from '../../lib/useDebouncedValue'
+
+/** Cards each Kanban column shows before "Show more". */
+const KANBAN_PAGE = 50
 
 const STATUS_BADGE = {
   new:          'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400',
@@ -202,17 +206,6 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   const searchRef = useRef(null)
   const queryClient = useQueryClient()
 
-  const { data: allLeads = EMPTY_ARRAY, isLoading: loading } = useQuery({
-    queryKey: ['leads'],
-    queryFn: () => db.leads.list(),
-    staleTime: 60_000,
-  })
-  // A rep sees only leads assigned to them; RLS enforces it, this keeps the
-  // counts and source breakdown on the page consistent with what it serves.
-  const leads = useMemo(
-    () => (ownScope ? allLeads.filter((l) => l.assigned_rep === ownScope) : allLeads),
-    [allLeads, ownScope]
-  )
   const { data: pipelines = EMPTY_ARRAY } = useQuery({
     queryKey: ['pipelines'],
     queryFn: () => db.pipelines.list(),
@@ -265,6 +258,60 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   const [currentPage, setCurrentPage] = useUrlState('page', 1)
   const [itemsPerPage, setItemsPerPage] = useState(() => safeStorage.get('leadsPerPage', 25))
   const [jumpToPage, setJumpToPage] = useState('')
+
+  // The leads on screen, read from the database a page — or a Kanban column —
+  // at a time, with the search, filters, tab and sort applied there. This page
+  // used to load every lead and do all of that in the browser, which the Data
+  // API caps at 1 000 rows. (BUG-066.) A rep sees only leads assigned to them;
+  // RLS enforces it, and the owner filter keeps the counts consistent with it.
+  const debouncedSearch = useDebouncedValue(searchQuery)
+  const listFilters = useMemo(
+    () => ({
+      tab: statusTab,
+      statuses: [...filterStatuses],
+      sources: [...filterSources],
+      reps: [...filterReps],
+      search: debouncedSearch,
+      ownerEmail: ownScope || null,
+    }),
+    [statusTab, filterStatuses, filterSources, filterReps, debouncedSearch, ownScope]
+  )
+  const { data: tabCounts, isLoading: countsLoading } = useQuery({
+    queryKey: ['leads', 'tab-counts', ownScope || null],
+    queryFn: () => db.leads.tabCounts(ownScope || null),
+  })
+  const { data: pageResult, isLoading: pageLoading } = useQuery({
+    queryKey: ['leads', 'page', listFilters, sortConfig, currentPage, itemsPerPage],
+    queryFn: () => db.leads.listPage(listFilters, sortConfig, currentPage, itemsPerPage),
+    placeholderData: keepPreviousData,
+    enabled: effectiveView === 'list',
+  })
+  const paginatedLeads = pageResult?.data ?? EMPTY_ARRAY
+  const matchingCount = pageResult?.count ?? 0
+  const loading = countsLoading || (effectiveView === 'list' && pageLoading)
+
+  const [columnLimits, setColumnLimits] = useState({})
+  const kanbanQueries = useQueries({
+    queries: LEAD_STATUS_LIST.map((status) => {
+      const limit = columnLimits[status] ?? KANBAN_PAGE
+      return {
+        queryKey: ['leads', 'kanban', status, listFilters, sortConfig, limit],
+        queryFn: () => db.leads.listColumn(status, LEAD_STATUS_LIST, listFilters, sortConfig, limit),
+        placeholderData: keepPreviousData,
+        enabled: effectiveView === 'kanban',
+      }
+    }),
+  })
+  const kanbanColumns = LEAD_STATUS_LIST.map((status, i) => ({
+    status,
+    leads: kanbanQueries[i]?.data?.data ?? EMPTY_ARRAY,
+    count: kanbanQueries[i]?.data?.count ?? 0,
+  }))
+  useEffect(() => setColumnLimits({}), [listFilters, sortConfig])
+  // The rows a menu or a card action can refer to: what is on screen.
+  const visibleLeads = effectiveView === 'kanban' ? kanbanColumns.flatMap((c) => c.leads) : paginatedLeads
+  // A selection belongs to the page it was made on (bulk actions act on what is shown).
+  useEffect(() => setSelectedLeads(new Set()), [currentPage, itemsPerPage, listFilters, sortConfig])
 
   const openConfirm = (title, message, onConfirm) => setConfirmDialog({ open: true, title, message, onConfirm })
   const closeConfirm = () => setConfirmDialog((d) => ({ ...d, open: false }))
@@ -411,58 +458,8 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
     }
   }, [queryClient])
 
-  const statusMenuLead = leads.find((l) => l.id === statusMenu.id)
-  const sourceMenuLead = leads.find((l) => l.id === sourceMenu.id)
-
-  const convertedCount = leads.filter((l) => l.status === 'converted').length
-  const disqualifiedCount = leads.filter((l) => l.status === 'disqualified').length
-
-  // Tab partition: 'all' shows everything (and is the only tab where Kanban is
-  // offered — the other tabs are single-status slices, so a status board there
-  // would collapse to one column).
-  const matchesTab = (l) => {
-    if (statusTab === 'all') return true
-    if (statusTab === 'converted') return l.status === 'converted'
-    if (statusTab === 'disqualified') return l.status === 'disqualified'
-    return l.status !== 'converted' && l.status !== 'disqualified'
-  }
-
-  const filteredLeads = leads
-    .filter(matchesTab)
-    .filter((l) => {
-      if (filterStatuses.size > 0 && !filterStatuses.has(l.status)) return false
-      if (filterSources.size > 0 && !filterSources.has(l.source)) return false
-      if (filterReps.size > 0 && !filterReps.has(l.assigned_rep)) return false
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase()
-        return (
-          l.full_name?.toLowerCase().includes(q) ||
-          l.company_name?.toLowerCase().includes(q) ||
-          l.email?.toLowerCase().includes(q) ||
-          l.phone?.toLowerCase().includes(q) ||
-          l.lead_code?.toLowerCase().includes(q)
-        )
-      }
-      return true
-    })
-    .sort((a, b) => {
-      let aVal
-      let bVal
-      if (sortConfig.key === 'full_name') {
-        // Sort by whatever's actually shown bold in the Name column.
-        aVal = (a.company_name || a.full_name || '').toLowerCase()
-        bVal = (b.company_name || b.full_name || '').toLowerCase()
-      } else if (sortConfig.key === 'created_at') {
-        aVal = new Date(a.created_at || 0).getTime()
-        bVal = new Date(b.created_at || 0).getTime()
-      } else {
-        aVal = (a[sortConfig.key] || '').toString().toLowerCase()
-        bVal = (b[sortConfig.key] || '').toString().toLowerCase()
-      }
-      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
-      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
-      return 0
-    })
+  const statusMenuLead = visibleLeads.find((l) => l.id === statusMenu.id)
+  const sourceMenuLead = visibleLeads.find((l) => l.id === sourceMenu.id)
 
   const handleSort = (key) => {
     setSortConfig((prev) => ({
@@ -471,10 +468,19 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
     }))
   }
 
-  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage)
+  const totalPages = Math.ceil(matchingCount / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = Math.min(startIndex + itemsPerPage, filteredLeads.length)
-  const paginatedLeads = filteredLeads.slice(startIndex, endIndex)
+  const endIndex = Math.min(startIndex + itemsPerPage, matchingCount)
+  // The last page can empty under the user (a delete, a narrower filter): step back.
+  useEffect(() => {
+    if (pageResult && totalPages >= 1 && currentPage > totalPages) setCurrentPage(totalPages)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageResult, totalPages, currentPage])
+
+  const loadExportRows = (scope) =>
+    scope === 'selected'
+      ? db.leads.getMany([...selectedLeads])
+      : db.leads.listAllMatching(scope === 'filtered' ? listFilters : { ownerEmail: ownScope || null }, sortConfig)
 
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
@@ -686,7 +692,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   }
 
   const nonConvertedSelected = () =>
-    [...selectedLeads].filter((id) => leads.find((l) => l.id === id)?.status !== 'converted')
+    [...selectedLeads].filter((id) => paginatedLeads.find((l) => l.id === id)?.status !== 'converted')
 
   const handleBulkDelete = () => {
     const ids = nonConvertedSelected()
@@ -837,7 +843,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
   }
 
   const handleKanbanStatusChange = async (leadId, newStatus) => {
-    const lead = leads.find((l) => l.id === leadId)
+    const lead = visibleLeads.find((l) => l.id === leadId)
     if (!lead) return
     try {
       await db.leads.updateStatus(lead.id, newStatus, currentUserEmail)
@@ -871,9 +877,10 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
           ))}
         </div>
         <ExportMenu
-          allRows={leads}
-          filteredRows={filteredLeads}
-          selectedRows={leads.filter((l) => selectedLeads.has(l.id))}
+          allCount={tabCounts?.all ?? 0}
+          filteredCount={effectiveView === 'list' ? matchingCount : kanbanColumns.reduce((n, c) => n + c.count, 0)}
+          selectedCount={selectedLeads.size}
+          loadRows={loadExportRows}
           label={t('leads.export')}
           ns="leads"
           onExport={(rows, scope) => exportLeadsXlsx(rows, t, `leads-${scope}`)}
@@ -927,10 +934,10 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
       {/* Status tabs — Active (default) vs Converted (view-only) */}
       <div className="flex gap-1 border-b border-[#e6e9ef] dark:border-[#212a38]">
         {[
-          { id: 'all', label: t('leads.tabAll'), count: leads.length },
-          { id: 'active', label: t('leads.tabActive'), count: leads.length - convertedCount - disqualifiedCount },
-          { id: 'converted', label: t('leads.tabConverted'), count: convertedCount },
-          { id: 'disqualified', label: t('leads.tabDisqualified'), count: disqualifiedCount },
+          { id: 'all', label: t('leads.tabAll'), count: tabCounts?.all ?? 0 },
+          { id: 'active', label: t('leads.tabActive'), count: tabCounts?.active ?? 0 },
+          { id: 'converted', label: t('leads.tabConverted'), count: tabCounts?.converted ?? 0 },
+          { id: 'disqualified', label: t('leads.tabDisqualified'), count: tabCounts?.disqualified ?? 0 },
         ].map(({ id, label, count }) => (
           <button
             key={id}
@@ -1084,7 +1091,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
           {/* Count + per-page row */}
           <div className="px-5 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[#e6e9ef] dark:border-[#212a38]">
             <span className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
-              {t('leads.showingRange', { from: filteredLeads.length === 0 ? 0 : startIndex + 1, to: endIndex, total: filteredLeads.length })}
+              {t('leads.showingRange', { from: matchingCount === 0 ? 0 : startIndex + 1, to: endIndex, total: matchingCount })}
             </span>
             <div className="flex items-center gap-2">
               <label className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('common.itemsPerPage')}:</label>
@@ -1145,8 +1152,8 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
                     <td colSpan="10">
                       <EmptyState
                         title={t('leads.noLeadsFound')}
-                        description={leads.length > 0 ? t('leads.adjustFilters') : t('leads.noLeadsHint')}
-                        action={canDo('create') && leads.length === 0 ? () => setShowAddLead(true) : undefined}
+                        description={(tabCounts?.all ?? 0) > 0 ? t('leads.adjustFilters') : t('leads.noLeadsHint')}
+                        action={canDo('create') && (tabCounts?.all ?? 0) === 0 ? () => setShowAddLead(true) : undefined}
                         actionLabel={t('leads.addFirstLead')}
                       />
                     </td>
@@ -1318,7 +1325,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
           {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-t border-[#e6e9ef] dark:border-[#212a38]">
               <div className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
-                {t('leads.showingRange', { from: startIndex + 1, to: endIndex, total: filteredLeads.length })}
+                {t('leads.showingRange', { from: startIndex + 1, to: endIndex, total: matchingCount })}
               </div>
               <div className="flex items-center gap-1">
                 <button
@@ -1365,7 +1372,10 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
       {/* Kanban view */}
       {effectiveView === 'kanban' && (
         <LeadsKanbanView
-          leads={filteredLeads}
+          columns={kanbanColumns}
+          onLoadMore={(status) =>
+            setColumnLimits((prev) => ({ ...prev, [status]: (prev[status] ?? KANBAN_PAGE) + KANBAN_PAGE }))
+          }
           onStatusChange={handleKanbanStatusChange}
           canEdit={canDo('edit')}
         />

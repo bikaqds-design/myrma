@@ -1,6 +1,9 @@
 import { supabase } from '../client.js'
 import { activities } from './activities.js'
 import { assertUpdated, assertAllAffected } from './_assertUpdated.js'
+import { fetchPage, fetchAllRows, chunksOf } from './_paging.js'
+import type { PagedResult } from './types.js'
+import { orIlike } from '../../lib/searchPattern.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -23,11 +26,161 @@ export interface LeadRow {
   updated_at: string | null
 }
 
+// ── Paged reads (BUG-066) ─────────────────────────────────────────────────────
+// The Leads screen loaded every lead and filtered, sorted and paged in the
+// browser; past the Data API's 1 000-row cap the list, its tab counts and its
+// Kanban were silently incomplete. These read `v_leads_list` (20260857), which
+// is `leads` plus the Name-column sort key.
+
+/** The status tabs: `active` is everything not converted or disqualified. */
+export type LeadTab = 'all' | 'active' | 'converted' | 'disqualified'
+
+export interface LeadFilters {
+  tab?: LeadTab
+  statuses?: string[]
+  sources?: string[]
+  reps?: string[]
+  /** Name, company, email, phone or lead code. */
+  search?: string
+  /** A rep scoped to their own leads (RLS enforces it too). */
+  ownerEmail?: string | null
+}
+
+/** Sortable columns → the column ordered on. The Name column sorts by what it shows. */
+export const LEAD_SORT_COLUMNS: Record<string, string> = {
+  full_name: 'sort_name',
+  source: 'source',
+  status: 'status',
+  assigned_rep: 'assigned_rep',
+  created_at: 'created_at',
+}
+
+export interface LeadSort {
+  key: string
+  direction: 'asc' | 'desc'
+}
+
+const LEAD_SEARCH_COLUMNS = ['full_name', 'company_name', 'email', 'phone', 'lead_code']
+
+/** Values for PostgREST's `in.(…)` inside an `or`/`not`: each double-quoted. */
+function inList(values: string[]): string {
+  return `(${values.map((v) => `"${String(v).replace(/[\\"]/g, (c) => `\\${c}`)}"`).join(',')})`
+}
+
+interface Filterable<Q> {
+  or(filters: string): Q
+  eq(column: string, value: unknown): Q
+  in(column: string, values: readonly unknown[]): Q
+  not(column: string, operator: string, value: unknown): Q
+}
+
+export function applyLeadFilters<Q extends Filterable<Q>>(query: Q, f: LeadFilters): Q {
+  let q = query
+  if (f.ownerEmail) q = q.eq('assigned_rep', f.ownerEmail)
+  if (f.tab === 'converted') q = q.eq('status', 'converted')
+  else if (f.tab === 'disqualified') q = q.eq('status', 'disqualified')
+  else if (f.tab === 'active') q = q.or('status.is.null,status.not.in.(converted,disqualified)')
+  if (f.statuses?.length) q = q.in('status', f.statuses)
+  if (f.sources?.length) q = q.in('source', f.sources)
+  if (f.reps?.length) q = q.in('assigned_rep', f.reps)
+  const search = f.search?.trim()
+  // Another .or() is ANDed with the tab's by PostgREST.
+  if (search) q = q.or(orIlike(LEAD_SEARCH_COLUMNS, search))
+  return q
+}
+
+export function resolveLeadSort(sort?: LeadSort): { column: string; ascending: boolean } {
+  const column = (sort && LEAD_SORT_COLUMNS[sort.key]) || 'created_at'
+  const ascending = sort && LEAD_SORT_COLUMNS[sort.key] ? sort.direction === 'asc' : false
+  return { column, ascending }
+}
+
 // ── Leads ─────────────────────────────────────────────────────────────────────
 // Once converted_at is set, a lead is immutable except for notes — convert()
 // is the only path that sets the converted_* fields. See data-model.md.
 
 export const leads = {
+  /** One page of leads, filtered and sorted in the database, with the exact number that match. */
+  async listPage(filters: LeadFilters, sort: LeadSort | undefined, page: number, pageSize: number): Promise<PagedResult<LeadRow>> {
+    const { column, ascending } = resolveLeadSort(sort)
+    return fetchPage<LeadRow>((from, to) => {
+      const base = supabase.from('v_leads_list').select('*', { count: 'exact' })
+      return applyLeadFilters(base, filters)
+        .order(column, { ascending, nullsFirst: ascending })
+        .order('id', { ascending: true })
+        .range(from, to)
+    }, page, pageSize)
+  },
+
+  /** Every lead matching the filters, in the list's order — for an export. */
+  async listAllMatching(filters: LeadFilters, sort?: LeadSort): Promise<LeadRow[]> {
+    const { column, ascending } = resolveLeadSort(sort)
+    return fetchAllRows<LeadRow>((from, to) => {
+      const base = supabase.from('v_leads_list').select('*')
+      return applyLeadFilters(base, filters)
+        .order(column, { ascending, nullsFirst: ascending })
+        .order('id', { ascending: true })
+        .range(from, to)
+    })
+  },
+
+  /**
+   * One Kanban column: the first `limit` leads in `status` and how many there
+   * are. The first column also collects leads whose status is not a known one,
+   * as the whole-list board did.
+   */
+  async listColumn(
+    status: string,
+    knownStatuses: string[],
+    filters: LeadFilters,
+    sort: LeadSort | undefined,
+    limit: number
+  ): Promise<{ data: LeadRow[]; count: number }> {
+    const { column, ascending } = resolveLeadSort(sort)
+    const collectsUnknown = status === knownStatuses[0]
+    const result = await fetchPage<LeadRow>((from, to) => {
+      const base = supabase.from('v_leads_list').select('*', { count: 'exact' })
+      const inColumn = collectsUnknown
+        ? base.or(`status.eq.${status},status.is.null,status.not.in.${inList(knownStatuses)}`)
+        : base.eq('status', status)
+      return applyLeadFilters(inColumn, filters)
+        .order(column, { ascending, nullsFirst: ascending })
+        .order('id', { ascending: true })
+        .range(from, to)
+    }, 1, limit)
+    return { data: result.data, count: result.count }
+  },
+
+  /** How many leads each status tab holds, for a rep's own leads or all. */
+  async tabCounts(ownerEmail?: string | null): Promise<Record<LeadTab, number>> {
+    const count = async (tab: LeadTab) => {
+      const base = supabase.from('leads').select('id', { count: 'exact', head: true })
+      const { count: n, error } = await applyLeadFilters(base, { tab, ownerEmail })
+      if (error) throw error
+      return n ?? 0
+    }
+    const [all, active, converted, disqualified] = await Promise.all([
+      count('all'),
+      count('active'),
+      count('converted'),
+      count('disqualified'),
+    ])
+    return { all, active, converted, disqualified }
+  },
+
+  /** Leads by id, in URL-safe chunks — the rows a selection export needs. */
+  async getMany(ids: string[]): Promise<LeadRow[]> {
+    const unique = [...new Set(ids.filter(Boolean))]
+    const out: LeadRow[] = []
+    for (const chunk of chunksOf(unique, 100)) {
+      const { data, error } = await supabase.from('leads').select('*').in('id', chunk)
+      if (error) throw error
+      out.push(...((data ?? []) as LeadRow[]))
+    }
+    return out
+  },
+
+  /** @deprecated Loads every lead, silently capped at 1 000 rows. Use listPage / listAllMatching. */
   async list(filters?: { status?: string; assignedRep?: string }): Promise<LeadRow[]> {
     let query = supabase.from('leads').select('*').order('created_at', { ascending: false })
     if (filters?.status) query = query.eq('status', filters.status)
