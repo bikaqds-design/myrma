@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { fetchAllRows } from './_paging.js'
 import { assertAffected } from './_assertUpdated.js'
 import { computeDocumentTotals } from './_documentTotals.js'
 
@@ -69,18 +70,21 @@ export const creditNotes = {
     sourceInvoiceId?: string
     assignedRep?: string
   }): Promise<CreditNoteRow[]> {
-    let q = supabase.from('credit_notes').select('*').order('created_at', { ascending: false })
-    if (filters?.customerId) q = q.eq('customer_id', filters.customerId)
-    if (filters?.status) q = q.eq('status', filters.status)
-    if (filters?.type) q = q.eq('type', filters.type)
-    if (filters?.sourceInvoiceId) q = q.eq('source_invoice_id', filters.sourceInvoiceId)
-    if (filters?.assignedRep) q = q.eq('assigned_rep', filters.assignedRep)
-    const { data, error } = await q
-    if (error) {
-      if (error.code === '42P01') return []
+    // Every matching credit note, newest first — not the first 1 000. (BUG-066.)
+    try {
+      return await fetchAllRows<CreditNoteRow>((from, to) => {
+        let q = supabase.from('credit_notes').select('*')
+        if (filters?.customerId) q = q.eq('customer_id', filters.customerId)
+        if (filters?.status) q = q.eq('status', filters.status)
+        if (filters?.type) q = q.eq('type', filters.type)
+        if (filters?.sourceInvoiceId) q = q.eq('source_invoice_id', filters.sourceInvoiceId)
+        if (filters?.assignedRep) q = q.eq('assigned_rep', filters.assignedRep)
+        return q.order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)
+      })
+    } catch (error) {
+      if ((error as { code?: string })?.code === '42P01') return []
       throw error
     }
-    return (data ?? []) as CreditNoteRow[]
   },
 
   async get(id: string): Promise<CreditNoteRow | null> {
@@ -287,15 +291,19 @@ export const creditNotes = {
   },
 
   async getApplications(creditNoteId: string): Promise<CreditNoteApplicationRow[]> {
-    const { data, error } = await supabase
-      .from('credit_note_applications')
-      .select('*')
-      .eq('credit_note_id', creditNoteId)
-      .order('applied_date', { ascending: false })
-    if (error) {
-      if (error.code === '42P01') return []
+    try {
+      return await fetchAllRows<CreditNoteApplicationRow>((from, to) =>
+        supabase
+          .from('credit_note_applications')
+          .select('*')
+          .eq('credit_note_id', creditNoteId)
+          .order('applied_date', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
+      )
+    } catch (error) {
+      if ((error as { code?: string })?.code === '42P01') return []
       throw error
     }
-    return (data ?? []) as CreditNoteApplicationRow[]
   },
 }

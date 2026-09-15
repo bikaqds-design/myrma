@@ -49,23 +49,25 @@ export default function PipelineStages({ currentUserEmail }) {
   })
   // Every deal, not just open ones: a won deal still occupies a stage, and
   // deleting a stage out from under it breaks the historical record too.
-  const { data: deals = EMPTY_ARRAY } = useQuery({
+  // Counted in the database (rma_pipeline_stage_counts) — this used to load
+  // every deal, capped at 1 000 rows. (BUG-066.)
+  const { data: stageRows = EMPTY_ARRAY } = useQuery({
     queryKey: ['cp-pipeline-deals'],
-    queryFn: () => db.deals.list(),
+    queryFn: () => db.deals.stageCounts(),
   })
 
-  // pipeline_id -> stage id -> deals on it. Built from what the deals actually
-  // say, not from the pipeline definition, which is the whole point: the two
-  // disagree today and the page has to be able to show that.
+  // pipeline_id -> stage id -> how many deals are on it. Built from what the
+  // deals actually say, not from the pipeline definition, which is the whole
+  // point: the two disagree today and the page has to be able to show that.
   const dealsByStage = useMemo(() => {
     const map = {}
-    for (const d of deals) {
-      if (!d.pipeline_id) continue
-      const byStage = (map[d.pipeline_id] ||= {})
-      ;(byStage[d.stage] ||= []).push(d)
+    for (const r of stageRows) {
+      if (!r.pipeline_id) continue
+      const byStage = (map[r.pipeline_id] ||= {})
+      byStage[r.stage] = (byStage[r.stage] || 0) + r.deal_count
     }
     return map
-  }, [deals])
+  }, [stageRows])
 
   if (isLoading) {
     return (
@@ -126,8 +128,9 @@ function PipelineCard({ pipeline, stageCounts, currentUserEmail, onSaved, confir
     const defined = new Set(pipeline.stages.map((s) => s.id))
     return Object.entries(stageCounts)
       .filter(([id]) => !defined.has(id))
-      .map(([id, list]) => ({ id, deals: list }))
-      .sort((a, b) => b.deals.length - a.deals.length)
+      // A deal with no stage at all is keyed "null", as it always was.
+      .map(([id, count]) => ({ id, stage: id === 'null' ? null : id, count }))
+      .sort((a, b) => b.count - a.count)
   }, [stageCounts, pipeline.stages])
 
   const patch = (id, fields) =>
@@ -213,22 +216,21 @@ function PipelineCard({ pipeline, stageCounts, currentUserEmail, onSaved, confir
       // call sites it was built for, wrong for a move.
       confirmLabel: t('cp.pipelineStages.moveDeals'),
       message: t('cp.pipelineStages.repairConfirm', {
-        count: orphan.deals.length,
+        count: orphan.count,
         from: orphan.id,
         to: target.name,
       }),
       onConfirm: async () => {
         try {
-          await db.deals.bulkMoveStage(
-            orphan.deals.map((d) => d.id),
-            targetId
-          )
-          toast.success(t('cp.pipelineStages.repaired', { count: orphan.deals.length }))
+          // Every deal on the undefined stage, read now rather than held.
+          const ids = await db.deals.idsOnStage(pipeline.id, orphan.stage)
+          await db.deals.bulkMoveStage(ids, targetId)
+          toast.success(t('cp.pipelineStages.repaired', { count: ids.length }))
           db.auditLog
             .log(
               currentUserEmail,
               'deals_restaged',
-              `Moved ${orphan.deals.length} deal(s) from undefined stage "${orphan.id}" to "${targetId}"`
+              `Moved ${ids.length} deal(s) from undefined stage "${orphan.id}" to "${targetId}"`
             )
             .catch(() => {})
           onSaved()
@@ -241,7 +243,7 @@ function PipelineCard({ pipeline, stageCounts, currentUserEmail, onSaved, confir
     })
   }
 
-  const totalDeals = Object.values(stageCounts).reduce((a, l) => a + l.length, 0)
+  const totalDeals = Object.values(stageCounts).reduce((a, n) => a + n, 0)
 
   return (
     <div className="bg-white dark:bg-[#121823] rounded-xl border border-gray-200 dark:border-[#212a38] p-5 space-y-4">
@@ -302,7 +304,7 @@ function PipelineCard({ pipeline, stageCounts, currentUserEmail, onSaved, confir
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-[#212a38]">
             {[...open, ...terminal].map((s, i) => {
-              const count = (stageCounts[s.id] || []).length
+              const count = stageCounts[s.id] || 0
               const terminalRow = isTerminal(s)
               return (
                 <tr key={s.id}>
@@ -472,7 +474,7 @@ function OrphanRow({ orphan, pipeline, onRepair }) {
       <span className="text-amber-900 dark:text-amber-100">
         <code className="font-semibold">{orphan.id}</code>
         {' — '}
-        {t('cp.pipelineStages.orphanCount', { count: orphan.deals.length })}
+        {t('cp.pipelineStages.orphanCount', { count: orphan.count })}
       </span>
       <label htmlFor={selectId} className="text-xs text-amber-800 dark:text-amber-200/90">
         {t('cp.pipelineStages.moveTo')}

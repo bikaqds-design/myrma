@@ -218,17 +218,5 @@ export const crmInvoices = {
   },
 
   /** listBySalesDocument: fetch all invoices for the unified All-tab view. */
-  async listAll(filters?: {
-    assignedRep?: string
-    search?: string
-  }): Promise<CrmInvoiceRow[]> {
-    let q = supabase.from('crm_invoices').select('*').order('created_at', { ascending: false })
-    if (filters?.assignedRep) q = q.eq('assigned_rep', filters.assignedRep)
-    const { data, error } = await q
-    if (error) {
-      if (error.code === '42P01') return []
-      throw error
-    }
-    return (data ?? []) as CrmInvoiceRow[]
-  },
+
 }

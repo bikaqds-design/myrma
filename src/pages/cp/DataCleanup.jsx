@@ -6,10 +6,11 @@ import toast from 'react-hot-toast'
 import { toUserMessage } from '../../lib/errorMessage'
 import { captureException } from '../../lib/sentry'
 
+const EMPTY_SUMMARY = { stale_completed: 0, stale_cancelled: 0, orphans: 0, duplicate_groups: 0 }
+
 export default function DataCleanup() {
   const { t } = useTranslation()
-  const [tickets, setTickets] = useState([])
-  const [customers, setCustomers] = useState([])
+  const [summary, setSummary] = useState(EMPTY_SUMMARY)
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState(false)
   const [completedDays, setCompletedDays] = useState(90)
@@ -24,19 +25,28 @@ export default function DataCleanup() {
   const [integrityLoading, setIntegrityLoading] = useState(false)
   const [expandedCheck, setExpandedCheck] = useState(null)
 
+  // Days → the instant a ticket must have been last updated before to count.
+  const cutoffISO = (days) => {
+    const d = new Date()
+    d.setDate(d.getDate() - days)
+    return d.toISOString()
+  }
+
+  // Counts only, from the database (rma_data_cleanup_summary, 20260863). This
+  // used to load every ticket and every customer and count in the browser —
+  // past the Data API's 1 000-row cap, stale tickets, orphans and duplicates
+  // found among some of them. (BUG-066.)
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [tickets, customers] = await Promise.all([db.rmaTickets.list(), db.customers.list()])
-      setTickets(tickets)
-      setCustomers(customers)
+      setSummary(await db.dataCleanup.summary(cutoffISO(completedDays), cutoffISO(cancelledDays)))
     } catch (err) {
       captureException(err)
       toast.error(i18next.t('cp.dataCleanup.loadFailed'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [completedDays, cancelledDays])
 
   useEffect(() => {
     load()
@@ -61,50 +71,38 @@ export default function DataCleanup() {
     }
   }
 
-  const cutoff = (days) => {
-    const d = new Date()
-    d.setDate(d.getDate() - days)
-    return d
-  }
-
-  const staleCompleted = tickets.filter(
-    (t) =>
-      t.ticket_status === 'Completed' &&
-      t.updated_date &&
-      new Date(t.updated_date) < cutoff(completedDays)
-  )
-  const staleCancelled = tickets.filter(
-    (t) =>
-      t.ticket_status === 'Cancelled' &&
-      t.updated_date &&
-      new Date(t.updated_date) < cutoff(cancelledDays)
-  )
+  const staleCompletedCount = summary.stale_completed
+  const staleCancelledCount = summary.stale_cancelled
 
   // A customer counts as linked if a ticket references it by id OR by display
-  // name. Matching on the name alone (as this did) offered any customer whose
-  // name had since changed for deletion, even though the FK still bound it —
-  // the delete would then be refused and the count was simply wrong (BUG-012).
-  // Matching on id alone would mis-flag legacy tickets that carry only a name,
-  // so the union is used: it can only ever reduce false orphans.
-  const linkedIds = new Set(tickets.map((t) => t.customer_id).filter(Boolean))
-  const linkedNames = new Set(tickets.map((t) => t.customer_name).filter(Boolean))
-  const orphanCustomers = customers.filter((c) => {
-    const name = c.customer_type === 'B2B' && c.company_name ? c.company_name : c.contact_person
-    return !linkedIds.has(c.id) && !linkedNames.has(name)
-  })
+  // name — matching on the name alone offered customers still bound by the FK
+  // for deletion (BUG-012), and on id alone would mis-flag legacy name-only
+  // tickets. The database applies the union (rma_orphan_customers). The lists
+  // are read in full when opened, not on every visit.
+  const openOrphans = async () => {
+    try {
+      setPreview({ type: 'orphans', items: await db.dataCleanup.orphanCustomers() })
+    } catch (err) {
+      captureException(err)
+      toast.error(toUserMessage(err))
+    }
+  }
+  const openDuplicates = async () => {
+    try {
+      setPreview({ type: 'duplicates', items: await db.dataCleanup.duplicateGroups() })
+    } catch (err) {
+      captureException(err)
+      toast.error(toUserMessage(err))
+    }
+  }
 
-  const nameCounts = customers.reduce((acc, c) => {
-    const name = (c.company_name || c.contact_person || '').toLowerCase().trim()
-    if (name) acc[name] = (acc[name] || []).concat(c)
-    return acc
-  }, {})
-  const duplicateGroups = Object.values(nameCounts).filter((g) => g.length > 1)
-
-  const handleDeleteTickets = async (list, label) => {
-    if (!list.length) return
-    if (!confirm(t('cp.dataCleanup.deleteConfirm', { count: list.length, label }))) return
+  const handleDeleteTickets = async (status, days, count, label) => {
+    if (!count) return
+    if (!confirm(t('cp.dataCleanup.deleteConfirm', { count, label }))) return
     setWorking(true)
     try {
+      // Every matching ticket, read now — the count above may be a moment old.
+      const ids = await db.rmaTickets.staleIds(status, cutoffISO(days))
       // Previously: `;(await db.rmaTickets.bulkDelete) ? … : Promise.all(…)`.
       // That awaited the *function reference* rather than a call, and neither
       // branch of the ternary was awaited — so the success toast and reload
@@ -113,8 +111,8 @@ export default function DataCleanup() {
       // deletes that cascade to inventory_units, ticket_comments,
       // ticket_activity, time_entries, ticket_parts and ticket_resolutions, so
       // reporting success without confirming them is the worst case (BUG-012).
-      await db.rmaTickets.bulkDelete(list.map((t) => t.id))
-      toast.success(t('cp.dataCleanup.deleted', { count: list.length, label }))
+      await db.rmaTickets.bulkDelete(ids)
+      toast.success(t('cp.dataCleanup.deleted', { count: ids.length, label }))
       await load()
     } catch (err) {
       captureException(err)
@@ -192,7 +190,7 @@ export default function DataCleanup() {
                 className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
               />
               <span className="text-sm text-gray-500">
-                {t('cp.dataCleanup.daysFound', { count: staleCompleted.length })}
+                {t('cp.dataCleanup.daysFound', { count: staleCompletedCount })}
               </span>
             </div>
           </div>
@@ -209,7 +207,7 @@ export default function DataCleanup() {
                 className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
               />
               <span className="text-sm text-gray-500">
-                {t('cp.dataCleanup.daysFound', { count: staleCancelled.length })}
+                {t('cp.dataCleanup.daysFound', { count: staleCancelledCount })}
               </span>
             </div>
           </div>
@@ -219,35 +217,35 @@ export default function DataCleanup() {
           <div className="p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between mb-2">
               <div>
-                <span className="text-2xl font-bold text-gray-900">{staleCompleted.length}</span>
+                <span className="text-2xl font-bold text-gray-900">{staleCompletedCount}</span>
                 <p className="text-sm text-gray-600">{t('cp.dataCleanup.staleCompleted')}</p>
                 <p className="text-xs text-gray-500">{t('cp.dataCleanup.completedAgo', { days: completedDays })}</p>
               </div>
               <span className="text-3xl">✅</span>
             </div>
             <button
-              onClick={() => handleDeleteTickets(staleCompleted, 'completed')}
-              disabled={staleCompleted.length === 0 || working}
+              onClick={() => handleDeleteTickets('Completed', completedDays, staleCompletedCount, 'completed')}
+              disabled={staleCompletedCount === 0 || working}
               className="w-full py-1.5 text-sm font-medium rounded-lg border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {t('cp.dataCleanup.deleteCompleted', { count: staleCompleted.length })}
+              {t('cp.dataCleanup.deleteCompleted', { count: staleCompletedCount })}
             </button>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between mb-2">
               <div>
-                <span className="text-2xl font-bold text-gray-900">{staleCancelled.length}</span>
+                <span className="text-2xl font-bold text-gray-900">{staleCancelledCount}</span>
                 <p className="text-sm text-gray-600">{t('cp.dataCleanup.staleCancelled')}</p>
                 <p className="text-xs text-gray-500">{t('cp.dataCleanup.cancelledAgo', { days: cancelledDays })}</p>
               </div>
               <span className="text-3xl">❌</span>
             </div>
             <button
-              onClick={() => handleDeleteTickets(staleCancelled, 'cancelled')}
-              disabled={staleCancelled.length === 0 || working}
+              onClick={() => handleDeleteTickets('Cancelled', cancelledDays, staleCancelledCount, 'cancelled')}
+              disabled={staleCancelledCount === 0 || working}
               className="w-full py-1.5 text-sm font-medium rounded-lg border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {t('cp.dataCleanup.deleteCancelled', { count: staleCancelled.length })}
+              {t('cp.dataCleanup.deleteCancelled', { count: staleCancelledCount })}
             </button>
           </div>
         </div>
@@ -260,15 +258,15 @@ export default function DataCleanup() {
           <div className="p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between mb-2">
               <div>
-                <span className="text-2xl font-bold text-gray-900">{orphanCustomers.length}</span>
+                <span className="text-2xl font-bold text-gray-900">{summary.orphans}</span>
                 <p className="text-sm text-gray-600">{t('cp.dataCleanup.noTickets')}</p>
                 <p className="text-xs text-gray-500">{t('cp.dataCleanup.neverSubmitted')}</p>
               </div>
               <span className="text-3xl">👤</span>
             </div>
             <button
-              onClick={() => setPreview({ type: 'orphans', items: orphanCustomers })}
-              disabled={orphanCustomers.length === 0}
+              onClick={openOrphans}
+              disabled={summary.orphans === 0}
               className="w-full py-1.5 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {t('cp.dataCleanup.reviewList')}
@@ -277,15 +275,15 @@ export default function DataCleanup() {
           <div className="p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between mb-2">
               <div>
-                <span className="text-2xl font-bold text-amber-600">{duplicateGroups.length}</span>
+                <span className="text-2xl font-bold text-amber-600">{summary.duplicate_groups}</span>
                 <p className="text-sm text-gray-600">{t('cp.dataCleanup.duplicates')}</p>
                 <p className="text-xs text-gray-500">{t('cp.dataCleanup.sameCompany')}</p>
               </div>
               <span className="text-3xl">⚠️</span>
             </div>
             <button
-              onClick={() => setPreview({ type: 'duplicates', items: duplicateGroups })}
-              disabled={duplicateGroups.length === 0}
+              onClick={openDuplicates}
+              disabled={summary.duplicate_groups === 0}
               className="w-full py-1.5 text-sm font-medium rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {t('cp.dataCleanup.reviewDuplicates')}

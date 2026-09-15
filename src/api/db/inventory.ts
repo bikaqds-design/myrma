@@ -3,7 +3,7 @@ import { buildTicketUnits } from '../../lib/rmaUnitCreate.js'
 import type { TicketProductInput, CatalogProduct } from '../../lib/rmaUnitCreate.js'
 import type { TableResult } from './types.js'
 import { assertUpdated, assertAffected, assertAllAffected } from './_assertUpdated.js'
-import { chunksOf } from './_paging.js'
+import { chunksOf, fetchAllRows } from './_paging.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -219,15 +219,30 @@ export const inventory = {
    *     should not be reported as a failed save.
    */
   /**
-   * The id + name of every catalog product, for re-linking RMA ticket lines to
-   * `products`. Deliberately tolerant: if the lookup fails the unit is still
+   * The id + name of every catalog product whose name matches one of `names`
+   * (trimmed, case-insensitive — buildCatalogIndex's key), for re-linking RMA
+   * ticket lines to `products` (rma_products_by_name_keys, 20260865). It used to
+   * read the whole catalog, which past 1 000 products left later ones unmatched.
+   * (BUG-066.) Deliberately tolerant: if the lookup fails the unit is still
    * created, just without a `product_id` — losing the dashboard grouping is bad,
    * losing the unit is worse.
    */
-  async listCatalogForUnitLinking(): Promise<CatalogProduct[]> {
-    const { data, error } = await supabase.from('products').select('id, product_name')
-    if (error) return []
-    return data || []
+  async listCatalogForUnitLinking(names: string[] = []): Promise<CatalogProduct[]> {
+    const keys = [...new Set(names.map((n) => (n || '').trim().toLowerCase()).filter(Boolean))]
+    if (!keys.length) return []
+    try {
+      const out: CatalogProduct[] = []
+      for (const chunk of chunksOf(keys, 100)) {
+        out.push(
+          ...(await fetchAllRows<CatalogProduct>((from, to) =>
+            supabase.rpc('rma_products_by_name_keys', { p_keys: chunk }).order('id', { ascending: true }).range(from, to)
+          ))
+        )
+      }
+      return out
+    } catch {
+      return []
+    }
   },
 
   async createUnitsFromTicket(
@@ -240,7 +255,9 @@ export const inventory = {
     // (and every ticket saved before that existed) still has to be matched by
     // name. Without it the unit is invisible to getStockSummary's per-product
     // grouping — see buildTicketUnits.
-    const catalog = await this.listCatalogForUnitLinking()
+    const catalog = await this.listCatalogForUnitLinking(
+      (products || []).filter((p) => !p.product_id).map((p) => p.product_name || '')
+    )
     const units = buildTicketUnits(ticketId, rmaNumber, products, undefined, catalog)
     if (!units.length) return { created: [], failed: [], missing: false }
 
@@ -278,16 +295,22 @@ export const inventory = {
    */
   async findTrackedSerials(serials: string[]): Promise<InventoryUnitRow[]> {
     if (!serials?.length) return []
-    const { data, error } = await supabase
-      .from('inventory_units')
-      .select('*')
-      .in('serial_number', serials)
-      .neq('status', 'closed')
-    if (error) {
-      if (error.code === '42P01') return []
-      throw error
+    // In chunks, so a ticket with many serials neither overflows the URL nor
+    // meets the 1 000-row cap. (BUG-066.)
+    const out: InventoryUnitRow[] = []
+    for (const chunk of chunksOf(serials, 100)) {
+      const { data, error } = await supabase
+        .from('inventory_units')
+        .select('*')
+        .in('serial_number', chunk)
+        .neq('status', 'closed')
+      if (error) {
+        if (error.code === '42P01') return []
+        throw error
+      }
+      out.push(...(data || []))
     }
-    return data || []
+    return out
   },
 
   async resolveUnits(
@@ -366,19 +389,23 @@ export const inventory = {
     return data as ManufacturerBatchRow
   },
 
+  /**
+   * Units per status, counted in the database (rma_inventory_status_counts,
+   * 20260863). It used to read every unit's status and count them here — past
+   * the Data API's 1 000-row cap, a count of some units. (BUG-066.)
+   */
   async getStats(): Promise<InventoryStatsRow | null> {
     try {
-      const { data, error } = await supabase.from('inventory_units').select('status')
-      if (error) {
-        if (error.code === '42P01') return null
-        return null
+      const { data, error } = await supabase.rpc('rma_inventory_status_counts')
+      if (error) return null
+      const s = (data ?? {}) as Partial<InventoryStatsRow>
+      return {
+        active_rma: Number(s.active_rma) || 0,
+        company_stock: Number(s.company_stock) || 0,
+        sent_to_manufacturer: Number(s.sent_to_manufacturer) || 0,
+        closed: Number(s.closed) || 0,
+        total: Number(s.total) || 0,
       }
-      const counts: InventoryStatsRow = { active_rma: 0, company_stock: 0, sent_to_manufacturer: 0, closed: 0, total: 0 }
-      data.forEach((u: { status: string }) => {
-        if (u.status in counts) counts[u.status as keyof InventoryStatsRow]++
-      })
-      counts.total = data.length
-      return counts
     } catch {
       return null
     }
@@ -507,15 +534,14 @@ export const inventory = {
    * whenever a ticket's product statuses are saved.
    */
   async listUnitsByTicket(ticketId: string): Promise<InventoryUnitRow[]> {
-    const { data, error } = await supabase
-      .from('inventory_units')
-      .select('*')
-      .eq('rma_ticket_id', ticketId)
-    if (error) {
-      if (error.code === '42P01') return []
+    try {
+      return await fetchAllRows<InventoryUnitRow>((from, to) =>
+        supabase.from('inventory_units').select('*').eq('rma_ticket_id', ticketId).order('id', { ascending: true }).range(from, to)
+      )
+    } catch (error) {
+      if ((error as { code?: string })?.code === '42P01') return []
       throw error
     }
-    return data || []
   },
 
   /**
@@ -564,15 +590,15 @@ export const inventory = {
 // ── Warehouses ────────────────────────────────────────────────────────────────
 
 export const warehouses = {
+  /** Every warehouse, A–Z — not the first 1 000. (BUG-066.) */
   async list(): Promise<TableResult<WarehouseRow[]>> {
     try {
-      const { data, error } = await supabase.from('warehouses').select('*').order('name', { ascending: true })
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
-    } catch {
+      const data = await fetchAllRows<WarehouseRow>((from, to) =>
+        supabase.from('warehouses').select('*').order('name', { ascending: true }).order('id', { ascending: true }).range(from, to)
+      )
+      return { missing: false, data }
+    } catch (error) {
+      if ((error as { code?: string })?.code === '42P01') return { missing: true, data: [] }
       return { missing: true, data: [] }
     }
   },
@@ -613,12 +639,9 @@ export const warehouses = {
 // (BUG-066): whole-table reads of units, stock rows and moves were removed.
 export const warehouseStock = {
   async listByProduct(productId: string): Promise<WarehouseStockRow[]> {
-    const { data, error } = await supabase
-      .from('warehouse_stock')
-      .select('*')
-      .eq('product_id', productId)
-    if (error) throw error
-    return data || []
+    return fetchAllRows<WarehouseStockRow>((from, to) =>
+      supabase.from('warehouse_stock').select('*').eq('product_id', productId).order('id', { ascending: true }).range(from, to)
+    )
   },
 }
 
@@ -639,33 +662,43 @@ export const stockMoves = {
     docId: string
   ): Promise<TableResult<ReceiptMoveRow[]>> {
     try {
-      const { data, error } = await supabase
-        .from('stock_moves')
-        .select('*')
-        .eq('doc_type', docType)
-        .eq('doc_id', docId)
-        .eq('move_type', 'receive')
-        .order('created_at', { ascending: true })
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
+      // Every receipt row — a large delivery is thousands of units, past the
+      // 1 000-row cap — with the units, stock rows and products they name read
+      // in chunks. (BUG-066.)
+      let moves: StockMoveRow[]
+      try {
+        moves = await fetchAllRows<StockMoveRow>((from, to) =>
+          supabase
+            .from('stock_moves')
+            .select('*')
+            .eq('doc_type', docType)
+            .eq('doc_id', docId)
+            .eq('move_type', 'receive')
+            .order('created_at', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to)
+        )
+      } catch (error) {
+        if ((error as { code?: string })?.code === '42P01') return { missing: true, data: [] }
         throw error
       }
-      const moves = (data || []) as StockMoveRow[]
       if (!moves.length) return { missing: false, data: [] }
 
       const unitIds = moves.filter((m) => m.ref_type === 'unit').map((m) => m.ref_id)
       const stockIds = moves.filter((m) => m.ref_type === 'warehouse_stock').map((m) => m.ref_id)
 
+      const readIn = async (table: string, columns: string, ids: string[]) => {
+        const rows: Record<string, unknown>[] = []
+        for (const chunk of chunksOf([...new Set(ids)], 100)) {
+          const { data, error } = await supabase.from(table).select(columns).in('id', chunk)
+          if (error) throw error
+          rows.push(...((data || []) as unknown as Record<string, unknown>[]))
+        }
+        return { data: rows, error: null }
+      }
       const [unitsRes, stockRes] = await Promise.all([
-        unitIds.length
-          ? supabase
-              .from('inventory_units')
-              .select('id, serial_number, product_name, warehouse_id')
-              .in('id', unitIds)
-          : Promise.resolve({ data: [], error: null }),
-        stockIds.length
-          ? supabase.from('warehouse_stock').select('id, product_id, warehouse_id').in('id', stockIds)
-          : Promise.resolve({ data: [], error: null }),
+        readIn('inventory_units', 'id, serial_number, product_name, warehouse_id', unitIds),
+        readIn('warehouse_stock', 'id, product_id, warehouse_id', stockIds),
       ])
 
       const unitById = new Map(
@@ -684,9 +717,7 @@ export const stockMoves = {
             .filter((id): id is string => Boolean(id))
         ),
       ]
-      const productsRes = productIds.length
-        ? await supabase.from('products').select('id, product_name').in('id', productIds)
-        : { data: [] }
+      const productsRes = await readIn('products', 'id, product_name', productIds)
       const productNameById = new Map(
         (productsRes.data || []).map((p: Record<string, unknown>) => [
           p.id as string,
@@ -727,12 +758,10 @@ export const stockMoves = {
 export const parts = {
   async list(): Promise<TableResult<PartRow[]>> {
     try {
-      const { data, error } = await supabase.from('parts').select('*').order('part_name', { ascending: true })
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
+      const data = await fetchAllRows<PartRow>((from, to) =>
+        supabase.from('parts').select('*').order('part_name', { ascending: true }).order('id', { ascending: true }).range(from, to)
+      )
+      return { missing: false, data }
     } catch {
       return { missing: true, data: [] }
     }
@@ -777,16 +806,16 @@ export const parts = {
 export const ticketParts = {
   async list(ticketId: string): Promise<TableResult<TicketPartRow[]>> {
     try {
-      const { data, error } = await supabase
-        .from('ticket_parts')
-        .select('*, part:parts(part_name, part_number)')
-        .eq('ticket_id', ticketId)
-        .order('created_date', { ascending: true })
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
+      const data = await fetchAllRows<TicketPartRow>((from, to) =>
+        supabase
+          .from('ticket_parts')
+          .select('*, part:parts(part_name, part_number)')
+          .eq('ticket_id', ticketId)
+          .order('created_date', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to)
+      )
+      return { missing: false, data }
     } catch {
       return { missing: true, data: [] }
     }
@@ -820,31 +849,16 @@ export const ticketParts = {
 export const timeEntries = {
   async list(ticketId: string): Promise<TableResult<TimeEntryRow[]>> {
     try {
-      const { data, error } = await supabase
-        .from('time_entries')
-        .select('*')
-        .eq('ticket_id', ticketId)
-        .order('created_date', { ascending: false })
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
-    } catch {
-      return { missing: true, data: [] }
-    }
-  },
-  async listAll(): Promise<TableResult<unknown[]>> {
-    try {
-      const { data, error } = await supabase
-        .from('time_entries')
-        .select('*, ticket:rma_tickets(rma_number, customer_name)')
-        .order('created_date', { ascending: false })
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
+      const data = await fetchAllRows<TimeEntryRow>((from, to) =>
+        supabase
+          .from('time_entries')
+          .select('*')
+          .eq('ticket_id', ticketId)
+          .order('created_date', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
+      )
+      return { missing: false, data }
     } catch {
       return { missing: true, data: [] }
     }
@@ -869,13 +883,16 @@ export const timeEntries = {
   },
   async getTotalMinutes(ticketId: string): Promise<number> {
     try {
-      const { data, error } = await supabase
-        .from('time_entries')
-        .select('duration_min')
-        .eq('ticket_id', ticketId)
-        .not('duration_min', 'is', null)
-      if (error) return 0
-      return (data || []).reduce((sum, e: { duration_min: number | null }) => sum + (e.duration_min || 0), 0)
+      const data = await fetchAllRows<{ id: string; duration_min: number | null }>((from, to) =>
+        supabase
+          .from('time_entries')
+          .select('id, duration_min')
+          .eq('ticket_id', ticketId)
+          .not('duration_min', 'is', null)
+          .order('id', { ascending: true })
+          .range(from, to)
+      )
+      return data.reduce((sum, e) => sum + (e.duration_min || 0), 0)
     } catch {
       return 0
     }

@@ -146,22 +146,27 @@ export const brands = {
 // ── Categories ────────────────────────────────────────────────────────────────
 
 export const categories = {
+  /** Every category, A–Z — not the first 1 000. (BUG-066.) */
   async list(): Promise<CategoryRow[]> {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('*, brand:brands(id, brand_name)')
-      .order('category_name', { ascending: true })
-    if (error) throw error
-    return data || []
+    return fetchAllRows<CategoryRow>((from, to) =>
+      supabase
+        .from('categories')
+        .select('*, brand:brands(id, brand_name)')
+        .order('category_name', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
   },
   async listByBrand(brandId: string): Promise<CategoryRow[]> {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('*')
-      .eq('brand_id', brandId)
-      .order('category_name', { ascending: true })
-    if (error) throw error
-    return data || []
+    return fetchAllRows<CategoryRow>((from, to) =>
+      supabase
+        .from('categories')
+        .select('*')
+        .eq('brand_id', brandId)
+        .order('category_name', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
   },
   async create(category: Partial<CategoryRow>): Promise<CategoryRow | undefined> {
     const { data, error } = await supabase.from('categories').insert([category]).select()
@@ -183,22 +188,27 @@ export const categories = {
 // ── Subcategories ─────────────────────────────────────────────────────────────
 
 export const subcategories = {
+  /** Every subcategory, A–Z — not the first 1 000. (BUG-066.) */
   async list(): Promise<SubcategoryRow[]> {
-    const { data, error } = await supabase
-      .from('subcategories')
-      .select('*, category:categories(id, category_name, brand_id)')
-      .order('subcategory_name', { ascending: true })
-    if (error) throw error
-    return data || []
+    return fetchAllRows<SubcategoryRow>((from, to) =>
+      supabase
+        .from('subcategories')
+        .select('*, category:categories(id, category_name, brand_id)')
+        .order('subcategory_name', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
   },
   async listByCategory(categoryId: string): Promise<SubcategoryRow[]> {
-    const { data, error } = await supabase
-      .from('subcategories')
-      .select('*')
-      .eq('category_id', categoryId)
-      .order('subcategory_name', { ascending: true })
-    if (error) throw error
-    return data || []
+    return fetchAllRows<SubcategoryRow>((from, to) =>
+      supabase
+        .from('subcategories')
+        .select('*')
+        .eq('category_id', categoryId)
+        .order('subcategory_name', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
   },
   async create(subcategory: Partial<SubcategoryRow>): Promise<SubcategoryRow | undefined> {
     const { data, error } = await supabase.from('subcategories').insert([subcategory]).select()
@@ -507,41 +517,6 @@ export const products = {
     return found
   },
 
-  /**
-   * @deprecated Loads the whole table, and the Data API returns at most 1 000
-   * rows, so past that it is silently incomplete (BUG-066). Still used by
-   * screens not yet moved to server-side paging; do not add callers.
-   */
-  async list(): Promise<ProductRow[]> {
-    const { data, error } = await supabase
-      .from('products')
-      .select(
-        '*, brand:brands(id, brand_name, brand_logo_url), category:categories(id, category_name), subcategory:subcategories(id, subcategory_name)'
-      )
-      .order('created_date', { ascending: false })
-      .limit(5000)
-    if (error) throw error
-    return data || []
-  },
-  async listPaged(page = 0, pageSize = 50): Promise<PagedResult<ProductRow>> {
-    const from = page * pageSize
-    const { data, count, error } = await supabase
-      .from('products')
-      .select(
-        '*, brand:brands(id, brand_name, brand_logo_url), category:categories(id, category_name), subcategory:subcategories(id, subcategory_name)',
-        { count: 'exact' }
-      )
-      .order('created_date', { ascending: false })
-      .range(from, from + pageSize - 1)
-    if (error) throw error
-    return {
-      data: data || [],
-      count: count || 0,
-      page,
-      pageSize,
-      totalPages: Math.ceil((count || 0) / pageSize),
-    }
-  },
   async get(id: string): Promise<ProductRow> {
     const { data, error } = await supabase
       .from('products')
@@ -639,23 +614,18 @@ export const products = {
    * ticket ids from there and fetching those tickets follows the association
    * that the RMA flow genuinely creates.
    */
-  async getRelatedTickets(productId: string): Promise<unknown[]> {
-    const { data: units, error: unitErr } = await supabase
-      .from('inventory_units')
-      .select('rma_ticket_id')
-      .eq('product_id', productId)
-      .not('rma_ticket_id', 'is', null)
-    if (unitErr) throw unitErr
-
-    const ticketIds = [...new Set((units || []).map((u) => u.rma_ticket_id))]
-    if (!ticketIds.length) return []
-
-    const { data, error } = await supabase
-      .from('rma_tickets')
-      .select('*')
-      .in('id', ticketIds)
-      .order('created_date', { ascending: false })
-    if (error) throw error
-    return data || []
+  /**
+   * One page of the tickets any unit of this product came in on, newest first
+   * (rma_product_tickets, 20260865). It read every unit's ticket id, then asked
+   * for all those tickets in one request — capped at 1 000 on both. (BUG-066.)
+   */
+  async relatedTicketsPage(productId: string, page: number, pageSize: number): Promise<ServerPage<Record<string, unknown>>> {
+    return fetchPage<Record<string, unknown>>((from, to) =>
+      supabase
+        .rpc('rma_product_tickets', { p_product_id: productId }, { count: 'exact' })
+        .order('created_date', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to),
+      page, pageSize)
   },
 }

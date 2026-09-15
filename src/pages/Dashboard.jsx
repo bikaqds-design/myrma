@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { db, supabase } from '../api/supabaseClient'
 import { safeStorage } from '../lib/safeStorage'
 import { isPastDueLocal, daysPastDueLocal, daysUntilDueLocal } from '../lib/dates'
@@ -17,7 +17,7 @@ import { formatMoneyCompact } from '../lib/money'
 import { useBaseCurrency } from '../hooks/useBaseCurrency'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { Spinner, Ltr } from '../components/ui'
-import { TICKET_STATUS, TICKET_STATUS_LIST, TICKET_STATUS_RESOLVED, ROLES } from '../lib/constants'
+import { TICKET_STATUS, TICKET_STATUS_LIST, ROLES } from '../lib/constants'
 import { useTranslation } from 'react-i18next'
 import { EMPTY_ARRAY } from '../lib/stableEmpty'
 
@@ -399,6 +399,16 @@ function EditBtn({ tk, onClick, disabled, title, danger, children }) {
 }
 
 
+// Shown until the first summary arrives, so every derived figure is a number.
+const EMPTY_TICKET_SUMMARY = {
+  total: 0, resolved: 0, overdue: 0, tracked: 0,
+  status_counts: [], priority_counts: {}, technicians: [], daily_created: {},
+  products: { received: 0, under_repair: 0, repaired: 0, cant_repair: 0, rma_stock: 0 },
+  top_issues: [],
+}
+const EMPTY_CRM = { open_value: 0, open_count: 0, won_this_month: 0, leads_this_month: 0, open_by_stage: [], won_by_rep: [] }
+const EMPTY_MY_OPEN = { data: [], count: 0 }
+
 export default function Dashboard({ currentUserEmail, currentUserRole, currentUserPermissions, onNavigate }) {
   const { darkMode } = useAppearance()
   const { t } = useTranslation()
@@ -433,25 +443,35 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
   const [dragId, setDragId] = useState(null)
 
   const queryClient = useQueryClient()
-  const { data: tickets = EMPTY_ARRAY, isLoading: loading } = useQuery({
-    queryKey: ['rma-tickets'],
-    queryFn: () => db.rmaTickets.list(),
+  // Every ticket figure is counted in the database for the chosen range
+  // (rma_dashboard_ticket_summary, 20260863). The page used to load every
+  // ticket and count them here — past the Data API's 1 000-row cap, the
+  // Dashboard described some of the tickets as all of them. (BUG-066.)
+  const since = useMemo(() => {
+    if (range === 'All') return null
+    const cutoff = new Date()
+    if (range === 'Today') cutoff.setHours(0, 0, 0, 0)
+    else cutoff.setDate(cutoff.getDate() - parseInt(range))
+    return cutoff.toISOString()
+  }, [range])
+  const { data: ticketSummary, isLoading: loading } = useQuery({
+    queryKey: ['dashboard', 'tickets', since],
+    queryFn: () => db.dashboard.ticketSummary(since),
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
   })
+  const summary = ticketSummary ?? EMPTY_TICKET_SUMMARY
   const { data: invStats = null } = useQuery({
     queryKey: ['inv-stats'],
     queryFn: () => db.inventory.getStats().catch(() => null),
     staleTime: 2 * 60_000,
   })
+  // A ticket change can move any figure, so every Dashboard query refetches.
   useEffect(() => {
+    const refresh = () => queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     const channel = supabase
       .channel('dashboard-rt')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rma_tickets' },
-        ({ new: row }) => { queryClient.setQueryData(['rma-tickets'], (old) => (old ? [row, ...old] : [row])) })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rma_tickets' },
-        ({ new: row }) => { queryClient.setQueryData(['rma-tickets'], (old) => old?.map((t) => (t.id === row.id ? row : t)) ?? [row]) })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'rma_tickets' },
-        ({ old: row }) => { queryClient.setQueryData(['rma-tickets'], (old) => old?.filter((t) => t.id !== row.id) ?? []) })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rma_tickets' }, refresh)
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [queryClient])
@@ -542,25 +562,32 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
 
   const on = (id) => layout.some((w) => w.id === id)
 
-  const { data: overdueFollowups = EMPTY_ARRAY } = useQuery({
-    queryKey: ['activities', 'overdue-count'],
-    queryFn: () => db.activities.listOverdue(),
+  const { data: overdueFollowupCount = 0 } = useQuery({
+    queryKey: ['dashboard', 'overdue-followups', 'count'],
+    queryFn: () => db.activities.countOverdue(),
     staleTime: 60_000,
     enabled: on('overdue_followups') || on('crm_kpi'),
   })
+  const { data: overdueFollowups = EMPTY_ARRAY } = useQuery({
+    queryKey: ['dashboard', 'overdue-followups', 'first'],
+    queryFn: () => db.activities.listOverdueFirst(8),
+    staleTime: 60_000,
+    enabled: on('overdue_followups'),
+  })
 
+  // Open pipeline, won and leads this month, the stage and rep breakdowns — all
+  // summed in the database (rma_dashboard_crm) instead of over every deal and
+  // lead loaded here.
+  const monthStart = useMemo(() => {
+    const d = new Date()
+    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString()
+  }, [])
   const crmDataEnabled = on('crm_kpi') || on('pipeline_by_stage') || on('rep_leaderboard')
-  const { data: crmDeals = EMPTY_ARRAY } = useQuery({
-    queryKey: ['crm-deals'],
-    queryFn: () => db.deals.list(),
+  const { data: crm = EMPTY_CRM } = useQuery({
+    queryKey: ['dashboard', 'crm', monthStart],
+    queryFn: () => db.dashboard.crm(monthStart),
     staleTime: 60_000,
     enabled: crmDataEnabled,
-  })
-  const { data: crmLeads = EMPTY_ARRAY } = useQuery({
-    queryKey: ['crm-leads'],
-    queryFn: () => db.leads.list(),
-    staleTime: 60_000,
-    enabled: on('crm_kpi'),
   })
   const { data: crmPipelines = EMPTY_ARRAY } = useQuery({
     queryKey: ['crm-pipelines'],
@@ -569,74 +596,54 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
     enabled: on('pipeline_by_stage'),
   })
 
-  const rangedTickets = useMemo(() => {
-    if (range === 'All') return tickets
-    const cutoff = new Date()
-    if (range === 'Today') cutoff.setHours(0, 0, 0, 0)
-    else cutoff.setDate(cutoff.getDate() - parseInt(range))
-    const iso = cutoff.toISOString()
-    return tickets.filter((t) => t.created_date && t.created_date >= iso)
-  }, [tickets, range])
+  const { data: recentTickets = EMPTY_ARRAY } = useQuery({
+    queryKey: ['dashboard', 'recent-tickets'],
+    queryFn: () => db.dashboard.recentTickets(8),
+    staleTime: 60_000,
+    enabled: on('recent_tickets'),
+  })
+  const { data: overdueList = EMPTY_ARRAY } = useQuery({
+    queryKey: ['dashboard', 'overdue-tickets', since],
+    queryFn: () => db.dashboard.overdueTickets(since, 8),
+    staleTime: 60_000,
+    enabled: on('overdue_tickets'),
+  })
+  const showMyOpen = currentUserRole === ROLES.TECHNICIAN || currentUserRole === ROLES.VIEWER
+  const { data: myOpen = EMPTY_MY_OPEN } = useQuery({
+    queryKey: ['dashboard', 'my-open-tickets', currentUserEmail],
+    queryFn: () => db.dashboard.myOpenTickets(currentUserEmail, 6),
+    staleTime: 60_000,
+    enabled: showMyOpen && !!currentUserEmail,
+  })
+  const myOpenTickets = showMyOpen ? myOpen.data : EMPTY_ARRAY
+  const myOpenCount = showMyOpen ? myOpen.count : 0
 
-  const totalTickets = useMemo(() => rangedTickets.length, [rangedTickets])
-
-  const closedTickets = useMemo(
-    () => rangedTickets.filter((t) => TICKET_STATUS_RESOLVED.includes(t.ticket_status)).length,
-    [rangedTickets]
-  )
-
-  const overdueList = useMemo(
-    () => rangedTickets.filter((t) => {
-      if (!t.due_date || TICKET_STATUS_RESOLVED.includes(t.ticket_status)) return false
-      // Inclusive to the end of the local day: `new Date('2026-09-06')`
-      // parses as UTC midnight, so a ticket due today used to read as
-      // overdue from 02:00 Cairo (BUG-038).
-      return isPastDueLocal(t.due_date)
-    }),
-    [rangedTickets]
-  )
+  const totalTickets = summary.total
+  const closedTickets = summary.resolved
+  const overdueCount = summary.overdue
 
   const statusCounts = useMemo(() => {
     const counts = {}
     TICKET_STATUS_LIST.forEach((s) => { counts[s] = 0 })
-    rangedTickets.forEach((t) => { if (counts[t.ticket_status] !== undefined) counts[t.ticket_status]++ })
+    summary.status_counts.forEach(({ status, count }) => { if (counts[status] !== undefined) counts[status] = count })
     return counts
-  }, [rangedTickets])
+  }, [summary])
 
-  const invProductCounts = useMemo(() => {
-    const flat = rangedTickets
-      .filter((t) => t.ticket_status !== TICKET_STATUS.CANCELLED)
-      .flatMap((t) => (t.products || []).map((p) => ({ ...p, ts: t.ticket_status })))
-      .filter((p) => {
-        if (p.ts === TICKET_STATUS.COMPLETED)
-          return p.product_status === 'Replacement' || p.product_status === 'Credit Note'
-        return true
-      })
-    const active = (ps) => flat.filter((p) => p.ts !== TICKET_STATUS.COMPLETED && p.product_status === ps).length
-    return {
-      allUnits:    invStats?.total ?? 0,
-      received:    flat.filter((p) => p.ts !== TICKET_STATUS.COMPLETED && (p.product_status === 'Received' || !p.product_status)).length,
-      underRepair: active('Under Repair'),
-      repaired:    active('Repaired'),
-      cantRepair:  active("Can't Repair"),
-      rmaStock:    flat.filter((p) => p.product_status === 'Replacement' || p.product_status === 'Credit Note').length,
-    }
-  }, [rangedTickets, invStats])
+  const invProductCounts = {
+    allUnits:    invStats?.total ?? 0,
+    received:    summary.products.received,
+    underRepair: summary.products.under_repair,
+    repaired:    summary.products.repaired,
+    cantRepair:  summary.products.cant_repair,
+    rmaStock:    summary.products.rma_stock,
+  }
 
-  const { slaPercent, resolutionPercent, trackedCount, onScheduleCount } = useMemo(() => {
-    const ticketsWithDue = rangedTickets.filter((t) => t.due_date && t.ticket_status !== TICKET_STATUS.CANCELLED)
-    const overdueActive = ticketsWithDue.filter(
-      (t) => !TICKET_STATUS_RESOLVED.includes(t.ticket_status) && isPastDueLocal(t.due_date)
-    ).length
-    return {
-      slaPercent: ticketsWithDue.length > 0
-        ? Math.round(((ticketsWithDue.length - overdueActive) / ticketsWithDue.length) * 100)
-        : 100,
-      resolutionPercent: rangedTickets.length > 0 ? Math.round((closedTickets / rangedTickets.length) * 100) : 0,
-      trackedCount: ticketsWithDue.length,
-      onScheduleCount: ticketsWithDue.length - overdueActive,
-    }
-  }, [rangedTickets, closedTickets])
+  // "On schedule" = tracked tickets (a due date, not cancelled) that are not
+  // overdue; every overdue ticket is tracked, since cancelled ones are resolved.
+  const trackedCount = summary.tracked
+  const onScheduleCount = trackedCount - overdueCount
+  const slaPercent = trackedCount > 0 ? Math.round((onScheduleCount / trackedCount) * 100) : 100
+  const resolutionPercent = totalTickets > 0 ? Math.round((closedTickets / totalTickets) * 100) : 0
 
   const weeklyTrend = useMemo(() => {
     const days = []
@@ -644,10 +651,10 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
       const d = new Date()
       d.setDate(d.getDate() - i)
       const ds = d.toISOString().split('T')[0]
-      days.push({ date: d.toLocaleDateString('en-US', { weekday: 'short' }), tickets: rangedTickets.filter((t) => t.created_date?.startsWith(ds)).length })
+      days.push({ date: d.toLocaleDateString('en-US', { weekday: 'short' }), tickets: summary.daily_created[ds] || 0 })
     }
     return days
-  }, [rangedTickets])
+  }, [summary])
 
   const monthlyTrend = useMemo(() => {
     const days = []
@@ -658,106 +665,62 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
       days.push({
         date: i % 6 === 0 ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
         fullDate: ds,
-        tickets: rangedTickets.filter((t) => t.created_date?.startsWith(ds)).length,
+        tickets: summary.daily_created[ds] || 0,
       })
     }
     return days
-  }, [rangedTickets])
+  }, [summary])
 
-  const statusDist = useMemo(() => {
-    const counts = {}
-    rangedTickets.forEach((t) => { counts[t.ticket_status] = (counts[t.ticket_status] || 0) + 1 })
-    return Object.entries(counts).map(([name, value]) => ({ name, value, color: STATUS_COLOR[name] || '#94a3b8' }))
-  }, [rangedTickets])
+  const statusDist = useMemo(
+    () => summary.status_counts.map(({ status, count }) => ({ name: status, value: count, color: STATUS_COLOR[status] || '#94a3b8' })),
+    [summary]
+  )
 
   const priorityDist = useMemo(() => {
     const order = ['Critical', 'High', 'Medium', 'Low']
-    const counts = {}
-    rangedTickets.forEach((t) => { if (t.priority) counts[t.priority] = (counts[t.priority] || 0) + 1 })
+    const counts = summary.priority_counts
     return order.filter((p) => counts[p]).map((name) => ({ name, value: counts[name], color: PRIORITY_COLOR[name] || '#94a3b8' }))
-  }, [rangedTickets])
+  }, [summary])
 
-  const technicianPerformance = useMemo(() => {
-    const stats = {}
-    rangedTickets.forEach((t) => {
-      const tech = t.assigned_technician || 'Unassigned'
-      if (!stats[tech]) stats[tech] = { total: 0, closed: 0 }
-      stats[tech].total++
-      if (TICKET_STATUS_RESOLVED.includes(t.ticket_status)) stats[tech].closed++
-    })
-    return Object.entries(stats)
-      .map(([name, s]) => ({ name, total: s.total, closed: s.closed, closeRate: s.total > 0 ? Math.round((s.closed / s.total) * 100) : 0 }))
-      .sort((a, b) => b.closeRate - a.closeRate)
-      .slice(0, 5)
-  }, [rangedTickets])
-
-  const topIssues = useMemo(() => {
-    const counts = {}
-    tickets.forEach((t) => {
-      if (!Array.isArray(t.products)) return
-      t.products.forEach((p) => {
-        const issue = p.issue_description?.trim()
-        if (issue) counts[issue] = (counts[issue] || 0) + 1
-      })
-    })
-    return Object.entries(counts).map(([issue, count]) => ({ issue, count })).sort((a, b) => b.count - a.count).slice(0, 5)
-  }, [tickets])
-
-  const recentTickets = useMemo(
-    () => [...tickets].sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0)).slice(0, 8),
-    [tickets]
+  const technicianPerformance = useMemo(
+    () =>
+      summary.technicians
+        .map(({ tech, total, closed }) => ({ name: tech || 'Unassigned', total, closed, closeRate: total > 0 ? Math.round((closed / total) * 100) : 0 }))
+        .sort((a, b) => b.closeRate - a.closeRate)
+        .slice(0, 5),
+    [summary]
   )
 
-  const myOpenTickets = useMemo(() => {
-    if (currentUserRole !== ROLES.TECHNICIAN && currentUserRole !== ROLES.VIEWER) return []
-    return tickets
-      .filter((t) => t.assigned_technician === currentUserEmail && !TICKET_STATUS_RESOLVED.includes(t.ticket_status))
-      .sort((a, b) => {
-        if (a.due_date && b.due_date) return new Date(a.due_date) - new Date(b.due_date)
-        if (a.due_date) return -1
-        if (b.due_date) return 1
-        return new Date(b.created_date || 0) - new Date(a.created_date || 0)
-      })
-  }, [tickets, currentUserEmail, currentUserRole])
+  const topIssues = summary.top_issues
 
-  const monthStart = useMemo(() => {
-    const d = new Date()
-    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString()
-  }, [])
-
-  const crmStats = useMemo(() => {
-    const openPipelineValue = crmDeals.filter((d) => d.status === 'open').reduce((s, d) => s + (d.value || 0), 0)
-    const dealsWonThisMonth = crmDeals.filter((d) => d.status === 'won' && d.won_at && d.won_at >= monthStart).length
-    const leadsThisMonth = crmLeads.filter((l) => l.created_at >= monthStart).length
-    return { openPipelineValue, dealsWonThisMonth, leadsThisMonth }
-  }, [crmDeals, crmLeads, monthStart])
+  const crmStats = {
+    openPipelineValue: crm.open_value,
+    dealsWonThisMonth: crm.won_this_month,
+    leadsThisMonth: crm.leads_this_month,
+  }
 
   const pipelineByStage = useMemo(() => {
-    const openDeals = crmDeals.filter((d) => d.status === 'open')
     const allStages = crmPipelines.flatMap((p) => (p.stages || []).filter((s) => !s.is_won && !s.is_lost))
     const stageMap = {}
-    openDeals.forEach((d) => {
-      const stage = allStages.find((s) => s.id === d.stage)
-      const name = stage?.name || d.stage
-      const order = stage?.order ?? 99
+    crm.open_by_stage.forEach(({ stage, count, value }) => {
+      const st = allStages.find((s) => s.id === stage)
+      const name = st?.name || stage
+      const order = st?.order ?? 99
       if (!stageMap[name]) stageMap[name] = { name, count: 0, value: 0, order }
-      stageMap[name].count++
-      stageMap[name].value += d.value || 0
+      stageMap[name].count += count
+      stageMap[name].value += value
     })
     return Object.values(stageMap).sort((a, b) => a.order - b.order)
-  }, [crmDeals, crmPipelines])
+  }, [crm, crmPipelines])
 
-  const repLeaderboard = useMemo(() => {
-    const wonThisMonth = crmDeals.filter((d) => d.status === 'won' && d.won_at && d.won_at >= monthStart)
-    const repMap = {}
-    wonThisMonth.forEach((d) => {
-      const rep = d.assigned_rep || '—'
-      if (!repMap[rep]) repMap[rep] = { rep, count: 0, value: 0 }
-      repMap[rep].count++
-      repMap[rep].value += d.value || 0
-    })
-    return Object.values(repMap).sort((a, b) => b.count - a.count || b.value - a.value).slice(0, 5)
-  }, [crmDeals, monthStart])
+  const repLeaderboard = useMemo(
+    () =>
+      crm.won_by_rep
+        .map(({ rep, count, value }) => ({ rep: rep || '—', count, value }))
+        .sort((a, b) => b.count - a.count || b.value - a.value)
+        .slice(0, 5),
+    [crm]
+  )
 
   const RANK_COLORS = ['#f59e0b', '#94a3b8', '#cd7f32']
 
@@ -774,12 +737,12 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
     open: statusCounts[TICKET_STATUS.OPEN] || 0,
     in_progress: statusCounts[TICKET_STATUS.IN_PROGRESS] || 0,
     pending: statusCounts[TICKET_STATUS.PENDING] || 0,
-    overdue: overdueList.length,
+    overdue: overdueCount,
     resolved: closedTickets,
     total: totalTickets,
     sla_percent: slaPercent,
     resolution_rate: resolutionPercent,
-  }), [range, statusCounts, overdueList.length, closedTickets, totalTickets, slaPercent, resolutionPercent])
+  }), [range, statusCounts, overdueCount, closedTickets, totalTickets, slaPercent, resolutionPercent])
 
   if (loading) {
     return (
@@ -809,7 +772,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
           {[
             { label: t('dashboard.totalTickets'), value: totalTickets, color: tk.text, spark: sparkWeekly, delta: '+8%', deltaUp: true },
             { label: t('dashboard.activeOpen'),  value: openActive,   color: tk.accent, spark: [12,14,11,17,15,16,openActive], caption: t('dashboard.across4States') },
-            { label: t('dashboard.overdue'),     value: overdueList.length, color: tk.bad, spark: [3,4,5,4,6,6,overdueList.length], caption: t('dashboard.needsAttention') },
+            { label: t('dashboard.overdue'),     value: overdueCount, color: tk.bad, spark: [3,4,5,4,6,6,overdueCount], caption: t('dashboard.needsAttention') },
             { label: t('dashboard.slaOntime'),   value: `${slaPercent}%`, color: tk.good, spark: [92,93,94,95,95,96,slaPercent], delta: '+2%', deltaUp: true },
           ].map(({ label, value, color, spark, delta, deltaUp, caption }) => (
             <div key={label} style={{ background: tk.surface, padding: 18, display: 'flex', flexDirection: 'column' }}>
@@ -845,7 +808,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
             { label: t('statusValues.Completed'),   value: statusCounts[TICKET_STATUS.COMPLETED],   navPath: `/rma-tickets?status=${TICKET_STATUS.COMPLETED}` },
             { label: t('statusValues.Closed'),      value: statusCounts[TICKET_STATUS.CLOSED],      navPath: `/rma-tickets?status=${TICKET_STATUS.CLOSED}` },
             { label: t('statusValues.Cancelled'),   value: statusCounts[TICKET_STATUS.CANCELLED],   navPath: `/rma-tickets?status=${TICKET_STATUS.CANCELLED}` },
-            { label: t('statusValues.Overdue'),     value: overdueList.length,                      navPath: '/rma-tickets?overdue=true' },
+            { label: t('statusValues.Overdue'),     value: overdueCount,                      navPath: '/rma-tickets?overdue=true' },
           ].map(({ label, value, navPath }, i) => {
             const color = STATUS_COLOR[label] || '#94a3b8'
             return (
@@ -880,7 +843,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
           { label: t('dashboard.openPipelineValue'), value: fmtCurrency(crmStats.openPipelineValue), color: tk.accent, caption: t('dashboard.openDealsCaption') },
           { label: t('dashboard.dealsWonThisMonth'), value: crmStats.dealsWonThisMonth,              color: tk.good,   caption: t('dashboard.thisMonth') },
           { label: t('dashboard.leadsThisMonth'),    value: crmStats.leadsThisMonth,                 color: '#6366f1', caption: t('dashboard.thisMonth') },
-          { label: t('dashboard.overdueFollowupsKpi'), value: overdueFollowups.length,               color: tk.bad,    caption: t('dashboard.needsAttention') },
+          { label: t('dashboard.overdueFollowupsKpi'), value: overdueFollowupCount,               color: tk.bad,    caption: t('dashboard.needsAttention') },
         ].map(({ label, value, color, caption }) => (
           <div key={label} style={{ display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: tk.textMuted, letterSpacing: 0.1 }}>{label}</span>
@@ -1013,8 +976,8 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
 
     overdue_followups: () => (
       <>
-        <CardHead title={t('dashboard.overdueFollowups')} action={String(overdueFollowups.length)} tk={tk} />
-        {overdueFollowups.length === 0 ? (
+        <CardHead title={t('dashboard.overdueFollowups')} action={String(overdueFollowupCount)} tk={tk} />
+        {overdueFollowupCount === 0 ? (
           <div style={{ textAlign: 'center', padding: '24px 0' }}>
             <svg className="mx-auto mb-2" width="32" height="32" fill="none" stroke={tk.good} strokeWidth="1.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1054,8 +1017,8 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
 
     overdue_tickets: () => (
       <>
-        <CardHead title={t('dashboard.overdueTickets')} action={String(overdueList.length)} tk={tk} />
-        {overdueList.length === 0 ? (
+        <CardHead title={t('dashboard.overdueTickets')} action={String(overdueCount)} tk={tk} />
+        {overdueCount === 0 ? (
           <div style={{ textAlign: 'center', padding: '24px 0' }}>
             <svg className="mx-auto mb-2" width="32" height="32" fill="none" stroke={tk.good} strokeWidth="1.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1197,7 +1160,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
       {myOpenTickets.length > 0 && (
         <div className="mb-4"
           style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 14, padding: 18 }}>
-          <CardHead title={t('dashboard.myOpenTickets')} action={`${myOpenTickets.length} ${t('common.open')}`} tk={tk} />
+          <CardHead title={t('dashboard.myOpenTickets')} action={`${myOpenCount} ${t('common.open')}`} tk={tk} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {myOpenTickets.slice(0, 6).map((ticket) => {
               const isDue = isPastDueLocal(ticket.due_date)

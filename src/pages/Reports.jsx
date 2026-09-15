@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import i18next from 'i18next'
 import ProfitabilityTab from './_ProfitabilityTab'
 import { useURLTab } from '../hooks/useURLTab'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -14,6 +14,9 @@ import { ROLES } from '../lib/constants'
 import { toCsv, downloadCsvText } from '../lib/csv'
 import { formatMoney } from '../lib/money'
 import { useBaseCurrency } from '../hooks/useBaseCurrency'
+import Pagination from '../components/Pagination'
+import { safeStorage } from '../lib/safeStorage'
+import { reportRange } from '../api/db/reports'
 
 // ─── CSV Utility ──────────────────────────────────────────────────────────────
 function downloadCSV(rows, columns, filename, t) {
@@ -67,17 +70,42 @@ function ExportButtons({ onCSV, onExcel }) {
   )
 }
 
+// ─── Data ─────────────────────────────────────────────────────────────────────
+// Each tab reads only its own figures and one page of its table, computed in
+// the database for the date range (20260864). The page used to load every
+// ticket, customer, invoice, quotation, order, payment, deal and lead and
+// filter them here — past the Data API's 1 000-row cap, a report on part of
+// the business presented as all of it. (BUG-066.)
+function useReport(key, queryFn, options = {}) {
+  const q = useQuery({ queryKey: ['reports', ...key], queryFn, placeholderData: keepPreviousData, ...options })
+  useEffect(() => {
+    if (q.isError) {
+      captureException(q.error, { page: 'Reports', context: String(key[0]) })
+      toast.error(i18next.t('reports.errorLoad'))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q.isError, q.error])
+  return q
+}
+
+/** Page + page size for a report table; the page returns to 1 when `resetKey` changes. */
+function useReportPaging(resetKey) {
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(() => safeStorage.get('reportsPerPage', 25))
+  useEffect(() => { safeStorage.set('reportsPerPage', perPage) }, [perPage])
+  useEffect(() => { setPage(1) }, [resetKey, perPage])
+  return { page, setPage, perPage, setPerPage }
+}
+
+function TabSpinner() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <Spinner size="lg" />
+    </div>
+  )
+}
+
 // ─── Date helpers ─────────────────────────────────────────────────────────────
-function startOfDay(date) {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-function endOfDay(date) {
-  const d = new Date(date)
-  d.setHours(23, 59, 59, 999)
-  return d
-}
 function toYMD(date) {
   return new Date(date).toISOString().split('T')[0]
 }
@@ -85,11 +113,6 @@ function resolutionHours(ticket) {
   if (ticket.ticket_status !== 'Completed' || !ticket.updated_date) return null
   const ms = new Date(ticket.updated_date) - new Date(ticket.created_date)
   return ms > 0 ? (ms / 3600000).toFixed(1) : null
-}
-function inRange(dateStr, from, to) {
-  if (!dateStr) return false
-  const d = new Date(dateStr)
-  return d >= startOfDay(from) && d <= endOfDay(to)
 }
 
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
@@ -187,71 +210,51 @@ function PriorityBadge({ priority }) {
 }
 
 // ─── Tickets Tab ──────────────────────────────────────────────────────────────
-function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
+function TicketsTab({ range, onNavigateToTicket, formatDate }) {
   const { t } = useTranslation()
   const [filterStatus, setFilterStatus] = useState('')
   const [filterPriority, setFilterPriority] = useState('')
   const [filterTechnician, setFilterTechnician] = useState('')
-
-  const statuses = useMemo(
-    () => [...new Set(tickets.map((tk) => tk.ticket_status).filter(Boolean))].sort(),
-    [tickets]
-  )
-  const priorities = useMemo(
-    () => [...new Set(tickets.map((tk) => tk.priority).filter(Boolean))].sort(),
-    [tickets]
-  )
-  const technicians = useMemo(
-    () => [...new Set(tickets.map((tk) => tk.assigned_technician).filter(Boolean))].sort(),
-    [tickets]
+  const filters = useMemo(
+    () => ({ status: filterStatus, priority: filterPriority, technician: filterTechnician }),
+    [filterStatus, filterPriority, filterTechnician]
   )
 
-  const filtered = useMemo(() => {
-    let list = [...tickets]
-    if (filterStatus) list = list.filter((tk) => tk.ticket_status === filterStatus)
-    if (filterPriority) list = list.filter((tk) => tk.priority === filterPriority)
-    if (filterTechnician) list = list.filter((tk) => tk.assigned_technician === filterTechnician)
-    return list
-  }, [tickets, filterStatus, filterPriority, filterTechnician])
-
-  const total = filtered.length
-  const completed = filtered.filter((tk) => tk.ticket_status === 'Completed')
-  const overdue = filtered.filter(
-    (tk) =>
-      tk.due_date &&
-      new Date(tk.due_date) < new Date() &&
-      tk.ticket_status !== 'Completed' &&
-      tk.ticket_status !== 'Cancelled'
+  const { data: summary, isLoading } = useReport(['tickets', 'summary', range, filters], () =>
+    db.reports.ticketSummary(range, filters)
   )
-  const resolveTimes = completed
-    .map((tk) => resolutionHours(tk))
-    .filter((v) => v !== null)
-    .map(Number)
-  const avgResolve = resolveTimes.length
-    ? (resolveTimes.reduce((s, v) => s + v, 0) / resolveTimes.length).toFixed(1)
+  const { page, setPage, perPage, setPerPage } = useReportPaging(JSON.stringify([range, filters]))
+  const { data: pageResult } = useReport(['tickets', 'page', range, filters, page, perPage], () =>
+    db.reports.ticketsPage(range, filters, page, perPage)
+  )
+  const rows = pageResult?.data ?? []
+
+  // Options are the values present in the range, whatever is selected.
+  const statuses = summary?.statuses ?? []
+  const priorities = summary?.priorities ?? []
+  const technicians = summary?.technicians ?? []
+
+  const total = summary?.total ?? 0
+  const overdueCount = summary?.overdue ?? 0
+  const avgResolve = summary?.avg_resolution_hours != null ? summary.avg_resolution_hours.toFixed(1) : '—'
+  const slaPct = summary?.completed_with_due
+    ? Math.round((summary.sla_met / summary.completed_with_due) * 100)
     : '—'
 
-  const completedWithDue = completed.filter((tk) => tk.due_date)
-  const slaMet = completedWithDue.filter(
-    (tk) => !tk.due_date || new Date(tk.updated_date) <= new Date(tk.due_date)
-  )
-  const slaPct = completedWithDue.length
-    ? Math.round((slaMet.length / completedWithDue.length) * 100)
-    : '—'
-
-  const handleExport = () => {
-    const columns = [
-      { key: 'rma_number', label: 'RMA #' },
-      { key: 'customer_name', label: 'Customer' },
-      { key: 'ticket_status', label: 'Status' },
-      { key: 'priority', label: 'Priority' },
-      { key: 'assigned_technician', label: 'Technician' },
-      { key: 'created_date', label: 'Created' },
-      { key: 'due_date', label: 'Due' },
-      { key: 'resolved_date', label: 'Resolved' },
-      { key: 'resolution_hrs', label: 'Resolution (hrs)' },
-    ]
-    const rows = filtered.map((tk) => ({
+  const exportColumns = [
+    { key: 'rma_number', label: 'RMA #' },
+    { key: 'customer_name', label: 'Customer' },
+    { key: 'ticket_status', label: 'Status' },
+    { key: 'priority', label: 'Priority' },
+    { key: 'assigned_technician', label: 'Technician' },
+    { key: 'created_date', label: 'Created' },
+    { key: 'due_date', label: 'Due' },
+    { key: 'resolved_date', label: 'Resolved' },
+    { key: 'resolution_hrs', label: 'Resolution (hrs)' },
+  ]
+  // Every ticket the report matches, read when exported — not the page on screen.
+  const exportRows = async () =>
+    (await db.reports.ticketsAll(range, filters)).map((tk) => ({
       rma_number: tk.rma_number || '',
       customer_name: tk.customer_name || '',
       ticket_status: tk.ticket_status || '',
@@ -262,33 +265,16 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
       resolved_date: tk.ticket_status === 'Completed' ? formatDate(tk.updated_date) : '',
       resolution_hrs: resolutionHours(tk) ?? 'Open',
     }))
-    downloadCSV(rows, columns, `tickets-report-${toYMD(new Date())}.csv`, t)
+  const handleExport = async () => {
+    try { downloadCSV(await exportRows(), exportColumns, `tickets-report-${toYMD(new Date())}.csv`, t) }
+    catch (err) { captureException(err); toast.error(t('reports.errorLoad')) }
   }
-  const handleExportExcel = () => {
-    const columns = [
-      { key: 'rma_number', label: 'RMA #' },
-      { key: 'customer_name', label: 'Customer' },
-      { key: 'ticket_status', label: 'Status' },
-      { key: 'priority', label: 'Priority' },
-      { key: 'assigned_technician', label: 'Technician' },
-      { key: 'created_date', label: 'Created' },
-      { key: 'due_date', label: 'Due' },
-      { key: 'resolved_date', label: 'Resolved' },
-      { key: 'resolution_hrs', label: 'Resolution (hrs)' },
-    ]
-    const rows = filtered.map((tk) => ({
-      rma_number: tk.rma_number || '',
-      customer_name: tk.customer_name || '',
-      ticket_status: tk.ticket_status || '',
-      priority: tk.priority || '',
-      assigned_technician: tk.assigned_technician || '',
-      created_date: formatDate(tk.created_date),
-      due_date: formatDate(tk.due_date),
-      resolved_date: tk.ticket_status === 'Completed' ? formatDate(tk.updated_date) : '',
-      resolution_hrs: resolutionHours(tk) ?? 'Open',
-    }))
-    downloadExcel(rows, columns, `tickets-report-${toYMD(new Date())}.xlsx`, t)
+  const handleExportExcel = async () => {
+    try { downloadExcel(await exportRows(), exportColumns, `tickets-report-${toYMD(new Date())}.xlsx`, t) }
+    catch (err) { captureException(err); toast.error(t('reports.errorLoad')) }
   }
+
+  if (isLoading) return <TabSpinner />
 
   const sel =
     'px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white dark:bg-[#0f1520] text-gray-800 dark:text-[#e8ebf0]'
@@ -317,10 +303,10 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
         />
         <KpiCard
           label={t('reports.kpiOverdueRate')}
-          value={total ? `${Math.round((overdue.length / total) * 100)}%` : '—'}
+          value={total ? `${Math.round((overdueCount / total) * 100)}%` : '—'}
           color="red"
           icon="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          sub={t('reports.overdueCount', { count: overdue.length })}
+          sub={t('reports.overdueCount', { count: overdueCount })}
         />
       </div>
 
@@ -363,7 +349,7 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
           ))}
         </select>
         <span className="text-sm text-gray-500 dark:text-[#9aa4b2]">
-          {t('reports.ticketCount', { count: filtered.length })}
+          {t('reports.ticketCount', { count: total })}
         </span>
         <div className="ms-auto">
           <ExportButtons onCSV={handleExport} onExcel={handleExportExcel} />
@@ -371,7 +357,7 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
       </div>
 
       {/* Table */}
-      {filtered.length === 0 ? (
+      {total === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
           <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('reports.noTicketsMatch')}</p>
         </div>
@@ -402,7 +388,7 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
-                {filtered.map((tk) => {
+                {rows.map((tk) => {
                   const hrs = resolutionHours(tk)
                   return (
                     <tr key={tk.id} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors">
@@ -466,6 +452,9 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
               </tbody>
             </table>
           </div>
+          <div className="px-4 pb-3">
+            <Pagination total={total} page={page} itemsPerPage={perPage} setItemsPerPage={setPerPage} onPage={setPage} />
+          </div>
         </div>
       )}
     </div>
@@ -473,83 +462,45 @@ function TicketsTab({ tickets, onNavigateToTicket, formatDate }) {
 }
 
 // ─── Customers Tab ────────────────────────────────────────────────────────────
-function CustomersTab({ customers, tickets, formatDate }) {
+function CustomersTab({ range, formatDate }) {
   const { t } = useTranslation()
-  const customerStats = useMemo(() => {
-    const map = {}
-    for (const tk of tickets) {
-      if (!tk.customer_id && !tk.customer_name) continue
-      const key = tk.customer_id || tk.customer_name
-      if (!map[key])
-        map[key] = {
-          total: 0,
-          open: 0,
-          lastActivity: null,
-          customerId: tk.customer_id,
-          customerName: tk.customer_name,
-        }
-      map[key].total++
-      if (tk.ticket_status !== 'Completed' && tk.ticket_status !== 'Cancelled') map[key].open++
-      if (!map[key].lastActivity || tk.created_date > map[key].lastActivity)
-        map[key].lastActivity = tk.created_date
-    }
-    return map
-  }, [tickets])
-
-  const enriched = useMemo(
-    () =>
-      customers
-        .map((c) => {
-          const stats = customerStats[c.id] || { total: 0, open: 0, lastActivity: null }
-          return {
-            ...c,
-            totalTickets: stats.total,
-            openTickets: stats.open,
-            lastActivity: stats.lastActivity,
-          }
-        })
-        .sort((a, b) => b.totalTickets - a.totalTickets),
-    [customers, customerStats]
+  const { data: summary, isLoading } = useReport(['customers', 'summary', range], () => db.reports.customerSummary(range))
+  const { page, setPage, perPage, setPerPage } = useReportPaging(JSON.stringify(range))
+  const { data: pageResult } = useReport(['customers', 'page', range, page, perPage], () =>
+    db.reports.customersPage(range, page, perPage)
   )
+  const rows = pageResult?.data ?? []
+  const customerCount = summary?.customers ?? 0
 
-  const totalActive = customers.filter((c) => c.customer_status === 'Active').length
-  const avgTickets = customers.length ? (tickets.length / customers.length).toFixed(1) : '—'
-  const topReturning = enriched.filter((c) => c.totalTickets > 1).length
+  const totalActive = summary?.active ?? 0
+  const avgTickets = customerCount ? ((summary?.tickets ?? 0) / customerCount).toFixed(1) : '—'
+  const topReturning = summary?.returning ?? 0
 
-  const handleExport = () => {
-    const columns = [
-      { key: 'name', label: 'Customer Name' },
-      { key: 'company', label: 'Company' },
-      { key: 'total', label: 'Total Tickets' },
-      { key: 'open', label: 'Open Tickets' },
-      { key: 'last', label: 'Last Activity' },
-    ]
-    const rows = enriched.map((c) => ({
+  const exportColumns = [
+    { key: 'name', label: 'Customer Name' },
+    { key: 'company', label: 'Company' },
+    { key: 'total', label: 'Total Tickets' },
+    { key: 'open', label: 'Open Tickets' },
+    { key: 'last', label: 'Last Activity' },
+  ]
+  const exportRows = async () =>
+    (await db.reports.customersAll(range)).map((c) => ({
       name: c.contact_person || c.company_name || '',
       company: c.company_name || '',
-      total: c.totalTickets,
-      open: c.openTickets,
-      last: formatDate(c.lastActivity),
+      total: c.total_tickets,
+      open: c.open_tickets,
+      last: formatDate(c.last_activity),
     }))
-    downloadCSV(rows, columns, `customers-report-${toYMD(new Date())}.csv`, t)
+  const handleExport = async () => {
+    try { downloadCSV(await exportRows(), exportColumns, `customers-report-${toYMD(new Date())}.csv`, t) }
+    catch (err) { captureException(err); toast.error(t('reports.errorLoad')) }
   }
-  const handleExportExcel = () => {
-    const columns = [
-      { key: 'name', label: 'Customer Name' },
-      { key: 'company', label: 'Company' },
-      { key: 'total', label: 'Total Tickets' },
-      { key: 'open', label: 'Open Tickets' },
-      { key: 'last', label: 'Last Activity' },
-    ]
-    const rows = enriched.map((c) => ({
-      name: c.contact_person || c.company_name || '',
-      company: c.company_name || '',
-      total: c.totalTickets,
-      open: c.openTickets,
-      last: formatDate(c.lastActivity),
-    }))
-    downloadExcel(rows, columns, `customers-report-${toYMD(new Date())}.xlsx`, t)
+  const handleExportExcel = async () => {
+    try { downloadExcel(await exportRows(), exportColumns, `customers-report-${toYMD(new Date())}.xlsx`, t) }
+    catch (err) { captureException(err); toast.error(t('reports.errorLoad')) }
   }
+
+  if (isLoading) return <TabSpinner />
 
   return (
     <div className="space-y-5">
@@ -581,7 +532,7 @@ function CustomersTab({ customers, tickets, formatDate }) {
         <ExportButtons onCSV={handleExport} onExcel={handleExportExcel} />
       </div>
 
-      {enriched.length === 0 ? (
+      {customerCount === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
           <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('reports.noCustomerData')}</p>
         </div>
@@ -608,7 +559,7 @@ function CustomersTab({ customers, tickets, formatDate }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
-                {enriched.map((c) => (
+                {rows.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors">
                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-[#e8ebf0]">
                       {c.contact_person || '—'}
@@ -616,25 +567,28 @@ function CustomersTab({ customers, tickets, formatDate }) {
                     <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2]">{c.company_name || '—'}</td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
-                        {c.totalTickets}
+                        {c.total_tickets}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {c.openTickets > 0 ? (
+                      {c.open_tickets > 0 ? (
                         <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                          {c.openTickets}
+                          {c.open_tickets}
                         </span>
                       ) : (
                         <span className="text-gray-300 text-xs">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs">
-                      {c.lastActivity ? formatDate(c.lastActivity) : '—'}
+                      {c.last_activity ? formatDate(c.last_activity) : '—'}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="px-4 pb-3">
+            <Pagination total={customerCount} page={page} itemsPerPage={perPage} setItemsPerPage={setPerPage} onPage={setPage} />
           </div>
         </div>
       )}
@@ -643,75 +597,49 @@ function CustomersTab({ customers, tickets, formatDate }) {
 }
 
 // ─── Technicians Tab ──────────────────────────────────────────────────────────
-function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: _formatDate }) {
+function TechniciansTab({ range }) {
   const { t } = useTranslation()
-  const stats = useMemo(() => {
-    const map = {}
-    for (const tk of tickets) {
-      const tech = tk.assigned_technician
-      if (!tech) continue
-      if (!map[tech])
-        map[tech] = { email: tech, assigned: 0, completed: 0, resolveTimes: [], hoursLogged: 0 }
-      map[tech].assigned++
-      if (tk.ticket_status === 'Completed') {
-        map[tech].completed++
-        const hrs = resolutionHours(tk)
-        if (hrs !== null) map[tech].resolveTimes.push(Number(hrs))
-      }
-    }
-    if (!timeEntriesMissing) {
-      for (const e of timeEntries) {
-        const tech = e.user_email || e.technician_email
-        if (tech && map[tech]) map[tech].hoursLogged += (e.duration_min || 0) / 60
-      }
-    }
-    return Object.values(map).sort((a, b) => b.assigned - a.assigned)
-  }, [tickets, timeEntries, timeEntriesMissing])
+  const { data: rows = [], isLoading } = useReport(['technicians', range], () => db.reports.technicians(range))
+  // The average is over every ticket in the range, assigned or not, as before.
+  const { data: ticketTotals } = useReport(['tickets', 'summary', range, { status: '', priority: '', technician: '' }], () =>
+    db.reports.ticketSummary(range, {})
+  )
+  // time_entries is part of every deployment now; kept so the banner still
+  // explains itself if the table is ever missing.
+  const timeEntriesMissing = false
 
+  const stats = rows.map((r) => ({
+    email: r.email,
+    assigned: r.assigned,
+    completed: r.completed,
+    avgResolve: r.avg_resolution_hours,
+    hoursLogged: r.hours_logged,
+  }))
   const activeTechs = stats.length
-  const avgAssigned = activeTechs ? (tickets.length / activeTechs).toFixed(1) : '—'
+  const avgAssigned = activeTechs ? ((ticketTotals?.total ?? 0) / activeTechs).toFixed(1) : '—'
   const totalHours = timeEntriesMissing
     ? null
     : stats.reduce((s, ts) => s + ts.hoursLogged, 0).toFixed(1)
 
-  const handleExport = () => {
-    const columns = [
-      { key: 'email', label: 'Technician' },
-      { key: 'assigned', label: 'Assigned Tickets' },
-      { key: 'completed', label: 'Completed Tickets' },
-      { key: 'avgResolve', label: 'Avg Resolution (hrs)' },
-      { key: 'hoursLogged', label: 'Hours Logged' },
-    ]
-    const rows = stats.map((ts) => ({
+  const exportColumns = [
+    { key: 'email', label: 'Technician' },
+    { key: 'assigned', label: 'Assigned Tickets' },
+    { key: 'completed', label: 'Completed Tickets' },
+    { key: 'avgResolve', label: 'Avg Resolution (hrs)' },
+    { key: 'hoursLogged', label: 'Hours Logged' },
+  ]
+  const exportRows = () =>
+    stats.map((ts) => ({
       email: ts.email,
       assigned: ts.assigned,
       completed: ts.completed,
-      avgResolve: ts.resolveTimes.length
-        ? (ts.resolveTimes.reduce((s, v) => s + v, 0) / ts.resolveTimes.length).toFixed(1)
-        : '—',
+      avgResolve: ts.avgResolve != null ? ts.avgResolve.toFixed(1) : '—',
       hoursLogged: timeEntriesMissing ? 'N/A' : ts.hoursLogged.toFixed(1),
     }))
-    downloadCSV(rows, columns, `technicians-report-${toYMD(new Date())}.csv`, t)
-  }
-  const handleExportExcel = () => {
-    const columns = [
-      { key: 'email', label: 'Technician' },
-      { key: 'assigned', label: 'Assigned Tickets' },
-      { key: 'completed', label: 'Completed Tickets' },
-      { key: 'avgResolve', label: 'Avg Resolution (hrs)' },
-      { key: 'hoursLogged', label: 'Hours Logged' },
-    ]
-    const rows = stats.map((ts) => ({
-      email: ts.email,
-      assigned: ts.assigned,
-      completed: ts.completed,
-      avgResolve: ts.resolveTimes.length
-        ? (ts.resolveTimes.reduce((s, v) => s + v, 0) / ts.resolveTimes.length).toFixed(1)
-        : '—',
-      hoursLogged: timeEntriesMissing ? 'N/A' : ts.hoursLogged.toFixed(1),
-    }))
-    downloadExcel(rows, columns, `technicians-report-${toYMD(new Date())}.xlsx`, t)
-  }
+  const handleExport = () => downloadCSV(exportRows(), exportColumns, `technicians-report-${toYMD(new Date())}.csv`, t)
+  const handleExportExcel = () => downloadExcel(exportRows(), exportColumns, `technicians-report-${toYMD(new Date())}.xlsx`, t)
+
+  if (isLoading) return <TabSpinner />
 
   return (
     <div className="space-y-5">
@@ -775,9 +703,7 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
               </thead>
               <tbody className="divide-y divide-[#e6e9ef] dark:divide-[#212a38]">
                 {stats.map((ts) => {
-                  const avgRes = ts.resolveTimes.length
-                    ? (ts.resolveTimes.reduce((s, v) => s + v, 0) / ts.resolveTimes.length).toFixed(1)
-                    : null
+                  const avgRes = ts.avgResolve != null ? ts.avgResolve.toFixed(1) : null
                   return (
                     <tr key={ts.email} className="hover:bg-gray-50 dark:hover:bg-[#1a2230] transition-colors">
                       <td className="px-4 py-3 font-medium text-gray-900 dark:text-[#e8ebf0] text-xs">{ts.email}</td>
@@ -835,8 +761,9 @@ function TechniciansTab({ tickets, timeEntries, timeEntriesMissing, formatDate: 
  * the board — the Pipeline page itself is the place to see the board as it
  * stands now.
  */
-function PipelineTab({ deals, leads, pipelines }) {
+function PipelineTab({ range, pipelines }) {
   const { t } = useTranslation()
+  const { data, isLoading } = useReport(['pipeline', range], () => db.reports.pipeline(range))
 
   const num = (v) => Number(v) || 0
   // Amounts here are stored in the base currency, so they are labelled with it
@@ -845,23 +772,19 @@ function PipelineTab({ deals, leads, pipelines }) {
   const fmtMoney = (v) => formatMoney(num(v), baseCurrency)
   const pct = (a, b) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '—')
 
-  const open = deals.filter((d) => d.status === 'open')
-  const won = deals.filter((d) => d.status === 'won')
-  const lost = deals.filter((d) => d.status === 'lost')
-  const openValue = open.reduce((a, d) => a + num(d.value), 0)
+  // Deal groups (pipeline × stage × status × rep) carry every count and value.
+  const groups = data?.deal_groups ?? []
+  const sumOf = (list, key) => list.reduce((a, g) => a + g[key], 0)
+  const openGroups = groups.filter((g) => g.status === 'open')
+  const openCount = sumOf(openGroups, 'count')
+  const wonCount = sumOf(groups.filter((g) => g.status === 'won'), 'count')
+  const lostCount = sumOf(groups.filter((g) => g.status === 'lost'), 'count')
+  const openValue = sumOf(openGroups, 'value')
 
   // Age is only meaningful for deals still open — a closed deal's age is its
   // cycle time, which is a different measure and is reported separately.
-  const days = (from, to) => Math.max(0, Math.round((new Date(to) - new Date(from)) / 86400000))
-  const avgOpenAge = open.length
-    ? Math.round(open.reduce((a, d) => a + days(d.created_at, Date.now()), 0) / open.length)
-    : 0
-  const closedWithDates = won.filter((d) => d.won_at && d.created_at)
-  const avgCycle = closedWithDates.length
-    ? Math.round(
-        closedWithDates.reduce((a, d) => a + days(d.created_at, d.won_at), 0) / closedWithDates.length
-      )
-    : null
+  const avgOpenAge = openCount ? Math.round((data?.open_age_days_sum ?? 0) / openCount) : 0
+  const avgCycle = data?.won_cycle?.count ? Math.round(data.won_cycle.days_sum / data.won_cycle.count) : null
 
   // Per pipeline, open deals in that pipeline's own stage order. Terminal
   // won/lost stages are skipped: those deals are counted in the win rate above
@@ -872,8 +795,8 @@ function PipelineTab({ deals, leads, pipelines }) {
         .filter((st) => !st.is_won && !st.is_lost)
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
         .map((st) => {
-          const inStage = open.filter((d) => d.pipeline_id === pl.id && d.stage === st.id)
-          return { id: st.id, name: st.name, count: inStage.length, value: inStage.reduce((a, d) => a + num(d.value), 0) }
+          const inStage = openGroups.filter((g) => g.pipeline_id === pl.id && g.stage === st.id)
+          return { id: st.id, name: st.name, count: sumOf(inStage, 'count'), value: sumOf(inStage, 'value') }
         })
       return { id: pl.id, name: pl.name, stages, total: stages.reduce((a, x) => a + x.count, 0) }
     })
@@ -885,42 +808,32 @@ function PipelineTab({ deals, leads, pipelines }) {
   const knownStage = new Set(
     pipelines.flatMap((pl) => (pl.stages || []).map((st) => `${pl.id}|${st.id}`))
   )
-  const orphaned = open.filter((d) => !knownStage.has(`${d.pipeline_id}|${d.stage}`)).length
+  const orphaned = sumOf(openGroups.filter((g) => !knownStage.has(`${g.pipeline_id}|${g.stage}`)), 'count')
 
-  const lostReasons = Object.entries(
-    lost.reduce((acc, d) => {
-      const r = d.lost_reason || t('reports.noReasonGiven')
-      acc[r] = (acc[r] || 0) + 1
-      return acc
-    }, {})
-  ).sort((a, b) => b[1] - a[1])
+  const lostReasons = (data?.lost_reasons ?? []).map((r) => [r.reason || t('reports.noReasonGiven'), r.count])
 
   // Leads by source, with the conversion rate for each. "Which source actually
   // turns into business" is the question a source breakdown is usually asked to
   // answer, and a bare count cannot answer it.
-  const bySource = Object.values(
-    leads.reduce((acc, l) => {
-      const src = l.source || t('reports.unknownSource')
-      acc[src] = acc[src] || { source: src, total: 0, converted: 0 }
-      acc[src].total += 1
-      if (l.status === 'converted' || l.converted_at) acc[src].converted += 1
-      return acc
-    }, {})
-  ).sort((a, b) => b.total - a.total)
-
-  const leadsConverted = leads.filter((l) => l.status === 'converted' || l.converted_at).length
+  const bySource = (data?.lead_sources ?? []).map((r) => ({
+    source: r.source || t('reports.unknownSource'),
+    total: r.total,
+    converted: r.converted,
+  }))
+  const leadsTotal = bySource.reduce((a, r) => a + r.total, 0)
+  const leadsConverted = bySource.reduce((a, r) => a + r.converted, 0)
 
   const byRep = Object.values(
-    deals.reduce((acc, d) => {
-      const rep = d.assigned_rep || t('reports.unassigned')
+    groups.reduce((acc, g) => {
+      const rep = g.rep || t('reports.unassigned')
       acc[rep] = acc[rep] || { rep, open: 0, won: 0, lost: 0, openValue: 0, wonValue: 0 }
-      if (d.status === 'open') {
-        acc[rep].open += 1
-        acc[rep].openValue += num(d.value)
-      } else if (d.status === 'won') {
-        acc[rep].won += 1
-        acc[rep].wonValue += num(d.value)
-      } else if (d.status === 'lost') acc[rep].lost += 1
+      if (g.status === 'open') {
+        acc[rep].open += g.count
+        acc[rep].openValue += g.value
+      } else if (g.status === 'won') {
+        acc[rep].won += g.count
+        acc[rep].wonValue += g.value
+      } else if (g.status === 'lost') acc[rep].lost += g.count
       return acc
     }, {})
   ).sort((a, b) => b.wonValue - a.wonValue)
@@ -947,20 +860,22 @@ function PipelineTab({ deals, leads, pipelines }) {
 
   const widest = Math.max(...byPipeline.flatMap((pl) => pl.stages.map((x) => x.count)), 1)
 
+  if (isLoading) return <TabSpinner />
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard
           label={t('reports.kpiOpenDeals')}
-          value={String(open.length)}
+          value={String(openCount)}
           sub={fmtMoney(openValue)}
           color="indigo"
           icon="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
         />
         <KpiCard
           label={t('reports.kpiDealWinRate')}
-          value={pct(won.length, won.length + lost.length)}
-          sub={t('reports.wonLostSub', { won: won.length, lost: lost.length, open: open.length })}
+          value={pct(wonCount, wonCount + lostCount)}
+          sub={t('reports.wonLostSub', { won: wonCount, lost: lostCount, open: openCount })}
           color="green"
           icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
         />
@@ -973,8 +888,8 @@ function PipelineTab({ deals, leads, pipelines }) {
         />
         <KpiCard
           label={t('reports.kpiLeadsConverted')}
-          value={`${leadsConverted} / ${leads.length}`}
-          sub={pct(leadsConverted, leads.length)}
+          value={`${leadsConverted} / ${leadsTotal}`}
+          sub={pct(leadsConverted, leadsTotal)}
           color="purple"
           icon="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
         />
@@ -1155,8 +1070,9 @@ function PipelineTab({ deals, leads, pipelines }) {
  * the invoice's view of its own settlement, and reconciling the two is the
  * Accounting page's job, not a report's.
  */
-function SalesTab({ quotations, salesOrders, invoices, payments, allSalesOrders, allInvoices }) {
+function SalesTab({ range }) {
   const { t } = useTranslation()
+  const { data, isLoading } = useReport(['sales', range], () => db.reports.sales(range))
 
   const num = (v) => Number(v) || 0
   // Amounts here are stored in the base currency, so they are labelled with it
@@ -1168,79 +1084,40 @@ function SalesTab({ quotations, salesOrders, invoices, payments, allSalesOrders,
   // A quotation is "won" once it has been converted or accepted; declined and
   // expired are the losses. draft/sent are still in play and count as neither,
   // so the win rate is not diluted by quotes nobody has answered yet.
-  const WON = ['converted', 'accepted']
-  const LOST = ['declined', 'expired']
-  const qtWon = quotations.filter((q) => WON.includes(q.status))
-  const qtLost = quotations.filter((q) => LOST.includes(q.status))
-  const qtOpen = quotations.filter((q) => !WON.includes(q.status) && !LOST.includes(q.status))
+  const qt = data?.quotations ?? { count: 0, value: 0, won: 0, lost: 0 }
+  const qtOpen = qt.count - qt.won - qt.lost
+  const invoiced = data?.invoiced ?? { count: 0, value: 0 }
+  const collected = data?.collected ?? { count: 0, value: 0 }
 
-  const liveOrders = salesOrders.filter((o) => o.status !== 'cancelled')
-  const liveInvoices = invoices.filter((i) => i.doc_status !== 'cancelled')
-  const livePayments = payments.filter((p) => p.status !== 'voided')
-
-  const qtValue = quotations.reduce((a, q) => a + num(q.total), 0)
-  const invValue = liveInvoices.reduce((a, i) => a + num(i.total), 0)
-  const collected = livePayments.reduce((a, p) => a + num(p.amount), 0)
-
-  // The funnel follows document lineage rather than counting what exists at each
-  // stage. Counting per stage looked right and was not: it reported "Invoices
-  // 140% of previous", because invoices raised this period mostly descend from
-  // orders raised last period. A percentage above 100 is the tell that the
-  // stages were never the same documents.
-  //
-  // So: start from the quotations raised in this period, follow quotation_id to
-  // their orders and so_id to their invoices, and report how far that cohort
-  // travelled. Orders and invoices with no ancestor quotation are real and are
-  // reported separately below, not folded in.
-  // Lineage walks the *unfiltered* orders and invoices on purpose. A quotation
-  // raised on the last day of the range whose order lands the following week
-  // still converted; filtering its descendants by the same dates would report it
-  // as lost. On today's data both readings give 3 and 1, so this is not a fix
-  // for a visible error — it is making the claim in the note below true for any
-  // range rather than only for this one.
-  const qtIds = new Set(quotations.map((q) => q.id))
-  const ordersFromQt = allSalesOrders.filter(
-    (o) => o.status !== 'cancelled' && o.quotation_id && qtIds.has(o.quotation_id)
-  )
-  const orderIds = new Set(ordersFromQt.map((o) => o.id))
-  const invoicesFromQt = allInvoices.filter(
-    (i) => i.doc_status !== 'cancelled' && i.so_id && orderIds.has(i.so_id)
-  )
-
+  // The funnel follows document lineage: the quotations raised in the period,
+  // the orders that descend from them and the invoices that descend from those
+  // orders — whenever those were raised (a quote converted next week still
+  // converted). Counting what exists at each stage reported "Invoices 140% of
+  // previous"; the database now walks the lineage (rma_report_sales).
   const stages = [
-    { key: 'qt', label: t('reports.funnelQuotations'), count: quotations.length, value: qtValue, color: '#6366f1' },
-    { key: 'so', label: t('reports.funnelOrders'), count: ordersFromQt.length, value: ordersFromQt.reduce((a, o) => a + num(o.total), 0), color: '#0ea5e9' },
-    { key: 'inv', label: t('reports.funnelInvoices'), count: invoicesFromQt.length, value: invoicesFromQt.reduce((a, i) => a + num(i.total), 0), color: '#14b8a6' },
+    { key: 'qt', label: t('reports.funnelQuotations'), count: qt.count, value: qt.value, color: '#6366f1' },
+    { key: 'so', label: t('reports.funnelOrders'), count: data?.funnel_orders?.count ?? 0, value: data?.funnel_orders?.value ?? 0, color: '#0ea5e9' },
+    { key: 'inv', label: t('reports.funnelInvoices'), count: data?.funnel_invoices?.count ?? 0, value: data?.funnel_invoices?.value ?? 0, color: '#14b8a6' },
   ]
   const widest = Math.max(...stages.map((x) => x.value), 1)
 
   // Documents raised in the period with no originating quotation, so the reader
-  // knows what the funnel above leaves out.
-  //
-  // Counted directly rather than as (period total - cohort). That subtraction
-  // mixes a date-filtered set with an unfiltered one and can go negative the
-  // moment a quote's order lands in a later period — a number that would be
-  // quietly wrong rather than obviously broken.
+  // knows what the funnel above leaves out — counted directly, never as
+  // (period total - cohort), which could go negative.
   const standalone = {
-    orders: liveOrders.filter((o) => !o.quotation_id || !qtIds.has(o.quotation_id)).length,
-    invoices: liveInvoices.filter((i) => !i.so_id || !orderIds.has(i.so_id)).length,
+    orders: data?.standalone_orders ?? 0,
+    invoices: data?.standalone_invoices ?? 0,
   }
 
   // Per rep, on quotations raised in the period.
-  const byRep = Object.values(
-    quotations.reduce((acc, q) => {
-      const rep = q.assigned_rep || t('reports.unassigned')
-      acc[rep] = acc[rep] || { rep, raised: 0, won: 0, lost: 0, value: 0, wonValue: 0 }
-      acc[rep].raised += 1
-      acc[rep].value += num(q.total)
-      if (WON.includes(q.status)) {
-        acc[rep].won += 1
-        acc[rep].wonValue += num(q.total)
-      }
-      if (LOST.includes(q.status)) acc[rep].lost += 1
-      return acc
-    }, {})
-  ).sort((a, b) => b.wonValue - a.wonValue)
+  const byRep = (data?.by_rep ?? []).map((r) => ({
+    rep: r.rep || t('reports.unassigned'),
+    raised: r.raised,
+    won: r.won,
+    lost: r.lost,
+    value: r.value,
+    wonValue: r.won_value,
+  }))
 
   const exportCols = [
     { key: 'rep', label: 'Rep' },
@@ -1260,34 +1137,36 @@ function SalesTab({ quotations, salesOrders, invoices, payments, allSalesOrders,
       wonValue: r.wonValue,
     }))
 
+  if (isLoading) return <TabSpinner />
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard
           label={t('reports.kpiQuotationsRaised')}
-          value={String(quotations.length)}
-          sub={fmtMoney(qtValue)}
+          value={String(qt.count)}
+          sub={fmtMoney(qt.value)}
           color="indigo"
           icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
         />
         <KpiCard
           label={t('reports.kpiWinRate')}
-          value={pct(qtWon.length, qtWon.length + qtLost.length)}
-          sub={t('reports.wonLostSub', { won: qtWon.length, lost: qtLost.length, open: qtOpen.length })}
+          value={pct(qt.won, qt.won + qt.lost)}
+          sub={t('reports.wonLostSub', { won: qt.won, lost: qt.lost, open: qtOpen })}
           color="green"
           icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
         />
         <KpiCard
           label={t('reports.kpiInvoiced')}
-          value={fmtMoney(invValue)}
-          sub={t('reports.docCount', { count: liveInvoices.length })}
+          value={fmtMoney(invoiced.value)}
+          sub={t('reports.docCount', { count: invoiced.count })}
           color="blue"
           icon="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
         />
         <KpiCard
           label={t('reports.kpiCollected')}
-          value={fmtMoney(collected)}
-          sub={t('reports.docCount', { count: livePayments.length })}
+          value={fmtMoney(collected.value)}
+          sub={t('reports.docCount', { count: collected.count })}
           color="purple"
           icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 9v1"
         />
@@ -1408,8 +1287,15 @@ function SalesTab({ quotations, salesOrders, invoices, payments, allSalesOrders,
  * `invoices` for `type === 'quote'`, a column that exists on neither schema and
  * so could never have returned anything.
  */
-function FinancialTab({ invoices, quotations, customers, formatDate }) {
+function FinancialTab({ range, formatDate }) {
   const { t } = useTranslation()
+  const { data: totals, isLoading } = useReport(['financial', 'totals', range], () => db.reports.financial(range))
+  const { page, setPage, perPage, setPerPage } = useReportPaging(JSON.stringify(range))
+  const { data: pageResult } = useReport(['financial', 'page', range, page, perPage], () =>
+    db.reports.invoicesPage(range, page, perPage)
+  )
+  const invoices = pageResult?.data ?? []
+  const invoiceCount = totals?.invoices ?? 0
 
   const DOC_STATUS_CLS = {
     posted:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
@@ -1423,74 +1309,53 @@ function FinancialTab({ invoices, quotations, customers, formatDate }) {
     reversed: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
   }
 
-  const customerName = (id) => {
-    const c = customers.find((x) => x.id === id)
-    return c ? c.company_name || c.contact_person || '—' : '—'
-  }
+  // The view names the customer: the company, or the contact person.
+  const customerName = (inv) => inv.customer_name || '—'
 
   // Cancelled invoices are excluded from every money total — counting them
   // would overstate revenue — but they stay in the table below, because "three
-  // were voided" is itself worth seeing.
-  const live = invoices.filter((i) => i.doc_status !== 'cancelled')
-  const num = (v) => Number(v) || 0
-
-  const totalInvoiced = live.reduce((s, i) => s + num(i.total), 0)
-  const totalPaid = live.reduce((s, i) => s + num(i.amount_paid), 0)
-  // "Outstanding", not the old "Pending / Overdue": the CRM has no overdue
-  // status. Overdue is a due date in the past on an unpaid invoice, which is a
-  // different question and is shown per-row instead of folded into a tile.
-  const outstanding = live.reduce((s, i) => s + Math.max(num(i.total) - num(i.amount_paid), 0), 0)
-  const quotesVal = quotations
-    .filter((q) => !['cancelled', 'declined', 'expired'].includes(q.status))
-    .reduce((s, q) => s + num(q.total), 0)
+  // were voided" is itself worth seeing. "Outstanding", not the old "Pending /
+  // Overdue": the CRM has no overdue status. All summed in the database.
+  const totalInvoiced = totals?.total_invoiced ?? 0
+  const totalPaid = totals?.total_paid ?? 0
+  const outstanding = totals?.outstanding ?? 0
+  const quotesVal = totals?.quotes_value ?? 0
 
   // Third copy of the same hardcoded dollar sign, in a tab the finding did not
   // list. Fixed with the other two. (Audit finding BUG-037.)
   const baseCurrency = useBaseCurrency()
   const fmtMoney = (v) => formatMoney(Number(v) || 0, baseCurrency)
 
-  const handleExport = () => {
-    const columns = [
-      { key: 'invoice_number', label: 'Invoice #' },
-      { key: 'customer_name', label: 'Customer' },
-      { key: 'doc_status', label: 'Document' },
-      { key: 'payment_status', label: 'Payment' },
-      { key: 'amount', label: 'Total' },
-      { key: 'paid', label: 'Paid' },
-      { key: 'due_date', label: 'Due Date' },
-    ]
-    const rows = invoices.map((i) => ({
+  const exportColumns = [
+    { key: 'invoice_number', label: 'Invoice #' },
+    { key: 'customer_name', label: 'Customer' },
+    { key: 'doc_status', label: 'Document' },
+    { key: 'payment_status', label: 'Payment' },
+    { key: 'amount', label: 'Total' },
+    { key: 'paid', label: 'Paid' },
+    { key: 'due_date', label: 'Due Date' },
+  ]
+  // Every invoice in the range, read when exported — not the page on screen.
+  const exportRows = async () =>
+    (await db.reports.invoicesAll(range)).map((i) => ({
       invoice_number: i.inv_code || '',
-      customer_name: customerName(i.customer_id),
+      customer_name: customerName(i),
       doc_status: i.doc_status || '',
       payment_status: i.payment_status || '',
       amount: Number(i.total) || 0,
       paid: Number(i.amount_paid) || 0,
       due_date: formatDate(i.due_date),
     }))
-    downloadCSV(rows, columns, `financial-report-${toYMD(new Date())}.csv`, t)
+  const handleExport = async () => {
+    try { downloadCSV(await exportRows(), exportColumns, `financial-report-${toYMD(new Date())}.csv`, t) }
+    catch (err) { captureException(err); toast.error(t('reports.errorLoad')) }
   }
-  const handleExportExcel = () => {
-    const columns = [
-      { key: 'invoice_number', label: 'Invoice #' },
-      { key: 'customer_name', label: 'Customer' },
-      { key: 'doc_status', label: 'Document' },
-      { key: 'payment_status', label: 'Payment' },
-      { key: 'amount', label: 'Total' },
-      { key: 'paid', label: 'Paid' },
-      { key: 'due_date', label: 'Due Date' },
-    ]
-    const rows = invoices.map((i) => ({
-      invoice_number: i.inv_code || '',
-      customer_name: customerName(i.customer_id),
-      doc_status: i.doc_status || '',
-      payment_status: i.payment_status || '',
-      amount: Number(i.total) || 0,
-      paid: Number(i.amount_paid) || 0,
-      due_date: formatDate(i.due_date),
-    }))
-    downloadExcel(rows, columns, `financial-report-${toYMD(new Date())}.xlsx`, t)
+  const handleExportExcel = async () => {
+    try { downloadExcel(await exportRows(), exportColumns, `financial-report-${toYMD(new Date())}.xlsx`, t) }
+    catch (err) { captureException(err); toast.error(t('reports.errorLoad')) }
   }
+
+  if (isLoading) return <TabSpinner />
 
   return (
     <div className="space-y-5">
@@ -1525,7 +1390,7 @@ function FinancialTab({ invoices, quotations, customers, formatDate }) {
         <ExportButtons onCSV={handleExport} onExcel={handleExportExcel} />
       </div>
 
-      {invoices.length === 0 ? (
+      {invoiceCount === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38]">
           <p className="text-sm text-gray-500 dark:text-[#9aa4b2]">{t('reports.noInvoicesInRange')}</p>
         </div>
@@ -1560,7 +1425,7 @@ function FinancialTab({ invoices, quotations, customers, formatDate }) {
                       {inv.inv_code || '—'}
                     </td>
                     <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] max-w-[150px] truncate">
-                      {customerName(inv.customer_id)}
+                      {customerName(inv)}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -1601,6 +1466,9 @@ function FinancialTab({ invoices, quotations, customers, formatDate }) {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="px-4 pb-3">
+            <Pagination total={invoiceCount} page={page} itemsPerPage={perPage} setItemsPerPage={setPerPage} onPage={setPage} />
           </div>
         </div>
       )}
@@ -1672,90 +1540,17 @@ export default function Reports({
   // with no content and no explanation. Fall back to the first tab they do have.
   const visibleTab = allTabs.some((x) => x.id === activeTab) ? activeTab : allTabs[0]?.id
 
-  const { data: reportData, isLoading: loading, isError, error, refetch } = useQuery({
-    queryKey: ['reports', isAdminOrManager],
-    queryFn: async () => {
-      // crmInvoices + quotations, not db.invoices. The legacy `invoices` table
-      // this used to read holds 0 rows — every invoice the business has raised
-      // is in `crm_invoices`, and quotations are their own table. The old query
-      // succeeded and returned nothing, so the Financial tab reported $0.00
-      // across the board instead of erroring.
-      const [tkRes, custRes, teRes, invRes, qtRes, soRes, payRes, dealRes, leadRes, pipeRes] =
-        await Promise.all([
-        db.rmaTickets.list(),
-        db.customers.list(),
-        isAdminOrManager ? db.timeEntries.listAll() : { missing: false, data: [] },
-        isAdminOrManager ? db.crmInvoices.list() : [],
-        isAdminOrManager ? db.quotations.list() : [],
-        isAdminOrManager ? db.salesOrders.list() : [],
-        isAdminOrManager ? db.payments.list() : [],
-        isAdminOrManager ? db.deals.list() : [],
-        isAdminOrManager ? db.leads.list() : [],
-        isAdminOrManager ? db.pipelines.list() : [],
-      ])
-      return { tkRes, custRes, teRes, invRes, qtRes, soRes, payRes, dealRes, leadRes, pipeRes }
-    },
+  // The date range as instants: the local start of the first day to the local
+  // end of the last, exactly what inRange() compared against.
+  const range = useMemo(() => reportRange(fromDate, toDate), [fromDate, toDate])
+  const queryClient = useQueryClient()
+  const refetch = () => queryClient.invalidateQueries({ queryKey: ['reports'] })
+  const { data: pipelines = [] } = useQuery({
+    queryKey: ['reports', 'pipelines'],
+    queryFn: () => db.pipelines.list(),
+    enabled: isAdminOrManager && visibleTab === 'pipeline',
+    staleTime: 5 * 60_000,
   })
-
-
-  useEffect(() => {
-    if (isError) {
-      captureException(error, { page: 'Reports', context: 'loadData' })
-      toast.error(i18next.t('reports.errorLoad'))
-    }
-  }, [isError, error])
-
-  const tickets = useMemo(() => reportData?.tkRes || [], [reportData])
-  const customers = useMemo(() => reportData?.custRes || [], [reportData])
-  const timeEntriesMissing = reportData?.teRes?.missing ?? false
-  const timeEntries = useMemo(() => reportData?.teRes?.data ?? [], [reportData])
-  const invoices = useMemo(() => reportData?.invRes ?? [], [reportData])
-  const quotations = useMemo(() => reportData?.qtRes ?? [], [reportData])
-  const salesOrders = useMemo(() => reportData?.soRes ?? [], [reportData])
-  const payments = useMemo(() => reportData?.payRes ?? [], [reportData])
-  const deals = useMemo(() => reportData?.dealRes ?? [], [reportData])
-  const leads = useMemo(() => reportData?.leadRes ?? [], [reportData])
-  const pipelines = useMemo(() => reportData?.pipeRes ?? [], [reportData])
-
-  // Apply date range filter
-  const filteredTickets = useMemo(
-    () => tickets.filter((tk) => inRange(tk.created_date, fromDate, toDate)),
-    [tickets, fromDate, toDate]
-  )
-  const filteredCustomers = useMemo(
-    () => customers.filter((c) => inRange(c.created_date, fromDate, toDate)),
-    [customers, fromDate, toDate]
-  )
-  // `created_at`, not `created_date`. The CRM tables use the former; the legacy
-  // `invoices` table used the latter. Filtering on the wrong key would have left
-  // this tab empty even after repointing it at the right table — the same
-  // silent-empty failure, one layer down.
-  const filteredInvoices = useMemo(
-    () => invoices.filter((i) => inRange(i.created_at, fromDate, toDate)),
-    [invoices, fromDate, toDate]
-  )
-  const filteredQuotations = useMemo(
-    () => quotations.filter((q) => inRange(q.created_at, fromDate, toDate)),
-    [quotations, fromDate, toDate]
-  )
-  const filteredSalesOrders = useMemo(
-    () => salesOrders.filter((o) => inRange(o.created_at, fromDate, toDate)),
-    [salesOrders, fromDate, toDate]
-  )
-  // Payments carry their own payment_date, which is the date that matters for
-  // "collected in this period" — created_at is when the row was typed.
-  const filteredDeals = useMemo(
-    () => deals.filter((d) => inRange(d.created_at, fromDate, toDate)),
-    [deals, fromDate, toDate]
-  )
-  const filteredLeads = useMemo(
-    () => leads.filter((l) => inRange(l.created_at, fromDate, toDate)),
-    [leads, fromDate, toDate]
-  )
-  const filteredPayments = useMemo(
-    () => payments.filter((p) => inRange(p.payment_date || p.created_at, fromDate, toDate)),
-    [payments, fromDate, toDate]
-  )
 
   // Display formatter passed to the tab sub-components (was referenced but never defined).
   const formatDate = (d) => (d ? new Date(d).toLocaleDateString() : '—')
@@ -1910,63 +1705,19 @@ export default function Reports({
         </div>
       </div>
 
-      {/* Content */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Spinner size="lg" />
-        </div>
-      ) : (
-        <>
-          {visibleTab === 'tickets' && (
-            <TicketsTab
-              tickets={filteredTickets}
-              onNavigateToTicket={onNavigateToTicket}
-              formatDate={formatDate}
-            />
-          )}
-          {visibleTab === 'customers' && isAdminOrManager && (
-            <CustomersTab
-              customers={filteredCustomers}
-              tickets={filteredTickets}
-              formatDate={formatDate}
-            />
-          )}
-          {visibleTab === 'technicians' && isAdminOrManager && (
-            <TechniciansTab
-              tickets={filteredTickets}
-              timeEntries={timeEntries}
-              timeEntriesMissing={timeEntriesMissing}
-              formatDate={formatDate}
-            />
-          )}
-          {visibleTab === 'pipeline' && isAdminOrManager && (
-            <PipelineTab deals={filteredDeals} leads={filteredLeads} pipelines={pipelines} />
-          )}
-          {visibleTab === 'sales' && isAdminOrManager && (
-            <SalesTab
-              quotations={filteredQuotations}
-              salesOrders={filteredSalesOrders}
-              invoices={filteredInvoices}
-              payments={filteredPayments}
-              allSalesOrders={salesOrders}
-              allInvoices={invoices}
-            />
-          )}
-          {visibleTab === 'financial' && isAdminOrManager && (
-            <FinancialTab
-              invoices={filteredInvoices}
-              quotations={filteredQuotations}
-              customers={customers}
-              formatDate={formatDate}
-            />
-          )}
-          {/* Reads its own data from the margin views rather than the page's
-              shared query: cost and profit come from v_invoice_margin, which
-              nothing else on this page needs, and loading it for every tab
-              would make five other tabs slower to open. */}
-          {visibleTab === 'profitability' && isAdminOrManager && <ProfitabilityTab />}
-        </>
+      {/* Content — each tab loads its own figures and shows its own spinner. */}
+      {visibleTab === 'tickets' && (
+        <TicketsTab range={range} onNavigateToTicket={onNavigateToTicket} formatDate={formatDate} />
       )}
+      {visibleTab === 'customers' && isAdminOrManager && <CustomersTab range={range} formatDate={formatDate} />}
+      {visibleTab === 'technicians' && isAdminOrManager && <TechniciansTab range={range} />}
+      {visibleTab === 'pipeline' && isAdminOrManager && <PipelineTab range={range} pipelines={pipelines} />}
+      {visibleTab === 'sales' && isAdminOrManager && <SalesTab range={range} />}
+      {visibleTab === 'financial' && isAdminOrManager && <FinancialTab range={range} formatDate={formatDate} />}
+      {/* Reads its own data from the margin views rather than the page's
+          shared query: cost and profit come from v_invoice_margin, which
+          nothing else on this page needs. */}
+      {visibleTab === 'profitability' && isAdminOrManager && <ProfitabilityTab />}
     </div>
   )
 }

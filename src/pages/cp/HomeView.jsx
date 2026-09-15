@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
-import { TICKET_STATUS } from '../../lib/constants'
 import { GROUPS, COLOR_MAP } from './_registry'
 import { formatMoneyCompact } from '../../lib/money'
 import { useBaseCurrency } from '../../hooks/useBaseCurrency'
@@ -14,54 +13,27 @@ export default function HomeView({ onNavigate, currentUserEmail: _currentUserEma
   const { data: stats } = useQuery({
     queryKey: ['control-panel-stats'],
     queryFn: async () => {
-      const [tickets, customers, users, deals, pipelines] = await Promise.all([
-        db.rmaTickets.list(),
-        db.customers.list(),
-        db.userRoles.listAllRoles(),
-        db.deals.list(),
-        db.pipelines.list(),
-      ])
-      const byStatus = tickets.reduce((a, t) => {
-        a[t.ticket_status] = (a[t.ticket_status] || 0) + 1
-        return a
-      }, {})
-      const open =
-        (byStatus[TICKET_STATUS.OPEN] || 0) +
-        (byStatus[TICKET_STATUS.IN_PROGRESS] || 0) +
-        (byStatus[TICKET_STATUS.ON_HOLD] || 0)
-      const overdue = tickets.filter(
-        (t) =>
-          t.due_date &&
-          new Date(t.due_date) < new Date() &&
-          t.ticket_status !== TICKET_STATUS.CLOSED &&
-          t.ticket_status !== TICKET_STATUS.CANCELLED
-      ).length
-      const openDeals = deals.filter((d) => d.status === 'open')
-
-      // Configuration health, which is the thing an admin console can report
-      // and the Dashboard cannot: deals sitting on a stage their own pipeline
-      // does not define. There are 24 of them today, all on the B2C board, and
-      // until the Pipelines & Stages editor existed there was no way to see it
-      // here or fix it anywhere.
-      const stagesByPipeline = {}
-      for (const p of pipelines) {
-        stagesByPipeline[p.id] = new Set((p.stages || []).map((x) => x.id))
-      }
-      const misStaged = deals.filter(
-        (d) => d.pipeline_id && stagesByPipeline[d.pipeline_id] && !stagesByPipeline[d.pipeline_id].has(d.stage)
-      ).length
-
+      // Counted in the database (rma_control_panel_stats, 20260863): this used
+      // to load every ticket, customer, user and deal to count them — past the
+      // Data API's 1 000-row cap, tiles that counted some of each. (BUG-066.)
+      // Pipelines are a handful of configuration rows and are read whole.
+      //
+      // Overdue here: a due date before now on a ticket that is not Closed or
+      // Cancelled. Mis-staged — the configuration health an admin console can
+      // report and the Dashboard cannot — is a deal whose pipeline exists but
+      // does not define its stage.
+      const [s, pipelines] = await Promise.all([db.controlPanel.stats(), db.pipelines.list()])
       return {
-        openTickets: open,
-        overdue,
-        customers: customers.length,
-        users: users.length,
-        openDeals: openDeals.length,
-        openDealValue: openDeals.reduce((a, d) => a + (d.value || 0), 0),
+        openTickets: s.open_tickets,
+        overdue: s.overdue,
+        customers: s.customers,
+        users: s.users,
+        openDeals: s.open_deals,
+        openDealValue: s.open_deal_value,
         activePipelines: pipelines.filter((p) => p.is_active).length,
         totalPipelines: pipelines.length,
         stageCount: pipelines.reduce((a, p) => a + (p.stages || []).length, 0),
-        misStaged,
+        misStaged: s.mis_staged,
       }
     },
     staleTime: 2 * 60_000,

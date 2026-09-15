@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { db, storage } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
@@ -10,6 +10,8 @@ import { useURLTab } from '../hooks/useURLTab'
 import { ROLES, TICKET_STATUS } from '../lib/constants'
 import { captureException } from '../lib/sentry'
 import ProductDocuments from '../components/ProductDocuments'
+import Pagination from '../components/Pagination'
+import { safeStorage } from '../lib/safeStorage'
 
 export default function ProductDetails({
   productId,
@@ -36,15 +38,14 @@ export default function ProductDetails({
   const { data: productPageData, isLoading: loading, refetch } = useQuery({
     queryKey: ['product-details', productId],
     queryFn: async () => {
-      const [productData, brandsData, categoriesData, subcategoriesData, ticketsData] =
+      const [productData, brandsData, categoriesData, subcategoriesData] =
         await Promise.all([
           db.products.get(productId),
           db.brands.list(),
           db.categories.list(),
           db.subcategories.list(),
-          db.products.getRelatedTickets(productId).catch(() => []),
         ])
-      return { productData, brandsData, categoriesData, subcategoriesData, ticketsData }
+      return { productData, brandsData, categoriesData, subcategoriesData }
     },
     enabled: !!productId,
   })
@@ -53,7 +54,22 @@ export default function ProductDetails({
   const brands = productPageData?.brandsData ?? []
   const categories = productPageData?.categoriesData ?? []
   const subcategories = productPageData?.subcategoriesData ?? []
-  const relatedTickets = productPageData?.ticketsData ?? []
+
+  // The tickets any unit of this product came in on, one page at a time
+  // (rma_product_tickets). It read every unit's ticket id and then every one of
+  // those tickets in a single request — both capped at 1 000 rows. (BUG-066.)
+  const [ticketPage, setTicketPage] = useState(1)
+  const [ticketsPerPage, setTicketsPerPage] = useState(() => safeStorage.get('productTicketsPerPage', 25))
+  useEffect(() => { safeStorage.set('productTicketsPerPage', ticketsPerPage) }, [ticketsPerPage])
+  useEffect(() => { setTicketPage(1) }, [productId, ticketsPerPage])
+  const { data: ticketsResult } = useQuery({
+    queryKey: ['product-tickets', productId, ticketPage, ticketsPerPage],
+    queryFn: () => db.products.relatedTicketsPage(productId, ticketPage, ticketsPerPage),
+    placeholderData: keepPreviousData,
+    enabled: !!productId,
+  })
+  const relatedTickets = ticketsResult?.data ?? []
+  const relatedTicketCount = ticketsResult?.count ?? 0
 
   const [editForm, setEditForm] = useState({
     brand_id: '',
@@ -342,7 +358,7 @@ export default function ProductDetails({
                   : 'border-transparent text-gray-500 hover:text-gray-700')
               }
             >
-              {t('products.tabRMAHistory', { count: relatedTickets.length })}
+              {t('products.tabRMAHistory', { count: relatedTicketCount })}
             </button>
             {/* The datasheet lives with the product, not in a separate uploads
                 area — the moment someone wants to attach one is the moment they
@@ -716,7 +732,7 @@ export default function ProductDetails({
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gray-900">{t('products.relatedRMATickets')}</h3>
 
-              {relatedTickets.length === 0 ? (
+              {relatedTicketCount === 0 ? (
                 <div className="text-center py-12 bg-gray-50 rounded-lg">
                   <svg
                     className="w-16 h-16 text-gray-300 mx-auto mb-4"
@@ -807,6 +823,7 @@ export default function ProductDetails({
                       ))}
                     </tbody>
                   </table>
+                  <Pagination total={relatedTicketCount} page={ticketPage} itemsPerPage={ticketsPerPage} setItemsPerPage={setTicketsPerPage} onPage={setTicketPage} />
                 </div>
               )}
             </div>

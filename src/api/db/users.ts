@@ -1,6 +1,7 @@
 import { supabase } from '../client.js'
 import { assertUpdated, assertAffected } from './_assertUpdated.js'
 import type { PrefsResult, SetPrefsResult } from './types.js'
+import { fetchAllRows } from './_paging.js'
 import { auditInsert } from './audit.js'
 import { captureException } from '../../lib/sentry.js'
 
@@ -70,12 +71,15 @@ export const userRoles = {
   },
   /** Admin surface: the complete row. Non-admins see only themselves. */
   async listAllRoles(): Promise<UserRoleRow[]> {
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('*')
-      .order('created_date', { ascending: false })
-    if (error) throw error
-    return data || []
+    // Every row — User Management lists them all. (BUG-066.)
+    return fetchAllRows<UserRoleRow>((from, to) =>
+      supabase
+        .from('user_roles')
+        .select('*')
+        .order('created_date', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
   },
   async createRole(email: string, role: string): Promise<UserRoleRow | undefined> {
     const { data, error } = await supabase
@@ -188,15 +192,19 @@ export const userRoles = {
     assertAffected(data, 'User')
   },
   async getCustomRoles(): Promise<unknown[]> {
-    const { data, error } = await supabase
-      .from('custom_roles')
-      .select('*')
-      .order('created_date', { ascending: false })
-    if (error) {
-      if (error.code === '42P01') return [] // optional table not yet migrated
+    try {
+      return await fetchAllRows<unknown>((from, to) =>
+        supabase
+          .from('custom_roles')
+          .select('*')
+          .order('created_date', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
+      )
+    } catch (error) {
+      if ((error as { code?: string })?.code === '42P01') return [] // optional table not yet migrated
       throw error
     }
-    return data || []
   },
   /**
    * baseRole is what row-level security treats holders of this role as. RLS

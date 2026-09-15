@@ -1,4 +1,6 @@
 import { supabase } from '../client.js'
+import { fetchPage, fetchAllRows } from './_paging.js'
+import type { PagedResult } from './types.js'
 
 /**
  * Margin reporting — reads v_invoice_margin and v_sales_rep_performance
@@ -54,30 +56,94 @@ export interface SalesRepPerformanceRow {
 /** A missing view means the migration has not been applied yet. */
 const NOT_PROVISIONED = ['42P01', 'PGRST205']
 
+/** Raw sums behind the Profitability totals (rma_margin_totals, 20260864). */
+export interface MarginTotalsRaw {
+  invoices: number
+  invoices_costed: number
+  revenue_base: number
+  costed_revenue_base: number
+  cogs_base: number
+  margin_base: number
+}
+
 export const margin = {
-  async byInvoice(): Promise<{ data: InvoiceMarginRow[]; missing: boolean }> {
-    const { data, error } = await supabase
-      .from('v_invoice_margin')
-      .select('*')
-      .order('posted_at', { ascending: false })
-    if (error) {
-      if (NOT_PROVISIONED.includes(error.code)) return { data: [], missing: true }
+  /**
+   * One page of invoice margins, most recently posted first. It read every row
+   * — capped at 1 000 — and summed them on the page. (BUG-066.)
+   */
+  async byInvoicePage(page: number, pageSize: number): Promise<PagedResult<InvoiceMarginRow>> {
+    try {
+      return await fetchPage<InvoiceMarginRow>((from, to) =>
+        supabase
+          .from('v_invoice_margin')
+          .select('*', { count: 'exact' })
+          .order('posted_at', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to),
+        page, pageSize)
+    } catch (error) {
+      if (NOT_PROVISIONED.includes((error as { code?: string })?.code ?? '')) {
+        return { missing: true, data: [], count: 0, page, pageSize, totalPages: 0 }
+      }
       throw error
     }
-    return { data: (data ?? []) as InvoiceMarginRow[], missing: false }
   },
 
-  async byRep(): Promise<{ data: SalesRepPerformanceRow[]; missing: boolean }> {
-    const { data, error } = await supabase
-      .from('v_sales_rep_performance')
-      .select('*')
-      .order('revenue_base', { ascending: false })
+  /** Totals across every invoice margin, summed in the database; null when the views are missing. */
+  async totals(): Promise<MarginTotalsRaw | null> {
+    const { data, error } = await supabase.rpc('rma_margin_totals')
     if (error) {
-      if (NOT_PROVISIONED.includes(error.code)) return { data: [], missing: true }
+      if (NOT_PROVISIONED.includes(error.code) || error.code === '42883' || error.code === 'PGRST202') return null
       throw error
     }
-    return { data: (data ?? []) as SalesRepPerformanceRow[], missing: false }
+    const s = (data ?? {}) as Partial<MarginTotalsRaw>
+    return {
+      invoices: Number(s.invoices) || 0,
+      invoices_costed: Number(s.invoices_costed) || 0,
+      revenue_base: Number(s.revenue_base) || 0,
+      costed_revenue_base: Number(s.costed_revenue_base) || 0,
+      cogs_base: Number(s.cogs_base) || 0,
+      margin_base: Number(s.margin_base) || 0,
+    }
   },
+
+  /** Every rep's performance row (one per rep), best revenue first. */
+  async byRep(): Promise<{ data: SalesRepPerformanceRow[]; missing: boolean }> {
+    try {
+      const data = await fetchAllRows<SalesRepPerformanceRow>((from, to) =>
+        supabase
+          .from('v_sales_rep_performance')
+          .select('*')
+          .order('revenue_base', { ascending: false })
+          .order('assigned_rep', { ascending: true })
+          .range(from, to)
+      )
+      return { data, missing: false }
+    } catch (error) {
+      if (NOT_PROVISIONED.includes((error as { code?: string })?.code ?? '')) return { data: [], missing: true }
+      throw error
+    }
+  },
+}
+
+/**
+ * The Profitability totals from the database's raw sums, rounded exactly as
+ * summariseMargin rounds its own — so the two can never disagree.
+ */
+export function marginTotalsFromRaw(raw: MarginTotalsRaw): ReturnType<typeof summariseMargin> {
+  const revenueBase = Number(raw.revenue_base) || 0
+  const costedRevenueBase = Number(raw.costed_revenue_base) || 0
+  const marginBase = Number(raw.margin_base) || 0
+  return {
+    invoices: raw.invoices,
+    invoicesCosted: raw.invoices_costed,
+    invoicesCostUnknown: raw.invoices - raw.invoices_costed,
+    revenueBase: Math.round(revenueBase * 100) / 100,
+    costedRevenueBase: Math.round(costedRevenueBase * 100) / 100,
+    cogsBase: Math.round((Number(raw.cogs_base) || 0) * 100) / 100,
+    marginBase: Math.round(marginBase * 100) / 100,
+    marginPct: costedRevenueBase > 0 ? Math.round((10000 * marginBase) / costedRevenueBase) / 100 : null,
+  }
 }
 
 /**

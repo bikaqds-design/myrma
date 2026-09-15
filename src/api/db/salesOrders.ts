@@ -1,6 +1,7 @@
 import { supabase } from '../client.js'
 import { assertAffected } from './_assertUpdated.js'
 import { computeDocumentTotals } from './_documentTotals.js'
+import { fetchAllRows, chunksOf } from './_paging.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -50,18 +51,27 @@ export const salesOrders = {
     /** Resolve SOs for several quotations at once — a deal can hold many. */
     quotationIds?: string[]
   }): Promise<SalesOrderRow[]> {
-    let q = supabase.from('sales_orders').select('*').order('created_at', { ascending: false })
-    if (filters?.customerId) q = q.eq('customer_id', filters.customerId)
-    if (filters?.status) q = q.eq('status', filters.status)
-    if (filters?.assignedRep) q = q.eq('assigned_rep', filters.assignedRep)
-    if (filters?.quotationId) q = q.eq('quotation_id', filters.quotationId)
-    if (filters?.quotationIds) q = q.in('quotation_id', filters.quotationIds)
-    const { data, error } = await q
-    if (error) {
-      if (error.code === '42P01') return []
+    // Every matching order, newest first — not the first 1 000 — with a long
+    // quotationIds list asked for in chunks. (BUG-066.)
+    const read = (quotationIds?: string[]) =>
+      fetchAllRows<SalesOrderRow>((from, to) => {
+        let q = supabase.from('sales_orders').select('*')
+        if (filters?.customerId) q = q.eq('customer_id', filters.customerId)
+        if (filters?.status) q = q.eq('status', filters.status)
+        if (filters?.assignedRep) q = q.eq('assigned_rep', filters.assignedRep)
+        if (filters?.quotationId) q = q.eq('quotation_id', filters.quotationId)
+        if (quotationIds) q = q.in('quotation_id', quotationIds)
+        return q.order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)
+      })
+    try {
+      if (!filters?.quotationIds) return await read()
+      if (filters.quotationIds.length === 0) return []
+      const parts = await Promise.all(chunksOf(filters.quotationIds, 100).map((ids) => read(ids)))
+      return parts.flat().sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : a.id < b.id ? -1 : 1))
+    } catch (error) {
+      if ((error as { code?: string })?.code === '42P01') return []
       throw error
     }
-    return (data ?? []) as SalesOrderRow[]
   },
 
   async get(id: string): Promise<SalesOrderRow | null> {

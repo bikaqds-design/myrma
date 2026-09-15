@@ -1,5 +1,6 @@
 import { supabase } from '../client.js'
 import { assertUpdated, assertAffected } from './_assertUpdated.js'
+import { fetchAllRows } from './_paging.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -33,14 +34,17 @@ async function clearExistingPrimary(customerId: string, excludeId?: string): Pro
 }
 
 export const contacts = {
+  /** Every contact of the customer, newest first — not the first 1 000. (BUG-066.) */
   async list(customerId: string): Promise<ContactRow[]> {
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('*')
-      .eq('customer_id', customerId)
-      .order('created_at', { ascending: false })
-    if (error) throw error
-    return data || []
+    return fetchAllRows<ContactRow>((from, to) =>
+      supabase
+        .from('contacts')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
   },
   async create(contact: Omit<ContactRow, 'id' | 'created_at'>): Promise<ContactRow> {
     if (contact.is_primary) await clearExistingPrimary(contact.customer_id)

@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { fetchAllRows } from './_paging.js'
 import { assertAffected } from './_assertUpdated.js'
 
 /**
@@ -67,25 +68,32 @@ export function toRules(country: CountryRow, areas: CountryAreaCodeRow[]): Count
 
 export const geo = {
   async listCountries(): Promise<{ data: CountryRow[]; missing: boolean }> {
-    const { data, error } = await supabase.from('countries').select('*').order('name')
-    if (error) {
-      if (NOT_PROVISIONED.includes(error.code)) return { data: [], missing: true }
+    try {
+      const data = await fetchAllRows<CountryRow>((from, to) =>
+        supabase.from('countries').select('*').order('name').order('code').range(from, to)
+      )
+      return { data, missing: false }
+    } catch (error) {
+      if (NOT_PROVISIONED.includes((error as { code?: string })?.code ?? '')) return { data: [], missing: true }
       throw error
     }
-    return { data: (data ?? []) as CountryRow[], missing: false }
   },
 
   async listAreaCodes(): Promise<CountryAreaCodeRow[]> {
-    const { data, error } = await supabase
-      .from('country_area_codes')
-      .select('*')
-      .order('country_code')
-      .order('area_code')
-    if (error) {
-      if (NOT_PROVISIONED.includes(error.code)) return []
+    try {
+      return await fetchAllRows<CountryAreaCodeRow>((from, to) =>
+        supabase
+          .from('country_area_codes')
+          .select('*')
+          .order('country_code')
+          .order('area_code')
+          .order('id', { ascending: true })
+          .range(from, to)
+      )
+    } catch (error) {
+      if (NOT_PROVISIONED.includes((error as { code?: string })?.code ?? '')) return []
       throw error
     }
-    return (data ?? []) as CountryAreaCodeRow[]
   },
 
   async updateCountry(code: string, patch: Partial<CountryRow>): Promise<void> {

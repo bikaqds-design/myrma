@@ -649,16 +649,20 @@ export interface VendorInvoiceChargeRow {
  */
 export const vendorInvoiceCharges = {
   async list(vendorInvoiceId: string): Promise<VendorInvoiceChargeRow[]> {
-    const { data, error } = await supabase
-      .from('vendor_invoice_charges')
-      .select('*')
-      .eq('vendor_invoice_id', vendorInvoiceId)
-      .order('created_at', { ascending: true })
-    if (error) {
-      if (error.code === '42P01') return []
+    try {
+      return await fetchAllRows<VendorInvoiceChargeRow>((from, to) =>
+        supabase
+          .from('vendor_invoice_charges')
+          .select('*')
+          .eq('vendor_invoice_id', vendorInvoiceId)
+          .order('created_at', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to)
+      )
+    } catch (error) {
+      if ((error as { code?: string })?.code === '42P01') return []
       throw error
     }
-    return (data ?? []) as VendorInvoiceChargeRow[]
   },
 
   async create(input: {

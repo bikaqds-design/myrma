@@ -300,28 +300,38 @@ export const deals = {
     return (data ?? []) as string[]
   },
 
-  /** @deprecated Loads every deal, silently capped at 1 000 rows. Use listPage / listAllMatching / buckets. */
-  async list(filters?: {
-    pipelineId?: string
-    status?: string
-    assignedRep?: string
-  }): Promise<DealRow[]> {
-    let query = supabase.from('deals').select('*').order('created_at', { ascending: false })
-    if (filters?.pipelineId) query = query.eq('pipeline_id', filters.pipelineId)
-    if (filters?.status) query = query.eq('status', filters.status)
-    if (filters?.assignedRep) query = query.eq('assigned_rep', filters.assignedRep)
-    const { data, error } = await query
-    if (error) throw error
-    return data || []
+  /** One page of a customer's deals, newest first, with how many there are. (BUG-066.) */
+  async listPageForCustomer(customerId: string, page: number, pageSize: number): Promise<PagedResult<DealRow>> {
+    return fetchPage<DealRow>((from, to) =>
+      supabase
+        .from('deals')
+        .select('*', { count: 'exact' })
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to),
+      page, pageSize)
   },
-  async listForCustomer(customerId: string): Promise<DealRow[]> {
-    const { data, error } = await supabase
-      .from('deals')
-      .select('*')
-      .eq('customer_id', customerId)
-      .order('created_at', { ascending: false })
-    if (error) throw error
-    return data || []
+  /** Deals per pipeline × stage, every deal on a pipeline (rma_pipeline_stage_counts, 20260863). */
+  async stageCounts(): Promise<Array<{ pipeline_id: string; stage: string | null; deal_count: number }>> {
+    const rows = await fetchAllRows<{ pipeline_id: string; stage: string | null; deal_count: number }>((from, to) =>
+      supabase
+        .rpc('rma_pipeline_stage_counts')
+        .order('pipeline_id', { ascending: true })
+        .order('stage', { ascending: true })
+        .range(from, to)
+    )
+    return rows.map((r) => ({ ...r, deal_count: Number(r.deal_count) || 0 }))
+  },
+  /** Ids of every deal on a pipeline's stage (a null stage matches deals with none). */
+  async idsOnStage(pipelineId: string, stage: string | null): Promise<string[]> {
+    const rows = await fetchAllRows<{ id: string }>((from, to) => {
+      const q = supabase.from('deals').select('id').eq('pipeline_id', pipelineId)
+      return (stage === null ? q.is('stage', null) : q.eq('stage', stage))
+        .order('id', { ascending: true })
+        .range(from, to)
+    })
+    return rows.map((r) => r.id)
   },
   async get(id: string): Promise<DealRow> {
     const { data, error } = await supabase.from('deals').select('*').eq('id', id).single()
@@ -484,12 +494,17 @@ export const deals = {
   async bulkMoveStage(ids: string[], stageId: string): Promise<void> {
     if (!ids.length) return
     // Validate stage is present in every pipeline represented by the selection.
-    const { data: dealRows, error: fetchErr } = await supabase
-      .from('deals')
-      .select('id, pipeline_id, status')
-      .in('id', ids)
-    if (fetchErr) throw fetchErr
-    const dealList = (dealRows ?? []) as Array<{ id: string; pipeline_id: string; status: string }>
+    // Read and written in chunks: a selection can be thousands of deals, more
+    // than one URL or one 1 000-row response holds. (BUG-066.)
+    const dealList: Array<{ id: string; pipeline_id: string; status: string }> = []
+    for (const chunk of chunksOf(ids, 100)) {
+      const { data: dealRows, error: fetchErr } = await supabase
+        .from('deals')
+        .select('id, pipeline_id, status')
+        .in('id', chunk)
+      if (fetchErr) throw fetchErr
+      dealList.push(...((dealRows ?? []) as Array<{ id: string; pipeline_id: string; status: string }>))
+    }
     const pipelineIds = [...new Set(dealList.map((d) => d.pipeline_id))]
     const { data: pipelineRows, error: pipeErr } = await supabase
       .from('pipelines')
@@ -501,23 +516,25 @@ export const deals = {
         throw new Error(`Stage "${stageId}" is not valid for all selected deals' pipelines`)
       }
     }
-    const { data: moved, error } = await supabase
-      .from('deals')
-      .update({ stage: stageId, updated_at: new Date().toISOString() })
-      .in('id', ids)
-      .select('id')
-    if (error) throw error
-    assertAllAffected(moved, ids, 'deal')
+    for (const chunk of chunksOf(ids, 100)) {
+      const { data: moved, error } = await supabase
+        .from('deals')
+        .update({ stage: stageId, updated_at: new Date().toISOString() })
+        .in('id', chunk)
+        .select('id')
+      if (error) throw error
+      assertAllAffected(moved, chunk, 'deal')
+    }
     // Reset won/lost terminal fields for any deals that were in a terminal state.
     const terminalIds = dealList.filter((d) => d.status === 'won' || d.status === 'lost').map((d) => d.id)
-    if (terminalIds.length > 0) {
+    for (const chunk of chunksOf(terminalIds, 100)) {
       const { data: reopened, error: termErr } = await supabase
         .from('deals')
         .update({ status: 'open', won_at: null, lost_at: null, lost_reason: null })
-        .in('id', terminalIds)
+        .in('id', chunk)
         .select('id')
       if (termErr) throw termErr
-      assertAllAffected(reopened, terminalIds, 'deal')
+      assertAllAffected(reopened, chunk, 'deal')
     }
   },
   async reopen(id: string, stageId: string, actorEmail: string | null = null): Promise<DealRow> {

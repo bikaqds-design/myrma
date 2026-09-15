@@ -1,5 +1,6 @@
 import { supabase } from '../client.js'
 import { assertUpdated } from './_assertUpdated.js'
+import { fetchAllRows } from './_paging.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -34,10 +35,11 @@ function validateStages(stages: PipelineStage[]): void {
 }
 
 export const pipelines = {
+  /** Every pipeline, by name. (BUG-066: read in full.) */
   async list(): Promise<PipelineRow[]> {
-    const { data, error } = await supabase.from('pipelines').select('*').order('name')
-    if (error) throw error
-    return data || []
+    return fetchAllRows<PipelineRow>((from, to) =>
+      supabase.from('pipelines').select('*').order('name').order('id', { ascending: true }).range(from, to)
+    )
   },
   async get(id: string): Promise<PipelineRow> {
     const { data, error } = await supabase.from('pipelines').select('*').eq('id', id).single()

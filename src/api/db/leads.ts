@@ -180,15 +180,6 @@ export const leads = {
     return out
   },
 
-  /** @deprecated Loads every lead, silently capped at 1 000 rows. Use listPage / listAllMatching. */
-  async list(filters?: { status?: string; assignedRep?: string }): Promise<LeadRow[]> {
-    let query = supabase.from('leads').select('*').order('created_at', { ascending: false })
-    if (filters?.status) query = query.eq('status', filters.status)
-    if (filters?.assignedRep) query = query.eq('assigned_rep', filters.assignedRep)
-    const { data, error } = await query
-    if (error) throw error
-    return data || []
-  },
   async get(id: string): Promise<LeadRow> {
     const { data, error } = await supabase.from('leads').select('*').eq('id', id).single()
     if (error) throw error

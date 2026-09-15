@@ -1,10 +1,12 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { db } from '../api/supabaseClient'
-// summariseMargin comes from its own module: supabaseClient.js is a namespace
+// marginTotalsFromRaw comes from its own module: supabaseClient.js is a namespace
 // barrel (db, auth, storage, …) and does not forward loose helpers.
-import { summariseMargin } from '../api/db/margin'
+import { marginTotalsFromRaw } from '../api/db/margin'
+import Pagination from '../components/Pagination'
+import { safeStorage } from '../lib/safeStorage'
 import { useBaseCurrency } from '../hooks/useBaseCurrency'
 import { formatMoney } from '../lib/money'
 import EmptyState from '../components/EmptyState'
@@ -29,9 +31,22 @@ export default function ProfitabilityTab() {
   const fmt = (v) => (v === null || v === undefined ? '—' : formatMoney(v, baseCurrency))
   const pct = (v) => (v === null || v === undefined ? '—' : `${Number(v).toFixed(1)}%`)
 
+  // Totals are summed in the database over every invoice, and the invoice table
+  // is paged there — it used to read every margin row (capped at 1 000) and add
+  // them up here. (BUG-066.)
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(() => safeStorage.get('reportsPerPage', 25))
+  useEffect(() => { safeStorage.set('reportsPerPage', perPage) }, [perPage])
+  useEffect(() => { setPage(1) }, [perPage])
+
+  const { data: rawTotals, isLoading: loadingTotals } = useQuery({
+    queryKey: ['margin', 'totals'],
+    queryFn: () => db.margin.totals(),
+  })
   const { data: invoiceRes, isLoading: loadingInvoices } = useQuery({
-    queryKey: ['margin', 'by-invoice'],
-    queryFn: () => db.margin.byInvoice(),
+    queryKey: ['margin', 'by-invoice', page, perPage],
+    queryFn: () => db.margin.byInvoicePage(page, perPage),
+    placeholderData: keepPreviousData,
   })
   const { data: repRes, isLoading: loadingReps } = useQuery({
     queryKey: ['margin', 'by-rep'],
@@ -40,10 +55,10 @@ export default function ProfitabilityTab() {
 
   const invoices = invoiceRes?.data ?? EMPTY_ARRAY
   const reps = repRes?.data ?? EMPTY_ARRAY
-  const missing = invoiceRes?.missing || repRes?.missing
-  const totals = useMemo(() => summariseMargin(invoices), [invoices])
+  const missing = invoiceRes?.missing || repRes?.missing || (!loadingTotals && rawTotals === null)
+  const totals = rawTotals ? marginTotalsFromRaw(rawTotals) : null
 
-  if (loadingInvoices || loadingReps) {
+  if (loadingTotals || loadingInvoices || loadingReps) {
     return <div className="py-12 text-center text-sm text-gray-500 dark:text-[#9aa4b2]">{t('common.loading')}</div>
   }
 
@@ -58,7 +73,7 @@ export default function ProfitabilityTab() {
     )
   }
 
-  if (invoices.length === 0) {
+  if (!totals || totals.invoices === 0) {
     return <EmptyState title={t('reports.marginNoInvoices')} description={t('reports.marginNoInvoicesHint')} />
   }
 
@@ -187,6 +202,9 @@ export default function ProfitabilityTab() {
             ))}
           </tbody>
         </table>
+        <div className="px-4 pb-3">
+          <Pagination total={invoiceRes?.count ?? 0} page={page} itemsPerPage={perPage} setItemsPerPage={setPerPage} onPage={setPage} />
+        </div>
       </Card>
     </div>
   )

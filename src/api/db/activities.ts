@@ -370,19 +370,18 @@ export const activities = {
   },
   // RLS already scopes results to what the caller can see (manager+ sees
   // all, sales_rep sees only their own assigned_rep rows).
-  // Every open activity past due, oldest first — every row, not the first 1 000.
-  // A count alone is countOverdue().
-  async listOverdue(): Promise<ActivityRow[]> {
-    const now = new Date().toISOString()
-    return fetchAllRows<ActivityRow>((from, to) =>
-      supabase
-        .from('activities')
-        .select('*')
-        .lt('due_date', now)
-        .is('completed_at', null)
-        .order('due_date', { ascending: true })
-        .order('id', { ascending: true })
-        .range(from, to)
-    )
+  // The first `limit` open activities past due, oldest first — the Dashboard's
+  // list. How many there are is countOverdue(). (BUG-066.)
+  async listOverdueFirst(limit: number, now: Date = new Date()): Promise<ActivityRow[]> {
+    const { data, error } = await supabase
+      .from('activities')
+      .select('*')
+      .lt('due_date', now.toISOString())
+      .is('completed_at', null)
+      .order('due_date', { ascending: true })
+      .order('id', { ascending: true })
+      .range(0, Math.max(0, limit - 1))
+    if (error) throw error
+    return (data ?? []) as ActivityRow[]
   },
 }

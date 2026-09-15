@@ -11,9 +11,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const orderMock = vi.fn()
-vi.mock('../api/client.js', () => ({
-  supabase: { from: () => ({ select: () => ({ order: orderMock }) }) },
-}))
+// listActive reads every announcement in chunks (BUG-066): each chunk is
+// select → order → order → range, and a chunk with nothing queued is the empty
+// one that ends the read.
+vi.mock('../api/client.js', () => {
+  const chain = {
+    order: () => chain,
+    range: async () => (await orderMock()) ?? { data: [], error: null },
+  }
+  return { supabase: { from: () => ({ select: () => chain }) } }
+})
 
 const { announcements } = await import('../api/db/system')
 
