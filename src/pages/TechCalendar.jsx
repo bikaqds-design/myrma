@@ -9,6 +9,7 @@ import EmptyState from '../components/EmptyState'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { captureException } from '../lib/sentry'
 import { EMPTY_ARRAY } from '../lib/stableEmpty'
+import { localDateKey, getMonday, weekDays, weekRange, dueDayKey } from '../lib/calendarDays'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -29,37 +30,12 @@ const STATUS_CLS = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Returns the Monday of the week containing `date` */
-function getMonday(date) {
-  const d = new Date(date)
-  const day = d.getDay() // 0=Sun
-  const diff = day === 0 ? -6 : 1 - day
-  d.setDate(d.getDate() + diff)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-/** Returns array of 7 Date objects starting from monday */
-function weekDays(monday) {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday)
-    d.setDate(d.getDate() + i)
-    return d
-  })
-}
-
-function isoDate(date) {
-  return date.toISOString().split('T')[0]
-}
+// Days are the viewer's calendar days (src/lib/calendarDays.js). The columns
+// used to be keyed by the UTC date of each local midnight, which east of UTC is
+// the day before — in Egypt every ticket and activity showed one column late.
 
 function sameDay(a, b) {
-  return isoDate(a) === isoDate(b)
-}
-
-/** The day after a 'YYYY-MM-DD' key, as midnight UTC in ISO form. */
-function nextDayStartUtc(key) {
-  const [y, m, d] = key.split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString()
+  return localDateKey(a) === localDateKey(b)
 }
 
 /** Unscheduled tickets shown before "Show more". */
@@ -169,9 +145,9 @@ export default function TechCalendar({
   // beside tickets: open, dated, not a log entry, as on the Activities page.
   const effectiveTech = isAdminOrManager ? selectedTech : currentUserEmail
   const days = weekDays(mondayDate)
-  // Day keys are the ISO dates the grid has always used for its columns.
-  const firstKey = isoDate(days[0])
-  const lastKey = isoDate(days[6])
+  // The week's first and last day, and the instants it starts and ends, in the
+  // viewer's time zone.
+  const { firstKey, lastKey, fromIso, toIso } = weekRange(mondayDate)
 
   const { data: tickets = EMPTY_ARRAY, isLoading: loading, isError, error, refetch } = useQuery({
     queryKey: ['tech-calendar-tickets', firstKey, lastKey, effectiveTech || null],
@@ -181,7 +157,7 @@ export default function TechCalendar({
   const { data: planned = EMPTY_ARRAY } = useQuery({
     queryKey: ['tech-calendar-activities', firstKey, lastKey, effectiveTech || null],
     queryFn: () =>
-      db.activities.listPlannedBetween(`${firstKey}T00:00:00.000Z`, nextDayStartUtc(lastKey), effectiveTech || null),
+      db.activities.listPlannedBetween(fromIso, toIso, effectiveTech || null),
     placeholderData: keepPreviousData,
   })
   const [unscheduledLimit, setUnscheduledLimit] = useState(UNSCHEDULED_PAGE)
@@ -215,12 +191,11 @@ export default function TechCalendar({
   const ticketsByDay = useMemo(() => {
     const map = {}
     days.forEach((d) => {
-      map[isoDate(d)] = []
+      map[localDateKey(d)] = []
     })
     filteredTickets.forEach((t) => {
-      if (!t.due_date) return
-      const key = t.due_date.split('T')[0]
-      if (map[key]) map[key].push(t)
+      const key = dueDayKey(t.due_date)
+      if (key && map[key]) map[key].push(t)
     })
     return map
   }, [filteredTickets, days])
@@ -228,12 +203,11 @@ export default function TechCalendar({
   const activitiesByDay = useMemo(() => {
     const map = {}
     days.forEach((d) => {
-      map[isoDate(d)] = []
+      map[localDateKey(d)] = []
     })
     filteredPlanned.forEach((a) => {
-      if (!a.due_date) return
-      const key = a.due_date.split('T')[0]
-      if (map[key]) map[key].push(a)
+      const key = dueDayKey(a.due_date)
+      if (key && map[key]) map[key].push(a)
     })
     return map
   }, [filteredPlanned, days])
@@ -384,7 +358,7 @@ export default function TechCalendar({
         {/* Day columns */}
         <div className="grid grid-cols-7 min-h-[400px]">
           {days.map((d, i) => {
-            const key = isoDate(d)
+            const key = localDateKey(d)
             const dayTickets = ticketsByDay[key] || []
             const dayActivities = activitiesByDay[key] || []
             const isToday = sameDay(d, new Date())
@@ -402,11 +376,11 @@ export default function TechCalendar({
                   <ActivityCard key={act.id} activity={act} />
                 ))}
                 {dayTickets.map((ticket) => {
-                  const dueDate = ticket.due_date ? new Date(ticket.due_date) : null
-                  dueDate && dueDate.setHours(0, 0, 0, 0)
+                  // A ticket's due date is a plain date: overdue once that day is before today.
+                  const dueKey = dueDayKey(ticket.due_date)
                   const isOverdue =
-                    dueDate &&
-                    dueDate < today &&
+                    dueKey &&
+                    dueKey < localDateKey(today) &&
                     ticket.ticket_status !== 'Completed' &&
                     ticket.ticket_status !== 'Cancelled'
                   return (
