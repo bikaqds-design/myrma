@@ -594,7 +594,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
       related_id: deal.id,
       type: 'approval',
       title: `approval|quotation|${qt.id}|${qt.qt_code}|${qt.total ?? 0}|${customerName}`,
-      // Always set a due_date — listAllPlanned() filters out null-due_date rows,
+      // Always set a due_date — the Activities page's planned tabs leave out rows with no due_date,
       // so a null here would hide the approval from the Activities page.
       due_date: qt.validity_until || new Date().toISOString(),
       assigned_rep: qt.assigned_rep || null,

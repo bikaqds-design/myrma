@@ -1653,6 +1653,7 @@
     "showMoreProducts": "عرض المزيد ({{shown}} من {{total}})"
   },
   "calendar": {
+    "showMoreUnscheduled": "عرض {{count}} أخرى",
     "title": "التقويم",
     "subtitle": "عرض أسبوعي للتذاكر والمتابعات المخططة حسب تاريخ الاستحقاق",
     "today": "اليوم",

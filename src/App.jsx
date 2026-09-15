@@ -142,7 +142,6 @@ const PurchaseDocumentDetail = lazyWithReload(() => import('./pages/Purchasing/P
 const VendorDetails = lazyWithReload(() => import('./pages/Purchasing/VendorDetails'))
 const NotFoundPage = lazyWithReload(() => import('./pages/NotFoundPage'))
 import CommandPalette from './components/CommandPalette'
-import { EMPTY_ARRAY } from './lib/stableEmpty'
 
 const PageSpinner = () => <RouteSkeleton />
 
@@ -823,13 +822,14 @@ export default function App() {
   }
 
   // ── Overdue activities count — drives the sidebar badge ──────────────────
-  const { data: overdueActivities = EMPTY_ARRAY } = useQuery({
+  // A head count: the badge needs the number, and loading every overdue row to
+  // count them stopped at the Data API's 1 000-row cap. (BUG-066.)
+  const { data: overdueActivityCount = 0 } = useQuery({
     queryKey: ['activities', 'overdue-count'],
-    queryFn: () => db.activities.listOverdue(),
+    queryFn: () => db.activities.countOverdue(),
     staleTime: 60_000,
     enabled: !!currentUser,
   })
-  const overdueActivityCount = overdueActivities.length
 
   // ── Active state derived from URL ─────────────────────────────────────────
   const isProductsActive = pathname === '/products' || pathname.startsWith('/products/')

@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
-import { useCustomersById } from '../../lib/useLookups'
+import { useDebouncedValue } from '../../lib/useDebouncedValue'
 import { useURLTab } from '../../hooks/useURLTab'
 import { canDo, ownershipScope } from '../../lib/permissions'
 import { PageHeader } from '../../components/ui'
@@ -168,91 +168,64 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
   const today = new Date().toISOString().split('T')[0]
 
   // ── Data queries ──────────────────────────────────────────────────────────
-  const { data: allActivities = EMPTY_ARRAY, isLoading } = useQuery({
-    queryKey: ['activities', 'planned'],
-    queryFn: () => db.activities.listAllPlanned(),
-    staleTime: 30_000,
-  })
-  const { data: allCompleted = EMPTY_ARRAY } = useQuery({
-    queryKey: ['activities', 'completed'],
-    queryFn: () => db.activities.listCompleted(),
-    staleTime: 30_000,
-  })
+  // One page, read from v_activities_list with the tab, search, filters and sort
+  // applied in the database, plus a head count per tab. The page used to load
+  // every planned and completed activity, every lead and every deal (to name the
+  // rows) and do all of that in the browser — past the Data API's 1 000-row cap,
+  // part of the work shown as all of it. (BUG-066.)
+  //
   // A rep sees only their own activities — including the approval inbox, which
-  // is where the money documents surface. RLS enforces it server-side.
-  const activities = useMemo(
-    () => (ownScope ? allActivities.filter((a) => a.assigned_rep === ownScope) : allActivities),
-    [allActivities, ownScope]
+  // is where the money documents surface. RLS enforces it server-side; the owner
+  // filter keeps the counts consistent with it.
+  const debouncedSearch = useDebouncedValue(search)
+  const listFilters = useMemo(
+    () => ({
+      tab,
+      type: filterType,
+      assignee: filterAssignee,
+      source: filterSource,
+      search: debouncedSearch,
+      ownerEmail: ownScope || null,
+    }),
+    [tab, filterType, filterAssignee, filterSource, debouncedSearch, ownScope]
   )
-  const completedActivities = useMemo(
-    () => (ownScope ? allCompleted.filter((a) => a.assigned_rep === ownScope) : allCompleted),
-    [allCompleted, ownScope]
-  )
-  const { data: leads = EMPTY_ARRAY } = useQuery({
-    queryKey: ['leads'],
-    queryFn: () => db.leads.list(),
+  const { data: pageResult, isLoading } = useQuery({
+    queryKey: ['activities', 'page', listFilters, sortConfig, currentPage, itemsPerPage],
+    queryFn: () => db.activities.listPage(listFilters, sortConfig, currentPage, itemsPerPage),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  })
+  const paginatedActivities = pageResult?.data ?? EMPTY_ARRAY
+  const matchingCount = pageResult?.count ?? 0
+  const { data: tabCounts } = useQuery({
+    queryKey: ['activities', 'tab-counts', ownScope || null],
+    queryFn: () => db.activities.tabCounts(ownScope || null),
+    staleTime: 30_000,
+  })
+  const { data: allAssignees = EMPTY_ARRAY } = useQuery({
+    queryKey: ['activities', 'assignees', tab === 'logs', ownScope || null],
+    queryFn: () => db.activities.assignees(tab === 'logs', ownScope || null),
     staleTime: 60_000,
   })
-  const { data: deals = EMPTY_ARRAY } = useQuery({
-    queryKey: ['deals'],
-    queryFn: () => db.deals.list(),
-    staleTime: 60_000,
-  })
-
-  const leadMap     = useMemo(() => Object.fromEntries(leads.map((l) => [l.id, l])),     [leads])
-  const dealMap     = useMemo(() => Object.fromEntries(deals.map((d) => [d.id, d])),     [deals])
-  // Only the customers the rows name — through their deal, or directly — by id.
-  // (BUG-066.)
-  const customerMap = useCustomersById([
-    ...deals.map((d) => d.customer_id),
-    ...allActivities.filter((a) => a.related_type === 'customer').map((a) => a.related_id),
-    ...allCompleted.filter((a) => a.related_type === 'customer').map((a) => a.related_id),
-  ])
 
   // ── Name resolution ───────────────────────────────────────────────────────
-  const getCustomerName = React.useCallback((a) => {
-    // Approval rows (deal- or customer-linked) carry the customer name in the
-    // encoded title, so they resolve uniformly regardless of related_type.
-    if (a.type === 'approval') return parseApprovalTitle(a.title).customer || '—'
-    if (a.related_type === 'lead') {
-      const l = leadMap[a.related_id]
-      return l ? (l.company_name || l.full_name || '—') : '—'
-    }
-    if (a.related_type === 'deal') {
-      const d = dealMap[a.related_id]
-      if (!d) return '—'
-      const c = customerMap[d.customer_id]
-      return c ? (c.company_name || c.contact_person || '—') : '—'
-    }
-    if (a.related_type === 'customer') {
-      const c = customerMap[a.related_id]
-      return c ? (c.company_name || c.contact_person || '—') : '—'
-    }
-    return '—'
-  }, [leadMap, dealMap, customerMap])
-
-  // Source record code — lets users search the Activities page directly by
-  // the underlying lead/deal/QT/SO/INV/CN code instead of just title/customer.
-  const getSourceCode = React.useCallback((a) => {
-    if (a.type === 'approval') return parseApprovalTitle(a.title).code || ''
-    if (a.related_type === 'lead') return leadMap[a.related_id]?.lead_code || ''
-    if (a.related_type === 'deal') return dealMap[a.related_id]?.deal_code || ''
-    return ''
-  }, [leadMap, dealMap])
+  // The view names each row: the approval title's customer, the lead, or the
+  // deal's / activity's customer.
+  const getCustomerName = (a) => a.customer_name || '—'
 
   // Navigation link — open the source: a lead/deal's scheduled activity opens
   // that record; an approval opens the underlying document detail (works for
   // both deal- and customer-linked quotations). Not the customer page.
-  const getCustomerLink = React.useCallback((a) => {
+  const getCustomerLink = (a) => {
     if (a.type === 'approval') {
       const { docType, docId } = parseApprovalTitle(a.title)
       if (!docId) return null
       return PURCHASE_DOC_TYPES.has(docType) ? `/purchasing/${docType}/${docId}` : `/sales/${docType}/${docId}`
     }
-    if (a.related_type === 'lead') return leadMap[a.related_id] ? `/leads/${a.related_id}` : null
-    if (a.related_type === 'deal') return dealMap[a.related_id] ? `/pipeline/${a.related_id}` : null
+    if (a.related_type === 'lead') return a.related_exists ? `/leads/${a.related_id}` : null
+    if (a.related_type === 'deal') return a.related_exists ? `/pipeline/${a.related_id}` : null
     return null
-  }, [leadMap, dealMap])
+  }
 
   // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(() => { safeStorage.set('activitiesPerPage', itemsPerPage) }, [itemsPerPage])
@@ -260,8 +233,8 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
   // Reset to page one only when a filter really changes, never on mount —
   // otherwise a shared link like ?q=acme&page=3 lands on page 1.
   useResetOnFilterChange([search, filterType, filterAssignee, filterSource, tab, itemsPerPage, sortConfig], () => setCurrentPage(1))
-  // Clear selection when tab changes
-  useEffect(() => { setSelectedActivities(new Set()) }, [tab])
+  // A selection belongs to the page it was made on (bulk actions act on what is shown).
+  useEffect(() => { setSelectedActivities(new Set()) }, [listFilters, sortConfig, currentPage, itemsPerPage])
 
   const handleSort = (key) => {
     setSortConfig((prev) => ({
@@ -269,70 +242,6 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc',
     }))
   }
-
-  // ── Tab counts ─────────────────────────────────────────────────────────────
-  const overdueCount = useMemo(
-    () => activities.filter((a) => { const d = a.due_date?.split('T')[0]; return d && d < today }).length,
-    [activities, today]
-  )
-  const todayCount = useMemo(
-    () => activities.filter((a) => { const d = a.due_date?.split('T')[0]; return d && d === today }).length,
-    [activities, today]
-  )
-
-  // ── Source pool for current tab ────────────────────────────────────────────
-  const sourcePool = tab === 'logs' ? completedActivities : activities
-
-  // ── Filtering ─────────────────────────────────────────────────────────────
-  const tabFiltered = useMemo(() => {
-    if (tab === 'logs')    return completedActivities
-    if (tab === 'overdue') return activities.filter((a) => { const d = a.due_date?.split('T')[0]; return d && d < today })
-    if (tab === 'today')   return activities.filter((a) => { const d = a.due_date?.split('T')[0]; return d && d === today })
-    return activities
-  }, [activities, completedActivities, tab, today])
-
-  const filtered = useMemo(() => {
-    let f = tabFiltered
-    if (search) {
-      const q = search.toLowerCase()
-      f = f.filter((a) =>
-        a.title.toLowerCase().includes(q) ||
-        getCustomerName(a).toLowerCase().includes(q) ||
-        (a.assigned_rep ?? '').toLowerCase().includes(q) ||
-        getSourceCode(a).toLowerCase().includes(q)
-      )
-    }
-    if (filterType)     f = f.filter((a) => a.type === filterType)
-    if (filterAssignee) f = f.filter((a) => a.assigned_rep === filterAssignee)
-    if (filterSource)   f = f.filter((a) => activitySource(a) === filterSource)
-
-    // Sort
-    const isLogs = tab === 'logs'
-    f = [...f].sort((a, b) => {
-      let aVal, bVal
-      if (sortConfig.key === 'due_date') {
-        const dateKey = isLogs ? 'completed_at' : 'due_date'
-        aVal = new Date(a[dateKey] || 0).getTime()
-        bVal = new Date(b[dateKey] || 0).getTime()
-      } else if (sortConfig.key === 'customer') {
-        aVal = getCustomerName(a).toLowerCase()
-        bVal = getCustomerName(b).toLowerCase()
-      } else {
-        aVal = (a[sortConfig.key] ?? '').toString().toLowerCase()
-        bVal = (b[sortConfig.key] ?? '').toString().toLowerCase()
-      }
-      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
-      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
-      return 0
-    })
-
-    return f
-  }, [tabFiltered, search, filterType, filterAssignee, filterSource, getCustomerName, getSourceCode, sortConfig, tab])
-
-  const allAssignees = useMemo(
-    () => [...new Set(sourcePool.map((a) => a.assigned_rep).filter(Boolean))].sort(),
-    [sourcePool]
-  )
 
   const activeFilterCount = [filterType, filterAssignee, filterSource].filter(Boolean).length
 
@@ -361,10 +270,14 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
   }
 
   // ── Pagination ────────────────────────────────────────────────────────────
-  const totalPages  = Math.ceil(filtered.length / itemsPerPage)
+  const totalPages  = Math.ceil(matchingCount / itemsPerPage)
   const startIndex  = (currentPage - 1) * itemsPerPage
-  const endIndex    = Math.min(startIndex + itemsPerPage, filtered.length)
-  const paginatedActivities = filtered.slice(startIndex, endIndex)
+  const endIndex    = Math.min(startIndex + paginatedActivities.length, matchingCount)
+  // The last page can empty under the user (a completion, a narrower filter): step back.
+  useEffect(() => {
+    if (pageResult && totalPages >= 1 && currentPage > totalPages) setCurrentPage(totalPages)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageResult, totalPages, currentPage])
 
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
@@ -576,10 +489,10 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
 
   // ── Tab config ─────────────────────────────────────────────────────────────
   const TABS = [
-    { id: 'all',     label: t('activities.tabAll'),     count: activities.length },
-    { id: 'today',   label: t('activities.tabToday'),   count: todayCount },
-    { id: 'overdue', label: t('activities.tabOverdue'), count: overdueCount },
-    { id: 'logs',    label: t('activities.tabLogs'),    count: completedActivities.length },
+    { id: 'all',     label: t('activities.tabAll'),     count: tabCounts?.all ?? 0 },
+    { id: 'today',   label: t('activities.tabToday'),   count: tabCounts?.today ?? 0 },
+    { id: 'overdue', label: t('activities.tabOverdue'), count: tabCounts?.overdue ?? 0 },
+    { id: 'logs',    label: t('activities.tabLogs'),    count: tabCounts?.logs ?? 0 },
   ]
 
   const EMPTY = {
@@ -598,7 +511,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
     <div className="space-y-4">
       <PageHeader
         title={t('activities.title')}
-        subtitle={t('activities.subtitle', { count: activities.length })}
+        subtitle={t('activities.subtitle', { count: tabCounts?.all ?? 0 })}
       />
 
       {/* Tabs */}
@@ -757,9 +670,9 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
         <div className="px-5 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[#e6e9ef] dark:border-[#212a38]">
           <span className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
             {t('activities.showingRange', {
-              from: filtered.length === 0 ? 0 : startIndex + 1,
+              from: matchingCount === 0 ? 0 : startIndex + 1,
               to: endIndex,
-              total: filtered.length,
+              total: matchingCount,
             })}
           </span>
           <div className="flex items-center gap-2">
@@ -1047,7 +960,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
         {totalPages > 1 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-t border-[#e6e9ef] dark:border-[#212a38]">
             <div className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
-              {t('activities.showingRange', { from: startIndex + 1, to: endIndex, total: filtered.length })}
+              {t('activities.showingRange', { from: startIndex + 1, to: endIndex, total: matchingCount })}
             </div>
             <div className="flex items-center gap-1">
               <button
