@@ -1,4 +1,8 @@
 import { supabase } from '../client.js'
+import { fetchPage, fetchAllRows } from './_paging.js'
+import type { PagedResult } from './types.js'
+import { orIlike } from '../../lib/searchPattern.js'
+import type { PaymentListFilters } from './payments.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 // AP mirror of payments.ts (customer AR) — see 20260760_vendor_payments.sql.
@@ -43,17 +47,39 @@ export interface VendorPaymentApplicationRow {
 
 // ── Module ────────────────────────────────────────────────────────────────────
 
+/** A vendor payment as the Accounting page lists it (v_vendor_payments_list, 20260861). */
+export interface VendorPaymentListRow extends VendorPaymentRow {
+  vendor_name: string | null
+}
+
 export const vendorPayments = {
+  /** One page of vendor payments, newest first, searched in the database. (BUG-066.) */
+  async listPage(filters: PaymentListFilters, page: number, pageSize: number): Promise<PagedResult<VendorPaymentListRow>> {
+    const search = filters.search?.trim()
+    return fetchPage<VendorPaymentListRow>((from, to) => {
+      let q = supabase.from('v_vendor_payments_list').select('*', { count: 'exact' })
+      if (search) q = q.or(orIlike(['payment_code', 'vendor_name', 'reference_number'], search))
+      return q
+        .order('payment_date', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+    }, page, pageSize)
+  },
+
+  /** Every vendor payment matching the filters — all of them, not the first 1 000. */
   async list(filters?: { vendorId?: string; status?: string }): Promise<VendorPaymentRow[]> {
-    let q = supabase.from('vendor_payments').select('*').order('payment_date', { ascending: false })
-    if (filters?.vendorId) q = q.eq('vendor_id', filters.vendorId)
-    if (filters?.status) q = q.eq('status', filters.status)
-    const { data, error } = await q
-    if (error) {
-      if (error.code === '42P01') return []
+    try {
+      return await fetchAllRows<VendorPaymentRow>((from, to) => {
+        let q = supabase.from('vendor_payments').select('*')
+        if (filters?.vendorId) q = q.eq('vendor_id', filters.vendorId)
+        if (filters?.status) q = q.eq('status', filters.status)
+        return q.order('payment_date', { ascending: false }).order('id', { ascending: true }).range(from, to)
+      })
+    } catch (error) {
+      if ((error as { code?: string })?.code === '42P01') return []
       throw error
     }
-    return (data ?? []) as VendorPaymentRow[]
   },
 
   async get(id: string): Promise<VendorPaymentRow | null> {

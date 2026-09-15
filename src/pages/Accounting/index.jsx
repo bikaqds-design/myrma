@@ -1,10 +1,12 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { canDo } from '../../lib/permissions'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
-import { useCustomersById } from '../../lib/useLookups'
+import { useDebouncedValue } from '../../lib/useDebouncedValue'
+import Pagination from '../../components/Pagination'
+import { safeStorage } from '../../lib/safeStorage'
 import { useURLTab } from '../../hooks/useURLTab'
 import { Button, PageHeader, Table } from '../../components/ui'
 import { PageSkeleton } from '../../components/Skeleton'
@@ -57,65 +59,73 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
   const [search, setSearch] = useState('')
   const [vendorSearch, setVendorSearch] = useState('')
 
-  const { data: payments = EMPTY_ARRAY, isLoading: paymentsLoading } = useQuery({
-    queryKey: ['payments'],
-    queryFn: () => db.payments.list(),
+  // ── Data ──────────────────────────────────────────────────────────────────
+  // The payment lists are read a page at a time, searched in the database, with
+  // the customer / vendor name on each row; the aging reports are bucketed and
+  // summed in the database per customer / vendor. The page used to load every
+  // payment, every posted invoice, every vendor invoice and every brand and do
+  // all of that in the browser — past the Data API's 1 000-row cap, part of the
+  // ledger, and receivable and payable totals that could leave invoices out.
+  // (BUG-066.)
+  const [perPage, setPerPage] = useState(() => safeStorage.get('accountingPerPage', 25))
+  useEffect(() => { safeStorage.set('accountingPerPage', perPage) }, [perPage])
+  const [paymentsPage, setPaymentsPage] = useState(1)
+  const [vendorPaymentsPage, setVendorPaymentsPage] = useState(1)
+  const debouncedSearch = useDebouncedValue(search)
+  const debouncedVendorSearch = useDebouncedValue(vendorSearch)
+  useEffect(() => setPaymentsPage(1), [debouncedSearch, perPage])
+  useEffect(() => setVendorPaymentsPage(1), [debouncedVendorSearch, perPage])
+
+  const { data: paymentsResult, isLoading: paymentsLoading } = useQuery({
+    queryKey: ['payments', 'page', debouncedSearch, paymentsPage, perPage],
+    queryFn: () => db.payments.listPage({ search: debouncedSearch }, paymentsPage, perPage),
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
+    enabled: tab === 'payments',
   })
-  const { data: aging = EMPTY_ARRAY, isLoading: agingLoading } = useQuery({
+  const { data: agingByCustomer = EMPTY_ARRAY, isLoading: agingLoading } = useQuery({
     queryKey: ['ar-aging'],
-    queryFn: () => db.customerLedger.agingReport(),
+    queryFn: () => db.customerLedger.arAging(),
     staleTime: 30_000,
     enabled: tab === 'aging',
   })
-  const { data: vendorPayments = EMPTY_ARRAY, isLoading: vendorPaymentsLoading } = useQuery({
-    queryKey: ['vendor-payments'],
-    queryFn: () => db.vendorPayments.list(),
+  const { data: vendorPaymentsResult, isLoading: vendorPaymentsLoading } = useQuery({
+    queryKey: ['vendor-payments', 'page', debouncedVendorSearch, vendorPaymentsPage, perPage],
+    queryFn: () => db.vendorPayments.listPage({ search: debouncedVendorSearch }, vendorPaymentsPage, perPage),
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
     enabled: tab === 'vendor_payments',
   })
-  const { data: apAging = EMPTY_ARRAY, isLoading: apAgingLoading } = useQuery({
+  const { data: apAgingByVendor = EMPTY_ARRAY, isLoading: apAgingLoading } = useQuery({
     queryKey: ['ap-aging'],
-    queryFn: () => db.vendorLedger.apAgingReport(),
+    queryFn: () => db.vendorLedger.apAging(),
     staleTime: 30_000,
     enabled: tab === 'ap_aging',
   })
+  // The vendor picker in "Record payment" needs every vendor; read only when it opens.
   const { data: vendors = EMPTY_ARRAY } = useQuery({
     queryKey: ['brands-as-vendors'],
     queryFn: () => db.brands.list(),
     staleTime: 60_000,
+    enabled: showRecordVendorModal,
   })
 
-  // Only the customers the payments name, by id — not the whole table, which
-  // the Data API caps at 1 000 rows. (BUG-066.)
-  const customerMap = useCustomersById(payments.map((p) => p.customer_id))
-  const customerName = (id) => customerMap[id]?.company_name || customerMap[id]?.contact_person || '—'
-  const vendorMap = useMemo(() => Object.fromEntries(vendors.map((v) => [v.id, v])), [vendors])
-  const vendorName = (id) => vendorMap[id]?.brand_name || '—'
+  const filteredPayments = paymentsResult?.data ?? EMPTY_ARRAY
+  const paymentsCount = paymentsResult?.count ?? 0
+  const filteredVendorPayments = vendorPaymentsResult?.data ?? EMPTY_ARRAY
+  const vendorPaymentsCount = vendorPaymentsResult?.count ?? 0
+  const customerName = (row) => row.customer_name || '—'
+  const vendorName = (row) => row.vendor_name || '—'
 
-  const filteredPayments = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    const sorted = [...payments].sort((a, b) => new Date(b.payment_date) - new Date(a.payment_date))
-    if (!q) return sorted
-    return sorted.filter(
-      (p) =>
-        (p.payment_code || '').toLowerCase().includes(q) ||
-        customerName(p.customer_id).toLowerCase().includes(q) ||
-        (p.reference_number || '').toLowerCase().includes(q)
-    )
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [payments, search, customerMap])
-
-  const agingByCustomer = useMemo(() => {
-    const map = new Map()
-    for (const row of aging) {
-      const cur = map.get(row.customer_id) || { customer_id: row.customer_id, ...emptyAgingTotals() }
-      cur[row.bucket] += row.remaining
-      cur.total += row.remaining
-      map.set(row.customer_id, cur)
-    }
-    return Array.from(map.values()).sort((a, b) => b.total - a.total)
-  }, [aging])
+  // The last page can empty under the user (a void, a narrower search): step back.
+  useEffect(() => {
+    const pages = Math.ceil(paymentsCount / perPage)
+    if (paymentsResult && pages >= 1 && paymentsPage > pages) setPaymentsPage(pages)
+  }, [paymentsResult, paymentsCount, paymentsPage, perPage])
+  useEffect(() => {
+    const pages = Math.ceil(vendorPaymentsCount / perPage)
+    if (vendorPaymentsResult && pages >= 1 && vendorPaymentsPage > pages) setVendorPaymentsPage(pages)
+  }, [vendorPaymentsResult, vendorPaymentsCount, vendorPaymentsPage, perPage])
 
   const agingTotals = useMemo(
     () =>
@@ -129,38 +139,6 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
       ),
     [agingByCustomer]
   )
-
-  const filteredVendorPayments = useMemo(() => {
-    const q = vendorSearch.trim().toLowerCase()
-    const sorted = [...vendorPayments].sort((a, b) => new Date(b.payment_date) - new Date(a.payment_date))
-    if (!q) return sorted
-    return sorted.filter(
-      (p) =>
-        (p.payment_code || '').toLowerCase().includes(q) ||
-        vendorName(p.vendor_id).toLowerCase().includes(q) ||
-        (p.reference_number || '').toLowerCase().includes(q)
-    )
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vendorPayments, vendorSearch, vendorMap])
-
-  const apAgingByVendor = useMemo(() => {
-    const map = new Map()
-    for (const row of apAging) {
-      const cur = map.get(row.vendor_id) || { vendor_id: row.vendor_id, ...emptyAgingTotals() }
-      // remaining_base, NOT remaining. A vendor invoice carries its own
-      // currency and these buckets sum across every invoice, so adding
-      // `remaining` put a USD balance into an EGP total as though the digits
-      // were the same money. Measured in production when this was fixed: one
-      // approved USD 3,750 invoice at 48.5, so payables showed E£4,540 against
-      // a true E£182,665 — understated about forty-fold. vendorLedger.ts
-      // computed remaining_base for exactly this and warned about it on the
-      // type; this reducer was the one place that ignored it.
-      cur[row.bucket] += row.remaining_base
-      cur.total += row.remaining_base
-      map.set(row.vendor_id, cur)
-    }
-    return Array.from(map.values()).sort((a, b) => b.total - a.total)
-  }, [apAging])
 
   const apAgingTotals = useMemo(
     () =>
@@ -341,7 +319,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
                   filteredPayments.map((p) => (
                     <tr key={p.id} className="border-b border-[#f0f2f6] dark:border-[#1a2230] last:border-0 hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]">
                       <td className="px-4 py-3 font-mono text-xs text-[#211f1b] dark:text-[#e8ebf0]">{p.payment_code}</td>
-                      <td className="px-4 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{customerName(p.customer_id)}</td>
+                      <td className="px-4 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{customerName(p)}</td>
                       <td className="px-4 py-3 text-[#6c6760] dark:text-[#9aa4b2]">{t(METHOD_LABEL_KEY[p.method] ?? p.method)}</td>
                       <td className="px-4 py-3 text-[#6c6760] dark:text-[#9aa4b2]">{p.reference_number || '—'}</td>
                       <td className="px-4 py-3 text-[#6c6760] dark:text-[#9aa4b2]">{p.payment_date}</td>
@@ -365,6 +343,9 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
               </tbody>
             </table>
           </div>
+          {paymentsCount > 0 && (
+            <Pagination total={paymentsCount} page={paymentsPage} itemsPerPage={perPage} setItemsPerPage={setPerPage} onPage={setPaymentsPage} />
+          )}
         </>
       )}
 
@@ -392,7 +373,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
                 {
                   key: 'customer',
                   header: t('accounting.colCustomer'),
-                  cell: (r) => customerName(r.customer_id),
+                  cell: (r) => customerName(r),
                 },
                 ...BUCKET_KEYS.map((b) => ({
                   key: b,
@@ -463,7 +444,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
                   filteredVendorPayments.map((p) => (
                     <tr key={p.id} className="border-b border-[#f0f2f6] dark:border-[#1a2230] last:border-0 hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]">
                       <td className="px-4 py-3 font-mono text-xs text-[#211f1b] dark:text-[#e8ebf0]">{p.payment_code}</td>
-                      <td className="px-4 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{vendorName(p.vendor_id)}</td>
+                      <td className="px-4 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{vendorName(p)}</td>
                       <td className="px-4 py-3 text-[#6c6760] dark:text-[#9aa4b2]">{t(METHOD_LABEL_KEY[p.method] ?? p.method)}</td>
                       <td className="px-4 py-3 text-[#6c6760] dark:text-[#9aa4b2]">{p.reference_number || '—'}</td>
                       <td className="px-4 py-3 text-[#6c6760] dark:text-[#9aa4b2]">{p.payment_date}</td>
@@ -487,6 +468,9 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
               </tbody>
             </table>
           </div>
+          {vendorPaymentsCount > 0 && (
+            <Pagination total={vendorPaymentsCount} page={vendorPaymentsPage} itemsPerPage={perPage} setItemsPerPage={setPerPage} onPage={setVendorPaymentsPage} />
+          )}
         </>
       )}
 
@@ -533,7 +517,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
                 ) : (
                   apAgingByVendor.map((r) => (
                     <tr key={r.vendor_id} className="border-b border-[#f0f2f6] dark:border-[#1a2230] last:border-0 hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]">
-                      <td className="px-4 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{vendorName(r.vendor_id)}</td>
+                      <td className="px-4 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{vendorName(r)}</td>
                       {BUCKET_KEYS.map((b) => (
                         <td key={b} className="px-4 py-3 text-end text-[#6c6760] dark:text-[#9aa4b2]">{r[b] > 0 ? fmtMoney(r[b]) : '—'}</td>
                       ))}

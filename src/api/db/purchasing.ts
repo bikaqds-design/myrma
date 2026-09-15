@@ -1,6 +1,7 @@
 import { supabase } from '../client.js'
 import type { TableResult } from './types.js'
 import { assertUpdated, assertAffected } from './_assertUpdated.js'
+import { fetchAllRows } from './_paging.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 // Vendors are Brands (src/api/db/catalog.ts `brands`) — there is no separate
@@ -282,12 +283,19 @@ export const purchaseOrders = {
 // inventory + the vendor-payable balance (see vendorPayments.ts).
 
 export const vendorInvoices = {
-  async list(filters?: { purchaseOrderId?: string }): Promise<VendorInvoiceRow[]> {
-    let q = supabase.from('vendor_invoices').select('*').order('created_at', { ascending: false })
-    if (filters?.purchaseOrderId) q = q.eq('purchase_order_id', filters.purchaseOrderId)
-    const { data, error } = await q
-    if (error) throw error
-    return data || []
+  /**
+   * Every vendor invoice matching the filters, newest first — all of them, not
+   * the first 1 000. `vendorId` and `statuses` narrow in the database, so a
+   * payment's open invoices are read for that vendor alone. (BUG-066.)
+   */
+  async list(filters?: { purchaseOrderId?: string; vendorId?: string; statuses?: string[] }): Promise<VendorInvoiceRow[]> {
+    return fetchAllRows<VendorInvoiceRow>((from, to) => {
+      let q = supabase.from('vendor_invoices').select('*')
+      if (filters?.purchaseOrderId) q = q.eq('purchase_order_id', filters.purchaseOrderId)
+      if (filters?.vendorId) q = q.eq('vendor_id', filters.vendorId)
+      if (filters?.statuses?.length) q = q.in('status', filters.statuses)
+      return q.order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)
+    })
   },
   async get(id: string): Promise<VendorInvoiceRow> {
     const { data, error } = await supabase.from('vendor_invoices').select('*').eq('id', id).single()

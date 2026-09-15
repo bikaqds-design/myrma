@@ -605,11 +605,13 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
     if (!vendorId) return
     let cancelled = false
     setLoadingInvoices(true)
-    db.vendorInvoices.list()
+    // Only this vendor's payable invoices, narrowed in the database. This read
+    // every vendor invoice and filtered here — past the Data API's 1 000-row
+    // cap, some open invoices were never offered. (BUG-066.)
+    db.vendorInvoices.list({ vendorId, statuses: PAYABLE_STATUSES })
       .then((all) => {
         if (cancelled) return
         const open = all
-          .filter((vi) => vi.vendor_id === vendorId && PAYABLE_STATUSES.includes(vi.status))
           .filter((vi) => (Number(vi.total) || 0) - (Number(vi.amount_paid) || 0) > 0.001)
           .sort((a, b) => (a.due_date || '9999-12-31').localeCompare(b.due_date || '9999-12-31'))
         setOpenInvoices(open)
