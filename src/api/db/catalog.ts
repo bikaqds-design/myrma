@@ -73,13 +73,16 @@ export interface PagedResult<T> {
 // ── Brands ────────────────────────────────────────────────────────────────────
 
 export const brands = {
+  /** Every brand (brands are also the vendors), A–Z — all of them, not the first 1 000. (BUG-066.) */
   async list(): Promise<BrandRow[]> {
-    const { data, error } = await supabase
-      .from('brands')
-      .select('*')
-      .order('brand_name', { ascending: true })
-    if (error) throw error
-    return data || []
+    return fetchAllRows<BrandRow>((from, to) =>
+      supabase
+        .from('brands')
+        .select('*')
+        .order('brand_name', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
   },
   async create(brand: Partial<BrandRow>): Promise<BrandRow | undefined> {
     const { data, error } = await supabase.from('brands').insert([brand]).select()

@@ -1,6 +1,7 @@
 import { supabase } from '../client.js'
 import { assertAffected } from './_assertUpdated.js'
 import { computeDocumentTotals } from './_documentTotals.js'
+import { fetchAllRows } from './_paging.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -52,18 +53,22 @@ export const crmInvoices = {
     assignedRep?: string
     soId?: string
   }): Promise<CrmInvoiceRow[]> {
-    let q = supabase.from('crm_invoices').select('*').order('created_at', { ascending: false })
-    if (filters?.customerId) q = q.eq('customer_id', filters.customerId)
-    if (filters?.docStatus) q = q.eq('doc_status', filters.docStatus)
-    if (filters?.paymentStatus) q = q.eq('payment_status', filters.paymentStatus)
-    if (filters?.assignedRep) q = q.eq('assigned_rep', filters.assignedRep)
-    if (filters?.soId) q = q.eq('so_id', filters.soId)
-    const { data, error } = await q
-    if (error) {
-      if (error.code === '42P01') return []
+    // Every matching invoice — a customer's open invoices for a payment must
+    // all be offered, not the first 1 000. (BUG-066.)
+    try {
+      return await fetchAllRows<CrmInvoiceRow>((from, to) => {
+        let q = supabase.from('crm_invoices').select('*')
+        if (filters?.customerId) q = q.eq('customer_id', filters.customerId)
+        if (filters?.docStatus) q = q.eq('doc_status', filters.docStatus)
+        if (filters?.paymentStatus) q = q.eq('payment_status', filters.paymentStatus)
+        if (filters?.assignedRep) q = q.eq('assigned_rep', filters.assignedRep)
+        if (filters?.soId) q = q.eq('so_id', filters.soId)
+        return q.order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)
+      })
+    } catch (error) {
+      if ((error as { code?: string })?.code === '42P01') return []
       throw error
     }
-    return (data ?? []) as CrmInvoiceRow[]
   },
 
   async get(id: string): Promise<CrmInvoiceRow | null> {

@@ -1,7 +1,6 @@
 import { supabase } from '../client.js'
-import { crmInvoices } from './crmInvoices'
-import { agingBucket } from '../../lib/aging.js'
-import { daysPastDueLocal } from '../../lib/dates.js'
+import { fetchAllRows } from './_paging.js'
+import { todayLocalISO } from '../../lib/dates.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -22,14 +21,20 @@ export interface LedgerEntryRow {
 // See src/lib/aging.js for what each bucket means and why 'current' is gone.
 export type AgingBucket = 'not_due' | 'd1_30' | 'd31_60' | 'd61_90' | 'd90_plus' | 'no_due_date'
 
-export interface AgingInvoiceRow {
+/** One customer's open receivables by bucket (rma_ar_aging, 20260861). */
+export type AgingCustomerRow = {
   customer_id: string
-  invoice_id: string
-  inv_code: string | null
-  due_date: string | null
-  remaining: number
-  daysPastDue: number
-  bucket: AgingBucket
+  customer_name: string | null
+  total: number
+} & Record<AgingBucket, number>
+
+const AGING_NUMBER_FIELDS = ['not_due', 'd1_30', 'd31_60', 'd61_90', 'd90_plus', 'no_due_date', 'total'] as const
+
+/** Numeric columns come back as strings or numbers; the report adds them. */
+export function toAgingNumbers<T extends Record<string, unknown>>(row: T): T {
+  const out: Record<string, unknown> = { ...row }
+  for (const f of AGING_NUMBER_FIELDS) out[f] = Number(row[f] ?? 0)
+  return out as T
 }
 
 // ── Module ────────────────────────────────────────────────────────────────────
@@ -43,48 +48,40 @@ export const customerLedger = {
    * for a running balance.
    */
   async list(customerId: string): Promise<LedgerEntryRow[]> {
-    const { data, error } = await supabase
-      .from('v_customer_ledger')
-      .select('*')
-      .eq('customer_id', customerId)
-      .order('entry_date', { ascending: true })
-    if (error) {
-      if (error.code === '42P01') return []
+    // A statement needs every entry — read past the Data API's row cap. (BUG-066.)
+    try {
+      return await fetchAllRows<LedgerEntryRow>((from, to) =>
+        supabase
+          .from('v_customer_ledger')
+          .select('*')
+          .eq('customer_id', customerId)
+          .order('entry_date', { ascending: true })
+          .order('entry_type', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to)
+      )
+    } catch (error) {
+      if ((error as { code?: string })?.code === '42P01') return []
       throw error
     }
-    return (data ?? []) as LedgerEntryRow[]
   },
 
   /**
-   * agingReport: one row per posted invoice with an outstanding balance,
-   * bucketed by days past due (Not yet due / 1-30 / 31-60 / 61-90 / 90+, plus No due date) relative to
-   * due_date. Reads crm_invoices directly rather than the ledger view —
-   * amount_paid already reflects both payment and credit-note applications
-   * (maintained by the application RPCs, never by the client), so this is the single
-   * source of truth for "what's still owed and how overdue is it."
-   * Caller groups by customer_id and joins customer names client-side, same
-   * convention used by the Sales Documents / Pipeline pages.
+   * arAging: open receivables per customer, by aging bucket (src/lib/aging.js),
+   * largest total first. Bucketed and summed in the database (rma_ar_aging,
+   * 20260861) over every posted invoice with a balance — this used to load
+   * every posted invoice into the browser, which the Data API caps at 1 000
+   * rows, so the receivable total could quietly leave invoices out. (BUG-066.)
+   * `today` is the viewer's local date: an invoice due today is not yet late.
    */
-  async agingReport(): Promise<AgingInvoiceRow[]> {
-    const invoices = await crmInvoices.list({ docStatus: 'posted' })
-    return invoices
-      .map((inv) => {
-        const remaining = Math.round(((inv.total ?? 0) - (inv.amount_paid ?? 0)) * 100) / 100
-        if (remaining <= 0.001) return null
-        // Local calendar days, not UTC milliseconds: `new Date(due_date)` is UTC
-        // midnight, which put the count a day out for part of every Cairo
-        // morning (BUG-038). 0 for a missing date; the bucket says so instead.
-        const daysPastDue = daysPastDueLocal(inv.due_date)
-        return {
-          customer_id: inv.customer_id,
-          invoice_id: inv.id,
-          inv_code: inv.inv_code,
-          due_date: inv.due_date,
-          remaining,
-          daysPastDue,
-          bucket: agingBucket(inv.due_date) as AgingBucket,
-        } as AgingInvoiceRow
-      })
-      .filter((row): row is AgingInvoiceRow => row !== null)
+  async arAging(today: string = todayLocalISO()): Promise<AgingCustomerRow[]> {
+    const rows = await fetchAllRows<AgingCustomerRow>((from, to) =>
+      supabase
+        .rpc('rma_ar_aging', { p_today: today })
+        .order('total', { ascending: false })
+        .order('customer_id', { ascending: true })
+        .range(from, to)
+    )
+    return rows.map(toAgingNumbers)
   },
 }

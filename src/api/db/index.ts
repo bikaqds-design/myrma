@@ -171,7 +171,7 @@ export type { CrmInvoiceRow, CrmInvoiceLine } from './crmInvoices.js'
 export type { CreditNoteRow, CreditNoteLine, CreditNoteApplicationRow } from './creditNotes.js'
 export type { SalesDocumentRow, SalesDocType } from './salesDocuments.js'
 export type { PaymentRow, PaymentApplicationRow } from './payments.js'
-export type { LedgerEntryRow, LedgerEntryType, AgingBucket, AgingInvoiceRow } from './customerLedger.js'
+export type { LedgerEntryRow, LedgerEntryType, AgingBucket, AgingCustomerRow } from './customerLedger.js'
 export type {
   PurchaseLine, PurchaseOrderRow, VendorInvoiceRow,
   PurchaseDocType, PurchaseDocumentRow, VendorInvoiceChargeRow, ChargeType,
@@ -179,7 +179,7 @@ export type {
 export { landedUnitCosts } from './purchasing.js'
 export type { VendorPaymentRow, VendorPaymentApplicationRow } from './vendorPayments.js'
 export type {
-  VendorLedgerEntryRow, VendorLedgerEntryType, ApAgingBucket, ApAgingInvoiceRow,
+  VendorLedgerEntryRow, VendorLedgerEntryType, ApAgingBucket, ApAgingVendorRow,
 } from './vendorLedger.js'
 export type { InvoiceMarginRow, SalesRepPerformanceRow } from './margin.js'
 export { summariseMargin } from './margin.js'
