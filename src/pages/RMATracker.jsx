@@ -207,7 +207,7 @@ export default function RMATracker() {
         }
         clearFailures()
         setTicket(found)
-        const c = await db.rmaTracker.getPublicComments(found.id)
+        const c = await db.rmaTracker.getPublicComments(found.id, found.rma_number)
         setComments(c)
       } finally {
         setLoading(false)
@@ -239,6 +239,7 @@ export default function RMATracker() {
       }
       const comment = await db.rmaTracker.addComment(
         ticket.id,
+        ticket.rma_number,
         authorName.trim(),
         authorEmail.trim() || null,
         messageText.trim(),

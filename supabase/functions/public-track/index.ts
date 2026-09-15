@@ -6,6 +6,11 @@
 //   - comments:   list non-internal comments for a ticket
 //   - addComment: post a customer comment
 //
+// The RMA number is the only secret protecting a ticket, so all three actions
+// require it. `comments` and `addComment` used to accept a bare ticket id — ids
+// appear in staff links (`?ticket=<id>`) — which let anyone read a ticket's
+// public thread or post to it without knowing the number. (BUG-023.)
+//
 // Rate limiting (15 requests / minute per caller):
 //   - The count lives in the database, so it survives a cold start and is
 //     shared by every instance. This is the limit that actually holds.
@@ -17,6 +22,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.116.0'
 import { corsOriginHeaders } from '../_shared/cors.ts'
+import { provenTicketId, escapeLikePattern } from '../_shared/trackerProof.ts'
 
 // ─── Rate limiter (per-instance, in-memory) ──────────────────────────────────
 const RATE_LIMIT_PER_MINUTE = 15
@@ -120,6 +126,19 @@ const TICKET_PUBLIC_COLUMNS =
 const COMMENT_PUBLIC_COLUMNS =
   'id, ticket_id, created_date, comment_text, author_name, is_customer_comment, attachments, parent_comment_id'
 
+/** Id of the ticket with this RMA number (case-insensitive, literal), or null. */
+function ticketIdLookup(admin: ReturnType<typeof createClient>) {
+  return async (rmaNumber: string): Promise<string | null> => {
+    const { data, error } = await admin
+      .from('rma_tickets')
+      .select('id')
+      .ilike('rma_number', escapeLikePattern(rmaNumber))
+      .maybeSingle()
+    if (error || !data) return null
+    return data.id as string
+  }
+}
+
 /**
  * Dropping user_email from the select is not enough on its own: the ticket
  * drawer stores the staff member's email address *as* author_name
@@ -137,22 +156,6 @@ const COMMENT_PUBLIC_COLUMNS =
  * thread is unreadable without it. Only the team side is collapsed to the label
  * the UI already shows beside those replies.
  */
-/**
- * Neutralises LIKE metacharacters so the lookup matches one RMA number instead
- * of a pattern.
- *
- * ilike is used for case-insensitivity — customers type "rma-…" — but it also
- * honours % and _, and the input went in raw. That turned the endpoint into an
- * enumeration tool: "RMA-21052026%" returned a real ticket, customer name
- * included, without knowing the number. Since the RMA number is the only secret
- * protecting this data, a date prefix collapsed the guessing space from the full
- * number to a handful of days.
- *
- * Backslash first, or it would double-escape the escapes added after it.
- */
-function escapeLikePattern(input: string) {
-  return input.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
-}
 
 function maskStaffIdentity(c: Record<string, unknown>) {
   if (c?.is_customer_comment) return c
@@ -285,8 +288,9 @@ Deno.serve(async (req) => {
     }
 
     case 'comments': {
-      const ticketId = (body.ticketId || '').trim()
-      if (!ticketId) return json({ error: 'ticketId is required' }, 400)
+      if (!body.ticketId || !body.rmaNumber) return json({ error: 'ticketId and rmaNumber are required' }, 400)
+      const ticketId = await provenTicketId(ticketIdLookup(admin), body.rmaNumber, body.ticketId)
+      if (!ticketId) return json({ error: 'Ticket not found' }, 404)
 
       const { data, error } = await admin
         .from('ticket_comments')
@@ -307,6 +311,7 @@ Deno.serve(async (req) => {
     case 'addComment': {
       const c = body.comment as {
         ticketId?: string
+        rmaNumber?: string
         authorName?: string
         authorEmail?: string | null
         commentText?: string
@@ -318,6 +323,12 @@ Deno.serve(async (req) => {
       }
       if (c.commentText.length > 5000) return json({ error: 'comment too long (max 5000 chars)' }, 400)
       if (c.authorName.length > 120) return json({ error: 'authorName too long' }, 400)
+      if (!c.rmaNumber) return json({ error: 'rmaNumber is required' }, 400)
+
+      // Knowing a ticket's id is not enough to post to it: the caller must also
+      // hold its RMA number (BUG-023).
+      const provenId = await provenTicketId(ticketIdLookup(admin), c.rmaNumber, c.ticketId)
+      if (!provenId) return json({ error: 'Ticket not found' }, 404)
 
       // A reply must belong to the same ticket. `parent_comment_id` was passed
       // straight through, so a comment on ticket A could be threaded under a
@@ -329,7 +340,7 @@ Deno.serve(async (req) => {
           .select('id, ticket_id')
           .eq('id', c.parentCommentId)
           .maybeSingle()
-        if (!parent || parent.ticket_id !== c.ticketId) {
+        if (!parent || parent.ticket_id !== provenId) {
           return json({ error: 'parentCommentId does not belong to this ticket' }, 400)
         }
         parentId = parent.id as string
@@ -338,7 +349,7 @@ Deno.serve(async (req) => {
       const storageOrigin = new URL(supabaseUrl).origin
 
       const payload = {
-        ticket_id: c.ticketId,
+        ticket_id: provenId,
         comment_text: c.commentText.trim(),
         user_email: sanitiseEmail(c.authorEmail),
         author_name: c.authorName.trim(),
@@ -349,7 +360,7 @@ Deno.serve(async (req) => {
         created_date: new Date().toISOString(),
       }
 
-      let { data, error } = await admin.from('ticket_comments').insert([payload]).select()
+      let { data, error } = await admin.from('ticket_comments').insert([payload]).select(COMMENT_PUBLIC_COLUMNS)
 
       // Schema fallback: drop the new columns if they don't exist yet
       if (error && (error.code === '42703' || error.message?.includes('column'))) {
@@ -361,7 +372,7 @@ Deno.serve(async (req) => {
           is_internal: false,
           created_date: payload.created_date,
         }
-        const retry = await admin.from('ticket_comments').insert([basic]).select()
+        const retry = await admin.from('ticket_comments').insert([basic]).select('id, ticket_id, created_date, comment_text, author_name')
         if (retry.error) {
           console.error('addComment error:', retry.error)
           return json({ error: 'Add comment failed' }, 500)
