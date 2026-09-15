@@ -17,6 +17,8 @@ import {
   automationRules,
   currencies,
   dataIntegrity,
+  controlPanel,
+  dataCleanup,
 } from './system.js'
 import { inventory, warehouses, warehouseStock, stockMoves, parts, ticketParts, timeEntries } from './inventory.js'
 import { inventoryLists } from './inventoryLists.js'
@@ -48,6 +50,8 @@ import { geo } from './geo.js'
 import { productDocuments } from './documents.js'
 import { knowledgeLists } from './knowledgeLists.js'
 import { companyDocuments } from './companyDocuments.js'
+import { dashboard } from './dashboard.js'
+import { reports } from './reports.js'
 
 export const db = {
   // Users & roles
@@ -83,6 +87,12 @@ export const db = {
   automationRules,
   currencies,
   dataIntegrity,
+  controlPanel,
+  dataCleanup,
+
+  // Dashboard + Reports (BUG-066: figures computed in the database)
+  dashboard,
+  reports,
 
   // Inventory & parts
   inventory,

@@ -2,7 +2,7 @@ import { supabase } from '../client.js'
 import type { TableResult } from './types.js'
 import { captureException } from '../../lib/sentry.js'
 import { assertUpdated, assertAffected, assertAllAffected } from './_assertUpdated.js'
-import { fetchPage, fetchAllRows } from './_paging.js'
+import { fetchPage, fetchAllRows, chunksOf } from './_paging.js'
 import type { PagedResult as ServerPage } from './types.js'
 import { quoteOrValue } from '../../lib/searchPattern.js'
 import { TICKET_STATUS_RESOLVED } from '../../lib/constants.js'
@@ -279,31 +279,6 @@ export const rmaTickets = {
    * rows, so past that it is silently incomplete (BUG-066). Still used by
    * screens not yet moved to server-side paging; do not add callers.
    */
-  async list(): Promise<RMATicketRow[]> {
-    const { data, error } = await supabase
-      .from('rma_tickets')
-      .select('*')
-      .order('created_date', { ascending: false })
-      .limit(5000)
-    if (error) throw error
-    return data || []
-  },
-  async listPaged(page = 0, pageSize = 50): Promise<PagedResult<RMATicketRow>> {
-    const from = page * pageSize
-    const { data, count, error } = await supabase
-      .from('rma_tickets')
-      .select('*', { count: 'exact' })
-      .order('created_date', { ascending: false })
-      .range(from, from + pageSize - 1)
-    if (error) throw error
-    return {
-      data: data || [],
-      count: count || 0,
-      page,
-      pageSize,
-      totalPages: Math.ceil((count || 0) / pageSize),
-    }
-  },
   async get(id: string): Promise<RMATicketRow> {
     const { data, error } = await supabase.from('rma_tickets').select('*').eq('id', id).single()
     if (error) throw error
@@ -331,9 +306,30 @@ export const rmaTickets = {
   // individual deletes and did not await them (BUG-012).
   async bulkDelete(ids: string[]): Promise<void> {
     if (!ids.length) return
-    const { data, error } = await supabase.from('rma_tickets').delete().in('id', ids).select('id')
-    if (error) throw error
-    assertAllAffected(data, ids, 'ticket')
+    // In chunks: one request naming thousands of ids overflows the URL, and the
+    // deleted rows it returns would be capped at 1 000. (BUG-066.)
+    for (const chunk of chunksOf(ids, 100)) {
+      const { data, error } = await supabase.from('rma_tickets').delete().in('id', chunk).select('id')
+      if (error) throw error
+      assertAllAffected(data, chunk, 'ticket')
+    }
+  },
+  /**
+   * Ids of tickets in `status` last updated before `before` — Data Cleanup's
+   * stale tickets, every one of them. (BUG-066.)
+   */
+  async staleIds(status: string, before: string): Promise<string[]> {
+    const rows = await fetchAllRows<{ id: string }>((from, to) =>
+      supabase
+        .from('rma_tickets')
+        .select('id')
+        .eq('ticket_status', status)
+        .not('updated_date', 'is', null)
+        .lt('updated_date', before)
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
+    return rows.map((r) => r.id)
   },
 }
 

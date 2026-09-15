@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { db, storage, branding as brandingAPI } from '../api/supabaseClient'
 import QRCode from 'qrcode'
 import toast from 'react-hot-toast'
@@ -10,12 +10,16 @@ import { CardSkeleton } from '../components/Skeleton'
 import AttachmentsField from '../components/AttachmentsField'
 import { Button, Spinner, Ltr } from '../components/ui'
 import { useURLTab } from '../hooks/useURLTab'
-import { ROLES, TICKET_STATUS } from '../lib/constants'
+import { ROLES } from '../lib/constants'
 import { captureException } from '../lib/sentry'
 import { EMPTY_ARRAY } from '../lib/stableEmpty'
 import { safeAttachmentHref } from '../lib/attachmentUrl'
 import { formatMoney } from '../lib/money'
 import { useBaseCurrency } from '../hooks/useBaseCurrency'
+import Pagination from '../components/Pagination'
+import { safeStorage } from '../lib/safeStorage'
+
+const EMPTY_TICKET_COUNTS = { total: 0, open: 0 }
 
 export default function CustomerDetails({
   customerId,
@@ -34,18 +38,14 @@ export default function CustomerDetails({
   const { data: customerPageData, isLoading: loading } = useQuery({
     queryKey: ['customer-details', customerId],
     queryFn: async () => {
-      // Fetch customer + notes in parallel first, then tickets using both
-      // customer_id FK and customer_name string so legacy tickets are found too.
+      // The customer and every note on it. Tickets, deals and the activity log
+      // are paged below — the page used to read them all, and each stopped at
+      // the Data API's 1 000-row cap without saying so. (BUG-066.)
       const [customerData, notesData] = await Promise.all([
         db.customers.get(customerId),
         db.customerNotes.list(customerId),
       ])
-      const displayNames = [
-        customerData?.company_name,
-        customerData?.contact_person,
-      ].filter(Boolean)
-      const ticketsData = await db.customers.getRelatedTickets(customerId, displayNames)
-      return { customerData, ticketsData, notesData }
+      return { customerData, notesData }
     },
     enabled: !!customerId,
   })
@@ -57,17 +57,50 @@ export default function CustomerDetails({
     enabled: !!customerId,
   })
 
-  const { data: customerDeals = EMPTY_ARRAY } = useQuery({
-    queryKey: ['customer-deals', customerId],
-    queryFn: () => db.deals.listForCustomer(customerId),
+  // One page size for the three paged lists on this page.
+  const [perPage, setPerPage] = useState(() => safeStorage.get('customerDetailsPerPage', 25))
+  useEffect(() => { safeStorage.set('customerDetailsPerPage', perPage) }, [perPage])
+  const [ticketPage, setTicketPage] = useState(1)
+  const [dealPage, setDealPage] = useState(1)
+  const [activityPage, setActivityPage] = useState(1)
+  useEffect(() => { setTicketPage(1); setDealPage(1); setActivityPage(1) }, [customerId, perPage])
+
+  const { data: ticketCounts = EMPTY_TICKET_COUNTS } = useQuery({
+    queryKey: ['customer-ticket-counts', customerId],
+    queryFn: () => db.customers.relatedTicketCounts(customerId),
+    enabled: !!customerId,
+  })
+  const { data: ticketsResult } = useQuery({
+    queryKey: ['customer-tickets', customerId, ticketPage, perPage],
+    queryFn: () => db.customers.relatedTicketsPage(customerId, ticketPage, perPage),
+    placeholderData: keepPreviousData,
+    enabled: !!customerId,
+  })
+  const tickets = ticketsResult?.data ?? EMPTY_ARRAY
+  const ticketCount = ticketsResult?.count ?? ticketCounts.total
+
+  const { data: dealsResult } = useQuery({
+    queryKey: ['customer-deals', customerId, dealPage, perPage],
+    queryFn: () => db.deals.listPageForCustomer(customerId, dealPage, perPage),
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
     enabled: !!customerId,
   })
+  const customerDeals = dealsResult?.data ?? EMPTY_ARRAY
+  const dealCount = dealsResult?.count ?? 0
 
   const customer = customerPageData?.customerData ?? null
-  const tickets = customerPageData?.ticketsData ?? []
   const [notes, setNotes] = useState([])
   const [activeTab, setActiveTab] = useURLTab('tab', 'profile')
+
+  const { data: activityResult } = useQuery({
+    queryKey: ['customer-activity', customerId, activityPage, perPage],
+    queryFn: () => db.customers.activityPage(customerId, activityPage, perPage),
+    placeholderData: keepPreviousData,
+    enabled: !!customerId && activeTab === 'activity',
+  })
+  const activityRows = activityResult?.data ?? EMPTY_ARRAY
+  const activityCount = activityResult?.count ?? 0
   const [isEditing, setIsEditing] = useState(false)
   const [editForm, setEditForm] = useState({})
 
@@ -231,6 +264,7 @@ export default function CustomerDetails({
         updated_date: new Date().toISOString(),
       })
       setNotes((prev) => [created, ...prev])
+      queryClient.invalidateQueries({ queryKey: ['customer-activity', customerId] })
       setNewNote('')
       toast.success(t('customerDetails.noteAdded'))
       db.auditLog
@@ -255,6 +289,7 @@ export default function CustomerDetails({
         updated_date: new Date().toISOString(),
       })
       setNotes((prev) => prev.map((n) => (n.id === noteId ? updated : n)))
+      queryClient.invalidateQueries({ queryKey: ['customer-activity', customerId] })
       setEditingNote(null)
       setEditNoteText('')
       toast.success(t('customerDetails.noteUpdated'))
@@ -276,6 +311,7 @@ export default function CustomerDetails({
       try {
         await db.customerNotes.delete(noteId)
         setNotes((prev) => prev.filter((n) => n.id !== noteId))
+        queryClient.invalidateQueries({ queryKey: ['customer-activity', customerId] })
         toast.success(t('customerDetails.noteDeleted'))
         db.auditLog
           .log(
@@ -510,18 +546,14 @@ export default function CustomerDetails({
         {[
           {
             label: t('customerDetails.totalRMAs'),
-            value: tickets.length,
+            value: ticketCounts.total,
             icon: '🎫',
             color: 'bg-blue-50 text-blue-700',
           },
           {
             label: t('customerDetails.openTickets'),
-            value: tickets.filter(
-              (t) =>
-                t.ticket_status === TICKET_STATUS.OPEN ||
-                t.ticket_status === TICKET_STATUS.IN_PROGRESS ||
-                t.ticket_status === TICKET_STATUS.ON_HOLD
-            ).length,
+            // Open, In Progress or On Hold — counted in the database.
+            value: ticketCounts.open,
             icon: '🔓',
             color: 'bg-yellow-50 text-yellow-700',
           },
@@ -553,9 +585,9 @@ export default function CustomerDetails({
             {[
               { key: 'profile',  label: t('customerDetails.tabProfile'), icon: '👤' },
               { key: 'contacts', label: t('customerDetails.tabContacts', { count: contacts.length }), icon: '👥' },
-              { key: 'deals',    label: t('customerDetails.tabDeals', { count: customerDeals.length }), icon: '💼' },
+              { key: 'deals',    label: t('customerDetails.tabDeals', { count: dealCount }), icon: '💼' },
               { key: 'billing',  label: t('customerDetails.tabBilling'), icon: '💳' },
-              { key: 'rma',      label: t('customerDetails.tabRMAHistory', { count: tickets.length }), icon: '🎫' },
+              { key: 'rma',      label: t('customerDetails.tabRMAHistory', { count: ticketCount }), icon: '🎫' },
               { key: 'notes',    label: t('customerDetails.tabNotes', { count: notes.length }), icon: '📝' },
               { key: 'activity', label: t('customerDetails.tabActivity'), icon: '📋' },
             ].map((tab) => (
@@ -972,7 +1004,7 @@ export default function CustomerDetails({
           {/* ==================== RMA HISTORY TAB ==================== */}
           {activeTab === 'rma' && (
             <div>
-              {tickets.length === 0 ? (
+              {ticketCount === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   <div className="text-4xl mb-3">🎫</div>
                   <p className="font-medium">{t('customerDetails.noTickets')}</p>
@@ -1021,6 +1053,7 @@ export default function CustomerDetails({
                       ))}
                     </tbody>
                   </table>
+                  <Pagination total={ticketCount} page={ticketPage} itemsPerPage={perPage} setItemsPerPage={setPerPage} onPage={setTicketPage} />
                 </div>
               )}
             </div>
@@ -1279,7 +1312,7 @@ export default function CustomerDetails({
           {/* ==================== DEALS TAB ==================== */}
           {activeTab === 'deals' && (
             <div>
-              {customerDeals.length === 0 ? (
+              {dealCount === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   <svg className="mx-auto w-10 h-10 mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1329,6 +1362,9 @@ export default function CustomerDetails({
                       })}
                     </tbody>
                   </table>
+                  <div className="px-4 pb-3">
+                    <Pagination total={dealCount} page={dealPage} itemsPerPage={perPage} setItemsPerPage={setPerPage} onPage={setDealPage} />
+                  </div>
                 </div>
               )}
             </div>
@@ -1421,36 +1457,37 @@ export default function CustomerDetails({
               <p className="text-sm text-gray-500 mb-4">
                 {t('customerDetails.activityTimeline')}
               </p>
-              {[
-                ...tickets.map((tk) => ({
-                  type: 'ticket',
-                  date: tk.created_date,
-                  icon: '🎫',
-                  color: 'bg-blue-100',
-                  title: t('customerDetails.activityRmaCreated'),
-                  detail: `${tk.rma_number || tk.id?.slice(0, 8)} — ${tk.issue_description || tk.title || '—'}`,
-                  action: () => onNavigateToTicket(tk.id),
-                })),
-                ...notes.map((n) => ({
-                  type: 'note',
-                  date: n.created_date,
-                  icon: '📝',
-                  color: 'bg-yellow-100',
-                  title: t('customerDetails.activityNoteAdded'),
-                  detail: n.note.length > 80 ? n.note.slice(0, 80) + '...' : n.note,
-                  by: n.created_by,
-                })),
-                {
-                  type: 'created',
-                  date: customer.created_date,
-                  icon: '✅',
-                  color: 'bg-green-100',
-                  title: t('customerDetails.activityCustomerCreated'),
-                  detail: t('customerDetails.activityAddedBy', { by: customer.created_by || '—' }),
-                },
-              ]
-                .filter((e) => e.date)
-                .sort((a, b) => new Date(b.date) - new Date(a.date))
+              {activityRows
+                .map((row) =>
+                  row.event_type === 'ticket'
+                    ? {
+                        type: 'ticket',
+                        date: row.event_at,
+                        icon: '🎫',
+                        color: 'bg-blue-100',
+                        title: t('customerDetails.activityRmaCreated'),
+                        detail: `${row.code || row.ref_id?.slice(0, 8)} — ${row.detail || '—'}`,
+                        action: () => onNavigateToTicket(row.ref_id),
+                      }
+                    : row.event_type === 'note'
+                      ? {
+                          type: 'note',
+                          date: row.event_at,
+                          icon: '📝',
+                          color: 'bg-yellow-100',
+                          title: t('customerDetails.activityNoteAdded'),
+                          detail: (row.detail || '').length > 80 ? row.detail.slice(0, 80) + '...' : row.detail || '',
+                          by: row.actor,
+                        }
+                      : {
+                          type: 'created',
+                          date: row.event_at,
+                          icon: '✅',
+                          color: 'bg-green-100',
+                          title: t('customerDetails.activityCustomerCreated'),
+                          detail: t('customerDetails.activityAddedBy', { by: row.actor || '—' }),
+                        }
+                )
                 .map((event, idx) => (
                   <div key={idx} className="flex gap-4 items-start">
                     <div
@@ -1475,7 +1512,10 @@ export default function CustomerDetails({
                     </div>
                   </div>
                 ))}
-              {tickets.length === 0 && notes.length === 0 && (
+              {activityCount > 0 && (
+                <Pagination total={activityCount} page={activityPage} itemsPerPage={perPage} setItemsPerPage={setPerPage} onPage={setActivityPage} />
+              )}
+              {activityResult && activityCount <= 1 && ticketCount === 0 && notes.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   <div className="text-3xl mb-2">📋</div>
                   <p>{t('customerDetails.noActivity')}</p>

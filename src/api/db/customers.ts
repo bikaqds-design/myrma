@@ -122,6 +122,35 @@ export function resolveCustomerSort(sort?: CustomerSort): { column: CustomerSort
 
 // ── Customers ─────────────────────────────────────────────────────────────────
 
+/** A ticket as the Customer Details RMA History tab lists it. */
+export interface CustomerTicketRow {
+  id: string
+  rma_number: string | null
+  customer_name: string | null
+  customer_id: string | null
+  ticket_status: string | null
+  priority: string | null
+  general_description: string | null
+  created_date: string | null
+  due_date: string | null
+  products: unknown
+  assigned_technician: string | null
+}
+
+const CUSTOMER_TICKET_COLUMNS =
+  'id, rma_number, customer_name, customer_id, ticket_status, priority, general_description, created_date, due_date, products, assigned_technician'
+
+/** One Customer Details activity-log entry (v_customer_activity, 20260865). */
+export interface CustomerActivityRow {
+  customer_id: string
+  event_type: 'ticket' | 'note' | 'created'
+  ref_id: string
+  event_at: string
+  code: string | null
+  detail: string | null
+  actor: string | null
+}
+
 export const customers = {
   /**
    * One page of customers, filtered and sorted in the database, with the exact
@@ -238,31 +267,6 @@ export const customers = {
    * rows, so past that it is silently incomplete (BUG-066). Still used by the
    * screens not yet moved to server-side paging; do not add callers.
    */
-  async list(): Promise<CustomerRow[]> {
-    const { data, error } = await supabase
-      .from('customers')
-      .select('*')
-      .order('created_date', { ascending: false })
-      .limit(5000)
-    if (error) throw error
-    return data || []
-  },
-  async listPaged(page = 0, pageSize = 50): Promise<PagedResult<CustomerRow>> {
-    const from = page * pageSize
-    const { data, count, error } = await supabase
-      .from('customers')
-      .select('*', { count: 'exact' })
-      .order('created_date', { ascending: false })
-      .range(from, from + pageSize - 1)
-    if (error) throw error
-    return {
-      data: data || [],
-      count: count || 0,
-      page,
-      pageSize,
-      totalPages: Math.ceil((count || 0) / pageSize),
-    }
-  },
   async get(id: string): Promise<CustomerRow> {
     const { data, error } = await supabase.from('customers').select('*').eq('id', id).single()
     if (error) throw error
@@ -373,21 +377,41 @@ export const customers = {
    * The `customerNames` parameter is kept in the signature and ignored, so the
    * call site in CustomerDetails.jsx needs no coordinated change.
    */
-  async getRelatedTickets(customerId: string, _customerNames: string[] = []): Promise<unknown[]> {
-    try {
-      const { data, error } = await supabase
+  /**
+   * One page of the customer's tickets, newest first, with how many there are.
+   * The Customer Details RMA History tab. (BUG-066: it read them all, capped.)
+   */
+  async relatedTicketsPage(customerId: string, page: number, pageSize: number): Promise<ServerPage<CustomerTicketRow>> {
+    return fetchPage<CustomerTicketRow>((from, to) =>
+      supabase
         .from('rma_tickets')
-        .select(
-          'id, rma_number, customer_name, customer_id, ticket_status, priority, general_description, created_date, due_date, products, assigned_technician'
-        )
+        .select(CUSTOMER_TICKET_COLUMNS, { count: 'exact' })
         .eq('customer_id', customerId)
         .order('created_date', { ascending: false })
-      if (error) throw error
-      return data || []
-    } catch (err) {
-      if ((err as { code?: string })?.code === '42P01') return []
-      throw err
-    }
+        .order('id', { ascending: true })
+        .range(from, to),
+      page, pageSize)
+  },
+  /** How many tickets the customer has, and how many are open (Open, In Progress, On Hold). */
+  async relatedTicketCounts(customerId: string): Promise<{ total: number; open: number }> {
+    const head = () => supabase.from('rma_tickets').select('id', { count: 'exact', head: true }).eq('customer_id', customerId)
+    const [all, open] = await Promise.all([head(), head().in('ticket_status', ['Open', 'In Progress', 'On Hold'])])
+    if (all.error) throw all.error
+    if (open.error) throw open.error
+    return { total: all.count ?? 0, open: open.count ?? 0 }
+  },
+  /** One page of the customer's activity log (v_customer_activity, 20260865), newest first. */
+  async activityPage(customerId: string, page: number, pageSize: number): Promise<ServerPage<CustomerActivityRow>> {
+    return fetchPage<CustomerActivityRow>((from, to) =>
+      supabase
+        .from('v_customer_activity')
+        .select('*', { count: 'exact' })
+        .eq('customer_id', customerId)
+        .order('event_at', { ascending: false })
+        .order('event_type', { ascending: true })
+        .order('ref_id', { ascending: true })
+        .range(from, to),
+      page, pageSize)
   },
   async uploadPhoto(file: File, customerId: string): Promise<string> {
     const fileExt = file.name.split('.').pop()
@@ -404,14 +428,17 @@ export const customers = {
 // ── Customer Notes ────────────────────────────────────────────────────────────
 
 export const customerNotes = {
+  /** Every note on the customer, newest first — not the first 1 000. (BUG-066.) */
   async list(customerId: string): Promise<CustomerNoteRow[]> {
-    const { data, error } = await supabase
-      .from('customer_notes')
-      .select('*')
-      .eq('customer_id', customerId)
-      .order('created_date', { ascending: false })
-    if (error) throw error
-    return data || []
+    return fetchAllRows<CustomerNoteRow>((from, to) =>
+      supabase
+        .from('customer_notes')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('created_date', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
   },
   async create(note: Partial<CustomerNoteRow>): Promise<CustomerNoteRow | undefined> {
     const { data, error } = await supabase.from('customer_notes').insert([note]).select()

@@ -5,6 +5,7 @@ import { PRIORITY, CONFIG_KEY, AUTOMATION_ACTION } from '../../lib/constants.js'
 import { assertUpdated, assertAffected } from './_assertUpdated.js'
 import { captureException } from '../../lib/sentry.js'
 import { addHoursLocalISO } from '../../lib/dates'
+import { fetchAllRows } from './_paging.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -92,15 +93,10 @@ export interface AutomationRule {
 export const announcements = {
   async list(): Promise<TableResult<AnnouncementRow[]>> {
     try {
-      const { data, error } = await supabase
-        .from('announcements')
-        .select('*')
-        .order('created_date', { ascending: false })
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
+      const data = await fetchAllRows<AnnouncementRow>((from, to) =>
+        supabase.from('announcements').select('*').order('created_date', { ascending: false }).order('id', { ascending: true }).range(from, to)
+      )
+      return { missing: false, data }
     } catch {
       return { missing: true, data: [] }
     }
@@ -120,13 +116,16 @@ export const announcements = {
     // names, so every create failed outright with "column starts_at ... does not
     // exist" — which is why the table held zero rows and nobody had noticed.
     try {
-      const { data, error } = await supabase
-        .from('announcements')
-        .select('*')
-        .order('created_date', { ascending: false })
-      if (error) return []
+      let data: AnnouncementRow[]
+      try {
+        data = await fetchAllRows<AnnouncementRow>((from, to) =>
+          supabase.from('announcements').select('*').order('created_date', { ascending: false }).order('id', { ascending: true }).range(from, to)
+        )
+      } catch {
+        return []
+      }
       const now = Date.now()
-      return (data || []).filter((a) => {
+      return data.filter((a) => {
         if (a.is_active === false) return false
         const starts = a.start_date ? new Date(a.start_date).getTime() : null
         const ends = a.end_date ? new Date(a.end_date).getTime() : null
@@ -160,12 +159,10 @@ export const announcements = {
 export const rmaConfig = {
   async getAll(): Promise<TableResult<RmaConfigRow[]>> {
     try {
-      const { data, error } = await supabase.from('rma_config').select('*')
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
+      const data = await fetchAllRows<RmaConfigRow>((from, to) =>
+        supabase.from('rma_config').select('*').order('id', { ascending: true }).range(from, to)
+      )
+      return { missing: false, data }
     } catch {
       return { missing: true, data: [] }
     }
@@ -193,15 +190,10 @@ export const rmaConfig = {
 export const customFields = {
   async list(): Promise<TableResult<CustomFieldRow[]>> {
     try {
-      const { data, error } = await supabase
-        .from('custom_field_definitions')
-        .select('*')
-        .order('sort_order', { ascending: true })
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
+      const data = await fetchAllRows<CustomFieldRow>((from, to) =>
+        supabase.from('custom_field_definitions').select('*').order('sort_order', { ascending: true }).order('id', { ascending: true }).range(from, to)
+      )
+      return { missing: false, data }
     } catch {
       return { missing: true, data: [] }
     }
@@ -236,17 +228,17 @@ export const webhooks = {
       // table-wide SELECT on webhooks — it has a column grant that omits
       // secret_key — so `select('*')` is refused by Postgres with "permission
       // denied for column secret_key" rather than quietly dropping it.
-      const { data, error } = await supabase
-        .from('webhooks')
-        .select(
-          'id, name, url, events, is_active, last_triggered_at, created_by, created_date, has_secret',
-        )
-        .order('created_date', { ascending: false })
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
+      const data = await fetchAllRows<WebhookRow>((from, to) =>
+        supabase
+          .from('webhooks')
+          .select(
+            'id, name, url, events, is_active, last_triggered_at, created_by, created_date, has_secret',
+          )
+          .order('created_date', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
+      )
+      return { missing: false, data }
     } catch {
       return { missing: true, data: [] }
     }
@@ -527,19 +519,18 @@ export interface CurrencyRow {
  */
 export const currencies = {
   async listActive(): Promise<CurrencyRow[]> {
-    const { data, error } = await supabase
-      .from('currencies')
-      .select('*')
-      .eq('is_active', true)
-      .order('code')
-    if (error) {
+    try {
+      return await fetchAllRows<CurrencyRow>((from, to) =>
+        supabase.from('currencies').select('*').eq('is_active', true).order('code').range(from, to)
+      )
+    } catch (error) {
       // 42P01 undefined_table: the migration has not been applied yet. An empty
       // list degrades the picker to base-currency-only rather than breaking the
       // whole purchasing form.
-      if (error.code === '42P01' || error.code === 'PGRST205') return []
+      const code = (error as { code?: string })?.code
+      if (code === '42P01' || code === 'PGRST205') return []
       throw error
     }
-    return data || []
   },
 }
 
@@ -569,6 +560,102 @@ export interface IntegrityIssue {
  * is that a NEW violation in real trading data becomes visible instead of
  * waiting to be discovered in a customer statement nobody believes.
  */
+// ── Control Panel home + Data Cleanup (BUG-066) ───────────────────────────────
+// Both screens loaded every ticket, customer, user and deal to count them.
+
+export interface ControlPanelStats {
+  open_tickets: number
+  overdue: number
+  customers: number
+  users: number
+  open_deals: number
+  open_deal_value: number
+  mis_staged: number
+}
+
+export interface DuplicateCustomerRow {
+  group_key: string
+  group_size: number
+  group_newest: string | null
+  id: string
+  company_name: string | null
+  contact_person: string | null
+  email: string | null
+  mobile: string | null
+  created_date: string | null
+}
+
+export const controlPanel = {
+  async stats(now: Date = new Date()): Promise<ControlPanelStats> {
+    const { data, error } = await supabase.rpc('rma_control_panel_stats', { p_now: now.toISOString() })
+    if (error) throw error
+    const s = (data ?? {}) as Partial<ControlPanelStats>
+    return {
+      open_tickets: Number(s.open_tickets) || 0,
+      overdue: Number(s.overdue) || 0,
+      customers: Number(s.customers) || 0,
+      users: Number(s.users) || 0,
+      open_deals: Number(s.open_deals) || 0,
+      open_deal_value: Number(s.open_deal_value) || 0,
+      mis_staged: Number(s.mis_staged) || 0,
+    }
+  },
+}
+
+export const dataCleanup = {
+  /** Stale ticket counts before the two cut-offs, orphan customers, duplicate groups. */
+  async summary(completedBefore: string, cancelledBefore: string): Promise<{
+    stale_completed: number
+    stale_cancelled: number
+    orphans: number
+    duplicate_groups: number
+  }> {
+    const { data, error } = await supabase.rpc('rma_data_cleanup_summary', {
+      p_completed_before: completedBefore,
+      p_cancelled_before: cancelledBefore,
+    })
+    if (error) throw error
+    const s = (data ?? {}) as Record<string, unknown>
+    return {
+      stale_completed: Number(s.stale_completed) || 0,
+      stale_cancelled: Number(s.stale_cancelled) || 0,
+      orphans: Number(s.orphans) || 0,
+      duplicate_groups: Number(s.duplicate_groups) || 0,
+    }
+  },
+
+  /** Every customer no ticket refers to by id or display name, newest first. */
+  async orphanCustomers(): Promise<Array<Record<string, unknown>>> {
+    return fetchAllRows<Record<string, unknown>>((from, to) =>
+      supabase
+        .rpc('rma_orphan_customers')
+        .order('created_date', { ascending: false, nullsFirst: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
+  },
+
+  /** Every customer sharing a display name with another, grouped, newest group first. */
+  async duplicateGroups(): Promise<DuplicateCustomerRow[][]> {
+    const rows = await fetchAllRows<DuplicateCustomerRow>((from, to) =>
+      supabase
+        .rpc('rma_duplicate_customers')
+        .order('group_newest', { ascending: false, nullsFirst: false })
+        .order('group_key', { ascending: true })
+        .order('created_date', { ascending: false, nullsFirst: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
+    const groups: DuplicateCustomerRow[][] = []
+    for (const r of rows) {
+      const last = groups[groups.length - 1]
+      if (last && last[0].group_key === r.group_key) last.push(r)
+      else groups.push([r])
+    }
+    return groups
+  },
+}
+
 export const dataIntegrity = {
   async summary(): Promise<IntegrityIssueGroup[]> {
     const { data, error } = await supabase.rpc('rma_data_integrity_summary')

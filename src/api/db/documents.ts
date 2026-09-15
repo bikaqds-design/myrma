@@ -221,16 +221,22 @@ export const productDocuments = {
     productId: string,
     docType: DocType
   ): Promise<Pick<ProductDocumentRow, 'id' | 'title' | 'deleted_at'>[]> {
-    const { data, error } = await supabase
-      .from('product_documents')
-      .select('id, title, deleted_at')
-      .eq('product_id', productId)
-      .eq('doc_type', docType)
-    if (error) {
-      if (NOT_PROVISIONED.includes(error.code)) return []
+    // Every document of this type on the product — the upload's conflict check
+    // must see all of them, not the first 1 000. (BUG-066.)
+    try {
+      return await fetchAllRows<Pick<ProductDocumentRow, 'id' | 'title' | 'deleted_at'>>((from, to) =>
+        supabase
+          .from('product_documents')
+          .select('id, title, deleted_at')
+          .eq('product_id', productId)
+          .eq('doc_type', docType)
+          .order('id', { ascending: true })
+          .range(from, to)
+      )
+    } catch (error) {
+      if (NOT_PROVISIONED.includes((error as { code?: string })?.code ?? '')) return []
       throw error
     }
-    return data ?? []
   },
 
 }

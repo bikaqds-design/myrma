@@ -191,15 +191,19 @@ export const vendorPayments = {
   },
 
   async getApplications(paymentId: string): Promise<VendorPaymentApplicationRow[]> {
-    const { data, error } = await supabase
-      .from('vendor_payment_applications')
-      .select('*')
-      .eq('payment_id', paymentId)
-      .order('applied_date', { ascending: false })
-    if (error) {
-      if (error.code === '42P01') return []
+    try {
+      return await fetchAllRows<VendorPaymentApplicationRow>((from, to) =>
+        supabase
+          .from('vendor_payment_applications')
+          .select('*')
+          .eq('payment_id', paymentId)
+          .order('applied_date', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
+      )
+    } catch (error) {
+      if ((error as { code?: string })?.code === '42P01') return []
       throw error
     }
-    return (data ?? []) as VendorPaymentApplicationRow[]
   },
 }
