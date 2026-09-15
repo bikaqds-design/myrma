@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
-import { useCustomersById } from '../../lib/useLookups'
+import { useDebouncedValue } from '../../lib/useDebouncedValue'
 import { useURLTab } from '../../hooks/useURLTab'
 import { canDo, ownershipScope } from '../../lib/permissions'
 import { Button, PageHeader } from '../../components/ui'
@@ -127,25 +127,36 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
   const [jumpToPage, setJumpToPage] = useState('')
 
   // ── Data ────────────────────────────────────────────────────────────────────
-  const { data: allDocuments = EMPTY_ARRAY, isLoading } = useQuery({
-    queryKey: ['sales-documents'],
-    queryFn: () => db.salesDocuments.listAll(),
+  // One page, read from v_sales_documents_list with the tab, search, filters and
+  // sort applied in the database, plus the tab counts and filter options in one
+  // call. The page used to load every document and the customers they name and
+  // do all of that in the browser — past the Data API's 1 000-row cap, part of
+  // the documents shown as all of them. (BUG-066.)
+  //
+  // A sales rep sees their own documents only. RLS already refuses to serve
+  // anyone else's; the owner filter keeps the counts, tab badges and rep
+  // dropdown built from the same set. Owning it means either being the assigned
+  // rep or having raised it, which is the same test the policy uses.
+  const ownScope = ownershipScope(currentUserRole, currentUserPermissions, 'sales', scopeEmail ?? currentUserEmail)
+  const debouncedSearch = useDebouncedValue(search)
+  const listFilters = useMemo(
+    () => ({ tab, status: filterStatus, rep: filterRep, search: debouncedSearch, ownerEmail: ownScope || null }),
+    [tab, filterStatus, filterRep, debouncedSearch, ownScope]
+  )
+  const { data: pageResult, isLoading } = useQuery({
+    queryKey: ['sales-documents', 'page', listFilters, sortConfig, currentPage, itemsPerPage],
+    queryFn: () => db.salesDocuments.listPage(listFilters, sortConfig, currentPage, itemsPerPage),
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
   })
-
-  // A sales rep sees their own documents only. RLS already refuses to serve
-  // anyone else's, so this normally filters nothing — it keeps the counts, tab
-  // badges and rep dropdown built from the same set the server would return,
-  // instead of implying a company-wide view. Owning it means either being the
-  // assigned rep or having raised it, which is the same test the policy uses.
-  const ownScope = ownershipScope(currentUserRole, currentUserPermissions, 'sales', scopeEmail ?? currentUserEmail)
-  const documents = useMemo(
-    () =>
-      ownScope
-        ? allDocuments.filter((d) => d.assigned_rep === ownScope || d.created_by === ownScope)
-        : allDocuments,
-    [allDocuments, ownScope]
-  )
+  const paginated = pageResult?.data ?? EMPTY_ARRAY
+  const matchingCount = pageResult?.count ?? 0
+  const { data: summary } = useQuery({
+    queryKey: ['sales-documents', 'summary', tab, ownScope || null],
+    queryFn: () => db.salesDocuments.summary(tab, ownScope || null),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  })
   const { data: usersList = EMPTY_ARRAY } = useQuery({
     queryKey: ['users'],
     queryFn: () => db.userRoles.directory(),
@@ -157,12 +168,8 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
     [usersList]
   )
 
-  // Only the customers the documents name, by id. (BUG-066.)
-  const customerMap = useCustomersById(allDocuments.map((d) => d.customer_id))
-  const customerName = React.useCallback((id) => {
-    const c = customerMap[id]
-    return c ? (c.company_name || c.contact_person || '—') : '—'
-  }, [customerMap])
+  // The view names each document's customer: the company, or the contact person.
+  const customerName = (doc) => doc.customer_name || '—'
 
   // ── Effects ─────────────────────────────────────────────────────────────────
   useEffect(() => { safeStorage.set('salesDocsPerPage', itemsPerPage) }, [itemsPerPage])
@@ -170,7 +177,8 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
   // Reset to page one only when a filter really changes, never on mount —
   // otherwise a shared link like ?q=acme&page=3 lands on page 1.
   useResetOnFilterChange([search, filterStatus, filterRep, tab, itemsPerPage, sortConfig], () => setCurrentPage(1))
-  useEffect(() => { setSelectedKeys(new Set()) }, [tab])
+  // A selection belongs to the page it was made on (bulk actions act on what is shown).
+  useEffect(() => { setSelectedKeys(new Set()) }, [listFilters, sortConfig, currentPage, itemsPerPage])
   useEffect(() => {
     const handler = (e) => { if (!newMenuRef.current?.contains(e.target)) setNewMenuOpen(false) }
     document.addEventListener('mousedown', handler)
@@ -195,75 +203,21 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
     }))
   }
 
-  // ── Tab counts (active set per type; archived counted separately) ────────────
-  const countByType = useMemo(() => {
-    const c = { all: 0, quotation: 0, sales_order: 0, invoice: 0, credit_note: 0, archive: 0 }
-    for (const d of documents) {
-      if (d.archived) { c.archive += 1; continue }
-      c.all += 1
-      c[d.doc_type] = (c[d.doc_type] ?? 0) + 1
-    }
-    return c
-  }, [documents])
-
-  // ── Filtering ────────────────────────────────────────────────────────────────
-  // Archived documents live only in the Archive tab; every other tab shows the
-  // active (non-archived) set.
-  const tabFiltered = useMemo(() => {
-    if (tab === 'archive') return documents.filter((d) => d.archived)
-    const active = documents.filter((d) => !d.archived)
-    return tab === 'all' ? active : active.filter((d) => d.doc_type === tab)
-  }, [documents, tab])
-
-  const allStatuses = useMemo(
-    () => [...new Set(tabFiltered.map((d) => d.doc_status).filter(Boolean))].sort(),
-    [tabFiltered]
-  )
-  const allReps = useMemo(
-    () => [...new Set(documents.map((d) => d.assigned_rep).filter(Boolean))].sort(),
-    [documents]
-  )
-
-  const filtered = useMemo(() => {
-    let f = tabFiltered
-    if (search) {
-      const q = search.toLowerCase()
-      f = f.filter((d) =>
-        (d.doc_code ?? '').toLowerCase().includes(q) ||
-        customerName(d.customer_id).toLowerCase().includes(q) ||
-        (d.assigned_rep ?? '').toLowerCase().includes(q)
-      )
-    }
-    if (filterStatus) f = f.filter((d) => d.doc_status === filterStatus)
-    if (filterRep)    f = f.filter((d) => d.assigned_rep === filterRep)
-
-    f = [...f].sort((a, b) => {
-      let aVal, bVal
-      if (sortConfig.key === 'total') {
-        aVal = Number(a.total) || 0; bVal = Number(b.total) || 0
-      } else if (sortConfig.key === 'created_at' || sortConfig.key === 'type_specific_date') {
-        aVal = new Date(a[sortConfig.key] || 0).getTime()
-        bVal = new Date(b[sortConfig.key] || 0).getTime()
-      } else if (sortConfig.key === 'customer') {
-        aVal = customerName(a.customer_id).toLowerCase(); bVal = customerName(b.customer_id).toLowerCase()
-      } else {
-        aVal = (a[sortConfig.key] ?? '').toString().toLowerCase()
-        bVal = (b[sortConfig.key] ?? '').toString().toLowerCase()
-      }
-      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
-      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
-      return 0
-    })
-    return f
-  }, [tabFiltered, search, filterStatus, filterRep, sortConfig, customerName])
+  const countByType = summary?.counts ?? { all: 0, quotation: 0, sales_order: 0, invoice: 0, credit_note: 0, archive: 0 }
+  const allStatuses = summary?.statuses ?? EMPTY_ARRAY
+  const allReps = summary?.reps ?? EMPTY_ARRAY
 
   const activeFilterCount = [filterStatus, filterRep].filter(Boolean).length
 
   // ── Pagination ───────────────────────────────────────────────────────────────
-  const totalPages = Math.ceil(filtered.length / itemsPerPage)
+  const totalPages = Math.ceil(matchingCount / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex   = Math.min(startIndex + itemsPerPage, filtered.length)
-  const paginated  = filtered.slice(startIndex, endIndex)
+  const endIndex   = Math.min(startIndex + paginated.length, matchingCount)
+  // The last page can empty under the user (an archive, a narrower filter): step back.
+  useEffect(() => {
+    if (pageResult && totalPages >= 1 && currentPage > totalPages) setCurrentPage(totalPages)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageResult, totalPages, currentPage])
 
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
@@ -319,7 +273,7 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
     if (checked) next.add(rowKey(d)); else next.delete(rowKey(d))
     setSelectedKeys(next)
   }
-  const selectedRows = filtered.filter((d) => selectedKeys.has(rowKey(d)))
+  const selectedRows = paginated.filter((d) => selectedKeys.has(rowKey(d)))
 
   // ── Export (XLSX) ────────────────────────────────────────────────────────────
   const exportDocs = (rows) => {
@@ -327,7 +281,7 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
     const data = rows.map((d) => ({
       [t('salesDocuments.colType')]: t(DOC_TYPE_LABEL_KEY[d.doc_type]),
       [t('salesDocuments.colCode')]: d.doc_code || '',
-      [t('salesDocuments.colCustomer')]: customerName(d.customer_id),
+      [t('salesDocuments.colCustomer')]: customerName(d),
       [t('salesDocuments.colRep')]: d.assigned_rep || '',
       [t('salesDocuments.colStatus')]: statusLabel(d.doc_status, t),
       [t('salesDocuments.colTotal')]: Number(d.total) || 0,
@@ -339,6 +293,20 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
     XLSX.utils.book_append_sheet(wb, ws, t('salesDocuments.title'))
     XLSX.writeFile(wb, `sales-documents-${new Date().toISOString().slice(0, 10)}.xlsx`)
     toast.success(t('salesDocuments.exportSuccess', { count: rows.length }))
+  }
+
+  // "Export" takes every document matching the tab, search and filters — read
+  // when clicked, not the page on screen.
+  const [exporting, setExporting] = useState(false)
+  const exportMatching = async () => {
+    setExporting(true)
+    try {
+      exportDocs(await db.salesDocuments.listAllMatching(listFilters, sortConfig))
+    } catch {
+      toast.error(t('common.error'))
+    } finally {
+      setExporting(false)
+    }
   }
 
   // ── Bulk archive / restore ───────────────────────────────────────────────────
@@ -377,9 +345,9 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
     <div className="space-y-4">
       <PageHeader
         title={t('salesDocuments.title')}
-        subtitle={t('salesDocuments.subtitle', { count: documents.length })}
+        subtitle={t('salesDocuments.subtitle', { count: countByType.all + countByType.archive })}
       >
-        <Button variant="secondary" onClick={() => exportDocs(filtered)}>
+        <Button variant="secondary" onClick={exportMatching} disabled={exporting}>
           <svg className="w-4 h-4 me-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
@@ -580,9 +548,9 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
         <div className="px-5 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[#e6e9ef] dark:border-[#212a38]">
           <span className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
             {t('salesDocuments.showingRange', {
-              from: filtered.length === 0 ? 0 : startIndex + 1,
+              from: matchingCount === 0 ? 0 : startIndex + 1,
               to: endIndex,
-              total: filtered.length,
+              total: matchingCount,
             })}
           </span>
           <div className="flex items-center gap-2">
@@ -692,7 +660,7 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
                         onClick={() => navigate(`/customers/${doc.customer_id}`)}
                         className="text-sm text-[#4338ca] dark:text-[#a5b4fc] hover:underline line-clamp-1 text-start"
                       >
-                        {customerName(doc.customer_id)}
+                        {customerName(doc)}
                       </button>
                     </td>
                     <td className="px-4 py-3 text-sm text-[#6c6760] dark:text-[#9aa4b2] whitespace-nowrap">
@@ -730,7 +698,7 @@ export default function SalesDocuments({ currentUserRole, currentUserEmail, curr
         {totalPages > 1 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-t border-[#e6e9ef] dark:border-[#212a38]">
             <div className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
-              {t('salesDocuments.showingRange', { from: startIndex + 1, to: endIndex, total: filtered.length })}
+              {t('salesDocuments.showingRange', { from: startIndex + 1, to: endIndex, total: matchingCount })}
             </div>
             <div className="flex items-center gap-1">
               <button
