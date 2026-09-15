@@ -1,8 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
-import { safeStorage } from '../../lib/safeStorage'
 import { useConfirm } from '../../hooks/useConfirm'
 
 const SURFACE = 'bg-white dark:bg-[#121823]'
@@ -83,10 +82,23 @@ function StagePin({ deal, stages, stageMap, open, onToggle, onMove }) {
   )
 }
 
+// One page of deals, read from the database with the search, filters and sort
+// applied there (db.deals.listPage). This view used to be handed every deal and
+// sort and page them itself — past the Data API's 1 000-row cap, a part of the
+// pipeline shown as the whole. The page owns the query; this renders the page it
+// is given, the matching `totalCount` and the `totalValue` of every matching
+// deal. (BUG-066.)
 export default function PipelineListView({
   deals,
+  totalCount,
+  totalValue,
+  sort,
+  onSortChange,
+  currentPage,
+  itemsPerPage,
+  onPageChange,
+  onItemsPerPageChange,
   stages,
-  customerMap,
   selectedDeals,
   onSelectedChange,
   onMoveStage,
@@ -98,58 +110,25 @@ export default function PipelineListView({
   const { confirm, confirmDialog } = useConfirm()
   const navigate = useNavigate()
 
-  const [sortCol, setSortCol] = useState('created_at')
-  const [sortDir, setSortDir] = useState('desc')
+  const sortCol = sort.key
+  const sortDir = sort.direction
   const [openStagePinId, setOpenStagePinId] = useState(null)
   const [bulkStage, setBulkStage] = useState('')
-
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(() => safeStorage.get('pipelineListPerPage', 25))
   const [jumpToPage, setJumpToPage] = useState('')
 
   const stageMap = useMemo(() => Object.fromEntries(stages.map((s) => [s.id, s])), [stages])
   const openStages = useMemo(() => stages.filter((s) => !s.is_won && !s.is_lost), [stages])
 
-  useEffect(() => {
-    safeStorage.set('pipelineListPerPage', itemsPerPage)
-  }, [itemsPerPage])
+  const handleSort = (col) => onSortChange(col)
 
-  // Reset to page 1 when the deals list changes (filter/search applied in parent)
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [deals])
-
-  const sorted = useMemo(() => {
-    return [...deals].sort((a, b) => {
-      let av = a[sortCol]
-      let bv = b[sortCol]
-      if (sortCol === 'value') {
-        av = Number(av) || 0
-        bv = Number(bv) || 0
-      } else {
-        av = av ?? ''
-        bv = bv ?? ''
-      }
-      if (av < bv) return sortDir === 'asc' ? -1 : 1
-      if (av > bv) return sortDir === 'asc' ? 1 : -1
-      return 0
-    })
-  }, [deals, sortCol, sortDir])
-
-  const handleSort = (col) => {
-    if (sortCol === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    else { setSortCol(col); setSortDir('asc') }
-  }
-
-  const totalPages = Math.ceil(sorted.length / itemsPerPage)
+  const totalPages = Math.ceil(totalCount / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = Math.min(startIndex + itemsPerPage, sorted.length)
-  const paged = sorted.slice(startIndex, endIndex)
+  const endIndex = Math.min(startIndex + deals.length, totalCount)
+  const paged = deals
 
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page)
+      onPageChange(page)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
@@ -207,7 +186,6 @@ export default function PipelineListView({
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const totalValue = sorted.reduce((s, d) => s + (Number(d.value) || 0), 0)
   const allSelected = paged.length > 0 && paged.every((d) => selectedDeals.has(d.id))
 
   const handleSelectAll = (checked) => {
@@ -299,7 +277,7 @@ export default function PipelineListView({
         {/* Count + per-page row */}
         <div className={`px-5 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b ${BORDER}`}>
           <span className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
-            {t('pipeline.showingRange', { from: sorted.length === 0 ? 0 : startIndex + 1, to: endIndex, total: sorted.length })}
+            {t('pipeline.showingRange', { from: totalCount === 0 ? 0 : startIndex + 1, to: endIndex, total: totalCount })}
             {' · '}
             {totalValue.toLocaleString()} {t('pipeline.currency')}
             {selectedDeals.size > 0 && (
@@ -313,7 +291,7 @@ export default function PipelineListView({
             <select
               aria-label={t('common.itemsPerPage')}
               value={itemsPerPage}
-              onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
+              onChange={(e) => onItemsPerPageChange(parseInt(e.target.value))}
               className={`px-3 py-1 border ${BORDER} rounded-lg text-sm bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] focus:ring-2 focus:ring-[#4338ca] focus:border-transparent`}
             >
               <option value={10}>10</option>
@@ -363,7 +341,6 @@ export default function PipelineListView({
                 </tr>
               ) : (
                 paged.map((deal, ri) => {
-                  const cust = customerMap[deal.customer_id]
                   const isSelected = selectedDeals.has(deal.id)
                   return (
                     <tr
@@ -405,7 +382,7 @@ export default function PipelineListView({
                       {/* Customer */}
                       <td className="px-4 py-3 text-[#6c6760] dark:text-[#9aa4b2] max-w-[180px]">
                         <span className="line-clamp-1">
-                          {cust?.company_name || cust?.contact_person || '—'}
+                          {deal.customer_name || '—'}
                         </span>
                       </td>
                       {/* Stage — pin dropdown */}
@@ -438,12 +415,12 @@ export default function PipelineListView({
                 })
               )}
             </tbody>
-            {sorted.length > 0 && (
+            {totalCount > 0 && (
               <tfoot>
                 <tr className={`border-t-2 ${BORDER} bg-[#f8f9fb] dark:bg-[#0f1520]`}>
                   {/* checkbox + # + code + title + customer + stage = 6 */}
                   <td colSpan={6} className="px-4 py-2.5 text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2]">
-                    {t('pipeline.listTotal')} ({sorted.length})
+                    {t('pipeline.listTotal')} ({totalCount})
                   </td>
                   {/* value — always shows grand total for all filtered deals */}
                   <td className="px-4 py-2.5 text-xs font-semibold text-[#211f1b] dark:text-[#e8ebf0] text-end whitespace-nowrap">
@@ -460,7 +437,7 @@ export default function PipelineListView({
         {totalPages > 1 && (
           <div className={`flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-t ${BORDER}`}>
             <div className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
-              {t('pipeline.showingRange', { from: startIndex + 1, to: endIndex, total: sorted.length })}
+              {t('pipeline.showingRange', { from: startIndex + 1, to: endIndex, total: totalCount })}
             </div>
             <div className="flex items-center gap-1">
               <button

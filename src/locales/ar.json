@@ -644,6 +644,7 @@
     "pendingApproval": "في انتظار الاعتماد"
   },
   "pipeline": {
+    "kanbanShowMore": "عرض {{count}} أخرى",
     "title": "مسار المبيعات",
     "subtitle": "تتبع الصفقات من الفتح حتى الإغلاق",
     "selectPipeline": "اختر مسار المبيعات",

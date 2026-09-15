@@ -1,5 +1,6 @@
 import { supabase } from '../client.js'
 import { assertUpdated, assertAffected } from './_assertUpdated.js'
+import { fetchAllRows, chunksOf } from './_paging.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -66,15 +67,25 @@ export const activities = {
     relatedType: ActivityRow['related_type'],
     relatedIds: string[]
   ): Promise<ActivityRow[]> {
-    if (relatedIds.length === 0) return []
-    const { data, error } = await supabase
-      .from('activities')
-      .select('*')
-      .eq('related_type', relatedType)
-      .in('related_id', relatedIds)
-      .is('completed_at', null)
-    if (error) throw error
-    return data || []
+    // Ids go into the URL, so they are sent 100 at a time, and each chunk's
+    // activities are read in full rather than up to the Data API's row cap.
+    // (BUG-066.)
+    const unique = [...new Set(relatedIds.filter(Boolean))]
+    const out: ActivityRow[] = []
+    for (const chunk of chunksOf(unique, 100)) {
+      const rows = await fetchAllRows<ActivityRow>((from, to) =>
+        supabase
+          .from('activities')
+          .select('*')
+          .eq('related_type', relatedType)
+          .in('related_id', chunk)
+          .is('completed_at', null)
+          .order('id', { ascending: true })
+          .range(from, to)
+      )
+      out.push(...rows)
+    }
+    return out
   },
   async list(
     relatedType: ActivityRow['related_type'],

@@ -1,17 +1,19 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueries, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { ownershipScope } from '../../lib/permissions'
 import toast from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { db } from '../../api/supabaseClient'
-import { useCustomersById } from '../../lib/useLookups'
+import { useDebouncedValue } from '../../lib/useDebouncedValue'
+import { safeStorage } from '../../lib/safeStorage'
+import { stageTotals, stageActivityValues, activityTypeStats } from '../../lib/pipelineBuckets'
 import { PageSkeleton } from '../../components/Skeleton'
 import { PageHeader, Button } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
-import { DEAL_ROTTING_THRESHOLD_DAYS } from '../../lib/constants'
+import { DEAL_ROTTING_THRESHOLD_DAYS, ACTIVITY_TYPE_SCHEDULABLE } from '../../lib/constants'
 import { useURLTab } from '../../hooks/useURLTab'
 import { EMPTY_DEAL_FORM, EMPTY_LOST_FORM } from './_constants'
 import { CreateDealModal, MarkLostModal } from './_modals'
@@ -21,9 +23,15 @@ import PipelinePivotView from './PipelinePivotView'
 import PipelineActivityView from './PipelineActivityView'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 
+/** Cards each Kanban column shows before "Show more". */
+const KANBAN_PAGE = 50
+
 // ─── XLSX Export ──────────────────────────────────────────────────────────────
 
-function exportDealsXlsx(deals, stages, customerMap, _currency, t, label = 'pipeline-deals') {
+// `deals` are rows from v_deals_list, loaded when the export is chosen, so they
+// carry the customer's name; the export no longer depends on which customers
+// happen to be loaded for the screen. (BUG-066.)
+function exportDealsXlsx(deals, stages, t, label = 'pipeline-deals') {
   if (!deals.length) {
     toast(t('pipeline.exportEmpty'))
     return
@@ -53,7 +61,6 @@ function exportDealsXlsx(deals, stages, customerMap, _currency, t, label = 'pipe
   const dataRows = []
   for (const stage of stages) {
     for (const deal of deals.filter((d) => d.stage === stage.id)) {
-      const cust = customerMap[deal.customer_id]
       const rotting =
         deal.status === 'open' && deal.updated_at
           ? Date.now() - new Date(deal.updated_at).getTime() > ROTTING_MS
@@ -66,7 +73,7 @@ function exportDealsXlsx(deals, stages, customerMap, _currency, t, label = 'pipe
       dataRows.push([
         stageNameMap[deal.stage] || deal.stage,
         deal.title,
-        cust?.company_name || cust?.contact_person || '',
+        deal.customer_name || '',
         Number(deal.value) || 0,
         deal.status,
         deal.probability ?? 0,
@@ -113,22 +120,6 @@ const ROTTING_MS = DEAL_ROTTING_THRESHOLD_DAYS * 24 * 60 * 60 * 1000
 function isRotting(deal) {
   if (!deal.updated_at) return false
   return Date.now() - new Date(deal.updated_at).getTime() > ROTTING_MS
-}
-
-// Worst-case rollup across a deal's open activities — overdue beats today
-// beats planned beats none. Mirrors Odoo's mail.activity_mixin precedence.
-function dealActivityState(dealActivities) {
-  let state = null
-  const now = Date.now()
-  const todayEnd = new Date().setHours(23, 59, 59, 999)
-  for (const a of dealActivities) {
-    if (!a.due_date) continue
-    const due = new Date(a.due_date).getTime()
-    if (due < now) return 'overdue'
-    if (due <= todayEnd) state = state === 'overdue' ? state : 'today'
-    else if (!state) state = 'planned'
-  }
-  return state
 }
 
 function initials(email) {
@@ -288,38 +279,6 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
   const pipelineId =
     pipelines.find((p) => p.id === pipelineParam)?.id ?? pipelines[0]?.id ?? null
 
-  // Deliberately not filtered to status:'open' — Won/Lost deals must still
-  // render in their own terminal columns (the Won/Lost columns exist
-  // specifically to hold them), not vanish from the board.
-  const { data: deals = EMPTY_ARRAY, isLoading: dealsLoading } = useQuery({
-    queryKey: ['deals', pipelineId],
-    // A rep sees only deals assigned to them. RLS enforces it; passing the
-    // filter keeps the board's per-stage counts and totals consistent with it.
-    queryFn: () =>
-      db.deals.list({
-        pipelineId,
-        ...(ownScope ? { assignedRep: ownScope } : {}),
-      }),
-    enabled: !!pipelineId,
-  })
-
-  // Only the customers the deals name, by id. (BUG-066.)
-  const customerMap = useCustomersById(deals.map((d) => d.customer_id))
-  const dealIds = useMemo(() => deals.map((d) => d.id), [deals])
-  const { data: openActivities = EMPTY_ARRAY } = useQuery({
-    queryKey: ['activities', 'deal', 'bulk', dealIds],
-    queryFn: () => db.activities.listForRelated('deal', dealIds),
-    enabled: dealIds.length > 0,
-  })
-  const activitiesByDeal = useMemo(() => {
-    const map = {}
-    for (const a of openActivities) {
-      if (!map[a.related_id]) map[a.related_id] = []
-      map[a.related_id].push(a)
-    }
-    return map
-  }, [openActivities])
-
   const [showCreate, setShowCreate] = useState(false)
   const [dealForm, setDealForm] = useState(EMPTY_DEAL_FORM)
   const [pendingDealCode, setPendingDealCode] = useState('')
@@ -331,33 +290,128 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
   const [filterStages, setFilterStages] = useState(new Set())
   const [filterReps, setFilterReps] = useState(new Set())
   const [showExportDropdown, setShowExportDropdown] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [selectedDeals, setSelectedDeals] = useState(new Set())
 
-  const allReps = useMemo(
-    () => [...new Set(deals.map((d) => d.assigned_rep).filter(Boolean))].sort(),
-    [deals]
+  const activeFilterCount = filterStages.size + filterReps.size
+
+  // ── Data ──────────────────────────────────────────────────────────────────
+  // Every view reads from the database with the search, filters and sort
+  // applied there: the list a page at a time, the Kanban a column at a time,
+  // the Activity view a page of open deals at a time, and every count, total,
+  // chart and pivot from grouped sums. This page used to load every deal in the
+  // pipeline (and every open activity on them) and do all of that in the
+  // browser — which the Data API caps at 1 000 rows. (BUG-066.)
+  //
+  // Deliberately not filtered to status:'open' — Won/Lost deals must still
+  // render in their own terminal columns, not vanish from the board. A rep sees
+  // only deals assigned to them; RLS enforces it, and the owner filter keeps
+  // the counts consistent with it.
+  const debouncedSearch = useDebouncedValue(searchQuery)
+  const filters = useMemo(
+    () => ({
+      pipelineId,
+      search: debouncedSearch,
+      stages: [...filterStages],
+      reps: [...filterReps],
+      ownerEmail: ownScope || null,
+    }),
+    [pipelineId, debouncedSearch, filterStages, filterReps, ownScope]
+  )
+  const hasPipeline = !!pipelineId
+
+  const { data: pipelineCount = 0 } = useQuery({
+    queryKey: ['deals', 'pipeline-count', pipelineId, ownScope || null],
+    queryFn: () => db.deals.countInPipeline(pipelineId, ownScope || null),
+    enabled: hasPipeline,
+  })
+  const { data: allReps = EMPTY_ARRAY } = useQuery({
+    queryKey: ['deals', 'reps', pipelineId],
+    queryFn: () => db.deals.repsInPipeline(pipelineId),
+    enabled: hasPipeline,
+  })
+  const { data: buckets = EMPTY_ARRAY } = useQuery({
+    queryKey: ['deals', 'buckets', filters],
+    queryFn: () => db.deals.buckets(filters),
+    placeholderData: keepPreviousData,
+    enabled: hasPipeline,
+  })
+  const totalsByStage = useMemo(() => stageTotals(buckets), [buckets])
+  const matchingCount = useMemo(() => buckets.reduce((n, b) => n + b.deal_count, 0), [buckets])
+  const matchingValue = useMemo(() => buckets.reduce((n, b) => n + b.value_sum, 0), [buckets])
+
+  // List
+  const [listSort, setListSort] = useState({ key: 'created_at', direction: 'desc' })
+  const [listPage, setListPage] = useState(1)
+  const [listPerPage, setListPerPage] = useState(() => safeStorage.get('pipelineListPerPage', 25))
+  useEffect(() => safeStorage.set('pipelineListPerPage', listPerPage), [listPerPage])
+  const { data: listResult } = useQuery({
+    queryKey: ['deals', 'page', filters, listSort, listPage, listPerPage],
+    queryFn: () => db.deals.listPage(filters, listSort, listPage, listPerPage),
+    placeholderData: keepPreviousData,
+    enabled: hasPipeline && activeView === 'list',
+  })
+  const listDeals = listResult?.data ?? EMPTY_ARRAY
+  const listCount = listResult?.count ?? 0
+  const handleListSort = (key) =>
+    setListSort((prev) =>
+      prev.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
+    )
+
+  // Activity view: open deals, a page at a time, with those deals' open activities
+  const [activityPage, setActivityPage] = useState(1)
+  const [activityPerPage, setActivityPerPage] = useState(() => safeStorage.get('pipelineActivityPerPage', 25))
+  useEffect(() => safeStorage.set('pipelineActivityPerPage', activityPerPage), [activityPerPage])
+  const { data: activityResult } = useQuery({
+    queryKey: ['deals', 'activity-page', filters, activityPage, activityPerPage],
+    queryFn: () => db.deals.listPage({ ...filters, openOnly: true }, undefined, activityPage, activityPerPage),
+    placeholderData: keepPreviousData,
+    enabled: hasPipeline && activeView === 'activity',
+  })
+  const activityDeals = activityResult?.data ?? EMPTY_ARRAY
+  const activityDealIds = useMemo(() => activityDeals.map((d) => d.id), [activityDeals])
+  const { data: pageActivities = EMPTY_ARRAY } = useQuery({
+    queryKey: ['activities', 'deal', 'open', activityDealIds],
+    queryFn: () => db.activities.listForRelated('deal', activityDealIds),
+    enabled: activeView === 'activity' && activityDealIds.length > 0,
+  })
+  const activitiesByDeal = useMemo(() => {
+    const map = {}
+    for (const a of pageActivities) (map[a.related_id] ??= []).push(a)
+    return map
+  }, [pageActivities])
+  const { data: activityTypeRows = EMPTY_ARRAY } = useQuery({
+    queryKey: ['deals', 'activity-types', filters],
+    queryFn: () => db.deals.activityTypeCounts(filters),
+    placeholderData: keepPreviousData,
+    enabled: hasPipeline && activeView === 'activity',
+  })
+  const activityColStats = useMemo(
+    () => activityTypeStats(activityTypeRows, ACTIVITY_TYPE_SCHEDULABLE),
+    [activityTypeRows]
   )
 
-  const filteredDeals = useMemo(() => {
-    let result = deals
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      result = result.filter((d) => {
-        const custName = customerMap[d.customer_id]?.company_name?.toLowerCase() || ''
-        return (
-          d.title?.toLowerCase().includes(q) ||
-          custName.includes(q) ||
-          d.assigned_rep?.toLowerCase().includes(q) ||
-          d.deal_code?.toLowerCase().includes(q)
-        )
-      })
-    }
-    if (filterStages.size > 0) result = result.filter((d) => filterStages.has(d.stage))
-    if (filterReps.size > 0) result = result.filter((d) => filterReps.has(d.assigned_rep))
-    return result
-  }, [deals, searchQuery, filterStages, filterReps, customerMap])
+  // A filter change starts every view from its beginning, and a selection
+  // belongs to the page it was made on (bulk actions act on what is shown).
+  const [columnLimits, setColumnLimits] = useState({})
+  useEffect(() => {
+    setListPage(1)
+    setActivityPage(1)
+    setColumnLimits({})
+  }, [filters])
+  useEffect(() => setSelectedDeals(new Set()), [filters, listSort, listPage, listPerPage, activeView])
 
-  const activeFilterCount = filterStages.size + filterReps.size
+  // The last page can empty under the user (a delete, a narrower filter): step back.
+  useEffect(() => {
+    if (!listResult) return
+    const pages = Math.ceil(listResult.count / listPerPage)
+    if (pages >= 1 && listPage > pages) setListPage(pages)
+  }, [listResult, listPage, listPerPage])
+  useEffect(() => {
+    if (!activityResult) return
+    const pages = Math.ceil(activityResult.count / activityPerPage)
+    if (pages >= 1 && activityPage > pages) setActivityPage(pages)
+  }, [activityResult, activityPage, activityPerPage])
 
   React.useEffect(() => {
     const handler = (e) => {
@@ -408,12 +462,58 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
   }
 
   const activePipeline = pipelines.find((p) => p.id === pipelineId)
-  const stages = activePipeline ? [...activePipeline.stages].sort((a, b) => a.order - b.order) : []
+  const stages = activePipeline ? [...activePipeline.stages].sort((a, b) => a.order - b.order) : EMPTY_ARRAY
 
+  // Kanban: each column is its own read — its newest cards and its true count,
+  // with "Show more" for the rest. A column the stage filter excludes is empty
+  // without asking.
+  const kanbanQueries = useQueries({
+    queries: stages.map((stage) => {
+      const limit = columnLimits[stage.id] ?? KANBAN_PAGE
+      const excluded = filters.stages.length > 0 && !filters.stages.includes(stage.id)
+      return {
+        queryKey: ['deals', 'kanban', filters, stage.id, limit],
+        queryFn: () => db.deals.listColumn(stage.id, filters, limit),
+        placeholderData: keepPreviousData,
+        enabled: hasPipeline && activeView === 'kanban' && !excluded,
+      }
+    }),
+  })
   const dealsByStage = {}
-  for (const s of stages) dealsByStage[s.id] = []
-  for (const d of filteredDeals) {
-    if (dealsByStage[d.stage]) dealsByStage[d.stage].push(d)
+  const countByStage = {}
+  stages.forEach((stage, i) => {
+    dealsByStage[stage.id] = kanbanQueries[i]?.data?.data ?? EMPTY_ARRAY
+    countByStage[stage.id] = kanbanQueries[i]?.data?.count ?? 0
+  })
+  const dealsLoading = activeView === 'kanban' && kanbanQueries.some((q) => q.isLoading)
+  const { data: activityValueRows = EMPTY_ARRAY } = useQuery({
+    queryKey: ['deals', 'activity-values', filters],
+    queryFn: () => db.deals.activityValues(filters),
+    placeholderData: keepPreviousData,
+    enabled: hasPipeline && activeView === 'kanban',
+  })
+  const activityValuesByStage = useMemo(() => stageActivityValues(activityValueRows), [activityValueRows])
+
+  // The rows a card action or a menu can refer to: what is on screen.
+  const visibleDeals =
+    activeView === 'kanban' ? stages.flatMap((s) => dealsByStage[s.id]) : activeView === 'activity' ? activityDeals : listDeals
+
+  const loadExportRows = (scope) =>
+    scope === 'selected'
+      ? db.deals.getMany([...selectedDeals])
+      : db.deals.listAllMatching(scope === 'filtered' ? filters : { pipelineId, ownerEmail: ownScope || null })
+
+  const handleExport = async (scope) => {
+    setShowExportDropdown(false)
+    setExporting(true)
+    try {
+      const rows = await loadExportRows(scope)
+      exportDealsXlsx(rows, stages, t, `pipeline-${scope}`)
+    } catch (error) {
+      toast.error(t('pipeline.failedSave', { error: error.message }))
+    } finally {
+      setExporting(false)
+    }
   }
 
   const handleOpenCreate = (stageId = null) => {
@@ -483,7 +583,7 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
     const { source, destination, draggableId } = result
     if (!destination || destination.droppableId === source.droppableId) return
     const destStage = stages.find((s) => s.id === destination.droppableId)
-    const deal = deals.find((d) => d.id === draggableId)
+    const deal = visibleDeals.find((d) => d.id === draggableId)
     // Closed deals are not draggable (isDragDisabled below), but guard here too.
     if (!destStage || !deal || deal.status !== 'open') return
 
@@ -494,11 +594,18 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
     }
 
     // Optimistic move so the card doesn't snap back while the request is in
-    // flight — update in place rather than removing, since Won deals must
-    // stay visible (now in the Won column), not disappear from the board.
-    queryClient.setQueryData(['deals', pipelineId], (prev = []) =>
-      prev.map((d) => (d.id === draggableId ? { ...d, stage: destStage.id, status: destStage.is_won ? 'won' : d.status } : d))
-    )
+    // flight: out of its column, into the destination's (Won deals stay
+    // visible, now in the Won column), with both counts adjusted.
+    await queryClient.cancelQueries({ queryKey: ['deals', 'kanban'] })
+    const moved = { ...deal, stage: destStage.id, status: destStage.is_won ? 'won' : deal.status }
+    for (const [key, data] of queryClient.getQueriesData({ queryKey: ['deals', 'kanban'] })) {
+      if (!data) continue
+      if (key[3] === deal.stage) {
+        queryClient.setQueryData(key, { data: data.data.filter((d) => d.id !== deal.id), count: Math.max(0, data.count - 1) })
+      } else if (key[3] === destStage.id) {
+        queryClient.setQueryData(key, { data: [moved, ...data.data], count: data.count + 1 })
+      }
+    }
 
     try {
       if (destStage.is_won) {
@@ -553,9 +660,10 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
           ))}
         </div>
         {/* Export dropdown */}
-        {deals.length > 0 && (
+        {pipelineCount > 0 && (
           <div className="relative export-dropdown-pipeline">
             <button
+              disabled={exporting}
               onClick={(e) => { e.stopPropagation(); setShowExportDropdown(!showExportDropdown) }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#e6e9ef] dark:border-[#212a38] text-sm text-[#6c6760] dark:text-[#9aa4b2] hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] transition-colors"
             >
@@ -571,7 +679,7 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
               <div className="absolute end-0 mt-2 w-64 bg-white dark:bg-[#121823] rounded-xl shadow-lg border border-[#e6e9ef] dark:border-[#212a38] z-20 py-1.5">
                 {/* Export All */}
                 <button
-                  onClick={() => { exportDealsXlsx(deals, stages, customerMap, t('pipeline.currency'), t, 'pipeline-all'); setShowExportDropdown(false) }}
+                  onClick={() => handleExport('all')}
                   className="w-full px-4 py-2.5 text-start hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3"
                 >
                   <svg className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -579,13 +687,13 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
                   </svg>
                   <div>
                     <div className="text-sm font-medium text-[#211f1b] dark:text-[#e8ebf0]">{t('pipeline.exportAll')}</div>
-                    <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('pipeline.exportAllDesc', { count: deals.length })}</div>
+                    <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('pipeline.exportAllDesc', { count: pipelineCount })}</div>
                   </div>
                 </button>
                 {/* Export Filtered — only when filters/search are active */}
-                {filteredDeals.length !== deals.length && (
+                {matchingCount !== pipelineCount && (
                   <button
-                    onClick={() => { exportDealsXlsx(filteredDeals, stages, customerMap, t('pipeline.currency'), t, 'pipeline-filtered'); setShowExportDropdown(false) }}
+                    onClick={() => handleExport('filtered')}
                     className="w-full px-4 py-2.5 text-start hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3 border-t border-[#f0f2f6] dark:border-[#1a2230]"
                   >
                     <svg className="w-4 h-4 text-indigo-500 dark:text-[#a5b4fc] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -593,18 +701,14 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
                     </svg>
                     <div>
                       <div className="text-sm font-medium text-[#211f1b] dark:text-[#e8ebf0]">{t('pipeline.exportFiltered')}</div>
-                      <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('pipeline.exportFilteredDesc', { count: filteredDeals.length })}</div>
+                      <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('pipeline.exportFilteredDesc', { count: matchingCount })}</div>
                     </div>
                   </button>
                 )}
                 {/* Export Selected — only when rows are checked */}
                 {selectedDeals.size > 0 && (
                   <button
-                    onClick={() => {
-                      const data = deals.filter((d) => selectedDeals.has(d.id))
-                      exportDealsXlsx(data, stages, customerMap, t('pipeline.currency'), t, 'pipeline-selected')
-                      setShowExportDropdown(false)
-                    }}
+                    onClick={() => handleExport('selected')}
                     className="w-full px-4 py-2.5 text-start hover:bg-[#f4f6f9] dark:hover:bg-[#0f1520] flex items-center gap-3 border-t border-[#f0f2f6] dark:border-[#1a2230]"
                   >
                     <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -659,7 +763,7 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
         </button>
         {(searchQuery || activeFilterCount > 0) && (
           <span className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">
-            {t('pipeline.filteredCount', { count: filteredDeals.length, total: deals.length })}
+            {t('pipeline.filteredCount', { count: matchingCount, total: pipelineCount })}
           </span>
         )}
       </div>
@@ -690,12 +794,21 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
         </div>
       )}
 
-      {/* Non-kanban views share the same data already loaded */}
       {activeView === 'list' && (
         <PipelineListView
-          deals={filteredDeals}
+          deals={listDeals}
+          totalCount={listCount}
+          totalValue={matchingValue}
+          sort={listSort}
+          onSortChange={handleListSort}
+          currentPage={listPage}
+          itemsPerPage={listPerPage}
+          onPageChange={setListPage}
+          onItemsPerPageChange={(n) => {
+            setListPerPage(n)
+            setListPage(1)
+          }}
           stages={stages}
-          customerMap={customerMap}
           selectedDeals={selectedDeals}
           onSelectedChange={setSelectedDeals}
           onMoveStage={handleMoveStage}
@@ -705,17 +818,22 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
         />
       )}
       {activeView === 'graph' && (
-        <PipelineGraphView deals={filteredDeals} stages={stages} />
+        <PipelineGraphView buckets={buckets} stages={stages} />
       )}
       {activeView === 'pivot' && (
-        <PipelinePivotView deals={filteredDeals} stages={stages} />
+        <PipelinePivotView buckets={buckets} stages={stages} />
       )}
       {activeView === 'activity' && (
         <PipelineActivityView
-          deals={filteredDeals}
+          deals={activityDeals}
+          totalCount={activityResult?.count ?? 0}
+          currentPage={activityPage}
+          itemsPerPage={activityPerPage}
+          onPageChange={setActivityPage}
+          onItemsPerPageChange={setActivityPerPage}
           stages={stages}
-          customerMap={customerMap}
           activitiesByDeal={activitiesByDeal}
+          colStats={activityColStats}
         />
       )}
 
@@ -742,12 +860,10 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
           <div className="grid grid-flow-col auto-cols-[minmax(16rem,1fr)] md:auto-cols-[minmax(0,1fr)] overflow-x-auto md:overflow-x-visible gap-3 pb-4">
             {stages.map((stage) => {
               const stageDeals = dealsByStage[stage.id] || []
-              const totalValue = stageDeals.reduce((sum, d) => sum + (Number(d.value) || 0), 0)
-              const buckets = { overdue: 0, today: 0, planned: 0 }
-              for (const d of stageDeals) {
-                const state = dealActivityState(activitiesByDeal[d.id] || [])
-                if (state) buckets[state] += Number(d.value) || 0
-              }
+              const stageCount = countByStage[stage.id] ?? 0
+              // Over every deal in the column, not just the cards loaded.
+              const totalValue = totalsByStage[stage.id]?.value ?? 0
+              const buckets = activityValuesByStage[stage.id] ?? { overdue: 0, today: 0, planned: 0 }
               const pct = (n) => (totalValue > 0 ? (n / totalValue) * 100 : 0)
 
               return (
@@ -758,7 +874,7 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
                       <h3 className="text-sm font-semibold text-gray-700 dark:text-[#e8ebf0] truncate" title={stage.name}>
                         {stage.name}{' '}
                         <span className="text-gray-400 dark:text-[#a4acb7] font-normal">
-                          ({stageDeals.length})
+                          ({stageCount})
                         </span>
                       </h3>
                       {!stage.is_won && !stage.is_lost && canDo('create') && (
@@ -799,7 +915,6 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
                         }`}
                       >
                         {stageDeals.map((deal, index) => {
-                          const customer = customerMap[deal.customer_id]
                           const rotting = isRotting(deal)
                           const closed = deal.status !== 'open'
                           return (
@@ -828,7 +943,7 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
                                     </p>
                                   )}
                                   <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-0.5 truncate">
-                                    {customer?.company_name || customer?.contact_person || '—'}
+                                    {deal.customer_name || '—'}
                                   </p>
                                   {deal.value != null && (
                                     <p className="text-sm font-medium text-gray-900 dark:text-[#e8ebf0] mt-1">
@@ -854,6 +969,18 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
                           )
                         })}
                         {provided.placeholder}
+
+                        {stageCount > stageDeals.length && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setColumnLimits((prev) => ({ ...prev, [stage.id]: (prev[stage.id] ?? KANBAN_PAGE) + KANBAN_PAGE }))
+                            }
+                            className="w-full mt-1 py-1.5 text-xs font-medium text-indigo-600 dark:text-[#a5b4fc] hover:underline"
+                          >
+                            {t('pipeline.kanbanShowMore', { count: stageCount - stageDeals.length })}
+                          </button>
+                        )}
                       </div>
                     )}
                   </Droppable>
