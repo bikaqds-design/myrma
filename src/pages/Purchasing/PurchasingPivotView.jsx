@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { DIMENSIONS, dimensionKey, docTotalBase, isLiveDocument, sortDimensionKeys } from './_shared'
+import { DIMENSIONS, dimensionKey, isLiveDocument, sortDimensionKeys } from './_shared'
 import { useBaseCurrency } from '../../hooks/useBaseCurrency'
 
 /**
@@ -20,8 +20,11 @@ import { useBaseCurrency } from '../../hooks/useBaseCurrency'
  *
  * Empty cells are rendered blank rather than as zero: on a sparse grid a screen
  * of zeroes hides the handful of cells that carry the data.
+ *
+ * Like the chart it reads `buckets` — counts and spend summed in the database
+ * (BUG-066) — so every cell covers every matching document.
  */
-export default function PurchasingPivotView({ documents, vendorName }) {
+export default function PurchasingPivotView({ buckets }) {
   const { t } = useTranslation()
   // Every spend cell is a sum across documents, so all of them are in base
   // currency and the footnote has to name it.
@@ -31,7 +34,7 @@ export default function PurchasingPivotView({ documents, vendorName }) {
   const [rowDim, setRowDim] = useState('vendor')
   const [colDim, setColDim] = useState('status')
 
-  const live = useMemo(() => (documents || []).filter(isLiveDocument), [documents])
+  const live = useMemo(() => (buckets || []).filter(isLiveDocument), [buckets])
 
   const pivot = useMemo(() => {
     // cells[rowKey][colKey] = { count, spend }
@@ -40,30 +43,30 @@ export default function PurchasingPivotView({ documents, vendorName }) {
     const colTotals = new Map()
     const grand = { count: 0, spend: 0 }
 
-    const bump = (bucket, doc) => {
-      bucket.count += 1
-      bucket.spend += docTotalBase(doc)
+    const bump = (bucket, row) => {
+      bucket.count += Number(row.doc_count) || 0
+      bucket.spend += Number(row.spend) || 0
     }
     const ensure = (map, key) => {
       if (!map.has(key)) map.set(key, { count: 0, spend: 0 })
       return map.get(key)
     }
 
-    for (const doc of live) {
-      const r = dimensionKey(doc, rowDim, { vendorName, t })
-      const c = dimensionKey(doc, colDim, { vendorName, t })
+    for (const row of live) {
+      const r = dimensionKey(row, rowDim, t)
+      const c = dimensionKey(row, colDim, t)
       if (!cells.has(r)) cells.set(r, new Map())
-      bump(ensure(cells.get(r), c), doc)
-      bump(ensure(rowTotals, r), doc)
-      bump(ensure(colTotals, c), doc)
-      bump(grand, doc)
+      bump(ensure(cells.get(r), c), row)
+      bump(ensure(rowTotals, r), row)
+      bump(ensure(colTotals, c), row)
+      bump(grand, row)
     }
 
     const rowKeys = sortDimensionKeys([...rowTotals.keys()], rowDim, (k) => rowTotals.get(k)[measure])
     const colKeys = sortDimensionKeys([...colTotals.keys()], colDim, (k) => colTotals.get(k)[measure])
 
     return { cells, rowKeys, colKeys, rowTotals, colTotals, grand }
-  }, [live, rowDim, colDim, measure, vendorName, t])
+  }, [live, rowDim, colDim, measure, t])
 
   const fmt = (bucket) => {
     if (!bucket || bucket[measure] === 0) return ''

@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
+import { useDebouncedValue } from '../../lib/useDebouncedValue'
 import { useURLTab } from '../../hooks/useURLTab'
 import { canDo } from '../../lib/permissions'
 import { Button, PageHeader } from '../../components/ui'
@@ -196,20 +197,65 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
   const [jumpToPage, setJumpToPage] = useState('')
 
   // ── Data ────────────────────────────────────────────────────────────────────
-  const { data: docsRes, isLoading } = useQuery({
-    queryKey: ['purchase-documents'],
-    queryFn: () => db.purchaseDocuments.listAll(),
+  // One page of documents from v_purchase_documents_list, with the tab, search,
+  // filters and sort applied in the database; the tab counts and status options
+  // in one call; and, for the graph and pivot, the matching documents counted
+  // and summed per type × status × vendor × month. The page used to load every
+  // document and every brand and do all of that in the browser — past the Data
+  // API's 1 000-row cap, part of the documents (and part of the spend) shown as
+  // all of them. (BUG-066.)
+  const debouncedSearch = useDebouncedValue(search)
+  const listFilters = useMemo(
+    () => ({ tab, status: filterStatus, vendorId: filterVendor, search: debouncedSearch }),
+    [tab, filterStatus, filterVendor, debouncedSearch]
+  )
+  const { data: pageResult, isLoading: docsLoading } = useQuery({
+    queryKey: ['purchase-documents', 'page', listFilters, sortConfig, currentPage, itemsPerPage],
+    queryFn: () => db.purchaseDocuments.listPage(listFilters, sortConfig, currentPage, itemsPerPage),
+    enabled: !isVendorsTab && view === 'list',
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
   })
-  const documents = useMemo(() => (docsRes?.missing ? [] : (docsRes?.data ?? [])), [docsRes])
+  const { data: summary } = useQuery({
+    queryKey: ['purchase-documents', 'summary', isVendorsTab ? 'all' : tab],
+    queryFn: () => db.purchaseDocuments.summary(isVendorsTab ? 'all' : tab),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  })
+  const { data: buckets = EMPTY_ARRAY, isLoading: bucketsLoading } = useQuery({
+    queryKey: ['purchase-documents', 'buckets', listFilters],
+    queryFn: () => db.purchaseDocuments.buckets(listFilters),
+    enabled: !isVendorsTab && view !== 'list',
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  })
 
-  const { data: vendorList = EMPTY_ARRAY } = useQuery({
-    queryKey: ['brands-as-vendors'],
-    queryFn: () => db.brands.list(),
+  // The Vendors tab pages brands in the database too (v_vendors_list).
+  const { data: vendorPage, isLoading: vendorsLoading } = useQuery({
+    queryKey: ['brands-as-vendors', 'page', debouncedSearch, vendorSort, currentPage, itemsPerPage],
+    queryFn: () => db.brands.listVendorsPage(debouncedSearch, vendorSort, currentPage, itemsPerPage),
+    enabled: isVendorsTab,
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
   })
-  const vendorMap = useMemo(() => Object.fromEntries(vendorList.map((v) => [v.id, v])), [vendorList])
-  const vendorName = React.useCallback((id) => vendorMap[id]?.brand_name || '—', [vendorMap])
+  const { data: vendorCount = 0 } = useQuery({
+    queryKey: ['brands-as-vendors', 'count'],
+    queryFn: () => db.brands.count(),
+    staleTime: 60_000,
+  })
+  // Every vendor, for the vendor filter and the create forms' vendor picker —
+  // read in full (brands.list walks past the row cap), and only when one of
+  // them is on screen.
+  const needVendorOptions = showFilters || !!filterVendor || createType === 'purchase_order' || createType === 'vendor_invoice'
+  const { data: vendorList = EMPTY_ARRAY } = useQuery({
+    queryKey: ['brands-as-vendors', 'all'],
+    queryFn: () => db.brands.list(),
+    enabled: needVendorOptions,
+    staleTime: 60_000,
+  })
+
+  // The view names each document's vendor (the brand).
+  const vendorName = (doc) => doc.vendor_name || '—'
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['purchase-documents'] })
   const invalidateVendors = () => queryClient.invalidateQueries({ queryKey: ['brands-as-vendors'] })
@@ -226,7 +272,8 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
   // Guarded the same way as the page reset: this fires on mount too, and was
   // wiping the search arriving from a shared link before anyone saw it.
   useResetOnFilterChange([tab], () => setSearch(''))
-  useEffect(() => { setSelectedKeys(new Set()) }, [tab])
+  // A selection belongs to the page it was made on (bulk actions act on what is shown).
+  useEffect(() => { setSelectedKeys(new Set()) }, [listFilters, sortConfig, currentPage, itemsPerPage])
   useEffect(() => {
     const handler = (e) => { if (!newMenuRef.current?.contains(e.target)) setNewMenuOpen(false) }
     document.addEventListener('mousedown', handler)
@@ -247,87 +294,16 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
   }
 
   // ── Tab counts ────────────────────────────────────────────────────────────────
-  const countByType = useMemo(() => {
-    const c = { all: 0, purchase_order: 0, vendor_invoice: 0, archive: 0 }
-    for (const d of documents) {
-      if (d.archived) { c.archive += 1; continue }
-      c.all += 1
-      c[d.doc_type] = (c[d.doc_type] ?? 0) + 1
-    }
-    return c
-  }, [documents])
-
-  const tabFiltered = useMemo(() => {
-    if (tab === 'archive') return documents.filter((d) => d.archived)
-    if (tab === 'vendors') return []
-    const active = documents.filter((d) => !d.archived)
-    return tab === 'all' ? active : active.filter((d) => d.doc_type === tab)
-  }, [documents, tab])
-
-  const allStatuses = useMemo(
-    () => [...new Set(tabFiltered.map((d) => d.doc_status).filter(Boolean))].sort(),
-    [tabFiltered]
-  )
-
-  const filtered = useMemo(() => {
-    let f = tabFiltered
-    if (search) {
-      const q = search.toLowerCase()
-      f = f.filter((d) => (d.doc_code ?? '').toLowerCase().includes(q) || vendorName(d.vendor_id).toLowerCase().includes(q))
-    }
-    if (filterStatus) f = f.filter((d) => d.doc_status === filterStatus)
-    if (filterVendor) f = f.filter((d) => d.vendor_id === filterVendor)
-
-    f = [...f].sort((a, b) => {
-      let aVal, bVal
-      if (sortConfig.key === 'total') {
-        // Base currency, or the column sorts a $2,000 import below a E£5,000
-        // local purchase that cost a twentieth as much.
-        aVal = docTotalBase(a); bVal = docTotalBase(b)
-      } else if (sortConfig.key === 'created_at' || sortConfig.key === 'type_specific_date') {
-        aVal = new Date(a[sortConfig.key] || 0).getTime()
-        bVal = new Date(b[sortConfig.key] || 0).getTime()
-      } else if (sortConfig.key === 'vendor') {
-        aVal = vendorName(a.vendor_id).toLowerCase(); bVal = vendorName(b.vendor_id).toLowerCase()
-      } else {
-        aVal = (a[sortConfig.key] ?? '').toString().toLowerCase()
-        bVal = (b[sortConfig.key] ?? '').toString().toLowerCase()
-      }
-      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
-      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
-      return 0
-    })
-    return f
-  }, [tabFiltered, search, filterStatus, filterVendor, sortConfig, vendorName])
+  const countByType = summary?.counts ?? { all: 0, purchase_order: 0, vendor_invoice: 0, archive: 0, total: 0 }
+  const allStatuses = summary?.statuses ?? EMPTY_ARRAY
 
   const activeFilterCount = [filterStatus, filterVendor].filter(Boolean).length
 
   // Vendors are a different shape to documents — no status, no total, no dates —
-  // so they get their own search and sort rather than being forced through the
-  // document pipeline above. They share the paging state below, since only one
-  // tab is ever on screen.
-  const vendorFiltered = useMemo(() => {
-    let f = vendorList
-    if (search) {
-      const q = search.toLowerCase()
-      f = f.filter((v) =>
-        [v.brand_name, v.contact_person, v.email, v.phone].some((field) =>
-          (field ?? '').toLowerCase().includes(q)
-        )
-      )
-    }
-    return [...f].sort((a, b) => {
-      const aVal = (a[vendorSort.key] ?? '').toString().toLowerCase()
-      const bVal = (b[vendorSort.key] ?? '').toString().toLowerCase()
-      // Blanks sort last in either direction; a contact-less vendor at the top
-      // of an A-Z list is noise, not information.
-      if (!aVal && bVal) return 1
-      if (aVal && !bVal) return -1
-      if (aVal < bVal) return vendorSort.direction === 'asc' ? -1 : 1
-      if (aVal > bVal) return vendorSort.direction === 'asc' ? 1 : -1
-      return 0
-    })
-  }, [vendorList, search, vendorSort])
+  // so they get their own search and sort (brands.listVendorsPage: blanks last
+  // in either direction, since a contact-less vendor at the top of an A-Z list
+  // is noise). They share the paging state below, since only one tab is ever
+  // on screen.
 
   const handleVendorSort = (key) => {
     setVendorSort((prev) => ({
@@ -337,12 +313,18 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
   }
 
   // ── Pagination ───────────────────────────────────────────────────────────────
-  const rows = isVendorsTab ? vendorFiltered : filtered
-  const totalPages = Math.ceil(rows.length / itemsPerPage)
+  const activeResult = isVendorsTab ? vendorPage : pageResult
+  const paginated = activeResult?.data ?? EMPTY_ARRAY
+  const matchingCount = activeResult?.count ?? 0
+  const totalPages = Math.ceil(matchingCount / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = Math.min(startIndex + itemsPerPage, rows.length)
-  const paginated = rows.slice(startIndex, endIndex)
-  const rangeFrom = rows.length === 0 ? 0 : startIndex + 1
+  const endIndex = Math.min(startIndex + paginated.length, matchingCount)
+  const rangeFrom = matchingCount === 0 ? 0 : startIndex + 1
+  // The last page can empty under the user (an archive, a narrower filter): step back.
+  useEffect(() => {
+    if (activeResult && totalPages >= 1 && currentPage > totalPages) setCurrentPage(totalPages)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeResult, totalPages, currentPage])
 
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
@@ -377,7 +359,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
     { id: 'purchase_order', label: t('purchasing.tabPurchaseOrders'), count: countByType.purchase_order },
     { id: 'vendor_invoice', label: t('purchasing.tabVendorInvoices'), count: countByType.vendor_invoice },
     { id: 'archive', label: t('purchasing.tabArchive'), count: countByType.archive },
-    { id: 'vendors', label: t('purchasing.tabVendors'), count: vendorList.length },
+    { id: 'vendors', label: t('purchasing.tabVendors'), count: vendorCount },
   ]
 
   const isArchiveTab = tab === 'archive'
@@ -396,7 +378,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
     if (checked) next.add(rowKey(d)); else next.delete(rowKey(d))
     setSelectedKeys(next)
   }
-  const selectedRows = filtered.filter((d) => selectedKeys.has(rowKey(d)))
+  const selectedRows = isVendorsTab ? EMPTY_ARRAY : paginated.filter((d) => selectedKeys.has(rowKey(d)))
 
   // ── Export (XLSX) ────────────────────────────────────────────────────────────
   const exportDocs = (rows) => {
@@ -404,7 +386,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
     const data = rows.map((d) => ({
       [t('purchasing.colType')]: t(DOC_TYPE_LABEL_KEY[d.doc_type]),
       [t('purchasing.colCode')]: d.doc_code || '',
-      [t('purchasing.colVendor')]: vendorName(d.vendor_id),
+      [t('purchasing.colVendor')]: vendorName(d),
       [t('purchasing.colStatus')]: statusLabel(d.doc_status, t),
       [t('purchasing.colTotal')]: Number(d.total) || 0,
       [t('purchasing.colCurrency')]: d.currency || baseCurrency,
@@ -420,6 +402,13 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
     XLSX.writeFile(wb, `purchasing-${new Date().toISOString().slice(0, 10)}.xlsx`)
     toast.success(t('purchasing.exportSuccess', { count: rows.length }))
   }
+
+  // Export All / Filtered read every matching document when chosen, not the page
+  // on screen; Selected is the checked rows, which are all on this page.
+  const loadExportRows = (scope) =>
+    scope === 'selected'
+      ? selectedRows
+      : db.purchaseDocuments.listAllMatching(scope === 'filtered' ? listFilters : { tab: 'any' }, sortConfig)
 
   // ── Bulk archive / restore ───────────────────────────────────────────────────
   const handleBulkArchive = async (archived) => {
@@ -449,11 +438,12 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
     toast.success(t(resultKey, { done, failed }))
   }
 
+  const isLoading = isVendorsTab ? vendorsLoading : view === 'list' ? docsLoading : bucketsLoading
   if (isLoading) return <PageSkeleton cols={8} />
 
   return (
     <div className="space-y-4">
-      <PageHeader title={t('purchasing.title')} subtitle={t('purchasing.subtitle', { count: documents.length })}>
+      <PageHeader title={t('purchasing.title')} subtitle={t('purchasing.subtitle', { count: countByType.total })}>
         {isVendorsTab ? (
           canCreate && (
             <Button onClick={() => setCreateType('vendor')}>+ {t('purchasing.newVendor')}</Button>
@@ -505,9 +495,10 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
               </button>
             </div>
             <ExportMenu
-              allRows={documents}
-              filteredRows={filtered}
-              selectedRows={selectedRows}
+              allCount={countByType.total}
+              filteredCount={view === 'list' ? matchingCount : buckets.reduce((n, b) => n + (Number(b.doc_count) || 0), 0)}
+              selectedCount={selectedRows.length}
+              loadRows={loadExportRows}
               onExport={(rows) => exportDocs(rows)}
               label={t('purchasing.export')}
               ns="purchasing"
@@ -598,7 +589,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
           <ListRangeBar
             from={rangeFrom}
             to={endIndex}
-            total={rows.length}
+            total={matchingCount}
             itemsPerPage={itemsPerPage}
             onItemsPerPage={setItemsPerPage}
           />
@@ -626,7 +617,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
                     <td colSpan={6} className="px-5 py-10 text-center text-sm text-[#6c6760] dark:text-[#9aa4b2]">
                       {/* Distinguishes "no vendors at all" from "none match the
                           search" — the fix for the latter is to clear the box. */}
-                      {vendorList.length === 0 ? t('purchasing.noVendorsYet') : t('purchasing.noVendorsMatch')}
+                      {vendorCount === 0 ? t('purchasing.noVendorsYet') : t('purchasing.noVendorsMatch')}
                     </td>
                   </tr>
                 ) : (
@@ -662,7 +653,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
             totalPages={totalPages}
             from={rangeFrom}
             to={endIndex}
-            total={rows.length}
+            total={matchingCount}
             onPage={handlePageChange}
             jumpToPage={jumpToPage}
             setJumpToPage={setJumpToPage}
@@ -784,12 +775,12 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
           )}
 
           {/* The analytics views replace the table but keep the search/filter bar
-              above them — both read from `filtered`, so narrowing the list
-              narrows the analysis too. */}
+              above them — both read buckets for the same filters as the list,
+              so narrowing the list narrows the analysis too. */}
           {view === 'graph' ? (
-            <PurchasingGraphView documents={filtered} vendorName={vendorName} />
+            <PurchasingGraphView buckets={buckets} />
           ) : view === 'pivot' ? (
-            <PurchasingPivotView documents={filtered} vendorName={vendorName} />
+            <PurchasingPivotView buckets={buckets} />
           ) : (
           <>
           {/* Table */}
@@ -797,7 +788,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
             <ListRangeBar
               from={rangeFrom}
               to={endIndex}
-              total={rows.length}
+              total={matchingCount}
               itemsPerPage={itemsPerPage}
               onItemsPerPage={setItemsPerPage}
             />
@@ -881,7 +872,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
                           {doc.doc_code || t('purchasing.pendingCode')}
                         </td>
                         <td className="px-4 py-3 max-w-[180px] text-sm text-[#211f1b] dark:text-[#e8ebf0] line-clamp-1">
-                          {vendorName(doc.vendor_id)}
+                          {vendorName(doc)}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -936,7 +927,7 @@ export default function Purchasing({ currentUserRole, currentUserEmail, currentU
               totalPages={totalPages}
               from={rangeFrom}
               to={endIndex}
-              total={rows.length}
+              total={matchingCount}
               onPage={handlePageChange}
               jumpToPage={jumpToPage}
               setJumpToPage={setJumpToPage}

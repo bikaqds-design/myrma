@@ -145,7 +145,7 @@ export type { UserRoleRow, UserActivityRow, UserPreferencesRow } from './users.j
 export type { NotificationRow } from './notifications.js'
 export type { RMATicketRow, TicketActivityRow, TicketCommentRow, TicketProductItem, TicketResolutionRow } from './tickets.js'
 export type { CustomerRow, CustomerNoteRow } from './customers.js'
-export type { BrandRow, CategoryRow, SubcategoryRow, ProductRow } from './catalog.js'
+export type { BrandRow, VendorSort, CategoryRow, SubcategoryRow, ProductRow } from './catalog.js'
 export type {
   InventoryUnitRow, ManufacturerBatchRow, WarehouseRow,
   PartRow, TicketPartRow, TimeEntryRow, InventoryStatsRow,
@@ -174,7 +174,7 @@ export type { PaymentRow, PaymentApplicationRow } from './payments.js'
 export type { LedgerEntryRow, LedgerEntryType, AgingBucket, AgingCustomerRow } from './customerLedger.js'
 export type {
   PurchaseLine, PurchaseOrderRow, VendorInvoiceRow,
-  PurchaseDocType, PurchaseDocumentRow, VendorInvoiceChargeRow, ChargeType,
+  PurchaseDocType, PurchaseDocumentRow, PurchaseDocumentListRow, PurchaseDocTab, PurchaseDocFilters, PurchaseDocSort, PurchaseDocSummary, PurchaseDocBucket, VendorInvoiceChargeRow, ChargeType,
 } from './purchasing.js'
 export { landedUnitCosts } from './purchasing.js'
 export type { VendorPaymentRow, VendorPaymentApplicationRow } from './vendorPayments.js'

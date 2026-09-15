@@ -16,7 +16,7 @@ import {
   Legend,
 } from 'recharts'
 import { useAppearance } from '../../contexts/AppearanceContext'
-import { DIMENSIONS, dimensionKey, docTotalBase, isLiveDocument, sortDimensionKeys } from './_shared'
+import { DIMENSIONS, groupBuckets, sortDimensionKeys, summarizeBuckets } from './_shared'
 import { useBaseCurrency } from '../../hooks/useBaseCurrency'
 
 /**
@@ -35,6 +35,10 @@ import { useBaseCurrency } from '../../hooks/useBaseCurrency'
  * voided vendor invoice was never committed, and counting it would overstate
  * every total. The count measure excludes them too, so the two measures always
  * describe the same population.
+ *
+ * It reads `buckets` — the matching documents counted and summed in the
+ * database per type × status × vendor × month (BUG-066) — not the documents
+ * themselves, so its numbers cover every document and not the first 1 000.
  */
 
 const MEASURES = ['count', 'spend']
@@ -65,7 +69,7 @@ function ChartTypeBtn({ active, onClick, children, title }) {
   )
 }
 
-export default function PurchasingGraphView({ documents, vendorName }) {
+export default function PurchasingGraphView({ buckets }) {
   const { t } = useTranslation()
   // Spend is summed in base currency, so the axis and tooltips have to be
   // labelled with the base currency rather than a fixed string in the locale
@@ -77,29 +81,17 @@ export default function PurchasingGraphView({ documents, vendorName }) {
   const [groupBy, setGroupBy] = useState('vendor')
   const [chartType, setChartType] = useState('bar')
 
-  const live = useMemo(() => (documents || []).filter(isLiveDocument), [documents])
-
   const chartData = useMemo(() => {
-    const groups = {}
-    for (const doc of live) {
-      const key = dimensionKey(doc, groupBy, { vendorName, t })
-      if (!groups[key]) groups[key] = { name: key, count: 0, spend: 0 }
-      groups[key].count += 1
-      groups[key].spend += docTotalBase(doc)
-    }
-    return sortDimensionKeys(Object.keys(groups), groupBy, (k) => groups[k][measure]).map(
-      (k) => groups[k]
+    const groups = groupBuckets(buckets, groupBy, t)
+    return sortDimensionKeys([...groups.keys()], groupBy, (k) => groups.get(k)[measure]).map(
+      (k) => ({ name: k, ...groups.get(k) })
     )
-  }, [live, groupBy, measure, vendorName, t])
+  }, [buckets, groupBy, measure, t])
 
-  const totals = useMemo(
-    () => ({
-      docs: live.length,
-      spend: live.reduce((sum, d) => sum + docTotalBase(d), 0),
-      vendors: new Set(live.map((d) => d.vendor_id).filter(Boolean)).size,
-    }),
-    [live]
-  )
+  const totals = useMemo(() => {
+    const s = summarizeBuckets(buckets)
+    return { docs: s.liveDocuments, spend: s.spend, vendors: s.vendors }
+  }, [buckets])
 
   const axisColor = darkMode ? '#9aa4b2' : '#6c6760'
   const gridColor = darkMode ? '#212a38' : '#e6e9ef'

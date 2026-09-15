@@ -101,12 +101,21 @@ describe('screens aggregate in base currency', () => {
     expect(src).not.toMatch(/reduce\([^)]*Number\(\w+\.total\)/)
   })
 
+  // Since BUG-066 the adding happens in the database, over every document: the
+  // screens sum the `spend` of document buckets, and the bucket spend is the sum
+  // of each document's base-currency total — docTotalBase's rule, in SQL.
   it.each(['PurchasingGraphView.jsx', 'PurchasingPivotView.jsx', 'VendorDetails.jsx'])(
-    '%s adds through docTotalBase',
+    '%s adds base-currency spend from the document buckets',
     (name) => {
-      expect(readFileSync(files[name], 'utf8')).toContain('docTotalBase')
+      expect(readFileSync(files[name], 'utf8')).toMatch(/summarizeBuckets|groupBuckets|row\.spend/)
     }
   )
+
+  it('buckets spend from each document\'s base-currency total', () => {
+    const sql = readFileSync('supabase/migrations/20260862_purchasing_lists.sql', 'utf8')
+    expect(sql).toContain('coalesce(d.total_base, coalesce(d.total, 0) * coalesce(nullif(d.exchange_rate, 0), 1)) AS total_base_value')
+    expect(sql).toContain('sum(d.total_base_value)')
+  })
 
   // The label was a locale string that read "EGP" whatever the system was set
   // to, so a business configured in USD saw dollar figures labelled EGP.
@@ -114,9 +123,9 @@ describe('screens aggregate in base currency', () => {
     expect(readFileSync(path, 'utf8')).not.toContain("purchasing.currencyCode")
   })
 
-  it('sorts the purchasing list by base currency', () => {
-    const src = readFileSync(files['index.jsx'], 'utf8')
-    expect(src).toMatch(/aVal = docTotalBase\(a\); bVal = docTotalBase\(b\)/)
+  it('sorts the purchasing list by base currency', async () => {
+    const { resolvePurchaseDocSort } = await import('../api/db/purchasing')
+    expect(resolvePurchaseDocSort({ key: 'total', direction: 'desc' }).column).toBe('total_base_value')
   })
 
   // A running balance is a sum, so it has to use the base column too.

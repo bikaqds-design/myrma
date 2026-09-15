@@ -1,12 +1,14 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { db } from '../../api/supabaseClient'
 import { PageSkeleton } from '../../components/Skeleton'
 import EmptyState from '../../components/EmptyState'
+import Pagination from '../../components/Pagination'
 import { Button, Ltr } from '../../components/ui'
-import { DOC_TYPE_BADGE, docTotalBase, docTypeLabel, statusLabel, statusPillCls } from './_shared'
+import { DOC_TYPE_BADGE, docTypeLabel, statusLabel, statusPillCls, summarizeBuckets } from './_shared'
 import { useBaseCurrency } from '../../hooks/useBaseCurrency'
+import { safeStorage } from '../../lib/safeStorage'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 
 /**
@@ -25,9 +27,6 @@ import { EMPTY_ARRAY } from '../../lib/stableEmpty'
  * Vendors are Brands (Purchase Module redesign 9R): there is no vendors table,
  * so the profile fields come from `brands`.
  */
-
-/** Money in the vendor's documents was never committed if the doc was killed. */
-const DEAD_STATUSES = new Set(['cancelled', 'void', 'voided'])
 
 function fmtMoney(n) {
   return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -72,23 +71,43 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
   const { t } = useTranslation()
   const baseCurrency = useBaseCurrency()
 
-  const { data: vendorList = EMPTY_ARRAY, isLoading: loadingVendor } = useQuery({
-    queryKey: ['brands'],
-    queryFn: () => db.brands.list(),
+  const { data: vendor = null, isLoading: loadingVendor } = useQuery({
+    queryKey: ['brands-as-vendors', 'one', vendorId],
+    queryFn: () => db.brands.get(vendorId),
+    enabled: !!vendorId,
     staleTime: 60_000,
   })
-  const vendor = useMemo(() => vendorList.find((v) => v.id === vendorId) || null, [vendorList, vendorId])
 
-  const { data: docsRes, isLoading: loadingDocs } = useQuery({
-    queryKey: ['purchase-documents'],
-    queryFn: () => db.purchaseDocuments.listAll(),
+  // This vendor's documents, newest first, one page at a time; the count and the
+  // spend come from the same documents counted and summed in the database. The
+  // page used to load every document and keep this vendor's — past the Data
+  // API's 1 000-row cap, some of them missing from the list and the totals.
+  // (BUG-066.)
+  const [docPage, setDocPage] = useState(1)
+  const [docsPerPage, setDocsPerPage] = useState(() => safeStorage.get('vendorDocsPerPage', 25))
+  useEffect(() => { safeStorage.set('vendorDocsPerPage', docsPerPage) }, [docsPerPage])
+  useEffect(() => { setDocPage(1) }, [vendorId, docsPerPage])
+  const vendorFilters = useMemo(() => ({ tab: 'any', vendorId }), [vendorId])
+  const { data: docsResult, isLoading: loadingDocs } = useQuery({
+    queryKey: ['purchase-documents', 'page', vendorFilters, 'newest', docPage, docsPerPage],
+    queryFn: () =>
+      db.purchaseDocuments.listPage(vendorFilters, { key: 'created_at', direction: 'desc' }, docPage, docsPerPage),
+    enabled: !!vendorId,
+    placeholderData: keepPreviousData,
   })
-  const documents = useMemo(() => {
-    const all = docsRes?.missing ? [] : (docsRes?.data ?? [])
-    return all
-      .filter((d) => d.vendor_id === vendorId)
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-  }, [docsRes, vendorId])
+  const documents = docsResult?.data ?? EMPTY_ARRAY
+  const documentsCount = docsResult?.count ?? 0
+  // The last page can empty under the user (a document moved elsewhere): step back.
+  useEffect(() => {
+    const pages = Math.ceil(documentsCount / docsPerPage)
+    if (docsResult && pages >= 1 && docPage > pages) setDocPage(pages)
+  }, [docsResult, documentsCount, docsPerPage, docPage])
+
+  const { data: buckets = EMPTY_ARRAY } = useQuery({
+    queryKey: ['purchase-documents', 'buckets', vendorFilters],
+    queryFn: () => db.purchaseDocuments.buckets(vendorFilters),
+    enabled: !!vendorId,
+  })
 
   const { data: ledger = EMPTY_ARRAY, isLoading: loadingLedger } = useQuery({
     queryKey: ['vendor-ledger', vendorId],
@@ -97,16 +116,11 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
   })
 
   // Spend counts only documents that still stand — a cancelled PO never cost
-  // anything, and including it would inflate every vendor's total.
-  const totalSpend = useMemo(
-    () =>
-      documents
-        .filter((d) => !DEAD_STATUSES.has(String(d.doc_status || '').toLowerCase()))
-        // Base currency: a vendor can be invoiced in more than one, and adding
-        // the raw totals would report dollars and pounds as a single figure.
-        .reduce((sum, d) => sum + docTotalBase(d), 0),
-    [documents]
-  )
+  // anything, and including it would inflate every vendor's total. It is summed
+  // in base currency (each document's total_base, in the database): a vendor can
+  // be invoiced in more than one, and adding the raw totals would report dollars
+  // and pounds as a single figure.
+  const totalSpend = useMemo(() => summarizeBuckets(buckets).spend, [buckets])
 
   // The ledger is signed: invoices positive, payments negative. The sum is what
   // is still owed, which is why it needs no separate query.
@@ -178,7 +192,7 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
           value={`${fmtMoney(outstanding)} ${baseCurrency}`}
           tone={outstanding > 0.001 ? 'warn' : 'default'}
         />
-        <StatTile label={t('purchasing.vendorDocumentCount')} value={documents.length.toLocaleString()} />
+        <StatTile label={t('purchasing.vendorDocumentCount')} value={documentsCount.toLocaleString()} />
       </div>
 
       {/* ── Documents ──────────────────────────────────────────────────────── */}
@@ -246,6 +260,9 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
               </tbody>
             </table>
           </div>
+        )}
+        {documentsCount > 0 && (
+          <Pagination total={documentsCount} page={docPage} itemsPerPage={docsPerPage} setItemsPerPage={setDocsPerPage} onPage={setDocPage} />
         )}
       </div>
 

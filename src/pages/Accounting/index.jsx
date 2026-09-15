@@ -368,7 +368,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
 
           <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-x-auto">
             <Table
-              caption={t('accounting.tabArAging')}
+              caption={t('accounting.tabAging')}
               columns={[
                 {
                   key: 'customer',
