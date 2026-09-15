@@ -505,11 +505,10 @@ function CustomersTab({ range, formatDate }) {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        {/* Not "Active Customers": this counts customers with an RMA ticket in
-            the selected range — 3 of 888 on the current data. The old label
-            implied the company had three customers. */}
+        {/* Customers created in the range whose status is Active. It was
+            labelled "Customers with Tickets", which the figure never counted. */}
         <KpiCard
-          label={t('reports.kpiCustomersWithTickets')}
+          label={t('reports.kpiActiveCustomers')}
           value={totalActive}
           color="indigo"
           icon="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"

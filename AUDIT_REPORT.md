@@ -1518,7 +1518,21 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Impact: scalability ceiling; wrong totals after growth.
 * Suggested fix: adopt `listPaged` + server filters (plan already noted in code comments).
 * Confidence: Confirmed by code reading
-* **Not attempted 2026-09-13.** This is a server-side pagination and filtering change across seven screens, not a small fix — the code comments already sketch the `listPaged` plan. It is also not yet urgent: the largest table the cap applies to holds 888 rows against a 5,000-row limit, so nothing is being truncated today. It should be done before that number grows, not after.
+* ~~**Not attempted 2026-09-13.**~~ Superseded — see below.
+* **Correction to this finding (2026-09-14): the real cap is 1,000 rows, not 5,000.** The Supabase Data API setting "Max rows" is 1,000 on this project and silently overrides `.limit(5000)`, so every whole-table read stopped at 1,000 rows with no error, and the list was longer than the one above (it also covered inventory, knowledge, leads, pipeline, activities, the calendar, sales documents, accounting, purchasing and the Control Panel).
+* **Status: FIXED 2026-09-15 — all phases merged, migrations applied and every screen verified live against SQL.** Every screen now asks the database for one page plus an exact count, with filters and sort applied there; every total, chart, pivot and KPI is summed there; and "Export all" and records that genuinely need every row read in chunks past the cap (`fetchPage` / `fetchAllRows` in `src/api/db/_paging.ts`). Delivered in PRs #7–#22 (except #18, the calendar fix below) with migrations `20260852`–`20260865` (security-invoker views and functions, anon revoked, apply-time guards), each with a SQL reconciliation test in `supabase/tests/` run against the hosted project in a rolled-back transaction and a live comparison of the page against SQL:
+  * RMA Tickets (incl. Kanban per column), Customers, Products + Hierarchy counts, Inventory (all tabs), Knowledge Center, Company Docs, KB, bulk upload SKU matching;
+  * Leads, Pipeline (list, Kanban, graph, pivot, activity views), Activities + sidebar badge, Tech Calendar;
+  * Sales Documents, Accounting (payments, vendor payments, AR/AP aging), Purchasing (documents, graph, pivot, Vendors tab, Vendor Details);
+  * Dashboard, Reports (all seven tabs incl. Profitability), Customer Details, Product Details, Control Panel home, Pipelines & Stages, Data Cleanup, and the remaining unbounded helper reads.
+* **Guard against regression:** `src/test/fullTableReadGuard.test.js` fails CI if a removed whole-table helper is called or re-added, if any `.limit()` asks for more than 1,000, or if a read in `src/api/db` has no range or chunking outside a short, commented allowlist (the WhatsApp reads, on hold by the owner's instruction).
+* **Found and fixed along the way:**
+  * Tech Calendar placed every ticket and activity one day late in Cairo (UTC+3): day keys were the UTC date of local midnight (PR #18, `src/lib/calendarDays.js`).
+  * Pipeline pivot defaulted to a column dimension that produced a single "Unknown" column, and the Activity view's "done" counts were always 0 (PR #16).
+  * Accounting's AR aging table caption rendered a raw i18n key (PR #21).
+  * Customer Details' activity log showed "—" for every ticket's detail — it read two columns the ticket query never selected (PR #22).
+  * **Regression introduced by PR #17 and closed by PR #22:** the sidebar overdue badge (a number) and the Dashboard's Overdue Follow-Ups widget (a list) shared one query cache key, so the Dashboard could crash with "slice is not a function" when the badge loaded first. Confirmed in the browser console on the pre-#22 bundle and re-verified absent after.
+  * Reports' Customers tab labelled its first KPI "Customers with Tickets" while counting active customers; relabelled "Active Customers" (this change).
 
 #### [LOW] Public tracker uses `alert()` and a client-side lockout that the caller controls
 
