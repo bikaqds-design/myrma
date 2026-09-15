@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import i18next from 'i18next'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { Button, Spinner, PageHeader } from '../components/ui'
@@ -55,6 +55,15 @@ function isoDate(date) {
 function sameDay(a, b) {
   return isoDate(a) === isoDate(b)
 }
+
+/** The day after a 'YYYY-MM-DD' key, as midnight UTC in ISO form. */
+function nextDayStartUtc(key) {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString()
+}
+
+/** Unscheduled tickets shown before "Show more". */
+const UNSCHEDULED_PAGE = 60
 
 function shortDate(date) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -151,18 +160,43 @@ export default function TechCalendar({
   const [selectedTech, setSelectedTech] = useState('')
 
   // ─── Load data ──────────────────────────────────────────────────────────────
+  // Only the week on screen: the tickets and planned activities due in it, for
+  // the person chosen. The page used to load every ticket and every planned
+  // activity and pick the week out in the browser — which the Data API caps at
+  // 1 000 rows, so a busy week could simply be missing. (BUG-066.)
+  //
+  // Planned CRM work — scheduled calls and approvals awaiting action — shows
+  // beside tickets: open, dated, not a log entry, as on the Activities page.
+  const effectiveTech = isAdminOrManager ? selectedTech : currentUserEmail
+  const days = weekDays(mondayDate)
+  // Day keys are the ISO dates the grid has always used for its columns.
+  const firstKey = isoDate(days[0])
+  const lastKey = isoDate(days[6])
+
   const { data: tickets = EMPTY_ARRAY, isLoading: loading, isError, error, refetch } = useQuery({
-    queryKey: ['tech-calendar-tickets'],
-    queryFn: () => db.rmaTickets.list(),
+    queryKey: ['tech-calendar-tickets', firstKey, lastKey, effectiveTech || null],
+    queryFn: () => db.rmaTickets.listDueBetween(firstKey, lastKey, effectiveTech || null),
+    placeholderData: keepPreviousData,
   })
-  // Planned CRM work — scheduled calls and approvals awaiting action. The page
-  // used to load tickets alone, so the only dated things it could show were 13
-  // repairs spread over four months; most weeks rendered empty while follow-ups
-  // sat unseen. listAllPlanned() already encodes what "planned" means (open,
-  // dated, not a log entry), so this page and the Activities page agree.
   const { data: planned = EMPTY_ARRAY } = useQuery({
-    queryKey: ['tech-calendar-activities'],
-    queryFn: () => db.activities.listAllPlanned(),
+    queryKey: ['tech-calendar-activities', firstKey, lastKey, effectiveTech || null],
+    queryFn: () =>
+      db.activities.listPlannedBetween(`${firstKey}T00:00:00.000Z`, nextDayStartUtc(lastKey), effectiveTech || null),
+    placeholderData: keepPreviousData,
+  })
+  const [unscheduledLimit, setUnscheduledLimit] = useState(UNSCHEDULED_PAGE)
+  useEffect(() => setUnscheduledLimit(UNSCHEDULED_PAGE), [effectiveTech])
+  const { data: unscheduledResult } = useQuery({
+    queryKey: ['tech-calendar-unscheduled', effectiveTech || null, unscheduledLimit],
+    queryFn: () => db.rmaTickets.listUnscheduled(effectiveTech || null, unscheduledLimit),
+    placeholderData: keepPreviousData,
+  })
+  // Assignees, not technicians: a row is one person's week, and a rep with a
+  // scheduled call belongs on it as much as a technician with a repair.
+  const { data: technicians = EMPTY_ARRAY } = useQuery({
+    queryKey: ['tech-calendar-assignees'],
+    queryFn: () => db.activities.calendarAssignees(),
+    enabled: isAdminOrManager,
   })
   useEffect(() => {
     if (isError) {
@@ -172,35 +206,11 @@ export default function TechCalendar({
   }, [isError, error])
 
   // ─── Derived data ────────────────────────────────────────────────────────────
-  // Assignees, not technicians: a row is one person's week, and a rep with a
-  // scheduled call belongs on it as much as a technician with a repair.
-  const technicians = useMemo(() => {
-    const set = new Set()
-    tickets.forEach((t) => {
-      if (t.assigned_technician) set.add(t.assigned_technician)
-    })
-    planned.forEach((a) => {
-      if (a.assigned_rep) set.add(a.assigned_rep)
-    })
-    return Array.from(set).sort()
-  }, [tickets, planned])
-
-  const effectiveTech = isAdminOrManager ? selectedTech : currentUserEmail
-
-  const filteredTickets = useMemo(() => {
-    if (!effectiveTech) return tickets
-    return tickets.filter((t) => t.assigned_technician === effectiveTech)
-  }, [tickets, effectiveTech])
-
-  const filteredPlanned = useMemo(() => {
-    if (!effectiveTech) return planned
-    return planned.filter((a) => a.assigned_rep === effectiveTech)
-  }, [planned, effectiveTech])
+  const filteredTickets = tickets
+  const filteredPlanned = planned
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-
-  const days = weekDays(mondayDate)
 
   const ticketsByDay = useMemo(() => {
     const map = {}
@@ -228,13 +238,8 @@ export default function TechCalendar({
     return map
   }, [filteredPlanned, days])
 
-  const unscheduled = useMemo(
-    () =>
-      filteredTickets.filter(
-        (t) => !t.due_date && t.ticket_status !== 'Completed' && t.ticket_status !== 'Cancelled'
-      ),
-    [filteredTickets]
-  )
+  const unscheduled = unscheduledResult?.data ?? EMPTY_ARRAY
+  const unscheduledCount = unscheduledResult?.count ?? 0
 
   // ─── Navigation ──────────────────────────────────────────────────────────────
   const goToPrev = () => {
@@ -437,9 +442,9 @@ export default function TechCalendar({
             />
           </svg>
           {t('calendar.unscheduledTickets')}
-          {unscheduled.length > 0 && (
+          {unscheduledCount > 0 && (
             <span className="ms-1 px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2] text-xs font-medium">
-              {unscheduled.length}
+              {unscheduledCount}
             </span>
           )}
         </h3>
@@ -460,6 +465,15 @@ export default function TechCalendar({
               />
             ))}
           </div>
+        )}
+        {unscheduledCount > unscheduled.length && (
+          <button
+            type="button"
+            onClick={() => setUnscheduledLimit((n) => n + UNSCHEDULED_PAGE)}
+            className="w-full mt-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-[#a5b4fc] hover:underline"
+          >
+            {t('calendar.showMoreUnscheduled', { count: unscheduledCount - unscheduled.length })}
+          </button>
         )}
       </div>
     </div>

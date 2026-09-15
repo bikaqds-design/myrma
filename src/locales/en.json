@@ -1541,6 +1541,7 @@
     "showMoreProducts": "Show more ({{shown}} of {{total}})"
   },
   "calendar": {
+    "showMoreUnscheduled": "Show {{count}} more",
     "title": "Calendar",
     "subtitle": "Weekly view of tickets and planned follow-ups by due date",
     "today": "Today",

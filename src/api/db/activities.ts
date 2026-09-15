@@ -1,6 +1,8 @@
 import { supabase } from '../client.js'
 import { assertUpdated, assertAffected } from './_assertUpdated.js'
-import { fetchAllRows, chunksOf } from './_paging.js'
+import { fetchPage, fetchAllRows, chunksOf } from './_paging.js'
+import type { PagedResult } from './types.js'
+import { orIlike } from '../../lib/searchPattern.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -36,6 +38,106 @@ export type ActivityCreateInput = Omit<
   'id' | 'created_at' | 'completed_at' | 'attachments' | 'parent_id'
 > & { attachments?: ActivityAttachment[]; parent_id?: string | null }
 
+// ── Paged reads (BUG-066) ─────────────────────────────────────────────────────
+// The Activities page loaded every planned activity, every completed one, every
+// lead and every deal, and named, searched, filtered, sorted, counted and paged
+// in the browser — past the Data API's 1 000-row cap, part of the work shown as
+// all of it. These read `v_activities_list` (20260859), which carries what the
+// page shows for each row.
+
+/** An activity as the Activities page lists it. */
+export interface ActivityListRow extends ActivityRow {
+  /** The document type for an approval, otherwise related_type. */
+  source: string
+  customer_name: string | null
+  /** Lead / deal code, or the approval's document code. */
+  source_code: string | null
+  /** Whether the lead or deal the row links to exists (and is visible). */
+  related_exists: boolean
+}
+
+/**
+ * The page's tabs. `all`, `today` and `overdue` are planned work (open, dated,
+ * not a system log); `logs` is completed work. Today and overdue compare the
+ * due date's UTC calendar day with today's, as the page always has.
+ */
+export type ActivityTab = 'all' | 'today' | 'overdue' | 'logs'
+
+export interface ActivityFilters {
+  tab?: ActivityTab
+  type?: string
+  assignee?: string
+  source?: string
+  /** Title, customer name, assignee or record code. */
+  search?: string
+  /** A rep scoped to their own activities (RLS enforces it too). */
+  ownerEmail?: string | null
+}
+
+export interface ActivitySort {
+  key: string
+  direction: 'asc' | 'desc'
+}
+
+const ACTIVITY_SEARCH_COLUMNS = ['title', 'customer_name', 'assigned_rep', 'source_code']
+
+/** Midnight UTC today and tomorrow, as ISO strings. */
+export function utcDayBounds(now: Date = new Date()): { start: string; end: string } {
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
+  return { start: start.toISOString(), end: end.toISOString() }
+}
+
+interface ActivityFilterable<Q> {
+  eq(column: string, value: unknown): Q
+  neq(column: string, value: unknown): Q
+  is(column: string, value: null): Q
+  not(column: string, operator: string, value: unknown): Q
+  gte(column: string, value: unknown): Q
+  lt(column: string, value: unknown): Q
+  or(filters: string): Q
+}
+
+export function applyActivityFilters<Q extends ActivityFilterable<Q>>(query: Q, f: ActivityFilters, now: Date = new Date()): Q {
+  let q = query.neq('type', 'log')
+  if (f.tab === 'logs') {
+    q = q.not('completed_at', 'is', null)
+  } else {
+    q = q.is('completed_at', null).not('due_date', 'is', null)
+    const { start, end } = utcDayBounds(now)
+    if (f.tab === 'today') q = q.gte('due_date', start).lt('due_date', end)
+    else if (f.tab === 'overdue') q = q.lt('due_date', start)
+  }
+  if (f.ownerEmail) q = q.eq('assigned_rep', f.ownerEmail)
+  if (f.type) q = q.eq('type', f.type)
+  if (f.assignee) q = q.eq('assigned_rep', f.assignee)
+  if (f.source) q = q.eq('source', f.source)
+  const search = f.search?.trim()
+  if (search) q = q.or(orIlike(ACTIVITY_SEARCH_COLUMNS, search))
+  return q
+}
+
+/**
+ * Sortable columns → the column ordered on. The date column is the due date,
+ * or the completion date on the logs tab. A row with no customer sorts after
+ * every name, as "—" did.
+ */
+export function resolveActivitySort(sort: ActivitySort | undefined, tab?: ActivityTab): { column: string; ascending: boolean; nullsFirst: boolean } {
+  const ascending = sort ? sort.direction === 'asc' : true
+  switch (sort?.key) {
+    case 'related_type':
+    case 'assigned_rep':
+    case 'created_at':
+      return { column: sort.key, ascending, nullsFirst: ascending }
+    case 'title':
+      return { column: 'title_sort', ascending, nullsFirst: ascending }
+    case 'customer':
+      return { column: 'customer_sort', ascending, nullsFirst: !ascending }
+    default:
+      return { column: tab === 'logs' ? 'completed_at' : 'due_date', ascending: sort?.key === 'due_date' ? ascending : true, nullsFirst: ascending }
+  }
+}
+
 // ── Activities ────────────────────────────────────────────────────────────────
 // related_id is polymorphic — no DB-level FK is possible across 4 different
 // target tables, so create() verifies the referenced row exists before
@@ -61,6 +163,82 @@ async function assertRelatedExists(
 }
 
 export const activities = {
+  /** One page of the Activities list, filtered and sorted in the database, with the exact number that match. */
+  async listPage(
+    filters: ActivityFilters,
+    sort: ActivitySort | undefined,
+    page: number,
+    pageSize: number,
+    now: Date = new Date()
+  ): Promise<PagedResult<ActivityListRow>> {
+    const { column, ascending, nullsFirst } = resolveActivitySort(sort, filters.tab)
+    return fetchPage<ActivityListRow>((from, to) => {
+      const base = supabase.from('v_activities_list').select('*', { count: 'exact' })
+      return applyActivityFilters(base, filters, now)
+        .order(column, { ascending, nullsFirst })
+        .order('id', { ascending: true })
+        .range(from, to)
+    }, page, pageSize)
+  },
+
+  /** How many activities each tab holds, for a rep's own work or everyone's. */
+  async tabCounts(ownerEmail?: string | null, now: Date = new Date()): Promise<Record<ActivityTab, number>> {
+    const count = async (tab: ActivityTab) => {
+      const base = supabase.from('activities').select('id', { count: 'exact', head: true })
+      const { count: n, error } = await applyActivityFilters(base, { tab, ownerEmail }, now)
+      if (error) throw error
+      return n ?? 0
+    }
+    const [all, today, overdue, logs] = await Promise.all([count('all'), count('today'), count('overdue'), count('logs')])
+    return { all, today, overdue, logs }
+  },
+
+  /** The assignees of planned (or, on the logs tab, completed) activities, for the filter. */
+  async assignees(completed: boolean, ownerEmail?: string | null): Promise<string[]> {
+    const { data, error } = await supabase.rpc('rma_activity_assignees', {
+      p_completed: completed,
+      p_owner: ownerEmail || null,
+    })
+    if (error) throw error
+    return (data ?? []) as string[]
+  },
+
+  /** How many open activities are past due — the sidebar badge. RLS scopes it. */
+  async countOverdue(now: Date = new Date()): Promise<number> {
+    const { count, error } = await supabase
+      .from('activities')
+      .select('id', { count: 'exact', head: true })
+      .lt('due_date', now.toISOString())
+      .is('completed_at', null)
+    if (error) throw error
+    return count ?? 0
+  },
+
+  /**
+   * Planned activities due in [from, to) — one Tech Calendar week — optionally
+   * for one assignee. Every row in the range, however many.
+   */
+  async listPlannedBetween(from: string, to: string, assignee?: string | null): Promise<ActivityRow[]> {
+    return fetchAllRows<ActivityRow>((rangeFrom, rangeTo) => {
+      let q = supabase
+        .from('activities')
+        .select('*')
+        .is('completed_at', null)
+        .neq('type', 'log')
+        .gte('due_date', from)
+        .lt('due_date', to)
+      if (assignee) q = q.eq('assigned_rep', assignee)
+      return q.order('due_date', { ascending: true }).order('id', { ascending: true }).range(rangeFrom, rangeTo)
+    })
+  },
+
+  /** Ticket technicians and reps with planned activities, for the Tech Calendar's picker. */
+  async calendarAssignees(): Promise<string[]> {
+    const { data, error } = await supabase.rpc('rma_calendar_assignees')
+    if (error) throw error
+    return (data ?? []) as string[]
+  },
+
   // Bulk variant for board/list views that need open-activity state (overdue/
   // today/planned) for many records at once without one query per card.
   async listForRelated(
@@ -87,18 +265,21 @@ export const activities = {
     }
     return out
   },
+  /** One record's whole history (chatter, comments, approvals) — every row, not the first 1 000. */
   async list(
     relatedType: ActivityRow['related_type'],
     relatedId: string
   ): Promise<ActivityRow[]> {
-    const { data, error } = await supabase
-      .from('activities')
-      .select('*')
-      .eq('related_type', relatedType)
-      .eq('related_id', relatedId)
-      .order('due_date', { ascending: true, nullsFirst: false })
-    if (error) throw error
-    return data || []
+    return fetchAllRows<ActivityRow>((from, to) =>
+      supabase
+        .from('activities')
+        .select('*')
+        .eq('related_type', relatedType)
+        .eq('related_id', relatedId)
+        .order('due_date', { ascending: true, nullsFirst: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
   },
   async create(activity: ActivityCreateInput): Promise<ActivityRow> {
     await assertRelatedExists(activity.related_type, activity.related_id)
@@ -189,38 +370,19 @@ export const activities = {
   },
   // RLS already scopes results to what the caller can see (manager+ sees
   // all, sales_rep sees only their own assigned_rep rows).
+  // Every open activity past due, oldest first — every row, not the first 1 000.
+  // A count alone is countOverdue().
   async listOverdue(): Promise<ActivityRow[]> {
-    const { data, error } = await supabase
-      .from('activities')
-      .select('*')
-      .lt('due_date', new Date().toISOString())
-      .is('completed_at', null)
-      .order('due_date', { ascending: true })
-    if (error) throw error
-    return data || []
-  },
-  // All open (non-completed, non-log) scheduled activities across all related
-  // types. Used by the Activities page and for overdue-count badge derivation.
-  async listAllPlanned(): Promise<ActivityRow[]> {
-    const { data, error } = await supabase
-      .from('activities')
-      .select('*')
-      .is('completed_at', null)
-      .neq('type', 'log')
-      .not('due_date', 'is', null)
-      .order('due_date', { ascending: true })
-    if (error) throw error
-    return data || []
-  },
-  // All completed (non-log) activities, newest first — used by Activity Logs tab.
-  async listCompleted(): Promise<ActivityRow[]> {
-    const { data, error } = await supabase
-      .from('activities')
-      .select('*')
-      .not('completed_at', 'is', null)
-      .neq('type', 'log')
-      .order('completed_at', { ascending: false })
-    if (error) throw error
-    return data || []
+    const now = new Date().toISOString()
+    return fetchAllRows<ActivityRow>((from, to) =>
+      supabase
+        .from('activities')
+        .select('*')
+        .lt('due_date', now)
+        .is('completed_at', null)
+        .order('due_date', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
   },
 }

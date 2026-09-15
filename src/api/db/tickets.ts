@@ -246,6 +246,35 @@ export const rmaTickets = {
   },
 
   /**
+   * Tickets due on a day in [fromDate, toDate] (inclusive 'YYYY-MM-DD'), for one
+   * Tech Calendar week, optionally one technician's. Every row in the range.
+   */
+  async listDueBetween(fromDate: string, toDate: string, technician?: string | null): Promise<RMATicketRow[]> {
+    return fetchAllRows<RMATicketRow>((from, to) => {
+      let q = supabase.from('rma_tickets').select('*').gte('due_date', fromDate).lte('due_date', toDate)
+      if (technician) q = q.eq('assigned_technician', technician)
+      return q.order('due_date', { ascending: true }).order('id', { ascending: true }).range(from, to)
+    })
+  },
+
+  /**
+   * Open tickets with no due date — the calendar's "unscheduled" panel: the
+   * newest `limit` and how many there are.
+   */
+  async listUnscheduled(technician: string | null | undefined, limit: number): Promise<{ data: RMATicketRow[]; count: number }> {
+    const result = await fetchPage<RMATicketRow>((from, to) => {
+      let q = supabase
+        .from('rma_tickets')
+        .select('*', { count: 'exact' })
+        .is('due_date', null)
+        .not('ticket_status', 'in', '("Completed","Cancelled")')
+      if (technician) q = q.eq('assigned_technician', technician)
+      return q.order('created_date', { ascending: false }).order('id', { ascending: true }).range(from, to)
+    }, 1, limit)
+    return { data: result.data, count: result.count }
+  },
+
+  /**
    * @deprecated Loads the whole table, and the Data API returns at most 1 000
    * rows, so past that it is silently incomplete (BUG-066). Still used by
    * screens not yet moved to server-side paging; do not add callers.
@@ -311,14 +340,17 @@ export const rmaTickets = {
 // ── Ticket Activity ───────────────────────────────────────────────────────────
 
 export const ticketActivity = {
+  /** A ticket's whole history — every row, not the first 1 000. (BUG-066.) */
   async list(ticketId: string): Promise<TicketActivityRow[]> {
-    const { data, error } = await supabase
-      .from('ticket_activity')
-      .select('*')
-      .eq('ticket_id', ticketId)
-      .order('created_date', { ascending: false })
-    if (error) throw error
-    return data || []
+    return fetchAllRows<TicketActivityRow>((from, to) =>
+      supabase
+        .from('ticket_activity')
+        .select('*')
+        .eq('ticket_id', ticketId)
+        .order('created_date', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
   },
   async create(activityData: Partial<TicketActivityRow>): Promise<TicketActivityRow | undefined> {
     const { data, error } = await supabase.from('ticket_activity').insert([activityData]).select()
@@ -341,17 +373,23 @@ export const ticketActivity = {
 // ── Ticket Comments ───────────────────────────────────────────────────────────
 
 export const ticketComments = {
+  /** A ticket's whole comment thread — every row, not the first 1 000. (BUG-066.) */
   async list(ticketId: string): Promise<TableResult<TicketCommentRow[]>> {
-    const { data, error } = await supabase
-      .from('ticket_comments')
-      .select('*')
-      .eq('ticket_id', ticketId)
-      .order('created_date', { ascending: true })
-    if (error) {
-      if (error.code === '42P01') return { missing: true, data: [] }
+    try {
+      const data = await fetchAllRows<TicketCommentRow>((from, to) =>
+        supabase
+          .from('ticket_comments')
+          .select('*')
+          .eq('ticket_id', ticketId)
+          .order('created_date', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to)
+      )
+      return { missing: false, data }
+    } catch (error) {
+      if ((error as { code?: string })?.code === '42P01') return { missing: true, data: [] }
       throw error
     }
-    return { missing: false, data: data || [] }
   },
   async create(dto: {
     ticketId: string
