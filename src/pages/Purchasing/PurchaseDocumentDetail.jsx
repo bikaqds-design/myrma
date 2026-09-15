@@ -124,8 +124,9 @@ export default function PurchaseDocumentDetail({
   })
 
   const { data: vendor } = useQuery({
-    queryKey: ['brand-vendor', doc?.vendor_id],
-    queryFn: () => db.brands.list().then((rows) => rows.find((r) => r.id === doc.vendor_id)),
+    queryKey: ['brands-as-vendors', 'one', doc?.vendor_id],
+    // One brand by id — this used to read every brand to find it. (BUG-066.)
+    queryFn: () => db.brands.get(doc.vendor_id),
     enabled: !!doc?.vendor_id,
   })
 

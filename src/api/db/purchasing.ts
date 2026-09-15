@@ -1,7 +1,8 @@
 import { supabase } from '../client.js'
-import type { TableResult } from './types.js'
+import type { PagedResult } from './types.js'
 import { assertUpdated, assertAffected } from './_assertUpdated.js'
-import { fetchAllRows } from './_paging.js'
+import { fetchPage, fetchAllRows } from './_paging.js'
+import { orIlike } from '../../lib/searchPattern.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 // Vendors are Brands (src/api/db/catalog.ts `brands`) — there is no separate
@@ -111,6 +112,103 @@ export interface PurchaseDocumentRow {
   archived_at: string | null
 }
 
+/** A document as the Purchasing page lists it (v_purchase_documents_list, 20260862). */
+export interface PurchaseDocumentListRow extends PurchaseDocumentRow {
+  vendor_name: string | null
+  /** `total_base`, or `total` at the document's rate for a row that predates it. */
+  total_base_value: number
+}
+
+// ── Paged reads (BUG-066) ─────────────────────────────────────────────────────
+// The page loaded every document and did the tab split, counts, search,
+// filters, sort, paging, spend graph and pivot in the browser — past the Data
+// API's 1 000-row cap, part of the documents shown as all of them.
+
+/** 'all' and the two types are the active documents; 'archive' the archived; 'any' every one. */
+export type PurchaseDocTab = 'all' | PurchaseDocType | 'archive' | 'any'
+
+export interface PurchaseDocFilters {
+  tab?: PurchaseDocTab
+  status?: string
+  vendorId?: string
+  /** Code or vendor name. */
+  search?: string
+}
+
+export interface PurchaseDocSort {
+  key: string
+  direction: 'asc' | 'desc'
+}
+
+export interface PurchaseDocSummary {
+  counts: Record<'all' | PurchaseDocType | 'archive' | 'total', number>
+  statuses: string[]
+}
+
+/** Documents counted and base-currency spend summed, per type × status × vendor × created month. */
+export interface PurchaseDocBucket {
+  doc_type: PurchaseDocType
+  doc_status: string
+  vendor_id: string | null
+  vendor_name: string | null
+  /** 'YYYY-MM' in the viewer's time zone. */
+  created_month: string | null
+  doc_count: number
+  spend: number
+}
+
+interface PurchaseDocFilterable<Q> {
+  eq(column: string, value: unknown): Q
+  or(filters: string): Q
+}
+
+export function applyPurchaseDocFilters<Q extends PurchaseDocFilterable<Q>>(query: Q, f: PurchaseDocFilters): Q {
+  let q = query
+  if (f.tab === 'archive') q = q.eq('archived', true)
+  else if (f.tab !== 'any') {
+    q = q.eq('archived', false)
+    if (f.tab && f.tab !== 'all') q = q.eq('doc_type', f.tab)
+  }
+  if (f.status) q = q.eq('doc_status', f.status)
+  if (f.vendorId) q = q.eq('vendor_id', f.vendorId)
+  const search = f.search?.trim()
+  if (search) q = q.or(orIlike(['doc_code', 'vendor_name'], search))
+  return q
+}
+
+/**
+ * Sortable columns → the column ordered on. Codes and vendors sort
+ * case-insensitively; a document with no vendor name sorts after every name;
+ * totals sort in base currency; a missing date sorts first, as the page's
+ * `new Date(0)` did.
+ */
+export function resolvePurchaseDocSort(sort?: PurchaseDocSort): { column: string; ascending: boolean; nullsFirst: boolean } {
+  const ascending = sort ? sort.direction === 'asc' : false
+  switch (sort?.key) {
+    case 'doc_type':
+    case 'doc_status':
+    case 'type_specific_date':
+    case 'created_at':
+      return { column: sort.key, ascending, nullsFirst: ascending }
+    case 'doc_code':
+      return { column: 'doc_code_sort', ascending, nullsFirst: ascending }
+    case 'vendor':
+      return { column: 'vendor_sort', ascending, nullsFirst: !ascending }
+    case 'total':
+      return { column: 'total_base_value', ascending, nullsFirst: ascending }
+    default:
+      return { column: 'created_at', ascending: false, nullsFirst: false }
+  }
+}
+
+function viewerTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  } catch {
+    return 'UTC'
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function computeTotals(lines: PurchaseLine[]): {
@@ -146,13 +244,16 @@ function computeTotals(lines: PurchaseLine[]): {
 // set server-side by receive_vendor_invoice when a linked VI is received.
 
 export const purchaseOrders = {
+  /** Every purchase order, newest first — all of them, not the first 1 000. (BUG-066.) */
   async list(): Promise<PurchaseOrderRow[]> {
-    const { data, error } = await supabase
-      .from('purchase_orders')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (error) throw error
-    return data || []
+    return fetchAllRows<PurchaseOrderRow>((from, to) =>
+      supabase
+        .from('purchase_orders')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
   },
   async get(id: string): Promise<PurchaseOrderRow> {
     const { data, error } = await supabase.from('purchase_orders').select('*').eq('id', id).single()
@@ -413,20 +514,82 @@ const DOC_TABLE: Record<PurchaseDocType, string> = {
 }
 
 export const purchaseDocuments = {
-  async listAll(): Promise<TableResult<PurchaseDocumentRow[]>> {
-    try {
-      const { data, error } = await supabase
-        .from('v_purchase_documents')
-        .select('*')
-        .order('created_at', { ascending: false })
-      if (error) {
-        if (error.code === '42P01') return { missing: true, data: [] }
-        throw error
-      }
-      return { missing: false, data: data || [] }
-    } catch {
-      return { missing: true, data: [] }
+  /**
+   * One page of documents, filtered and sorted in the database, with the exact
+   * number that match. A purchase order and a vendor invoice can share an id,
+   * so the tie breaker is type then id.
+   */
+  async listPage(
+    filters: PurchaseDocFilters,
+    sort: PurchaseDocSort | undefined,
+    page: number,
+    pageSize: number
+  ): Promise<PagedResult<PurchaseDocumentListRow>> {
+    const { column, ascending, nullsFirst } = resolvePurchaseDocSort(sort)
+    return fetchPage<PurchaseDocumentListRow>((from, to) => {
+      const base = supabase.from('v_purchase_documents_list').select('*', { count: 'exact' })
+      return applyPurchaseDocFilters(base, filters)
+        .order(column, { ascending, nullsFirst })
+        .order('doc_type', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+    }, page, pageSize)
+  },
+
+  /** Every document matching the filters, in the list's order — for an export. */
+  async listAllMatching(filters: PurchaseDocFilters, sort?: PurchaseDocSort): Promise<PurchaseDocumentListRow[]> {
+    const { column, ascending, nullsFirst } = resolvePurchaseDocSort(sort)
+    return fetchAllRows<PurchaseDocumentListRow>((from, to) => {
+      const base = supabase.from('v_purchase_documents_list').select('*')
+      return applyPurchaseDocFilters(base, filters)
+        .order(column, { ascending, nullsFirst })
+        .order('doc_type', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+    })
+  },
+
+  /** Tab counts (and the grand total) and the statuses present in `tab`. */
+  async summary(tab: PurchaseDocTab): Promise<PurchaseDocSummary> {
+    const { data, error } = await supabase.rpc('rma_purchase_document_summary', { p_tab: tab })
+    if (error) throw error
+    const s = (data ?? {}) as Partial<PurchaseDocSummary>
+    const counts = (s.counts ?? {}) as Partial<PurchaseDocSummary['counts']>
+    return {
+      counts: {
+        all: Number(counts.all ?? 0),
+        purchase_order: Number(counts.purchase_order ?? 0),
+        vendor_invoice: Number(counts.vendor_invoice ?? 0),
+        archive: Number(counts.archive ?? 0),
+        total: Number(counts.total ?? 0),
+      },
+      statuses: s.statuses ?? [],
     }
+  },
+
+  /**
+   * Count and base-currency spend of the matching documents, per type × status
+   * × vendor × created month (rma_purchase_document_buckets). Every number the
+   * graph, the pivot and Vendor Details show is a sum of these rows. Cancelled
+   * documents are included; the screens leave them out of spend.
+   */
+  async buckets(filters: PurchaseDocFilters): Promise<PurchaseDocBucket[]> {
+    const rows = await fetchAllRows<PurchaseDocBucket>((from, to) =>
+      supabase
+        .rpc('rma_purchase_document_buckets', {
+          p_tab: filters.tab ?? 'all',
+          p_status: filters.status || null,
+          p_vendor_id: filters.vendorId || null,
+          p_term: filters.search?.trim() || null,
+          p_tz: viewerTimeZone(),
+        })
+        .order('doc_type', { ascending: true })
+        .order('doc_status', { ascending: true })
+        .order('vendor_id', { ascending: true })
+        .order('created_month', { ascending: true })
+        .range(from, to)
+    )
+    return rows.map((r) => ({ ...r, doc_count: Number(r.doc_count), spend: Number(r.spend) }))
   },
 
   /**

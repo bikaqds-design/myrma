@@ -24,6 +24,13 @@ export interface BrandRow {
   payment_terms: string | null
 }
 
+/** A column the Purchasing Vendors tab sorts by. */
+export interface VendorSort {
+  key: string
+  direction: 'asc' | 'desc'
+}
+const VENDOR_SORT_KEYS: readonly string[] = ['brand_name', 'contact_person', 'email', 'phone', 'payment_terms']
+
 export interface CategoryRow {
   id: string
   brand_id: string
@@ -83,6 +90,41 @@ export const brands = {
         .order('id', { ascending: true })
         .range(from, to)
     )
+  },
+  /** One brand, or null when it does not exist (or the caller cannot see it). */
+  async get(id: string): Promise<BrandRow | null> {
+    const { data, error } = await supabase.from('brands').select('*').eq('id', id).maybeSingle()
+    if (error) throw error
+    return (data as BrandRow | null) ?? null
+  },
+  /**
+   * One page of the Purchasing Vendors tab (v_vendors_list, 20260862): searched
+   * over name, contact, email and phone; sorted case-insensitively with blank
+   * values last in either direction. (BUG-066.)
+   */
+  async listVendorsPage(
+    search: string,
+    sort: VendorSort | undefined,
+    page: number,
+    pageSize: number
+  ): Promise<ServerPage<BrandRow>> {
+    const key = sort && VENDOR_SORT_KEYS.includes(sort.key) ? sort.key : 'brand_name'
+    const ascending = sort ? sort.direction !== 'desc' : true
+    const term = search?.trim()
+    return fetchPage<BrandRow>((from, to) => {
+      let q = supabase.from('v_vendors_list').select('*', { count: 'exact' })
+      if (term) q = q.or(orIlike(['brand_name', 'contact_person', 'email', 'phone'], term))
+      return q
+        .order(`${key}_sort`, { ascending, nullsFirst: false })
+        .order('id', { ascending: true })
+        .range(from, to)
+    }, page, pageSize)
+  },
+  /** How many brands (vendors) exist. */
+  async count(): Promise<number> {
+    const { count, error } = await supabase.from('brands').select('id', { count: 'exact', head: true })
+    if (error) throw error
+    return count ?? 0
   },
   async create(brand: Partial<BrandRow>): Promise<BrandRow | undefined> {
     const { data, error } = await supabase.from('brands').insert([brand]).select()

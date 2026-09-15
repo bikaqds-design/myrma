@@ -70,16 +70,57 @@ export function isLiveDocument(doc) {
 export const DIMENSIONS = ['vendor', 'status', 'month', 'type']
 
 /**
- * The bucket a document falls into along one dimension. Shared by the chart and
- * the pivot so that "group by vendor" cannot come to mean two different things.
+ * The group a row of document buckets (purchaseDocuments.buckets, BUG-066) falls
+ * into along one dimension. Shared by the chart, the pivot and Vendor Details so
+ * that "group by vendor" cannot come to mean two different things.
+ *
+ * A vendor with no name groups under "—", as the list shows it. Months are the
+ * created month in the viewer's time zone — created_at is the one date every
+ * document type has — worked out by the database.
  */
-export function dimensionKey(doc, dimension, { vendorName, t }) {
-  if (dimension === 'vendor') return vendorName(doc.vendor_id) || t('common.unknown')
-  if (dimension === 'status') return statusLabel(doc.doc_status, t)
-  if (dimension === 'type') return docTypeLabel(doc.doc_type, t)
-  // month — bucket on created_at, the one date every document type has.
-  const d = doc.created_at ? new Date(doc.created_at) : null
-  return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : t('common.unknown')
+export function dimensionKey(row, dimension, t) {
+  if (dimension === 'vendor') return row.vendor_name || '—'
+  if (dimension === 'status') return statusLabel(row.doc_status, t)
+  if (dimension === 'type') return docTypeLabel(row.doc_type, t)
+  return row.created_month || t('common.unknown')
+}
+
+/**
+ * Count and spend per group along `dimension`, over the live buckets only.
+ * Returns Map<key, { count, spend }>; spend is base currency.
+ */
+export function groupBuckets(buckets, dimension, t) {
+  const groups = new Map()
+  for (const b of buckets || []) {
+    if (!isLiveDocument(b)) continue
+    const key = dimensionKey(b, dimension, t)
+    const g = groups.get(key) ?? { count: 0, spend: 0 }
+    g.count += Number(b.doc_count) || 0
+    g.spend += Number(b.spend) || 0
+    groups.set(key, g)
+  }
+  return groups
+}
+
+/**
+ * The totals under the chart and on Vendor Details. `documents` counts every
+ * document, cancelled ones included; `liveDocuments`, `spend` and `vendors`
+ * leave cancelled documents out, because that money was never committed.
+ */
+export function summarizeBuckets(buckets) {
+  let documents = 0
+  let liveDocuments = 0
+  let spend = 0
+  const vendors = new Set()
+  for (const b of buckets || []) {
+    const n = Number(b.doc_count) || 0
+    documents += n
+    if (!isLiveDocument(b)) continue
+    liveDocuments += n
+    spend += Number(b.spend) || 0
+    if (b.vendor_id) vendors.add(b.vendor_id)
+  }
+  return { documents, liveDocuments, spend, vendors: vendors.size }
 }
 
 /**
