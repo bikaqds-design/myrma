@@ -1,0 +1,51 @@
+name: Migration drift
+
+# Does production's migration ledger match supabase/migrations/? (BUG-014.)
+#
+# The ledger drifted twice without anyone noticing, most recently because
+# migrations applied through the dashboard/MCP are recorded under a generated
+# timestamp rather than their file's version. See scripts/migration-drift.mjs
+# for exactly what counts as drift.
+#
+# When it runs, and when it deliberately does not:
+#   - push to main: a merged migration that production has not applied (or
+#     recorded under the wrong version) shows up straight away;
+#   - daily: catches a change made directly in production between merges;
+#   - on demand: after applying a migration, to confirm the ledger row.
+#   - NOT on pull requests. A PR that adds a migration is SUPPOSED to be ahead
+#     of production until it is applied, so a PR run would fail on exactly the
+#     work it is meant to review.
+#
+# Reads production through rma_applied_migration_versions() (20260868) with the
+# URL and anon key the integration tier already holds — no database password in
+# the Actions of a public repository. Without those secrets (a fork) the script
+# skips and says so; with them, any failure to read production fails the run.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # 05:17 UTC daily — off the hour, when scheduled runs are least delayed.
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: Production ledger matches migration files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # No npm install: the script uses only Node built-ins.
+      - name: Compare applied versions with migration files
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: node scripts/migration-drift.mjs
