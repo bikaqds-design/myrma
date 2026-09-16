@@ -212,9 +212,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Node 22, not 20: supabase-js now builds a Realtime client inside
+      # createClient(), and on a Node without a built-in WebSocket that throws
+      # "Node.js 20 detected without native WebSocket support" before a single
+      # query is sent. Every test in this tier failed that way on 2026-09-16,
+      # the first run that had the secrets — so not one assertion had ever
+      # executed here. Node 22 ships WebSocket natively. Only this job moves:
+      # the browser bundle is unaffected (browsers have WebSocket), and the
+      # build/unit job stays where it is.
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
