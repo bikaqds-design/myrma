@@ -28,6 +28,10 @@ const PRIVILEGED_RPCS: Array<{ name: string; args: Record<string, unknown> }> = 
   { name: 'move_rma_units', args: { p_ticket_id: NOWHERE, p_moves: [], p_actor_email: 'anon@example.com' } },
   { name: 'mark_batch_sent', args: { p_batch_id: NOWHERE, p_sent_date: '2026-01-01T00:00:00Z', p_tracking_number: 'probe' } },
   { name: 'rma_staff_directory', args: {} },
+  // 20260870: these end sessions without asking who is asking, so no client
+  // role may execute them at all.
+  { name: 'rma_end_sessions_for_email', args: { p_email: 'nobody@invalid.example' } },
+  { name: 'rma_end_sessions_without_access', args: {} },
 ]
 
 describeIntegration(`RPC authorization — anonymous callers (${skipReason})`, () => {
