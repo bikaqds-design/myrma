@@ -2,7 +2,7 @@ import { supabase } from '../client.js'
 import { buildTicketUnits } from '../../lib/rmaUnitCreate.js'
 import type { TicketProductInput, CatalogProduct } from '../../lib/rmaUnitCreate.js'
 import type { TableResult } from './types.js'
-import { assertUpdated, assertAffected, assertAllAffected } from './_assertUpdated.js'
+import { assertUpdated, assertAffected } from './_assertUpdated.js'
 import { chunksOf, fetchAllRows } from './_paging.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -313,22 +313,6 @@ export const inventory = {
     return out
   },
 
-  async resolveUnits(
-    ids: string[],
-    resolutionType: string,
-    notes?: string
-  ): Promise<InventoryUnitRow[]> {
-    const status = resolutionType === 'return_to_customer' ? 'closed' : 'company_stock'
-    const { data, error } = await supabase
-      .from('inventory_units')
-      .update({ status, resolution_type: resolutionType, resolved_date: new Date().toISOString(), notes: notes || null })
-      .in('id', ids)
-      .select()
-    if (error) throw error
-    assertAllAffected(data, ids, 'inventory unit')
-    return data || []
-  },
-
   /**
    * One transaction, and a real sequence for the number.
    *
@@ -412,30 +396,31 @@ export const inventory = {
   },
 
   /**
-   * @deprecated RMA-workflow warehouse assignment — a direct field mutation
-   * with no stock_moves ledger row and no reservation check. Still used by
-   * ByProductTab / WarehouseDetailModal / ProductDetailModal (the RMA repair
-   * workflow). New funnel/warehouse code should use the atomic RPC wrappers
-   * (transferStock / adjustStock / moveRmaUnits / promoteRmaUnit) instead.
-   * Consolidating these two paths is a Warehouse Module R2 item — see CLAUDE.md
-   * (the feature sets differ; don't merge blindly).
+   * Move a selection of units to one warehouse, on the ledger. (BUG-032.)
+   *
+   * This was a direct PATCH of `warehouse_id`, which wrote no `stock_moves`
+   * row — so the Warehouse Dashboard and margin reporting could not see a
+   * transfer at all. It now goes through `transfer_units` (20260866), which
+   * records one ledger row per unit that actually moves, refuses a unit
+   * reserved for a sales order, and refuses a system or archived destination.
+   *
+   * Returns how many units actually moved: one already in the destination is a
+   * no-op rather than an error, so the count can be lower than the selection.
+   *
+   * The whole selection travels in the request body, so there is no longer a
+   * URL-length reason to chunk — and chunking would break atomicity, which is
+   * the point of routing through the function.
    */
-  async transferUnits(unitIds: string[], warehouseId: string | null): Promise<void> {
+  async transferUnits(unitIds: string[], warehouseId: string, actorEmail?: string): Promise<number> {
     if (!unitIds.length) throw new Error('No unit IDs provided')
-    // The ids go into the URL; a whole warehouse's worth in one request is too
-    // long to send. (BUG-066.) What did not change is reported once, over all
-    // of them, so the message counts the whole selection.
-    const changed: { id: string }[] = []
-    for (const chunk of chunksOf(unitIds, 100)) {
-      const { data, error } = await supabase
-        .from('inventory_units')
-        .update({ warehouse_id: warehouseId || null })
-        .in('id', chunk)
-        .select('id')
-      if (error) throw error
-      changed.push(...(data ?? []))
-    }
-    assertAllAffected(changed, unitIds, 'inventory unit')
+    if (!warehouseId) throw new Error('No destination warehouse provided')
+    const { data, error } = await supabase.rpc('transfer_units', {
+      p_unit_ids: unitIds,
+      p_to_warehouse_id: warehouseId,
+      p_actor_email: actorEmail ?? null,
+    })
+    if (error) throw error
+    return (data as number) ?? 0
   },
 
   // ── Sprint 8 Phase 8a RPC wrappers — dual-mode (serialized + bulk) ────────────

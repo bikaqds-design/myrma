@@ -225,8 +225,10 @@ export function ProductDetailModal({
   const handleTransfer = async (warehouseId) => {
     const ids = selected.length > 0 ? selected : group.units.map((u) => u.id)
     try {
-      await db.inventory.transferUnits(ids, warehouseId)
-      toast.success(t('inventory.unitsTransferred', { count: ids.length }))
+      const moved = await db.inventory.transferUnits(ids, warehouseId, userEmail)
+      // A unit already in the destination is a no-op, so report what moved.
+      if (moved === 0) toast.success(t('inventory.unitsAlreadyInWarehouse'))
+      else toast.success(t('inventory.unitsTransferred', { count: moved }))
       db.auditLog
         .log(
           userEmail,
@@ -238,9 +240,10 @@ export function ProductDetailModal({
       setShowTransfer(false)
       onReload()
     } catch (err) {
-      // A bulk action can change some of the selection and not the rest (BUG-074):
-      // say how many did not change, and refresh so the rows that did are not shown stale.
-      if (err?.code === 'RMA_NOT_ALL_UPDATED') toast.error(err.message)
+      // transfer_units refuses the whole selection rather than moving part of
+      // it (BUG-032), and says why — a reserved unit, a system location. That
+      // reason is worth more than a generic failure, so show it.
+      if (err?.code === 'P0001') toast.error(err.message)
       else toast.error(t('inventory.transferFailed'))
       onReload()
     }

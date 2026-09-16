@@ -1155,6 +1155,7 @@
     "sendToMfrCount": "Send to Manufacturer ({{count}})",
     "batchCreatedSuccess": "Batch created!",
     "unitsTransferredCount": "{{count}} unit(s) transferred",
+    "unitsAlreadyInWarehouse": "Those units are already in that warehouse",
     "notesLabelColon": "Notes:",
     "warehouseTablesNotSetup": "Warehouse tables not set up yet",
     "warehouseTablesSetupHint": "Run the SQL below in your Supabase SQL Editor to enable custom warehouses and unit transfer.",
