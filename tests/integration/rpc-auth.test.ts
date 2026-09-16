@@ -22,6 +22,12 @@ const PRIVILEGED_RPCS: Array<{ name: string; args: Record<string, unknown> }> = 
   { name: 'void_invoice', args: { p_invoice_id: NOWHERE, p_actor_email: 'anon@example.com', p_reason: 'probe' } },
   { name: 'approve_sales_order', args: { p_so_id: NOWHERE, p_actor_email: 'anon@example.com' } },
   { name: 'cancel_sales_order', args: { p_so_id: NOWHERE, p_actor_email: 'anon@example.com' } },
+  // BUG-032 / BUG-087 (2026-09-16): the functions whose guards changed that day.
+  { name: 'convert_quotation_to_so', args: { p_quotation_id: NOWHERE, p_actor_email: 'anon@example.com' } },
+  { name: 'transfer_units', args: { p_unit_ids: [NOWHERE], p_to_warehouse_id: NOWHERE, p_actor_email: 'anon@example.com' } },
+  { name: 'move_rma_units', args: { p_ticket_id: NOWHERE, p_moves: [], p_actor_email: 'anon@example.com' } },
+  { name: 'mark_batch_sent', args: { p_batch_id: NOWHERE, p_sent_date: '2026-01-01T00:00:00Z', p_tracking_number: 'probe' } },
+  { name: 'rma_staff_directory', args: {} },
 ]
 
 describeIntegration(`RPC authorization — anonymous callers (${skipReason})`, () => {
