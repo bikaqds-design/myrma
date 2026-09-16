@@ -3,7 +3,6 @@ import { assertUpdated, assertAffected } from './_assertUpdated.js'
 import type { PrefsResult, SetPrefsResult } from './types.js'
 import { fetchAllRows } from './_paging.js'
 import { auditInsert } from './audit.js'
-import { captureException } from '../../lib/sentry.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -125,26 +124,14 @@ export const userRoles = {
     if (error) throw error
     assertAffected(data, 'User')
 
-    // Suspension has to end the sessions too, or it is only half a suspension.
-    // (Audit finding BUG-049.) Writing the status left every device the user
-    // was signed in on holding a valid refresh token: RLS stops them wherever a
-    // policy consults rma_user_role(), but Edge Functions do their own checks,
-    // so a suspended account kept working in the places that matter most.
-    //
-    // Best-effort on purpose. The status change has already committed and is
-    // the part that must not be rolled back; if the revoke fails, the account
-    // is still suspended and still restricted by RLS. Reporting the failure as
-    // if the suspension failed would be worse than reporting it to Sentry,
-    // because it would invite an admin to retry an action that already worked.
-    if (status === 'suspended' || status === 'locked') {
-      const { error: revokeError } = await supabase.rpc('rma_revoke_user_sessions_by_email', {
-        p_email: email,
-      })
-      if (revokeError) {
-        captureException(revokeError, { context: 'users/updateUserStatus/revokeSessions', email, status })
-      }
-    }
-
+    // Ending the user's sessions is NOT done here any more. (BUG-049, then
+    // 20260870.) This used to call rma_revoke_user_sessions_by_email after the
+    // write, best-effort, and only for 'suspended'/'locked' — so 'deactivated'
+    // never ended a session, and nor did any status change made anywhere but
+    // this screen. A trigger on user_roles now ends them in the same
+    // transaction as the change, for suspended, locked, deactivated, an expiry
+    // in the past, or a removed user — and never for 'pending', because an
+    // invitee signs in while pending.
     return data?.[0]
   },
   /**
