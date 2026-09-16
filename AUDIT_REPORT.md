@@ -10,7 +10,7 @@
 
 ---
 
-## 0. Scorecard — current status (2026-09-16)
+## 0. Scorecard — current status (2026-09-17)
 
 > This section is the live status. Sections 1–7 below are the audit **as written on 2026-09-03**, with each finding's own status notes appended over time; every finding now opens with a one-line **Current status** that agrees with this table.
 
@@ -18,10 +18,10 @@
 |---|---|---|---|---|
 | Critical | 4 | 4 | 0 | 0 |
 | High | 19 | 18 | 0 | 1 |
-| Medium | 34 | 32 | 2 | 0 |
+| Medium | 34 | 33 | 1 | 0 |
 | Low | 24 | 23 | 1 | 0 |
 | Informational | 6 | 2 | 4 | 0 |
-| **Total** | **87** | **79** | **7** | **1** |
+| **Total** | **87** | **80** | **6** | **1** |
 
 The 2026-09-03 audit filed 83 findings; the rest were filed during remediation, as the fixes turned up new defects (BUG-079 onward). Every Critical is fixed, and every High except the on-hold WhatsApp webhook — each applied to production and verified there.
 
@@ -30,7 +30,6 @@ The 2026-09-03 audit filed 83 findings; the rest were filed during remediation, 
 | Finding | Remaining | Waiting on |
 |---|---|---|
 | BUG-006 (High) | WhatsApp webhook unreachable by Meta and unsigned | Owner: all WhatsApp work on hold |
-| BUG-030 (Medium) | Parts consumption adjusts stock and records the part in two calls | A single RPC — ready to build |
 | BUG-073 (Informational) | Four application/stock tables not yet RPC-only | An architecture decision |
 | BUG-077 (Informational) | Two WhatsApp Edge Functions on old `std` imports | The WhatsApp hold |
 | BUG-041, BUG-063 | Violations that live only in seed/test records | The planned data reset |
@@ -44,9 +43,9 @@ The 2026-09-03 audit filed 83 findings; the rest were filed during remediation, 
 - **`Migration drift` workflow** (push to `main`, daily, on demand): production's migration ledger must match `supabase/migrations/` exactly. After every `apply_migration`, set that row's `version` to the file prefix.
 - **By hand, rolled back on production:** `supabase/tests/authenticated_role_probes.sql` and the other `supabase/tests/*.sql` reference scripts. The CI `db-tests` job is disabled (`if: false`); none of those files run in CI.
 
-### Closed on 2026-09-15 and 2026-09-16
+### Closed on 2026-09-15 to 2026-09-17
 
-BUG-066 (every list pages in the database, PRs #7–#23) · BUG-023 residual (the tracker needs the RMA number) · BUG-032 (transfer and batch ledger) · **BUG-087** (role guards failed open for suspended and role-less callers, ~34 functions) · BUG-014 residual (drift check in CI) · BUG-049 residual (sessions end on every loss of access) · BUG-061 residual (signed-in role probes).
+BUG-030 (parts used on a ticket: stock and record in one transaction, table closed to direct writes) · BUG-066 (every list pages in the database, PRs #7–#23) · BUG-023 residual (the tracker needs the RMA number) · BUG-032 (transfer and batch ledger) · **BUG-087** (role guards failed open for suspended and role-less callers, ~34 functions) · BUG-014 residual (drift check in CI) · BUG-049 residual (sessions end on every loss of access) · BUG-061 residual (signed-in role probes).
 
 ---
 
@@ -894,7 +893,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Parts consumption is non-atomic and silently clamps at zero
 
 * ID: BUG-030
-* **Current status (2026-09-16):** PARTLY FIXED — `adjust_part_quantity` no longer clamps; **still open:** `ticketParts.add()`/`remove()` adjust stock and write `ticket_parts` as two separate calls, so a failed second call leaves stock and consumption out of step. Needs one RPC doing both.
+* **Current status (2026-09-17):** FIXED — `adjust_part_quantity` no longer clamps (20260828), and adding or removing a part changes stock and `ticket_parts` in one transaction, with the table closed to direct writes (20260871).
 * Category: Data Integrity / Logic
 * Location: `src/api/db/inventory.ts` `ticketParts.add` (calls `adjust_part_quantity(-qty)` **then** inserts `ticket_parts`; `remove` re-adds quantity then deletes); live function `adjust_part_quantity` → `GREATEST(0, quantity + p_delta)` with no insufficient-stock error
 * Description: Adding 5 of a part with 3 in stock succeeds, records 5 on the ticket and leaves stock at 0 — no error, 2 units accounted for nowhere. If the `ticket_parts` insert fails after the RPC, stock is decremented with no consumption record (and vice versa on remove).
@@ -906,6 +905,10 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Confidence: Confirmed by code reading
 * **Status: HALF FIXED — applied and verified in production 2026-09-06** (`20260828_parts_reject_negative_stock.sql`). `adjust_part_quantity` no longer clamps: `GREATEST(0, quantity + p_delta)` is gone and the function raises when the balance would go below zero, naming the part and both quantities. It also now raises when the part id does not exist, where it previously returned an empty result the caller read as success. A `FOR UPDATE` lock was added so two technicians consuming the last unit at the same moment cannot both pass the check.
 * **The atomicity half is NOT fixed and is deliberately left open.** `ticketParts.add()` still calls the RPC and *then* inserts into `ticket_parts` as two separate statements, so a failed insert still decrements stock with no consumption record, and `remove()` has the mirror problem. Closing that needs a single RPC doing both writes, which changes the client contract — a larger change than this migration, and the report says so rather than implying the finding is closed.
+* **Atomicity half: FIXED — 2026-09-17** (`20260871_ticket_parts_atomic.sql`). `rma_ticket_part_add` (staff except viewer) takes the stock through `adjust_part_quantity` and inserts the row in one transaction; `unit_cost` defaults to the part's cost and `added_by` is the signed-in user. `rma_ticket_part_remove` (admin) locks the row and returns **its own** quantity to **its own** part before deleting it — the old `remove()` took both from the browser.
+* **Two worse problems turned up while building it.** (1) The table's write policies were a second path around stock: any non-viewer staff member could INSERT a `ticket_parts` row without taking stock, or UPDATE its quantity or part without moving stock. (2) The old `remove()` re-added the stock **before** the delete, and the DELETE policy is admin-only — so every attempt by a non-admin raised stock and then failed. Direct INSERT/UPDATE/DELETE is now revoked from client roles and the three write policies are dropped; reading is unchanged. No screen wrote the table directly (the ticket drawer only lists), and backup restore runs as SECURITY DEFINER.
+* **Not changed:** deleting a ticket still cascades to its `ticket_parts` rows without returning stock. Whether fitted parts go back on the shelf is a business rule.
+* Verified by rolled-back probe on production as real signed-in roles (`supabase/tests/ticket_parts_atomic.sql`, **13 passed, 0 failed**): viewer add refused; 5 of 3 refused with stock left at 3; 0 and −2 refused; unknown ticket refused before stock moves; technician adds 2 → stock 1, one row, cost from the part, `added_by` the technician; direct INSERT, UPDATE and admin DELETE refused with 42501; technician remove refused with stock and row untouched; admin remove → stock back to 3, row gone; second remove refused; viewer can still read. Pinned by `src/test/ticketPartsAtomic.test.js` (in CI) and two anon-refusal checks in `tests/integration/rpc-auth.test.ts`.
 * Verified by rolled-back probe: consuming 5 of a part with 3 in stock is refused (“Not enough PROBE PART in stock: 3 available, 5 requested”), the stock is left untouched at 3 after the refusal, consuming exactly the 3 on hand still works, and adjusting a non-existent part raises.
 
 #### [MEDIUM] `restore_units` restores any unit ids without checking they belong to the document or were delivered
