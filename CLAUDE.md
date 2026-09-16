@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > **Engineering rules:** [`CONSTITUTION.md`](CONSTITUTION.md) · **Audit status:** [`AUDIT_REPORT.md`](AUDIT_REPORT.md) — §0 is the live scorecard · **Archive:** [`docs/archive/README.md`](docs/archive/README.md) (finished plans, past audits, completed QA runs)
 
-**Current state (2026-09-16).** The build phase is finished: CRM core, Sales Documents, Accounting, the redesigned Purchase Module and Warehouse Module R1 all shipped (history in [`docs/archive/MASTER_UPGRADE_PLAN.md`](docs/archive/MASTER_UPGRADE_PLAN.md)). Work is now pre-launch hardening driven by `AUDIT_REPORT.md`: **87 findings — 79 fixed, 7 partly fixed, 1 open** (BUG-006, WhatsApp webhook, on hold). What each open item waits on is in the report's §0.
+**Current state (2026-09-17).** The build phase is finished: CRM core, Sales Documents, Accounting, the redesigned Purchase Module and Warehouse Module R1 all shipped (history in [`docs/archive/MASTER_UPGRADE_PLAN.md`](docs/archive/MASTER_UPGRADE_PLAN.md)). Work is now pre-launch hardening driven by `AUDIT_REPORT.md`: **87 findings — 80 fixed, 6 partly fixed, 1 open** (BUG-006, WhatsApp webhook, on hold). What each open item waits on is in the report's §0.
 
 **Standing rules for working in this repo:**
 - **WhatsApp work is on hold.** Do not fix or refactor WhatsApp code, functions or templates unless the owner lifts the hold.
@@ -541,6 +541,10 @@ Security invariants in CI (2026-09-16):
 Sessions end on loss of access (2026-09-16):
 
 - `20260870_revoke_sessions_on_access_loss.sql` — trigger `trg_user_roles_end_sessions_on_access_loss` (AFTER UPDATE OF status/access_expires_at/user_email OR DELETE on `user_roles`) deletes the user's `auth.sessions` in the same transaction for `suspended`/`locked`/`deactivated`, a past expiry, an email change or deletion — **never for `pending`** (invitees sign in while pending). pg_cron `end-sessions-without-access` (every 15 min) sweeps users with a role row whose access is no longer current. Internal functions `rma_end_sessions_for_email` / `rma_end_sessions_without_access` have no auth check and are **not** client-executable. `users.updateUserStatus()` no longer revokes from the browser.
+
+Parts used on a ticket (2026-09-17, BUG-030):
+
+- `20260871_ticket_parts_atomic.sql` — `rma_ticket_part_add(ticket, part, quantity, unit_cost?, notes?)` (staff except viewer) and `rma_ticket_part_remove(id)` (admin) change stock through `adjust_part_quantity` and write `ticket_parts` in one transaction, behind `db.ticketParts.add()` / `remove(id)`. `ticket_parts` is **read-only to client roles** — no INSERT/UPDATE/DELETE grant, no write policy — so any new write must go through these functions. Pinned by `src/test/ticketPartsAtomic.test.js`; `supabase/tests/ticket_parts_atomic.sql` is the rolled-back reference probe (13/13).
 
 Authenticated-role probes (2026-09-16, BUG-061):
 

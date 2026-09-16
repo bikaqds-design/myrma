@@ -32,6 +32,9 @@ const PRIVILEGED_RPCS: Array<{ name: string; args: Record<string, unknown> }> = 
   // role may execute them at all.
   { name: 'rma_end_sessions_for_email', args: { p_email: 'nobody@invalid.example' } },
   { name: 'rma_end_sessions_without_access', args: {} },
+  // 20260871 (BUG-030): parts used on a ticket.
+  { name: 'rma_ticket_part_add', args: { p_ticket_id: NOWHERE, p_part_id: NOWHERE, p_quantity: 1 } },
+  { name: 'rma_ticket_part_remove', args: { p_id: NOWHERE } },
 ]
 
 describeIntegration(`RPC authorization — anonymous callers (${skipReason})`, () => {

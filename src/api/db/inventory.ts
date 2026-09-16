@@ -805,27 +805,36 @@ export const ticketParts = {
       return { missing: true, data: [] }
     }
   },
+  // Stock and the ticket_parts row change in one transaction (BUG-030). The
+  // table is not writable directly; added_by is the signed-in user.
   async add(
     ticketId: string,
     partId: string,
     quantity: number,
     unitCost: number | null,
-    notes: string | null,
-    addedBy: string | null
+    notes: string | null
   ): Promise<TicketPartRow | undefined> {
-    await parts.adjustQuantity(partId, -quantity)
-    const { data, error } = await supabase
+    const { data, error } = await supabase.rpc('rma_ticket_part_add', {
+      p_ticket_id: ticketId,
+      p_part_id: partId,
+      p_quantity: quantity,
+      p_unit_cost: unitCost,
+      p_notes: notes || null,
+    })
+    if (error) throw error
+    const row = data as TicketPartRow | null
+    if (!row) return undefined
+    const { data: withPart } = await supabase
       .from('ticket_parts')
-      .insert([{ ticket_id: ticketId, part_id: partId, quantity, unit_cost: unitCost, notes: notes || null, added_by: addedBy || null, created_date: new Date().toISOString() }])
       .select('*, part:parts(part_name, part_number)')
-    if (error) throw error
-    return data?.[0]
+      .eq('id', row.id)
+      .maybeSingle()
+    return (withPart as TicketPartRow | null) ?? row
   },
-  async remove(id: string, partId: string, quantity: number): Promise<void> {
-    await parts.adjustQuantity(partId, quantity)
-    const { data, error } = await supabase.from('ticket_parts').delete().eq('id', id).select('id')
+  // Returns the removed row's own quantity to its own part (BUG-030).
+  async remove(id: string): Promise<void> {
+    const { error } = await supabase.rpc('rma_ticket_part_remove', { p_id: id })
     if (error) throw error
-    assertAffected(data, 'Ticket part')
   },
 }
 
