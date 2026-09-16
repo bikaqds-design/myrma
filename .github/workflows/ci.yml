@@ -171,6 +171,12 @@ jobs:
             -v ON_ERROR_STOP=1 \
             -f supabase/tests/transfer_units_ledger.sql
 
+      - name: Run role-guard (BUG-087) SQL assertions
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -f supabase/tests/role_guards_fail_closed.sql
+
       - name: Stop Supabase
         if: always()
         run: supabase stop
