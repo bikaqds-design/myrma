@@ -1243,6 +1243,7 @@
     "sendToMfrCount": "إرسال للمصنع ({{count}})",
     "batchCreatedSuccess": "تم إنشاء الدفعة!",
     "unitsTransferredCount": "تم نقل {{count}} وحدة/وحدات",
+    "unitsAlreadyInWarehouse": "هذه الوحدات موجودة بالفعل في هذا المخزن",
     "notesLabelColon": "ملاحظات:",
     "warehouseTablesNotSetup": "جداول المستودعات غير مُعدّة بعد",
     "warehouseTablesSetupHint": "شغّل SQL أدناه في محرر Supabase SQL لتفعيل المستودعات المخصصة ونقل الوحدات.",

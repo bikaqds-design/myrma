@@ -9,8 +9,8 @@
  *    a status filter only on a real count column);
  *  - an unmatched product's units are found by grouping name, so
  *    "Unknown Product" resolves to its units;
- *  - a transfer of many units is sent in URL-safe chunks and still reports
- *    what did not change over the whole selection.
+ *  - a transfer goes to transfer_units in one call, so it is one transaction
+ *    with a ledger row per unit rather than a direct field write (BUG-032).
  * What the views compute is pinned in supabase/tests/inventory_list_views.sql.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -32,7 +32,13 @@ function builder(table) {
 }
 
 vi.mock('../api/client.js', () => ({
-  supabase: { from: (table) => builder(table), rpc: () => builder('rpc') },
+  supabase: {
+    from: (table) => builder(table),
+    rpc: (name, args) => {
+      calls.push(['rpc', name, args])
+      return builder('rpc')
+    },
+  },
 }))
 
 const { inventoryLists } = await import('../api/db/inventoryLists')
@@ -148,26 +154,36 @@ describe('stock moves page', () => {
 })
 
 describe('transferUnits', () => {
-  it('sends ids 100 at a time', async () => {
+  it('sends the whole selection to transfer_units in one call', async () => {
+    // One call is the point: chunking it would split one transfer across
+    // several transactions, and a refusal half way would leave the units
+    // scattered between two warehouses (BUG-032).
     const ids = Array.from({ length: 250 }, (_, i) => `u${i}`)
-    responses = [0, 100, 200].map((start) => ({
-      data: ids.slice(start, start + 100).map((id) => ({ id })),
-      error: null,
-    }))
-    await inventory.transferUnits(ids, 'w2')
-    expect(on('inventory_units', 'in').map(([, chunk]) => chunk.length)).toEqual([100, 100, 50])
+    responses = [{ data: 250, error: null }]
+    await inventory.transferUnits(ids, 'w2', 'me@example.com')
+
+    const rpcCalls = calls.filter((c) => c[0] === 'rpc')
+    expect(rpcCalls).toHaveLength(1)
+    expect(rpcCalls[0][1]).toBe('transfer_units')
+    expect(rpcCalls[0][2]).toEqual({
+      p_unit_ids: ids,
+      p_to_warehouse_id: 'w2',
+      p_actor_email: 'me@example.com',
+    })
+    // and nothing writes inventory_units directly any more
+    expect(on('inventory_units', 'update')).toEqual([])
   })
 
-  it('reports what did not change over the whole selection', async () => {
-    const ids = Array.from({ length: 150 }, (_, i) => `u${i}`)
-    responses = [
-      { data: ids.slice(0, 100).map((id) => ({ id })), error: null },
-      { data: ids.slice(100, 140).map((id) => ({ id })), error: null },
-    ]
-    await expect(inventory.transferUnits(ids, 'w2')).rejects.toMatchObject({
-      code: 'RMA_NOT_ALL_UPDATED',
-      total: 150,
-      unchangedIds: ids.slice(140),
-    })
+  it('returns how many units actually moved, which can be fewer than asked', async () => {
+    // A unit already in the destination is a no-op, not an error — the count
+    // is what the screen reports.
+    responses = [{ data: 1, error: null }]
+    await expect(inventory.transferUnits(['a', 'b'], 'w2')).resolves.toBe(1)
+  })
+
+  it('refuses an empty selection or a missing destination without calling the database', async () => {
+    await expect(inventory.transferUnits([], 'w2')).rejects.toThrow()
+    await expect(inventory.transferUnits(['a'], '')).rejects.toThrow()
+    expect(calls.filter((c) => c[0] === 'rpc')).toEqual([])
   })
 })
