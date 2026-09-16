@@ -158,7 +158,7 @@ const INPUT_BASE =
  * Without this the Unicode bidi algorithm moves leading/trailing symbols to the
  * visual other end: in Arabic, `+966520968114` renders as `966520968114+`, which
  * reads as a different (and wrong) number. Found in manual QA on 2026-08-05
- * (WAREHOUSE_R1_TEST_CHECKLIST.md §E).
+ * (docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md §E).
  *
  * `dir="ltr"` alone fixes ordering; `unicode-bidi: isolate` also stops the value
  * from disturbing the ordering of the RTL text around it.

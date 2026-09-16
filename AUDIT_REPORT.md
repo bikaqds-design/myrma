@@ -6,11 +6,51 @@
 **Scope:** frontend (React 18 + Vite), data layer (`src/api/**`), 11 Supabase Edge Functions, live RLS policies / RPCs / triggers / storage / cron, CI and build configuration, dependencies.
 **Method:** static review of every module listed in the inventory, real execution of the static toolchain, read-only SQL against the live project, and a small number of **rolled-back** row-level-security probes (each ran inside a `DO` block that ends in `RAISE EXCEPTION`, so nothing was committed). No application code was modified. This file is the only artifact created.
 
-> Important caveat carried through the whole report: the repository's migration files are known **not** to describe the live database (the project's own `PRELAUNCH_REVIEW.md` says so, and `supabase_migrations.schema_migrations` holds a single version). Every policy, function and constraint quoted below was therefore read from the **live** catalog, not from the SQL files.
+> Important caveat carried through the whole report: the repository's migration files are known **not** to describe the live database (the project's own `docs/archive/PRELAUNCH_REVIEW.md` says so, and `supabase_migrations.schema_migrations` holds a single version). Every policy, function and constraint quoted below was therefore read from the **live** catalog, not from the SQL files.
 
 ---
 
-## 1. Executive Summary
+## 0. Scorecard — current status (2026-09-16)
+
+> This section is the live status. Sections 1–7 below are the audit **as written on 2026-09-03**, with each finding's own status notes appended over time; every finding now opens with a one-line **Current status** that agrees with this table.
+
+| Severity | Findings | Fixed | Partly fixed | Open |
+|---|---|---|---|---|
+| Critical | 4 | 4 | 0 | 0 |
+| High | 19 | 18 | 0 | 1 |
+| Medium | 34 | 32 | 2 | 0 |
+| Low | 24 | 23 | 1 | 0 |
+| Informational | 6 | 2 | 4 | 0 |
+| **Total** | **87** | **79** | **7** | **1** |
+
+The 2026-09-03 audit filed 83 findings; the rest were filed during remediation, as the fixes turned up new defects (BUG-079 onward). Every Critical is fixed, and every High except the on-hold WhatsApp webhook — each applied to production and verified there.
+
+### What is still open, and why
+
+| Finding | Remaining | Waiting on |
+|---|---|---|
+| BUG-006 (High) | WhatsApp webhook unreachable by Meta and unsigned | Owner: all WhatsApp work on hold |
+| BUG-030 (Medium) | Parts consumption adjusts stock and records the part in two calls | A single RPC — ready to build |
+| BUG-073 (Informational) | Four application/stock tables not yet RPC-only | An architecture decision |
+| BUG-077 (Informational) | Two WhatsApp Edge Functions on old `std` imports | The WhatsApp hold |
+| BUG-041, BUG-063 | Violations that live only in seed/test records | The planned data reset |
+| BUG-074, BUG-078 (Informational) | Items deliberately left as they are, recorded in each finding | Nothing — accepted as designed |
+
+**Owner actions outside the code:** delete any backup file exported before 2026-09-06 (BUG-025); run `supabase/tests/authenticated_role_probes.sql` after any change to RLS, grants or guard triggers (BUG-061).
+
+### How the fixes are checked now
+
+- **CI on every PR and push to `main`:** unit tests, lint, typecheck and build; and the integration tier against **production** — anon cannot read or write protected tables, privileged RPCs refuse anonymous callers, the columns the app selects exist, and (via `rma_security_invariant_counts()`) there is no fail-open role guard, no helper without COALESCE, no policy negating a helper, and exactly the two chosen anon-executable functions.
+- **`Migration drift` workflow** (push to `main`, daily, on demand): production's migration ledger must match `supabase/migrations/` exactly. After every `apply_migration`, set that row's `version` to the file prefix.
+- **By hand, rolled back on production:** `supabase/tests/authenticated_role_probes.sql` and the other `supabase/tests/*.sql` reference scripts. The CI `db-tests` job is disabled (`if: false`); none of those files run in CI.
+
+### Closed on 2026-09-15 and 2026-09-16
+
+BUG-066 (every list pages in the database, PRs #7–#23) · BUG-023 residual (the tracker needs the RMA number) · BUG-032 (transfer and batch ledger) · **BUG-087** (role guards failed open for suspended and role-less callers, ~34 functions) · BUG-014 residual (drift check in CI) · BUG-049 residual (sessions end on every loss of access) · BUG-061 residual (signed-in role probes).
+
+---
+
+## 1. Executive Summary (as audited 2026-09-03)
 
 | Severity | Count |
 |---|---|
@@ -174,6 +214,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [CRITICAL] Any staff account can insert payment rows directly, bypassing the payment RPCs
 
 * ID: BUG-001
+* **Current status (2026-09-16):** FIXED.
 * Category: Permissions / Data Integrity
 * Location: live RLS policy `payments.staff_insert_payments` (`WITH CHECK (rma_is_staff())`) and `vendor_payments.staff_insert_vendor_payments` (same); repo `supabase/migrations/20260751_harden_money_rpcs.sql` / `20260780_accountant_can_move_cash.sql` did not narrow the INSERT policy; view `v_customer_ledger` includes every `payments` row with `status = 'active'`
 * Description: `record_payment` / `record_vendor_payment` enforce `rma_can_handle_cash()` and assign gapless `PAY-` codes, but the underlying tables accept a plain `INSERT` from any role that passes `rma_is_staff()` — that includes `viewer`, `technician` and `sales_rep`. A row inserted this way has `status = 'active'`, so it is summed into the customer statement (Billing tab) and into the AR picture.
@@ -188,6 +229,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [CRITICAL] A sales rep can rewrite any column of their own posted invoice; posted financial documents are not locked
 
 * ID: BUG-002
+* **Current status (2026-09-16):** FIXED.
 * Category: Permissions / Data Integrity / Security
 * Location: live policies `crm_invoices.manager_update_crm_invoices` — `USING (rma_is_manager_or_above() OR assigned_rep = rma_current_user_email() OR created_by = rma_current_user_email())`, **no `WITH CHECK`**; identical shape on `credit_notes.manager_update_credit_notes`, `payments.manager_update_payments`, `vendor_payments.manager_update_vendor_payments`; trigger list on `crm_invoices` contains only `trg_crm_invoices_updated_at`
 * Description: Ownership grants an unrestricted UPDATE. Nothing at the database layer prevents a rep (or anyone who created the row) from setting `payment_status = 'paid'`, `amount_paid = total`, `total`, `line_items`, `doc_status`, `inv_code` or `customer_id` on a row that has already been posted. The client only ever writes a subset of columns, so the UI hides the hole; the REST API does not. The `manager_update_payments` policy is not even gated on a cash role — any `created_by` match qualifies, so whoever recorded a payment can rewrite its amount afterwards.
@@ -203,6 +245,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [CRITICAL] Storage bucket is public and listable, any authenticated user can delete every object, anonymous uploads are unbounded, and the live policies differ from the migration
 
 * ID: BUG-003
+* **Current status (2026-09-16):** FIXED.
 * Category: Security / Data Integrity
 * Location: live `storage.buckets` row `rma-attachments` (`public = true`, `file_size_limit = NULL`, `allowed_mime_types = NULL`); live `storage.objects` policies `Allow public read 1gfjb3d_0` (SELECT, `public`, `qual true`), `Allow authenticated delete 1gfjb3d_0` (DELETE, `authenticated`, `qual true`), `Allow authenticated uploads 1gfjb3d_0` (INSERT, `authenticated`, `WITH CHECK true`), `anon can upload comment attachments` (INSERT, `anon`, path `comments/*`, no size/MIME check); repo `supabase/migrations/20260527_storage_bucket_policies.sql` (which defines a 25 MB / image-or-PDF anon policy that is **not** live); `src/api/storage.js` (client-side `validateAttachment` is the only check and trusts `file.type`)
 * Description: Every upload — RMA attachments (customer devices, invoices), customer documents, comment attachments, avatars, product datasheets, branding — lands in one public bucket. Because the SELECT policy is `true` for `public`, an unauthenticated caller can *list* the bucket through the Storage API and then fetch every object; object names are the only protection and listing removes it. The DELETE and INSERT policies for `authenticated` carry no bucket or path condition, so a viewer can delete or overwrite any file (including another user's avatar or the company logo) and can upload arbitrary content of any size. Anonymous callers can upload unlimited files of any type into `comments/` (only the browser code limits size/type, and it can be skipped). The migration in the repo describes a stricter world that was never applied.
@@ -218,6 +261,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [CRITICAL] Document approvals and sales/purchase state transitions are enforced only in the UI
 
 * ID: BUG-004
+* **Current status (2026-09-16):** FIXED.
 * Category: Permissions / Logic
 * Location: `src/api/db/salesOrders.ts` (`markSent`), `src/api/db/quotations.ts` (`markSent/markAccepted/markDeclined/cancel/reopen`), `src/api/db/purchasing.ts` (`markSent/markConfirmed/rejectToDraft/cancel`, `submitForApproval/approve/rejectToDraft/cancel`), `src/pages/Activities/index.jsx:458-492` (`approveDocument`/`rejectDocument` gate on `canDo('purchasing','approve')` / `canDo('sales','post')` client-side only); live policies `sales_update_sales_orders` (rep may update own SO, no column restriction), `sales_update_quotations`, `purchase_orders.manager_write_purchase_orders` (ALL for any manager), `vendor_invoices.manager_write_vendor_invoices` (ALL for any manager); no transition trigger on `quotations`/`sales_orders`/`crm_invoices`/`credit_notes` (only purchase tables have `assert_purchase_status_transition`)
 * Description: `approve_sales_order` (reserve stock, manager-only) and `post_invoice` exist, but the same status columns are writable directly. A sales rep can `PATCH sales_orders SET status='delivered'` on their own order, skipping reservation and delivery entirely, and can mark their own quotation `accepted`/`converted`. `ROLE_DEFAULT_PERMISSIONS.manager.purchasing.approve = false` is meaningless at the database: `manager_write_*` is `ALL`, so a manager can approve the purchase order they raised (`UPDATE vendor_invoices SET status='approved'`), and the app's own `vendorInvoices.approve()` is exactly that write. The manager probe in this audit found no VI in `pending_approval` to flip (0 rows), so this is confirmed from policy text rather than execution.
@@ -235,6 +279,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] The scheduled notification drain has failed on every run since it was created
 
 * ID: BUG-005
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic / Error Handling
 * Location: live `cron.job` id 2 `drain-notification-queue` (`net.http_post(url := …/functions/v1/notification-worker, headers := {"Content-Type":…,"x-trigger-source":"pg_cron"})` — no `Authorization`/`apikey` header); repo `supabase/migrations/20260604_pgcron_notifications.sql`; `supabase/functions/notification-worker/index.ts` (deployed with `verify_jwt: true`)
 * Description: With `verify_jwt` on, the Supabase gateway rejects any request lacking a JWT before the function code runs. The cron body never carries one.
@@ -251,6 +296,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] The WhatsApp webhook is unreachable by Meta and, once reachable, unauthenticated
 
 * ID: BUG-006
+* **Current status (2026-09-16):** OPEN — on hold by owner instruction (all WhatsApp work postponed).
 * Category: Security / Logic
 * Location: `supabase/functions/whatsapp-webhook/index.ts`; live function `whatsapp-webhook` (`verify_jwt: true`); `notification_logs` (`delivered_at`/`read_at` NULL on all 192 rows)
 * Description: Meta calls the webhook with no Supabase JWT, so both the GET verification handshake and every POST status update are rejected at the gateway. Independently, the POST handler verifies nothing — it does not check `X-Hub-Signature-256` — so once `verify_jwt` is switched off anyone can post fake delivery statuses or fake "customer replies" into `notification_logs`. Two `.catch()` calls on PostgREST builders (lines ~117 and ~131) are also unreachable code paths worth checking against the deployed supabase-js version.
@@ -264,6 +310,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] Supabase Realtime publishes no tables, so every live subscription in the app is dead
 
 * ID: BUG-007
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic / Configuration
 * Location: live `supabase_realtime` publication (0 member tables); ten `postgres_changes` subscriptions — `src/App.jsx:650` (`notifications`), `src/pages/Dashboard.jsx:447` (`rma_tickets` INSERT/UPDATE/DELETE), `src/pages/Customers/index.jsx:178`, `src/pages/Products/index.jsx:187`, `src/pages/Leads/index.jsx:403`, `src/pages/RMATickets/index.jsx:214`, `src/pages/Inventory/index.jsx:75` (`inventory_units` + `rma_tickets`), `src/components/ActivityChatter.jsx:135`, `src/components/CommentPanel.jsx:59`, `src/pages/Pipeline/DealCommentPanel.jsx:59`
 * Description: Postgres only writes a row change into the logical replication stream if the table belongs to a publication. `supabase_realtime` contained **zero** tables, so Realtime never saw a single event. Every `.subscribe()` still succeeds — the channel joins, the callback registers, no error surfaces anywhere — and then no callback ever fires. This is the silent failure mode: nothing looks broken, lists just go stale.
@@ -283,6 +330,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] Updates that RLS filters to zero rows are reported as success, then logged, notified and emailed
 
 * ID: BUG-008
+* **Current status (2026-09-16):** FIXED. Shipped with the 2026-09-06 front-end deploy.
 * Category: Error Handling / Logic
 * Location: `src/api/db/tickets.ts:106-110` (`update()` returns `data?.[0]` — `undefined` on 0 rows — with no error); same pattern in `customers.ts`, `catalog.ts`, `system.ts`, `quotations.ts`, `salesOrders.ts`, `crmInvoices.ts` (`.single()` variants throw `PGRST116`, the array variants do not); consumer `src/pages/RMATickets/TicketForm.jsx:647-668` (`await db.rmaTickets.update(...)` then `logTicketChanges`, `dispatchUpdateNotifications`, `fireUpdateEmails`, `dispatchRmaStageMoves`, `toast.success`); `TicketForm.handleSubmit` permission check is `canDo('edit_all') || canDo('edit_assigned')` without checking assignment; live policy `rma_tickets.staff_update` restricts technicians to `assigned_technician = me`
 * Description: PostgREST applies RLS as a filter, so an unauthorised UPDATE returns `200 []`. The technician role has `rma_tickets.view_all = true` and `edit_assigned = true`; the list page guards the edit button per row, but the form itself does not, and the bulk product-status action (`RMATickets/index.jsx:555-610`) applies to any selected ticket. After a 0-row update the code writes `ticket_activity` rows describing the change (insert policy allows it), creates in-app notifications, calls `send-email` for the customer, fires WhatsApp events and reports "Ticket updated".
@@ -302,6 +350,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] Outbound webhooks can never fire in production, and their signing secrets live in the browser
 
 * ID: BUG-009
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic / Security
 * Location: `src/api/db/system.ts:236-282` (`webhooks.dispatch` runs `fetch(h.url)` in the browser and computes the HMAC with `secret_key` read from the `webhooks` table); `vercel.json` CSP `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io`; callers `src/pages/RMATickets/TicketForm.jsx:172-189, 315`; test buttons `src/pages/cp/Integrations.jsx:128-146`, `src/pages/cp/WebhooksConfig.jsx:79-99`
 * Description: The Content-Security-Policy shipped on Vercel forbids the browser from connecting to any host except Supabase and Sentry, so every webhook `fetch` is blocked before it leaves the page; `dispatch` swallows the error. The integration "Test" buttons fail for the same reason. Even where CSP is absent (local dev), delivery depends on the user's browser staying open and exposes `secret_key` to every admin session.
@@ -323,6 +372,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] Non-viewer staff can rewrite inventory units directly, un-reserving stock held by sales orders without a ledger entry
 
 * ID: BUG-010
+* **Current status (2026-09-16):** FIXED.
 * Category: Permissions / Data Integrity
 * Location: live policy `inventory_units.staff_update` — `USING/WITH CHECK (rma_is_staff() AND rma_user_role() <> 'viewer')`, no column restriction; same on `manufacturer_batches`, `ticket_parts`; `warehouse_stock.manager_write_warehouse_stock` (ALL for managers, quantity editable without `stock_moves`); `stock_moves.no_direct_client_insert` correctly blocks the ledger
 * Description: The stock model relies on `reservation_status`, `reserved_by_doc_*`, `warehouse_id`, `status` and `unit_cost_base` changing only via RPCs that write `stock_moves`. A technician (or sales rep) can `PATCH` any of those columns.
@@ -340,6 +390,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] The viewer role can write ticket resolutions, edit every notification and change the company-wide appearance; any staff can forge notifications
 
 * ID: BUG-011
+* **Current status (2026-09-16):** FIXED.
 * Category: Permissions
 * Location: live policies `ticket_resolutions.staff_write_resolutions` (INSERT `rma_is_staff()`), `ticket_resolutions.staff_write_update_resolutions` (UPDATE `rma_is_staff()`, no `WITH CHECK`), `notifications.user_update_read` (UPDATE `USING rma_is_staff()` — intended for `read_by` but covers every column), `notifications.staff_insert` (INSERT `rma_is_staff()`, arbitrary `target_roles`/`created_by`), `rma_config.staff_write_appearance_settings` (ALL for staff on `config_key='appearance_settings'` — favicon, tab title, login background are company-wide), `email_queue.staff_insert_email_queue`, `notification_queue.staff_insert_notif_queue` (viewer can enqueue WhatsApp jobs to any phone)
 * Description: `viewer` is documented as read-only, and `mark_notifications_read` was already hardened to use the JWT identity — but the table-level UPDATE policy it replaced is still there.
@@ -359,6 +410,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] Data Cleanup deletes tickets without awaiting, calls a method that does not exist, and always reports success
 
 * ID: BUG-012
+* **Current status (2026-09-16):** FIXED. Shipped with the 2026-09-06 front-end deploy.
 * Category: Error Handling / Data Integrity
 * Location: `src/pages/cp/DataCleanup.jsx:69-84`
 * Description: `;(await db.rmaTickets.bulkDelete) ? db.rmaTickets.bulkDelete(...) : Promise.all(list.map(t => db.rmaTickets.delete(t.id)))` — `rmaTickets.bulkDelete` is not defined in `src/api/db/tickets.ts`, so the expression always falls to the `Promise.all` branch, which is **not awaited**. The success toast fires immediately, `load()` re-reads before the deletes finish, and any failure becomes an unhandled promise rejection (not shown to the user, not captured by `captureException`). The deletes are hard deletes that cascade to `inventory_units`, `ticket_comments`, `ticket_activity`, `time_entries`, `ticket_parts`, `ticket_resolutions`. The "orphan customers" heuristic on lines 56-61 compares `customer_name` strings rather than `customer_id`, so a customer whose display name changed is offered for deletion while linked by FK (the RPC will then refuse, correctly, but the count is misleading).
@@ -375,6 +427,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] A credit note raised from an invoice ignores the invoice's discount and tax
 
 * ID: BUG-013
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic (calculation)
 * Location: `src/pages/SalesDocuments/_modals.jsx:222-246` (`CreditNoteFromInvoiceModal` displays `lineTotal` = net-of-discount + tax, but `handleSubmit` passes only `qty` and `unit_price`); `src/api/db/creditNotes.ts:95-118` (`create()` computes `subtotal = Σ qty × unit_price`, `tax_amount: 0`, `total = subtotal`); `creditNotes.update()` same; `issue_credit_note` applies `v_cn.total` to the invoice
 * Description: For an invoice line with 10% discount and 14% tax, the modal shows the credited amount as `qty × price × 0.9 × 1.14`, but the stored credit note total is `qty × price`. On issue, that (wrong) total is applied against the invoice.
@@ -394,6 +447,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] Migration history is broken: the live database records one applied migration out of 137
 
 * ID: BUG-014
+* **Current status (2026-09-16):** FIXED. Ledger re-aligned again 2026-09-16 (rows = files) and now checked by the `Migration drift` workflow.
 * Category: Data Integrity / Configuration
 * Location: live `supabase_migrations.schema_migrations` → only `20260524`; repo `supabase/migrations/` (137 files, incl. `00000000_baseline_schema.sql`); `.github/workflows/ci.yml` (`db-tests` job disabled with `if: false`)
 * Description: Migrations were applied through the SQL editor. `supabase db push` / `migration list` will try to re-apply everything (most files are not idempotent). The project's own review already found policies live that no migration creates, and this audit found the storage policies differ from the file that claims to define them (BUG-003). There is no automated way to rebuild or diff the schema, and the SQL test files in `supabase/tests/` are unrunnable.
@@ -425,6 +479,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] The Webhooks control-panel page calls a method that does not exist
 
 * ID: BUG-015
+* **Current status (2026-09-16):** FIXED. Shipped with the 2026-09-06 front-end deploy.
 * Category: Logic
 * Location: `src/pages/cp/WebhooksConfig.jsx:46-56` (`await db.webhooks.save(newHooks, currentUserEmail)`); `src/api/db/system.ts` exports `webhooks = { list, create, update, delete, dispatch }`; `src/pages/ControlPanel.jsx:154` mounts `WebhooksConfig` for section `webhooks` while `Integrations.jsx` (section `integrations`) is a second, table-backed webhook editor
 * Description: Saving on the Webhooks section throws `TypeError: db.webhooks.save is not a function`, caught and shown as a toast. Two different UIs manage the same concept with different secret header names (`X-myRMA-Secret` vs `X-Webhook-Secret` vs the HMAC `X-Signature-256` used by `dispatch`).
@@ -441,6 +496,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] CI lint gate fails on HEAD
 
 * ID: BUG-016
+* **Current status (2026-09-16):** FIXED.
 * Category: Configuration
 * Location: `package.json` (`lint:ci: eslint src --max-warnings 2391`), `.github/workflows/ci.yml` (job `ci` runs `npm run lint:ci`), `eslint.config.js` (`no-restricted-syntax` hardcoded-text rule)
 * Description: The warning budget was set to a snapshot count and has been exceeded (2406). Every push to `test`/`main` currently fails the required job, which trains the team to ignore CI.
@@ -458,6 +514,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] Known-vulnerable dependencies in the production bundle
 
 * ID: BUG-017
+* **Current status (2026-09-16):** FIXED.
 * Category: Security
 * Location: `package.json` / `package-lock.json`
 * Description: `npm audit` reports 11 high. Directly reachable from the app: **react-router / react-router-dom 7.15.1** (open redirect via backslash in `<Link>`/`useNavigate` — CVE-2025-68470 bypass; RSCErrorHandler XSS) — fixed in 7.18.3; **xlsx 0.18.5** (prototype pollution, ReDoS on crafted workbooks; no fixed npm release — the app parses user-supplied CSV only with its own parser but *imports* SheetJS for export, and `XLSX.read` is not used, so exposure is limited to the bundle); **dompurify** (moderate, via jspdf); **vite ≤ 6.4.2** dev-server `server.fs.deny` bypass on Windows (dev only); build-time only: `sharp`/`@vite-pwa/assets-generator`, `undici`, `postcss`, `browserslist`, `brace-expansion`, `nanoid`, `fast-uri`, `@babel/core`.
@@ -475,6 +532,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] Admin password-reset function skips the status check and leaves created accounts without a role
 
 * ID: BUG-018
+* **Current status (2026-09-16):** FIXED.
 * Category: Permissions / Logic
 * Location: `supabase/functions/admin-reset-password/index.ts:44-56` (checks `roleRow?.role !== 'super_admin'` only; `admin-invite-user` and `admin-delete-user` also require `status === 'active'`), `:73-78` (`targetEmail === caller.email` case-sensitive; target not lower-cased before `createUser`), `:99-114` (creates the auth user; the role row is inserted separately by the browser in `src/pages/UserManagement/index.jsx:266-268`)
 * Description: A suspended or expired super_admin whose JWT is still valid (sessions are not revoked on suspension) can reset any user's password or mint new auth accounts. The create path is two requests from the browser; if the second (`createRole`) fails or the tab closes, an auth account exists with no role — the live database already has 1 such account and 10 role rows with no auth account.
@@ -492,6 +550,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] Notifications targeted at roles the creator does not hold are never created
 
 * ID: BUG-079
+* **Current status (2026-09-16):** FIXED. Shipped with the 2026-09-06 front-end deploy.
 * Category: Logic / Error Handling
 * Location: `src/api/db/notifications.ts:47-70` (`create()` does `.insert([...]).select()`); live policy `notifications.user_read_targeted` (SELECT `USING rma_is_staff() AND (target_roles IS NULL OR … rma_user_role() = ANY(target_roles) OR rma_current_user_email() = ANY(target_emails))`); callers `src/pages/Customers/index.jsx:436,470,559` and `src/pages/Products/index.jsx:788,821` (`targetRoles: ['admin','super_admin']`), `src/pages/RMATickets/index.jsx:244` (`targetRoles: ['admin','manager']`)
 * Description: PostgREST's `.select()` compiles to `INSERT … RETURNING`, and `RETURNING` is subject to the **SELECT** policy. `user_read_targeted` only lets a user read a notification aimed at their own role or address. So when a technician or sales_rep creates a notification targeted at `['admin','super_admin']`, the RETURNING clause is refused and **the whole statement aborts** — the row is never inserted. `create()` swallows the error (`if (error) … return null`), so nothing surfaces.
@@ -506,6 +565,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] The RMA ticket table's row menu crashes the page: the row map shadows the translation function
 
 * ID: BUG-083
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic / UX
 * Location: `src/pages/RMATickets/index.jsx` — `const { t } = useTranslation()` (line 26) and `const tr = t` (line 32), with table rows rendered by `paginatedTickets.map((t, idx) => …)`; inside that callback `t` is the **ticket**, and five calls used `t('…')`: `common.unassigned`, `common.view`, `common.edit`, `tickets.exportPDF`, `common.delete`
 * Description: the `tr` alias exists precisely because the row map shadows the translator — the rest of the row already uses it. Five calls did not. Calling the ticket object as a function raises `TypeError: t is not a function` during render, and the error boundary replaces the page with the crash screen.
@@ -522,6 +582,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] The audit log can be forged by any authenticated user
 
 * ID: BUG-019
+* **Current status (2026-09-16):** FIXED. The client half shipped with the 2026-09-06 front-end deploy.
 * Category: Security / Data Integrity
 * Location: live policy `user_activity_log.auth_insert` — `WITH CHECK (rma_is_authenticated())`; `src/api/db/audit.ts` (`auditInsert` writes `user_email` from the caller; failed writes are queued in `localStorage` and replayed on next app start by whoever is signed in); `src/App.jsx:790-792`
 * Description: `user_email` is free text. Any staff account can insert `{user_email: 'admin@…', action_type: 'ticket_deleted', …}`; the queue in localStorage can also be edited before replay. `handleLogout` logs `logout` **after** `signOut()`, so that insert is refused (no session) and ends up in the queue, attributed to a later session or lost.
@@ -540,6 +601,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] A role waiting for whoever registers the address
 
 * ID: BUG-084
+* **Current status (2026-09-16):** FIXED.
 * Category: Security / Access Control
 * Location: `public.user_roles` (live data) — 10 rows created 2026-06-24, all on `@test.com`, all `status = 'active'`, none ever signed in; one holds `super_admin` and one `admin`. Resolution path: `src/api/db/users.ts` `userRoles.getUserRole(email)`.
 * Description: a role is resolved by matching `user_roles.user_email` against the signed-in address. Nothing ties the row to an account — the row simply waits. So each of these is a standing grant to whoever first creates an account with that address, and the project has `disable_signup = false` (read from `/auth/v1/settings`, 2026-09-13).
@@ -563,6 +625,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] 40% of the customer phone numbers cannot be dialled
 
 * ID: BUG-085
+* **Current status (2026-09-16):** FIXED.
 * Category: Data Integrity
 * Location: `public.customers.mobile` (live data); `src/lib/customerDuplicates.js`; `rma_data_integrity_issues()` case 5
 * Description: found while examining BUG-063's 14 "duplicate" mobiles, six of whose seven pairs turned out not to be duplicates at all. The numbers themselves are the problem. Of 470 customers holding a mobile (418 of 888 have none), **186 could not be dialled as an Egyptian mobile** — and 28 of those had simply lost their leading zero, 27 of them replaced by a `+`, so `01091768465` was stored as `+1091768465`.
@@ -589,6 +652,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Invoice and credit-note update policy admitted roles that cannot see the documents
 
 * ID: BUG-086
+* **Current status (2026-09-16):** FIXED.
 * Category: Security / Access Control
 * Location: live policies on `public.crm_invoices` and `public.credit_notes` (UPDATE), compared with the same tables' SELECT policies and with `quotations` / `sales_orders`
 * Description: found while checking which tables were safe for BUG-074's write guard. Every sibling document table gates its update branch on role — `quotations` and `sales_orders` allow `manager_or_above OR (sales_rep AND (assigned_rep = me OR created_by = me))`. `crm_invoices` and `credit_notes` drop the `sales_rep AND`, so their UPDATE policy is `manager_or_above OR assigned_rep = me OR created_by = me` **for any role** — while their SELECT policy admits only managers, sales reps and accountants.
@@ -605,6 +669,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] The WhatsApp queue's cancel buttons have never worked — notification_queue had no UPDATE policy
 
 * ID: BUG-080
+* **Current status (2026-09-16):** FIXED.
 * Category: Permissions / Logic
 * Location: live table `public.notification_queue` — policies were `admin_read_notif_queue` (SELECT) and `staff_insert_notif_queue` (INSERT) only, with **no UPDATE policy**; callers `src/api/db/whatsappNotifications.ts:352` (`cancel`) and `:357` (`cancelAll`)
 * Description: RLS is enabled on the table, so an absent UPDATE policy is a deny for every role — including `super_admin`. The WhatsApp queue screen offers Cancel and Cancel All regardless. PostgREST reports the RLS-filtered UPDATE as `200 []`, and neither call site inspected the row count, so both buttons reported success and changed nothing.
@@ -619,6 +684,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Accounts-payable aging adds foreign-currency balances into the base-currency totals
 
 * ID: BUG-082
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic / Financial reporting
 * Location: `src/pages/Accounting/index.jsx` `apAgingByVendor` (`cur[row.bucket] += row.remaining`, `cur.total += row.remaining`), fed by `src/api/db/vendorLedger.ts` `apAgingReport`, which computes both `remaining` (in the invoice's own currency) and `remaining_base`, and documents on its type that bucket totals must use the latter
 * Description: Vendor invoices can be raised in a foreign currency (20260792). The payables aging reducer summed `remaining` — each balance in its own currency — into totals presented in the base currency, so a USD balance was added to EGP balances digit for digit.
@@ -634,6 +700,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] MFA challenge is skipped when the assurance-level lookup fails
 
 * ID: BUG-020
+* **Current status (2026-09-16):** FIXED.
 * Category: Security
 * Location: `src/App.jsx` `handleLogin` and `checkAuth` (`const { data: aalData } = await auth.mfa.getLevel()` — `error` ignored; `if (aalData?.nextLevel === 'aal2' …)` is false when `aalData` is undefined)
 * Description: A transient failure of `getAuthenticatorAssuranceLevel` lets an enrolled user straight into the app at AAL1. Today no user has a verified factor (`auth.mfa_factors` verified = 0), so the exposure is latent.
@@ -650,6 +717,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Edge functions accept suspended users and expose provider errors; `ai-assist` is unrestricted
 
 * ID: BUG-021
+* **Current status (2026-09-16):** FIXED.
 * Category: Security / Error Handling
 * Location: `supabase/functions/ai-assist/index.ts` (any authenticated JWT; no role, status or rate limit; `catch` returns HTTP **200** with `error: "NVIDIA error 401: …"`); `send-whatsapp/index.ts:63-70` and `notification-worker/index.ts:80-90` (role read but `status` not checked); `kb-chat/index.ts` (provider response body — up to 400 chars — streamed to the client; CORS hardcoded `*` instead of the shared helper); `manage-sessions/index.ts` (errors returned with 200)
 * Description: The database layer fails closed for suspended accounts, but the functions read `user_roles.role` directly with the service key and never consult `status`/`access_expires_at`. `ai-assist` also interpolates arbitrary client-supplied `data` into the prompt (prompt-injection surface) and burns paid LLM quota for any signed-in identity.
@@ -667,6 +735,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Anyone holding the public anon key can trigger the notification worker
 
 * ID: BUG-022
+* **Current status (2026-09-16):** FIXED.
 * Category: Security
 * Location: `supabase/functions/notification-worker/index.ts:83-92` (`else if (triggerSource !== 'pg_cron') return 401` — a literal header value is the credential); live cron sends exactly that header (BUG-005); the comment in the file acknowledges the gap
 * Description: Once BUG-005 is fixed by adding a JWT to the cron call, the header check still lets any caller who presents the anon key (it ships in the bundle) plus `x-trigger-source: pg_cron` drain the queue and consume WhatsApp/Resend quota at will.
@@ -684,6 +753,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Public tracker accepts unvalidated attachment JSON, emails and cross-ticket parent ids; rate limiting is per-instance and the client lockout is cosmetic
 
 * ID: BUG-023
+* **Current status (2026-09-16):** FIXED. Residual closed 2026-09-15: comments require the RMA number (`public-track` v19).
 * Category: Security / Logic
 * Location: `supabase/functions/public-track/index.ts:205-250` (`attachments: Array.isArray(c.attachments) ? c.attachments : []` — any JSON, any `url`; `user_email: c.authorEmail` unvalidated; `parent_comment_id: c.parentCommentId` may point at a comment on another ticket; `ticketId` accepted for any UUID without proof of knowing the RMA number); `:19-40` in-memory bucket (resets on cold start, per isolate); `src/pages/RMATracker.jsx:7-45` (localStorage lockout the caller controls)
 * Description: Staff see customer attachments as `<a href={att.url}>` in `TicketDrawer.jsx:1105` — a `javascript:` or attacker-hosted URL is rendered as a clickable link with the attacker's chosen `name`. The comment endpoint requires only a ticket UUID, so a leaked/guessed id (they appear in `?ticket=` URLs staff share) lets anyone post to that ticket without the RMA number. Rate limiting does not survive across instances or restarts.
@@ -705,6 +775,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] The service worker caches authenticated API responses and never clears them on logout
 
 * ID: BUG-024
+* **Current status (2026-09-16):** FIXED.
 * Category: Security / UX
 * Location: `vite.config.js:51-60` (`runtimeCaching` `NetworkFirst` for `https://*.supabase.co/*`, `cacheableResponse: { statuses: [0, 200] }`, 10 s timeout); no `caches.delete` / SW unregister anywhere in `src/` (grep)
 * Description: Every REST GET (customers, tickets, invoices, user_roles) is stored in Cache Storage under `supabase-api`. On a shared machine the next user of the same browser profile — or anyone with disk access — can read it after logout. When the network is slow (>10 s) or offline, stale data of a *previous* account can be served to the current one with no indication.
@@ -722,6 +793,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Backup export contains password hashes, permission maps and webhook secrets; restore is not transactional
 
 * ID: BUG-025
+* **Current status (2026-09-16):** FIXED. Restore is atomic since `20260848_atomic_restore.sql`. **Owner action:** delete any backup file exported before 2026-09-06 — those still contain the webhook secret and the legacy password hash.
 * Category: Security / Data Integrity
 * Location: `src/api/backup.js` (`BACKUP_TABLES` includes `user_roles` (full row incl. `password_hash`, `permissions`, `notes`, `suspended_reason`), `webhooks` (`secret_key`), `notification_settings`, `rma_config`; only `email_settings` is redacted); `importEnvelope` upserts table by table with no transaction and continues past failures
 * Description: The JSON file an admin downloads to their laptop carries a legacy credential column (1 live row is non-null) and every integration secret in clear text. A restore that fails at table 20 leaves 19 tables at backup state and the rest live — parents and children out of step.
@@ -747,6 +819,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Upload validation is inconsistent and trusts the client; object paths include unsanitised identifiers
 
 * ID: BUG-026
+* **Current status (2026-09-16):** FIXED.
 * Category: Security
 * Location: `src/api/storage.js` — `uploadBrandLogo` (no size/type check), `uploadProductImage` (resize only), `uploadCommentAttachment`/`uploadFile`/`uploadCustomerAttachment` (`validateAttachment` checks `file.type`, a client-supplied string); `src/api/branding.js` `uploadFavicon`/`uploadLogo` (no checks beyond a 1 MB size check in `BrandingTab.jsx`); paths `products/${productSku}/…`, `brands/${brandName.toLowerCase()}/…` use raw user input
 * Description: With a public bucket (BUG-003), an SVG or HTML file uploaded as a "logo" is served from the storage origin and can carry script; a SKU containing `/` or `..` writes outside the product folder.
@@ -764,6 +837,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Control-panel RMA Config writes settings nothing reads; custom fields are never rendered; SLA "pause on hold" is unused
 
 * ID: BUG-027
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic / UX
 * Location: `src/pages/cp/RMAConfig.jsx:90-96` (saves `rma_config` keys `sla_rules`, `auto_assignment_rules`, `default_settings`); the only consumers of SLA are `db.slaConfig` (key `sla_config`, edited by `SLAPolicies.jsx`) — grep finds no reader of `sla_rules`/`auto_assignment_rules`/`default_settings`; `src/pages/cp/CustomFields.jsx` manages `custom_field_definitions` but no form (`TicketForm`, `Customers/_modals`, `CustomerDetails`) renders them (grep: 0 hits outside `cp/`); `slaConfig.DEFAULT.pauseOnHold` is stored and displayed but `computeDueDate` ignores it
 * Description: Three admin screens promise behaviour that has no implementation: RMA response/resolution SLA per priority (a second, disconnected SLA editor), auto-assignment rules, ticket defaults, custom fields, SLA pause.
@@ -784,6 +858,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Converting a sales order to an invoice is a check-then-insert race
 
 * ID: BUG-028
+* **Current status (2026-09-16):** FIXED.
 * Category: Data Integrity / Async
 * Location: `src/api/db/salesOrders.ts:215-255` (`convertToInvoice`: `select … eq('so_id') … neq('doc_status','cancelled')` then `insert`); no unique constraint on `crm_invoices(so_id) WHERE doc_status <> 'cancelled'`
 * Description: Two clicks (or two users) within the round-trip create two draft invoices for one order; both can later be posted, delivering the same reservation twice (`deliver_units` moves whatever is still reserved, the second gets nothing but still bills).
@@ -800,6 +875,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Manufacturer batch numbers are derived from a row count and the batch/unit writes are not atomic
 
 * ID: BUG-029
+* **Current status (2026-09-16):** FIXED.
 * Category: Data Integrity
 * Location: `src/api/db/inventory.ts` `createBatch` (`BATCH-<date>-<count+1>` from `SELECT count(*)`; `manufacturer_batches.batch_number` is UNIQUE; the subsequent `inventory_units` update is unawaited-for-error and outside any transaction)
 * Description: After any batch is deleted, or with two users creating batches at once, the generated number collides and the insert fails; if the units update fails the batch exists with `unit_count` but no linked units.
@@ -818,6 +894,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Parts consumption is non-atomic and silently clamps at zero
 
 * ID: BUG-030
+* **Current status (2026-09-16):** PARTLY FIXED — `adjust_part_quantity` no longer clamps; **still open:** `ticketParts.add()`/`remove()` adjust stock and write `ticket_parts` as two separate calls, so a failed second call leaves stock and consumption out of step. Needs one RPC doing both.
 * Category: Data Integrity / Logic
 * Location: `src/api/db/inventory.ts` `ticketParts.add` (calls `adjust_part_quantity(-qty)` **then** inserts `ticket_parts`; `remove` re-adds quantity then deletes); live function `adjust_part_quantity` → `GREATEST(0, quantity + p_delta)` with no insufficient-stock error
 * Description: Adding 5 of a part with 3 in stock succeeds, records 5 on the ticket and leaves stock at 0 — no error, 2 units accounted for nowhere. If the `ticket_parts` insert fails after the RPC, stock is decremented with no consumption record (and vice versa on remove).
@@ -834,6 +911,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] `restore_units` restores any unit ids without checking they belong to the document or were delivered
 
 * ID: BUG-031
+* **Current status (2026-09-16):** FIXED.
 * Category: Data Integrity
 * Location: live function `restore_units(p_unit_ids uuid[], p_doc_type, p_doc_id, …)` (manager check only; loops over the ids and sets `reservation_status='available'`, writes `stock_moves` with hard-coded `from_status='delivered'`); called from `creditNotes.restoreUnits` and `void_invoice`
 * Description: A manager can pass unit ids delivered on a different invoice (or currently reserved for another sales order) and flip them to available, and the ledger will claim they were "delivered → available" for a credit note that never covered them. `creditNotes.restoreUnits` then sets `restock_status='restocked'` in a second, unguarded write.
@@ -852,6 +930,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Legacy direct-mutation inventory paths are still used by four screens and bypass the ledger
 
 * ID: BUG-032
+* **Current status (2026-09-16):** FIXED. Both halves: the reserved/system guard (2026-09-06) and the transfer + manufacturer-batch ledger (`20260866`, 2026-09-16).
 * Category: Data Integrity
 * Location: `src/api/db/inventory.ts` `transferUnits` (marked `@deprecated`, no reservation check, no `stock_moves`), `resolveUnits`, `markBatchSent`, `markBatchResolved` (sets every unit in the batch to `closed` regardless of resolution outcome); callers `Inventory/CompanyStockTab.jsx:120,147`, `Inventory/ProductDetailModal.jsx:200,221`, `Inventory/WarehousesTab.jsx:714`, `Inventory/ManufacturerTab.jsx:457,470`
 * Description: The Warehouse Dashboard and margin reporting rely on `stock_moves` as history; these paths move/close units with no ledger row, can move a **reserved** unit out from under its sales order, and can move units into system RMA warehouses (`transferUnits` has no `assert_not_system_warehouse`).
@@ -875,6 +954,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [HIGH] Every `IF NOT rma_is_*()` guard in a SECURITY DEFINER RPC fails **open** for a caller with no current role
 
 * ID: BUG-087
+* **Current status (2026-09-16):** FIXED.
 * Category: Permissions
 * Found: 2026-09-16, live, while verifying `20260866` (BUG-032) against production — the migration's own SQL test reported "a technician was NOT refused", and the reason turned out to be worse than the test's own wording.
 * Location: `rma_user_role()` (`SELECT COALESCE(cr.base_role, ur.role) … WHERE ur.user_email = auth.jwt()->>'email' AND rma_access_is_current(ur.status, ur.access_expires_at)`), `rma_is_manager_or_above()` / `rma_is_admin()` / `rma_is_staff()`, and the ~34 `SECURITY DEFINER` functions that open with `IF NOT public.rma_is_…() THEN RAISE` — including `post_invoice`, `void_invoice`, `issue_credit_note`, `record_vendor_payment`, `approve_sales_order`, `delete_customer_cascade`, `delete_customers_cascade`, `transfer_stock`, `adjust_stock`, `receive_stock`, `promote_rma_unit`, `archive_warehouse`, `rma_restore_apply`, `rma_revoke_user_sessions`, `rma_staff_directory`.
@@ -897,6 +977,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Deal stage/status can diverge: bulk moves are two writes, terminal stages do not set status, arbitrary status writes are allowed
 
 * ID: BUG-033
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic / Data Integrity
 * Location: `src/api/db/deals.ts` `bulkMoveStage` (UPDATE stage, then a second UPDATE resetting `status='open', won_at=null…` for terminal deals — no transaction; moving into an `is_won`/`is_lost` stage leaves `status='open'`), `moveStage` (same for single moves via the detail page stage bar), `update()` (accepts `status`, `won_at`, `lost_at` from callers), `Pipeline/index.jsx:483-513` (drag handles won/lost specially, but `PipelineListView`/bulk does not)
 * Description: `deals.status` and `deals.stage` are meant to agree (`markWon` sets both). Several paths change one without the other; no trigger enforces the invariant.
@@ -914,6 +995,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Sales-document state machine is unenforced and inconsistent between screens
 
 * ID: BUG-034
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic
 * Location: `quotations.reopen()` sets `draft` (used by `DealDetail.jsx:590`) while `SalesDocumentDetail.jsx:251` "reopen" calls `markSent` (`sent`); `quotations.cancel` allowed on a `converted` quotation; `salesOrders.markSent` allowed from `delivered`/`cancelled`; `crmInvoices.cancelDraft` guarded, but nothing stops `update()` on a posted invoice's `line_items` (client) — see BUG-002 for the DB side
 * Description: Without a transition table (as `assert_purchase_status_transition` provides for purchasing) the same button means different things on different pages and impossible transitions are one API call away.
@@ -929,6 +1011,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] RMA numbers are generated client-side from the loaded ticket list
 
 * ID: BUG-035
+* **Current status (2026-09-16):** FIXED.
 * Category: Data Integrity / Async
 * Location: `src/pages/RMATickets/_utils.js` `generateRmaNumber(existingTickets)` (max of today's serials + 1 from the `tickets` prop, which `rmaTickets.list()` caps at 5,000 rows); `TicketForm.jsx:589` (`previewRmaNumber` computed at mount) and `:625` (recomputed at save); `rma_tickets.rma_number` UNIQUE
 * Description: Two users creating tickets concurrently get the same number; the second save fails with a unique violation shown as "Failed to save ticket: duplicate key…". The preview shown in the form header may differ from the saved number if another ticket was created meanwhile, and past 5,000 tickets the numbering restarts.
@@ -946,6 +1029,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Ticket resolutions default to USD with a hard-coded currency list while the base currency is EGP
 
 * ID: BUG-036
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic / UX
 * Location: `src/pages/RMATickets/TicketForm.jsx:426,465,710,1433`, `TicketDrawer.jsx:81,209,807,913` (`currency: 'USD'`, list `['USD','EUR','GBP','AED','SAR','EGP']`); `src/lib/money.js` header comment documents this exact defect as fixed elsewhere; `ticket_resolutions.currency` has no FK to `currencies`
 * Description: Every refund/credit resolution saved without touching the dropdown is recorded in dollars; the list ignores the `currencies` table and the base-currency config.
@@ -964,6 +1048,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Reports pipeline and sales sections hard-code a dollar sign
 
 * ID: BUG-037
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic / UX
 * Location: `src/pages/Reports.jsx:850-851` and `:1168-1169` (`fmt$ = (v) => \`$${…}\``), used for open pipeline value, won value, quotation/order/invoice funnel values and collected cash
 * Description: Amounts stored in the base currency (EGP) are labelled `$`. `src/lib/money.js` exists precisely to prevent this and is used elsewhere.
@@ -981,6 +1066,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Date handling mixes UTC and local time; due dates and overdue flags are off by up to a day
 
 * ID: BUG-038
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic (date/time)
 * Location: `src/pages/RMATickets/_utils.js` `DEFAULT_DUE` and `src/api/db/system.ts` `slaConfig.computeDueDate` (`toISOString().split('T')[0]` → UTC calendar date; for Cairo (UTC+2/+3) any ticket created before 02:00–03:00 local gets yesterday's date + N); `Dashboard.jsx:590,625`, `Reports.jsx:230,244,444,1593`, `TechCalendar.jsx:81`, `TicketDrawer`/`RMATickets` overdue checks (`new Date(due_date) < new Date()` where `due_date` is a `date` column → parsed as UTC midnight, so a ticket due *today* is "overdue" from 02:00–03:00 local); `Reports.jsx:244` on-time = `updated_date <= due_date` (midnight) → anything closed on the due day after 00:00 UTC counts as late; `customerLedger.agingReport` similar
 * Description: The app is used in Egypt but every date comparison is UTC-based, and end-of-day is never applied to `date` columns.
@@ -1000,6 +1086,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Legacy `user_roles.password_hash` column still holds a value and is readable by admins
 
 * ID: BUG-039
+* **Current status (2026-09-16):** FIXED.
 * Category: Security
 * Location: live `user_roles.password_hash` (1 non-null row); readable through `listAllRoles()` (`select('*')`) by any admin; exported by backups (BUG-025)
 * Description: A credential store nobody maintains, from the Base44 era; the migration comments already flag it.
@@ -1017,6 +1104,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Customer detail "related tickets" matches by display name, leaking tickets between same-named customers
 
 * ID: BUG-040
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic / Security
 * Location: `src/api/db/customers.ts` `getRelatedTickets(customerId, customerNames)` (second query `in('customer_name', names)`); `CustomerDetails.jsx:41`
 * Description: Two customers named "Ahmed Ali" (14 duplicate mobiles already exist, see BUG-063) see each other's RMA history, and a rename detaches history that is linked only by name. The `rma_tickets.customer_id` FK exists (only 1 ticket lacks it).
@@ -1034,6 +1122,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Live data already violates ledger and stock invariants
 
 * ID: BUG-041
+* **Current status (2026-09-16):** PARTLY FIXED — the integrity check and the money repair are done; the remaining violations are the June seed cohort, which the planned data reset removes (owner: all current data is disposable test data).
 * Category: Data Integrity
 * Location: live data — `crm_invoices` INV-2026-00010/11/12/13/14/15 (posted 2026-06-08 by `*@test.com` seed accounts) have `amount_paid > 0` and `payment_status` paid/partial but **zero** `payment_applications`/`credit_note_applications`; 15 `sales_orders` with `status='delivered'` have no `stock_moves` rows; 8 live `inventory_units` have an empty serial; 3 posted invoices have no `due_date`
 * Description: The seed/fixture invoices sit on real customer statements (`v_customer_ledger` shows the invoice at full total and no payment, while the invoice itself says "paid"), so those customers' balances are wrong; the delivered orders without moves are either legacy or created via the direct-status path in BUG-004.
@@ -1070,6 +1159,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Untranslated UI strings (2,398) and locale key drift break the Arabic experience
 
 * ID: BUG-042
+* **Current status (2026-09-16):** FIXED.
 * Category: UX
 * Location: eslint `no-restricted-syntax` report (2,398 hardcoded user-visible strings across `src/pages`, `src/components`, `src/App.jsx` — e.g. `App.jsx` "Account Settings", "Sign out", MFA screen; `RMATracker.jsx` "Support Team", "↩ Reply", `alert('Failed to send message…')`); `src/locales/ar.json` missing 7 keys present in `en.json` (`userManagement.moduleCount`, `userManagement.overriddenCount`, `cp.pipelineStages.dealCount`, `cp.pipelineStages.cantDeleteInUse`, `cp.pipelineStages.orphanCount`, `cp.pipelineStages.repairConfirm`, `cp.pipelineStages.repaired`) and carrying 47 keys `en.json` does not
 * Description: The project ships RTL/Arabic as a feature; a third of the interface remains English and punctuation renders on the wrong edge (the rule's own message).
@@ -1090,6 +1180,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Overdue-ticket emails are re-queued daily forever and will flood customers when the drain is repaired
 
 * ID: BUG-043
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic
 * Location: live function `queue_overdue_ticket_emails()` (cron 08:00; dedupe only against jobs created in the last 23 h; no cap per ticket; no check that a previous email was *sent*); `notification_queue` currently holds 341 pending `ticket.overdue` emails across the open tickets
 * Description: A ticket overdue for 60 days has ~60 queued emails. Fixing BUG-005 without draining first sends all of them; even after that, customers receive one reminder per day indefinitely.
@@ -1104,6 +1195,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] CSV/XLSX exports do not neutralise spreadsheet formulas
 
 * ID: BUG-044
+* **Current status (2026-09-16):** FIXED.
 * Category: Security
 * Location: `src/pages/Inventory/_shared.jsx:140-158` (`downloadCSV` escapes quotes only), `src/pages/Reports.jsx:16` (`downloadCSV`), `Customers/index.jsx`, `Products/index.jsx`, `Leads/index.jsx`, `Pipeline/index.jsx`, `Purchasing/index.jsx`, `SalesDocuments/index.jsx` (`XLSX.utils.aoa_to_sheet` with raw strings)
 * Description: A customer named `=HYPERLINK("http://evil","click")` or `=cmd|' /C calc'!A0` (entered by a sales rep, a lead import, or via the public tracker author name) executes when a manager opens the export in Excel.
@@ -1122,6 +1214,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Bulk CSV imports skip validation and insert row by row
 
 * ID: BUG-045
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic / Performance
 * Location: `src/pages/Customers/index.jsx:741-870` (custom `parseCSVLine`, no email/phone validation — `customerSchema` is used only for single creates; duplicate detection only against the ≤5,000 rows loaded), `src/pages/Products/index.jsx:534-670` (same; header names case-sensitive), `src/pages/Leads/index.jsx:752-812` (`for … await db.leads.create(lead)` — one request per row, no rollback, partial imports on failure; no `assigned_rep`/email validation)
 * Description: Invalid emails and phones enter the database (the form-level zod rules are bypassed), a 2,000-row lead file makes 2,000 requests, and a failure mid-way leaves a partial import with no report of which rows landed.
@@ -1144,6 +1237,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Announcements ignore their target roles and expiry is evaluated client-side only
 
 * ID: BUG-046
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic
 * Location: `src/App.jsx` `AnnouncementBanner` (`db.announcements.listActive()` then renders all; `target_roles` never read); `system.ts` `listActive` (filters `is_active`/`starts_at`/`ends_at` in JS after fetching every row)
 * Description: An announcement targeted at `technician` is shown to everyone; the banner also overlaps the permission-preview banner (both `fixed top-0 z-50`).
@@ -1162,6 +1256,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Login/logout activity entries are wrong or lost
 
 * ID: BUG-047
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic
 * Location: `src/App.jsx` `handleLogin` (`\`Signed in as ${currentUserRole || 'user'}\`` — `currentUserRole` is the *previous* render's state, so it is always `'user'`), `handleLogout` (activity written after `signOut()`, see BUG-019), `handleMfaVerify` (same pattern)
 * Description: The user activity log, surfaced in Account Settings and User Management, never records the role at login and rarely records logouts.
@@ -1178,6 +1273,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Credit-note-from-ticket flow closes the ticket in a second, unguarded write
 
 * ID: BUG-048
+* **Current status (2026-09-16):** FIXED.
 * Category: Data Integrity
 * Location: `src/pages/RMATickets/TicketDrawer.jsx:95-113`, `src/pages/SalesDocuments/SalesDocumentDetail.jsx:376-384` (`issue_credit_note` RPC, then `rmaTickets.update({ticket_status: CLOSED})`, then activity logs)
 * Description: If the ticket update fails (RLS 0-row no-op for a technician — BUG-008 — or network), the credit note is issued and applied but the ticket stays open with a "credit_note_created" activity; retrying re-issues nothing (the RPC refuses a non-draft CN) so the UI cannot recover without manual edits.
@@ -1196,6 +1292,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Session management screen lists only the current session and cannot revoke
 
 * ID: BUG-049
+* **Current status (2026-09-16):** FIXED. Residual closed 2026-09-16: sessions now end for every loss of access (`20260870`).
 * Category: UX / Security
 * Location: `supabase/functions/manage-sessions/index.ts` (header comment documents `{action:'revoke', sessionId}`; only `list` is implemented; `list` returns `[currentSession]` decoded from the caller's own JWT); `src/pages/AccountSettings.jsx:374-398` (renders that list as "Active sessions" and offers "Sign out all")
 * Description: Users are led to believe they can see and manage every device; they see one entry. Suspending a user in User Management does not end their existing sessions either (nothing calls `auth.admin.signOut(userId)`), so a suspended user keeps API access until token expiry for anything not guarded by `rma_user_role()` (edge functions — BUG-021).
@@ -1224,6 +1321,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Multiple-permissive-policy overlap and legacy duplicates on `notification_preferences`, `user_preferences`, `customers`
 
 * ID: BUG-050
+* **Current status (2026-09-16):** FIXED.
 * Category: Permissions / Performance
 * Location: live policies — `notification_preferences` has `user_own` (ALL) **plus** three older `Users can … their own preferences` policies using bare `auth.email()` (flagged `auth_rls_initplan`); `user_preferences` has `users_own_prefs` (ALL, no `WITH CHECK`) plus four per-command policies; `customers` has both `manager_insert` and `sales_insert_customers`; 116 advisor warnings in total across 26 tables
 * Description: Overlapping permissive policies are OR-ed, so the widest one wins and each extra policy is evaluated per row. `users_own_prefs` (ALL with only `USING`) allows an UPDATE that changes `user_email` to another user (no `WITH CHECK`), then the row is no longer visible to its owner.
@@ -1242,6 +1340,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] `appearanceScope.test.jsx` fails intermittently under the full parallel suite
 
 * ID: BUG-081
+* **Current status (2026-09-16):** FIXED.
 * Category: Testing
 * Location: `src/test/appearanceScope.test.jsx:187-188` (`await waitFor(() => expect(api.fontFamily).toBe('poppins'))` then `expect(api.darkMode).toBe(false)`)
 * Description: One assertion failed during a full `vitest run` and could not be reproduced afterwards. The `waitFor` covers `fontFamily` only; `darkMode` is asserted immediately after it on the same settled state, so if the two updates land in separate ticks under load the second assertion can read the earlier value.
@@ -1257,6 +1356,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] TypeScript is not type-checked anywhere; `tsc` reports 83 errors
 
 * ID: BUG-051
+* **Current status (2026-09-16):** FIXED.
 * Category: Configuration
 * Location: `tsconfig.json` (`strict: true`, no `allowJs`), `package.json` (no `typecheck` script, no `typescript` devDependency), `src/lib/messaging/providers/WhatsAppProvider.ts:39` (imports `../../api/client.js`, a path that does not exist), `src/api/db/inventory.ts:696-920` (18 `TS2339` from untyped Supabase results), `src/lib/stableEmpty.ts:40`, `src/lib/rmaStageMoves.ts:72`
 * Description: The `.ts` modules are only transpiled by esbuild; the types they export are never checked, so the "Row types" contract in `src/api/db` can drift silently. The root-level `CLAUDE.md` for another project claims an `npm run typecheck` script exists; this repo has none.
@@ -1274,6 +1374,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Formatting drift and CI/documentation mismatch
 
 * ID: BUG-052
+* **Current status (2026-09-16):** FIXED.
 * Category: Configuration
 * Location: `npx prettier --check src` → 259 files; `.github/workflows/ci.yml` runs only `test`, `lint:ci`, `build` (no `format:check`, no typecheck, no `npm audit`), while `README.md:200-203,293,407` and `CLAUDE.md:28-31` state that `format:check` runs in CI and that the lint gate is "zero warnings"
 * Description: Docs describe a stricter pipeline than exists.
@@ -1290,6 +1391,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] React hook dependency warnings and unused test variables
 
 * ID: BUG-053
+* **Current status (2026-09-16):** FIXED.
 * Category: Code quality
 * Location: `src/lib/useUrlState.js:91` (`useCallback` missing `params` — intentional but suppressed by a disable comment elsewhere, not here), `src/pages/Customers/index.jsx:165` (missing `setCurrentPage`), `src/pages/RMATickets/index.jsx:162` (missing `filterOverdue`, `setCurrentPage`); `src/test/appearanceScope.test.jsx:18`, `src/test/useUrlState.test.jsx:85,86,130,131` (`no-unused-vars`)
 * Description: The two page effects reset the page number when filters change but omit `filterOverdue`, so toggling that filter does not reset pagination (can land on an empty page).
@@ -1305,6 +1407,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Chunk-load failure triggers an unbounded reload loop
 
 * ID: BUG-054
+* **Current status (2026-09-16):** FIXED.
 * Category: Error Handling
 * Location: `src/App.jsx` `lazyWithReload` (`window.location.reload()` on `Failed to fetch dynamically imported module`, no attempt counter)
 * Description: If a chunk is genuinely missing (CDN outage, bad deploy, ad-blocker), every page load reloads again forever.
@@ -1322,6 +1425,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Error boundary shows raw error messages in production
 
 * ID: BUG-055
+* **Current status (2026-09-16):** FIXED.
 * Category: Error Handling / Security
 * Location: `src/components/ErrorBoundary.jsx` (renders `error.message` in production; "Copy error details" includes the full stack and URL)
 * Description: Messages from PostgREST/Supabase (constraint names, table names) can surface verbatim; `toUserMessage` exists for toasts but is not applied here.
@@ -1339,6 +1443,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] CSP allows `unsafe-inline`/`unsafe-eval`; function CORS defaults to `*`
 
 * ID: BUG-056
+* **Current status (2026-09-16):** FIXED. Merged to main; the script CSP is live in `vercel.json`.
 * Category: Security
 * Location: `vercel.json` (`script-src 'self' 'unsafe-inline' 'unsafe-eval'`, `img-src https:`); `supabase/functions/_shared/cors.ts` (falls back to `Access-Control-Allow-Origin: *` when `ALLOWED_ORIGINS` is unset — the deployed functions carry no such secret according to the code comments); `kb-chat` ignores the helper and hardcodes `*`
 * Description: The CSP would not stop an injected script; the CORS wildcard lets any origin call the functions with a user's token if it obtains one. Because auth uses bearer tokens rather than cookies, the practical risk is low.
@@ -1369,6 +1474,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] `anon` still holds full DML grants on ~25 tables and can execute trigger and helper functions
 
 * ID: BUG-057
+* **Current status (2026-09-16):** FIXED.
 * Category: Security (defence in depth)
 * Location: `information_schema.role_table_grants` (anon: DELETE/INSERT/UPDATE/SELECT/TRUNCATE on `activities`, `contacts`, `credit_notes`, `crm_invoices`, `deals`, `document_sequences`, `kb_articles`, `leads`, `notification_logs/queue/settings`, `payments`, `payment_applications`, `pipelines`, `purchase_orders`, `quotations`, `sales_orders`, `stock_moves`, `ticket_resolutions`, `user_preferences`, `vendor_*`, `warehouse_stock`, `whatsapp_templates` and all six views); advisor `anon_security_definer_function_executable` × 15 (`rma_is_admin`, `rma_user_role`, `rma_current_user_email`, trigger bodies `protect_system_warehouse`, `sync_payment_balance`, …); `pg_net` in `public`; Auth "leaked password protection" disabled
 * Description: RLS currently blocks every anonymous read/write (the project's own probe confirms it), so this is not exploitable today, but a single future `TO public` policy — like the two found in the pre-launch review — becomes an anonymous write again. Trigger functions callable via `/rpc/` just error, but need not be exposed.
@@ -1392,6 +1498,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Missing foreign-key indexes and unused indexes
 
 * ID: BUG-058
+* **Current status (2026-09-16):** FIXED.
 * Category: Performance
 * Location: advisor `unindexed_foreign_keys` × 25 — notably `inventory_units.rma_ticket_id`, `inventory_units.warehouse_id`, `ticket_activity.ticket_id`, `customer_notes.customer_id`, `ticket_comments.parent_comment_id`, `deals.pipeline_id`, `deals.contact_id`, `purchase_orders.vendor_id`, `vendor_invoices.{vendor_id,purchase_order_id,currency}`, `leads.converted_*`, `*_applications.reverses_application_id`; `unused_index` × 19
 * Description: `listUnitsByTicket`, ticket cascade deletes, `ticket_activity.list`, `customerNotes.list` and the warehouse breakdowns all filter on unindexed FKs; fine at today's row counts (≤ 900 rows per table) but they are the tables that grow.
@@ -1412,6 +1519,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Resend API key is stored in a table readable by every admin browser
 
 * ID: BUG-059
+* **Current status (2026-09-16):** FIXED. Migration `20260842` was applied 2026-09-13, after the front-end deploy.
 * Category: Security
 * Location: `email_settings.api_key` (`email_settings.admin_all` policy); `src/api/email.js` `getEmailSettings` (`select('*')`), `src/pages/BrandingSettings/EmailSettingsTab.jsx:70` (rendered into an input)
 * Description: The provider secret travels to the browser of every admin and can be exfiltrated by any XSS. `send-email` already runs server-side and could read it from a function secret.
@@ -1432,6 +1540,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Search inputs leave the `_` LIKE wildcard unescaped
 
 * ID: BUG-060
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic
 * Location: `src/components/CommandPalette.jsx:41` (`q.replace(/[%,()]/g, ' ')`), `src/api/db/catalog.ts:290` (`search()` escapes `%`,`_`,`\` but then strips `(),"`)
 * Description: Typing `_` matches any single character; harmless data-wise (RLS applies) but produces surprising results; PostgREST `or()` syntax characters are stripped rather than escaped so a search containing `.` still behaves oddly.
@@ -1451,6 +1560,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Integration test asserts on a table that does not exist
 
 * ID: BUG-061
+* **Current status (2026-09-16):** FIXED. Residual closed 2026-09-16: signed-in role probes, 24/24 on production (`supabase/tests/authenticated_role_probes.sql`).
 * Category: Test coverage
 * Location: `tests/integration/_client.ts` `PROTECTED_TABLES` includes `'purchase_documents'` (the view is `v_purchase_documents`; there is no such table); `rls.test.ts` treats *any* error as "correctly denied", so a 404/42P01 passes; `rpc-auth.test.ts` only checks anonymous callers
 * Description: The tier gives a green result for a relation it never touched, and no test covers the authenticated-role bypasses in BUG-001/002/010/011.
@@ -1473,6 +1583,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Dead, deprecated or unsafe exports remain in the data layer
 
 * ID: BUG-062
+* **Current status (2026-09-16):** FIXED.
 * Category: Code quality
 * Location: `src/api/db/crmInvoices.ts` `recordPayment` (client read-modify-write of `amount_paid`, no role check, unused), `src/App.jsx` `handleSignup` (never called — `Login` has no sign-up UI — yet still wires `auth.signUp`), `src/api/db/inventory.ts` `invoices` (legacy module with client-side `generateNumber` max+1), `quotations.getByDeal` (`@deprecated`), `src/lib/messaging/providers/WhatsAppProvider.ts` (unused, broken import), internal `_reverse_*` RPC wrappers
 * Description: Unsafe paths that a future caller could reach; bundle weight.
@@ -1494,6 +1605,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Data-quality issues visible in production
 
 * ID: BUG-063
+* **Current status (2026-09-16):** PARTLY FIXED — the guards are in place; the remaining duplicates, due dates and blank serials are existing test records, resolved by the planned data reset rather than repaired.
 * Category: Data Integrity
 * Location: live data — 14 customers share a mobile number with another customer (the bulk-import dedupe only compares against loaded rows and the single-create form does not check); 8 live (`status <> 'closed'`) `inventory_units` have an empty `serial_number` (the partial unique index excludes them, so duplicates are possible); 3 posted invoices have no `due_date` (aging treats them as "current" forever); 10 `user_roles` rows have no `auth.users` account and 1 auth user has no role
 * Description: Each is a small inconsistency the code tolerates but that skews reports and dropdowns.
@@ -1515,6 +1627,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] `kb-chat` and `ai-assist` pass provider detail and user text through without limits
 
 * ID: BUG-064
+* **Current status (2026-09-16):** FIXED.
 * Category: Error Handling
 * Location: `supabase/functions/kb-chat/index.ts` (`fail(\`Provider returned ${status}: ${detail.slice(0,400)}\`)`, `history` up to 6 × 4,000 chars), `ai-assist/index.ts` (`NVIDIA error ${resp.status}: ${errText}` to the client with HTTP 200)
 * Description: Upstream error bodies may include request ids or quota details; the app shows them in toasts.
@@ -1533,6 +1646,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Aging buckets mislabel overdue invoices and undated invoices
 
 * ID: BUG-065
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic
 * Location: `src/api/db/customerLedger.ts` `bucketFor` (`daysPastDue <= 30 → 'current'`), `agingReport` (`due_date` null → `daysPastDue = 0`); same in `vendorLedger.ts`
 * Description: An invoice 29 days past due is reported as "current"; invoices with no due date are never aged.
@@ -1554,6 +1668,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Whole-table client-side lists capped at 5,000 rows
 
 * ID: BUG-066
+* **Current status (2026-09-16):** FIXED.
 * Category: Performance
 * Location: `rmaTickets.list()`, `customers.list()`, `products.list()` (`.limit(5000)`), plus unbounded `deals.list()`, `leads.list()`, `activities.listAllPlanned()`, `notificationLogs`, `backup` (paged) — used by Dashboard, Reports, RMATickets, Customers, Products, TechCalendar, DataCleanup
 * Description: Filtering, sorting, counting and RMA-number generation are done in memory over the first 5,000 rows; beyond that the UI silently truncates (the paged helpers exist but are used only for counts).
@@ -1582,6 +1697,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Public tracker uses `alert()` and a client-side lockout that the caller controls
 
 * ID: BUG-067
+* **Current status (2026-09-16):** FIXED.
 * Category: UX / Security
 * Location: `src/pages/RMATracker.jsx:7-45,247`
 * Description: Clearing `localStorage` resets the "15-minute lockout"; the only real limit is the per-instance bucket in `public-track` (BUG-023). `alert()` blocks the page and is untranslated.
@@ -1602,6 +1718,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Sales-document form previews unrounded totals that can differ from the stored, rounded ones
 
 * ID: BUG-068
+* **Current status (2026-09-16):** FIXED.
 * Category: Logic
 * Location: `src/pages/SalesDocuments/SalesDocumentForm.jsx:69-76` (sums floating-point line values without rounding), `src/api/db/quotations.ts`/`salesOrders.ts`/`crmInvoices.ts` `computeTotals` (rounds each aggregate to 2 dp at the end); `purchasing.ts` line uses `qty_ordered × unit_cost` with `discount_pct`/`tax_pct` but `receive_vendor_invoice` costs stock from `rma_vi_landed_unit_costs` (server) — consistent, but the client preview of "tax in cost" depends on `purchase_tax_in_cost` config the form does not read
 * Description: Preview and stored totals can differ by a cent; three copies of `computeTotals` exist (quotations, sales orders, invoices) plus a fourth in purchasing.
@@ -1620,6 +1737,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Vercel installs with `npm install` rather than `npm ci`
 
 * ID: BUG-069
+* **Current status (2026-09-16):** FIXED.
 * Category: Configuration
 * Location: `vercel.json` (`"installCommand": "npm install --legacy-peer-deps"`), `.npmrc` (`legacy-peer-deps=true`)
 * Description: Production installs can drift from `package-lock.json`; peer-dependency conflicts are suppressed globally.
@@ -1637,6 +1755,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Repository hygiene: generated and unrelated files in the tree
 
 * ID: BUG-070
+* **Current status (2026-09-16):** FIXED.
 * Category: Code quality
 * Location: `eslint-report.json` (1.4 MB, committed), `MyCRM Manual Test 05-07-2026.xlsx` and `claude/` (untracked in root), `coverage/` and `dist/` present locally, root-level `C:\Users\bika_\CLAUDE.md` describing a Base44 architecture that this repo does not use (misleads any tooling reading it), `supabase/.temp/` committed
 * Description: Noise and misleading documentation.
@@ -1654,6 +1773,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] `edit_assigned` and `change_status` permissions are not honoured consistently across the RMA screens
 
 * ID: BUG-071
+* **Current status (2026-09-16):** FIXED.
 * Category: Permissions (UI)
 * Location: `src/pages/RMATickets/index.jsx:411-416` (edit guard checks assignment), `:505-508` (bulk status requires `edit_all || change_status` — no assignment check), `:555-558` (bulk product status requires `edit_all || edit_assigned` — no assignment check), `TicketForm.jsx:585-592` (no assignment check), `TicketDrawer.jsx:799,834,1506` (`canDo('edit_all') || canDo('edit_assigned')`)
 * Description: The client-side model lets a technician attempt bulk changes on anyone's tickets; the DB rejects silently (BUG-008), so the user gets success toasts for nothing.
@@ -1673,6 +1793,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] `activities` route permission differs between the route table and the inline check
 
 * ID: BUG-072
+* **Current status (2026-09-16):** FIXED.
 * Category: Permissions (UI)
 * Location: `src/App.jsx` `ROUTE_PERMISSIONS` (`/activities → deals.view`) vs the `<Route path="/activities">` element (`deals.view || leads.view`); `/knowledge-center` gated on `products.view` (so a viewer can reach the LLM chat and document upload UI — uploads are RLS-blocked for non-managers but the buttons show)
 * Description: A custom role with `leads.view` but not `deals.view` is blocked by `RouteGuard` before the inline OR is evaluated.
@@ -1692,6 +1813,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [INFORMATIONAL] Consolidate financial writes behind RPCs and lock posted documents with triggers
 
 * ID: BUG-073
+* **Current status (2026-09-16):** PARTLY FIXED — every document table has transition/settled-document triggers and the money tables are admin-only or procedure-only; **still open:** making `payment_applications`, `credit_note_applications`, `vendor_payment_applications` and `warehouse_stock` RPC-only is an architecture decision not yet taken.
 * Category: Security / Data Integrity
 * Location: schema-wide (see BUG-001/002/004/010)
 * Description: The codebase already moved *most* money and stock logic into SECURITY DEFINER RPCs; the remaining exposure comes from table-level policies that still allow the same writes directly. A "RPC-only" posture (`WITH CHECK (false)` on client inserts/updates for financial tables, or a GUC the RPCs set and triggers require) closes the class rather than the instances.
@@ -1713,6 +1835,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [INFORMATIONAL] Add a row-count guard to every update/delete helper
 
 * ID: BUG-074
+* **Current status (2026-09-16):** PARTLY FIXED — 60 write sites guarded; the 12 bulk `.in(...)` writes and a few zero-rows-is-normal helpers are left unguarded by design, as recorded below.
 * Category: Error Handling
 * Location: `src/api/db/*.ts`
 * Description: A tiny `expectOne(data)` helper would turn the silent 0-row class (BUG-008) into a thrown error everywhere at once.
@@ -1733,6 +1856,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [INFORMATIONAL] Supabase Auth settings could not be verified from the audit tooling
 
 * ID: BUG-075
+* **Current status (2026-09-16):** FIXED.
 * Category: Configuration
 * Location: Supabase dashboard → Authentication
 * Description: Whether public sign-ups are disabled (the app has no sign-up UI, but `auth.signUp` is wired and 1 auth user has no role), password policy, OTP/recovery-link expiry, refresh-token rotation, "require current password", and MFA enforcement are dashboard settings not exposed to SQL. `auth_leaked_password_protection` is reported disabled by the advisor.
@@ -1748,6 +1872,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [INFORMATIONAL] `ownershipScope` is documented as "not a security boundary" — and is currently the only boundary for several screens
 
 * ID: BUG-076
+* **Current status (2026-09-16):** FIXED.
 * Category: Permissions
 * Location: `src/lib/permissions.ts` `ownershipScope`; Sales Documents / Pipeline / Leads pages
 * Description: The comment is accurate: RLS is meant to be the boundary. This audit found RLS *reads* for `sales_rep` are correctly scoped (own rows), so the UI filter is cosmetic as intended. Listed so the assumption is on record.
@@ -1757,6 +1882,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [INFORMATIONAL] Deno `serve` import from `std@0.168.0` in four functions
 
 * ID: BUG-077
+* **Current status (2026-09-16):** PARTLY FIXED — every Edge Function moved off `std@0.168.0` except the two WhatsApp functions, which are on hold with the rest of the WhatsApp work.
 * Category: Configuration
 * Location: `notification-worker`, `send-whatsapp`, `whatsapp-webhook`, `manage-sessions` (`https://deno.land/std@0.168.0/http/server.ts`), others use `Deno.serve`; supabase-js pulled as `@2` (floating major) in most functions vs pinned `2.45.0` in `kb-chat`
 * Description: Floating versions make deploys non-reproducible; `std/http/server.ts` is deprecated.
@@ -1770,6 +1896,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [INFORMATIONAL] Bundle size warning and PWA precache of 5 MB
 
 * ID: BUG-078
+* **Current status (2026-09-16):** PARTLY FIXED — Arabic is lazy-loaded (about 239 KB smaller live); the remaining bundle-size and precache items are recorded below.
 * Category: Performance
 * Location: `vite build` output (one chunk > 500 kB; precache 90 entries / 5.07 MB); `vite.config.js` manual chunks
 * Description: First load and SW install are heavy; `xlsx`, `jspdf`, `html2canvas`, `pdfjs-dist`, `recharts` are candidates for lazy loading (pdfjs already is).
@@ -2030,7 +2157,7 @@ SELECT tablename, policyname, cmd, roles, qual, with_check FROM pg_policies WHER
 | Resend / Meta account state (domain verification, template approvals) | external | provider dashboards |
 | `test:db` SQL assertion suites (`supabase/tests/*.sql`) | cannot run without Docker and a baseline | port to the integration tier against staging |
 | Load / concurrency behaviour of the RPCs (`FOR UPDATE` paths were read, not stress-tested) | no staging | k6 or pgbench scripts |
-| UI click-through of every screen | out of scope for a static/DB audit; the project's own checklists (`WAREHOUSE_R1_TEST_CHECKLIST.md`, `CRM_QA_CHECKLIST.md`) remain unchecked | manual QA |
+| UI click-through of every screen | out of scope for a static/DB audit; the project's own checklists (`docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md`, `docs/archive/CRM_QA_CHECKLIST.md`) remain unchecked | manual QA |
 
 ### D. Assumptions made
 

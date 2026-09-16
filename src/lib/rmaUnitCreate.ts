@@ -5,7 +5,7 @@
 // stays a thin transport layer.
 //
 // Background — the bug this module exists to prevent (found in manual QA on
-// 2026-08-05, WAREHOUSE_R1_TEST_CHECKLIST.md §2): a ticket carrying one
+// 2026-08-05, docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md §2): a ticket carrying one
 // already-tracked serial had ALL of its units discarded, because the units
 // were inserted as a single batch and every error was swallowed with
 // `return []`. Both halves are addressed — the insert falls back to per-row

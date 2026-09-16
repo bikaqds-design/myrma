@@ -6,7 +6,7 @@
  * labelled with a single hardcoded string reading "Quotation Approval Request", which
  * meant Sales Orders, Invoices, Credit Notes, Purchase Orders and Vendor Invoices all
  * announced themselves as quotations in the pool (found in manual QA 2026-08-06,
- * WAREHOUSE_R1_TEST_CHECKLIST.md — sales-funnel run log).
+ * docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md — sales-funnel run log).
  *
  * The doc-type nouns already exist as `activities.source*` (used by the Source column
  * and the filter dropdown), so they are reused here rather than duplicated — one

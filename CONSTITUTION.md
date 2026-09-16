@@ -1,6 +1,6 @@
 # myRMA Engineering Constitution
 
-> **Version:** 2.1 — Amended 2026-06-08 (AI Assist + Skeleton/Breadcrumb components + secrets table)  
+> **Version:** 2.2 — Amended 2026-09-17 (factual corrections only: the audit record moved to `AUDIT_REPORT.md`, current CI and test tiers, archived plan documents; no law added or relaxed)  
 > **Authority:** This document is the single source of truth for all engineering decisions in myRMA.  
 > **Scope:** All contributors, developers, and AI coding agents working on this codebase.  
 > **Enforcement:** Rules marked **LAW** are non-negotiable. Rules marked **MUST** require justification to override. Rules marked **SHOULD** are strong defaults.
@@ -84,9 +84,9 @@ When making any engineering decision, ask in order:
 | Auth | Supabase Auth | Latest | JWT tokens, RLS enforced |
 | Storage | Supabase Storage | Latest | `rma-attachments` bucket |
 | Error Tracking | Sentry | Latest | Wired into `ErrorBoundary` |
-| Testing | Vitest | Latest | Unit tests in `src/lib/` |
+| Testing | Vitest | Latest | Unit tests in `src/test/` and `src/lib/`; integration tier in `tests/integration/` |
 | Linting | ESLint 9 (flat config) | 9.x | Zero errors target |
-| Formatting | Prettier | Latest | Enforced on CI |
+| Formatting | Prettier | Latest | Configured; **not** enforced by CI (BUG-052) |
 | PWA | vite-plugin-pwa | Latest | Workbox generateSW |
 | Virtualization | @tanstack/react-virtual | v3.x | For un-paginated lists |
 
@@ -1262,11 +1262,12 @@ d:\myrma-app\
 │   └── migrations\             # Database migrations (YYYYMMDD_description.sql)
 ├── .github\
 │   └── workflows\
-│       └── ci.yml              # CI: test → lint:ci → build
+│       ├── ci.yml              # CI: test → lint:ci → typecheck → build; integration tier vs production
+│       └── migration-drift.yml # Production migration ledger must match supabase/migrations/
 ├── .specify\                   # Speckit planning artifacts
 ├── docs\
-│   └── archive\                # Historical audit reports, superseded test snapshots
-│       └── AUDIT_LOG.md        # Engineering audit history and scorecard
+│   └── archive\                # Finished plans, past audits, completed QA runs (index: README.md)
+├── AUDIT_REPORT.md             # Live audit record — §0 is the current scorecard
 ├── CLAUDE.md                   # AI agent instructions (checked into repo)
 ├── CONSTITUTION.md             # This file
 ├── vite.config.js              # Vite + PWA configuration
@@ -1287,7 +1288,7 @@ d:\myrma-app\
 | New Edge Function | `supabase/functions/new-function/index.ts` |
 | New migration | `supabase/migrations/YYYYMMDD_description.sql` |
 
-**LAW: Do not create files in the root directory** unless they are project-level configs (vite.config.js, tailwind.config.js, etc.) or actively-maintained documentation (CONSTITUTION.md, CLAUDE.md, AGENTS.md, DESIGN.md, IMPROVEMENT_PLAN.md, README.md). One-time or historical reports (audit logs, dated test snapshots) go in `docs/archive/` instead.
+**LAW: Do not create files in the root directory** unless they are project-level configs (vite.config.js, tailwind.config.js, etc.) or actively-maintained documentation (CONSTITUTION.md, CLAUDE.md, AGENTS.md, DESIGN.md, AUDIT_REPORT.md, README.md). One-time or historical reports (audit logs, dated test snapshots) go in `docs/archive/` instead.
 
 ### 13.3 Import Order (Enforced by ESLint)
 
@@ -1395,17 +1396,14 @@ TypeScript is adopted in `src/lib/` and `src/api/db/`.
 
 ### 15.1 Current Test Suite
 
-305 tests across 9 suites in `src/lib/` and `src/test/`:
+| Tier | Where | Runs in CI |
+|------|-------|-----------|
+| Unit (Vitest, ~1,700 tests in 96 files) | `src/test/`, `src/lib/` | Yes — every PR |
+| Integration (read-only, against the hosted project) | `tests/integration/` | Yes — every PR, Node 22 |
+| Migration ledger | `scripts/migration-drift.mjs` | `Migration drift` workflow — push to `main`, daily |
+| SQL reference scripts (RPC behaviour, signed-in role probes) | `supabase/tests/*.sql` | **No** — run by hand inside a rolled-back transaction; the `db-tests` job is disabled |
 
-| File | Tests | Coverage |
-|------|-------|---------|
-| `constants.test.js` | Unit tests for all constant values and type correctness | Constants are correct and non-empty |
-| `permissions.test.js` | Tests for `canDo()` across all role/permission combinations | All role transitions, bypass logic |
-| `schemas.test.js` | Validation schema tests for all Zod schemas | Valid inputs pass, invalid inputs fail |
-| `rmaStageMoves.test.js` | `buildRmaMoves()` serial/name matching + RMA-location mapping | Warehouse Module R1 auto-move logic |
-| `dealValue.test.js` | `dealValueFor()` open/won/lost value + `canMarkDealWon()` | Forecast-vs-actual deal value rule |
-
-Run with `npm test` (Vitest).
+Run the unit tier with `npm test`. See `README.md` → Testing for what each tier proves.
 
 ### 15.2 What Must Be Tested
 
@@ -1496,19 +1494,28 @@ security(storage): add anon upload size and MIME type restrictions
 
 ### 16.3 CI/CD Pipeline
 
-GitHub Actions runs on every push and PR to `main`:
+GitHub Actions runs on every push to `main` and `test`, and on every PR:
 
 ```
-1. npm test          — Vitest (277 unit tests, must all pass)
-2. npm run lint:ci   — ESLint (zero errors gate)
-3. npm run build     — Vite production build (must succeed)
+Test · Lint · Build
+  1. npm test            — Vitest unit tier, must all pass
+  2. npm run lint:ci     — ESLint, zero warnings
+  3. npm run typecheck   — tsc, zero errors
+  4. npm run lint:ui     — untranslated-string report (does not gate)
+  5. npm run build       — Vite production build, must succeed
+
+DB · Integration
+  npm run test:integration — read-only checks against the hosted project
+
+Migration drift (separate workflow; push to main, daily, on demand)
+  node scripts/migration-drift.mjs
 ```
 
 **LAW: No merges to `main` with failing CI.** No exceptions.
 
 **MUST: Before pushing, run locally:**
 ```
-npm test && npm run lint && npm run build
+npm test && npm run lint:ci && npm run typecheck && npm run build
 ```
 
 ### 16.4 Production Deployment
@@ -1541,7 +1548,7 @@ This section is for Claude Code, GitHub Copilot, and any other AI coding assista
 Priority order for authoritative information:
 1. This `CONSTITUTION.md`
 2. `CLAUDE.md` (project-level instructions)
-3. `docs/archive/AUDIT_LOG.md` (what was changed and why)
+3. `AUDIT_REPORT.md` (what was found, what was changed and why — §0 is the current status)
 4. The actual source code files
 5. READMEs and docs (may be outdated)
 
@@ -1663,10 +1670,10 @@ const isRtl = i18n.language === 'ar'
 
 ### 17.10 Documenting Changes
 
-**MUST: When making changes that affect the audit record, update `docs/archive/AUDIT_LOG.md`** changelog section with:
+**MUST: When making changes that affect the audit record, update `AUDIT_REPORT.md`** — the finding's own status notes and its **Current status** line, and the §0 scorecard if a finding changes state — with:
 - Date (YYYY-MM-DD)
 - Change summary
-- ID if it corresponds to an existing finding
+- ID if it corresponds to an existing finding (new defects get the next `BUG-` number)
 
 **MUST: When changing architectural patterns (routing, state management, data access), update `CLAUDE.md`** to reflect the new pattern.
 
@@ -1747,7 +1754,7 @@ if (role === 'admin' || role === 'super_admin' || permissions?.tickets?.delete) 
 Before approving any PR, verify:
 
 - [ ] All tests pass (`npm test`)
-- [ ] Zero ESLint errors (`npm run lint`)
+- [ ] Zero ESLint warnings (`npm run lint:ci`) and zero type errors (`npm run typecheck`)
 - [ ] Build succeeds (`npm run build`)
 - [ ] No new magic strings (uses `constants.ts`)
 - [ ] No direct Supabase import in page components
@@ -1758,7 +1765,7 @@ Before approving any PR, verify:
 - [ ] No deleted or weakened security features
 - [ ] New constants added to `src/lib/constants.ts`
 - [ ] `CLAUDE.md` updated if architectural patterns changed
-- [ ] `docs/archive/AUDIT_LOG.md` changelog updated if relevant to audit findings
+- [ ] `AUDIT_REPORT.md` updated if relevant to audit findings
 
 ### 18.4 Living Document
 
@@ -1769,7 +1776,7 @@ This constitution is a living document. When:
 
 **MUST: Constitution changes are reviewed by the project lead** and committed as `docs(constitution): <description>`.
 
-**MUST: All constitution changes are documented in the `docs/archive/AUDIT_LOG.md` changelog.**
+**MUST: All constitution changes are recorded in the version line at the top of this file.** (Until 2026-09 they were logged in `docs/archive/AUDIT_LOG.md`, now archived.)
 
 ---
 

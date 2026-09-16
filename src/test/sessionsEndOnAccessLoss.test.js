@@ -12,7 +12,8 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-const sql = readFileSync('supabase/migrations/20260870_revoke_sessions_on_access_loss.sql', 'utf8')
+// Normalise line endings: a Windows checkout has CRLF, and the assertions below span lines.
+const sql = readFileSync('supabase/migrations/20260870_revoke_sessions_on_access_loss.sql', 'utf8').replace(/\r\n/g, '\n')
 const users = readFileSync('src/api/db/users.ts', 'utf8')
 
 /** SQL with `-- …` comments removed, so a rule is asserted on code, never on prose about it. */

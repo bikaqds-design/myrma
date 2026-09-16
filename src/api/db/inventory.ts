@@ -202,7 +202,7 @@ export const inventory = {
    * Creates one `inventory_units` row per product on a newly-saved RMA ticket.
    *
    * Two failure modes were found in manual QA on 2026-08-05
-   * (WAREHOUSE_R1_TEST_CHECKLIST.md §2) and are fixed here:
+   * (docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md §2) and are fixed here:
    *
    *  1. **All-or-nothing.** Every unit went in as one `.insert(units)` batch, so
    *     a single duplicate serial discarded the whole ticket's units. The batch

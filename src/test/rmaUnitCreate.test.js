@@ -2,7 +2,7 @@
  * rmaUnitCreate.test.js — the pure core of RMA inventory-unit creation.
  *
  * Covers the two defects found in manual QA on 2026-08-05
- * (WAREHOUSE_R1_TEST_CHECKLIST.md §2): a ticket carrying one already-tracked
+ * (docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md §2): a ticket carrying one already-tracked
  * serial silently produced no units at all. This file tests the decision half
  * (which units to build, which serials would be rejected, how to name a
  * failure); inventory.createUnitsFromTicket.test.js covers the insert half.

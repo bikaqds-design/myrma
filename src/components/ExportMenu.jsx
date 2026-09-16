@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next'
  *   Export Selected  only when rows are checked
  *
  * The pattern was introduced on Leads and Pipeline (see the "System-wide Design
- * Unification Sprint" notes in MASTER_UPGRADE_PLAN.md) as ~65 lines of inline
+ * Unification Sprint" notes in docs/archive/MASTER_UPGRADE_PLAN.md) as ~65 lines of inline
  * JSX, copied between them. Purchasing needed it third, and copying a block that
  * size a third time is exactly how the warehouse-destination filter ended up
  * written four times and wrong in all four. So it lives here once.

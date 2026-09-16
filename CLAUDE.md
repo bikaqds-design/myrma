@@ -2,18 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **Full engineering rules are in [`CONSTITUTION.md`](CONSTITUTION.md).**  
-> **Audit history and scorecard are in [`docs/archive/AUDIT_LOG.md`](docs/archive/AUDIT_LOG.md).**
+> **Engineering rules:** [`CONSTITUTION.md`](CONSTITUTION.md) · **Audit status:** [`AUDIT_REPORT.md`](AUDIT_REPORT.md) — §0 is the live scorecard · **Archive:** [`docs/archive/README.md`](docs/archive/README.md) (finished plans, past audits, completed QA runs)
 
-**Active sprint:** Sprints 7.6 / 8 / 9 all ✅ BUILT 2026-07-01, migrations applied + RPC-layer VERIFIED 2026-07-02 (see [`MASTER_UPGRADE_PLAN.md`](MASTER_UPGRADE_PLAN.md)). Migrations `20260737`–`20260755` are applied and confirmed. Sprint 7.6 (inventory model reconciliation) is gate-verified via SQL. Sprint 8 (dual serialized/bulk stock model, rebuilt Inventory page, warehouse management, bulk actions) had its RPC layer checked by the `db-tests` SQL files (that CI job has since been disabled — see CI/CD) — **manual UI click-through QA and the deferred 52-item funnel checklist are still pending**, RPC correctness alone doesn't close those. Sprint 7.5 (sales funnel hardening) ✅ complete. **Sprint H — Security & DB-Test Hardening ✅ COMPLETE 2026-07-02**: full-system audit (see [`AUDIT_REPORT_2026-07-02.md`](AUDIT_REPORT_2026-07-02.md)) — every Critical/High finding fixed and verified live. Remaining items (credit-limit enforcement policy, legacy `invoices` retirement, God-component decomposition) are deferred pending user testing/decisions, not bugs. Source audit retired — see [`docs/archive/sales-funnel-audit.md`](docs/archive/sales-funnel-audit.md).
+**Current state (2026-09-16).** The build phase is finished: CRM core, Sales Documents, Accounting, the redesigned Purchase Module and Warehouse Module R1 all shipped (history in [`docs/archive/MASTER_UPGRADE_PLAN.md`](docs/archive/MASTER_UPGRADE_PLAN.md)). Work is now pre-launch hardening driven by `AUDIT_REPORT.md`: **87 findings — 79 fixed, 7 partly fixed, 1 open** (BUG-006, WhatsApp webhook, on hold). What each open item waits on is in the report's §0.
 
-**Purchase Module — redesigned 2026-07-05:** Sprint 9's original Vendor→PI→PO→VI funnel has been rebuilt: Brands are now the vendors (standalone `vendors` table + Proforma Invoices removed, all prior purchasing data wiped per user approval), the funnel is **Purchase Order → Vendor Invoice** with new statuses and an approval-pool step for VIs, POs get a PDF export, and a full Vendor Payments (AP) ledger mirrors the customer AR layer — see the Purchase Module section below and migrations `20260756`–`20260762`. Code, migrations, and DB tests are BUILT and gate-green (277/277 tests, 0 lint errors, build ✓) — **manual click-through QA is still pending**, same "BUILT ≠ VERIFIED" distinction as Sprint 8/9's original build.
-
-**Warehouse Module — redesigned R1, 2026-07-09:** RMA ticket stages (Received/Under Repair/Repaired/Can't Repair/Replacement/Credit Note) are now **real inventory locations** instead of free-text ticket status — 8 protected system warehouses (`RMA-*`, `REPLACEMENT`, `CREDIT-NOTE`, `SCRAP`), units auto-move between them on every ticket save via `move_rma_units`, and `promote_rma_unit` is the previously-missing active_rma→sellable path. The Inventory Overview is rebuilt into a **Warehouse Dashboard** (Available/Reserved/Physical Total/Main/Branches/RMA with drill-down drawers); the 5 old RMA-stage tabs and `ProductStatusTab.jsx` are gone. See migrations `20260764`–`20260767` and the Inventory section below. **BUILT + gate-green at build time (287/287 tests, 0 lint errors, build ✓). Migrations `20260764`–`20260767` were APPLIED and SQL-verified on 2026-08-04** — all 8 system locations seeded with correct codes/types, and the `20260767` backfill left 0 unplaced `active_rma` units on non-cancelled tickets. **Manual click-through QA is still pending** (`WAREHOUSE_R1_TEST_CHECKLIST.md` §1–§9 are all still unchecked) — same "BUILT ≠ VERIFIED" distinction.
-
-**CRM Leads/Pipeline round — 2026-08-04/05:** closes all 8 findings from the 2026-07-05 manual test (`MyCRM Manual Test 05-07-2026.xlsx`, Leads + Pipeline only) plus gaps found while working. **Leads** gains All/Active/Converted/Disqualified tabs (Kanban scoped to All Leads only) and a reopen-disqualified action. **Deals** get their edit modal back (it was fully built but had lost its only opener), with customer/contact/pipeline now editable — pipeline via the new `deals.movePipeline()`, since stages belong to a pipeline and `moveStage()` validates against the deal's *current* one. **A deal can now hold any number of quotations**, each independent (own approval, own SO conversion), and **deal value has two meanings**: open → forecast (sum of live quotations), won/lost → actual (sum of converted only) — see the Deal value section below. Quotations lock once `accepted` (both the deal tab and Sales Documents), and Cancel is replaced by Archive wired to the same `setArchived` the Sales Documents Archive tab uses. Gate-green (305/305 tests, 0 lint errors, build ✓) — **manual click-through QA pending**, same "BUILT ≠ VERIFIED" distinction. Note `lint:ci` was **failing on HEAD** before this round (3 pre-existing unused vars vs. `--max-warnings 0`) and is now green.
-
-**Master build tracker:** [`MASTER_UPGRADE_PLAN.md`](MASTER_UPGRADE_PLAN.md) — sprint-by-sprint tracker for the CRM upgrade (Track A) and Odoo-benchmarked system upgrades (Track B). Supersedes the archived `CRM_UPGRADE_PLAN.md` / `SYSTEM_UPGRADE_PLAN.md`. Earlier SpecKit artifacts for Track A Sprint 1 live in `specs/002-crm-upgrade/`. Source study: [`docs/archive/CRM_UPGRADE_STUDY.md`](docs/archive/CRM_UPGRADE_STUDY.md).
+**Standing rules for working in this repo:**
+- **WhatsApp work is on hold.** Do not fix or refactor WhatsApp code, functions or templates unless the owner lifts the hold.
+- **All current production data is disposable test data** and will be erased before launch. Use it for testing; never "repair" rows — fix code, constraints and guards instead.
+- **Migrations and Edge Functions reach production only with the owner's explicit OK.** Dry-run first inside a transaction that ends in a forced rollback.
+- **After every `apply_migration` (dashboard/MCP), set that ledger row's `version` to the file prefix** — those tools record a generated timestamp, and the `Migration drift` workflow fails on the mismatch.
+- **`main` is protected:** push a branch and open a PR. CI must be green before merging.
+- **Verify what you claim.** A green job is not proof a check ran — the `db-tests` job is `if: false`, and the integration tier skips without secrets. Read the log or the annotations.
 
 ## Commands
 
@@ -29,7 +28,10 @@ npm run lint:ci        # ESLint strict for CI (blocks on warnings too)
 npm run lint:fix       # ESLint auto-fix
 npm run format         # Prettier write
 npm run format:check   # Prettier check (NOT run in CI; formatting is not enforced)
-npm run test:db        # DB test tier: supabase start (applies all migrations) + runs supabase/tests/audit_hardening.sql — requires Docker + psql locally
+npm run typecheck      # tsc --noEmit — zero errors, gated in CI
+npm run test:integration  # read-only checks against the hosted project; needs VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+node scripts/migration-drift.mjs  # production migration ledger vs supabase/migrations/ (same env vars)
+npm run test:db        # NOT runnable here: needs Docker + a rebuildable schema (see CI/CD). Run supabase/tests/*.sql by hand, rolled back, instead
 ```
 
 ## Environment
@@ -168,9 +170,9 @@ Many optional tables (e.g. `announcements`, `custom_field_definitions`, `invento
 
 ### Permissions
 
-Roles: `super_admin`, `admin`, `manager`, `technician`, `viewer`.
+Roles: `super_admin`, `admin`, `manager`, `technician`, `viewer`, `sales_rep`, `accountant` (the canonical list is `ROLES` in `src/lib/constants.ts`).
 
-`super_admin` and `admin` bypass all permission checks. Other roles carry a `permissions` JSON object loaded from the `user_roles` table and passed down from `App.jsx` as `currentUserPermissions`. Default permission sets for `manager`, `technician`, and `viewer` are defined in `ROLE_DEFAULT_PERMISSIONS` in **`src/lib/permissions.ts`** (not App.jsx). The `canDo(role, permissions, section, action)` helper is exported from the same file.
+`super_admin` and `admin` bypass all permission checks. Other roles carry a `permissions` JSON object loaded from the `user_roles` table and passed down from `App.jsx` as `currentUserPermissions`. Default permission sets for the non-admin roles are defined in `ROLE_DEFAULT_PERMISSIONS` in **`src/lib/permissions.ts`** (not App.jsx). The `canDo(role, permissions, section, action)` helper is exported from the same file.
 
 **Critical:** always resolve permissions with `resolvePermissions(role, stored)` (also in `permissions.ts`) before storing them in state — never use `stored || ROLE_DEFAULT_PERMISSIONS[role]`. An empty `{}` object is truthy and would override role defaults, stripping all permissions. `resolvePermissions` merges stored overrides on top of role defaults and treats `{}` / `null` / partial objects correctly.
 
@@ -392,6 +394,8 @@ The `ErrorBoundary` shows the error **message** in production (safe, user-diagno
 
 All schema changes are SQL migration files in `supabase/migrations/` named `YYYYMMDD_description.sql`. All migrations are idempotent (`IF NOT EXISTS`, `IF EXISTS`, `DROP POLICY IF EXISTS`). Never alter production schema via the Supabase dashboard without a corresponding migration file.
 
+The list below is **curated, not exhaustive** — `supabase/migrations/` is authoritative, and the `Migration drift` workflow keeps production in step with it. Migrations `20260768`–`20260865` (Warehouse R1 follow-ups, the currency/costing work and the September audit fixes) are described in `AUDIT_REPORT.md` under the finding each one fixes, and in their own header comments.
+
 Current migrations:
 - `20260524_customer_cascade_delete.sql`
 - `20260524_features.sql`
@@ -410,7 +414,7 @@ Current migrations:
 - `20260613_search_by_serial.sql`
 - `20260617_kb_articles.sql`
 
-CRM upgrade (Track A — `specs/002-crm-upgrade/`), applied in order:
+CRM upgrade (Track A — `docs/archive/specs/002-crm-upgrade/`), applied in order:
 - `20260618_crm_add_sales_rep_role.sql` — adds the `sales_rep` role (prerequisite, sequenced first)
 - `20260619_crm_contacts.sql`
 - `20260620_crm_pipelines.sql`
@@ -492,7 +496,7 @@ Purchase Module (Sprint 9), applied in order:
 - `20260749_receive_vendor_invoice_rpc.sql` — `receive_vendor_invoice` atomic dual-mode RPC; assigns `VI-YYYY-NNNNN` only on first receipt, supports partial (multi-shipment) receipt via per-line `qty_received`
 - `20260750_purchase_documents_view.sql` — `v_purchase_documents` UNION view (same pattern as `v_sales_documents`)
 
-Audit hardening (2026-07-02 — see [`AUDIT_REPORT_2026-07-02.md`](AUDIT_REPORT_2026-07-02.md)), applied in order:
+Audit hardening (2026-07-02 — see [`docs/archive/AUDIT_REPORT_2026-07-02.md`](docs/archive/AUDIT_REPORT_2026-07-02.md)), applied in order:
 
 - `20260751_harden_money_rpcs.sql` — closes audit CRIT-1/2/3 + HIGH-2 for the money layer: `record_payment` and `issue_credit_note` gain a `rma_is_manager_or_above()` guard and a **server-derived actor** (`COALESCE(rma_current_user_email(), p_actor_email)` — the passed-in actor is no longer trusted); `record_payment` validates each allocation (running-sum ≤ payment amount, invoice is `posted` and belongs to the paying customer, `FOR UPDATE`); `sync_payment_balance` de-clamped (no more `GREATEST(…,0)`) so over-allocation drives `unapplied_amount` negative and trips the new `CHECK (unapplied_amount >= 0)`; adds transactional `apply_payment_to_invoice` + `apply_credit_note_to_invoice` RPCs (the client `applyToInvoice` helpers now delegate to these instead of a non-atomic read-then-write). **`SECURITY DEFINER` bypasses RLS** — so these in-body guards, not the table policies, are what enforce authz on the RPC path.
 - `20260752_lockdown_rpc_execute.sql` — closes CRIT-1's "no REVOKE" half comprehensively: dynamically `REVOKE`s PUBLIC/anon `EXECUTE` and `GRANT`s only `authenticated`/`service_role` on all 24 client-invoked RPCs (resolves overloads via `pg_proc`). The `rma_*` RLS helpers are intentionally excluded (policies must keep calling them).
@@ -542,7 +546,7 @@ Authenticated-role probes (2026-09-16, BUG-061):
 
 - `supabase/tests/authenticated_role_probes.sql` — reference script, **not CI**: reproduces a signed-in call without a password (sets PostgREST's JWT claims + `SET LOCAL ROLE authenticated`) for one active account per role, checks the BUG-001/002/004/010/011/034/087 loopholes are refused and the legitimate action beside each still works, then forces a rollback. Run it by hand after any change to RLS, grants or guard triggers; last run 24/24.
 
-**Warehouse Module R1 runtime model:** ticket `product_status` (Received/Under Repair/Repaired/Can't Repair/Replacement/Credit Note) auto-maps to a system location on every ticket save (create/edit/bulk) — **Replacement AND Credit Note both → RMA-STOCK** (ticket status is intent; the real onward move is an R2 item). The client half is pure `buildRmaMoves()` in `src/lib/rmaStageMoves.ts` (serial-first/name-fallback pairing, skips ambiguous matches, 10 Vitest cases) → `move_rma_units`; the RPC's idempotency means the client never needs each unit's current location. **Sellable = warehouse_type `main`/`branch` OR legacy `NULL` type** (never made more restrictive than pre-model). "Main" column = main/legacy-NULL company_stock; "Branches" = per-`branch` breakdown; "RMA" = per-system-location active_rma counts; "Physical Total" = sellable + RMA locations, **excluding SCRAP + closed**. Non-catalog RMA units (`product_id NULL`) surface as synthetic `in_catalog:false` dashboard rows. **BUILT + gate-green at build time (287/287 tests, `inventory_hardening3.sql` 12 checks, 0 lint errors, build ✓). Migrations `20260764`–`20260767` applied + SQL-verified 2026-08-04; manual click-through QA still pending** (see `WAREHOUSE_R1_TEST_CHECKLIST.md`). **R2 (deferred):** server-side sellable-location guard in `reserve_units` (currently display-only — it still counts all company_stock regardless of location), document-driven onward moves (CN issue → CN location, replacement shipment), (the unledgered `transferUnits` path was consolidated on 2026-09-16 — see `20260866` below).
+**Warehouse Module R1 runtime model:** ticket `product_status` (Received/Under Repair/Repaired/Can't Repair/Replacement/Credit Note) auto-maps to a system location on every ticket save (create/edit/bulk) — **Replacement AND Credit Note both → RMA-STOCK** (ticket status is intent; the real onward move is an R2 item). The client half is pure `buildRmaMoves()` in `src/lib/rmaStageMoves.ts` (serial-first/name-fallback pairing, skips ambiguous matches, 10 Vitest cases) → `move_rma_units`; the RPC's idempotency means the client never needs each unit's current location. **Sellable = warehouse_type `main`/`branch` OR legacy `NULL` type** (never made more restrictive than pre-model). "Main" column = main/legacy-NULL company_stock; "Branches" = per-`branch` breakdown; "RMA" = per-system-location active_rma counts; "Physical Total" = sellable + RMA locations, **excluding SCRAP + closed**. Non-catalog RMA units (`product_id NULL`) surface as synthetic `in_catalog:false` dashboard rows. **BUILT + gate-green at build time (287/287 tests, `inventory_hardening3.sql` 12 checks, 0 lint errors, build ✓). Migrations `20260764`–`20260767` applied + SQL-verified 2026-08-04; manual click-through QA still pending** (see `docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md`). **R2 (deferred):** server-side sellable-location guard in `reserve_units` (currently display-only — it still counts all company_stock regardless of location), document-driven onward moves (CN issue → CN location, replacement shipment), (the unledgered `transferUnits` path was consolidated on 2026-09-16 — see `20260866` above).
 
 **The "who" convention for CRM tables:** `assigned_rep` and `created_by` are `text` columns holding the user's **email**, NOT `uuid REFERENCES auth.users`. This was a repeated source of "Invalid uuid" bugs — Zod schemas must validate these as email/string, never `.uuid()`.
 
@@ -568,9 +572,10 @@ All UI primitives come from `src/components/ui.jsx`. Never re-implement buttons,
 
 ### CI/CD
 
-GitHub Actions (`.github/workflows/ci.yml`) runs on push to `main` **and `test`**, plus every PR (audit HIGH-1 fix — it previously ran on `main` only, which the team never pushes to, so CI effectively never ran). Two independent jobs, both required:
+GitHub Actions (`.github/workflows/ci.yml`) runs on push to `main` **and `test`**, plus every PR (audit HIGH-1 fix — it previously ran on `main` only, which the team never pushes to, so CI effectively never ran). Three jobs, of which two actually run:
 
-- **`ci`** — `test → lint:ci → build`, all three must pass. Node 20, `npm ci` (`--legacy-peer-deps` is set in `.npmrc`).
+- **`ci`** — `test → lint:ci → typecheck → lint:ui (report only) → build`. Node 20, `npm ci` (`--legacy-peer-deps` is set in `.npmrc`).
+- **`integration`** — `npm run test:integration` against the **hosted production project**, read-only, **Node 22** (supabase-js needs a built-in WebSocket; on Node 20 every test crashed before running). Uses the `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` repository secrets (added 2026-09-16 — before that the tier had silently skipped since it was written). Covers anon RLS refusals, anon RPC refusals, the columns the app selects, and `security-invariants.test.ts`.
 - **`db-tests`** (audit HIGH-3) — **DISABLED (`if: false`) since 2026-08-07 and not coming back** (the Base44-created schema can't be rebuilt without a baseline, and Docker is ruled out), so none of the SQL files below run in CI; they are reference scripts, run against production inside a rolled-back transaction when needed. Where the rest of this file says a `supabase/tests/*.sql` file is "in CI", read it as this. As originally designed, it installs the Supabase CLI, runs `supabase start` (spins up a real local Postgres and applies every migration in `supabase/migrations/` from scratch — this doubles as an ongoing regression check that the full migration history still applies cleanly, generalizing the exact failure class behind CRIT-4), then runs four SQL test files (plus `vendor_payments.sql`) via `psql -v ON_ERROR_STOP=1`, all `RAISE EXCEPTION`ing with the specific failing check if any assertion breaks:
   - `supabase/tests/audit_hardening.sql` — CRIT-1/2/3/5 + HIGH-2 invariants (role guard, allocation validation, server-derived actor, payment/CN reversal, atomic apply).
   - `supabase/tests/inventory_hardening.sql` — reserve/deliver/release conservation for both serialized (`inventory_units`) and bulk (`warehouse_stock`) stock, over-reservation rejection, duplicate-serial rejection, and idempotency of `release_warehouse_stock`/`deliver_warehouse_stock` under a duplicate call — the exact property `20260741_warehouse_stock_reservation_rpcs.sql`'s own header comment flags as needing explicit verification, not assumption.
