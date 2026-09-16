@@ -103,7 +103,7 @@ export function StockBreakdownModal({
   // appear nowhere actionable: availableUnits excludes them, the reserved and
   // RMA sections don't list them, and the All Units drill-in is read-only — so
   // adjusting a unit off stock was a one-way door with no route back
-  // (WAREHOUSE_R1_TEST_CHECKLIST.md §9). Listing them here restores Adjust so
+  // (docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md §9). Listing them here restores Adjust so
   // the status can be corrected.
   //
   // Deliberately NOT offered Transfer: transfer_stock requires an available

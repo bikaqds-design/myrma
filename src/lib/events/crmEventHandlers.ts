@@ -82,7 +82,7 @@ async function resolveRepPhone(
     captureException(
       new Error(
         'CRM rep notifications are not deliverable: no phone number is stored for staff users. ' +
-          'See Finding 8 in PRELAUNCH_REVIEW.md.'
+          'See Finding 8 in docs/archive/PRELAUNCH_REVIEW.md.'
       ),
       { context: 'crmEventHandlers/resolveRepPhone' }
     )

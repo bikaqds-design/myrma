@@ -295,7 +295,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
   // refetch raced those INSERTs and usually won — the Deal Log then showed a
   // stale feed until the page was reloaded, and nothing invalidated again once
   // the writes landed. Found three times in manual QA on 2026-08-05
-  // (WAREHOUSE_R1_TEST_CHECKLIST.md §B/§C): quotation submitted for approval,
+  // (docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md §B/§C): quotation submitted for approval,
   // and deal field edits, both missing from the log until a manual reload.
   //
   // logEvent keeps each in-flight write so refresh() can await them before

@@ -1,4 +1,4 @@
-# myRMA Enterprise RMA Management System
+# myCRM (myRMA 2.0)
 
 > A full-stack, enterprise-grade **Return Merchandise Authorization (RMA)** management platform built for warehouse operations, technical teams, and customer service staff.
 
@@ -25,7 +25,7 @@ myRMA provides end-to-end lifecycle management for product returns, warranty cla
 | **CRM — Sales Documents** | Quotation → Sales Order → Invoice → Credit Note funnel, manager-approval workflow, gapless invoice/credit-note numbering, two-stage inventory reservation |
 | **CRM — Accounting** | Customer payments ledger (multi-invoice allocation), AR aging report, per-customer statement, soft credit limits |
 | **CRM — Purchasing** | Brands-as-vendors, Purchase Order → Vendor Invoice funnel with manager-approval step, PO PDF export, atomic dual-mode stock receipt, Vendor Payments (AP) ledger, full procurement audit trail |
-| **Role-Based Access Control** | 6 roles: `super_admin`, `admin`, `manager`, `technician`, `viewer`, `sales_rep` |
+| **Role-Based Access Control** | 7 roles: `super_admin`, `admin`, `manager`, `technician`, `viewer`, `sales_rep`, `accountant` — enforced by RLS and by fail-closed guards in every privileged database function |
 | **Real-Time Notifications** | Live updates via Supabase Realtime, per-user preference controls |
 | **Dark Mode** | Full dark/light theme toggle, persisted per user |
 | **PWA / Offline** | Installable app with offline shell via Workbox service worker |
@@ -291,7 +291,8 @@ myrma-app/
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                            # CI: test → lint:ci → build
-├── docs/archive/AUDIT_LOG.md                 # Engineering audit history + scorecard
+├── AUDIT_REPORT.md                          # Live audit — §0 is the current scorecard
+├── docs/archive/                            # Finished plans, past audits, completed QA runs
 ├── CLAUDE.md                                 # AI agent instructions
 ├── CONSTITUTION.md                           # Engineering constitution (rules + standards)
 └── vite.config.js                            # Vite + PWA configuration
@@ -379,54 +380,54 @@ Roles are stored in the `user_roles` table. Default permission sets are defined 
 
 ## Testing
 
-```bash
-npm test
-```
+Four tiers, from fastest to closest to production:
 
-305 unit tests across 9 suites in `src/lib/` and `src/test/`:
+| Tier | Command | What it proves | Where it runs |
+|------|---------|----------------|---------------|
+| Unit | `npm test` | ~1,700 Vitest tests in 96 files under `src/test/` and `src/lib/` — pure logic, data-layer request shapes, and static guards that fail CI if a known defect comes back (whole-table reads, un-COALESCEd role helpers, direct `warehouse_id` writes, …) | CI, every PR |
+| Integration | `npm run test:integration` | ~38 read-only checks against the **production** project with the anon key: protected tables refuse anonymous reads/writes, privileged RPCs refuse anonymous callers, every column the app selects exists, and the security-invariant counts are clean | CI, every PR (needs the `VITE_SUPABASE_*` secrets) |
+| Migration ledger | `node scripts/migration-drift.mjs` | Production's applied migrations match `supabase/migrations/` exactly | `Migration drift` workflow: push to `main`, daily, on demand |
+| Signed-in roles + RPC behaviour | paste a `supabase/tests/*.sql` file into the SQL editor | e.g. `authenticated_role_probes.sql`: for one active account per role, each audited loophole is refused and the legitimate action beside it still works. Every file ends in a forced rollback. | **By hand** — not CI (see below) |
 
-| Suite | Coverage |
-|-------|---------|
-| `constants.test.js` | All constant values and type correctness |
-| `permissions.test.js` | `canDo()` across all role/permission combinations |
-| `schemas.test.js` | Zod schemas with valid + invalid inputs |
-| `rmaStageMoves.test.js` | `buildRmaMoves()` serial/name matching + RMA-location mapping (Warehouse R1) |
-| `dealValue.test.js` | `dealValueFor()` forecast-vs-actual deal value + `canMarkDealWon()` guard |
-
-Tests run in under 5 seconds via Vitest with jsdom environment (serialised — `fileParallelism: false`).
+The SQL files under `supabase/tests/` are **reference scripts**. The CI job that
+was meant to run them (`db-tests`) needs Docker and a rebuildable schema, has
+neither, and is disabled; running them against production is done by hand,
+inside a rolled-back transaction.
 
 ---
 
 ## CI/CD
 
-GitHub Actions runs automatically on every push to `main` and `test`, plus every PR.
+`.github/workflows/ci.yml` runs on every push to `main` and `test`, and on every PR.
 
 ```
-ci job (gates the build):
+Test · Lint · Build (Node 20) — gates the merge:
   1. npm ci --legacy-peer-deps
   2. npm test              → the unit suite must pass
-  3. npm run lint:ci       → zero ESLint warnings allowed
-  4. npm run lint:ui       → untranslated-string report; does NOT gate
-  5. npm run build         → production build must succeed
+  3. npm run lint:ci       → zero ESLint warnings
+  4. npm run typecheck     → zero TypeScript errors
+  5. npm run lint:ui       → untranslated-string report; does NOT gate
+  6. npm run build         → production build must succeed
 
-integration job:
-  npm run test:integration, against the HOSTED project: RLS refuses an
-  anonymous caller, SECURITY DEFINER RPCs reject unauthorized callers, and
-  every column the app selects still exists. Skips itself — staying green —
-  when the VITE_SUPABASE_* secrets are absent, as on a fork.
+DB · Integration (Node 22) — against the HOSTED production project:
+  npm run test:integration. Read-only. Node 22 because supabase-js needs a
+  built-in WebSocket. Skips — with a visible message — only when the
+  VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY secrets are absent (a fork).
 
-db-tests job:
-  DISABLED (`if: false`). It required `supabase start`, and Docker has been
-  ruled out; the integration job replaced it. The supabase/tests/*.sql files
-  remain the reference for the assertions still to be ported.
+DB · Audit Hardening Tests:
+  DISABLED (`if: false`). Needs `supabase start` (Docker, ruled out) and a
+  schema the migrations alone cannot rebuild.
 ```
 
-`npm run format:check` is **not** run by CI, and formatting is therefore not
-enforced: `npx prettier --check src` currently reports hundreds of files, and
-bringing them into line belongs in a commit of its own rather than mixed into
-unrelated work. (BUG-052.)
+`.github/workflows/migration-drift.yml` runs on push to `main`, daily and on
+demand (not on PRs, where a new migration is supposed to be ahead of
+production). It fails if a migration file has no ledger row, a ledger row has no
+file, or two files share a version. **After applying a migration through the
+dashboard or MCP, set its ledger row's `version` to the file prefix** — those
+tools record a generated timestamp instead.
 
-The build step uses Supabase placeholder values from GitHub Secrets (falls back gracefully in CI).
+`npm run format:check` is **not** run by CI, and formatting is therefore not
+enforced (BUG-052).
 
 ---
 
@@ -452,6 +453,11 @@ The app is installable as a Progressive Web App:
 - **Service role key** lives only in Edge Function secrets — never in browser code
 - **Public tracker** rate-limited via `public-track` Edge Function
 - **Input validation** via Zod schemas before any database write
+- **Fail-closed role checks** — the `rma_is_*` helpers return `false`, never `NULL`, for a caller without a current role, so a suspended or role-less account is refused by every privileged function (BUG-087); CI re-checks this against production on every run
+- **Sessions end on loss of access** — suspending, locking, deactivating, expiring or removing a user deletes their sessions in the same transaction, with a 15-minute sweep for expiries that simply pass
+- **Settled documents are locked** — posted invoices and credit notes cannot be edited, and document status changes go through their lifecycle functions
+- **Stock movements are ledgered** — every transfer, reservation, delivery and batch status change writes `stock_moves`
+- **Script CSP** without `unsafe-inline` or `unsafe-eval` (`vercel.json`)
 
 ---
 
@@ -467,7 +473,7 @@ Key rules for contributors:
 4. **All permission checks use `canDo()`** from `src/lib/permissions.ts`
 5. **All `localStorage` access uses `safeStorage`** from `src/lib/safeStorage.ts`
 6. **All new `src/lib/` code has unit tests**
-7. **Dark mode classes on every new UI component** (`dark:bg-gray-800` etc.)
+7. **Dark mode on every new UI component**, using the Direction B tokens in `CLAUDE.md` / `DESIGN.md` — never `dark:bg-gray-*` or `dark:bg-slate-*`
 8. **CI must pass** before merging to `main`
 9. **All schema changes are SQL migration files** — no ad-hoc dashboard edits
 
@@ -499,11 +505,13 @@ security(storage): restrict anonymous upload MIME types
 
 | File | Purpose |
 |------|---------|
-| [`CLAUDE.md`](CLAUDE.md) | AI agent instructions — architecture patterns, gotchas, and rules |
-| [`CONSTITUTION.md`](CONSTITUTION.md) | Engineering constitution — 18 sections of laws, standards, and enforcement |
-| [`docs/archive/AUDIT_LOG.md`](docs/archive/AUDIT_LOG.md) | Full engineering audit history — all findings, fixes, and project scorecard |
-| [`docs/archive/`](docs/archive/) | Historical/dated reports: old test snapshots, the GUARD-skill audit, competitive analysis, past system audits |
+| [`AUDIT_REPORT.md`](AUDIT_REPORT.md) | The live audit — **§0 is the current scorecard** (87 findings: fixed / partly / open, and what each open item waits on), followed by every finding with its evidence and fix |
+| [`CLAUDE.md`](CLAUDE.md) | Architecture, data-layer conventions, migrations list and the rules that keep known defects from returning |
+| [`CONSTITUTION.md`](CONSTITUTION.md) | Engineering laws, standards and enforcement |
+| [`DESIGN.md`](DESIGN.md) | Direction B "Command" design system — tokens and component styling |
+| [`design/`](design/) | UI/UX audit (inventory, dark mode, pagination, search & filters) and its backlog |
+| [`docs/archive/`](docs/archive/) | Finished plans, past audits and completed QA runs — see its `README.md` for what each file was |
 
 ---
 
-*myRMA v2.0 · Built with React 18 · Vite 6 · Supabase · Tailwind CSS*
+*myCRM (myRMA 2.0) · Built with React 18 · Vite 6 · Supabase · Tailwind CSS*

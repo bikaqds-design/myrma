@@ -280,7 +280,7 @@ function dispatchCreateSideEffects(newTicket, ticketData, rmaNumber, userEmail, 
     .createUnitsFromTicket(newTicket.id, newTicket.rma_number || rmaNumber, ticketData.products)
     .then((result) => {
       // A partial failure used to be invisible: the units silently vanished
-      // while the UI reported success (WAREHOUSE_R1_TEST_CHECKLIST.md §2).
+      // while the UI reported success (docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md §2).
       if (result.failed.length) {
         captureException(
           new Error(`createUnitsFromTicket: ${result.failed.length} unit(s) failed — ${result.failed[0].message}`),

@@ -154,7 +154,7 @@ BEGIN
   -- ── CHECK 6b: moving a RESERVED active_rma unit is rejected ──
   -- Added 2026-08-06. This is the rejection behind the UI's
   -- `inventory.autoMoveFailed` toast ("Ticket saved, but moving the unit(s)…
-  -- failed") — WAREHOUSE_R1_TEST_CHECKLIST.md §4. That row sat unrunnable for
+  -- failed") — docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md §4. That row sat unrunnable for
   -- the whole manual QA pass because the application cannot produce the state:
   -- the sales funnel only ever reserves `company_stock`, never an RMA unit. It
   -- is trivially stageable here, so the guard is asserted in CI rather than

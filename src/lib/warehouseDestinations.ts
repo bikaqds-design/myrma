@@ -4,7 +4,7 @@
 //
 // Exists because the same filter was written inline four times and got it
 // wrong in all four (found in manual QA 2026-08-05,
-// WAREHOUSE_R1_TEST_CHECKLIST.md §9):
+// docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md §9):
 //
 //   TransferStockModal.jsx   is_active + not-source            → missing !is_system
 //   BulkStockActionModal.jsx is_active                    (×2) → missing !is_system

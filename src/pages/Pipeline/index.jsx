@@ -270,7 +270,7 @@ export default function Pipeline({ currentUserRole, currentUserEmail, currentUse
   // move a deal to another pipeline, so a moved deal simply vanished — invisible
   // to the board and to its own search — and the only route back was
   // Customers → <customer> → Deals. Found in manual QA 2026-08-05
-  // (WAREHOUSE_R1_TEST_CHECKLIST.md §B).
+  // (docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md §B).
   //
   // Falls back to the first pipeline when the param is absent or names a
   // pipeline that no longer exists, so a stale bookmark degrades to a working

@@ -1025,7 +1025,7 @@ export default function App() {
   // Runs through t() so the header matches the rest of the chrome — it used to
   // be a hardcoded English map, which left the bar reading "Deal Details" while
   // the whole page beneath it was Arabic (found in manual QA 2026-08-05,
-  // WAREHOUSE_R1_TEST_CHECKLIST.md §E). Reuses the existing `nav.*` keys so the
+  // docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md §E). Reuses the existing `nav.*` keys so the
   // header and the sidebar entry for a page always agree.
   const mobileTitle = (() => {
     if (pathname.startsWith('/products/')) return t('nav.productDetails')

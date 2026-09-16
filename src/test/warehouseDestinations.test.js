@@ -6,7 +6,7 @@
  * through the RMA auto-move / promote flow (Warehouse Module R1, migration
  * 20260764).
  *
- * Found in manual QA 2026-08-05 (WAREHOUSE_R1_TEST_CHECKLIST.md §9): the same
+ * Found in manual QA 2026-08-05 (docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md §9): the same
  * filter was inlined in four places and wrong in all four — three omitted
  * !is_system, and ReceiveStockModal had no filter at all. Offering SCRAP in a
  * transfer dropdown lets a user write stock off with no RMA ticket; offering

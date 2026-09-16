@@ -193,7 +193,7 @@ for this by hand.
 
 **Bidi isolation exists and is unused.** `ui.jsx` exports an `Ltr` component
 whose own comment records that this bug was found in manual QA on 2026-08-05
-(`WAREHOUSE_R1_TEST_CHECKLIST.md §E`). It is used **6 times** in the entire
+(`docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md §E`). It is used **6 times** in the entire
 codebase; `unicodeBidi` appears once. Consequences are visible in the captured
 screenshots (see `01-AUDIT.md` UX-GLOBAL-003).
 

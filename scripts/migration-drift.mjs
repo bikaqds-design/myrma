@@ -1,4 +1,7 @@
-#!/usr/bin/env node
+// No `#!/usr/bin/env node` line: on a Windows checkout (CRLF) Vitest fails to
+// import a module that starts with one ("Invalid or unexpected token"), which
+// broke src/test/migrationDrift.test.js locally while CI on Linux stayed green.
+// Run it as `node scripts/migration-drift.mjs`.
 /**
  * migration-drift.mjs — does production's migration ledger match the files?
  * (Audit finding BUG-014.)

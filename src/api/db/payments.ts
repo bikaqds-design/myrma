@@ -123,7 +123,7 @@ export const payments = {
       // (`"[]"`) rather than an array, and record_payment's
       // `jsonb_array_elements(p_allocations)` then fails with
       // "cannot extract elements from a scalar" — which killed every payment
-      // recorded from an invoice (WAREHOUSE_R1_TEST_CHECKLIST.md funnel row 43).
+      // recorded from an invoice (docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md funnel row 43).
       p_allocations: allocations,
     })
     if (error) throw error

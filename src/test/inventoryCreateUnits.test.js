@@ -2,7 +2,7 @@
  * inventoryCreateUnits.test.js — the insert half of RMA inventory-unit creation.
  *
  * Regression cover for the two defects found in manual QA on 2026-08-05
- * (WAREHOUSE_R1_TEST_CHECKLIST.md §2), where a ticket with one already-tracked
+ * (docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md §2), where a ticket with one already-tracked
  * serial produced NO units for ANY of its products and reported success:
  *
  *   1. the units went in as a single batch, so one bad row voided the good ones
