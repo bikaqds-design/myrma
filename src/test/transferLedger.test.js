@@ -56,8 +56,19 @@ describe('the function carries the guard’s rules itself', () => {
     expect(migration).toMatch(/IF v_dest\.is_system THEN[\s\S]{0,200}RAISE EXCEPTION/)
   })
 
-  it('is manager-or-above, like transfer_stock', () => {
-    expect(migration).toContain('IF NOT public.rma_is_manager_or_above() THEN')
+  it('is manager-or-above, like transfer_stock — but NULL-safe about it', () => {
+    // rma_user_role() is NULL for a caller with no current role row, so the
+    // bare `IF NOT rma_is_manager_or_above()` the other RPCs use is an IF on
+    // NULL and does not fire. Found live on production; filed as BUG-087.
+    expect(migration).toContain('IF NOT COALESCE(public.rma_is_manager_or_above(), false) THEN')
+    expect(migration).not.toMatch(/IF NOT public\.rma_is_manager_or_above\(\) THEN/)
+  })
+
+  it('the batch guards are NULL-safe too', () => {
+    expect(migration).not.toMatch(/IF NOT \(public\.rma_is_staff\(\)/)
+    expect(
+      (migration.match(/IF NOT COALESCE\(public\.rma_is_staff\(\) AND public\.rma_user_role\(\) <> 'viewer', false\)/g) || []).length
+    ).toBe(2)
   })
 
   it('writes one ledger row per unit moved, and none for a no-op', () => {

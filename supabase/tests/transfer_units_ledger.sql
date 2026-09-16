@@ -164,6 +164,24 @@ BEGIN
   PERFORM set_config('request.jwt.claims',
     json_build_object('email', v_mgr, 'role', 'authenticated')::text, true);
 
+  -- ── CHECK 7b: a caller with NO CURRENT ROLE is refused ──
+  --   Not a variation on CHECK 7 but a different failure mode, and the one
+  --   that was live on production: rma_user_role() returns NULL for a
+  --   suspended/expired account or an auth user with no user_roles row, so
+  --   `IF NOT rma_is_manager_or_above()` is an IF on NULL and does not fire.
+  --   The guard must COALESCE. (BUG-087.)
+  v_check_count := v_check_count + 1;
+  PERFORM set_config('request.jwt.claims',
+    json_build_object('email', 'nobody-with-no-role@example.com', 'role', 'authenticated')::text, true);
+  BEGIN
+    PERFORM public.transfer_units(ARRAY[v_unit1], v_wh_a, NULL);
+    v_failures := array_append(v_failures, 'CHECK 7b (caller with no current role refused): was NOT refused');
+  EXCEPTION WHEN OTHERS THEN
+    NULL; -- expected
+  END;
+  PERFORM set_config('request.jwt.claims',
+    json_build_object('email', v_mgr, 'role', 'authenticated')::text, true);
+
   -- ── CHECK 8: the actor on the ledger row is the signed-in user, not the
   --            string the caller passed ──
   v_check_count := v_check_count + 1;

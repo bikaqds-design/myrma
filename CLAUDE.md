@@ -540,6 +540,8 @@ public.rma_current_user_email() -- current user's email
 
 **`auth.user_role()` and similar do not exist — never use them.**
 
+**These helpers return NULL, not false, for a caller with no current role** (suspended, expired, or an auth account with no `user_roles` row) — `rma_user_role()` finds no row, and `NULL IN (…)` is NULL. In an RLS policy that is safe: a policy treats NULL as "no" and fails closed. **In plpgsql it is not**: `IF NOT public.rma_is_manager_or_above() THEN RAISE …` is an `IF` on NULL, does not fire, and the guard waves the caller through — measured live on production, where a role-less caller got every row out of the manager-only `rma_staff_directory()`. So **every guard inside a SECURITY DEFINER function must be `IF NOT COALESCE(public.rma_is_…(), false) THEN`**. `20260866`'s three functions do this; ~34 older RPCs still carry the bare idiom and are filed as BUG-087.
+
 ### Shared component library
 
 All UI primitives come from `src/components/ui.jsx`. Never re-implement buttons, inputs, modals, badges, or spinners in page components. Key exports: `Button` (variants: primary, secondary, danger, success, ghost, warning), `Spinner` (has built-in `role="status"` and `aria-label="Loading"`), `Badge`, `Card` (flat hairline, no shadow), `Input`, `Select`, `Textarea`, `Label`, `PageHeader`, `SectionTitle`, `Divider`, `IconButton`, `ModalOverlay`, `ModalCard`, `StatusPill` (dot + label pill, colored by status string — uses its own internal color map, no props beyond `status` and optional `className`).

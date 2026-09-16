@@ -129,7 +129,16 @@ DECLARE
   v_unit   record;
   v_moved  integer := 0;
 BEGIN
-  IF NOT public.rma_is_manager_or_above() THEN
+  -- COALESCE, and not the bare `IF NOT rma_is_manager_or_above()` idiom the
+  -- other RPCs use. That helper is `SELECT rma_user_role() IN (…)`, and
+  -- rma_user_role() returns NULL for a caller with no CURRENT role row — a
+  -- suspended or expired account, or an auth user with no user_roles row at
+  -- all. `NULL IN (…)` is NULL, `NOT NULL` is NULL, and an IF on NULL does not
+  -- fire: the guard waves them through. RLS policies fail closed on NULL, so
+  -- the same helper is safe there; a plpgsql IF fails OPEN. Found live while
+  -- verifying this migration, and filed as BUG-087 for the ~34 functions that
+  -- still carry the bare idiom.
+  IF NOT COALESCE(public.rma_is_manager_or_above(), false) THEN
     RAISE EXCEPTION 'Not authorized to transfer units' USING ERRCODE = 'P0001';
   END IF;
 
@@ -229,7 +238,10 @@ DECLARE
   v_batch public.manufacturer_batches;
   v_actor text;
 BEGIN
-  IF NOT (public.rma_is_staff() AND public.rma_user_role() <> 'viewer') THEN
+  -- Same NULL-safety as transfer_units above: rma_is_staff() is NULL, not
+  -- false, for a caller with no current role row, and the bare IF would let
+  -- them through. Carried over from 20260830 with COALESCE added.
+  IF NOT COALESCE(public.rma_is_staff() AND public.rma_user_role() <> 'viewer', false) THEN
     RAISE EXCEPTION 'Not authorized to update manufacturer batches' USING ERRCODE = 'P0001';
   END IF;
 
@@ -287,7 +299,10 @@ DECLARE
   v_batch public.manufacturer_batches;
   v_actor text;
 BEGIN
-  IF NOT (public.rma_is_staff() AND public.rma_user_role() <> 'viewer') THEN
+  -- Same NULL-safety as transfer_units above: rma_is_staff() is NULL, not
+  -- false, for a caller with no current role row, and the bare IF would let
+  -- them through. Carried over from 20260830 with COALESCE added.
+  IF NOT COALESCE(public.rma_is_staff() AND public.rma_user_role() <> 'viewer', false) THEN
     RAISE EXCEPTION 'Not authorized to update manufacturer batches' USING ERRCODE = 'P0001';
   END IF;
 
