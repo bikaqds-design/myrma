@@ -12,6 +12,8 @@
 
 ## 0. Scorecard — current status (2026-09-17)
 
+> **Audit work paused 2026-09-17 (owner).** Every finding outside WhatsApp is closed; the two left are WhatsApp and wait on the owner lifting that hold. Re-checked on production before pausing: the notification drain (BUG-005) ran 720 times in 24 hours, all succeeded, HTTP 200, authenticated with the worker secret; Edge Function CORS (BUG-056) no longer answers an unknown origin, so `ALLOWED_ORIGINS` is set; migration ledger 205 rows = 205 files; GitHub has no open issues or pull requests.
+
 > This section is the live status. Sections 1–7 below are the audit **as written on 2026-09-03**, with each finding's own status notes appended over time; every finding now opens with a one-line **Current status** that agrees with this table.
 
 | Severity | Findings | Fixed | Partly fixed | Open |
@@ -34,9 +36,13 @@ The 2026-09-03 audit filed 83 findings; the rest were filed during remediation, 
 | BUG-006 (High) | WhatsApp webhook unreachable by Meta and unsigned | Owner: all WhatsApp work on hold |
 | BUG-077 (Informational) | Two WhatsApp Edge Functions on old `std` imports | The WhatsApp hold |
 
+**Tracked elsewhere, not audit bugs:** the UI/UX backlog in `design/BACKLOG.md` (0 Critical; the remaining High items are long-running consistency work — hard-coded colours, empty states, component-kit adoption — and it records that none blocks launch); Warehouse Module R1's manual click-through QA and its deferred R2 items (see `CLAUDE.md`).
+
 **Owner actions outside the code:** delete any backup file exported before 2026-09-06 (BUG-025); run `supabase/tests/authenticated_role_probes.sql` after any change to RLS, grants or guard triggers (BUG-061).
 
 ### How the fixes are checked now
+
+- **Local unit runs on Windows:** a one-off failure did not reproduce in 7 further full runs; the three tests that re-read the whole source tree per case (up to 2.7 s against Vitest's 5 s limit) now read it once (PR #37).
 
 - **CI on every PR and push to `main`:** unit tests, lint, typecheck and build; and the integration tier against **production** — anon cannot read or write protected tables, privileged RPCs refuse anonymous callers, the columns the app selects exist, and (via `rma_security_invariant_counts()`) there is no fail-open role guard, no helper without COALESCE, no policy negating a helper, and exactly the two chosen anon-executable functions.
 - **`Migration drift` workflow** (push to `main`, daily, on demand): production's migration ledger must match `supabase/migrations/` exactly. After every `apply_migration`, set that row's `version` to the file prefix.
@@ -44,7 +50,7 @@ The 2026-09-03 audit filed 83 findings; the rest were filed during remediation, 
 
 ### Closed on 2026-09-15 to 2026-09-17
 
-BUG-030 (parts used on a ticket: stock and record in one transaction, table closed to direct writes) · BUG-073 (was already fixed on 09-14 but mis-scored as partly fixed; `vendor_payments`, missed by that fix, closed on 09-17) · BUG-066 (every list pages in the database, PRs #7–#23) · BUG-023 residual (the tracker needs the RMA number) · BUG-032 (transfer and batch ledger) · **BUG-087** (role guards failed open for suspended and role-less callers, ~34 functions) · BUG-014 residual (drift check in CI) · BUG-049 residual (sessions end on every loss of access) · BUG-061 residual (signed-in role probes).
+BUG-030 (parts used on a ticket: stock and record in one transaction, table closed to direct writes; deleting a ticket now returns its parts, `20260873`, owner decision) · BUG-073 (was already fixed on 09-14 but mis-scored as partly fixed; `vendor_payments`, missed by that fix, closed on 09-17) · BUG-066 (every list pages in the database, PRs #7–#23) · BUG-023 residual (the tracker needs the RMA number) · BUG-032 (transfer and batch ledger) · **BUG-087** (role guards failed open for suspended and role-less callers, ~34 functions) · BUG-014 residual (drift check in CI) · BUG-049 residual (sessions end on every loss of access) · BUG-061 residual (signed-in role probes).
 
 ---
 
