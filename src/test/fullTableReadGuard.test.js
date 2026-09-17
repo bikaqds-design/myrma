@@ -32,7 +32,12 @@ function walk(dir) {
 }
 
 const baseName = (f) => f.split(/[\\/]/).pop()
-const uiFiles = walk('src').filter((f) => !/^src[\\/]api[\\/]/.test(f))
+
+// Read every source file once, when the module loads. Reading them again inside
+// each test case made single cases take up to 2.7 s on a busy Windows machine,
+// close to Vitest's 5 s per-test timeout; the reads are not what is under test.
+const sources = new Map(walk('src').map((f) => [f, readFileSync(f, 'utf8')]))
+const uiFiles = [...sources.keys()].filter((f) => !/^src[\\/]api[\\/]/.test(f))
 
 describe('screens never read a whole table', () => {
   const banned = [
@@ -49,7 +54,7 @@ describe('screens never read a whole table', () => {
   ]
 
   it.each(banned)('no caller of %s', (pattern, name) => {
-    const hits = uiFiles.filter((f) => pattern.test(readFileSync(f, 'utf8')))
+    const hits = uiFiles.filter((f) => pattern.test(sources.get(f)))
     expect(hits, `${name} reads a whole table (capped at 1 000 rows); use a paged or summarised read`).toEqual([])
   })
 })
@@ -83,9 +88,9 @@ describe('nothing asks for more than the API returns', () => {
     // WhatsApp is on hold by the owner's instruction; its log export is revisited then.
     const allowed = new Set(['whatsappNotifications.ts'])
     const hits = []
-    for (const f of walk('src')) {
+    for (const [f, text] of sources) {
       if (allowed.has(baseName(f))) continue
-      const code = readFileSync(f, 'utf8')
+      const code = text
         .split(/\r?\n/)
         .filter((line) => !/^\s*(\*|\/\/)/.test(line))
         .join('\n')
