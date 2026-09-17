@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Current state (2026-09-17).** The build phase is finished: CRM core, Sales Documents, Accounting, the redesigned Purchase Module and Warehouse Module R1 all shipped (history in [`docs/archive/MASTER_UPGRADE_PLAN.md`](docs/archive/MASTER_UPGRADE_PLAN.md)). Work is now pre-launch hardening driven by `AUDIT_REPORT.md`: **87 findings — 85 fixed, 1 partly fixed (BUG-077, WhatsApp imports), 1 open** (BUG-006, WhatsApp webhook, on hold). What each open item waits on is in the report's §0.
 
+**Audit work is paused (2026-09-17, owner).** Nothing outside WhatsApp is open; resume only when asked.
+
 **Standing rules for working in this repo:**
 - **WhatsApp work is on hold.** Do not fix or refactor WhatsApp code, functions or templates unless the owner lifts the hold.
 - **All current production data is disposable test data** and will be erased before launch. Use it for testing; never "repair" rows — fix code, constraints and guards instead.
