@@ -10,6 +10,7 @@ import {
   MODULE_LABEL_KEYS,
   SENSITIVE_ACTIONS,
 } from '../../lib/permissionCatalog'
+import { SearchInput } from '../../components/SearchInput'
 
 // ── What the database will actually honour ───────────────────────────────────
 //
@@ -598,15 +599,12 @@ export function PermissionMatrix({ permissions, baseline, onToggle, onToggleModu
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 flex-wrap">
-        <label htmlFor="perm-search" className="sr-only">
-          {t('userManagement.searchModules')}
-        </label>
-        <input
+        <SearchInput
           id="perm-search"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={setQuery}
           placeholder={t('userManagement.searchModules')}
-          className="w-full sm:w-72 px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-gray-900 dark:text-[#e8ebf0]"
+          className="w-full sm:w-72"
         />
         <span className="text-xs text-gray-500 dark:text-[#9aa4b2]">
           {t('userManagement.moduleCount', {

@@ -102,6 +102,8 @@ unaffected.
 
 ### UX-SEARCH-002 — No way to clear a search (Low)
 
+> **Closed 2026-09-17.** List search boxes now use the shared `src/components/SearchInput.jsx`: `type="search"`, a translated clear button shown only while there is text, focus kept in the field after clearing (the native WebKit cancel button is hidden so there is one control, not two). Customer/product pickers, the `/tracker` RMA-number lookup and the WhatsApp log (on hold) are deliberately not converted. `src/test/SearchInput.test.jsx` fails if a page adds a raw `<input>` with a search placeholder.
+
 The Customers search, with `computer` typed in it, offers **no clear control at
 all** — measured in the running app, zero buttons matching clear/reset/× were
 visible. The field is `type="text"`, so the browser's own clear affordance is
@@ -197,7 +199,7 @@ measured correctly, is 33 ms.
 | ID | Finding | Severity | Effort |
 |---|---|---|---|
 | UX-SEARCH-001 | Search and filters are not in the URL | Medium | M |
-| UX-SEARCH-002 | No clear control; `type="text"` not `type="search"` | Low | S |
+| ✅ UX-SEARCH-002 | ~~No clear control; `type="text"` not `type="search"`~~ **CLOSED** 2026-09-17 | Low | — |
 | UX-SEARCH-003 | Arabic text not normalised for search — latent, no Arabic data yet | Low | S |
 
 Three further candidates were dropped after measurement: debouncing (already

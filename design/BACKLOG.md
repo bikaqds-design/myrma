@@ -2,7 +2,7 @@
 
 Findings from `design/audit/01-AUDIT.md` that are not closed, and why.
 
-**Status: 27 of 47 closed, 3 retracted, 1 won't-fix. 0 Critical, 3 High, 2 Medium, 2 Low remaining.**
+**Status: 28 of 47 closed, 3 retracted, 1 won't-fix. 0 Critical, 3 High, 1 Medium, 1 Low remaining.**
 (Three search findings added 2026-09-03.)
 
 The single remaining Medium is UX-GLOBAL-009 (spinners rather than skeletons in
@@ -99,7 +99,7 @@ search box; two real findings, one latent.
 | ID | Issue | Sev | Effort |
 |---|---|---|---|
 | ✅ UX-SEARCH-001 | ~~Search and filters not in the URL~~ **CLOSED** — all 7 standalone list routes, each verified from a cold link. Tabbed screens need tab-scoped param names; Leads' Set-based multi-selects need list encoding | Medium | — |
-| UX-SEARCH-002 | No clear control on a search box, and only 2 of ~32 inputs are `type="search"` so the native one is absent too | Low | S |
+| ✅ UX-SEARCH-002 | ~~No clear control on a search box~~ **CLOSED** (2026-09-17) — every list search box is the shared `SearchInput` (`type="search"`, clear button that keeps focus); `src/test/SearchInput.test.jsx` fails on a raw one. Pickers and the `/tracker` lookup are left as they are | Low | — |
 | UX-SEARCH-003 | Arabic not normalised for search (`احمد` will not find `أحمد`). **Latent** — zero Arabic text in 888 customers, 406 products, 33 leads | Low | S |
 
 Three candidates were dropped after measuring: debouncing is already correct

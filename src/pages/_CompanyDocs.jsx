@@ -13,6 +13,7 @@ import { purgeExpiredCompanyTrash } from '../lib/documentTrash'
 import { formatBytes } from '../lib/knowledgeTree'
 import { toUserMessage } from '../lib/errorMessage'
 import { captureException } from '../lib/sentry'
+import { SearchInput } from '../components/SearchInput'
 
 /**
  * Company Docs (2026-09-03) — reference material that belongs to the
@@ -258,17 +259,16 @@ export default function CompanyDocs({ currentUserEmail, currentUserRole, current
       ) : (
         <>
           <form onSubmit={runSearch} className="flex flex-wrap gap-2">
-            <div className="flex-1 min-w-[240px] relative">
-              <input
-                type="search"
-                value={queryDraft}
-                onChange={(e) => setQueryDraft(e.target.value)}
-                placeholder={t('knowledgeCenter.companyDocs.searchPlaceholder')}
-                aria-label={t('knowledgeCenter.search')}
-                className="w-full ps-10 pe-3 py-2.5 border border-[#e6e9ef] dark:border-[#212a38] dark:bg-[#121823] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
-              />
-              <SearchIcon />
-            </div>
+            <SearchInput
+              value={queryDraft}
+              onChange={setQueryDraft}
+              // Clearing the box also clears the applied search, not just the draft.
+              onClear={clearSearch}
+              placeholder={t('knowledgeCenter.companyDocs.searchPlaceholder')}
+              aria-label={t('knowledgeCenter.search')}
+              className="flex-1 min-w-[240px]"
+              inputClassName="w-full py-2.5 border border-[#e6e9ef] dark:border-[#212a38] dark:bg-[#121823] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-indigo-600"
+            />
             <button type="submit" className="px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
               {t('knowledgeCenter.search')}
             </button>
@@ -412,10 +412,3 @@ function UploadIcon() {
   )
 }
 
-function SearchIcon() {
-  return (
-    <svg className="w-4 h-4 absolute start-3.5 top-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-    </svg>
-  )
-}
