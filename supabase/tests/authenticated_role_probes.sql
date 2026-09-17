@@ -20,7 +20,7 @@
 -- #  NOT RUN BY CI. The `db-tests` job is disabled (`if: false`), and running
 -- #  this from CI would need a database credential in GitHub, which the owner
 -- #  has declined. It is a reference script, run by hand after security-relevant
--- #  changes. Last run against production 2026-09-16: 24 of 24 passed.
+-- #  changes. Last run against production 2026-09-17: 28 of 28 passed.
 -- #
 -- #  It picks its own fixtures — one active account per role, a customer, a
 -- #  posted invoice, a ticket, a vendor, an available unit — so it keeps working
