@@ -18,22 +18,21 @@
 |---|---|---|---|---|
 | Critical | 4 | 4 | 0 | 0 |
 | High | 19 | 18 | 0 | 1 |
-| Medium | 34 | 33 | 1 | 0 |
-| Low | 24 | 23 | 1 | 0 |
-| Informational | 6 | 2 | 4 | 0 |
-| **Total** | **87** | **80** | **6** | **1** |
+| Medium | 34 | 34 | 0 | 0 |
+| Low | 24 | 24 | 0 | 0 |
+| Informational | 6 | 5 | 1 | 0 |
+| **Total** | **87** | **85** | **1** | **1** |
 
 The 2026-09-03 audit filed 83 findings; the rest were filed during remediation, as the fixes turned up new defects (BUG-079 onward). Every Critical is fixed, and every High except the on-hold WhatsApp webhook — each applied to production and verified there.
+
+> **Correction 2026-09-17.** The 2026-09-16 version of this table counted BUG-041, 063, 073, 074 and 078 as partly fixed. Each had been closed on 2026-09-13 or 09-14, but its closing note sits *above* an older “partly fixed” note, and the summary took the lower one as the latest. BUG-073's re-check did find one real gap, `vendor_payments`, closed the same day (`20260872`).
 
 ### What is still open, and why
 
 | Finding | Remaining | Waiting on |
 |---|---|---|
 | BUG-006 (High) | WhatsApp webhook unreachable by Meta and unsigned | Owner: all WhatsApp work on hold |
-| BUG-073 (Informational) | Four application/stock tables not yet RPC-only | An architecture decision |
 | BUG-077 (Informational) | Two WhatsApp Edge Functions on old `std` imports | The WhatsApp hold |
-| BUG-041, BUG-063 | Violations that live only in seed/test records | The planned data reset |
-| BUG-074, BUG-078 (Informational) | Items deliberately left as they are, recorded in each finding | Nothing — accepted as designed |
 
 **Owner actions outside the code:** delete any backup file exported before 2026-09-06 (BUG-025); run `supabase/tests/authenticated_role_probes.sql` after any change to RLS, grants or guard triggers (BUG-061).
 
@@ -45,7 +44,7 @@ The 2026-09-03 audit filed 83 findings; the rest were filed during remediation, 
 
 ### Closed on 2026-09-15 to 2026-09-17
 
-BUG-030 (parts used on a ticket: stock and record in one transaction, table closed to direct writes) · BUG-066 (every list pages in the database, PRs #7–#23) · BUG-023 residual (the tracker needs the RMA number) · BUG-032 (transfer and batch ledger) · **BUG-087** (role guards failed open for suspended and role-less callers, ~34 functions) · BUG-014 residual (drift check in CI) · BUG-049 residual (sessions end on every loss of access) · BUG-061 residual (signed-in role probes).
+BUG-030 (parts used on a ticket: stock and record in one transaction, table closed to direct writes) · BUG-073 (was already fixed on 09-14 but mis-scored as partly fixed; `vendor_payments`, missed by that fix, closed on 09-17) · BUG-066 (every list pages in the database, PRs #7–#23) · BUG-023 residual (the tracker needs the RMA number) · BUG-032 (transfer and batch ledger) · **BUG-087** (role guards failed open for suspended and role-less callers, ~34 functions) · BUG-014 residual (drift check in CI) · BUG-049 residual (sessions end on every loss of access) · BUG-061 residual (signed-in role probes).
 
 ---
 
@@ -1125,7 +1124,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [MEDIUM] Live data already violates ledger and stock invariants
 
 * ID: BUG-041
-* **Current status (2026-09-16):** PARTLY FIXED — the integrity check and the money repair are done; the remaining violations are the June seed cohort, which the planned data reset removes (owner: all current data is disposable test data).
+* **Current status (2026-09-17):** FIXED (closed 2026-09-13) — the integrity check (`rma_data_integrity_issues()`) and the money repair are done; the remaining violations are test records that the planned data reset removes, so there is nothing to repair (owner: all current data is disposable).
 * Category: Data Integrity
 * Location: live data — `crm_invoices` INV-2026-00010/11/12/13/14/15 (posted 2026-06-08 by `*@test.com` seed accounts) have `amount_paid > 0` and `payment_status` paid/partial but **zero** `payment_applications`/`credit_note_applications`; 15 `sales_orders` with `status='delivered'` have no `stock_moves` rows; 8 live `inventory_units` have an empty serial; 3 posted invoices have no `due_date`
 * Description: The seed/fixture invoices sit on real customer statements (`v_customer_ledger` shows the invoice at full total and no payment, while the invoice itself says "paid"), so those customers' balances are wrong; the delivered orders without moves are either legacy or created via the direct-status path in BUG-004.
@@ -1608,7 +1607,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [LOW] Data-quality issues visible in production
 
 * ID: BUG-063
-* **Current status (2026-09-16):** PARTLY FIXED — the guards are in place; the remaining duplicates, due dates and blank serials are existing test records, resolved by the planned data reset rather than repaired.
+* **Current status (2026-09-17):** FIXED (closed 2026-09-13) — the guards are in place (duplicate-mobile check, due dates at posting, integrity checks); the remaining duplicates, due dates and blank serials are test records removed by the planned data reset.
 * Category: Data Integrity
 * Location: live data — 14 customers share a mobile number with another customer (the bulk-import dedupe only compares against loaded rows and the single-create form does not check); 8 live (`status <> 'closed'`) `inventory_units` have an empty `serial_number` (the partial unique index excludes them, so duplicates are possible); 3 posted invoices have no `due_date` (aging treats them as "current" forever); 10 `user_roles` rows have no `auth.users` account and 1 auth user has no role
 * Description: Each is a small inconsistency the code tolerates but that skews reports and dropdowns.
@@ -1816,7 +1815,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [INFORMATIONAL] Consolidate financial writes behind RPCs and lock posted documents with triggers
 
 * ID: BUG-073
-* **Current status (2026-09-16):** PARTLY FIXED — every document table has transition/settled-document triggers and the money tables are admin-only or procedure-only; **still open:** making `payment_applications`, `credit_note_applications`, `vendor_payment_applications` and `warehouse_stock` RPC-only is an architecture decision not yet taken.
+* **Current status (2026-09-17):** FIXED — every document table has transition/settled-document triggers, and every money and stock ledger table (`payments`, `vendor_payments`, the three application tables, `warehouse_stock`) is procedure-only: `20260850` (2026-09-14) and `20260872` (2026-09-17, `vendor_payments`, which 20260850 missed).
 * Category: Security / Data Integrity
 * Location: schema-wide (see BUG-001/002/004/010)
 * Description: The codebase already moved *most* money and stock logic into SECURITY DEFINER RPCs; the remaining exposure comes from table-level policies that still allow the same writes directly. A "RPC-only" posture (`WITH CHECK (false)` on client inserts/updates for financial tables, or a GUC the RPCs set and triggers require) closes the class rather than the instances.
@@ -1826,6 +1825,8 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 * Suggested fix: as described; add a `supabase/manual/*_probe_roles.sql` run to CI once a staging project exists.
 * Confidence: Suspected (design recommendation)
 * **Status: FIXED 2026-09-14 — payments, their applications and warehouse stock are procedure-only.** Migration `20260850`, on the owner's decision.
+* **Correction 2026-09-17 — `vendor_payments` had been missed.** `20260850`'s list covered `payments` but not its accounts-payable twin, so on production an administrator could still insert a vendor payment with no VP- number or allocation checks, change its amount after it was applied, or delete one invoices had been paid from (`admin_insert/update/delete_vendor_payments`, plus INSERT/UPDATE/DELETE/TRUNCATE grants). Closed by `20260872_vendor_payments_procedure_only.sql`, the same shape as 20260850: refuses to apply if any writer is not SECURITY DEFINER (`record_vendor_payment`, `void_vendor_payment`, `sync_vendor_payment_balance` all are), and to finish if a write grant or policy survives. The app only ever read the table.
+* Verified by rolled-back probe on production: as an administrator, direct INSERT, UPDATE and DELETE on `vendor_payments` are refused (42501); as a manager, `record_vendor_payment` still creates a payment, `void_vendor_payment` still voids it, and reads still work. `authenticated_role_probes.sql` now also checks the administrator case for `payments` and `vendor_payments`, and `src/test/moneyTablesProcedureOnly.test.js` (in CI) pins that all six tables are revoked by a migration and that nothing in `src/` writes them. The 2026-09-16 scorecard showed this finding as partly fixed because the older 09-13 note below was read as the latest.
 * **Why it was safe, measured first:** the app never writes these tables directly — every reference in `src/` is a read — and all 21 functions that write them, plus the `trg_sync_payment_balance` trigger, are SECURITY DEFINER, so none depends on the caller's rights. The migration refuses to apply if any writer is not.
 * **Worse than filed:** besides the admin-only write policies, `authenticated` held **TRUNCATE** on all five tables — a privilege that ignores row-level security entirely. PostgREST cannot issue it, so it was not reachable through the app, but no client role had reason to hold it. Revoked along with INSERT, UPDATE, DELETE, TRIGGER and REFERENCES; SELECT and every read policy are unchanged.
 * **Proven against production with a rolled-back probe as a real administrator:** direct INSERT into payments, UPDATE of warehouse_stock and DELETE from payment_applications are all refused; `record_payment` still creates a payment and `recalculate_stock` still runs; a technician still reads warehouse stock. The ledger rules in the procedures can no longer be bypassed, even by an administrator with API access.
@@ -1838,7 +1839,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [INFORMATIONAL] Add a row-count guard to every update/delete helper
 
 * ID: BUG-074
-* **Current status (2026-09-16):** PARTLY FIXED — 60 write sites guarded; the 12 bulk `.in(...)` writes and a few zero-rows-is-normal helpers are left unguarded by design, as recorded below.
+* **Current status (2026-09-17):** FIXED (closed 2026-09-14) — every user-initiated write fails loudly when it changes nothing, bulk actions included; only writes where zero rows is correct, and the WhatsApp helpers (on hold), are unguarded.
 * Category: Error Handling
 * Location: `src/api/db/*.ts`
 * Description: A tiny `expectOne(data)` helper would turn the silent 0-row class (BUG-008) into a thrown error everywhere at once.
@@ -1899,7 +1900,7 @@ Findings are grouped by severity. IDs are sequential across the whole report.
 #### [INFORMATIONAL] Bundle size warning and PWA precache of 5 MB
 
 * ID: BUG-078
-* **Current status (2026-09-16):** PARTLY FIXED — Arabic is lazy-loaded (about 239 KB smaller live); the remaining bundle-size and precache items are recorded below.
+* **Current status (2026-09-17):** FIXED (closed 2026-09-14) — Arabic is lazy-loaded and the main chunk is a fifth smaller; the owner chose to keep pre-caching every page.
 * Category: Performance
 * Location: `vite build` output (one chunk > 500 kB; precache 90 entries / 5.07 MB); `vite.config.js` manual chunks
 * Description: First load and SW install are heavy; `xlsx`, `jspdf`, `html2canvas`, `pdfjs-dist`, `recharts` are candidates for lazy loading (pdfjs already is).
