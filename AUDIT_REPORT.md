@@ -36,7 +36,7 @@ The 2026-09-03 audit filed 83 findings; the rest were filed during remediation, 
 | BUG-006 (High) | WhatsApp webhook unreachable by Meta and unsigned | Owner: all WhatsApp work on hold |
 | BUG-077 (Informational) | Two WhatsApp Edge Functions on old `std` imports | The WhatsApp hold |
 
-**Tracked elsewhere, not audit bugs:** the UI/UX backlog in `design/BACKLOG.md` (0 Critical; the remaining High items are long-running consistency work — hard-coded colours, empty states, component-kit adoption — and it records that none blocks launch); Warehouse Module R1's manual click-through QA and its deferred R2 items (see `CLAUDE.md`).
+**Tracked elsewhere, not audit bugs:** the UI/UX backlog in `design/BACKLOG.md` (0 Critical; the remaining High items are long-running consistency work — hard-coded colours, empty states, component-kit adoption — and it records that none blocks launch); Warehouse Module R1's deferred R2 items (see `CLAUDE.md`) — its manual QA passed on 2026-08-05/06 and again as a regression re-run on 2026-09-17, which raised four UI/reporting findings recorded in `docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md` (the largest: delivered units still counted in Main and Physical Total).
 
 **Owner actions outside the code:** delete any backup file exported before 2026-09-06 (BUG-025); run `supabase/tests/authenticated_role_probes.sql` after any change to RLS, grants or guard triggers (BUG-061).
 
