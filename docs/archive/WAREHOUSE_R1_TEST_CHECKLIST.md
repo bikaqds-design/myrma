@@ -21,7 +21,7 @@ remain ⬜" was true on the day it was written and has since been overtaken.
 
 | Module | Where it was run | State |
 |---|---|---|
-| Inventory / Warehouse R1 | this file, §0–§9 | ✅ closed 2026-08-05/06; regression re-run ✅ 2026-09-17 (4 findings, see below) |
+| Inventory / Warehouse R1 | this file, §0–§9 | ✅ closed 2026-08-05/06; regression re-run ✅ 2026-09-17 (4 findings, see below; #1 fixed by `20260874`) |
 | Sales, Accounting, Leads, Deals, Activities (funnel) | this file, "Sales-Funnel 52-Item Checklist" | ✅ 52/52 closed 2026-08-06/07 |
 | Purchasing | this file, "Purchase Module (Sprint 9R)" | ✅ closed 2026-08-07 |
 | Leads / Pipeline (Sprints 2.5 + 3) | `CRM_QA_CHECKLIST.md` | ✅ closed 2026-08-08, bar row 40 |
@@ -98,7 +98,7 @@ the UI **and** in the database. Baseline: 441 units, 557 stock moves, 13 tickets
 
 **Findings (not fixed in this run):**
 
-1. **Delivered units still count as stock on hand.** A serialized unit delivered on a sales order keeps
+1. **FIXED 2026-09-17 (`20260874_delivered_units_not_on_hand.sql`, owner request) — delivered units still counted as stock on hand.** After the fix, applied and verified: test2 Main 21 → 1 and Physical 50 → 30, test 3 Main 17 → 16, MAIN warehouse units 398 → 377 in the UI; a warehouse holding only delivered stock can be archived. Original finding: A serialized unit delivered on a sales order keeps
    `status = 'company_stock'` with `reservation_status = 'delivered'`. `v_product_stock_summary`
    excludes it from Available but still counts it in **Main** (or Branches) and **Physical Total**, and
    the Stock Breakdown shows it in "Total" and the warehouse distribution. 21 units today: `test2`

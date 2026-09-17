@@ -26,7 +26,7 @@
 -- #  Docker; see .github/workflows/ci.yml). On 2026-09-14 this block was run
 -- #  against the hosted project with the cleanup replaced by an unconditional
 -- #  RAISE, so the transaction rolled back and no fixture row was kept — all
--- #  10 checks passed (after correcting CHECK 1d's expected value to 11). Run
+-- #  10 checks passed (after correcting CHECK 1d's expected value to 11). Re-run 2026-09-17 after 20260874 (delivered units not on hand): 10 of 10. Run
 -- #  it the same way after changing the views.
 -- ############################################################################
 
@@ -257,10 +257,12 @@ BEGIN
 
   -- ── CHECK 9: per-warehouse counts ────────────────────────────────────────────
   v_checks := v_checks + 1;
-  IF (SELECT unit_count FROM public.v_warehouse_unit_counts WHERE warehouse_id = v_main)
-     IS DISTINCT FROM (SELECT count(*)::int FROM public.inventory_units WHERE warehouse_id = v_main
-                          AND NOT (status = 'company_stock' AND reservation_status IS NOT DISTINCT FROM 'delivered')) THEN
-    v_failures := array_append(v_failures, 'CHECK 9: warehouse unit count does not match the table (delivered units excluded)');
+  -- The main warehouse holds 11 fixture units: 4 company stock of the serialized
+  -- product (one delivered), 1 RMA, 1 closed, 3 grouped, 2 labelled. The
+  -- delivered unit has left the building (20260874), so 10.
+  IF (SELECT unit_count FROM public.v_warehouse_unit_counts WHERE warehouse_id = v_main) IS DISTINCT FROM 10 THEN
+    v_failures := array_append(v_failures, format('CHECK 9: main warehouse unit count %s, expected 10 (the delivered unit excluded)',
+      (SELECT unit_count FROM public.v_warehouse_unit_counts WHERE warehouse_id = v_main)));
   END IF;
 
   -- ── CHECK 10: access — invoker rights, no anon ───────────────────────────────
