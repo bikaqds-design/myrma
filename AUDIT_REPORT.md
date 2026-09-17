@@ -12,7 +12,7 @@
 
 ## 0. Scorecard — current status (2026-09-17)
 
-> **Audit work paused 2026-09-17 (owner).** Every finding outside WhatsApp is closed; the two left are WhatsApp and wait on the owner lifting that hold. Re-checked on production before pausing: the notification drain (BUG-005) ran 720 times in 24 hours, all succeeded, HTTP 200, authenticated with the worker secret; Edge Function CORS (BUG-056) no longer answers an unknown origin, so `ALLOWED_ORIGINS` is set; migration ledger 205 rows = 205 files; GitHub has no open issues or pull requests.
+> **Audit work paused 2026-09-17 (owner).** Every finding outside WhatsApp is closed; the two left are WhatsApp and wait on the owner lifting that hold. Re-checked on production before pausing: the notification drain (BUG-005) ran 720 times in 24 hours, all succeeded, HTTP 200, authenticated with the worker secret; Edge Function CORS (BUG-056) no longer answers an unknown origin, so `ALLOWED_ORIGINS` is set; migration ledger 205 rows = 205 files (206 = 206 after `20260874` later that day); GitHub has no open issues or pull requests.
 
 > This section is the live status. Sections 1–7 below are the audit **as written on 2026-09-03**, with each finding's own status notes appended over time; every finding now opens with a one-line **Current status** that agrees with this table.
 

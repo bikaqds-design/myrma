@@ -1398,7 +1398,7 @@ TypeScript is adopted in `src/lib/` and `src/api/db/`.
 
 | Tier | Where | Runs in CI |
 |------|-------|-----------|
-| Unit (Vitest, ~1,700 tests in 96 files) | `src/test/`, `src/lib/` | Yes — every PR |
+| Unit (Vitest, ~1,770 tests in 100 files) | `src/test/`, `src/lib/` | Yes — every PR |
 | Integration (read-only, against the hosted project) | `tests/integration/` | Yes — every PR, Node 22 |
 | Migration ledger | `scripts/migration-drift.mjs` | `Migration drift` workflow — push to `main`, daily |
 | SQL reference scripts (RPC behaviour, signed-in role probes) | `supabase/tests/*.sql` | **No** — run by hand inside a rolled-back transaction; the `db-tests` job is disabled |
