@@ -7,6 +7,7 @@ import Modal from '../../components/Modal'
 import { ROLES } from '../../lib/constants'
 import { StatusBadge, RoleBadge, ASSIGNABLE_ROLES } from './_shared'
 import { FILTER_ROLES, FILTER_STATUSES, PAGE_SIZES } from './_directory'
+import { SearchInput } from '../../components/SearchInput'
 
 export function UsersTab({
   users,
@@ -69,19 +70,13 @@ export function UsersTab({
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2 mb-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={t('userManagement.searchPlaceholder')}
-            aria-label={t('userManagement.searchLabel')}
-            className={`${inputCls} w-full ps-9`}
-          />
-          <svg className="w-4 h-4 absolute start-3 top-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-          </svg>
-        </div>
+        <SearchInput
+          value={search}
+          onChange={onSearchChange}
+          placeholder={t('userManagement.searchPlaceholder')}
+          aria-label={t('userManagement.searchLabel')}
+          className="flex-1 min-w-[200px]"
+        />
 
         <select value={roleFilter} onChange={(e) => onRoleFilterChange(e.target.value)}
           aria-label={t('userManagement.filterRole')} className={inputCls}>

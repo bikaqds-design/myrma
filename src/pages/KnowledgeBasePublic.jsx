@@ -4,6 +4,7 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { db, branding as brandingAPI } from '../api/supabaseClient'
 import { useDebouncedValue } from '../lib/useDebouncedValue'
 import { EMPTY_ARRAY } from '../lib/stableEmpty'
+import { SearchInput } from '../components/SearchInput'
 
 /** Articles shown at first, and added by each "Show more". */
 const BATCH = 50
@@ -81,15 +82,13 @@ export default function KnowledgeBasePublic() {
           <p className="text-gray-500">{t('kb.subtitle')}</p>
         </div>
 
-        <div className="max-w-xl mx-auto">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('kb.searchPlaceholder')}
-            aria-label={t('kb.searchPlaceholder')}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 focus:border-transparent shadow-sm"
-          />
-        </div>
+        <SearchInput
+          value={query}
+          onChange={setQuery}
+          placeholder={t('kb.searchPlaceholder')}
+          className="max-w-xl mx-auto"
+          inputClassName="w-full py-3 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-600 focus:border-transparent shadow-sm outline-none"
+        />
 
         {loading && (
           <div className="flex justify-center py-10">

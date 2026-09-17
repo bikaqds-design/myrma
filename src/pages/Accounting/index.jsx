@@ -15,6 +15,7 @@ import { VoidModal } from '../SalesDocuments/_modals'
 import { RecordVendorPaymentModal } from '../Purchasing/_modals'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { AGING_BUCKETS, emptyAgingTotals } from '../../lib/aging'
+import { SearchInput } from '../../components/SearchInput'
 
 const METHOD_LABEL_KEY = {
   cash: 'accounting.methodCash',
@@ -276,16 +277,12 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
 
       {tab === 'payments' && (
         <>
-          <div className="relative max-w-md">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('accounting.searchPlaceholder')}
-              aria-label={t('accounting.searchPlaceholder')}
-              className="w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none"
-            />
-          </div>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder={t('accounting.searchPlaceholder')}
+            className="max-w-md"
+          />
 
           <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-x-auto">
             <table className="w-full text-sm">
@@ -402,16 +399,12 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
 
       {tab === 'vendor_payments' && (
         <>
-          <div className="relative max-w-md">
-            <input
-              type="text"
-              value={vendorSearch}
-              onChange={(e) => setVendorSearch(e.target.value)}
-              placeholder={t('accounting.searchPlaceholderVendor')}
-              aria-label={t('accounting.searchPlaceholderVendor')}
-              className="w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none"
-            />
-          </div>
+          <SearchInput
+            value={vendorSearch}
+            onChange={setVendorSearch}
+            placeholder={t('accounting.searchPlaceholderVendor')}
+            className="max-w-md"
+          />
 
           <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-x-auto">
             <table className="w-full text-sm">

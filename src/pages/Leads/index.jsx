@@ -26,6 +26,7 @@ import LeadsKanbanView from './LeadsKanbanView'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { contactFieldProblems } from '../../lib/importValidation'
 import { useDebouncedValue } from '../../lib/useDebouncedValue'
+import { SearchInput } from '../../components/SearchInput'
 
 /** Cards each Kanban column shows before "Show more". */
 const KANBAN_PAGE = 50
@@ -967,20 +968,7 @@ export default function Leads({ currentUserRole, currentUserEmail, currentUserPe
         <div className="px-5 py-4">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-3 flex-wrap">
-              <div className="relative flex-1 max-w-md">
-                <input
-                  ref={searchRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t('leads.searchPlaceholder')}
-                  aria-label={t('leads.searchPlaceholder')}
-                  className="w-full ps-9 pe-4 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
-                />
-                <svg className="w-4 h-4 text-[#6c6760] dark:text-[#9aa4b2] absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
+              <SearchInput ref={searchRef} value={searchQuery} onChange={setSearchQuery} placeholder={t('leads.searchPlaceholder')} aria-label={t('leads.searchPlaceholder')} className="flex-1 max-w-md" />
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 aria-expanded={showFilters}
