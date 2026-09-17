@@ -47,10 +47,13 @@ describe('the app only reads these tables', () => {
     }
   }
   walk('src')
+  // Read once here, not once per table inside each case: re-reading the tree
+  // per case took up to 2.7 s on a busy Windows machine (Vitest's limit is 5 s).
+  const sources = new Map(files.map((f) => [f, read(f)]))
 
   it.each(PROCEDURE_ONLY)('no direct insert/update/delete/upsert on %s', (table) => {
     const pattern = new RegExp(String.raw`from\('${table}'\)\s*\.(insert|update|delete|upsert)\(`)
-    const offenders = files.filter((f) => pattern.test(read(f)))
+    const offenders = files.filter((f) => pattern.test(sources.get(f)))
     expect(offenders).toEqual([])
   })
 })

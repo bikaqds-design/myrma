@@ -197,6 +197,20 @@ describe('the screen does not undo the rule', () => {
  * build rather than a wrong number, so it is worth a test rather than care.
  */
 describe('imports from the api barrel resolve', () => {
+  // Read the source tree once, outside the timed test case: re-reading it inside
+  // the case took up to 1.7 s on a busy Windows machine (Vitest's limit is 5 s).
+  const walkSources = (dir) => {
+    const out = []
+    for (const entry of readdirSync(dir)) {
+      const path = join(dir, entry)
+      if (statSync(path).isDirectory()) {
+        if (entry !== 'test') out.push(...walkSources(path))
+      } else if (/\.(jsx?|tsx?)$/.test(entry)) out.push([path, readFileSync(path, 'utf8')])
+    }
+    return out
+  }
+  const sources = walkSources('src')
+
   it('every named import exists in supabaseClient.js', () => {
     const barrel = readFileSync('src/api/supabaseClient.js', 'utf8')
     const exported = new Set()
@@ -208,20 +222,8 @@ describe('imports from the api barrel resolve', () => {
     }
     expect(exported.size, 'could not parse the barrel exports').toBeGreaterThan(3)
 
-    const walk = (dir) => {
-      const out = []
-      for (const entry of readdirSync(dir)) {
-        const path = join(dir, entry)
-        if (statSync(path).isDirectory()) {
-          if (entry !== 'test') out.push(...walk(path))
-        } else if (/\.(jsx?|tsx?)$/.test(entry)) out.push(path)
-      }
-      return out
-    }
-
     const bad = []
-    for (const file of walk('src')) {
-      const src = readFileSync(file, 'utf8')
+    for (const [file, src] of sources) {
       for (const m of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"][^'"]*supabaseClient['"]/g)) {
         for (const name of m[1].split(',')) {
           const clean = name.trim().split(/\s+as\s+/)[0].trim()
