@@ -21,7 +21,7 @@ remain ⬜" was true on the day it was written and has since been overtaken.
 
 | Module | Where it was run | State |
 |---|---|---|
-| Inventory / Warehouse R1 | this file, §0–§9 | ✅ closed 2026-08-05/06 |
+| Inventory / Warehouse R1 | this file, §0–§9 | ✅ closed 2026-08-05/06; regression re-run ✅ 2026-09-17 (4 findings, see below) |
 | Sales, Accounting, Leads, Deals, Activities (funnel) | this file, "Sales-Funnel 52-Item Checklist" | ✅ 52/52 closed 2026-08-06/07 |
 | Purchasing | this file, "Purchase Module (Sprint 9R)" | ✅ closed 2026-08-07 |
 | Leads / Pipeline (Sprints 2.5 + 3) | `CRM_QA_CHECKLIST.md` | ✅ closed 2026-08-08, bar row 40 |
@@ -76,6 +76,45 @@ no stock summary on the product detail page, and a credit note closes its RMA ti
 about and logged, but still an implicit rule).
 
 ---
+
+### Regression re-run — 2026-09-17
+
+Owner asked for §1–§9 again after September's changes (BUG-066 paged inventory views, BUG-032
+`transfer_units` ledger, BUG-087 fail-closed guards, BUG-030 ticket parts). Run in the owner's
+Chrome as `bika.qds@gmail.com` (super_admin) against production test data, every step checked in
+the UI **and** in the database. Baseline: 441 units, 557 stock moves, 13 tickets.
+
+| § | Result | Evidence |
+|---|---|---|
+| 1 | ✅ | 8 system rows show only the padlock; sellable rows can be archived. Padlock opens the editor with name/code/type disabled and no Active toggle. Manager `qa-r1@example.com` saved on `CREDIT-NOTE` (name/code/type/active unchanged in the DB), then cleared. |
+| 2 | ✅ | Ticket with an already-tracked serial (`TEST-CB86E9-0022`) **blocked** with the named-serial message; DB unchanged (13 / 441 / 557). With a fresh serial: `RMA-17092026-0001` created, `test 3` unit `QA-R1-0917-A` (with `product_id`) and non-catalog `QA-R1-0917-B` both in **RMA-RECEIVED**, 2 `transfer` moves `doc_type=rma_ticket`, actor from the session. Overview `test 3` RMA 3→4, Physical Total 20. |
+| 3 | ✅ | Under Repair → RMA-REPAIR, Repaired → RMA-REPAIRED, Replacement → **RMA-STOCK** (Replacement Holding stayed 0); moves 559→560→561→562, one per edit. |
+| 4 | ✅ | Bulk product-status *Can't Repair* on `RMA-17092026-0001` + `RMA-06082026-0001`: all three units (including `QA-NOCRM-001` on the second ticket) → RMA-CANTREPAIR, moves 562→565, no error. |
+| 5 | ✅ | RMA drawer: *Promote to…* lists only Main Warehouse / Branch – Cairo; *Move to…* only system locations. Promote `QA-R1-0917-A` → Main: toast "Unit promoted to sellable stock", Available 15→16, Main 16→17, RMA 4→3, Physical Total unchanged, 1 move. **Technician gate not re-run** — it needs signing in as a technician, and passwords are not entered by the agent; the database side is covered by `authenticated_role_probes.sql` (28/28 today). |
+| 6 | ✅ | Columns unchanged. `QA-NOCRM-001` → Scrap: Physical Total 20→19, Available 16, RMA 3 (drawer regroups under SCRAP (1)). Branches drawer, serialized `test2`: Main 21 / Cairo 27, no controls. **Bulk** `QA Bulk Widget` (unchecked in August for lack of data): Main 33 / Cairo 6 with Transfer/Adjust; transferred 1 Cairo → Main — `warehouse_stock` Cairo 5 / Main 34, `transfer` move `ref_type=warehouse_stock`, toast shown, Overview row updated. |
+| 7 | ✅ | `QA R1 Non Catalog Device`: "Not in catalog" badge, no checkbox, Available/Main 0, RMA 1. |
+| 8 | ✅ | Stock Breakdown for `test 3`: RMA Distribution "RMA – Received 2, Scrap 1" (real locations), Physical Total 19. |
+| 9 | ✅ | For all 406 non-service products the Overview's Available, Reserved and RMA equal a direct count of units / `warehouse_stock` — **0 mismatches**. No active unit unplaced; no RMA unit reserved. |
+
+**Findings (not fixed in this run):**
+
+1. **Delivered units still count as stock on hand.** A serialized unit delivered on a sales order keeps
+   `status = 'company_stock'` with `reservation_status = 'delivered'`. `v_product_stock_summary`
+   excludes it from Available but still counts it in **Main** (or Branches) and **Physical Total**, and
+   the Stock Breakdown shows it in "Total" and the warehouse distribution. 21 units today: `test2`
+   shows Main 21 where 20 were delivered to customers, `test 3` Main 17 with one delivered. The
+   dashboard overstates physical stock by every unit ever sold. Needs a decision: exclude delivered
+   units from Main/Branches/Physical Total, or move a delivered unit out of `company_stock`.
+2. **Branches drawer does not refresh after a transfer.** After a successful bulk transfer the open
+   drawer still showed Main 33 / Cairo 6 while the table and the database had 34 / 5; closing and
+   reopening showed the right numbers.
+3. **Escape discards the Create Ticket form without asking.** Pressing Escape to dismiss the product
+   suggestion list closed the whole dialog and lost everything typed.
+4. *(cosmetic)* The RMA drawer's *Move to…* list offers the unit's current location.
+
+Left in the test data: ticket `RMA-17092026-0001` (units `QA-R1-0917-A` in Main, `QA-R1-0917-B` in
+RMA-CANTREPAIR), `QA-NOCRM-001` in Scrap, `RMA-06082026-0001` product status Can't Repair, and
+`QA Bulk Widget` Main 34 / Cairo 5. All production data is disposable test data.
 
 ### Run log — 2026-08-05
 

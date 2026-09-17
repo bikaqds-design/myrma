@@ -47,7 +47,7 @@ written for their original location and may point at files that have since moved
 | `RMA_TICKETS_QA_CHECKLIST.md` | 2026-08-10 | RMA Tickets |
 | `PUBLIC_TRACKER_QA_CHECKLIST.md`, `CUSTOMERS_QA_CHECKLIST.md` | 2026-08-12 | Public tracker; Customers |
 | `PRODUCTS_QA_CHECKLIST.md` | 2026-08-13 | Products |
-| `WAREHOUSE_R1_TEST_CHECKLIST.md` | 2026-08-05 → 08-17 | Warehouse Module R1, plus the pending-QA rows of earlier sprints — cited by code comments and migrations `20260768`–`20260770` |
+| `WAREHOUSE_R1_TEST_CHECKLIST.md` | 2026-08-05 → 08-17, re-run 2026-09-17 | Warehouse Module R1, plus the pending-QA rows of earlier sprints — cited by code comments and migrations `20260768`–`20260770` |
 
 ## SpecKit feature specs — all shipped
 
