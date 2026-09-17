@@ -35,6 +35,10 @@ export default function Modal({
   scrollable = true,
   /** Remove the default p-6 padding — for modals with custom internal layout */
   noPadding = false,
+  /** Radix hook: call event.preventDefault() to keep the dialog open on Escape */
+  onEscapeKeyDown,
+  /** Radix hook: call event.preventDefault() to keep the dialog open on an outside click or focus */
+  onInteractOutside,
 }) {
   const { t } = useTranslation()
   return (
@@ -69,6 +73,8 @@ export default function Modal({
             .filter(Boolean)
             .join(' ')}
           aria-describedby={description ? 'modal-description' : undefined}
+          onEscapeKeyDown={onEscapeKeyDown}
+          onInteractOutside={onInteractOutside}
         >
           {/*
             `hideHeader` used to skip the Dialog.Title entirely. Radix warns

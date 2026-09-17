@@ -87,6 +87,10 @@ export function ProductSearchInput({ value, onChange, onSelectProduct, brandId, 
         value={query}
         onChange={(e) => { setQuery(e.target.value); onChange(e.target.value); setOpen(true) }}
         onFocus={() => { if (query.trim()) setOpen(true) }}
+        // Escape closes the suggestion list only. A surrounding dialog checks
+        // aria-expanded and stays open (TicketForm, warehouse finding 3).
+        onKeyDown={(e) => { if (e.key === 'Escape' && open) setOpen(false) }}
+        aria-expanded={open && filtered.length > 0}
         placeholder={placeholder}
         className={inputClassName}
         autoComplete="off"

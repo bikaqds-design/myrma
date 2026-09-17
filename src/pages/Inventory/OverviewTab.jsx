@@ -82,6 +82,13 @@ export function OverviewTab({
     safeStorage.set('invOverviewPerPage', itemsPerPage)
   }, [itemsPerPage])
 
+  // A drawer opens on the row that was clicked, but must show the row as it is
+  // now: after a transfer the page refetches, and the drawer kept showing the
+  // stale snapshot (Warehouse R1 re-run, finding 2). Fall back to the snapshot
+  // only if the product has left the current page.
+  const liveRow = (target) =>
+    target ? paginated.find((r) => r.product_id === target.product_id) ?? target : null
+
   const selectableOnPage = useMemo(() => paginated.filter((r) => r.in_catalog), [paginated])
   const selectedSummaries = useMemo(
     () => selectableOnPage.filter((s) => selected.has(s.product_id)),
@@ -407,7 +414,7 @@ export function OverviewTab({
       <BranchesDrawer
         open={!!branchesTarget}
         onClose={() => setBranchesTarget(null)}
-        productSummary={branchesTarget}
+        productSummary={liveRow(branchesTarget)}
         warehouses={warehouses}
         isManagerOrAbove={isManagerOrAbove}
         userEmail={userEmail}
@@ -417,7 +424,7 @@ export function OverviewTab({
       <RmaDrawer
         open={!!rmaTarget}
         onClose={() => setRmaTarget(null)}
-        productSummary={rmaTarget}
+        productSummary={liveRow(rmaTarget)}
         warehouses={warehouses}
         isManagerOrAbove={isManagerOrAbove}
         userEmail={userEmail}

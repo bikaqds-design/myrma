@@ -264,7 +264,10 @@ export default function RMATickets({ userRole, userEmail, userPermissions, initi
       const typing =
         tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable
       if (e.key === 'Escape') {
-        setShowModal(false)
+        // The ticket form handles its own Escape: it closes a suggestion list
+        // first and asks before discarding typed changes. Closing it from here
+        // threw the form away without asking (Warehouse R1 re-run, finding 3).
+        if (showModal) return
         setShowShortcuts(false)
         handleCloseDetails()
         return
