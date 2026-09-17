@@ -6,9 +6,9 @@ import { db } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
 import { useDebouncedValue } from '../../lib/useDebouncedValue'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
-import { Spinner } from '../../components/ui'
 import { Pagination, downloadCSV, InvToolbar, InvFilterPanel, InvFilterField, INV_FILTER_SELECT_CLS } from './_shared'
 import { ProductDetailModal } from './ProductDetailModal'
+import { TableCardSkeleton } from '../../components/Skeleton'
 
 // ─── All Units — By Product ───────────────────────────────────────────────────
 // One page of product groups at a time, grouped, counted, searched and ordered
@@ -208,9 +208,7 @@ export function ByProductTab({
       </InvFilterPanel>
 
       {isLoading ? (
-        <div className="py-20 flex justify-center bg-white dark:bg-[#121823] rounded-lg border border-gray-200 dark:border-[#212a38]">
-          <Spinner />
-        </div>
+        <TableCardSkeleton cols={6} />
       ) : matchingCount === 0 ? (
         <div className="text-center py-20 bg-white dark:bg-[#121823] rounded-lg border border-gray-200 dark:border-[#212a38] flex flex-col items-center gap-3">
           <div className="w-12 h-12 bg-gray-100 dark:bg-[#1a2230] rounded-xl flex items-center justify-center">

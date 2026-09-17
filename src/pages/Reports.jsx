@@ -8,7 +8,7 @@ import * as XLSX from 'xlsx'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
 import { captureException } from '../lib/sentry'
-import { Spinner, PageHeader } from '../components/ui'
+import { PageHeader } from '../components/ui'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { ROLES } from '../lib/constants'
 import { toCsv, downloadCsvText } from '../lib/csv'
@@ -17,6 +17,7 @@ import { useBaseCurrency } from '../hooks/useBaseCurrency'
 import Pagination from '../components/Pagination'
 import { safeStorage } from '../lib/safeStorage'
 import { reportRange } from '../api/db/reports'
+import { StatsAndTableSkeleton } from '../components/Skeleton'
 
 // ─── CSV Utility ──────────────────────────────────────────────────────────────
 function downloadCSV(rows, columns, filename, t) {
@@ -97,12 +98,8 @@ function useReportPaging(resetKey) {
   return { page, setPage, perPage, setPerPage }
 }
 
-function TabSpinner() {
-  return (
-    <div className="flex items-center justify-center py-20">
-      <Spinner size="lg" />
-    </div>
-  )
+function TabSkeleton() {
+  return <StatsAndTableSkeleton />
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -274,7 +271,7 @@ function TicketsTab({ range, onNavigateToTicket, formatDate }) {
     catch (err) { captureException(err); toast.error(t('reports.errorLoad')) }
   }
 
-  if (isLoading) return <TabSpinner />
+  if (isLoading) return <TabSkeleton />
 
   const sel =
     'px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white dark:bg-[#0f1520] text-gray-800 dark:text-[#e8ebf0]'
@@ -500,7 +497,7 @@ function CustomersTab({ range, formatDate }) {
     catch (err) { captureException(err); toast.error(t('reports.errorLoad')) }
   }
 
-  if (isLoading) return <TabSpinner />
+  if (isLoading) return <TabSkeleton />
 
   return (
     <div className="space-y-5">
@@ -638,7 +635,7 @@ function TechniciansTab({ range }) {
   const handleExport = () => downloadCSV(exportRows(), exportColumns, `technicians-report-${toYMD(new Date())}.csv`, t)
   const handleExportExcel = () => downloadExcel(exportRows(), exportColumns, `technicians-report-${toYMD(new Date())}.xlsx`, t)
 
-  if (isLoading) return <TabSpinner />
+  if (isLoading) return <TabSkeleton />
 
   return (
     <div className="space-y-5">
@@ -859,7 +856,7 @@ function PipelineTab({ range, pipelines }) {
 
   const widest = Math.max(...byPipeline.flatMap((pl) => pl.stages.map((x) => x.count)), 1)
 
-  if (isLoading) return <TabSpinner />
+  if (isLoading) return <TabSkeleton />
 
   return (
     <div className="space-y-5">
@@ -1136,7 +1133,7 @@ function SalesTab({ range }) {
       wonValue: r.wonValue,
     }))
 
-  if (isLoading) return <TabSpinner />
+  if (isLoading) return <TabSkeleton />
 
   return (
     <div className="space-y-5">
@@ -1354,7 +1351,7 @@ function FinancialTab({ range, formatDate }) {
     catch (err) { captureException(err); toast.error(t('reports.errorLoad')) }
   }
 
-  if (isLoading) return <TabSpinner />
+  if (isLoading) return <TabSkeleton />
 
   return (
     <div className="space-y-5">

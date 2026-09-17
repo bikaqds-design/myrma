@@ -9,6 +9,7 @@ import { captureException } from '../../lib/sentry'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { toCsv, downloadCsvText } from '../../lib/csv'
 import { SearchInput } from '../../components/SearchInput'
+import { TableCardSkeleton } from '../../components/Skeleton'
 
 export default function AuditLog() {
   const { t } = useTranslation()
@@ -98,9 +99,7 @@ export default function AuditLog() {
 
   if (loading)
     return (
-      <div className="flex justify-center py-16">
-        <div className="animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
-      </div>
+      <TableCardSkeleton cols={5} />
     )
 
   return (

@@ -6,7 +6,7 @@ import { db } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
 import { useDebouncedValue } from '../../lib/useDebouncedValue'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
-import { Spinner } from '../../components/ui'
+import { TableCardSkeleton } from '../../components/Skeleton'
 import {
   Pagination,
   InvToolbar,
@@ -123,9 +123,7 @@ export function StockMovementsTab() {
       </InvFilterPanel>
 
       {isLoading ? (
-        <div className="py-20 flex justify-center bg-white dark:bg-[#121823] rounded-[14px] border border-[#e6e9ef] dark:border-[#212a38]">
-          <Spinner />
-        </div>
+        <TableCardSkeleton cols={6} />
       ) : matchingCount === 0 ? (
         <div className="text-center py-20 bg-white dark:bg-[#121823] rounded-[14px] border border-[#e6e9ef] dark:border-[#212a38]">
           <p className="text-[#6c6760] dark:text-[#9aa4b2] text-sm">{t('inventory.noMovementsYet')}</p>

@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
-import { PageHeader, Spinner, Button, Label, Select, Input } from '../../components/ui'
+import { PageHeader, Button, Label, Select, Input } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
 import { ActivityChatter } from '../../components/ActivityChatter'
 import Modal from '../../components/Modal'
@@ -19,6 +19,7 @@ import { destinationWarehouses } from '../../lib/warehouseDestinations'
 import { CreatePurchaseOrderModal, VendorInvoiceFormModal, RecordVendorPaymentModal } from './_modals'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { useConfirm } from '../../hooks/useConfirm'
+import { DetailSkeleton } from '../../components/Skeleton'
 
 const STATUS_PILL = {
   draft: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
@@ -272,7 +273,7 @@ export default function PurchaseDocumentDetail({
   if (!adapter) {
     return <div className="p-6"><EmptyState title={t('purchasing.noDocumentsYet')} description="" action={onBack} actionLabel={t('common.back')} /></div>
   }
-  if (isLoading) return <div className="flex justify-center py-20"><Spinner /></div>
+  if (isLoading) return <DetailSkeleton />
   if (isError || !doc) {
     return <div className="p-6"><EmptyState title={t('purchasing.noDocumentsYet')} description="" action={onBack} actionLabel={t('common.back')} /></div>
   }

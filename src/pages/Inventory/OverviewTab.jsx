@@ -5,7 +5,6 @@ import { db } from '../../api/supabaseClient'
 import { safeStorage } from '../../lib/safeStorage'
 import { useDebouncedValue } from '../../lib/useDebouncedValue'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
-import { Spinner } from '../../components/ui'
 import {
   downloadCSV,
   Pagination,
@@ -17,6 +16,7 @@ import {
 import { BulkStockActionModal } from './BulkStockActionModal'
 import { BranchesDrawer } from './BranchesDrawer'
 import { RmaDrawer } from './RmaDrawer'
+import { TableCardSkeleton } from '../../components/Skeleton'
 
 const TRACKING_BADGE = {
   serialized: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
@@ -265,9 +265,7 @@ export function OverviewTab({
       </InvFilterPanel>
 
       {isLoading ? (
-        <div className="py-20 flex justify-center bg-white dark:bg-[#121823] rounded-[14px] border border-[#e6e9ef] dark:border-[#212a38]">
-          <Spinner />
-        </div>
+        <TableCardSkeleton cols={9} />
       ) : matchingCount === 0 ? (
         <div className="text-center py-20 bg-white dark:bg-[#121823] rounded-[14px] border border-[#e6e9ef] dark:border-[#212a38]">
           <p className="text-[#6c6760] dark:text-[#9aa4b2] text-sm">{t('inventory.noStockData')}</p>
