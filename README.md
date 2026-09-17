@@ -384,7 +384,7 @@ Four tiers, from fastest to closest to production:
 
 | Tier | Command | What it proves | Where it runs |
 |------|---------|----------------|---------------|
-| Unit | `npm test` | ~1,700 Vitest tests in 96 files under `src/test/` and `src/lib/` — pure logic, data-layer request shapes, and static guards that fail CI if a known defect comes back (whole-table reads, un-COALESCEd role helpers, direct `warehouse_id` writes, …) | CI, every PR |
+| Unit | `npm test` | ~1,770 Vitest tests in 100 files under `src/test/` and `src/lib/` — pure logic, data-layer request shapes, and static guards that fail CI if a known defect comes back (whole-table reads, un-COALESCEd role helpers, direct `warehouse_id` writes, …) | CI, every PR |
 | Integration | `npm run test:integration` | ~38 read-only checks against the **production** project with the anon key: protected tables refuse anonymous reads/writes, privileged RPCs refuse anonymous callers, every column the app selects exists, and the security-invariant counts are clean | CI, every PR (needs the `VITE_SUPABASE_*` secrets) |
 | Migration ledger | `node scripts/migration-drift.mjs` | Production's applied migrations match `supabase/migrations/` exactly | `Migration drift` workflow: push to `main`, daily, on demand |
 | Signed-in roles + RPC behaviour | paste a `supabase/tests/*.sql` file into the SQL editor | e.g. `authenticated_role_probes.sql`: for one active account per role, each audited loophole is refused and the legitimate action beside it still works. Every file ends in a forced rollback. | **By hand** — not CI (see below) |
@@ -457,6 +457,8 @@ The app is installable as a Progressive Web App:
 - **Sessions end on loss of access** — suspending, locking, deactivating, expiring or removing a user deletes their sessions in the same transaction, with a 15-minute sweep for expiries that simply pass
 - **Settled documents are locked** — posted invoices and credit notes cannot be edited, and document status changes go through their lifecycle functions
 - **Stock movements are ledgered** — every transfer, reservation, delivery and batch status change writes `stock_moves`
+- **Money and stock ledgers are procedure-only** — payments, vendor payments, their application rows and bulk warehouse stock take no direct client writes, even from an administrator; only the database functions that keep balances and history in step can change them
+- **Parts used on a ticket** are added and removed through one database function each, so stock and the ticket's parts record always change together (deleting a ticket returns its parts)
 - **Script CSP** without `unsafe-inline` or `unsafe-eval` (`vercel.json`)
 
 ---
