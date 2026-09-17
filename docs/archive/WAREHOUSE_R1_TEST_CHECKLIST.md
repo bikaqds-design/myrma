@@ -21,7 +21,7 @@ remain ⬜" was true on the day it was written and has since been overtaken.
 
 | Module | Where it was run | State |
 |---|---|---|
-| Inventory / Warehouse R1 | this file, §0–§9 | ✅ closed 2026-08-05/06; regression re-run ✅ 2026-09-17 (4 findings, see below; #1 fixed by `20260874`) |
+| Inventory / Warehouse R1 | this file, §0–§9 | ✅ closed 2026-08-05/06; regression re-run ✅ 2026-09-17 (4 findings, see below: #1–#3 fixed, #4 withdrawn) |
 | Sales, Accounting, Leads, Deals, Activities (funnel) | this file, "Sales-Funnel 52-Item Checklist" | ✅ 52/52 closed 2026-08-06/07 |
 | Purchasing | this file, "Purchase Module (Sprint 9R)" | ✅ closed 2026-08-07 |
 | Leads / Pipeline (Sprints 2.5 + 3) | `CRM_QA_CHECKLIST.md` | ✅ closed 2026-08-08, bar row 40 |
@@ -105,12 +105,12 @@ the UI **and** in the database. Baseline: 441 units, 557 stock moves, 13 tickets
    shows Main 21 where 20 were delivered to customers, `test 3` Main 17 with one delivered. The
    dashboard overstates physical stock by every unit ever sold. Needs a decision: exclude delivered
    units from Main/Branches/Physical Total, or move a delivered unit out of `company_stock`.
-2. **Branches drawer does not refresh after a transfer.** After a successful bulk transfer the open
+2. **FIXED 2026-09-17** — the Overview drawers now read the refreshed page row (`liveRow` in `OverviewTab.jsx`), falling back to the clicked snapshot only if the product has left the page. Original finding: **Branches drawer does not refresh after a transfer.** After a successful bulk transfer the open
    drawer still showed Main 33 / Cairo 6 while the table and the database had 34 / 5; closing and
    reopening showed the right numbers.
-3. **Escape discards the Create Ticket form without asking.** Pressing Escape to dismiss the product
+3. **FIXED 2026-09-17** — Escape first closes an open customer/product suggestion list; with typed changes, Escape, an outside click, Cancel and the close button show an in-form "Discard this ticket?" bar (Keep editing / Discard). The RMA Tickets page shortcut no longer closes the form itself; `Modal` gained `onEscapeKeyDown` / `onInteractOutside` pass-throughs. Pinned by `src/test/warehouseUiFindings.test.jsx`. Original finding: **Escape discards the Create Ticket form without asking.** Pressing Escape to dismiss the product
    suggestion list closed the whole dialog and lost everything typed.
-4. *(cosmetic)* The RMA drawer's *Move to…* list offers the unit's current location.
+4. ~~*(cosmetic)* The RMA drawer's *Move to…* list offers the unit's current location.~~ **WITHDRAWN 2026-09-17** — `RmaDrawer.jsx` renders that option `disabled`, so it cannot be chosen; the run read option labels without their disabled state.
 
 Left in the test data: ticket `RMA-17092026-0001` (units `QA-R1-0917-A` in Main, `QA-R1-0917-B` in
 RMA-CANTREPAIR), `QA-NOCRM-001` in Scrap, `RMA-06082026-0001` product status Can't Repair, and

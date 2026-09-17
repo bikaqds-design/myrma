@@ -559,6 +559,48 @@ export function TicketForm({
     enabled: activeProductIdx >= 0,
   })
   const filteredProductsList = (idx) => (idx === activeProductIdx ? activeProductMatches : EMPTY_ARRAY)
+
+  // Closing the form must not silently throw away what was typed (Warehouse R1
+  // re-run, finding 3: Escape to dismiss a product suggestion list closed the
+  // whole dialog). `dirty` is set by the user's own input, not by the effects
+  // above that fill in defaults and load the resolution.
+  const [dirty, setDirty] = useState(false)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
+
+  function requestClose() {
+    if (dirty) setConfirmDiscard(true)
+    else onClose()
+  }
+
+  function handleEscapeKeyDown(e) {
+    const customerListOpen = showCustomerDropdown && filteredCustomersList.length > 0
+    const productListOpen = activeProductIdx >= 0 && activeProductMatches.length > 0
+    const otherListOpen = document.activeElement?.getAttribute('aria-expanded') === 'true'
+    if (customerListOpen || productListOpen || otherListOpen) {
+      // First Escape closes the open suggestion list, not the form.
+      e.preventDefault()
+      setShowCustomerDropdown(false)
+      setShowProductDropdowns((prev) => prev.map(() => false))
+      return
+    }
+    if (dirty) {
+      e.preventDefault()
+      setConfirmDiscard(true)
+    }
+  }
+
+  function handleInteractOutside(e) {
+    // The barcode scanner is portalled outside the dialog; using it is not
+    // leaving the form.
+    if (scanningProductIdx !== null) {
+      e.preventDefault()
+      return
+    }
+    if (dirty) {
+      e.preventDefault()
+      setConfirmDiscard(true)
+    }
+  }
   // Catalogue rows for the products already on the form, for their tracking mode.
   const lineProducts = useProductsById(formData.products.map((line) => line.product_id))
 
@@ -800,6 +842,8 @@ export function TicketForm({
     <Modal
       open={true}
       onClose={onClose}
+      onEscapeKeyDown={handleEscapeKeyDown}
+      onInteractOutside={handleInteractOutside}
       title={editingTicket ? t('ticketForm.editTitle') : t('ticketForm.createTitle')}
       className="max-w-4xl"
       noPadding
@@ -829,7 +873,9 @@ export function TicketForm({
             </div>
           </div>
           <button
-            onClick={onClose}
+            type="button"
+            onClick={requestClose}
+            aria-label={t('common.close')}
             className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -843,7 +889,14 @@ export function TicketForm({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form
+          onSubmit={handleSubmit}
+          onInput={() => setDirty(true)}
+          onMouseDownCapture={(e) => {
+            // Picking a customer or product from a list changes the form without an input event.
+            if (e.target.closest?.('.customer-dropdown button, .product-dropdown button')) setDirty(true)
+          }}
+        >
           <div className="px-6 py-5 space-y-5 max-h-[72vh] overflow-y-auto">
             {/* Row 1: Customer + Priority */}
             <div className="grid grid-cols-2 gap-4">
@@ -1538,19 +1591,38 @@ export function TicketForm({
           </div>
 
           {/* Footer */}
-          <div className="flex gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
-            <Button
-              variant="secondary"
-              type="button"
-              className="flex-1 justify-center"
-              onClick={onClose}
+          {confirmDiscard ? (
+            <div
+              role="alertdialog"
+              aria-label={t('ticketForm.discardTitle')}
+              className="flex flex-wrap items-center gap-3 px-6 py-4 border-t border-amber-200 bg-amber-50 rounded-b-2xl"
             >
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit" loading={uploading} className="flex-1 justify-center">
-              {editingTicket ? t('ticketForm.updateTicket') : t('ticketForm.createTicket')}
-            </Button>
-          </div>
+              <p className="flex-1 min-w-[12rem] text-sm text-amber-900">
+                <span className="font-semibold">{t('ticketForm.discardTitle')}</span>{' '}
+                {t('ticketForm.discardMessage')}
+              </p>
+              <Button variant="secondary" type="button" autoFocus onClick={() => setConfirmDiscard(false)}>
+                {t('ticketForm.keepEditing')}
+              </Button>
+              <Button variant="danger" type="button" onClick={onClose}>
+                {t('ticketForm.discardChanges')}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
+              <Button
+                variant="secondary"
+                type="button"
+                className="flex-1 justify-center"
+                onClick={requestClose}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button type="submit" loading={uploading} className="flex-1 justify-center">
+                {editingTicket ? t('ticketForm.updateTicket') : t('ticketForm.createTicket')}
+              </Button>
+            </div>
+          )}
         </form>
       </div>
     </Modal>
