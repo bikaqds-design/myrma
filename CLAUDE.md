@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > **Engineering rules:** [`CONSTITUTION.md`](CONSTITUTION.md) · **Audit status:** [`AUDIT_REPORT.md`](AUDIT_REPORT.md) — §0 is the live scorecard · **Archive:** [`docs/archive/README.md`](docs/archive/README.md) (finished plans, past audits, completed QA runs)
 
-**Current state (2026-09-17).** The build phase is finished: CRM core, Sales Documents, Accounting, the redesigned Purchase Module and Warehouse Module R1 all shipped (history in [`docs/archive/MASTER_UPGRADE_PLAN.md`](docs/archive/MASTER_UPGRADE_PLAN.md)). Work is now pre-launch hardening driven by `AUDIT_REPORT.md`: **87 findings — 80 fixed, 6 partly fixed, 1 open** (BUG-006, WhatsApp webhook, on hold). What each open item waits on is in the report's §0.
+**Current state (2026-09-17).** The build phase is finished: CRM core, Sales Documents, Accounting, the redesigned Purchase Module and Warehouse Module R1 all shipped (history in [`docs/archive/MASTER_UPGRADE_PLAN.md`](docs/archive/MASTER_UPGRADE_PLAN.md)). Work is now pre-launch hardening driven by `AUDIT_REPORT.md`: **87 findings — 85 fixed, 1 partly fixed (BUG-077, WhatsApp imports), 1 open** (BUG-006, WhatsApp webhook, on hold). What each open item waits on is in the report's §0.
 
 **Standing rules for working in this repo:**
 - **WhatsApp work is on hold.** Do not fix or refactor WhatsApp code, functions or templates unless the owner lifts the hold.
@@ -545,6 +545,10 @@ Sessions end on loss of access (2026-09-16):
 Parts used on a ticket (2026-09-17, BUG-030):
 
 - `20260871_ticket_parts_atomic.sql` — `rma_ticket_part_add(ticket, part, quantity, unit_cost?, notes?)` (staff except viewer) and `rma_ticket_part_remove(id)` (admin) change stock through `adjust_part_quantity` and write `ticket_parts` in one transaction, behind `db.ticketParts.add()` / `remove(id)`. `ticket_parts` is **read-only to client roles** — no INSERT/UPDATE/DELETE grant, no write policy — so any new write must go through these functions. Pinned by `src/test/ticketPartsAtomic.test.js`; `supabase/tests/ticket_parts_atomic.sql` is the rolled-back reference probe (13/13).
+
+Vendor payments procedure-only (2026-09-17, BUG-073 follow-up):
+
+- `20260872_vendor_payments_procedure_only.sql` — `vendor_payments` joins the tables `20260850` made procedure-only (`payments`, the three application tables, `warehouse_stock`): no client INSERT/UPDATE/DELETE/TRUNCATE, no write policy, reads unchanged. Write only through `record_vendor_payment` / `void_vendor_payment` / the application RPCs. Pinned by `src/test/moneyTablesProcedureOnly.test.js`.
 
 Authenticated-role probes (2026-09-16, BUG-061):
 

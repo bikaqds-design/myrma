@@ -77,6 +77,7 @@ DECLARE
   tech   text := (SELECT user_email FROM public.user_roles WHERE role = 'technician' AND public.rma_access_is_current(status, access_expires_at) AND EXISTS (SELECT 1 FROM auth.users u WHERE lower(u.email) = lower(user_email)) ORDER BY user_email LIMIT 1);
   rep    text := (SELECT user_email FROM public.user_roles WHERE role = 'sales_rep'  AND public.rma_access_is_current(status, access_expires_at) AND EXISTS (SELECT 1 FROM auth.users u WHERE lower(u.email) = lower(user_email)) ORDER BY user_email LIMIT 1);
   mgr    text := (SELECT user_email FROM public.user_roles WHERE role = 'manager'    AND public.rma_access_is_current(status, access_expires_at) AND EXISTS (SELECT 1 FROM auth.users u WHERE lower(u.email) = lower(user_email)) ORDER BY user_email LIMIT 1);
+  admin  text := (SELECT user_email FROM public.user_roles WHERE role IN ('super_admin', 'admin') AND public.rma_access_is_current(status, access_expires_at) AND EXISTS (SELECT 1 FROM auth.users u WHERE lower(u.email) = lower(user_email)) ORDER BY user_email LIMIT 1);
 
   cust   uuid := (SELECT id FROM public.customers ORDER BY created_date LIMIT 1);
   posted uuid := (SELECT id FROM public.crm_invoices WHERE doc_status = 'posted' ORDER BY created_at DESC LIMIT 1);
@@ -148,6 +149,14 @@ BEGIN
 
   -- BUG-087: below manager is refused a manager-only function
   r := r || pg_temp.probe('BUG-087 manager-only transfer_stock (technician)', tech, format('SELECT public.transfer_stock(%L, %L, %L, NULL, %L, NULL)', gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), unit), 'refused');
+
+  -- BUG-073: money tables are procedure-only, even for an administrator
+  r := r || pg_temp.probe('BUG-073 insert a payment (admin)', admin, format($s$INSERT INTO payments (customer_id, amount, method, created_by) VALUES (%L, 1, 'cash', 'x')$s$, cust), 'refused');
+  r := r || pg_temp.probe('BUG-073 insert a vendor payment (admin)', admin, format($s$INSERT INTO vendor_payments (vendor_id, amount, method, created_by) VALUES (%L, 1, 'cash', 'x')$s$, brand), 'refused');
+  r := r || pg_temp.probe('BUG-073 rewrite vendor payment amounts (admin)', admin, 'UPDATE vendor_payments SET amount = amount + 1', 'refused');
+
+  -- BUG-030: parts used on a ticket go through rma_ticket_part_add, never the table
+  r := r || pg_temp.probe('BUG-030 insert a ticket part directly (technician)', tech, format('INSERT INTO ticket_parts (ticket_id, part_id, quantity) VALUES (%L, %L, 1)', ticket, gen_random_uuid()), 'refused');
 
   SELECT count(*) INTO fails FROM unnest(r) x WHERE x LIKE 'FAIL%';
   RAISE EXCEPTION E'FORCED ROLLBACK — % checks, % failed, % skipped\n%',
