@@ -4,7 +4,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { db, auth } from '../../api/supabaseClient'
 import toast from 'react-hot-toast'
 import ConfirmDialog from '../../components/ConfirmDialog'
-import { Spinner } from '../../components/ui'
 import { useURLTab } from '../../hooks/useURLTab'
 import { ROLES } from '../../lib/constants'
 import { canDo, accessDenialReason } from '../../lib/permissions'
@@ -14,6 +13,7 @@ import { validatePasswordStrength, getDefaultPermissions } from './_utils'
 import { UsersTab, AddUserModal, InviteUserModal, PasswordResetModal, UserControlModal, ActivityModal } from './UsersTab'
 import { filterUsers, paginate, pruneSelection, deletableSelection } from './_directory'
 import { RoleTemplatesTab, CustomRolesTab, CreateRoleModal, PermissionsModal } from './RolesTab'
+import { PageSkeleton } from '../../components/Skeleton'
 
 // Custom Roles were hidden because they were not wired end-to-end: "not
 // assignable in the role dropdown, not loaded by getUserRole, not enforced by
@@ -741,9 +741,7 @@ export default function UserManagement({ currentUserRole, currentUserEmail, curr
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner size="lg" />
-      </div>
+      <PageSkeleton cols={6} />
     )
   }
 

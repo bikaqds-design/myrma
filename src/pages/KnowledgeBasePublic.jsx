@@ -5,6 +5,7 @@ import { db, branding as brandingAPI } from '../api/supabaseClient'
 import { useDebouncedValue } from '../lib/useDebouncedValue'
 import { EMPTY_ARRAY } from '../lib/stableEmpty'
 import { SearchInput } from '../components/SearchInput'
+import { CardListSkeleton } from '../components/Skeleton'
 
 /** Articles shown at first, and added by each "Show more". */
 const BATCH = 50
@@ -91,9 +92,7 @@ export default function KnowledgeBasePublic() {
         />
 
         {loading && (
-          <div className="flex justify-center py-10">
-            <div className="animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
-          </div>
+          <CardListSkeleton count={3} lines={2} />
         )}
 
         {!loading && filtered.length === 0 && (

@@ -2,12 +2,12 @@
 
 Findings from `design/audit/01-AUDIT.md` that are not closed, and why.
 
-**Status: 28 of 47 closed, 3 retracted, 1 won't-fix. 0 Critical, 3 High, 1 Medium, 1 Low remaining.**
+**Status: 29 of 47 closed, 3 retracted, 1 won't-fix. 0 Critical, 3 High, 0 Medium, 1 Low remaining.**
 (Three search findings added 2026-09-03.)
 
-The single remaining Medium is UX-GLOBAL-009 (spinners rather than skeletons in
-27 files), and it shrinks on its own as tables move to the `Table` primitive,
-which supplies skeleton rows.
+No Medium is open: UX-GLOBAL-009 (spinners rather than skeletons) closed on
+2026-09-17. The one Low left is UX-SEARCH-003 (Arabic search normalisation),
+which is latent and needs a database change.
 
 ### UX-DASH-003 — charts stay left-to-right (decided 2026-09-03)
 
@@ -86,7 +86,7 @@ See `design/audit/01-AUDIT.md` for the full table. The notable ones:
 | ~~UX-ONBOARD-004~~ | ~~Onboarding blocks the screen for every new user~~ **RETRACTED as written** — gated to admin/super_admin only, and dismissible | — |
 | ✅ UX-GLOBAL-002 | ~~No z-index ladder~~ **CLOSED** — named rungs in tailwind.config, relative order preserved | Medium |
 | ✅ UX-DASH-004 | ~~Unclear whether widgets link~~ **CLOSED** — "View all" was an inert span; now navigates | Medium |
-| UX-GLOBAL-009 | Loading is a spinner in 27 files, a skeleton in 5 | Medium |
+| ✅ UX-GLOBAL-009 | ~~Loading is a spinner in 27 files, a skeleton in 5~~ **CLOSED** (2026-09-17) — every list and detail content area loads as a skeleton (`src/components/Skeleton.jsx`, each a `role="status"` region); `src/test/loadingSkeletons.test.jsx` fails if a converted screen goes back to a spinner. Spinners remain where they are right: inside buttons, small inline loads (comments, sessions) and Control Panel settings forms | Medium |
 | ⏹ UX-DASH-003 | ~~Sparklines run left-to-right in RTL~~ **WON'T FIX** (decided 2026-09-03) | — |
 
 ---

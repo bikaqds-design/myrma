@@ -16,10 +16,11 @@ import { canDo } from '../lib/permissions'
 import { formatMoneyCompact } from '../lib/money'
 import { useBaseCurrency } from '../hooks/useBaseCurrency'
 import { useAppearance } from '../contexts/AppearanceContext'
-import { Spinner, Ltr } from '../components/ui'
+import { Ltr } from '../components/ui'
 import { TICKET_STATUS, TICKET_STATUS_LIST, ROLES } from '../lib/constants'
 import { useTranslation } from 'react-i18next'
 import { EMPTY_ARRAY } from '../lib/stableEmpty'
+import { StatsAndTableSkeleton } from '../components/Skeleton'
 
 const DashboardChart = lazy(() => import('./DashboardCharts'))
 
@@ -746,9 +747,7 @@ export default function Dashboard({ currentUserEmail, currentUserRole, currentUs
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Spinner size="lg" />
-      </div>
+      <StatsAndTableSkeleton />
     )
   }
 

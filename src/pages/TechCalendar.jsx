@@ -4,12 +4,13 @@ import i18next from 'i18next'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { db } from '../api/supabaseClient'
 import toast from 'react-hot-toast'
-import { Button, Spinner, PageHeader } from '../components/ui'
+import { Button, PageHeader } from '../components/ui'
 import EmptyState from '../components/EmptyState'
 import { useAppearance } from '../contexts/AppearanceContext'
 import { captureException } from '../lib/sentry'
 import { EMPTY_ARRAY } from '../lib/stableEmpty'
 import { localDateKey, getMonday, weekDays, weekRange, dueDayKey } from '../lib/calendarDays'
+import { CalendarSkeleton } from '../components/Skeleton'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -234,9 +235,7 @@ export default function TechCalendar({
   // ─── Render ──────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[320px]">
-        <Spinner size="lg" />
-      </div>
+      <CalendarSkeleton />
     )
   }
 

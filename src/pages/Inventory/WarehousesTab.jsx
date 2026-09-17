@@ -25,6 +25,7 @@ import {
 } from './_shared'
 import { TransferModal } from './TransferModal'
 import { SearchInput } from '../../components/SearchInput'
+import { TableCardSkeleton } from '../../components/Skeleton'
 
 const WAREHOUSE_TYPES = ['main', 'branch', 'service_center', 'rma', 'transit', 'virtual']
 
@@ -894,9 +895,7 @@ function WarehouseDetailModal({
         {/* Table */}
         <div className="flex-1 overflow-auto">
           {isLoading ? (
-            <div className="py-16 flex justify-center">
-              <Spinner />
-            </div>
+            <TableCardSkeleton cols={7} bare />
           ) : matchingCount === 0 ? (
             <div className="text-center py-16 text-gray-500 text-sm">
               {search

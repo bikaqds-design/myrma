@@ -127,7 +127,11 @@ preview, which has its own layout rules and no dark mode.
 Every list, table and widget needs four:
 
 - **loading** — skeletons shaped like the real content, not a bare spinner, so
-  the layout does not jump when data arrives
+  the layout does not jump when data arrives. Use `Table`'s `loading` prop, or
+  `src/components/Skeleton.jsx` (`PageSkeleton`, `TableCardSkeleton`,
+  `DetailSkeleton`, `StatsAndTableSkeleton`, `CardListSkeleton`,
+  `CalendarSkeleton`). A `Spinner size="sm"` is still right inside a button
+  while its action runs
 - **empty** — `EmptyState`, with the primary action in it
 - **error** — `toUserMessage(err)`, never `err.message`. Raw Postgres text tells
   the user nothing and leaks schema detail

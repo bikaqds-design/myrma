@@ -6,12 +6,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
 import { useCustomer } from '../../lib/useLookups'
-import { PageHeader, Spinner, Button } from '../../components/ui'
+import { PageHeader, Button } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
 import { downloadQuotationPDF } from '../../lib/quotationPdf'
 import { downloadSOPDF } from '../../lib/salesOrderPdf'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { useConfirm } from '../../hooks/useConfirm'
+import { DetailSkeleton } from '../../components/Skeleton'
 import {
   DocumentFormModal,
   RecordPaymentModal,
@@ -417,7 +418,7 @@ export default function SalesDocumentDetail({
     return <div className="p-6"><EmptyState title={t('salesDocuments.noDocuments')} description="" action={onBack} actionLabel={t('common.back')} /></div>
   }
   if (isLoading) {
-    return <div className="flex justify-center py-20"><Spinner /></div>
+    return <DetailSkeleton />
   }
   if (isError || !doc) {
     return <div className="p-6"><EmptyState title={t('salesDocuments.noDocuments')} description="" action={onBack} actionLabel={t('common.back')} /></div>
