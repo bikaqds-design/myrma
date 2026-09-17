@@ -9,6 +9,8 @@
 -- #
 -- #    - RMA units are never sellable, but are physically present;
 -- #    - company stock splits into available / reserved / delivered;
+-- #    - a delivered unit is not stock on hand: not in Main, branches,
+-- #      physical total or the per-warehouse count (20260874);
 -- #    - SCRAP is not physical stock; closed units count nowhere;
 -- #    - a warehouse with no type, or no warehouse at all, is Main;
 -- #    - branches are summed per branch; RMA units per SYSTEM location only.
@@ -145,12 +147,14 @@ BEGIN
     -- The RMA units read 'available' too and must not be counted.
     IF r.available <> 7 THEN v_failures := array_append(v_failures, format('CHECK 1a: available %s, expected 7 (RMA units must not be sellable)', r.available)); END IF;
     IF r.reserved <> 1 OR r.delivered <> 1 THEN v_failures := array_append(v_failures, format('CHECK 1b: reserved/delivered %s/%s, expected 1/1', r.reserved, r.delivered)); END IF;
-    -- Main: 4 in the main warehouse + the untyped warehouse + the unit with no warehouse.
-    IF r.main_qty <> 6 THEN v_failures := array_append(v_failures, format('CHECK 1c: main_qty %s, expected 6', r.main_qty)); END IF;
-    -- Physical: the 8 company-stock units outside SCRAP + the 3 RMA units at
+    -- Main: 3 on hand in the main warehouse (the delivered one is not, 20260874)
+    -- + the untyped warehouse + the unit with no warehouse.
+    IF r.main_qty <> 5 THEN v_failures := array_append(v_failures, format('CHECK 1c: main_qty %s, expected 5 (a delivered unit is not on hand)', r.main_qty)); END IF;
+    -- Physical: the 7 on-hand company-stock units outside SCRAP (the delivered
+    -- one excluded, 20260874) + the 3 RMA units at
     -- non-SCRAP system locations. Not the RMA unit parked in a normal
     -- warehouse, nothing in SCRAP, nothing closed.
-    IF r.physical_total <> 11 THEN v_failures := array_append(v_failures, format('CHECK 1d: physical_total %s, expected 11', r.physical_total)); END IF;
+    IF r.physical_total <> 10 THEN v_failures := array_append(v_failures, format('CHECK 1d: physical_total %s, expected 10', r.physical_total)); END IF;
     IF r.branches <> jsonb_build_array(jsonb_build_object('warehouse_id', v_branch, 'name', 'CI LV Branch ' || v_tag, 'code', 'CI-LV-BR-' || v_tag, 'qty', 2))
        OR r.branch_total <> 2 THEN
       v_failures := array_append(v_failures, format('CHECK 1e: branches %s / %s, expected the one branch with 2', r.branches, r.branch_total));
@@ -254,8 +258,9 @@ BEGIN
   -- ── CHECK 9: per-warehouse counts ────────────────────────────────────────────
   v_checks := v_checks + 1;
   IF (SELECT unit_count FROM public.v_warehouse_unit_counts WHERE warehouse_id = v_main)
-     IS DISTINCT FROM (SELECT count(*)::int FROM public.inventory_units WHERE warehouse_id = v_main) THEN
-    v_failures := array_append(v_failures, 'CHECK 9: warehouse unit count does not match the table');
+     IS DISTINCT FROM (SELECT count(*)::int FROM public.inventory_units WHERE warehouse_id = v_main
+                          AND NOT (status = 'company_stock' AND reservation_status IS NOT DISTINCT FROM 'delivered')) THEN
+    v_failures := array_append(v_failures, 'CHECK 9: warehouse unit count does not match the table (delivered units excluded)');
   END IF;
 
   -- ── CHECK 10: access — invoker rights, no anon ───────────────────────────────

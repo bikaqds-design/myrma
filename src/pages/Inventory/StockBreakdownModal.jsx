@@ -69,7 +69,11 @@ export function StockBreakdownModal({
           quantity: w.quantity,
         }))
     }
-    const productUnits = units.filter((u) => u.status === 'company_stock')
+    // Stock on hand: a unit delivered to a customer keeps status company_stock
+    // (restores and RMAs need it) but is no longer in the warehouse (20260874).
+    const productUnits = units.filter(
+      (u) => u.status === 'company_stock' && u.reservation_status !== 'delivered'
+    )
     const byWarehouse = {}
     for (const u of productUnits) {
       const key = u.warehouse_id || 'unassigned'
@@ -137,7 +141,8 @@ export function StockBreakdownModal({
 
   if (!productSummary) return null
 
-  const total = productSummary.available + productSummary.reserved + productSummary.delivered
+  // On hand only — delivered units have left the warehouse (20260874).
+  const total = productSummary.available + productSummary.reserved
 
   return (
     <Modal open={open} onClose={onClose} title={productSummary.product_name} className="max-w-2xl">
