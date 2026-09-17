@@ -1,5 +1,5 @@
 -- ############################################################################
--- #  TICKET PARTS — BUG-030 (20260871)
+-- #  TICKET PARTS — BUG-030 (20260871, 20260873)
 -- #
 -- #  Stock and the ticket_parts row change together or not at all, and the
 -- #  table cannot be written around the functions. Runs as real signed-in
@@ -130,7 +130,17 @@ BEGIN
     CASE WHEN o LIKE 'err:P0001%' AND (SELECT quantity FROM public.parts WHERE id = part) = 3 THEN 'PASS' ELSE 'FAIL' END,
     (SELECT quantity FROM public.parts WHERE id = part), o);
 
-  -- 10. reading is unchanged for staff
+  -- 10. deleting a ticket returns its parts (20260873) and touches no other ticket
+  o := pg_temp.as_user(tech, format('SELECT public.rma_ticket_part_add(%L, %L, 2)', ticket, part));
+  INSERT INTO public.rma_tickets (rma_number) VALUES ('PROBE-030-DEL') RETURNING id INTO tp;
+  o := pg_temp.as_user(tech, format('SELECT public.rma_ticket_part_add(%L, %L, 1)', tp, part));
+  o := pg_temp.as_user(admin, format('DELETE FROM public.rma_tickets WHERE id = %L', tp));
+  r := r || format('%s admin deletes a ticket holding 1 → stock %s (expect 1), other ticket keeps its 2: %s → %s',
+    CASE WHEN o = 'ok:1' AND (SELECT quantity FROM public.parts WHERE id = part) = 1
+          AND (SELECT sum(quantity) FROM public.ticket_parts WHERE part_id = part) = 2 THEN 'PASS' ELSE 'FAIL' END,
+    (SELECT quantity FROM public.parts WHERE id = part), (SELECT sum(quantity) FROM public.ticket_parts WHERE part_id = part), o);
+
+  -- 11. reading is unchanged for staff
   o := pg_temp.as_user(viewer, 'SELECT 1 FROM public.ticket_parts LIMIT 1');
   r := r || format('%s viewer can still read ticket_parts → %s', CASE WHEN o LIKE 'ok:%' THEN 'PASS' ELSE 'FAIL' END, o);
 

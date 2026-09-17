@@ -544,7 +544,8 @@ Sessions end on loss of access (2026-09-16):
 
 Parts used on a ticket (2026-09-17, BUG-030):
 
-- `20260871_ticket_parts_atomic.sql` — `rma_ticket_part_add(ticket, part, quantity, unit_cost?, notes?)` (staff except viewer) and `rma_ticket_part_remove(id)` (admin) change stock through `adjust_part_quantity` and write `ticket_parts` in one transaction, behind `db.ticketParts.add()` / `remove(id)`. `ticket_parts` is **read-only to client roles** — no INSERT/UPDATE/DELETE grant, no write policy — so any new write must go through these functions. Pinned by `src/test/ticketPartsAtomic.test.js`; `supabase/tests/ticket_parts_atomic.sql` is the rolled-back reference probe (13/13).
+- `20260871_ticket_parts_atomic.sql` — `rma_ticket_part_add(ticket, part, quantity, unit_cost?, notes?)` (staff except viewer) and `rma_ticket_part_remove(id)` (admin) change stock through `adjust_part_quantity` and write `ticket_parts` in one transaction, behind `db.ticketParts.add()` / `remove(id)`. `ticket_parts` is **read-only to client roles** — no INSERT/UPDATE/DELETE grant, no write policy — so any new write must go through these functions. Pinned by `src/test/ticketPartsAtomic.test.js`; `supabase/tests/ticket_parts_atomic.sql` is the rolled-back reference probe.
+- `20260873_ticket_parts_return_stock_on_delete.sql` — `trg_ticket_parts_return_stock` (AFTER DELETE on `ticket_parts`) returns the row's quantity to its part, so **deleting a ticket returns its parts** (owner decision 2026-09-17) and `rma_ticket_part_remove` no longer restocks itself — never add a second restock on a delete path, it would count twice.
 
 Vendor payments procedure-only (2026-09-17, BUG-073 follow-up):
 

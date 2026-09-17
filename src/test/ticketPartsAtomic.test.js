@@ -13,6 +13,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 
 const sql = readFileSync('supabase/migrations/20260871_ticket_parts_atomic.sql', 'utf8').replace(/\r\n/g, '\n')
+const onDelete = readFileSync('supabase/migrations/20260873_ticket_parts_return_stock_on_delete.sql', 'utf8').replace(/\r\n/g, '\n')
 const inventory = readFileSync('src/api/db/inventory.ts', 'utf8').replace(/\r\n/g, '\n')
 const ticketParts = inventory.slice(inventory.indexOf('export const ticketParts'), inventory.indexOf('// ── Time Tracking'))
 
@@ -45,7 +46,7 @@ describe('the migration', () => {
     expect(add).toContain('public.rma_current_user_email()')
   })
 
-  it('returns the removed row’s own quantity to its own part', () => {
+  it('returned the removed row’s own quantity to its own part (moved to a trigger by 20260873)', () => {
     expect(body).toContain('PERFORM public.adjust_part_quantity(v_row.part_id, v_row.quantity)')
     expect(body).toMatch(/WHERE tp\.id = p_id FOR UPDATE/)
   })
@@ -66,5 +67,26 @@ describe('the migration', () => {
   it('does not let anonymous callers execute either function', () => {
     expect(body).toContain('REVOKE ALL ON FUNCTION public.rma_ticket_part_add(uuid, uuid, integer, numeric, text) FROM anon')
     expect(body).toContain('REVOKE ALL ON FUNCTION public.rma_ticket_part_remove(uuid) FROM anon')
+  })
+})
+
+describe('deleting a ticket returns its parts (20260873)', () => {
+  const body = code(onDelete)
+  const removeStart = body.indexOf('FUNCTION public.rma_ticket_part_remove(')
+  const remove = body.slice(removeStart, body.indexOf('$fn$;', removeStart))
+
+  it('restocks on every ticket_parts delete, including the cascade from a ticket', () => {
+    expect(body).toMatch(/CREATE TRIGGER trg_ticket_parts_return_stock\s+AFTER DELETE ON public\.ticket_parts\s+FOR EACH ROW/)
+    expect(body).toContain('SET quantity     = p.quantity + OLD.quantity')
+    expect(body).toContain('WHERE p.id = OLD.part_id')
+  })
+
+  it('does not restock in rma_ticket_part_remove as well, which would count twice', () => {
+    expect(remove).toContain('DELETE FROM public.ticket_parts tp WHERE tp.id = p_id')
+    expect(remove).not.toMatch(/adjust_part_quantity|UPDATE public\.parts/)
+  })
+
+  it('keeps the restock function out of reach of client roles', () => {
+    expect(body).toContain('REVOKE ALL ON FUNCTION public.rma_ticket_parts_return_stock() FROM anon, authenticated')
   })
 })
