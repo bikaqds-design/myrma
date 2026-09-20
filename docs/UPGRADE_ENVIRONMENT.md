@@ -59,14 +59,31 @@ integration tier runs against an empty database and fails for the wrong reason.
 
 ### 3. Vercel preview environment for `next`
 
-Vercel → project **myrma** → Settings → Environment Variables. Add
-`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` with the staging values, scoped
-to **Preview** and limited to the `next` branch. Production values for `main`
-stay as they are.
+> **Until this is done, `next` preview deployments read and write the production
+> database.** Vercel already built previews for the first two `next` commits
+> using the Preview-scope variables, which are the production credentials. Do
+> not use those preview URLs yet.
+
+Two ways, same result — `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` with
+the staging values, scoped to **Preview** and limited to the `next` branch.
+Production values for `main` stay as they are.
+
+**By script** (preferred, it also records what was set):
+
+1. vercel.com → Account Settings → Tokens → create a token scoped to the team.
+2. Put it in `.env.staging` (git-ignored) as `VERCEL_TOKEN=…`.
+3. `bash scripts/vercel-preview-env.sh`
+
+**By hand:** Vercel → project **myrma** → Settings → Environment Variables → add
+each variable, tick **Preview** only, and choose branch `next`.
+
+Vite reads these at build time, so push a commit (or redeploy) afterwards for
+them to take effect.
 
 A second Vercel project was considered and rejected: the API reuses the project
-already linked to the repository, and branch-scoped preview variables achieve
-the same isolation with nothing extra to pay for or maintain.
+already linked to the repository (it answered *"Reused project myrma"*), and
+branch-scoped preview variables give the same isolation with nothing extra to
+pay for or maintain.
 
 ## Rules for this line
 
