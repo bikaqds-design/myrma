@@ -2,42 +2,23 @@
 -- 00000000_baseline_schema.sql
 --
 -- Generated from the live database by supabase/manual/GENERATE_baseline_schema.sql
--- Generated at: 2026-09-01 16:31:53.470417+00
+-- Generated at: 2026-09-20 09:56:09.113777+00
 --
 -- The complete public schema. Twenty of these tables were created by no
 -- migration in this repo, so before this file existed a clean Supabase
 -- project could not be provisioned from source at all.
 --
--- ON A FRESH DATABASE: run this file, then 00000001_baseline_reference_data.sql.
--- Do NOT then replay the historical migrations - this already reflects their
--- end state, and re-running them would re-apply ALTERs against a schema that
--- already has them.
---
--- VERIFIED on 2026-09-01 by applying this file to a brand-new, empty Supabase
--- project, then fingerprinting the result against production. Columns,
--- constraints, policies, views and triggers all matched exactly; function
--- bodies matched once carriage returns were normalised (production stores
--- CRLF inside 85 function bodies, inherited from Windows-authored migrations;
--- this file is LF throughout, which changes nothing about behaviour).
---
--- That run found four defects that no amount of reading the file would have
--- caught, all now fixed here and in the generator:
---   1. no CREATE EXTENSION, so uuid_generate_v4() did not exist and the first
---      of five tables using it failed;
---   2. the seven generated columns were emitted as DEFAULT, which Postgres
---      rejects outright ("cannot use column reference in DEFAULT expression");
---   3. functions are emitted alphabetically and some call others, so a
---      SQL-language body was validated before its callee existed -- hence the
---      SET check_function_bodies = false above, which is what pg_dump emits;
---   4. COMMENT ON TABLE was emitted for views, which Postgres refuses.
+-- ON A FRESH DATABASE: run this file ALONE. Do not then replay the historical
+-- migrations — this already reflects their end state, and re-running them
+-- would re-apply ALTERs against a schema that already has them.
 --
 -- Objects emitted:
---   2 extensions, 1 sequences, 62 tables, 165 pk/unique/check, 64 foreign keys,
---   96 indexes, 89 functions, 6 views, 30 triggers,
---   62 tables with RLS, 199 policies, 168 grants, 27 comments
+--   2 extensions, 2 sequences, 65 tables, 170 pk/unique/check, 64 foreign keys,
+--   109 indexes, 167 functions, 25 views, 50 triggers,
+--   65 tables with RLS, 177 policies, 179 grants, 49 comments
 --
--- Not included: non-public schemas, roles, storage buckets, column-level
--- privileges, and data.
+-- Not included: non-public schemas, roles, storage buckets,
+-- column-level privileges, and data.
 -- ============================================================================
 
 -- Functions are emitted alphabetically, and some call others -- rma_can_handle_cash()
@@ -51,10 +32,11 @@ CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
--- Sequences
+-- ── Sequences ───────────────────────────────────────────────────────────────
+CREATE SEQUENCE IF NOT EXISTS public.restore_staging_seq_seq;
 CREATE SEQUENCE IF NOT EXISTS public.ticket_activity_id_seq;
 
--- Tables
+-- ── Tables ──────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.activities (
   id uuid DEFAULT gen_random_uuid() NOT NULL,
   related_type text NOT NULL,
@@ -123,6 +105,26 @@ CREATE TABLE IF NOT EXISTS public.categories (
   created_by text,
   updated_date timestamp with time zone DEFAULT now(),
   updated_by text
+);
+
+CREATE TABLE IF NOT EXISTS public.company_documents (
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  title text NOT NULL,
+  description text,
+  file_name text NOT NULL,
+  file_url text NOT NULL,
+  storage_path text NOT NULL,
+  file_size integer,
+  mime_type text,
+  extracted_text text,
+  extraction_status text DEFAULT 'pending'::text NOT NULL,
+  page_count integer,
+  uploaded_by text,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
+  deleted_at timestamp with time zone,
+  deleted_by text,
+  search_vector tsvector GENERATED ALWAYS AS (((setweight(to_tsvector('simple'::regconfig, COALESCE(title, ''::text)), 'A'::"char") || setweight(to_tsvector('simple'::regconfig, COALESCE(description, ''::text)), 'B'::"char")) || setweight(to_tsvector('simple'::regconfig, COALESCE(extracted_text, ''::text)), 'C'::"char"))) STORED
 );
 
 CREATE TABLE IF NOT EXISTS public.contacts (
@@ -201,7 +203,8 @@ CREATE TABLE IF NOT EXISTS public.credit_notes (
   archived_by text,
   voided_at timestamp with time zone,
   voided_by text,
-  void_reason text
+  void_reason text,
+  discount_amount numeric(12,2) DEFAULT 0 NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.crm_invoices (
@@ -368,7 +371,8 @@ CREATE TABLE IF NOT EXISTS public.email_settings (
   from_name text DEFAULT 'myRMA System'::text,
   is_active boolean DEFAULT false,
   updated_by text,
-  updated_date timestamp with time zone DEFAULT now()
+  updated_date timestamp with time zone DEFAULT now(),
+  has_api_key boolean GENERATED ALWAYS AS (((api_key IS NOT NULL) AND (btrim(api_key) <> ''::text))) STORED
 );
 
 CREATE TABLE IF NOT EXISTS public.email_templates (
@@ -624,7 +628,9 @@ CREATE TABLE IF NOT EXISTS public.product_documents (
   uploaded_by text,
   created_at timestamp with time zone DEFAULT now() NOT NULL,
   updated_at timestamp with time zone DEFAULT now() NOT NULL,
-  search_vector tsvector GENERATED ALWAYS AS (((setweight(to_tsvector('simple'::regconfig, COALESCE(title, ''::text)), 'A'::"char") || setweight(to_tsvector('simple'::regconfig, COALESCE(description, ''::text)), 'B'::"char")) || setweight(to_tsvector('simple'::regconfig, COALESCE(extracted_text, ''::text)), 'C'::"char"))) STORED
+  search_vector tsvector GENERATED ALWAYS AS (((setweight(to_tsvector('simple'::regconfig, COALESCE(title, ''::text)), 'A'::"char") || setweight(to_tsvector('simple'::regconfig, COALESCE(description, ''::text)), 'B'::"char")) || setweight(to_tsvector('simple'::regconfig, COALESCE(extracted_text, ''::text)), 'C'::"char"))) STORED,
+  deleted_at timestamp with time zone,
+  deleted_by text
 );
 
 CREATE TABLE IF NOT EXISTS public.product_images (
@@ -665,6 +671,13 @@ CREATE TABLE IF NOT EXISTS public.products (
   product_description text,
   created_by text,
   stock_tracking_mode text DEFAULT 'serialized'::text NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.public_track_rate_limit (
+  ip_hash text NOT NULL,
+  window_start timestamp with time zone DEFAULT now() NOT NULL,
+  request_count integer DEFAULT 0 NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.purchase_orders (
@@ -718,6 +731,15 @@ CREATE TABLE IF NOT EXISTS public.quotations (
   archived boolean DEFAULT false NOT NULL,
   archived_at timestamp with time zone,
   archived_by text
+);
+
+CREATE TABLE IF NOT EXISTS public.restore_staging (
+  session_id uuid NOT NULL,
+  seq bigint DEFAULT nextval('restore_staging_seq_seq'::regclass) NOT NULL,
+  table_name text NOT NULL,
+  rows jsonb NOT NULL,
+  created_by uuid DEFAULT auth.uid(),
+  created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.rma_config (
@@ -923,7 +945,6 @@ CREATE TABLE IF NOT EXISTS public.user_roles (
   suspended_reason text,
   suspended_by text,
   suspended_date timestamp with time zone,
-  password_hash text,
   access_expires_at timestamp with time zone
 );
 
@@ -1042,7 +1063,8 @@ CREATE TABLE IF NOT EXISTS public.webhooks (
   last_triggered_at timestamp with time zone,
   created_by text,
   created_date timestamp with time zone DEFAULT now(),
-  updated_date timestamp with time zone DEFAULT now()
+  updated_date timestamp with time zone DEFAULT now(),
+  has_secret boolean GENERATED ALWAYS AS (((secret_key IS NOT NULL) AND (secret_key <> ''::text))) STORED
 );
 
 CREATE TABLE IF NOT EXISTS public.whatsapp_templates (
@@ -1065,7 +1087,7 @@ CREATE TABLE IF NOT EXISTS public.whatsapp_templates (
   created_by text
 );
 
--- Primary keys, unique and check constraints
+-- ── Primary keys, unique and check constraints ──────────────────────────────
 ALTER TABLE public.activities ADD CONSTRAINT activities_pkey PRIMARY KEY (id);
 ALTER TABLE public.activities ADD CONSTRAINT chk_activity_related_type CHECK ((related_type = ANY (ARRAY['lead'::text, 'deal'::text, 'customer'::text, 'contact'::text, 'purchase_order'::text, 'vendor_invoice'::text]))) NOT VALID;
 ALTER TABLE public.activities ADD CONSTRAINT chk_activity_type CHECK ((type = ANY (ARRAY['call'::text, 'meeting'::text, 'whatsapp'::text, 'email'::text, 'note'::text, 'task'::text, 'log'::text, 'approval'::text]))) NOT VALID;
@@ -1078,6 +1100,8 @@ ALTER TABLE public.brands ADD CONSTRAINT brands_status_check CHECK ((status = AN
 ALTER TABLE public.categories ADD CONSTRAINT categories_brand_id_category_name_key UNIQUE (brand_id, category_name);
 ALTER TABLE public.categories ADD CONSTRAINT categories_pkey PRIMARY KEY (id);
 ALTER TABLE public.categories ADD CONSTRAINT categories_status_check CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text])));
+ALTER TABLE public.company_documents ADD CONSTRAINT company_documents_extraction_status_check CHECK ((extraction_status = ANY (ARRAY['pending'::text, 'ok'::text, 'empty'::text, 'failed'::text, 'unsupported'::text])));
+ALTER TABLE public.company_documents ADD CONSTRAINT company_documents_pkey PRIMARY KEY (id);
 ALTER TABLE public.contacts ADD CONSTRAINT contacts_pkey PRIMARY KEY (id);
 ALTER TABLE public.countries ADD CONSTRAINT countries_landline_digits_check CHECK (((landline_digits >= 4) AND (landline_digits <= 15)));
 ALTER TABLE public.countries ADD CONSTRAINT countries_mobile_digits_check CHECK (((mobile_digits >= 4) AND (mobile_digits <= 15)));
@@ -1164,6 +1188,7 @@ ALTER TABLE public.products ADD CONSTRAINT products_product_type_check CHECK ((p
 ALTER TABLE public.products ADD CONSTRAINT products_sku_key UNIQUE (sku);
 ALTER TABLE public.products ADD CONSTRAINT products_status_check CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text, 'discontinued'::text])));
 ALTER TABLE public.products ADD CONSTRAINT products_stock_tracking_mode_check CHECK ((stock_tracking_mode = ANY (ARRAY['serialized'::text, 'bulk'::text])));
+ALTER TABLE public.public_track_rate_limit ADD CONSTRAINT public_track_rate_limit_pkey PRIMARY KEY (ip_hash);
 ALTER TABLE public.purchase_orders ADD CONSTRAINT chk_po_rate_positive CHECK ((exchange_rate > (0)::numeric));
 ALTER TABLE public.purchase_orders ADD CONSTRAINT purchase_orders_pkey PRIMARY KEY (id);
 ALTER TABLE public.purchase_orders ADD CONSTRAINT purchase_orders_po_code_key UNIQUE (po_code);
@@ -1171,6 +1196,8 @@ ALTER TABLE public.purchase_orders ADD CONSTRAINT purchase_orders_status_check C
 ALTER TABLE public.quotations ADD CONSTRAINT quotations_pkey PRIMARY KEY (id);
 ALTER TABLE public.quotations ADD CONSTRAINT quotations_qt_code_key UNIQUE (qt_code);
 ALTER TABLE public.quotations ADD CONSTRAINT quotations_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'sent'::text, 'accepted'::text, 'declined'::text, 'expired'::text, 'cancelled'::text, 'converted'::text])));
+ALTER TABLE public.restore_staging ADD CONSTRAINT restore_staging_pkey PRIMARY KEY (session_id, seq);
+ALTER TABLE public.restore_staging ADD CONSTRAINT restore_staging_rows_check CHECK ((jsonb_typeof(rows) = 'array'::text));
 ALTER TABLE public.rma_config ADD CONSTRAINT rma_config_config_key_key UNIQUE (config_key);
 ALTER TABLE public.rma_config ADD CONSTRAINT rma_config_pkey PRIMARY KEY (id);
 ALTER TABLE public.rma_tickets ADD CONSTRAINT rma_tickets_pkey PRIMARY KEY (id);
@@ -1180,7 +1207,7 @@ ALTER TABLE public.rma_tickets ADD CONSTRAINT rma_tickets_ticket_status_nonempty
 ALTER TABLE public.sales_orders ADD CONSTRAINT sales_orders_pkey PRIMARY KEY (id);
 ALTER TABLE public.sales_orders ADD CONSTRAINT sales_orders_so_code_key UNIQUE (so_code);
 ALTER TABLE public.sales_orders ADD CONSTRAINT sales_orders_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'sent'::text, 'accepted'::text, 'declined'::text, 'confirmed'::text, 'delivered'::text, 'cancelled'::text])));
-ALTER TABLE public.stock_moves ADD CONSTRAINT stock_moves_doc_type_check CHECK ((doc_type = ANY (ARRAY['sales_order'::text, 'invoice'::text, 'credit_note'::text, 'manual'::text, 'vendor_invoice'::text, 'rma_ticket'::text])));
+ALTER TABLE public.stock_moves ADD CONSTRAINT stock_moves_doc_type_check CHECK ((doc_type = ANY (ARRAY['sales_order'::text, 'invoice'::text, 'credit_note'::text, 'manual'::text, 'vendor_invoice'::text, 'rma_ticket'::text, 'manufacturer_batch'::text])));
 ALTER TABLE public.stock_moves ADD CONSTRAINT stock_moves_move_type_check CHECK ((move_type = ANY (ARRAY['reserve'::text, 'deliver'::text, 'release'::text, 'restore'::text, 'adjust'::text, 'receive'::text, 'transfer'::text])));
 ALTER TABLE public.stock_moves ADD CONSTRAINT stock_moves_pkey PRIMARY KEY (id);
 ALTER TABLE public.stock_moves ADD CONSTRAINT stock_moves_qty_check CHECK ((qty > 0));
@@ -1232,7 +1259,7 @@ ALTER TABLE public.whatsapp_templates ADD CONSTRAINT whatsapp_templates_header_t
 ALTER TABLE public.whatsapp_templates ADD CONSTRAINT whatsapp_templates_pkey PRIMARY KEY (id);
 ALTER TABLE public.whatsapp_templates ADD CONSTRAINT whatsapp_templates_status_check CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text, 'pending_approval'::text])));
 
--- Foreign keys
+-- ── Foreign keys ────────────────────────────────────────────────────────────
 ALTER TABLE public.activities ADD CONSTRAINT activities_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES activities(id) ON DELETE CASCADE;
 ALTER TABLE public.brands ADD CONSTRAINT brands_country_code_fkey FOREIGN KEY (country_code) REFERENCES countries(code);
 ALTER TABLE public.categories ADD CONSTRAINT categories_brand_id_fkey FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE;
@@ -1298,27 +1325,31 @@ ALTER TABLE public.vendor_payments ADD CONSTRAINT vendor_payments_vendor_id_fkey
 ALTER TABLE public.warehouse_stock ADD CONSTRAINT warehouse_stock_product_id_fkey FOREIGN KEY (product_id) REFERENCES products(id);
 ALTER TABLE public.warehouse_stock ADD CONSTRAINT warehouse_stock_warehouse_id_fkey FOREIGN KEY (warehouse_id) REFERENCES warehouses(id);
 
--- Indexes
+-- ── Indexes ─────────────────────────────────────────────────────────────────
 CREATE INDEX cn_applications_cn_idx ON public.credit_note_applications USING btree (credit_note_id);
 CREATE INDEX cn_applications_invoice_idx ON public.credit_note_applications USING btree (invoice_id);
-CREATE INDEX country_area_codes_country_idx ON public.country_area_codes USING btree (country_code);
+CREATE INDEX company_documents_deleted_at_idx ON public.company_documents USING btree (deleted_at);
+CREATE INDEX company_documents_search_idx ON public.company_documents USING gin (search_vector);
+CREATE INDEX credit_note_applications_reverses_application_id_idx ON public.credit_note_applications USING btree (reverses_application_id);
 CREATE INDEX credit_notes_customer_idx ON public.credit_notes USING btree (customer_id);
 CREATE INDEX credit_notes_invoice_idx ON public.credit_notes USING btree (source_invoice_id);
 CREATE INDEX credit_notes_status_idx ON public.credit_notes USING btree (status);
 CREATE INDEX credit_notes_type_idx ON public.credit_notes USING btree (type);
 CREATE INDEX crm_invoices_customer_idx ON public.crm_invoices USING btree (customer_id);
 CREATE INDEX crm_invoices_doc_status_idx ON public.crm_invoices USING btree (doc_status);
+CREATE UNIQUE INDEX crm_invoices_one_live_per_so_idx ON public.crm_invoices USING btree (so_id) WHERE ((so_id IS NOT NULL) AND (doc_status <> 'cancelled'::text));
 CREATE INDEX crm_invoices_pay_status_idx ON public.crm_invoices USING btree (payment_status);
 CREATE INDEX crm_invoices_rep_idx ON public.crm_invoices USING btree (assigned_rep);
 CREATE INDEX crm_invoices_so_idx ON public.crm_invoices USING btree (so_id);
+CREATE INDEX customer_notes_customer_id_idx ON public.customer_notes USING btree (customer_id);
+CREATE INDEX deals_contact_id_idx ON public.deals USING btree (contact_id);
+CREATE INDEX deals_pipeline_id_idx ON public.deals USING btree (pipeline_id);
 CREATE INDEX idx_activities_assigned_rep ON public.activities USING btree (assigned_rep);
 CREATE INDEX idx_activities_completed_at ON public.activities USING btree (completed_at);
 CREATE INDEX idx_activities_due_date ON public.activities USING btree (due_date);
 CREATE INDEX idx_activities_parent_id ON public.activities USING btree (parent_id);
 CREATE INDEX idx_activities_related_id ON public.activities USING btree (related_id);
-CREATE INDEX idx_categories_brand ON public.categories USING btree (brand_id);
 CREATE INDEX idx_contacts_customer_id ON public.contacts USING btree (customer_id);
-CREATE INDEX idx_customers_code ON public.customers USING btree (customer_code);
 CREATE INDEX idx_customers_email ON public.customers USING btree (email);
 CREATE INDEX idx_deals_assigned_rep ON public.deals USING btree (assigned_rep);
 CREATE INDEX idx_deals_customer_id ON public.deals USING btree (customer_id);
@@ -1342,18 +1373,16 @@ CREATE INDEX idx_notif_queue_status ON public.notification_queue USING btree (st
 CREATE INDEX idx_product_images_product ON public.product_images USING btree (product_id);
 CREATE INDEX idx_products_brand ON public.products USING btree (brand_id);
 CREATE INDEX idx_products_category ON public.products USING btree (category_id);
-CREATE INDEX idx_products_sku ON public.products USING btree (sku);
+CREATE INDEX idx_products_product_name ON public.products USING btree (product_name);
 CREATE INDEX idx_products_status ON public.products USING btree (status);
 CREATE INDEX idx_products_subcategory ON public.products USING btree (subcategory_id);
+CREATE INDEX idx_public_track_rate_limit_updated ON public.public_track_rate_limit USING btree (updated_at);
 CREATE INDEX idx_rma_tickets_customer ON public.rma_tickets USING btree (customer_id);
-CREATE INDEX idx_rma_tickets_number ON public.rma_tickets USING btree (rma_number);
 CREATE INDEX idx_rma_tickets_status ON public.rma_tickets USING btree (ticket_status);
-CREATE INDEX idx_subcategories_category ON public.subcategories USING btree (category_id);
 CREATE INDEX idx_ticket_comments_created ON public.ticket_comments USING btree (created_date);
 CREATE INDEX idx_ticket_comments_ticket ON public.ticket_comments USING btree (ticket_id);
 CREATE INDEX idx_user_activity_log_created_date ON public.user_activity_log USING btree (created_date DESC);
 CREATE INDEX idx_user_activity_log_user_email ON public.user_activity_log USING btree (user_email);
-CREATE INDEX idx_user_permissions_email ON public.user_permissions USING btree (user_email);
 CREATE INDEX idx_wa_templates_event_type ON public.whatsapp_templates USING btree (event_type);
 CREATE INDEX idx_wa_templates_provider ON public.whatsapp_templates USING btree (provider);
 CREATE INDEX idx_wa_templates_status ON public.whatsapp_templates USING btree (status);
@@ -1362,16 +1391,23 @@ CREATE INDEX inv_units_reservation_idx ON public.inventory_units USING btree (re
 CREATE INDEX inv_units_reserved_by_idx ON public.inventory_units USING btree (reserved_by_doc_id) WHERE (reserved_by_doc_id IS NOT NULL);
 CREATE UNIQUE INDEX inv_units_serial_unique_idx ON public.inventory_units USING btree (serial_number) WHERE ((serial_number IS NOT NULL) AND (serial_number <> ''::text) AND (status <> 'closed'::text));
 CREATE INDEX inv_units_vendor_invoice_idx ON public.inventory_units USING btree (vendor_invoice_id);
+CREATE INDEX inventory_units_rma_ticket_id_idx ON public.inventory_units USING btree (rma_ticket_id);
+CREATE INDEX inventory_units_warehouse_id_idx ON public.inventory_units USING btree (warehouse_id);
 CREATE INDEX invoices_status_idx ON public.invoices USING btree (status);
 CREATE INDEX invoices_ticket_idx ON public.invoices USING btree (ticket_id);
+CREATE INDEX leads_converted_customer_id_idx ON public.leads USING btree (converted_customer_id);
+CREATE INDEX leads_converted_deal_id_idx ON public.leads USING btree (converted_deal_id);
 CREATE INDEX notifications_created_date_idx ON public.notifications USING btree (created_date DESC);
 CREATE INDEX payment_applications_invoice_idx ON public.payment_applications USING btree (invoice_id);
 CREATE INDEX payment_applications_payment_idx ON public.payment_applications USING btree (payment_id);
+CREATE INDEX payment_applications_reverses_application_id_idx ON public.payment_applications USING btree (reverses_application_id);
 CREATE INDEX payments_customer_idx ON public.payments USING btree (customer_id);
 CREATE INDEX payments_status_idx ON public.payments USING btree (status);
+CREATE INDEX product_documents_deleted_at_idx ON public.product_documents USING btree (deleted_at);
 CREATE INDEX product_documents_product_idx ON public.product_documents USING btree (product_id);
 CREATE INDEX product_documents_search_idx ON public.product_documents USING gin (search_vector);
 CREATE INDEX product_documents_type_idx ON public.product_documents USING btree (doc_type);
+CREATE INDEX purchase_orders_vendor_id_idx ON public.purchase_orders USING btree (vendor_id);
 CREATE INDEX quotations_customer_idx ON public.quotations USING btree (customer_id);
 CREATE INDEX quotations_deal_idx ON public.quotations USING btree (deal_id);
 CREATE INDEX quotations_rep_idx ON public.quotations USING btree (assigned_rep);
@@ -1382,21 +1418,1004 @@ CREATE INDEX sales_orders_rep_idx ON public.sales_orders USING btree (assigned_r
 CREATE INDEX sales_orders_status_idx ON public.sales_orders USING btree (status);
 CREATE INDEX stock_moves_doc_idx ON public.stock_moves USING btree (doc_type, doc_id);
 CREATE INDEX stock_moves_ref_idx ON public.stock_moves USING btree (ref_type, ref_id);
+CREATE INDEX ticket_activity_ticket_id_idx ON public.ticket_activity USING btree (ticket_id);
+CREATE INDEX ticket_comments_parent_comment_id_idx ON public.ticket_comments USING btree (parent_comment_id);
 CREATE INDEX ticket_parts_part_idx ON public.ticket_parts USING btree (part_id);
 CREATE INDEX ticket_parts_ticket_idx ON public.ticket_parts USING btree (ticket_id);
 CREATE UNIQUE INDEX ticket_resolutions_ticket_id_unique ON public.ticket_resolutions USING btree (ticket_id);
 CREATE INDEX time_entries_ticket_idx ON public.time_entries USING btree (ticket_id);
 CREATE INDEX time_entries_user_idx ON public.time_entries USING btree (user_email);
 CREATE INDEX vendor_invoice_charges_vi_idx ON public.vendor_invoice_charges USING btree (vendor_invoice_id);
+CREATE INDEX vendor_invoices_purchase_order_id_idx ON public.vendor_invoices USING btree (purchase_order_id);
+CREATE INDEX vendor_invoices_vendor_id_idx ON public.vendor_invoices USING btree (vendor_id);
 CREATE INDEX vendor_payment_applications_invoice_idx ON public.vendor_payment_applications USING btree (invoice_id);
 CREATE INDEX vendor_payment_applications_payment_idx ON public.vendor_payment_applications USING btree (payment_id);
+CREATE INDEX vendor_payment_applications_reverses_application_id_idx ON public.vendor_payment_applications USING btree (reverses_application_id);
 CREATE INDEX vendor_payments_status_idx ON public.vendor_payments USING btree (status);
 CREATE INDEX vendor_payments_vendor_idx ON public.vendor_payments USING btree (vendor_id);
-CREATE INDEX warehouse_stock_product_idx ON public.warehouse_stock USING btree (product_id);
 CREATE INDEX warehouse_stock_warehouse_idx ON public.warehouse_stock USING btree (warehouse_id);
 CREATE UNIQUE INDEX warehouses_system_code_key ON public.warehouses USING btree (code) WHERE is_system;
 
--- Functions
+-- ── Views ───────────────────────────────────────────────────────────────────
+CREATE OR REPLACE VIEW public.v_activities_list WITH (security_invoker = true) AS
+ SELECT a.id,
+    a.related_type,
+    a.related_id,
+    a.type,
+    a.title,
+    a.due_date,
+    a.completed_at,
+    a.assigned_rep,
+    a.outcome_notes,
+    a.created_at,
+    a.created_by,
+    a.attachments,
+    a.parent_id,
+        CASE
+            WHEN a.type = 'approval'::text THEN COALESCE(NULLIF(split_part(a.title, '|'::text, 2), ''::text), 'quotation'::text)
+            ELSE COALESCE(a.related_type, 'deal'::text)
+        END AS source,
+    x.customer_name,
+    lower(x.customer_name) AS customer_sort,
+    lower(COALESCE(a.title, ''::text)) AS title_sort,
+        CASE
+            WHEN a.type = 'approval'::text THEN COALESCE(NULLIF(split_part(a.title, '|'::text, 4), ''::text), '—'::text)
+            WHEN a.related_type = 'lead'::text THEN l.lead_code
+            WHEN a.related_type = 'deal'::text THEN d.deal_code
+            ELSE NULL::text
+        END AS source_code,
+        CASE
+            WHEN a.related_type = 'lead'::text THEN l.id IS NOT NULL
+            WHEN a.related_type = 'deal'::text THEN d.id IS NOT NULL
+            ELSE false
+        END AS related_exists
+   FROM activities a
+     LEFT JOIN leads l ON a.related_type = 'lead'::text AND l.id = a.related_id
+     LEFT JOIN deals d ON a.related_type = 'deal'::text AND d.id = a.related_id
+     LEFT JOIN customers c ON c.id =
+        CASE a.related_type
+            WHEN 'deal'::text THEN d.customer_id
+            WHEN 'customer'::text THEN a.related_id
+            ELSE NULL::uuid
+        END
+     CROSS JOIN LATERAL ( SELECT
+                CASE
+                    WHEN a.type = 'approval'::text THEN COALESCE(NULLIF(split_part(a.title, '|'::text, 6), ''::text), '—'::text)
+                    WHEN a.related_type = 'lead'::text THEN COALESCE(NULLIF(l.company_name, ''::text), NULLIF(l.full_name, ''::text))
+                    WHEN a.related_type = ANY (ARRAY['deal'::text, 'customer'::text]) THEN COALESCE(NULLIF(c.company_name, ''::text), NULLIF(c.contact_person, ''::text))
+                    ELSE NULL::text
+                END AS customer_name) x;
+
+CREATE OR REPLACE VIEW public.v_bulk_stock_reservations WITH (security_invoker = true) AS
+ SELECT s.product_id,
+    m.doc_type,
+    m.doc_id,
+    sum(
+        CASE
+            WHEN m.move_type = 'reserve'::text THEN m.qty
+            WHEN m.move_type = ANY (ARRAY['release'::text, 'deliver'::text]) THEN - m.qty
+            ELSE 0
+        END)::integer AS qty
+   FROM stock_moves m
+     JOIN warehouse_stock s ON m.ref_type = 'warehouse_stock'::text AND s.id = m.ref_id
+  GROUP BY s.product_id, m.doc_type, m.doc_id
+ HAVING sum(
+        CASE
+            WHEN m.move_type = 'reserve'::text THEN m.qty
+            WHEN m.move_type = ANY (ARRAY['release'::text, 'deliver'::text]) THEN - m.qty
+            ELSE 0
+        END) > 0;
+
+CREATE OR REPLACE VIEW public.v_customer_activity WITH (security_invoker = true) AS
+ SELECT t.customer_id,
+    'ticket'::text AS event_type,
+    t.id AS ref_id,
+    t.created_date AS event_at,
+    t.rma_number AS code,
+    t.general_description AS detail,
+    NULL::text AS actor
+   FROM rma_tickets t
+  WHERE t.customer_id IS NOT NULL AND t.created_date IS NOT NULL
+UNION ALL
+ SELECT n.customer_id,
+    'note'::text AS event_type,
+    n.id AS ref_id,
+    n.created_date AS event_at,
+    NULL::text AS code,
+    n.note AS detail,
+    n.created_by AS actor
+   FROM customer_notes n
+  WHERE n.created_date IS NOT NULL
+UNION ALL
+ SELECT c.id AS customer_id,
+    'created'::text AS event_type,
+    c.id AS ref_id,
+    c.created_date AS event_at,
+    NULL::text AS code,
+    NULL::text AS detail,
+    c.created_by AS actor
+   FROM customers c
+  WHERE c.created_date IS NOT NULL;
+
+CREATE OR REPLACE VIEW public.v_customer_ledger WITH (security_invoker = true) AS
+ SELECT crm_invoices.id,
+    'invoice'::text AS entry_type,
+    crm_invoices.inv_code AS entry_code,
+    crm_invoices.customer_id,
+    crm_invoices.total AS amount,
+    crm_invoices.doc_status AS status,
+    crm_invoices.due_date,
+    COALESCE(crm_invoices.posted_at, crm_invoices.created_at) AS entry_date,
+    crm_invoices.created_at
+   FROM crm_invoices
+  WHERE crm_invoices.doc_status = 'posted'::text
+UNION ALL
+ SELECT credit_notes.id,
+    'credit_note'::text AS entry_type,
+    credit_notes.cn_code AS entry_code,
+    credit_notes.customer_id,
+    - credit_notes.total AS amount,
+    credit_notes.status,
+    NULL::date AS due_date,
+    COALESCE(credit_notes.issued_at, credit_notes.created_at) AS entry_date,
+    credit_notes.created_at
+   FROM credit_notes
+  WHERE credit_notes.status = ANY (ARRAY['issued'::text, 'applied'::text])
+UNION ALL
+ SELECT payments.id,
+    'payment'::text AS entry_type,
+    payments.payment_code AS entry_code,
+    payments.customer_id,
+    - payments.amount AS amount,
+    payments.status,
+    NULL::date AS due_date,
+    COALESCE(payments.payment_date::timestamp with time zone, payments.created_at) AS entry_date,
+    payments.created_at
+   FROM payments
+  WHERE payments.status = 'active'::text;
+
+CREATE OR REPLACE VIEW public.v_deals_list WITH (security_invoker = true) AS
+ SELECT d.id,
+    d.title,
+    d.customer_id,
+    d.contact_id,
+    d.pipeline_id,
+    d.stage,
+    d.value,
+    d.probability,
+    d.expected_close_date,
+    d.assigned_rep,
+    d.product_lines,
+    d.status,
+    d.lost_reason,
+    d.won_at,
+    d.lost_at,
+    d.notes,
+    d.created_at,
+    d.created_by,
+    d.updated_at,
+    d.deal_code,
+    COALESCE(NULLIF(c.company_name, ''::text), NULLIF(c.contact_person, ''::text)) AS customer_name,
+    lower(COALESCE(NULLIF(c.company_name, ''::text), NULLIF(c.contact_person, ''::text), ''::text)) AS customer_sort,
+    lower(COALESCE(d.title, ''::text)) AS title_sort,
+    COALESCE(d.value, 0::numeric) AS value_sort,
+    ( SELECT (s.value ->> 'order'::text)::numeric AS "numeric"
+           FROM pipelines p
+             CROSS JOIN LATERAL jsonb_array_elements(p.stages) s(value)
+          WHERE p.id = d.pipeline_id AND (s.value ->> 'id'::text) = d.stage
+         LIMIT 1) AS stage_order
+   FROM deals d
+     LEFT JOIN customers c ON c.id = d.customer_id;
+
+CREATE OR REPLACE VIEW public.v_inventory_product_groups WITH (security_invoker = true) AS
+ SELECT g.group_name AS product_name,
+    COALESCE(nb.brand_name, ''::text) AS brand,
+    g.total,
+    g.active_rma,
+    g.company_stock,
+    g.sent_to_manufacturer,
+    g.closed,
+    g.replacement,
+    g.credit_note
+   FROM ( SELECT COALESCE(NULLIF(inventory_units.product_name, ''::text), 'Unknown Product'::text) AS group_name,
+            count(*)::integer AS total,
+            count(*) FILTER (WHERE inventory_units.status = 'active_rma'::text)::integer AS active_rma,
+            count(*) FILTER (WHERE inventory_units.status = 'company_stock'::text)::integer AS company_stock,
+            count(*) FILTER (WHERE inventory_units.status = 'sent_to_manufacturer'::text)::integer AS sent_to_manufacturer,
+            count(*) FILTER (WHERE inventory_units.status = 'closed'::text)::integer AS closed,
+            count(*) FILTER (WHERE inventory_units.status = 'company_stock'::text AND inventory_units.resolution_type = 'replacement'::text)::integer AS replacement,
+            count(*) FILTER (WHERE inventory_units.status = 'company_stock'::text AND inventory_units.resolution_type IS DISTINCT FROM 'replacement'::text)::integer AS credit_note
+           FROM inventory_units
+          GROUP BY (COALESCE(NULLIF(inventory_units.product_name, ''::text), 'Unknown Product'::text))) g
+     LEFT JOIN LATERAL ( SELECT b.brand_name
+           FROM products p
+             LEFT JOIN brands b ON b.id = p.brand_id
+          WHERE p.product_name = g.group_name
+          ORDER BY p.created_date, p.id
+         LIMIT 1) nb ON true;
+
+CREATE OR REPLACE VIEW public.v_inventory_units WITH (security_invoker = true) AS
+ SELECT u.id,
+    u.rma_ticket_id,
+    u.rma_number,
+    u.product_name,
+    u.serial_number,
+    u.warranty_status,
+    u.status,
+    u.resolution_type,
+    u.resolved_date,
+    u.manufacturer_batch_id,
+    u.notes,
+    u.created_date,
+    u.warehouse_id,
+    u.reservation_status,
+    u.reserved_by_doc_type,
+    u.reserved_by_doc_id,
+    u.reserved_at,
+    u.reserved_by_email,
+    u.product_id,
+    u.vendor_invoice_id,
+    u.unit_cost_base,
+    COALESCE(NULLIF(u.product_name, ''::text), 'Unknown Product'::text) AS group_name,
+    nb.brand_name,
+    tk.customer_name AS ticket_customer_name,
+    tk.ticket_status
+   FROM inventory_units u
+     LEFT JOIN LATERAL ( SELECT b.brand_name
+           FROM products p
+             LEFT JOIN brands b ON b.id = p.brand_id
+          WHERE p.product_name = u.product_name
+          ORDER BY p.created_date, p.id
+         LIMIT 1) nb ON true
+     LEFT JOIN LATERAL ( SELECT t.customer_name,
+            t.ticket_status
+           FROM rma_tickets t
+          WHERE t.rma_number = u.rma_number
+         LIMIT 1) tk ON true;
+
+CREATE OR REPLACE VIEW public.v_invoice_margin WITH (security_invoker = true) AS
+ SELECT i.id,
+    i.inv_code,
+    i.customer_id,
+    COALESCE(NULLIF(btrim(c.company_name), ''::text), c.contact_person) AS customer_name,
+    i.assigned_rep,
+    i.posted_at,
+    i.doc_status,
+    i.payment_status,
+    i.total AS revenue_base,
+    i.cogs_base,
+    i.cogs_unknown_qty,
+    i.cogs_complete,
+        CASE
+            WHEN i.cogs_complete THEN round(i.total - i.cogs_base, 2)
+            ELSE NULL::numeric
+        END AS margin_base,
+        CASE
+            WHEN i.cogs_complete AND i.total > 0::numeric THEN round(100.0 * (i.total - i.cogs_base) / i.total, 2)
+            ELSE NULL::numeric
+        END AS margin_pct
+   FROM crm_invoices i
+     LEFT JOIN customers c ON c.id = i.customer_id
+  WHERE i.doc_status = 'posted'::text;
+
+CREATE OR REPLACE VIEW public.v_knowledge_product_placement WITH (security_invoker = true) AS
+ SELECT p.id AS product_id,
+    p.product_name,
+    p.sku,
+    p.product_image_url,
+    p.brand_id AS product_brand_id,
+    p.category_id AS product_category_id,
+    p.subcategory_id AS product_subcategory_id,
+    b.id AS brand_id,
+    b.brand_name,
+        CASE
+            WHEN c.id IS NOT NULL AND NOT c.brand_id IS DISTINCT FROM p.brand_id THEN c.id
+            ELSE NULL::uuid
+        END AS category_id,
+        CASE
+            WHEN c.id IS NOT NULL AND NOT c.brand_id IS DISTINCT FROM p.brand_id THEN c.category_name
+            ELSE NULL::text
+        END AS category_name,
+        CASE
+            WHEN c.id IS NOT NULL AND NOT c.brand_id IS DISTINCT FROM p.brand_id AND s.category_id = c.id THEN s.id
+            ELSE NULL::uuid
+        END AS subcategory_id,
+        CASE
+            WHEN c.id IS NOT NULL AND NOT c.brand_id IS DISTINCT FROM p.brand_id AND s.category_id = c.id THEN s.subcategory_name
+            ELSE NULL::text
+        END AS subcategory_name
+   FROM products p
+     LEFT JOIN brands b ON b.id = p.brand_id
+     LEFT JOIN categories c ON c.id = p.category_id
+     LEFT JOIN subcategories s ON s.id = p.subcategory_id;
+
+CREATE OR REPLACE VIEW public.v_leads_list WITH (security_invoker = true) AS
+ SELECT id,
+    full_name,
+    company_name,
+    phone,
+    email,
+    source,
+    status,
+    assigned_rep,
+    notes,
+    converted_at,
+    converted_customer_id,
+    converted_deal_id,
+    created_at,
+    created_by,
+    updated_at,
+    lead_code,
+    lower(COALESCE(NULLIF(company_name, ''::text), full_name, ''::text)) AS sort_name
+   FROM leads l;
+
+CREATE OR REPLACE VIEW public.v_payments_list WITH (security_invoker = true) AS
+ SELECT p.id,
+    p.payment_code,
+    p.customer_id,
+    p.amount,
+    p.unapplied_amount,
+    p.method,
+    p.reference_number,
+    p.payment_date,
+    p.notes,
+    p.status,
+    p.created_by,
+    p.created_at,
+    p.updated_at,
+    p.voided_at,
+    p.voided_by,
+    p.void_reason,
+    COALESCE(NULLIF(c.company_name, ''::text), NULLIF(c.contact_person, ''::text)) AS customer_name
+   FROM payments p
+     LEFT JOIN customers c ON c.id = p.customer_id;
+
+CREATE OR REPLACE VIEW public.v_product_stock_summary WITH (security_invoker = true) AS
+ WITH wh AS (
+         SELECT warehouses.id,
+            warehouses.name,
+            warehouses.code,
+            warehouses.warehouse_type,
+            warehouses.is_system,
+            warehouses.warehouse_type IS NULL OR (warehouses.warehouse_type = ANY (ARRAY[''::text, 'main'::text])) AS is_main,
+            warehouses.warehouse_type = 'branch'::text AS is_branch
+           FROM warehouses
+        ), u AS (
+         SELECT iu.product_id,
+            COALESCE(NULLIF(iu.product_name, ''::text), 'Unknown Product'::text) AS group_name,
+            iu.status,
+            iu.reservation_status,
+            w.id AS w_id,
+            w.name AS w_name,
+            w.code AS w_code,
+            COALESCE(w.is_main, true) AS w_main,
+            COALESCE(w.is_branch, false) AS w_branch,
+            COALESCE(w.is_system, false) AS w_system
+           FROM inventory_units iu
+             LEFT JOIN wh w ON w.id = iu.warehouse_id
+          WHERE iu.status = ANY (ARRAY['company_stock'::text, 'active_rma'::text])
+        ), serial_counts AS (
+         SELECT u.product_id,
+            count(*) FILTER (WHERE u.status = 'company_stock'::text AND u.reservation_status = 'available'::text)::integer AS available,
+            count(*) FILTER (WHERE u.status = 'company_stock'::text AND u.reservation_status = 'reserved'::text)::integer AS reserved,
+            count(*) FILTER (WHERE u.status = 'company_stock'::text AND u.reservation_status = 'delivered'::text)::integer AS delivered,
+            count(*) FILTER (WHERE u.status = 'company_stock'::text AND u.reservation_status IS DISTINCT FROM 'delivered'::text AND u.w_main)::integer AS main_qty,
+            (count(*) FILTER (WHERE u.status = 'company_stock'::text AND u.reservation_status IS DISTINCT FROM 'delivered'::text AND u.w_code IS DISTINCT FROM 'SCRAP'::text) + count(*) FILTER (WHERE u.status = 'active_rma'::text AND u.w_system AND u.w_code IS DISTINCT FROM 'SCRAP'::text))::integer AS physical_total
+           FROM u
+          WHERE u.product_id IS NOT NULL
+          GROUP BY u.product_id
+        ), serial_branches AS (
+         SELECT x.product_id,
+            jsonb_agg(jsonb_build_object('warehouse_id', x.w_id, 'name', COALESCE(x.w_name, ''::text), 'code', x.w_code, 'qty', x.qty) ORDER BY x.w_name, x.w_id) AS branches,
+            sum(x.qty)::integer AS branch_total
+           FROM ( SELECT u.product_id,
+                    u.w_id,
+                    u.w_name,
+                    u.w_code,
+                    count(*)::integer AS qty
+                   FROM u
+                  WHERE u.product_id IS NOT NULL AND u.status = 'company_stock'::text AND u.reservation_status IS DISTINCT FROM 'delivered'::text AND u.w_branch
+                  GROUP BY u.product_id, u.w_id, u.w_name, u.w_code) x
+          GROUP BY x.product_id
+        ), serial_rma AS (
+         SELECT x.product_id,
+            jsonb_agg(jsonb_build_object('warehouse_id', x.w_id, 'code', COALESCE(x.w_code, ''::text), 'name', COALESCE(x.w_name, ''::text), 'count', x.n) ORDER BY x.w_code, x.w_id) AS rma,
+            sum(x.n)::integer AS rma_total
+           FROM ( SELECT u.product_id,
+                    u.w_id,
+                    u.w_name,
+                    u.w_code,
+                    count(*)::integer AS n
+                   FROM u
+                  WHERE u.product_id IS NOT NULL AND u.status = 'active_rma'::text AND u.w_system
+                  GROUP BY u.product_id, u.w_id, u.w_name, u.w_code) x
+          GROUP BY x.product_id
+        ), ws AS (
+         SELECT s.product_id,
+            s.quantity,
+            s.reserved_quantity,
+            w.id AS w_id,
+            w.name AS w_name,
+            w.code AS w_code,
+            COALESCE(w.is_main, true) AS w_main,
+            COALESCE(w.is_branch, false) AS w_branch
+           FROM warehouse_stock s
+             LEFT JOIN wh w ON w.id = s.warehouse_id
+        ), bulk_counts AS (
+         SELECT ws.product_id,
+            sum(ws.quantity)::integer AS qty,
+            sum(ws.reserved_quantity)::integer AS reserved,
+            COALESCE(sum(ws.quantity) FILTER (WHERE ws.w_main), 0::bigint)::integer AS main_qty,
+            COALESCE(sum(ws.quantity) FILTER (WHERE ws.w_code IS DISTINCT FROM 'SCRAP'::text), 0::bigint)::integer AS physical_total
+           FROM ws
+          GROUP BY ws.product_id
+        ), bulk_branches AS (
+         SELECT x.product_id,
+            jsonb_agg(jsonb_build_object('warehouse_id', x.w_id, 'name', COALESCE(x.w_name, ''::text), 'code', x.w_code, 'qty', x.qty) ORDER BY x.w_name, x.w_id) AS branches,
+            sum(x.qty)::integer AS branch_total
+           FROM ( SELECT ws.product_id,
+                    ws.w_id,
+                    ws.w_name,
+                    ws.w_code,
+                    sum(ws.quantity)::integer AS qty
+                   FROM ws
+                  WHERE ws.w_branch
+                  GROUP BY ws.product_id, ws.w_id, ws.w_name, ws.w_code) x
+          GROUP BY x.product_id
+        ), unmatched AS (
+         SELECT x.group_name,
+            COALESCE(jsonb_agg(jsonb_build_object('warehouse_id', x.w_id, 'code', COALESCE(x.w_code, ''::text), 'name', COALESCE(x.w_name, ''::text), 'count', x.n) ORDER BY x.w_code, x.w_id) FILTER (WHERE x.w_id IS NOT NULL), '[]'::jsonb) AS rma,
+            COALESCE(sum(x.n) FILTER (WHERE x.w_id IS NOT NULL), 0::bigint)::integer AS rma_total,
+            COALESCE(sum(x.n) FILTER (WHERE x.w_id IS NOT NULL AND x.w_code IS DISTINCT FROM 'SCRAP'::text), 0::bigint)::integer AS physical_total
+           FROM ( SELECT u.group_name,
+                        CASE
+                            WHEN u.w_system THEN u.w_id
+                            ELSE NULL::uuid
+                        END AS w_id,
+                        CASE
+                            WHEN u.w_system THEN u.w_name
+                            ELSE NULL::text
+                        END AS w_name,
+                        CASE
+                            WHEN u.w_system THEN u.w_code
+                            ELSE NULL::text
+                        END AS w_code,
+                    count(*)::integer AS n
+                   FROM u
+                  WHERE u.product_id IS NULL AND u.status = 'active_rma'::text
+                  GROUP BY u.group_name, (
+                        CASE
+                            WHEN u.w_system THEN u.w_id
+                            ELSE NULL::uuid
+                        END), (
+                        CASE
+                            WHEN u.w_system THEN u.w_name
+                            ELSE NULL::text
+                        END), (
+                        CASE
+                            WHEN u.w_system THEN u.w_code
+                            ELSE NULL::text
+                        END)) x
+          GROUP BY x.group_name
+        )
+ SELECT p.id::text AS product_id,
+    p.product_name,
+        CASE
+            WHEN p.stock_tracking_mode = 'bulk'::text THEN 'bulk'::text
+            ELSE 'serialized'::text
+        END AS stock_tracking_mode,
+        CASE
+            WHEN p.stock_tracking_mode = 'bulk'::text THEN COALESCE(bc.qty - bc.reserved, 0)
+            ELSE COALESCE(sc.available, 0)
+        END AS available,
+        CASE
+            WHEN p.stock_tracking_mode = 'bulk'::text THEN COALESCE(bc.reserved, 0)
+            ELSE COALESCE(sc.reserved, 0)
+        END AS reserved,
+        CASE
+            WHEN p.stock_tracking_mode = 'bulk'::text THEN 0
+            ELSE COALESCE(sc.delivered, 0)
+        END AS delivered,
+        CASE
+            WHEN p.stock_tracking_mode = 'bulk'::text THEN COALESCE(bc.physical_total, 0)
+            ELSE COALESCE(sc.physical_total, 0)
+        END AS physical_total,
+        CASE
+            WHEN p.stock_tracking_mode = 'bulk'::text THEN COALESCE(bc.main_qty, 0)
+            ELSE COALESCE(sc.main_qty, 0)
+        END AS main_qty,
+        CASE
+            WHEN p.stock_tracking_mode = 'bulk'::text THEN COALESCE(bb.branches, '[]'::jsonb)
+            ELSE COALESCE(sb.branches, '[]'::jsonb)
+        END AS branches,
+        CASE
+            WHEN p.stock_tracking_mode = 'bulk'::text THEN COALESCE(bb.branch_total, 0)
+            ELSE COALESCE(sb.branch_total, 0)
+        END AS branch_total,
+        CASE
+            WHEN p.stock_tracking_mode = 'bulk'::text THEN '[]'::jsonb
+            ELSE COALESCE(sr.rma, '[]'::jsonb)
+        END AS rma,
+        CASE
+            WHEN p.stock_tracking_mode = 'bulk'::text THEN 0
+            ELSE COALESCE(sr.rma_total, 0)
+        END AS rma_total,
+    true AS in_catalog
+   FROM products p
+     LEFT JOIN serial_counts sc ON sc.product_id = p.id
+     LEFT JOIN serial_branches sb ON sb.product_id = p.id
+     LEFT JOIN serial_rma sr ON sr.product_id = p.id
+     LEFT JOIN bulk_counts bc ON bc.product_id = p.id
+     LEFT JOIN bulk_branches bb ON bb.product_id = p.id
+  WHERE p.product_type IS DISTINCT FROM 'service'::text
+UNION ALL
+ SELECT 'unmatched:'::text || m.group_name AS product_id,
+    m.group_name AS product_name,
+    'serialized'::text AS stock_tracking_mode,
+    0 AS available,
+    0 AS reserved,
+    0 AS delivered,
+    m.physical_total,
+    0 AS main_qty,
+    '[]'::jsonb AS branches,
+    0 AS branch_total,
+    m.rma,
+    m.rma_total,
+    false AS in_catalog
+   FROM unmatched m;
+
+CREATE OR REPLACE VIEW public.v_purchase_documents WITH (security_invoker = true) AS
+ SELECT purchase_orders.id,
+    'purchase_order'::text AS doc_type,
+    purchase_orders.po_code AS doc_code,
+    purchase_orders.vendor_id,
+    purchase_orders.created_by,
+    purchase_orders.status AS doc_status,
+    NULL::text AS payment_status,
+    purchase_orders.total,
+    purchase_orders.currency,
+    purchase_orders.exchange_rate,
+    purchase_orders.total_base,
+    purchase_orders.created_at,
+    purchase_orders.updated_at,
+    purchase_orders.expected_delivery_date AS type_specific_date,
+    'expected_delivery_date'::text AS type_specific_date_label,
+    purchase_orders.archived,
+    purchase_orders.archived_at
+   FROM purchase_orders
+UNION ALL
+ SELECT vendor_invoices.id,
+    'vendor_invoice'::text AS doc_type,
+    vendor_invoices.vi_code AS doc_code,
+    vendor_invoices.vendor_id,
+    vendor_invoices.created_by,
+    vendor_invoices.status AS doc_status,
+    vendor_invoices.payment_status,
+    vendor_invoices.total,
+    vendor_invoices.currency,
+    vendor_invoices.exchange_rate,
+    vendor_invoices.total_base,
+    vendor_invoices.created_at,
+    NULL::timestamp with time zone AS updated_at,
+    vendor_invoices.due_date AS type_specific_date,
+    'due_date'::text AS type_specific_date_label,
+    vendor_invoices.archived,
+    vendor_invoices.archived_at
+   FROM vendor_invoices;
+
+CREATE OR REPLACE VIEW public.v_report_invoices WITH (security_invoker = true) AS
+ SELECT i.id,
+    i.inv_code,
+    i.customer_id,
+    i.doc_status,
+    i.payment_status,
+    i.total,
+    i.amount_paid,
+    i.due_date,
+    i.created_at,
+    COALESCE(NULLIF(c.company_name, ''::text), NULLIF(c.contact_person, ''::text)) AS customer_name
+   FROM crm_invoices i
+     LEFT JOIN customers c ON c.id = i.customer_id;
+
+CREATE OR REPLACE VIEW public.v_sales_documents WITH (security_invoker = true) AS
+ SELECT quotations.id,
+    'quotation'::text AS doc_type,
+    quotations.qt_code AS doc_code,
+    quotations.customer_id,
+    quotations.assigned_rep,
+    quotations.created_by,
+    quotations.status AS doc_status,
+    NULL::text AS payment_status,
+    quotations.total,
+    quotations.created_at,
+    quotations.updated_at,
+    quotations.validity_until AS type_specific_date,
+    'validity_until'::text AS type_specific_date_label,
+    quotations.archived,
+    quotations.archived_at
+   FROM quotations
+UNION ALL
+ SELECT sales_orders.id,
+    'sales_order'::text AS doc_type,
+    sales_orders.so_code AS doc_code,
+    sales_orders.customer_id,
+    sales_orders.assigned_rep,
+    sales_orders.created_by,
+    sales_orders.status AS doc_status,
+    NULL::text AS payment_status,
+    sales_orders.total,
+    sales_orders.created_at,
+    sales_orders.updated_at,
+    sales_orders.delivery_date AS type_specific_date,
+    'delivery_date'::text AS type_specific_date_label,
+    sales_orders.archived,
+    sales_orders.archived_at
+   FROM sales_orders
+UNION ALL
+ SELECT crm_invoices.id,
+    'invoice'::text AS doc_type,
+    crm_invoices.inv_code AS doc_code,
+    crm_invoices.customer_id,
+    crm_invoices.assigned_rep,
+    crm_invoices.created_by,
+    crm_invoices.doc_status,
+    crm_invoices.payment_status,
+    crm_invoices.total,
+    crm_invoices.created_at,
+    crm_invoices.updated_at,
+    crm_invoices.due_date AS type_specific_date,
+    'due_date'::text AS type_specific_date_label,
+    crm_invoices.archived,
+    crm_invoices.archived_at
+   FROM crm_invoices
+UNION ALL
+ SELECT credit_notes.id,
+    'credit_note'::text AS doc_type,
+    credit_notes.cn_code AS doc_code,
+    credit_notes.customer_id,
+    credit_notes.assigned_rep,
+    credit_notes.created_by,
+    credit_notes.status AS doc_status,
+    NULL::text AS payment_status,
+    credit_notes.total,
+    credit_notes.created_at,
+    credit_notes.updated_at,
+    credit_notes.issued_at AS type_specific_date,
+    'issued_date'::text AS type_specific_date_label,
+    credit_notes.archived,
+    credit_notes.archived_at
+   FROM credit_notes;
+
+CREATE OR REPLACE VIEW public.v_stock_moves_listing WITH (security_invoker = true) AS
+ SELECT m.id,
+    m.ref_type,
+    m.ref_id,
+    m.doc_type,
+    m.doc_id,
+    m.move_type,
+    m.qty,
+    m.from_status,
+    m.to_status,
+    m.actor_email,
+    m.created_at,
+        CASE
+            WHEN m.ref_type = 'unit'::text AND iu.id IS NOT NULL THEN
+            CASE
+                WHEN COALESCE(iu.serial_number, ''::text) <> ''::text THEN ((COALESCE(iu.product_name, ''::text) || ' ('::text) || iu.serial_number) || ')'::text
+                ELSE COALESCE(iu.product_name, ''::text)
+            END
+            WHEN m.ref_type = 'warehouse_stock'::text AND s.id IS NOT NULL THEN (COALESCE(NULLIF(p.product_name, ''::text), s.product_id::text) || ' @ '::text) || COALESCE(NULLIF(w.name, ''::text), s.warehouse_id::text)
+            ELSE m.ref_id::text
+        END AS ref_label
+   FROM stock_moves m
+     LEFT JOIN inventory_units iu ON m.ref_type = 'unit'::text AND iu.id = m.ref_id
+     LEFT JOIN warehouse_stock s ON m.ref_type = 'warehouse_stock'::text AND s.id = m.ref_id
+     LEFT JOIN products p ON p.id = s.product_id
+     LEFT JOIN warehouses w ON w.id = s.warehouse_id;
+
+CREATE OR REPLACE VIEW public.v_vendor_ledger WITH (security_invoker = true) AS
+ SELECT vendor_invoices.id,
+    'vendor_invoice'::text AS entry_type,
+    vendor_invoices.vi_code AS entry_code,
+    vendor_invoices.vendor_id,
+    vendor_invoices.total AS amount,
+    vendor_invoices.currency,
+    vendor_invoices.total_base AS amount_base,
+    vendor_invoices.status,
+    vendor_invoices.due_date,
+    COALESCE(vendor_invoices.approved_at, vendor_invoices.created_at) AS entry_date,
+    vendor_invoices.created_at
+   FROM vendor_invoices
+  WHERE vendor_invoices.status = ANY (ARRAY['approved'::text, 'partially_received'::text, 'received'::text])
+UNION ALL
+ SELECT vendor_payments.id,
+    'vendor_payment'::text AS entry_type,
+    vendor_payments.payment_code AS entry_code,
+    vendor_payments.vendor_id,
+    - vendor_payments.amount AS amount,
+    vendor_payments.currency,
+    - vendor_payments.amount_base AS amount_base,
+    vendor_payments.status,
+    NULL::date AS due_date,
+    COALESCE(vendor_payments.payment_date::timestamp with time zone, vendor_payments.created_at) AS entry_date,
+    vendor_payments.created_at
+   FROM vendor_payments
+  WHERE vendor_payments.status = 'active'::text;
+
+CREATE OR REPLACE VIEW public.v_vendor_payments_list WITH (security_invoker = true) AS
+ SELECT vp.id,
+    vp.payment_code,
+    vp.vendor_id,
+    vp.amount,
+    vp.unapplied_amount,
+    vp.method,
+    vp.reference_number,
+    vp.payment_date,
+    vp.notes,
+    vp.status,
+    vp.voided_at,
+    vp.voided_by,
+    vp.void_reason,
+    vp.created_by,
+    vp.created_at,
+    vp.updated_at,
+    vp.currency,
+    vp.exchange_rate,
+    vp.amount_base,
+    NULLIF(b.brand_name, ''::text) AS vendor_name
+   FROM vendor_payments vp
+     LEFT JOIN brands b ON b.id = vp.vendor_id;
+
+CREATE OR REPLACE VIEW public.v_vendors_list WITH (security_invoker = true) AS
+ SELECT id,
+    brand_name,
+    brand_description,
+    brand_logo_url,
+    status,
+    created_date,
+    created_by,
+    updated_date,
+    updated_by,
+    contact_person,
+    email,
+    phone,
+    tax_id,
+    payment_terms,
+    country_code,
+    lower(NULLIF(brand_name, ''::text)) AS brand_name_sort,
+    lower(NULLIF(contact_person, ''::text)) AS contact_person_sort,
+    lower(NULLIF(email, ''::text)) AS email_sort,
+    lower(NULLIF(phone, ''::text)) AS phone_sort,
+    lower(NULLIF(payment_terms, ''::text)) AS payment_terms_sort
+   FROM brands b;
+
+CREATE OR REPLACE VIEW public.v_warehouse_unit_counts WITH (security_invoker = true) AS
+ SELECT warehouse_id,
+    count(*)::integer AS unit_count
+   FROM inventory_units
+  WHERE warehouse_id IS NOT NULL AND NOT (status = 'company_stock'::text AND NOT reservation_status IS DISTINCT FROM 'delivered'::text)
+  GROUP BY warehouse_id;
+
+CREATE OR REPLACE VIEW public.v_knowledge_documents WITH (security_invoker = true) AS
+ SELECT d.id,
+    d.product_id,
+    d.title,
+    d.doc_type,
+    d.description,
+    d.file_name,
+    d.file_url,
+    d.storage_path,
+    d.file_size,
+    d.mime_type,
+    d.extracted_text,
+    d.extraction_status,
+    d.page_count,
+    d.uploaded_by,
+    d.created_at,
+    d.updated_at,
+    d.deleted_at,
+    d.deleted_by,
+    d.search_vector,
+    pl.sku AS product_sku,
+    pl.product_name,
+    pl.product_brand_id,
+    pl.product_category_id,
+    pl.product_subcategory_id,
+    array_remove(ARRAY[pl.brand_id::text, pl.category_id::text, pl.subcategory_id::text, pl.product_id::text], NULL::text) AS path,
+    array_to_string(array_remove(ARRAY[pl.brand_name, pl.category_name, pl.subcategory_name, pl.product_name], NULL::text), ' / '::text) AS folder_path
+   FROM product_documents d
+     JOIN v_knowledge_product_placement pl ON pl.product_id = d.product_id;
+
+CREATE OR REPLACE VIEW public.v_knowledge_nodes WITH (security_invoker = true) AS
+ WITH docs AS (
+         SELECT product_documents.product_id,
+            count(*)::integer AS n,
+            COALESCE(sum(product_documents.file_size), 0::bigint) AS bytes,
+            max(product_documents.updated_at) AS modified
+           FROM product_documents
+          WHERE product_documents.deleted_at IS NULL
+          GROUP BY product_documents.product_id
+        ), prod AS (
+         SELECT pl.product_id,
+            pl.product_name,
+            pl.sku,
+            pl.product_image_url,
+            pl.product_brand_id,
+            pl.product_category_id,
+            pl.product_subcategory_id,
+            pl.brand_id,
+            pl.brand_name,
+            pl.category_id,
+            pl.category_name,
+            pl.subcategory_id,
+            pl.subcategory_name,
+            COALESCE(d.n, 0) AS n,
+            COALESCE(d.bytes, 0::bigint) AS bytes,
+            d.modified
+           FROM v_knowledge_product_placement pl
+             LEFT JOIN docs d ON d.product_id = pl.product_id
+        ), all_nodes AS (
+         SELECT b.id::text AS id,
+            'brand'::text AS kind,
+            0 AS kind_rank,
+            b.brand_name AS name,
+            '__root__'::text AS parent_id,
+            ARRAY[b.id::text] AS path,
+            NULL::text AS sku,
+            b.brand_logo_url AS logo_url,
+            NULL::text AS image_url,
+            COALESCE(sum(pr.n), 0::bigint)::integer AS doc_count,
+            COALESCE(sum(pr.bytes), 0::numeric)::bigint AS doc_bytes,
+            max(pr.modified) AS modified
+           FROM brands b
+             LEFT JOIN prod pr ON pr.brand_id = b.id
+          GROUP BY b.id
+        UNION ALL
+         SELECT c.id::text AS id,
+            'category'::text,
+            1,
+            c.category_name,
+            COALESCE(b.id::text, '__root__'::text) AS "coalesce",
+                CASE
+                    WHEN b.id IS NULL THEN ARRAY[c.id::text]
+                    ELSE ARRAY[b.id::text, c.id::text]
+                END AS "array",
+            NULL::text,
+            NULL::text,
+            NULL::text,
+            COALESCE(sum(pr.n), 0::bigint)::integer AS "coalesce",
+            COALESCE(sum(pr.bytes), 0::numeric)::bigint AS "coalesce",
+            max(pr.modified) AS max
+           FROM categories c
+             LEFT JOIN brands b ON b.id = c.brand_id
+             LEFT JOIN prod pr ON pr.category_id = c.id
+          GROUP BY c.id, b.id
+        UNION ALL
+         SELECT s.id::text AS id,
+            'subcategory'::text,
+            2,
+            s.subcategory_name,
+            COALESCE(c.id::text, '__root__'::text) AS "coalesce",
+                CASE
+                    WHEN c.id IS NULL THEN ARRAY[s.id::text]
+                    WHEN b.id IS NULL THEN ARRAY[c.id::text, s.id::text]
+                    ELSE ARRAY[b.id::text, c.id::text, s.id::text]
+                END AS "array",
+            NULL::text,
+            NULL::text,
+            NULL::text,
+            COALESCE(sum(pr.n), 0::bigint)::integer AS "coalesce",
+            COALESCE(sum(pr.bytes), 0::numeric)::bigint AS "coalesce",
+            max(pr.modified) AS max
+           FROM subcategories s
+             LEFT JOIN categories c ON c.id = s.category_id
+             LEFT JOIN brands b ON b.id = c.brand_id
+             LEFT JOIN prod pr ON pr.subcategory_id = s.id
+          GROUP BY s.id, c.id, b.id
+        UNION ALL
+         SELECT pr.product_id::text AS product_id,
+            'product'::text,
+            3,
+            pr.product_name,
+            COALESCE(pr.subcategory_id, pr.category_id, pr.brand_id)::text AS "coalesce",
+            array_remove(ARRAY[pr.brand_id::text, pr.category_id::text, pr.subcategory_id::text, pr.product_id::text], NULL::text) AS array_remove,
+            pr.sku,
+            NULL::text,
+            pr.product_image_url,
+            pr.n,
+            pr.bytes,
+            pr.modified
+           FROM prod pr
+        )
+ SELECT a.id,
+    a.kind,
+    a.kind_rank,
+    a.name,
+    COALESCE(a.parent_id, '__root__'::text) AS parent_id,
+    a.path,
+    a.sku,
+    a.logo_url,
+    a.image_url,
+    a.doc_count,
+    a.doc_bytes,
+    a.modified,
+    COALESCE(cc.child_count, 0::bigint)::integer AS child_count
+   FROM all_nodes a
+     LEFT JOIN ( SELECT COALESCE(all_nodes.parent_id, '__root__'::text) AS parent_id,
+            count(*) AS child_count
+           FROM all_nodes
+          GROUP BY (COALESCE(all_nodes.parent_id, '__root__'::text))) cc ON cc.parent_id = a.id;
+
+CREATE OR REPLACE VIEW public.v_purchase_documents_list WITH (security_invoker = true) AS
+ SELECT d.id,
+    d.doc_type,
+    d.doc_code,
+    d.vendor_id,
+    d.created_by,
+    d.doc_status,
+    d.payment_status,
+    d.total,
+    d.currency,
+    d.exchange_rate,
+    d.total_base,
+    d.created_at,
+    d.updated_at,
+    d.type_specific_date,
+    d.type_specific_date_label,
+    d.archived,
+    d.archived_at,
+    x.vendor_name,
+    lower(x.vendor_name) AS vendor_sort,
+    lower(COALESCE(d.doc_code, ''::text)) AS doc_code_sort,
+    COALESCE(d.total_base, COALESCE(d.total, 0::numeric) * COALESCE(NULLIF(d.exchange_rate, 0::numeric), 1::numeric)) AS total_base_value
+   FROM v_purchase_documents d
+     LEFT JOIN brands b ON b.id = d.vendor_id
+     CROSS JOIN LATERAL ( SELECT NULLIF(b.brand_name, ''::text) AS vendor_name) x;
+
+CREATE OR REPLACE VIEW public.v_sales_documents_list WITH (security_invoker = true) AS
+ SELECT s.id,
+    s.doc_type,
+    s.doc_code,
+    s.customer_id,
+    s.assigned_rep,
+    s.created_by,
+    s.doc_status,
+    s.payment_status,
+    s.total,
+    s.created_at,
+    s.updated_at,
+    s.type_specific_date,
+    s.type_specific_date_label,
+    s.archived,
+    s.archived_at,
+    x.customer_name,
+    lower(x.customer_name) AS customer_sort,
+    lower(COALESCE(s.doc_code, ''::text)) AS doc_code_sort,
+    lower(COALESCE(s.assigned_rep, ''::text)) AS rep_sort,
+    COALESCE(s.total, 0::numeric) AS total_sort
+   FROM v_sales_documents s
+     LEFT JOIN customers c ON c.id = s.customer_id
+     CROSS JOIN LATERAL ( SELECT COALESCE(NULLIF(c.company_name, ''::text), NULLIF(c.contact_person, ''::text)) AS customer_name) x;
+
+CREATE OR REPLACE VIEW public.v_sales_rep_performance WITH (security_invoker = true) AS
+ SELECT COALESCE(assigned_rep, '(unassigned)'::text) AS assigned_rep,
+    count(*) AS invoices_total,
+    count(*) FILTER (WHERE cogs_complete) AS invoices_costed,
+    count(*) FILTER (WHERE NOT cogs_complete) AS invoices_cost_unknown,
+    round(COALESCE(sum(revenue_base), 0::numeric), 2) AS revenue_base,
+    round(COALESCE(sum(revenue_base) FILTER (WHERE cogs_complete), 0::numeric), 2) AS costed_revenue_base,
+    round(COALESCE(sum(cogs_base) FILTER (WHERE cogs_complete), 0::numeric), 2) AS cogs_base,
+    round(COALESCE(sum(margin_base), 0::numeric), 2) AS margin_base,
+        CASE
+            WHEN COALESCE(sum(revenue_base) FILTER (WHERE cogs_complete), 0::numeric) > 0::numeric THEN round(100.0 * COALESCE(sum(margin_base), 0::numeric) / sum(revenue_base) FILTER (WHERE cogs_complete), 2)
+            ELSE NULL::numeric
+        END AS margin_pct,
+    min(posted_at) AS first_sale,
+    max(posted_at) AS last_sale
+   FROM v_invoice_margin m
+  GROUP BY (COALESCE(assigned_rep, '(unassigned)'::text));
+
+-- ── Functions ───────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public._reverse_credit_note_application(p_application_id uuid, p_reason text, p_actor text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -1603,14 +2622,31 @@ CREATE OR REPLACE FUNCTION public.adjust_part_quantity(p_id uuid, p_delta intege
  SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
+DECLARE
+  v_current integer;
+  v_name    text;
 BEGIN
-  IF NOT (public.rma_is_staff() AND public.rma_user_role() <> 'viewer') THEN
+  IF NOT COALESCE((public.rma_is_staff() AND public.rma_user_role() <> 'viewer'), false) THEN
     RAISE EXCEPTION 'Not authorized to adjust part quantities' USING ERRCODE = 'P0001';
+  END IF;
+
+  SELECT parts.quantity, parts.part_name INTO v_current, v_name
+    FROM public.parts WHERE parts.id = p_id FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Part % does not exist', p_id USING ERRCODE = 'P0001';
+  END IF;
+
+  IF v_current + p_delta < 0 THEN
+    RAISE EXCEPTION
+      'Not enough % in stock: % available, % requested'
+      , coalesce(v_name, 'part'), v_current, abs(p_delta)
+      USING ERRCODE = 'P0001';
   END IF;
 
   RETURN QUERY
   UPDATE public.parts
-     SET quantity     = GREATEST(0, parts.quantity + p_delta),
+     SET quantity     = parts.quantity + p_delta,
          updated_date = now()
    WHERE parts.id = p_id
   RETURNING parts.id, parts.quantity;
@@ -2007,7 +3043,8 @@ BEGIN
 
   SELECT COUNT(*) INTO v_unit_count
   FROM public.inventory_units
-  WHERE warehouse_id = p_warehouse_id AND status <> 'closed';
+  WHERE warehouse_id = p_warehouse_id AND status <> 'closed'
+    AND NOT (status = 'company_stock' AND reservation_status IS NOT DISTINCT FROM 'delivered');
 
   SELECT COUNT(*) INTO v_stock_count
   FROM public.warehouse_stock
@@ -2165,7 +3202,7 @@ DECLARE
 BEGIN
   -- Coarse gate: nobody outside sales or management cancels an order, and
   -- this costs no lookup, so it answers before revealing whether the id is real.
-  IF NOT (public.rma_is_manager_or_above() OR public.rma_user_role() = 'sales_rep') THEN
+  IF NOT COALESCE((public.rma_is_manager_or_above() OR public.rma_user_role() = 'sales_rep'), false) THEN
     RAISE EXCEPTION 'Not authorized to cancel sales orders' USING ERRCODE = 'P0001';
   END IF;
 
@@ -2217,7 +3254,7 @@ DECLARE
   v_so_id      uuid;
   v_null_lines bigint;
 BEGIN
-  IF NOT (public.rma_is_manager_or_above() OR public.rma_user_role() = 'sales_rep') THEN
+  IF NOT COALESCE((public.rma_is_manager_or_above() OR public.rma_user_role() = 'sales_rep'), false) THEN
     RAISE EXCEPTION 'Not authorized to convert quotations' USING ERRCODE = 'P0001';
   END IF;
 
@@ -2270,6 +3307,56 @@ END;
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.create_manufacturer_batch(p_unit_ids uuid[], p_manufacturer_name text, p_actor_email text)
+ RETURNS manufacturer_batches
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_batch  public.manufacturer_batches;
+  v_code   text;
+  v_found  integer;
+  v_taken  integer;
+BEGIN
+  IF NOT COALESCE((public.rma_is_staff() AND public.rma_user_role() <> 'viewer'), false) THEN
+    RAISE EXCEPTION 'Not authorized to create manufacturer batches' USING ERRCODE = 'P0001';
+  END IF;
+  IF p_unit_ids IS NULL OR array_length(p_unit_ids, 1) IS NULL THEN
+    RAISE EXCEPTION 'A batch needs at least one unit' USING ERRCODE = 'P0001';
+  END IF;
+
+  SELECT count(*) INTO v_found FROM public.inventory_units WHERE id = ANY(p_unit_ids);
+  IF v_found <> array_length(p_unit_ids, 1) THEN
+    RAISE EXCEPTION '% of the % unit(s) do not exist',
+      array_length(p_unit_ids, 1) - v_found, array_length(p_unit_ids, 1)
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  SELECT count(*) INTO v_taken FROM public.inventory_units
+   WHERE id = ANY(p_unit_ids) AND manufacturer_batch_id IS NOT NULL;
+  IF v_taken > 0 THEN
+    RAISE EXCEPTION '% of the % unit(s) already belong to another batch',
+      v_taken, array_length(p_unit_ids, 1) USING ERRCODE = 'P0001';
+  END IF;
+
+  v_code := public.nextval_for_type('batch');
+
+  INSERT INTO public.manufacturer_batches
+    (batch_number, manufacturer_name, status, unit_count, created_date, created_by)
+  VALUES
+    (v_code, p_manufacturer_name, 'draft', array_length(p_unit_ids, 1), now(), p_actor_email)
+  RETURNING * INTO v_batch;
+
+  UPDATE public.inventory_units
+     SET manufacturer_batch_id = v_batch.id
+   WHERE id = ANY(p_unit_ids);
+
+  RETURN v_batch;
+END;
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.crm_convert_lead(p_lead_id uuid, p_deal_title text, p_pipeline_id uuid, p_deal_value numeric DEFAULT NULL::numeric, p_existing_customer_id uuid DEFAULT NULL::uuid)
  RETURNS TABLE(customer_id uuid, deal_id uuid)
  LANGUAGE plpgsql
@@ -2291,10 +3378,10 @@ BEGIN
     RAISE EXCEPTION 'Lead % is already converted', p_lead_id;
   END IF;
 
-  IF NOT (
+  IF NOT COALESCE((
     public.rma_is_manager_or_above()
     OR (public.rma_user_role() = 'sales_rep' AND v_lead.assigned_rep = public.rma_current_user_email())
-  ) THEN
+  ), false) THEN
     RAISE EXCEPTION 'Not authorized to convert this lead';
   END IF;
 
@@ -2635,7 +3722,7 @@ END;
 $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.issue_credit_note(p_cn_id uuid, p_actor_email text)
+CREATE OR REPLACE FUNCTION public.issue_credit_note(p_cn_id uuid, p_actor_email text, p_close_ticket boolean DEFAULT false)
  RETURNS text
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -2654,60 +3741,74 @@ BEGIN
 
   v_actor := COALESCE(public.rma_current_user_email(), p_actor_email);
 
-  SELECT * INTO v_cn
-  FROM public.credit_notes
-  WHERE id = p_cn_id
-  FOR UPDATE;
+  SELECT * INTO v_cn FROM public.credit_notes WHERE id = p_cn_id FOR UPDATE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Credit note not found: %', p_cn_id;
   END IF;
 
   IF v_cn.status <> 'draft' THEN
-    RAISE EXCEPTION 'Credit note is already % — cannot issue again', v_cn.status;
+    RAISE EXCEPTION 'Credit note is already % - cannot issue again', v_cn.status;
   END IF;
 
   v_code := public.nextval_for_type('credit_note');
 
   UPDATE public.credit_notes
-  SET
-    cn_code           = v_code,
-    status            = 'issued',
-    remaining_balance = v_cn.total,
-    issued_at         = NOW(),
-    updated_at        = NOW()
+  SET cn_code           = v_code,
+      status            = 'issued',
+      remaining_balance = v_cn.total,
+      issued_at         = NOW(),
+      updated_at        = NOW()
   WHERE id = p_cn_id;
 
   IF v_cn.source_invoice_id IS NOT NULL THEN
     SELECT GREATEST(total - amount_paid, 0) INTO v_inv_remaining
     FROM public.crm_invoices
-    WHERE id = v_cn.source_invoice_id
-      AND doc_status = 'posted'
+    WHERE id = v_cn.source_invoice_id AND doc_status = 'posted'
     FOR UPDATE;
 
     IF FOUND AND v_inv_remaining > 0 THEN
       v_apply_amount := LEAST(v_cn.total, v_inv_remaining);
 
-      INSERT INTO public.credit_note_applications (
-        credit_note_id, invoice_id, amount_applied, applied_by
-      )
+      INSERT INTO public.credit_note_applications
+        (credit_note_id, invoice_id, amount_applied, applied_by)
       VALUES (p_cn_id, v_cn.source_invoice_id, v_apply_amount, v_actor);
 
       UPDATE public.crm_invoices
-      SET
-        amount_paid    = LEAST(amount_paid + v_apply_amount, total),
-        payment_status = CASE
-          WHEN LEAST(amount_paid + v_apply_amount, total) >= total THEN 'paid'
-          WHEN LEAST(amount_paid + v_apply_amount, total) > 0     THEN 'partial'
-          ELSE 'unpaid'
-          END,
-        paid_at = CASE
-          WHEN LEAST(amount_paid + v_apply_amount, total) >= total THEN NOW()
-          ELSE paid_at
-          END,
-        updated_at = NOW()
+      SET amount_paid    = LEAST(amount_paid + v_apply_amount, total),
+          payment_status = CASE
+            WHEN LEAST(amount_paid + v_apply_amount, total) >= total THEN 'paid'
+            WHEN LEAST(amount_paid + v_apply_amount, total) > 0     THEN 'partial'
+            ELSE 'unpaid'
+            END,
+          paid_at = CASE
+            WHEN LEAST(amount_paid + v_apply_amount, total) >= total THEN NOW()
+            ELSE paid_at
+            END,
+          updated_at = NOW()
       WHERE id = v_cn.source_invoice_id;
     END IF;
+  END IF;
+
+  -- BUG-048: close the originating ticket in the SAME transaction.
+  --
+  -- The ticket drawer used to call this RPC and then issue a separate
+  -- rmaTickets.update(). If that second write failed -- an RLS no-op for a
+  -- technician who is not the assignee, or a dropped connection -- the credit
+  -- note was already issued and applied while the ticket stayed open, and
+  -- retrying could not help because this function refuses a non-draft note.
+  -- There was no way back to a consistent state from the interface.
+  --
+  -- The ticket id is taken from the credit note itself, never from a caller
+  -- parameter, so this cannot be used to close an unrelated ticket.
+  IF p_close_ticket AND v_cn.ticket_id IS NOT NULL THEN
+    UPDATE public.rma_tickets
+       SET ticket_status = 'Closed',
+           closed_date   = COALESCE(closed_date, NOW()),
+           updated_by    = v_actor,
+           updated_date  = NOW()
+     WHERE id = v_cn.ticket_id
+       AND ticket_status <> 'Closed';
   END IF;
 
   RETURN v_code;
@@ -2728,7 +3829,7 @@ DECLARE
 BEGIN
   -- Same posture as move_rma_units: any non-viewer staff member can do this,
   -- because it happens as a side effect of an ordinary ticket save.
-  IF NOT (public.rma_is_staff() AND public.rma_user_role() <> 'viewer') THEN
+  IF NOT COALESCE((public.rma_is_staff() AND public.rma_user_role() <> 'viewer'), false) THEN
     RAISE EXCEPTION 'Not authorized to link a serial to an RMA ticket' USING ERRCODE = 'P0001';
   END IF;
 
@@ -2801,6 +3902,109 @@ END;
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.mark_batch_resolved(p_batch_id uuid, p_resolution_type text, p_resolution_date timestamp with time zone, p_notes text DEFAULT NULL::text)
+ RETURNS manufacturer_batches
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_batch public.manufacturer_batches;
+  v_actor text;
+BEGIN
+  IF NOT COALESCE(public.rma_is_staff() AND public.rma_user_role() <> 'viewer', false) THEN
+    RAISE EXCEPTION 'Not authorized to update manufacturer batches' USING ERRCODE = 'P0001';
+  END IF;
+
+  v_actor := COALESCE(public.rma_current_user_email(), 'system');
+
+  UPDATE public.manufacturer_batches
+     SET status           = 'resolved',
+         resolution_type  = p_resolution_type,
+         resolution_date  = p_resolution_date,
+         resolution_notes = p_notes
+   WHERE id = p_batch_id
+  RETURNING * INTO v_batch;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Batch % does not exist', p_batch_id USING ERRCODE = 'P0001';
+  END IF;
+
+  WITH before AS (
+    SELECT id, status
+      FROM public.inventory_units
+     WHERE manufacturer_batch_id = p_batch_id
+     ORDER BY id
+     FOR UPDATE
+  ), moved AS (
+    UPDATE public.inventory_units u
+       SET status = 'closed'
+      FROM before b
+     WHERE u.id = b.id
+       AND b.status IS DISTINCT FROM 'closed'
+    RETURNING u.id, b.status AS from_status
+  )
+  INSERT INTO public.stock_moves
+    (ref_type, ref_id, doc_type, doc_id, move_type, qty, from_status, to_status, actor_email)
+  SELECT 'unit', id, 'manufacturer_batch', p_batch_id, 'adjust', 1,
+         from_status, 'closed', v_actor
+    FROM moved;
+
+  RETURN v_batch;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.mark_batch_sent(p_batch_id uuid, p_sent_date timestamp with time zone, p_tracking_number text)
+ RETURNS manufacturer_batches
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_batch public.manufacturer_batches;
+  v_actor text;
+BEGIN
+  IF NOT COALESCE(public.rma_is_staff() AND public.rma_user_role() <> 'viewer', false) THEN
+    RAISE EXCEPTION 'Not authorized to update manufacturer batches' USING ERRCODE = 'P0001';
+  END IF;
+
+  v_actor := COALESCE(public.rma_current_user_email(), 'system');
+
+  UPDATE public.manufacturer_batches
+     SET status = 'sent', sent_date = p_sent_date, tracking_number = p_tracking_number
+   WHERE id = p_batch_id
+  RETURNING * INTO v_batch;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Batch % does not exist', p_batch_id USING ERRCODE = 'P0001';
+  END IF;
+
+  WITH before AS (
+    SELECT id, status
+      FROM public.inventory_units
+     WHERE manufacturer_batch_id = p_batch_id
+     ORDER BY id
+     FOR UPDATE
+  ), moved AS (
+    UPDATE public.inventory_units u
+       SET status = 'sent_to_manufacturer'
+      FROM before b
+     WHERE u.id = b.id
+       AND b.status IS DISTINCT FROM 'sent_to_manufacturer'
+    RETURNING u.id, b.status AS from_status
+  )
+  INSERT INTO public.stock_moves
+    (ref_type, ref_id, doc_type, doc_id, move_type, qty, from_status, to_status, actor_email)
+  SELECT 'unit', id, 'manufacturer_batch', p_batch_id, 'adjust', 1,
+         from_status, 'sent_to_manufacturer', v_actor
+    FROM moved;
+
+  RETURN v_batch;
+END;
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.mark_notifications_read(p_email text, p_ids uuid[])
  RETURNS void
  LANGUAGE plpgsql
@@ -2834,7 +4038,7 @@ DECLARE
   v_target_wh   record;
   v_moved_count integer := 0;
 BEGIN
-  IF NOT (public.rma_is_staff() AND public.rma_user_role() <> 'viewer') THEN
+  IF NOT COALESCE((public.rma_is_staff() AND public.rma_user_role() <> 'viewer'), false) THEN
     RAISE EXCEPTION 'Not authorized to move RMA units' USING ERRCODE = 'P0001';
   END IF;
 
@@ -3138,6 +4342,8 @@ CREATE OR REPLACE FUNCTION public.queue_overdue_ticket_emails()
  SET search_path TO 'public'
 AS $function$
 DECLARE
+  c_min_gap_days  constant integer := 3;
+  c_max_reminders constant integer := 5;
   ticket RECORD;
 BEGIN
   FOR ticket IN
@@ -3152,8 +4358,21 @@ BEGIN
         SELECT 1 FROM public.notification_queue q
         WHERE q.event_type = 'ticket.overdue'
           AND q.payload->>'ticketId' = t.id::text
-          AND q.created_at > now() - interval '23 hours'
+          AND q.status IN ('pending', 'processing')
       )
+      AND NOT EXISTS (
+        SELECT 1 FROM public.notification_logs l
+        WHERE l.ticket_id = t.id
+          AND l.event_type = 'ticket.overdue'
+          AND l.delivery_status = 'sent'
+          AND l.sent_at > now() - make_interval(days => c_min_gap_days)
+      )
+      AND (
+        SELECT count(*) FROM public.notification_logs l
+        WHERE l.ticket_id = t.id
+          AND l.event_type = 'ticket.overdue'
+          AND l.delivery_status = 'sent'
+      ) < c_max_reminders
   LOOP
     INSERT INTO public.notification_queue
       (job_type, event_type, payload, status, priority, scheduled_at, created_by)
@@ -3929,27 +5148,79 @@ CREATE OR REPLACE FUNCTION public.restore_units(p_unit_ids uuid[], p_doc_type te
  SET search_path TO 'public'
 AS $function$
 DECLARE
-  v_unit_id uuid;
+  v_unit_id  uuid;
+  v_so_id    uuid;
+  v_from     text;
+  v_bad      integer;
 BEGIN
   IF NOT public.rma_is_manager_or_above() THEN
     RAISE EXCEPTION 'Not authorized to restore units' USING ERRCODE = 'P0001';
   END IF;
 
+  IF p_unit_ids IS NULL OR array_length(p_unit_ids, 1) IS NULL THEN
+    RETURN;
+  END IF;
+
+  IF p_doc_type = 'credit_note' THEN
+    SELECT i.so_id INTO v_so_id
+      FROM public.credit_notes cn
+      JOIN public.crm_invoices i ON i.id = cn.source_invoice_id
+     WHERE cn.id = p_doc_id;
+    IF v_so_id IS NULL THEN
+      RAISE EXCEPTION
+        'Credit note % is not linked to an invoice with a sales order, so there is nothing it could have delivered',
+        p_doc_id USING ERRCODE = 'P0001';
+    END IF;
+  ELSIF p_doc_type IN ('invoice', 'crm_invoice') THEN
+    SELECT i.so_id INTO v_so_id FROM public.crm_invoices i WHERE i.id = p_doc_id;
+    IF v_so_id IS NULL THEN
+      RAISE EXCEPTION
+        'Invoice % is not linked to a sales order, so there is nothing it could have delivered',
+        p_doc_id USING ERRCODE = 'P0001';
+    END IF;
+  ELSE
+    RAISE EXCEPTION
+      'restore_units cannot verify ownership for document type %', p_doc_type
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  SELECT count(*) INTO v_bad
+    FROM unnest(p_unit_ids) AS u(unit_id)
+   WHERE NOT EXISTS (
+           SELECT 1 FROM public.stock_moves sm
+            WHERE sm.ref_type   = 'unit'
+              AND sm.ref_id     = u.unit_id
+              AND sm.move_type  = 'deliver'
+              AND sm.doc_type   = 'sales_order'
+              AND sm.doc_id     = v_so_id
+         )
+      OR NOT EXISTS (
+           SELECT 1 FROM public.inventory_units iu
+            WHERE iu.id = u.unit_id
+              AND iu.reservation_status = 'delivered'
+         );
+
+  IF v_bad > 0 THEN
+    RAISE EXCEPTION
+      '% of the % unit(s) were not delivered by this document, or are no longer in a delivered state. Nothing has been restored.',
+      v_bad, array_length(p_unit_ids, 1)
+      USING ERRCODE = 'P0001';
+  END IF;
+
   FOREACH v_unit_id IN ARRAY p_unit_ids
   LOOP
+    SELECT reservation_status INTO v_from
+      FROM public.inventory_units WHERE id = v_unit_id FOR UPDATE;
+
     UPDATE public.inventory_units
-    SET
-      reservation_status = 'available',
-      status             = CASE
-                             WHEN p_to_status = 'active_rma' THEN 'active_rma'
-                             ELSE status
-                           END
-    WHERE id = v_unit_id;
+       SET reservation_status = 'available',
+           status             = CASE WHEN p_to_status = 'active_rma' THEN 'active_rma' ELSE status END
+     WHERE id = v_unit_id;
 
     INSERT INTO public.stock_moves
       (ref_type, ref_id, doc_type, doc_id, move_type, qty, from_status, to_status, actor_email)
     VALUES
-      ('unit', v_unit_id, p_doc_type, p_doc_id, 'restore', 1, 'delivered', p_to_status, p_actor_email);
+      ('unit', v_unit_id, p_doc_type, p_doc_id, 'restore', 1, v_from, p_to_status, p_actor_email);
   END LOOP;
 END;
 $function$
@@ -4047,6 +5318,40 @@ END;
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.rma_accept_invitation()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_email text;
+  v_status text;
+BEGIN
+  v_email := auth.jwt() ->> 'email';
+  IF v_email IS NULL THEN
+    RETURN 'not_authenticated';
+  END IF;
+
+  SELECT status INTO v_status FROM public.user_roles WHERE user_email = v_email;
+
+  IF v_status IS NULL THEN
+    RETURN 'no_role';
+  END IF;
+
+  IF v_status <> 'pending' THEN
+    RETURN v_status;
+  END IF;
+
+  UPDATE public.user_roles
+     SET status = 'active'
+   WHERE user_email = v_email AND status = 'pending';
+
+  RETURN 'activated';
+END
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.rma_access_is_current(p_status text, p_expires timestamp with time zone)
  RETURNS boolean
  LANGUAGE sql
@@ -4056,13 +5361,270 @@ AS $function$ SELECT COALESCE(p_status, 'active') = 'active'
         AND (p_expires IS NULL OR p_expires > now()) $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.rma_activity_assignees(p_completed boolean, p_owner text DEFAULT NULL::text)
+ RETURNS text[]
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT coalesce(array_agg(DISTINCT assigned_rep ORDER BY assigned_rep), '{}')
+    FROM public.activities
+   WHERE type <> 'log'
+     AND assigned_rep IS NOT NULL
+     AND (p_owner IS NULL OR assigned_rep = p_owner)
+     AND CASE WHEN p_completed THEN completed_at IS NOT NULL
+              ELSE completed_at IS NULL AND due_date IS NOT NULL
+         END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_aging_bucket(p_due date, p_today date)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT CASE
+           WHEN p_due IS NULL THEN 'no_due_date'
+           WHEN p_today - p_due <= 0 THEN 'not_due'
+           WHEN p_today - p_due <= 30 THEN 'd1_30'
+           WHEN p_today - p_due <= 60 THEN 'd31_60'
+           WHEN p_today - p_due <= 90 THEN 'd61_90'
+           ELSE 'd90_plus'
+         END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_ap_aging(p_today date)
+ RETURNS TABLE(vendor_id uuid, vendor_name text, not_due numeric, d1_30 numeric, d31_60 numeric, d61_90 numeric, d90_plus numeric, no_due_date numeric, total numeric)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH open_invoices AS (
+    SELECT vi.vendor_id,
+           public.rma_aging_bucket(vi.due_date, p_today) AS bucket,
+           round(coalesce(vi.total, 0) - coalesce(vi.amount_paid, 0), 2) AS remaining,
+           coalesce(nullif(vi.exchange_rate, 0), 1) AS rate
+      FROM public.vendor_invoices vi
+     WHERE vi.status IN ('approved', 'partially_received', 'received')
+  ),
+  based AS (
+    SELECT vendor_id, bucket, round(remaining * rate, 2) AS remaining_base
+      FROM open_invoices
+     WHERE remaining > 0.001
+  )
+  SELECT o.vendor_id,
+         nullif(b.brand_name, ''),
+         coalesce(sum(o.remaining_base) FILTER (WHERE o.bucket = 'not_due'), 0),
+         coalesce(sum(o.remaining_base) FILTER (WHERE o.bucket = 'd1_30'), 0),
+         coalesce(sum(o.remaining_base) FILTER (WHERE o.bucket = 'd31_60'), 0),
+         coalesce(sum(o.remaining_base) FILTER (WHERE o.bucket = 'd61_90'), 0),
+         coalesce(sum(o.remaining_base) FILTER (WHERE o.bucket = 'd90_plus'), 0),
+         coalesce(sum(o.remaining_base) FILTER (WHERE o.bucket = 'no_due_date'), 0),
+         sum(o.remaining_base)
+    FROM based o
+    LEFT JOIN public.brands b ON b.id = o.vendor_id
+   GROUP BY o.vendor_id, b.brand_name;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_applied_migration_versions()
+ RETURNS text[]
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  SELECT coalesce(array_agg(m.version ORDER BY m.version), ARRAY[]::text[])
+    FROM supabase_migrations.schema_migrations AS m
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_ar_aging(p_today date)
+ RETURNS TABLE(customer_id uuid, customer_name text, not_due numeric, d1_30 numeric, d31_60 numeric, d61_90 numeric, d90_plus numeric, no_due_date numeric, total numeric)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH open_invoices AS (
+    SELECT i.customer_id,
+           public.rma_aging_bucket(i.due_date, p_today) AS bucket,
+           round(coalesce(i.total, 0) - coalesce(i.amount_paid, 0), 2) AS remaining
+      FROM public.crm_invoices i
+     WHERE i.doc_status = 'posted'
+  )
+  SELECT o.customer_id,
+         coalesce(nullif(c.company_name, ''), nullif(c.contact_person, '')),
+         coalesce(sum(o.remaining) FILTER (WHERE o.bucket = 'not_due'), 0),
+         coalesce(sum(o.remaining) FILTER (WHERE o.bucket = 'd1_30'), 0),
+         coalesce(sum(o.remaining) FILTER (WHERE o.bucket = 'd31_60'), 0),
+         coalesce(sum(o.remaining) FILTER (WHERE o.bucket = 'd61_90'), 0),
+         coalesce(sum(o.remaining) FILTER (WHERE o.bucket = 'd90_plus'), 0),
+         coalesce(sum(o.remaining) FILTER (WHERE o.bucket = 'no_due_date'), 0),
+         sum(o.remaining)
+    FROM open_invoices o
+    LEFT JOIN public.customers c ON c.id = o.customer_id
+   WHERE o.remaining > 0.001
+   GROUP BY o.customer_id, c.company_name, c.contact_person;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_assert_sales_status_transition()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_col     text;
+  v_old     text;
+  v_new     text;
+  v_allowed text[];
+  v_hint    text;
+BEGIN
+  -- The RPCs run as the function owner and are the intended writers.
+  IF current_user NOT IN ('authenticated', 'anon') THEN
+    RETURN NEW;
+  END IF;
+
+  -- Backup & Restore upserts these tables from the browser and is admin-gated.
+  -- Consistent with 20260808/20260809/20260813.
+  IF public.rma_is_admin() THEN
+    RETURN NEW;
+  END IF;
+
+  -- crm_invoices calls it doc_status; the other two call it status.
+  v_col := CASE TG_TABLE_NAME WHEN 'crm_invoices' THEN 'doc_status' ELSE 'status' END;
+  v_old := to_jsonb(OLD) ->> v_col;
+  v_new := to_jsonb(NEW) ->> v_col;
+
+  -- The document forms post the whole row back on save, so an unchanged status
+  -- is the ordinary case and must pass.
+  IF v_new IS NOT DISTINCT FROM v_old THEN
+    RETURN NEW;
+  END IF;
+
+  IF TG_TABLE_NAME = 'crm_invoices' THEN
+    v_allowed := CASE v_old
+      WHEN 'draft' THEN ARRAY['cancelled']
+      ELSE ARRAY[]::text[]
+    END;
+    v_hint := 'Posting is post_invoice() (it assigns the invoice number, checks the stock is reserved and records the cost); voiding is void_invoice().';
+
+  ELSIF TG_TABLE_NAME = 'credit_notes' THEN
+    -- No client status write exists, so none is permitted.
+    v_allowed := ARRAY[]::text[];
+    v_hint := 'Issuing is issue_credit_note(), voiding is void_credit_note(), and applying one to an invoice is apply_credit_note_to_invoice().';
+
+  ELSE  -- quotations
+    v_allowed := CASE v_old
+      WHEN 'draft'     THEN ARRAY['sent', 'cancelled']
+      WHEN 'sent'      THEN ARRAY['accepted', 'declined', 'expired', 'cancelled', 'draft']
+      WHEN 'accepted'  THEN ARRAY['declined', 'cancelled', 'draft']
+      WHEN 'declined'  THEN ARRAY['sent', 'draft', 'cancelled']
+      WHEN 'expired'   THEN ARRAY['sent', 'draft', 'cancelled']
+      WHEN 'cancelled' THEN ARRAY['sent', 'draft']
+      -- It is a sales order now. Cancelling it here would orphan that order.
+      WHEN 'converted' THEN ARRAY[]::text[]
+      ELSE ARRAY[]::text[]
+    END;
+    v_hint := 'Converting a quotation is convert_quotation_to_so(), which creates the sales order at the same time.';
+  END IF;
+
+  IF NOT (v_new = ANY (v_allowed)) THEN
+    RAISE EXCEPTION
+      'Illegal % status change: % -> %. Allowed from "%": %. %',
+      replace(TG_TABLE_NAME, '_', ' '),
+      v_old,
+      v_new,
+      v_old,
+      CASE WHEN array_length(v_allowed, 1) IS NULL
+           THEN 'nothing by editing the document'
+           ELSE array_to_string(v_allowed, ', ')
+      END,
+      v_hint
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  RETURN NEW;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_assign_ticket_number()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_date   text;
+  v_prefix text;
+  v_next   integer;
+BEGIN
+  v_date   := to_char(now(), 'DDMMYYYY');
+  v_prefix := 'RMA-' || v_date || '-';
+
+  PERFORM pg_advisory_xact_lock(hashtext('rma_ticket_number_' || v_date));
+
+  SELECT coalesce(max(substring(t.rma_number from '[0-9]+$')::integer), 0) + 1
+    INTO v_next
+    FROM public.rma_tickets t
+   WHERE t.rma_number LIKE v_prefix || '%'
+     AND t.rma_number ~ ('^' || v_prefix || '[0-9]+$');
+
+  NEW.rma_number := v_prefix || lpad(v_next::text, 4, '0');
+  RETURN NEW;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_calendar_assignees()
+ RETURNS text[]
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT coalesce(array_agg(DISTINCT person ORDER BY person), '{}')
+    FROM (
+      SELECT assigned_technician AS person FROM public.rma_tickets WHERE assigned_technician IS NOT NULL AND assigned_technician <> ''
+      UNION
+      SELECT assigned_rep FROM public.activities
+       WHERE assigned_rep IS NOT NULL AND assigned_rep <> ''
+         AND completed_at IS NULL AND type <> 'log' AND due_date IS NOT NULL
+    ) p;
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.rma_can_handle_cash()
  RETURNS boolean
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$ SELECT public.rma_is_manager_or_above()
-        OR public.rma_user_role() = 'accountant' $function$
+AS $function$ SELECT COALESCE(public.rma_is_manager_or_above()
+        OR public.rma_user_role() = 'accountant', false) $function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_control_panel_stats(p_now timestamp with time zone)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT jsonb_build_object(
+    'open_tickets', (SELECT count(*) FROM public.rma_tickets WHERE ticket_status IN ('Open', 'In Progress', 'On Hold')),
+    'overdue', (SELECT count(*) FROM public.rma_tickets
+                 WHERE due_date IS NOT NULL
+                   AND (due_date::timestamp AT TIME ZONE 'UTC') < coalesce(p_now, now())
+                   AND ticket_status IS DISTINCT FROM 'Closed' AND ticket_status IS DISTINCT FROM 'Cancelled'),
+    'customers', (SELECT count(*) FROM public.customers),
+    'users', (SELECT count(*) FROM public.user_roles),
+    'open_deals', (SELECT count(*) FROM public.deals WHERE status = 'open'),
+    'open_deal_value', (SELECT coalesce(sum(coalesce(value, 0)), 0) FROM public.deals WHERE status = 'open'),
+    'mis_staged', (SELECT count(*) FROM public.deals d JOIN public.pipelines p ON p.id = d.pipeline_id
+                    WHERE NOT EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(p.stages) = 'array' THEN p.stages ELSE '[]'::jsonb END) s
+                                       WHERE s->>'id' = d.stage))
+  );
+$function$
 ;
 
 CREATE OR REPLACE FUNCTION public.rma_current_user_email()
@@ -4071,6 +5633,413 @@ CREATE OR REPLACE FUNCTION public.rma_current_user_email()
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$ SELECT auth.jwt() ->> 'email' $function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_dashboard_crm(p_month_start timestamp with time zone)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT jsonb_build_object(
+    'open_value', (SELECT coalesce(sum(coalesce(value, 0)), 0) FROM public.deals WHERE status = 'open'),
+    'open_count', (SELECT count(*) FROM public.deals WHERE status = 'open'),
+    'won_this_month', (SELECT count(*) FROM public.deals WHERE status = 'won' AND won_at >= p_month_start),
+    'leads_this_month', (SELECT count(*) FROM public.leads WHERE created_at >= p_month_start),
+    'open_by_stage', coalesce((SELECT jsonb_agg(jsonb_build_object('stage', stage, 'count', n, 'value', v)) FROM (
+        SELECT stage, count(*) AS n, coalesce(sum(coalesce(value, 0)), 0) AS v
+          FROM public.deals WHERE status = 'open' GROUP BY stage) s), '[]'::jsonb),
+    'won_by_rep', coalesce((SELECT jsonb_agg(jsonb_build_object('rep', rep, 'count', n, 'value', v)) FROM (
+        SELECT nullif(assigned_rep, '') AS rep, count(*) AS n, coalesce(sum(coalesce(value, 0)), 0) AS v
+          FROM public.deals WHERE status = 'won' AND won_at >= p_month_start GROUP BY 1) s), '[]'::jsonb)
+  );
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_dashboard_ticket_summary(p_since timestamp with time zone, p_now timestamp with time zone, p_tz text)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH z AS (
+    SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_timezone_names WHERE name = p_tz) THEN p_tz ELSE 'UTC' END AS tz
+  ),
+  local_today AS (
+    SELECT (coalesce(p_now, now()) AT TIME ZONE z.tz)::date AS d FROM z
+  ),
+  ranged AS (
+    SELECT t.id, t.ticket_status, t.priority, t.assigned_technician, t.created_date, t.due_date, t.products,
+           t.ticket_status IN ('Completed', 'Closed', 'Cancelled') AS resolved,
+           (t.due_date IS NOT NULL AND t.due_date < (SELECT d FROM local_today)) AS past_due
+      FROM public.rma_tickets t
+     WHERE p_since IS NULL OR (t.created_date IS NOT NULL AND t.created_date >= p_since)
+  ),
+  products AS (
+    SELECT r.ticket_status AS ts, e->>'product_status' AS ps
+      FROM ranged r
+     CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(r.products) = 'array' THEN r.products ELSE '[]'::jsonb END) e
+     WHERE r.ticket_status IS DISTINCT FROM 'Cancelled'
+  ),
+  kept AS (
+    SELECT * FROM products WHERE ts IS DISTINCT FROM 'Completed' OR ps IN ('Replacement', 'Credit Note')
+  ),
+  issues AS (
+    SELECT regexp_replace(e->>'issue_description', '^\s+|\s+$', '', 'g') AS issue, t.created_date
+      FROM public.rma_tickets t
+     CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(t.products) = 'array' THEN t.products ELSE '[]'::jsonb END) e
+  )
+  SELECT jsonb_build_object(
+    'total', (SELECT count(*) FROM ranged),
+    'resolved', (SELECT count(*) FROM ranged WHERE resolved),
+    'overdue', (SELECT count(*) FROM ranged WHERE NOT resolved AND past_due),
+    'tracked', (SELECT count(*) FROM ranged WHERE due_date IS NOT NULL AND ticket_status IS DISTINCT FROM 'Cancelled'),
+    'status_counts', coalesce((SELECT jsonb_agg(jsonb_build_object('status', ticket_status, 'count', n) ORDER BY newest DESC NULLS LAST, ticket_status) FROM (
+        SELECT ticket_status, count(*) AS n, max(created_date) AS newest FROM ranged WHERE ticket_status IS NOT NULL GROUP BY 1) s), '[]'::jsonb),
+    'priority_counts', coalesce((SELECT jsonb_object_agg(priority, n) FROM (
+        SELECT priority, count(*) AS n FROM ranged WHERE coalesce(priority, '') <> '' GROUP BY 1) s), '{}'::jsonb),
+    'technicians', coalesce((SELECT jsonb_agg(jsonb_build_object('tech', tech, 'total', total, 'closed', closed) ORDER BY newest DESC NULLS LAST, tech) FROM (
+        SELECT nullif(assigned_technician, '') AS tech, count(*) AS total, count(*) FILTER (WHERE resolved) AS closed,
+               max(created_date) AS newest
+          FROM ranged GROUP BY 1) s), '[]'::jsonb),
+    'daily_created', coalesce((SELECT jsonb_object_agg(day, n) FROM (
+        SELECT to_char(created_date AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, count(*) AS n
+          FROM ranged
+         WHERE created_date >= coalesce(p_now, now()) - interval '31 days'
+         GROUP BY 1) s), '{}'::jsonb),
+    'products', jsonb_build_object(
+      'received',     (SELECT count(*) FROM kept WHERE ts IS DISTINCT FROM 'Completed' AND (coalesce(ps, '') = '' OR ps = 'Received')),
+      'under_repair', (SELECT count(*) FROM kept WHERE ts IS DISTINCT FROM 'Completed' AND ps = 'Under Repair'),
+      'repaired',     (SELECT count(*) FROM kept WHERE ts IS DISTINCT FROM 'Completed' AND ps = 'Repaired'),
+      'cant_repair',  (SELECT count(*) FROM kept WHERE ts IS DISTINCT FROM 'Completed' AND ps = 'Can''t Repair'),
+      'rma_stock',    (SELECT count(*) FROM kept WHERE ps IN ('Replacement', 'Credit Note'))
+    ),
+    'top_issues', coalesce((SELECT jsonb_agg(jsonb_build_object('issue', issue, 'count', n) ORDER BY n DESC, last_seen DESC NULLS LAST, issue) FROM (
+        SELECT issue, count(*) AS n, max(created_date) AS last_seen
+          FROM issues WHERE coalesce(issue, '') <> ''
+         GROUP BY issue ORDER BY n DESC, last_seen DESC NULLS LAST, issue LIMIT 5) s), '[]'::jsonb)
+  );
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_data_cleanup_summary(p_completed_before timestamp with time zone, p_cancelled_before timestamp with time zone)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT jsonb_build_object(
+    'stale_completed', (SELECT count(*) FROM public.rma_tickets
+                         WHERE ticket_status = 'Completed' AND updated_date IS NOT NULL AND updated_date < p_completed_before),
+    'stale_cancelled', (SELECT count(*) FROM public.rma_tickets
+                         WHERE ticket_status = 'Cancelled' AND updated_date IS NOT NULL AND updated_date < p_cancelled_before),
+    'orphans', (SELECT count(*) FROM public.rma_orphan_customers()),
+    'duplicate_groups', (SELECT count(DISTINCT group_key) FROM public.rma_duplicate_customers())
+  );
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_data_integrity_issues()
+ RETURNS TABLE(check_name text, severity text, entity text, entity_id uuid, reference text, detail text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  SELECT 'unbacked_amount_paid',
+         'high',
+         'crm_invoices',
+         i.id,
+         i.inv_code,
+         format('amount_paid is %s but applications total %s', i.amount_paid, applied.total_applied)
+    FROM public.crm_invoices i
+    JOIN LATERAL (
+      SELECT coalesce((SELECT sum(pa.amount_applied) FROM public.payment_applications pa
+                        WHERE pa.invoice_id = i.id), 0)
+           + coalesce((SELECT sum(ca.amount_applied) FROM public.credit_note_applications ca
+                        WHERE ca.invoice_id = i.id), 0) AS total_applied
+    ) applied ON true
+   WHERE i.doc_status <> 'cancelled'
+     AND i.amount_paid IS DISTINCT FROM applied.total_applied
+
+  UNION ALL
+
+  -- Known cohort: 15 rows, all updated_at = 2026-07-05. See the function
+  -- comment for why those are seed data and inventory is unaffected.
+  SELECT 'delivered_without_stock_moves',
+         'medium',
+         'sales_orders',
+         so.id,
+         so.so_code,
+         'status is delivered but no stock_moves rows reference this order'
+    FROM public.sales_orders so
+   WHERE so.status = 'delivered'
+     AND NOT EXISTS (SELECT 1 FROM public.stock_moves m
+                      WHERE m.doc_type = 'sales_order' AND m.doc_id = so.id)
+
+  UNION ALL
+
+  SELECT 'unit_without_serial',
+         'low',
+         'inventory_units',
+         u.id,
+         coalesce(u.serial_number, '(null)'),
+         'inventory unit has no serial number'
+    FROM public.inventory_units u
+   WHERE u.serial_number IS NULL OR btrim(u.serial_number) = ''
+
+  UNION ALL
+
+  SELECT 'posted_invoice_without_due_date',
+         'medium',
+         'crm_invoices',
+         i.id,
+         i.inv_code,
+         'invoice is posted but has no due_date, so it can never age or fall overdue'
+    FROM public.crm_invoices i
+   WHERE i.doc_status = 'posted' AND i.due_date IS NULL
+
+  UNION ALL
+
+  -- Compared on rma_mobile_key, the same last-nine-digits rule the customer
+  -- form and the CSV importer use, so the screen and this report cannot
+  -- disagree about who is a duplicate. String comparison missed five records
+  -- and flagged two whose "number" holds no digits at all.
+  --
+  -- Still a report and never a unique index: of the seven pairs found on
+  -- 2026-09-13, two were branch locations of one company, two were the
+  -- USD-currency twin of an existing account, one was a pair of test records.
+  SELECT 'duplicate_customer_mobile',
+         'medium',
+         'customers',
+         c.id,
+         c.mobile,
+         format('%s other customer record(s) are reachable on this number', dup.others)
+    FROM public.customers c
+    JOIN LATERAL (
+      SELECT count(*) AS others
+        FROM public.customers c2
+       WHERE c2.id <> c.id
+         AND public.rma_mobile_key(c2.mobile) = public.rma_mobile_key(c.mobile)
+    ) dup ON dup.others > 0
+   WHERE public.rma_mobile_key(c.mobile) <> ''
+
+  UNION ALL
+
+  SELECT 'role_without_account',
+         CASE WHEN coalesce(ur.status, 'active') = 'active'
+               AND ur.role IN ('admin', 'super_admin') THEN 'high' ELSE 'medium' END,
+         'user_roles',
+         ur.id,
+         ur.user_email,
+         format('role %s (%s) is assigned to an address with no account; whoever registers it inherits the role',
+                ur.role, coalesce(ur.status, 'active'))
+    FROM public.user_roles ur
+   WHERE NOT EXISTS (SELECT 1 FROM auth.users u WHERE lower(u.email) = lower(ur.user_email))
+
+  UNION ALL
+
+  SELECT 'account_without_role',
+         'low',
+         'auth.users',
+         u.id,
+         u.email,
+         'account exists but holds no user_roles row, so every query is refused after sign-in'
+    FROM auth.users u
+   WHERE u.email IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM public.user_roles ur WHERE lower(ur.user_email) = lower(u.email))
+
+  UNION ALL
+
+  -- Low severity and worth having anyway: this is the field RMA intake searches
+  -- by, so an unusable number is a customer the counter cannot find.
+  SELECT 'malformed_customer_mobile',
+         'low',
+         'customers',
+         c.id,
+         c.mobile,
+         CASE WHEN public.rma_mobile_key(c.mobile) = ''
+              THEN 'mobile contains no digits at all'
+              ELSE format('mobile has %s digits and is not an Egyptian mobile number (01[0125] + 8 digits)',
+                          length(regexp_replace(c.mobile, '\D', '', 'g'))) END
+    FROM public.customers c
+   WHERE btrim(coalesce(c.mobile, '')) <> ''
+     AND NOT public.rma_is_egyptian_mobile(c.mobile)
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_data_integrity_summary()
+ RETURNS TABLE(check_name text, severity text, issue_count bigint)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF NOT public.rma_is_admin() THEN
+    RAISE EXCEPTION 'Only an administrator can run the data integrity check.'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN QUERY
+    SELECT i.check_name, i.severity, count(*)
+      FROM public.rma_data_integrity_issues() i
+     GROUP BY i.check_name, i.severity
+     ORDER BY CASE i.severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, i.check_name;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_deal_activity_type_counts(p_pipeline_id uuid, p_term text)
+ RETURNS TABLE(stage text, assigned_rep text, activity_type text, activity_count integer, done_count integer)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT d.stage,
+         d.assigned_rep,
+         a.type,
+         count(*)::int,
+         (count(*) FILTER (WHERE a.completed_at IS NOT NULL))::int
+    FROM public.rma_deals_matching(p_pipeline_id, p_term) d
+    JOIN public.activities a
+      ON a.related_type = 'deal' AND a.related_id = d.id
+   WHERE d.status = 'open'
+   GROUP BY 1, 2, 3;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_deal_activity_values(p_pipeline_id uuid, p_term text, p_now timestamp with time zone, p_today_end timestamp with time zone)
+ RETURNS TABLE(stage text, assigned_rep text, activity_state text, deal_count integer, value_sum numeric)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH per_deal AS (
+    SELECT d.id, d.stage, d.assigned_rep, d.value,
+           CASE
+             WHEN bool_or(a.due_date < p_now) THEN 'overdue'
+             WHEN bool_or(a.due_date <= p_today_end) THEN 'today'
+             ELSE 'planned'
+           END AS activity_state
+      FROM public.rma_deals_matching(p_pipeline_id, p_term) d
+      JOIN public.activities a
+        ON a.related_type = 'deal' AND a.related_id = d.id
+       AND a.completed_at IS NULL AND a.due_date IS NOT NULL
+     GROUP BY d.id, d.stage, d.assigned_rep, d.value
+  )
+  SELECT stage, assigned_rep, activity_state, count(*)::int, coalesce(sum(value), 0)
+    FROM per_deal
+   GROUP BY 1, 2, 3;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_deal_buckets(p_pipeline_id uuid, p_term text, p_tz text)
+ RETURNS TABLE(stage text, assigned_rep text, status text, created_month text, close_month text, deal_count integer, value_sum numeric)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH z AS (
+    SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_timezone_names WHERE name = p_tz) THEN p_tz ELSE 'UTC' END AS tz
+  )
+  SELECT d.stage,
+         d.assigned_rep,
+         d.status,
+         to_char(d.created_at AT TIME ZONE z.tz, 'YYYY-MM'),
+         to_char(d.expected_close_date, 'YYYY-MM'),
+         count(*)::int,
+         coalesce(sum(d.value), 0)
+    FROM public.rma_deals_matching(p_pipeline_id, p_term) d, z
+   GROUP BY 1, 2, 3, 4, 5;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_deal_reps(p_pipeline_id uuid)
+ RETURNS text[]
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT coalesce(array_agg(DISTINCT assigned_rep ORDER BY assigned_rep), '{}')
+    FROM public.deals
+   WHERE pipeline_id = p_pipeline_id AND assigned_rep IS NOT NULL;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_deal_status_follows_stage()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_is_won  boolean;
+  v_is_lost boolean;
+BEGIN
+  IF NEW.pipeline_id IS NULL OR NEW.stage IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT coalesce((s.value ->> 'is_won')::boolean,  false),
+         coalesce((s.value ->> 'is_lost')::boolean, false)
+    INTO v_is_won, v_is_lost
+    FROM public.pipelines p
+    CROSS JOIN LATERAL jsonb_array_elements(p.stages) s
+   WHERE p.id = NEW.pipeline_id
+     AND s.value ->> 'id' = NEW.stage
+   LIMIT 1;
+
+  -- Stage not found in the pipeline: leave the row alone rather than invent a
+  -- status. moveStage() already rejects an unknown stage.
+  IF v_is_won IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF v_is_won THEN
+    NEW.status      := 'won';
+    NEW.won_at      := coalesce(NEW.won_at, now());
+    NEW.lost_at     := NULL;
+    NEW.lost_reason := NULL;
+    NEW.probability := 100;
+  ELSIF v_is_lost THEN
+    NEW.status      := 'lost';
+    NEW.lost_at     := coalesce(NEW.lost_at, now());
+    NEW.won_at      := NULL;
+    NEW.probability := 0;
+  ELSE
+    -- Back into play from a terminal stage: clear the terminal markers so the
+    -- reports stop counting it as decided.
+    IF NEW.status IN ('won', 'lost') THEN
+      NEW.status      := 'open';
+      NEW.won_at      := NULL;
+      NEW.lost_at     := NULL;
+      NEW.lost_reason := NULL;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_deals_matching(p_pipeline_id uuid, p_term text)
+ RETURNS SETOF v_deals_list
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH t AS (
+    SELECT btrim(coalesce(p_term, '')) AS term,
+           '%' || replace(replace(replace(btrim(coalesce(p_term, '')), '\', '\\'), '%', '\%'), '_', '\_') || '%' AS pattern
+  )
+  SELECT v.*
+    FROM public.v_deals_list v, t
+   WHERE v.pipeline_id = p_pipeline_id
+     AND (
+       t.term = ''
+       OR v.title ILIKE t.pattern
+       OR v.deal_code ILIKE t.pattern
+       OR v.assigned_rep ILIKE t.pattern
+       OR v.customer_name ILIKE t.pattern
+     );
+$function$
 ;
 
 CREATE OR REPLACE FUNCTION public.rma_document_counters()
@@ -4095,6 +6064,141 @@ END
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.rma_duplicate_customers()
+ RETURNS TABLE(group_key text, group_size bigint, group_newest timestamp with time zone, id uuid, company_name text, contact_person text, email text, mobile text, created_date timestamp with time zone)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH keyed AS (
+    SELECT c.*,
+           regexp_replace(lower(coalesce(nullif(c.company_name, ''), nullif(c.contact_person, ''), '')), '^\s+|\s+$', '', 'g') AS k
+      FROM public.customers c
+  ),
+  groups AS (
+    SELECT k, count(*) AS n, max(created_date) AS newest FROM keyed WHERE k <> '' GROUP BY k HAVING count(*) > 1
+  )
+  SELECT g.k, g.n, g.newest, c.id, c.company_name, c.contact_person, c.email, c.mobile, c.created_date
+    FROM keyed c JOIN groups g ON g.k = c.k;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_end_sessions_for_email(p_email text)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE
+  v_deleted integer;
+BEGIN
+  IF p_email IS NULL OR btrim(p_email) = '' THEN
+    RETURN 0;
+  END IF;
+
+  DELETE FROM auth.sessions s
+   USING auth.users u
+   WHERE s.user_id = u.id
+     AND lower(u.email) = lower(btrim(p_email));
+
+  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+  RETURN v_deleted;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_end_sessions_without_access()
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE
+  v_deleted integer;
+BEGIN
+  -- Users who HAVE a role row, whose access is not current, and who are not
+  -- merely pending. Role-less logins are left alone (see the header).
+  DELETE FROM auth.sessions s
+   USING auth.users u, public.user_roles ur
+   WHERE s.user_id = u.id
+     AND lower(ur.user_email) = lower(u.email)
+     AND COALESCE(ur.status, 'active') <> 'pending'
+     AND NOT public.rma_access_is_current(ur.status, ur.access_expires_at);
+
+  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+  RETURN v_deleted;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_fill_invoice_due_date()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_days integer;
+  v_from date;
+BEGIN
+  IF NEW.doc_status = 'posted' AND NEW.due_date IS NULL THEN
+    v_days := nullif(substring(coalesce(NEW.payment_terms, '') FROM '([0-9]+)'), '')::integer;
+    v_from := coalesce(NEW.posted_at, NEW.created_at, now())::date;
+    NEW.due_date := v_from + coalesce(v_days, 0);
+  END IF;
+  RETURN NEW;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_guard_approval_authority()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  -- SECURITY DEFINER callers (the RPCs) run as their owner and are trusted to
+  -- have done their own authorization. approve_sales_order does exactly that.
+  IF current_user NOT IN ('authenticated', 'anon') THEN
+    RETURN NEW;
+  END IF;
+
+  -- The document forms post the whole row back, so an unchanged status is the
+  -- ordinary case.
+  IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
+    RETURN NEW;
+  END IF;
+
+  -- Purchase side: approving committed spend is an administrator's act.
+  IF TG_TABLE_NAME = 'vendor_invoices' AND NEW.status = 'approved' THEN
+    IF NOT public.rma_is_admin() THEN
+      RAISE EXCEPTION
+        'Only an administrator can approve a vendor invoice. A manager may raise and receive it, but approving the spend is a separate authority.'
+        USING ERRCODE = 'P0001';
+    END IF;
+
+  ELSIF TG_TABLE_NAME = 'purchase_orders' AND NEW.status = 'confirmed' THEN
+    IF NOT public.rma_is_admin() THEN
+      RAISE EXCEPTION
+        'Only an administrator can confirm a purchase order. A manager may raise it and send it for approval.'
+        USING ERRCODE = 'P0001';
+    END IF;
+
+  -- Sales side: accepting a quotation is what allows it to become a sales order
+  -- and reserve stock, so it carries the same authority approve_sales_order
+  -- already demands one step later.
+  ELSIF TG_TABLE_NAME = 'quotations' AND NEW.status = 'accepted' THEN
+    IF NOT public.rma_is_manager_or_above() THEN
+      RAISE EXCEPTION
+        'Only a manager or above can accept a quotation. Send it for approval instead.'
+        USING ERRCODE = 'P0001';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.rma_guard_base_currency()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -4109,6 +6213,14 @@ BEGIN
   END IF;
   IF TG_OP = 'UPDATE' AND NEW.config_value IS NOT DISTINCT FROM OLD.config_value THEN
     RETURN NEW;   -- a no-op save from the settings form
+  END IF;
+  -- The same no-op arriving as an upsert: BEFORE INSERT fires before the
+  -- conflict is found, so compare with what is already stored.
+  IF TG_OP = 'INSERT' AND EXISTS (
+       SELECT 1 FROM public.rma_config c
+        WHERE c.config_key = NEW.config_key
+          AND c.config_value IS NOT DISTINCT FROM NEW.config_value) THEN
+    RETURN NEW;
   END IF;
 
   SELECT
@@ -4128,7 +6240,6 @@ BEGIN
       USING ERRCODE = 'P0001';
   END IF;
 
-  -- Must be a currency this installation actually knows about.
   IF NOT EXISTS (
     SELECT 1 FROM public.currencies
      WHERE code = btrim(NEW.config_value #>> '{}') AND is_active
@@ -4184,6 +6295,45 @@ END
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.rma_guard_direct_warehouse_move()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_system_name text;
+BEGIN
+  IF current_user NOT IN ('authenticated', 'anon') THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.warehouse_id IS NOT DISTINCT FROM OLD.warehouse_id THEN
+    RETURN NEW;
+  END IF;
+
+  IF OLD.reservation_status = 'reserved' THEN
+    RAISE EXCEPTION
+      'This unit is reserved for a sales order and cannot be moved. Release the reservation first.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NEW.warehouse_id IS NOT NULL THEN
+    SELECT w.name INTO v_system_name
+      FROM public.warehouses w
+     WHERE w.id = NEW.warehouse_id AND w.is_system;
+    IF v_system_name IS NOT NULL THEN
+      RAISE EXCEPTION
+        '"%" is a protected system location and cannot be the destination of a manual transfer. Use the RMA workflow.',
+        v_system_name
+        USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.rma_guard_document_rate()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -4212,6 +6362,149 @@ BEGIN
 
   RETURN NEW;
 END
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_guard_inventory_ledger_columns()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  c_guarded constant text[] := ARRAY[
+    'reservation_status','reserved_by_doc_type','reserved_by_doc_id','reserved_at',
+    'reserved_by_email','unit_cost_base','vendor_invoice_id','product_id','serial_number'
+  ];
+  v_changed text[];
+BEGIN
+  IF current_user NOT IN ('authenticated', 'anon') THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT coalesce(array_agg(k), ARRAY[]::text[]) INTO v_changed
+    FROM unnest(c_guarded) k
+   WHERE to_jsonb(OLD) -> k IS DISTINCT FROM to_jsonb(NEW) -> k;
+
+  IF array_length(v_changed, 1) > 0 THEN
+    RAISE EXCEPTION
+      'Stock ledger columns cannot be changed directly (%). Use the stock RPCs, which record the movement in stock_moves.',
+      array_to_string(v_changed, ', ')
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_guard_sales_order_status()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  -- The RPCs run as the function owner. They are the intended writers.
+  IF current_user NOT IN ('authenticated', 'anon') THEN
+    RETURN NEW;
+  END IF;
+
+  -- Backup & Restore upserts this table from the browser, and only an
+  -- administrator can reach it. Consistent with 20260808/20260809: an admin is
+  -- not a segregation boundary here, and a restore that silently skipped sales
+  -- orders would be discovered at the worst possible moment.
+  IF public.rma_is_admin() THEN
+    RETURN NEW;
+  END IF;
+
+  -- The document forms post the whole row back on save, so an unchanged status
+  -- is the normal case and must pass — editing a draft's line items is not a
+  -- transition.
+  IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
+    RETURN NEW;
+  END IF;
+
+  -- Submitting for approval, and re-submitting one that came back declined.
+  IF NEW.status = 'sent' AND OLD.status IN ('draft', 'sent', 'declined') THEN
+    RETURN NEW;
+  END IF;
+
+  RAISE EXCEPTION
+    'A sales order cannot be moved from % to % by editing it. Use the %.',
+    OLD.status,
+    NEW.status,
+    CASE NEW.status
+      WHEN 'delivered' THEN 'Accept action, which reserves the stock at the same time (approve_sales_order)'
+      WHEN 'accepted'  THEN 'Accept action, which reserves the stock at the same time (approve_sales_order)'
+      WHEN 'confirmed' THEN 'Accept action, which reserves the stock at the same time (approve_sales_order)'
+      WHEN 'declined'  THEN 'Reject action (reject_sales_order)'
+      WHEN 'cancelled' THEN 'Cancel action, which releases any reservation (cancel_sales_order)'
+      ELSE 'documented action for that transition'
+    END
+    USING ERRCODE = 'P0001';
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_guard_settled_document()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  -- TG_ARGV[0] is the column holding the document's status; the rest are the
+  -- columns that may still change after it leaves draft, on top of the archive
+  -- fields every document shares.
+  v_status_col text   := TG_ARGV[0];
+  v_allowed    text[] := ARRAY['archived', 'archived_at', 'archived_by', 'updated_at'];
+  v_generated  text[];
+  v_status     text;
+  i            integer;
+BEGIN
+  -- Only the client surface is policed. An RPC runs as the function owner and
+  -- is the intended way to change a settled document.
+  IF current_user NOT IN ('authenticated', 'anon') THEN
+    RETURN NEW;
+  END IF;
+
+  -- Backup & Restore writes these tables directly, and only an administrator
+  -- can reach it.
+  IF public.rma_is_admin() THEN
+    RETURN NEW;
+  END IF;
+
+  v_status := to_jsonb(OLD) ->> v_status_col;
+
+  -- A draft is still being written. Editing it is the whole point of the form.
+  IF v_status = 'draft' THEN
+    RETURN NEW;
+  END IF;
+
+  FOR i IN 1 .. TG_NARGS - 1 LOOP
+    v_allowed := v_allowed || TG_ARGV[i];
+  END LOOP;
+
+  -- Stored generated columns read as NULL in NEW here — see the header. They
+  -- are unwritable by any client and derived from columns this guard protects,
+  -- so ignoring them is safe.
+  SELECT coalesce(array_agg(a.attname::text), ARRAY[]::text[])
+    INTO v_generated
+    FROM pg_attribute a
+   WHERE a.attrelid = TG_RELID
+     AND a.attnum > 0
+     AND NOT a.attisdropped
+     AND a.attgenerated <> '';
+
+  v_allowed := v_allowed || v_generated;
+
+  IF (to_jsonb(OLD) - v_allowed) IS DISTINCT FROM (to_jsonb(NEW) - v_allowed) THEN
+    RAISE EXCEPTION
+      'This % is % and can no longer be edited directly. Use the void or reversal action instead — it restores the stock and the customer balance, which a direct edit does not.',
+      replace(TG_TABLE_NAME, '_', ' '), v_status
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  RETURN NEW;
+END;
 $function$
 ;
 
@@ -4253,6 +6546,23 @@ BEGIN
 
   RETURN NEW;
 END
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_inventory_status_counts()
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT jsonb_build_object(
+    'active_rma',           count(*) FILTER (WHERE status = 'active_rma'),
+    'company_stock',        count(*) FILTER (WHERE status = 'company_stock'),
+    'sent_to_manufacturer', count(*) FILTER (WHERE status = 'sent_to_manufacturer'),
+    'closed',               count(*) FILTER (WHERE status = 'closed'),
+    'total',                count(*)
+  )
+  FROM public.inventory_units;
 $function$
 ;
 
@@ -4328,7 +6638,7 @@ CREATE OR REPLACE FUNCTION public.rma_is_admin()
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$ SELECT public.rma_user_role() IN ('super_admin', 'admin') $function$
+AS $function$ SELECT COALESCE(public.rma_user_role() IN ('super_admin', 'admin'), false) $function$
 ;
 
 CREATE OR REPLACE FUNCTION public.rma_is_authenticated()
@@ -4339,12 +6649,23 @@ CREATE OR REPLACE FUNCTION public.rma_is_authenticated()
 AS $function$ SELECT auth.jwt() ->> 'email' IS NOT NULL $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.rma_is_egyptian_mobile(p_mobile text)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE
+ SET search_path TO 'public'
+AS $function$
+  SELECT d ~ '^01[0125][0-9]{8}$' OR d ~ '^201[0125][0-9]{8}$'
+    FROM (SELECT regexp_replace(coalesce(p_mobile, ''), '\D', '', 'g') AS d) t;
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.rma_is_manager_or_above()
  RETURNS boolean
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$ SELECT public.rma_user_role() IN ('super_admin', 'admin', 'manager') $function$
+AS $function$ SELECT COALESCE(public.rma_user_role() IN ('super_admin', 'admin', 'manager'), false) $function$
 ;
 
 CREATE OR REPLACE FUNCTION public.rma_is_staff()
@@ -4352,10 +6673,216 @@ CREATE OR REPLACE FUNCTION public.rma_is_staff()
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
-AS $function$ SELECT public.rma_user_role() IN (
+AS $function$ SELECT COALESCE(public.rma_user_role() IN (
   'super_admin', 'admin', 'manager', 'technician', 'viewer',
   'sales_rep', 'accountant'
-) $function$
+), false) $function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_knowledge_documents_matching(p_term text)
+ RETURNS SETOF v_knowledge_documents
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH t AS (
+    SELECT btrim(coalesce(p_term, '')) AS term,
+           '%' || replace(replace(replace(btrim(coalesce(p_term, '')), '\', '\\'), '%', '\%'), '_', '\_') || '%' AS pattern
+  )
+  SELECT v.*
+    FROM public.v_knowledge_documents v, t
+   WHERE t.term <> ''
+     AND (
+       v.search_vector @@ websearch_to_tsquery('simple', t.term)
+       OR v.product_sku ILIKE t.pattern
+       OR v.product_name ILIKE t.pattern
+     );
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_knowledge_folder_stats(p_folder text)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH d AS (
+    SELECT doc_type, extraction_status
+      FROM public.v_knowledge_documents
+     WHERE deleted_at IS NULL
+       AND (p_folder IS NULL OR p_folder = '__root__' OR p_folder = ANY (path))
+  )
+  SELECT jsonb_build_object(
+    'total', (SELECT count(*) FROM d),
+    'unsearchable', (SELECT count(*) FROM d WHERE extraction_status IS DISTINCT FROM 'ok'),
+    'by_type', coalesce((SELECT jsonb_object_agg(doc_type, n) FROM (SELECT doc_type, count(*) AS n FROM d GROUP BY doc_type) x), '{}'::jsonb)
+  );
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_list_my_sessions()
+ RETURNS TABLE(id uuid, created_at timestamp with time zone, refreshed_at timestamp with time zone, not_after timestamp with time zone, aal text, user_agent text, ip text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'auth'
+AS $function$
+  SELECT s.id,
+         s.created_at,
+         s.refreshed_at AT TIME ZONE 'UTC',
+         s.not_after,
+         s.aal::text,
+         s.user_agent,
+         host(s.ip)
+    FROM auth.sessions s
+   WHERE s.user_id = auth.uid()
+   ORDER BY s.refreshed_at DESC NULLS LAST, s.created_at DESC;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_margin_totals()
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT jsonb_build_object(
+    'invoices', count(*),
+    'invoices_costed', count(*) FILTER (WHERE cogs_complete AND margin_base IS NOT NULL),
+    'revenue_base', coalesce(sum(coalesce(revenue_base, 0)), 0),
+    'costed_revenue_base', coalesce(sum(coalesce(revenue_base, 0)) FILTER (WHERE cogs_complete AND margin_base IS NOT NULL), 0),
+    'cogs_base', coalesce(sum(coalesce(cogs_base, 0)) FILTER (WHERE cogs_complete AND margin_base IS NOT NULL), 0),
+    'margin_base', coalesce(sum(coalesce(margin_base, 0)) FILTER (WHERE cogs_complete AND margin_base IS NOT NULL), 0)
+  )
+  FROM public.v_invoice_margin;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_mobile_key(p_mobile text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE
+ SET search_path TO 'public'
+AS $function$
+  SELECT CASE WHEN length(d) > 9 THEN right(d, 9) ELSE d END
+    FROM (SELECT regexp_replace(coalesce(p_mobile, ''), '\D', '', 'g') AS d) t;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_orphan_customers()
+ RETURNS SETOF customers
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT c.*
+    FROM public.customers c
+   WHERE NOT EXISTS (SELECT 1 FROM public.rma_tickets t WHERE t.customer_id = c.id)
+     AND NOT EXISTS (
+       SELECT 1 FROM public.rma_tickets t
+        WHERE coalesce(t.customer_name, '') <> ''
+          AND t.customer_name = CASE WHEN c.customer_type = 'B2B' AND coalesce(c.company_name, '') <> ''
+                                     THEN c.company_name ELSE c.contact_person END
+     );
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_peek_next_ticket_number()
+ RETURNS text
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  WITH p AS (SELECT 'RMA-' || to_char(now(), 'DDMMYYYY') || '-' AS prefix)
+  SELECT p.prefix || lpad((
+           coalesce(max(substring(t.rma_number from '[0-9]+$')::integer), 0) + 1
+         )::text, 4, '0')
+    FROM p
+    LEFT JOIN public.rma_tickets t
+      ON t.rma_number LIKE p.prefix || '%'
+     AND t.rma_number ~ ('^' || p.prefix || '[0-9]+$')
+   GROUP BY p.prefix;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_pipeline_stage_counts()
+ RETURNS TABLE(pipeline_id uuid, stage text, deal_count bigint)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT d.pipeline_id, d.stage, count(*)
+    FROM public.deals d
+   WHERE d.pipeline_id IS NOT NULL
+   GROUP BY 1, 2;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_product_hierarchy_counts()
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT jsonb_build_object(
+    'total', (SELECT count(*) FROM public.products),
+    'by_brand', coalesce((
+      SELECT jsonb_object_agg(brand_id::text, n)
+        FROM (SELECT brand_id, count(*) AS n FROM public.products WHERE brand_id IS NOT NULL GROUP BY brand_id) b
+    ), '{}'::jsonb),
+    'by_category', coalesce((
+      SELECT jsonb_object_agg(category_id::text, n)
+        FROM (SELECT category_id, count(*) AS n FROM public.products WHERE category_id IS NOT NULL GROUP BY category_id) c
+    ), '{}'::jsonb)
+  );
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_product_sku_candidates(p_bases text[])
+ RETURNS TABLE(base_index integer, id uuid, sku text, product_name text)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH b AS (
+    SELECT u.base, u.ord::int AS ord
+      FROM unnest(coalesce(p_bases, '{}'::text[])) WITH ORDINALITY AS u(base, ord)
+     WHERE coalesce(u.base, '') <> ''
+  ),
+  p AS (
+    SELECT pr.id, pr.sku, pr.product_name,
+           regexp_replace(upper(coalesce(pr.sku, '')), '[^A-Z0-9]', '', 'g') AS norm
+      FROM public.products pr
+  )
+  SELECT b.ord, p.id, p.sku, p.product_name
+    FROM b
+    JOIN p ON p.norm <> ''
+          AND (p.norm = b.base OR (length(p.norm) >= 4 AND strpos(b.base, p.norm) > 0));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_product_tickets(p_product_id uuid)
+ RETURNS SETOF rma_tickets
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT t.*
+    FROM public.rma_tickets t
+   WHERE EXISTS (SELECT 1 FROM public.inventory_units u
+                  WHERE u.rma_ticket_id = t.id AND u.product_id = p_product_id);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_products_by_name_keys(p_keys text[])
+ RETURNS TABLE(id uuid, product_name text)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT p.id, p.product_name
+    FROM public.products p
+   WHERE lower(regexp_replace(coalesce(p.product_name, ''), '^\s+|\s+$', '', 'g')) = ANY (p_keys);
+$function$
 ;
 
 CREATE OR REPLACE FUNCTION public.rma_protect_last_super_admin()
@@ -4403,6 +6930,621 @@ END
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.rma_public_track_hit(p_ip_hash text, p_limit integer DEFAULT 15, p_window_seconds integer DEFAULT 60)
+ RETURNS TABLE(allowed boolean, reset_in integer)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_now    timestamptz := now();
+  v_window interval;
+  v_row    public.public_track_rate_limit%ROWTYPE;
+BEGIN
+  IF p_ip_hash IS NULL OR btrim(p_ip_hash) = '' THEN
+    RAISE EXCEPTION 'rma_public_track_hit requires a key.' USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+  p_limit          := least(greatest(coalesce(p_limit, 15), 1), 10000);
+  p_window_seconds := least(greatest(coalesce(p_window_seconds, 60), 1), 3600);
+  v_window := make_interval(secs => p_window_seconds);
+
+  INSERT INTO public.public_track_rate_limit AS r (ip_hash, window_start, request_count, updated_at)
+       VALUES (p_ip_hash, v_now, 1, v_now)
+  ON CONFLICT (ip_hash) DO UPDATE
+     SET request_count = CASE WHEN r.window_start < v_now - v_window THEN 1
+                              ELSE r.request_count + 1 END,
+         window_start  = CASE WHEN r.window_start < v_now - v_window THEN v_now
+                              ELSE r.window_start END,
+         updated_at    = v_now
+  RETURNING * INTO v_row;
+
+  allowed  := v_row.request_count <= p_limit;
+  reset_in := greatest(0, ceil(extract(epoch FROM (v_row.window_start + v_window) - v_now))::integer);
+
+  IF random() < 0.01 THEN
+    DELETE FROM public.public_track_rate_limit WHERE updated_at < v_now - interval '1 day';
+  END IF;
+
+  RETURN NEXT;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_purchase_document_buckets(p_tab text, p_status text, p_vendor_id uuid, p_term text, p_tz text)
+ RETURNS TABLE(doc_type text, doc_status text, vendor_id uuid, vendor_name text, created_month text, doc_count bigint, spend numeric)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH z AS (
+    SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_timezone_names WHERE name = p_tz) THEN p_tz ELSE 'UTC' END AS tz
+  ),
+  q AS (
+    SELECT btrim(coalesce(p_term, '')) AS term,
+           '%' || replace(replace(replace(btrim(coalesce(p_term, '')), '\', '\\'), '%', '\%'), '_', '\_') || '%' AS pattern
+  )
+  SELECT d.doc_type,
+         d.doc_status,
+         d.vendor_id,
+         d.vendor_name,
+         to_char(d.created_at AT TIME ZONE z.tz, 'YYYY-MM'),
+         count(*),
+         sum(d.total_base_value)
+    FROM public.v_purchase_documents_list d, z, q
+   WHERE public.rma_purchase_tab_holds(p_tab, d.doc_type, d.archived)
+     AND (nullif(p_status, '') IS NULL OR d.doc_status = p_status)
+     AND (p_vendor_id IS NULL OR d.vendor_id = p_vendor_id)
+     AND (q.term = '' OR d.doc_code ILIKE q.pattern OR d.vendor_name ILIKE q.pattern)
+   GROUP BY 1, 2, 3, 4, 5;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_purchase_document_summary(p_tab text)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH docs AS (
+    SELECT doc_type, doc_status, archived FROM public.v_purchase_documents
+  )
+  SELECT jsonb_build_object(
+    'counts', jsonb_build_object(
+      'all',            (SELECT count(*) FROM docs WHERE NOT coalesce(archived, false)),
+      'purchase_order', (SELECT count(*) FROM docs WHERE NOT coalesce(archived, false) AND doc_type = 'purchase_order'),
+      'vendor_invoice', (SELECT count(*) FROM docs WHERE NOT coalesce(archived, false) AND doc_type = 'vendor_invoice'),
+      'archive',        (SELECT count(*) FROM docs WHERE coalesce(archived, false)),
+      'total',          (SELECT count(*) FROM docs)
+    ),
+    'statuses', coalesce((SELECT jsonb_agg(DISTINCT doc_status ORDER BY doc_status)
+                            FROM docs
+                           WHERE public.rma_purchase_tab_holds(p_tab, doc_type, archived)
+                             AND doc_status IS NOT NULL AND doc_status <> ''), '[]'::jsonb)
+  );
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_purchase_tab_holds(p_tab text, p_doc_type text, p_archived boolean)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT CASE WHEN p_tab = 'any' THEN true
+              WHEN p_tab = 'archive' THEN coalesce(p_archived, false)
+              WHEN p_tab = 'all' OR p_tab IS NULL THEN NOT coalesce(p_archived, false)
+              ELSE NOT coalesce(p_archived, false) AND p_doc_type = p_tab
+         END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_report_customer_summary(p_from timestamp with time zone, p_to timestamp with time zone)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT jsonb_build_object(
+    'customers', (SELECT count(*) FROM public.rma_report_customers(p_from, p_to)),
+    'active', (SELECT count(*) FROM public.rma_report_customers(p_from, p_to) WHERE customer_status = 'Active'),
+    'returning', (SELECT count(*) FROM public.rma_report_customers(p_from, p_to) WHERE total_tickets > 1),
+    'tickets', (SELECT count(*) FROM public.rma_tickets
+                 WHERE created_date IS NOT NULL AND created_date >= p_from AND created_date <= p_to)
+  );
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_report_customers(p_from timestamp with time zone, p_to timestamp with time zone)
+ RETURNS TABLE(id uuid, contact_person text, company_name text, customer_status text, created_date timestamp with time zone, total_tickets bigint, open_tickets bigint, last_activity timestamp with time zone)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH stats AS (
+    SELECT t.customer_id,
+           count(*) AS total,
+           count(*) FILTER (WHERE t.ticket_status IS DISTINCT FROM 'Completed' AND t.ticket_status IS DISTINCT FROM 'Cancelled') AS open,
+           max(t.created_date) AS last_activity
+      FROM public.rma_tickets t
+     WHERE t.customer_id IS NOT NULL
+       AND t.created_date IS NOT NULL AND t.created_date >= p_from AND t.created_date <= p_to
+     GROUP BY t.customer_id
+  )
+  SELECT c.id, c.contact_person, c.company_name, c.customer_status, c.created_date,
+         coalesce(s.total, 0), coalesce(s.open, 0), s.last_activity
+    FROM public.customers c
+    LEFT JOIN stats s ON s.customer_id = c.id
+   WHERE c.created_date IS NOT NULL AND c.created_date >= p_from AND c.created_date <= p_to;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_report_financial(p_from timestamp with time zone, p_to timestamp with time zone)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH inv AS (
+    SELECT * FROM public.crm_invoices WHERE created_at IS NOT NULL AND created_at >= p_from AND created_at <= p_to
+  )
+  SELECT jsonb_build_object(
+    'invoices', (SELECT count(*) FROM inv),
+    'total_invoiced', (SELECT coalesce(sum(coalesce(total, 0)), 0) FROM inv WHERE doc_status IS DISTINCT FROM 'cancelled'),
+    'total_paid', (SELECT coalesce(sum(coalesce(amount_paid, 0)), 0) FROM inv WHERE doc_status IS DISTINCT FROM 'cancelled'),
+    'outstanding', (SELECT coalesce(sum(greatest(coalesce(total, 0) - coalesce(amount_paid, 0), 0)), 0)
+                      FROM inv WHERE doc_status IS DISTINCT FROM 'cancelled'),
+    'quotes_value', (SELECT coalesce(sum(coalesce(total, 0)), 0) FROM public.quotations
+                      WHERE created_at IS NOT NULL AND created_at >= p_from AND created_at <= p_to
+                        AND status IS DISTINCT FROM 'cancelled' AND status IS DISTINCT FROM 'declined'
+                        AND status IS DISTINCT FROM 'expired')
+  );
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_report_pipeline(p_from timestamp with time zone, p_to timestamp with time zone, p_now timestamp with time zone)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH d AS (
+    SELECT * FROM public.deals WHERE created_at IS NOT NULL AND created_at >= p_from AND created_at <= p_to
+  ),
+  l AS (
+    SELECT * FROM public.leads WHERE created_at IS NOT NULL AND created_at >= p_from AND created_at <= p_to
+  )
+  SELECT jsonb_build_object(
+    'deal_groups', coalesce((SELECT jsonb_agg(jsonb_build_object(
+        'pipeline_id', pipeline_id, 'stage', stage, 'status', status, 'rep', rep, 'count', n, 'value', v) ORDER BY newest DESC NULLS LAST)
+      FROM (SELECT pipeline_id, stage, status, nullif(assigned_rep, '') AS rep, count(*) AS n,
+                   coalesce(sum(coalesce(value, 0)), 0) AS v, max(created_at) AS newest
+              FROM d GROUP BY 1, 2, 3, 4) g), '[]'::jsonb),
+    'open_age_days_sum', (SELECT coalesce(sum(greatest(0, round(extract(epoch FROM (coalesce(p_now, now()) - created_at)) / 86400))), 0)
+                            FROM d WHERE status = 'open'),
+    'won_cycle', (SELECT jsonb_build_object('count', count(*),
+                     'days_sum', coalesce(sum(greatest(0, round(extract(epoch FROM (won_at - created_at)) / 86400))), 0))
+                    FROM d WHERE status = 'won' AND won_at IS NOT NULL),
+    'lost_reasons', coalesce((SELECT jsonb_agg(jsonb_build_object('reason', reason, 'count', n) ORDER BY n DESC, newest DESC NULLS LAST)
+      FROM (SELECT nullif(lost_reason, '') AS reason, count(*) AS n, max(created_at) AS newest
+              FROM d WHERE status = 'lost' GROUP BY 1) r), '[]'::jsonb),
+    'lead_sources', coalesce((SELECT jsonb_agg(jsonb_build_object('source', source, 'total', n, 'converted', c) ORDER BY n DESC, newest DESC NULLS LAST)
+      FROM (SELECT nullif(source, '') AS source, count(*) AS n,
+                   count(*) FILTER (WHERE status = 'converted' OR converted_at IS NOT NULL) AS c,
+                   max(created_at) AS newest
+              FROM l GROUP BY 1) s), '[]'::jsonb)
+  );
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_report_sales(p_from timestamp with time zone, p_to timestamp with time zone)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH qt AS (
+    SELECT * FROM public.quotations WHERE created_at IS NOT NULL AND created_at >= p_from AND created_at <= p_to
+  ),
+  so_r AS (
+    SELECT * FROM public.sales_orders
+     WHERE created_at IS NOT NULL AND created_at >= p_from AND created_at <= p_to AND status IS DISTINCT FROM 'cancelled'
+  ),
+  inv_r AS (
+    SELECT * FROM public.crm_invoices
+     WHERE created_at IS NOT NULL AND created_at >= p_from AND created_at <= p_to AND doc_status IS DISTINCT FROM 'cancelled'
+  ),
+  pay_r AS (
+    SELECT * FROM public.payments p
+     WHERE coalesce(p.payment_date::timestamp AT TIME ZONE 'UTC', p.created_at) >= p_from
+       AND coalesce(p.payment_date::timestamp AT TIME ZONE 'UTC', p.created_at) <= p_to
+       AND p.status IS DISTINCT FROM 'voided'
+  ),
+  ofq AS (
+    SELECT o.id, o.total FROM public.sales_orders o
+     WHERE o.status IS DISTINCT FROM 'cancelled' AND o.quotation_id IN (SELECT id FROM qt)
+  ),
+  ifq AS (
+    SELECT i.total FROM public.crm_invoices i
+     WHERE i.doc_status IS DISTINCT FROM 'cancelled' AND i.so_id IN (SELECT id FROM ofq)
+  )
+  SELECT jsonb_build_object(
+    'quotations', (SELECT jsonb_build_object(
+        'count', count(*),
+        'value', coalesce(sum(coalesce(total, 0)), 0),
+        'won', count(*) FILTER (WHERE status IN ('converted', 'accepted')),
+        'lost', count(*) FILTER (WHERE status IN ('declined', 'expired'))) FROM qt),
+    'invoiced', (SELECT jsonb_build_object('count', count(*), 'value', coalesce(sum(coalesce(total, 0)), 0)) FROM inv_r),
+    'collected', (SELECT jsonb_build_object('count', count(*), 'value', coalesce(sum(coalesce(amount, 0)), 0)) FROM pay_r),
+    'funnel_orders', (SELECT jsonb_build_object('count', count(*), 'value', coalesce(sum(coalesce(total, 0)), 0)) FROM ofq),
+    'funnel_invoices', (SELECT jsonb_build_object('count', count(*), 'value', coalesce(sum(coalesce(total, 0)), 0)) FROM ifq),
+    'standalone_orders', (SELECT count(*) FROM so_r WHERE quotation_id IS NULL OR quotation_id NOT IN (SELECT id FROM qt)),
+    'standalone_invoices', (SELECT count(*) FROM inv_r WHERE so_id IS NULL OR so_id NOT IN (SELECT id FROM ofq)),
+    'by_rep', coalesce((SELECT jsonb_agg(jsonb_build_object(
+        'rep', rep, 'raised', raised, 'won', won, 'lost', lost, 'value', v, 'won_value', wv) ORDER BY wv DESC, newest DESC NULLS LAST)
+      FROM (SELECT nullif(assigned_rep, '') AS rep, count(*) AS raised,
+                   count(*) FILTER (WHERE status IN ('converted', 'accepted')) AS won,
+                   count(*) FILTER (WHERE status IN ('declined', 'expired')) AS lost,
+                   coalesce(sum(coalesce(total, 0)), 0) AS v,
+                   coalesce(sum(coalesce(total, 0)) FILTER (WHERE status IN ('converted', 'accepted')), 0) AS wv,
+                   max(created_at) AS newest
+              FROM qt GROUP BY 1) r), '[]'::jsonb)
+  );
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_report_technicians(p_from timestamp with time zone, p_to timestamp with time zone)
+ RETURNS TABLE(email text, assigned bigint, completed bigint, avg_resolution_hours numeric, hours_logged numeric, last_assigned timestamp with time zone)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH ranged AS (
+    SELECT t.assigned_technician AS email, t.ticket_status, t.created_date,
+           CASE WHEN t.ticket_status = 'Completed' AND t.updated_date > t.created_date
+                THEN round((extract(epoch FROM (t.updated_date - t.created_date)) / 3600)::numeric, 1)
+           END AS hrs
+      FROM public.rma_tickets t
+     WHERE coalesce(t.assigned_technician, '') <> ''
+       AND t.created_date IS NOT NULL AND t.created_date >= p_from AND t.created_date <= p_to
+  ),
+  hours AS (
+    SELECT e.user_email AS email, sum(coalesce(e.duration_min, 0))::numeric / 60 AS h
+      FROM public.time_entries e
+     WHERE coalesce(e.user_email, '') <> ''
+     GROUP BY e.user_email
+  )
+  SELECT r.email,
+         count(*),
+         count(*) FILTER (WHERE r.ticket_status = 'Completed'),
+         avg(r.hrs),
+         coalesce(max(h.h), 0),
+         max(r.created_date)
+    FROM ranged r
+    LEFT JOIN hours h ON h.email = r.email
+   GROUP BY r.email;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_report_ticket_summary(p_from timestamp with time zone, p_to timestamp with time zone, p_status text, p_priority text, p_technician text, p_now timestamp with time zone)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH ranged AS (
+    SELECT * FROM public.rma_tickets t
+     WHERE t.created_date IS NOT NULL AND t.created_date >= p_from AND t.created_date <= p_to
+  ),
+  filtered AS (
+    SELECT * FROM ranged
+     WHERE (coalesce(p_status, '') = '' OR ticket_status = p_status)
+       AND (coalesce(p_priority, '') = '' OR priority = p_priority)
+       AND (coalesce(p_technician, '') = '' OR assigned_technician = p_technician)
+  ),
+  completed AS (
+    SELECT f.*,
+           CASE WHEN f.updated_date > f.created_date
+                THEN round((extract(epoch FROM (f.updated_date - f.created_date)) / 3600)::numeric, 1)
+           END AS hrs
+      FROM filtered f
+     WHERE f.ticket_status = 'Completed'
+  )
+  SELECT jsonb_build_object(
+    'total', (SELECT count(*) FROM filtered),
+    'completed', (SELECT count(*) FROM completed),
+    'avg_resolution_hours', (SELECT avg(hrs) FROM completed WHERE hrs IS NOT NULL),
+    'completed_with_due', (SELECT count(*) FROM completed WHERE due_date IS NOT NULL),
+    'sla_met', (SELECT count(*) FROM completed
+                 WHERE due_date IS NOT NULL AND updated_date <= (due_date::timestamp AT TIME ZONE 'UTC')),
+    'overdue', (SELECT count(*) FROM filtered
+                 WHERE due_date IS NOT NULL
+                   AND (due_date::timestamp AT TIME ZONE 'UTC') < coalesce(p_now, now())
+                   AND ticket_status IS DISTINCT FROM 'Completed' AND ticket_status IS DISTINCT FROM 'Cancelled'),
+    'statuses', coalesce((SELECT jsonb_agg(v ORDER BY v COLLATE "C") FROM (SELECT DISTINCT ticket_status AS v FROM ranged WHERE coalesce(ticket_status, '') <> '') s), '[]'::jsonb),
+    'priorities', coalesce((SELECT jsonb_agg(v ORDER BY v COLLATE "C") FROM (SELECT DISTINCT priority AS v FROM ranged WHERE coalesce(priority, '') <> '') s), '[]'::jsonb),
+    'technicians', coalesce((SELECT jsonb_agg(v ORDER BY v COLLATE "C") FROM (SELECT DISTINCT assigned_technician AS v FROM ranged WHERE coalesce(assigned_technician, '') <> '') s), '[]'::jsonb)
+  );
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_restore_apply(p_session uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_table   text;
+  v_rel     regclass;
+  v_rows    jsonb;
+  v_cols    text[];
+  v_pk      text[];
+  v_update  text[];
+  v_ident   boolean;
+  v_sql     text;
+  v_n       bigint;
+  v_results jsonb  := '[]'::jsonb;
+  v_rowsum  bigint := 0;
+  v_tables  integer := 0;
+BEGIN
+  IF NOT public.rma_is_admin() THEN
+    RAISE EXCEPTION 'Only an administrator can restore a backup.' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.restore_staging WHERE session_id = p_session) THEN
+    RAISE EXCEPTION 'Nothing has been uploaded for this restore.' USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+  SELECT string_agg(DISTINCT table_name, ', ') INTO v_sql
+    FROM public.restore_staging
+   WHERE session_id = p_session AND NOT table_name = ANY (public.rma_restore_manifest());
+  IF v_sql IS NOT NULL THEN
+    RAISE EXCEPTION 'Cannot restore: % not restorable.', v_sql USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+
+  FOREACH v_table IN ARRAY public.rma_restore_manifest() LOOP
+    SELECT jsonb_agg(e.elem ORDER BY s.seq, e.ord) INTO v_rows
+      FROM public.restore_staging s
+     CROSS JOIN LATERAL jsonb_array_elements(s.rows) WITH ORDINALITY AS e(elem, ord)
+     WHERE s.session_id = p_session AND s.table_name = v_table;
+    CONTINUE WHEN v_rows IS NULL;
+
+    v_rel := to_regclass('public.' || quote_ident(v_table));
+    IF v_rel IS NULL THEN
+      RAISE EXCEPTION 'Cannot restore %: the table does not exist in this database.', v_table;
+    END IF;
+
+    SELECT array_agg(a.attname::text ORDER BY a.attnum) INTO v_cols
+      FROM pg_attribute a
+     WHERE a.attrelid = v_rel AND a.attnum > 0 AND NOT a.attisdropped
+       AND a.attgenerated = ''
+       AND a.attname IN (SELECT DISTINCT k FROM jsonb_array_elements(v_rows) x, jsonb_object_keys(x) k)
+       AND NOT (v_table = 'user_roles' AND a.attname = 'password_hash');
+
+    SELECT array_agg(a.attname::text ORDER BY k.ord) INTO v_pk
+      FROM pg_index i
+     CROSS JOIN LATERAL unnest(i.indkey) WITH ORDINALITY AS k(attnum, ord)
+      JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum
+     WHERE i.indrelid = v_rel AND i.indisprimary;
+
+    IF v_pk IS NULL THEN
+      RAISE EXCEPTION 'Cannot restore %: it has no primary key to match rows on.', v_table;
+    END IF;
+    IF v_cols IS NULL OR NOT (v_pk <@ v_cols) THEN
+      RAISE EXCEPTION 'Cannot restore %: the backup rows do not include its primary key.', v_table;
+    END IF;
+
+    SELECT array_agg(c) INTO v_update FROM unnest(v_cols) c WHERE NOT c = ANY (v_pk);
+    SELECT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = v_rel AND attidentity = 'a' AND NOT attisdropped)
+      INTO v_ident;
+
+    v_sql := format(
+      'INSERT INTO public.%I (%s) %s SELECT %s FROM jsonb_populate_recordset(NULL::public.%I, $1) ON CONFLICT (%s) DO %s',
+      v_table,
+      (SELECT string_agg(quote_ident(c), ', ') FROM unnest(v_cols) c),
+      CASE WHEN v_ident THEN 'OVERRIDING SYSTEM VALUE' ELSE '' END,
+      (SELECT string_agg(quote_ident(c), ', ') FROM unnest(v_cols) c),
+      v_table,
+      (SELECT string_agg(quote_ident(c), ', ') FROM unnest(v_pk) c),
+      CASE WHEN v_update IS NULL THEN 'NOTHING'
+           ELSE 'UPDATE SET ' || (SELECT string_agg(format('%I = EXCLUDED.%I', c, c), ', ') FROM unnest(v_update) c) END
+    );
+
+    BEGIN
+      EXECUTE v_sql USING v_rows;
+      GET DIAGNOSTICS v_n = ROW_COUNT;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE EXCEPTION 'Restore stopped at %: %', v_table, SQLERRM USING ERRCODE = SQLSTATE;
+    END;
+
+    v_results := v_results || jsonb_build_object('table', v_table, 'count', v_n, 'attempted', jsonb_array_length(v_rows));
+    v_rowsum := v_rowsum + v_n;
+    v_tables := v_tables + 1;
+  END LOOP;
+
+  DELETE FROM public.restore_staging WHERE session_id = p_session;
+  RETURN jsonb_build_object('tables', v_tables, 'rows', v_rowsum, 'results', v_results);
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_restore_begin()
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+BEGIN
+  IF NOT public.rma_is_admin() THEN
+    RAISE EXCEPTION 'Only an administrator can restore a backup.' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  DELETE FROM public.restore_staging WHERE created_at < now() - interval '1 day';
+  RETURN gen_random_uuid();
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_restore_discard(p_session uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+BEGIN
+  IF NOT public.rma_is_admin() THEN
+    RAISE EXCEPTION 'Only an administrator can restore a backup.' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  DELETE FROM public.restore_staging WHERE session_id = p_session;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_restore_manifest()
+ RETURNS text[]
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT ARRAY[
+    'currencies', 'countries', 'country_area_codes', 'rma_config', 'brands', 'categories',
+    'subcategories', 'warehouses', 'pipelines', 'parts', 'custom_field_definitions', 'custom_roles',
+    'user_roles', 'user_preferences', 'announcements', 'kb_articles', 'branding_settings',
+    'email_templates', 'whatsapp_templates', 'notification_settings', 'notification_preferences',
+    'products', 'product_images', 'product_documents', 'company_documents', 'customers', 'contacts',
+    'customer_notes', 'deals', 'leads', 'rma_tickets', 'ticket_comments', 'ticket_activity',
+    'ticket_parts', 'ticket_resolutions', 'time_entries', 'purchase_orders', 'vendor_invoices',
+    'vendor_invoice_charges', 'vendor_payments', 'vendor_payment_applications',
+    'manufacturer_batches', 'inventory_units', 'warehouse_stock', 'quotations', 'sales_orders',
+    'crm_invoices', 'invoices', 'payments', 'payment_applications', 'credit_notes',
+    'credit_note_applications', 'activities', 'notifications', 'user_activity_log'
+  ]::text[]
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_restore_stage(p_session uuid, p_table text, p_rows jsonb)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+BEGIN
+  IF NOT public.rma_is_admin() THEN
+    RAISE EXCEPTION 'Only an administrator can restore a backup.' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF p_session IS NULL THEN
+    RAISE EXCEPTION 'A restore session is required.' USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+  IF NOT p_table = ANY (public.rma_restore_manifest()) THEN
+    RAISE EXCEPTION 'Table % cannot be restored.', p_table USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+  IF p_rows IS NULL OR jsonb_typeof(p_rows) <> 'array' THEN
+    RAISE EXCEPTION 'Rows for % must be a JSON array.', p_table USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+
+  INSERT INTO public.restore_staging (session_id, table_name, rows) VALUES (p_session, p_table, p_rows);
+  RETURN jsonb_array_length(p_rows);
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_revoke_my_session(p_session_id uuid)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'auth'
+AS $function$
+DECLARE
+  v_deleted integer;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated.' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  DELETE FROM auth.sessions s
+   WHERE s.id = p_session_id AND s.user_id = auth.uid();
+  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+  RETURN v_deleted > 0;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_revoke_user_sessions(p_user_id uuid)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'auth'
+AS $function$
+DECLARE
+  v_deleted integer;
+BEGIN
+  IF NOT public.rma_is_admin() THEN
+    RAISE EXCEPTION 'Only an administrator can revoke another user''s sessions.'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  DELETE FROM auth.sessions s WHERE s.user_id = p_user_id;
+  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+  RETURN v_deleted;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_revoke_user_sessions_by_email(p_email text)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'auth'
+AS $function$
+DECLARE
+  v_user_id uuid;
+BEGIN
+  IF NOT public.rma_is_admin() THEN
+    RAISE EXCEPTION 'Only an administrator can revoke another user''s sessions.'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  SELECT u.id INTO v_user_id FROM auth.users u WHERE lower(u.email) = lower(btrim(p_email));
+
+  -- A user_roles row can exist for someone who has never signed in. That is not
+  -- an error: there are simply no sessions to end.
+  IF v_user_id IS NULL THEN
+    RETURN 0;
+  END IF;
+
+  RETURN public.rma_revoke_user_sessions(v_user_id);
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_sales_document_summary(p_tab text, p_owner text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH docs AS (
+    SELECT doc_type, doc_status, assigned_rep, archived
+      FROM public.v_sales_documents
+     WHERE p_owner IS NULL OR assigned_rep = p_owner OR created_by = p_owner
+  ),
+  in_tab AS (
+    SELECT * FROM docs
+     WHERE CASE WHEN p_tab = 'archive' THEN archived
+                WHEN p_tab = 'all' OR p_tab IS NULL THEN NOT archived
+                ELSE NOT archived AND doc_type = p_tab
+           END
+  )
+  SELECT jsonb_build_object(
+    'counts', jsonb_build_object(
+      'all',         (SELECT count(*) FROM docs WHERE NOT archived),
+      'quotation',   (SELECT count(*) FROM docs WHERE NOT archived AND doc_type = 'quotation'),
+      'sales_order', (SELECT count(*) FROM docs WHERE NOT archived AND doc_type = 'sales_order'),
+      'invoice',     (SELECT count(*) FROM docs WHERE NOT archived AND doc_type = 'invoice'),
+      'credit_note', (SELECT count(*) FROM docs WHERE NOT archived AND doc_type = 'credit_note'),
+      'archive',     (SELECT count(*) FROM docs WHERE archived)
+    ),
+    'statuses', coalesce((SELECT jsonb_agg(DISTINCT doc_status ORDER BY doc_status) FROM in_tab WHERE doc_status IS NOT NULL AND doc_status <> ''), '[]'::jsonb),
+    'reps',     coalesce((SELECT jsonb_agg(DISTINCT assigned_rep ORDER BY assigned_rep) FROM docs WHERE assigned_rep IS NOT NULL AND assigned_rep <> ''), '[]'::jsonb)
+  );
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.rma_search_by_serial(serial text)
  RETURNS TABLE(id uuid, rma_number text, customer_name text, ticket_status text, priority text, assigned_technician text, created_date timestamp with time zone, due_date date, products jsonb)
  LANGUAGE sql
@@ -4419,6 +7561,46 @@ AS $function$
     WHERE p->>'serial_number' ILIKE serial
   )
   ORDER BY created_date DESC;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_security_invariant_counts()
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  SELECT jsonb_build_object(
+    'unwrapped_role_guards', (
+      SELECT count(*)
+        FROM pg_catalog.pg_proc p
+        JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = 'public' AND p.prokind = 'f' AND p.prosecdef
+         AND pg_catalog.pg_get_functiondef(p.oid)
+             ~ 'IF\s+NOT\s+\((?:[^;])*?rma_user_role\(\)(?:[^;])*?\)\s+THEN'
+    ),
+    'helpers_without_coalesce', (
+      SELECT count(*)
+        FROM pg_catalog.pg_proc p
+        JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = 'public'
+         AND p.proname IN ('rma_is_staff', 'rma_is_admin', 'rma_is_manager_or_above', 'rma_can_handle_cash')
+         AND pg_catalog.pg_get_functiondef(p.oid) !~ 'COALESCE\('
+    ),
+    'policies_negating_helpers', (
+      SELECT count(*)
+        FROM pg_catalog.pg_policies
+       WHERE coalesce(qual, '') || ' ' || coalesce(with_check, '')
+             ~* '(not\s*\(?\s*(public\.)?rma_(is_[a-z_]+|can_handle_cash)\(\)|rma_(is_[a-z_]+|can_handle_cash)\(\)\s*(is|=|<>|!=))'
+    ),
+    'anon_executable_functions', (
+      SELECT count(*)
+        FROM pg_catalog.pg_proc p
+        JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = 'public' AND p.prokind IN ('f', 'p')
+         AND pg_catalog.has_function_privilege('anon', p.oid, 'EXECUTE')
+    )
+  )
 $function$
 ;
 
@@ -4500,6 +7682,183 @@ END;
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.rma_stamp_activity_actor()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_email text;
+BEGIN
+  v_email := public.rma_current_user_email();
+  IF v_email IS NOT NULL AND v_email <> '' THEN
+    NEW.user_email := v_email;
+  END IF;
+  RETURN NEW;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_stamp_created_by()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_email text;
+BEGIN
+  v_email := public.rma_current_user_email();
+  IF v_email IS NOT NULL AND v_email <> '' THEN
+    NEW.created_by := v_email;
+  END IF;
+  RETURN NEW;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_ticket_customer_names(p_term text DEFAULT NULL::text, p_limit integer DEFAULT 20)
+ RETURNS SETOF text
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT DISTINCT t.customer_name
+    FROM public.rma_tickets t
+   WHERE coalesce(btrim(t.customer_name), '') <> ''
+     AND strpos(lower(t.customer_name), lower(btrim(coalesce(p_term, '')))) > 0
+   ORDER BY t.customer_name
+   LIMIT greatest(1, least(coalesce(p_limit, 20), 100));
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_ticket_filter_options()
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT jsonb_build_object(
+    'statuses', coalesce((
+      SELECT jsonb_agg(s ORDER BY s)
+        FROM (SELECT DISTINCT ticket_status AS s FROM public.rma_tickets WHERE ticket_status IS NOT NULL) x
+    ), '[]'::jsonb),
+    'technicians', coalesce((
+      SELECT jsonb_agg(s ORDER BY s)
+        FROM (SELECT DISTINCT assigned_technician AS s FROM public.rma_tickets
+               WHERE coalesce(btrim(assigned_technician), '') <> '') x
+    ), '[]'::jsonb)
+  );
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_ticket_part_add(p_ticket_id uuid, p_part_id uuid, p_quantity integer, p_unit_cost numeric DEFAULT NULL::numeric, p_notes text DEFAULT NULL::text)
+ RETURNS ticket_parts
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE
+  v_cost numeric;
+  v_row  public.ticket_parts;
+BEGIN
+  IF NOT COALESCE((public.rma_is_staff() AND public.rma_user_role() <> 'viewer'), false) THEN
+    RAISE EXCEPTION 'Not authorized to add parts to a ticket' USING ERRCODE = 'P0001';
+  END IF;
+
+  IF p_quantity IS NULL OR p_quantity <= 0 THEN
+    RAISE EXCEPTION 'Quantity must be a whole number above zero' USING ERRCODE = 'P0001';
+  END IF;
+  IF p_unit_cost IS NOT NULL AND p_unit_cost < 0 THEN
+    RAISE EXCEPTION 'Unit cost cannot be negative' USING ERRCODE = 'P0001';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.rma_tickets t WHERE t.id = p_ticket_id) THEN
+    RAISE EXCEPTION 'Ticket % does not exist', p_ticket_id USING ERRCODE = 'P0001';
+  END IF;
+
+  -- Raises on an unknown part or insufficient stock, and locks the part row.
+  PERFORM public.adjust_part_quantity(p_part_id, -p_quantity);
+
+  SELECT p.unit_cost INTO v_cost FROM public.parts p WHERE p.id = p_part_id;
+
+  INSERT INTO public.ticket_parts (ticket_id, part_id, quantity, unit_cost, notes, added_by, created_date)
+  VALUES (
+    p_ticket_id, p_part_id, p_quantity,
+    COALESCE(p_unit_cost, v_cost, 0),
+    NULLIF(btrim(p_notes), ''),
+    public.rma_current_user_email(),
+    now()
+  )
+  RETURNING * INTO v_row;
+
+  RETURN v_row;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_ticket_part_remove(p_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+BEGIN
+  IF NOT COALESCE(public.rma_is_admin(), false) THEN
+    RAISE EXCEPTION 'Not authorized to remove parts from a ticket' USING ERRCODE = 'P0001';
+  END IF;
+
+  -- trg_ticket_parts_return_stock returns the row's quantity to its part.
+  DELETE FROM public.ticket_parts tp WHERE tp.id = p_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Ticket part % does not exist', p_id USING ERRCODE = 'P0001';
+  END IF;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_ticket_parts_return_stock()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+BEGIN
+  UPDATE public.parts p
+     SET quantity     = p.quantity + OLD.quantity,
+         updated_date = now()
+   WHERE p.id = OLD.part_id;
+  RETURN OLD;
+END;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_tickets_matching(p_term text DEFAULT NULL::text)
+ RETURNS SETOF rma_tickets
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'public'
+AS $function$
+  WITH q AS (SELECT lower(btrim(coalesce(p_term, ''))) AS term)
+  SELECT t.*
+    FROM public.rma_tickets t, q
+   WHERE q.term = ''
+      OR strpos(lower(coalesce(t.rma_number, '')), q.term) > 0
+      OR strpos(lower(coalesce(t.customer_name, '')), q.term) > 0
+      OR strpos(lower(coalesce(t.ticket_status, '')), q.term) > 0
+      OR strpos(lower(coalesce(t.priority, '')), q.term) > 0
+      OR strpos(lower(coalesce(t.assigned_technician, '')), q.term) > 0
+      OR EXISTS (
+           SELECT 1
+             FROM jsonb_array_elements(
+                    CASE WHEN jsonb_typeof(t.products) = 'array' THEN t.products ELSE '[]'::jsonb END
+                  ) AS p
+            WHERE strpos(lower(coalesce(p->>'serial_number', '')), q.term) > 0
+               OR strpos(lower(coalesce(p->>'product_name', '')), q.term) > 0
+         );
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.rma_user_role()
  RETURNS text
  LANGUAGE sql
@@ -4512,6 +7871,43 @@ AS $function$
    WHERE ur.user_email = (auth.jwt() ->> 'email')
      AND public.rma_access_is_current(ur.status, ur.access_expires_at)
    LIMIT 1
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.rma_user_roles_end_sessions_on_access_loss()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    -- A removed user, or a cancelled invitation: nothing left to grant access.
+    PERFORM public.rma_end_sessions_for_email(OLD.user_email);
+    RETURN OLD;
+  END IF;
+
+  -- The row now describes a different person; the old address lost access.
+  IF NEW.user_email IS DISTINCT FROM OLD.user_email THEN
+    PERFORM public.rma_end_sessions_for_email(OLD.user_email);
+  END IF;
+
+  -- Moved INTO a status that grants nothing. 'pending' is excluded on purpose:
+  -- an invitee signs in while pending (see the header).
+  IF NEW.status IN ('suspended', 'locked', 'deactivated')
+     AND OLD.status IS DISTINCT FROM NEW.status THEN
+    PERFORM public.rma_end_sessions_for_email(NEW.user_email);
+  END IF;
+
+  -- An expiry set (or moved) to a moment that has already passed.
+  IF NEW.access_expires_at IS NOT NULL
+     AND NEW.access_expires_at <= now()
+     AND OLD.access_expires_at IS DISTINCT FROM NEW.access_expires_at THEN
+    PERFORM public.rma_end_sessions_for_email(NEW.user_email);
+  END IF;
+
+  RETURN NEW;
+END;
 $function$
 ;
 
@@ -4923,6 +8319,91 @@ END;
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.transfer_units(p_unit_ids uuid[], p_to_warehouse_id uuid, p_actor_email text DEFAULT NULL::text)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_actor  text;
+  v_dest   record;
+  v_unit   record;
+  v_moved  integer := 0;
+BEGIN
+  -- COALESCE, and not the bare `IF NOT rma_is_manager_or_above()` idiom the
+  -- other RPCs use: `NULL IN (…)` is NULL, `NOT NULL` is NULL, and an IF on
+  -- NULL does not fire. RLS policies fail closed on NULL; a plpgsql IF fails
+  -- OPEN. (BUG-087.)
+  IF NOT COALESCE(public.rma_is_manager_or_above(), false) THEN
+    RAISE EXCEPTION 'Not authorized to transfer units' USING ERRCODE = 'P0001';
+  END IF;
+
+  IF p_unit_ids IS NULL OR array_length(p_unit_ids, 1) IS NULL THEN
+    RAISE EXCEPTION 'No units were given to transfer' USING ERRCODE = 'P0001';
+  END IF;
+
+  IF p_to_warehouse_id IS NULL THEN
+    RAISE EXCEPTION 'A destination warehouse is required' USING ERRCODE = 'P0001';
+  END IF;
+
+  v_actor := COALESCE(public.rma_current_user_email(), NULLIF(p_actor_email, ''), 'system');
+
+  SELECT id, name, is_active, is_system INTO v_dest
+    FROM public.warehouses WHERE id = p_to_warehouse_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Destination warehouse % does not exist', p_to_warehouse_id
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  IF v_dest.is_system THEN
+    RAISE EXCEPTION 'Cannot transfer into the system location "%" — it is managed by the RMA workflow',
+      v_dest.name USING ERRCODE = 'P0001';
+  END IF;
+
+  IF NOT COALESCE(v_dest.is_active, true) THEN
+    RAISE EXCEPTION 'Warehouse "%" is archived', v_dest.name USING ERRCODE = 'P0001';
+  END IF;
+
+  FOR v_unit IN
+    SELECT u.id, u.warehouse_id, u.reservation_status, u.serial_number
+      FROM public.inventory_units u
+     WHERE u.id = ANY(p_unit_ids)
+     ORDER BY u.id
+     FOR UPDATE
+  LOOP
+    IF v_unit.reservation_status = 'reserved' THEN
+      RAISE EXCEPTION 'Unit % is reserved for a sales order and cannot be transferred',
+        COALESCE(NULLIF(v_unit.serial_number, ''), v_unit.id::text)
+        USING ERRCODE = 'P0001';
+    END IF;
+
+    CONTINUE WHEN v_unit.warehouse_id IS NOT DISTINCT FROM p_to_warehouse_id;
+
+    UPDATE public.inventory_units
+       SET warehouse_id = p_to_warehouse_id
+     WHERE id = v_unit.id;
+
+    INSERT INTO public.stock_moves
+      (ref_type, ref_id, doc_type, doc_id, move_type, qty, from_status, to_status, actor_email)
+    VALUES
+      ('unit', v_unit.id, 'manual', NULL, 'transfer', 1,
+       v_unit.warehouse_id::text, p_to_warehouse_id::text, v_actor);
+
+    v_moved := v_moved + 1;
+  END LOOP;
+
+  IF (SELECT count(*) FROM public.inventory_units WHERE id = ANY(p_unit_ids))
+     <> (SELECT count(DISTINCT x) FROM unnest(p_unit_ids) AS x) THEN
+    RAISE EXCEPTION 'Some of the units given do not exist' USING ERRCODE = 'P0001';
+  END IF;
+
+  RETURN v_moved;
+END;
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.void_credit_note(p_cn_id uuid, p_reason text, p_actor_email text)
  RETURNS void
  LANGUAGE plpgsql
@@ -5167,225 +8648,8 @@ END;
 $function$
 ;
 
--- Views
-CREATE OR REPLACE VIEW public.v_customer_ledger WITH (security_invoker = true) AS
- SELECT crm_invoices.id,
-    'invoice'::text AS entry_type,
-    crm_invoices.inv_code AS entry_code,
-    crm_invoices.customer_id,
-    crm_invoices.total AS amount,
-    crm_invoices.doc_status AS status,
-    crm_invoices.due_date,
-    COALESCE(crm_invoices.posted_at, crm_invoices.created_at) AS entry_date,
-    crm_invoices.created_at
-   FROM crm_invoices
-  WHERE crm_invoices.doc_status = 'posted'::text
-UNION ALL
- SELECT credit_notes.id,
-    'credit_note'::text AS entry_type,
-    credit_notes.cn_code AS entry_code,
-    credit_notes.customer_id,
-    - credit_notes.total AS amount,
-    credit_notes.status,
-    NULL::date AS due_date,
-    COALESCE(credit_notes.issued_at, credit_notes.created_at) AS entry_date,
-    credit_notes.created_at
-   FROM credit_notes
-  WHERE credit_notes.status = ANY (ARRAY['issued'::text, 'applied'::text])
-UNION ALL
- SELECT payments.id,
-    'payment'::text AS entry_type,
-    payments.payment_code AS entry_code,
-    payments.customer_id,
-    - payments.amount AS amount,
-    payments.status,
-    NULL::date AS due_date,
-    COALESCE(payments.payment_date::timestamp with time zone, payments.created_at) AS entry_date,
-    payments.created_at
-   FROM payments
-  WHERE payments.status = 'active'::text;
-
-CREATE OR REPLACE VIEW public.v_invoice_margin WITH (security_invoker = true) AS
- SELECT i.id,
-    i.inv_code,
-    i.customer_id,
-    COALESCE(NULLIF(btrim(c.company_name), ''::text), c.contact_person) AS customer_name,
-    i.assigned_rep,
-    i.posted_at,
-    i.doc_status,
-    i.payment_status,
-    i.total AS revenue_base,
-    i.cogs_base,
-    i.cogs_unknown_qty,
-    i.cogs_complete,
-        CASE
-            WHEN i.cogs_complete THEN round(i.total - i.cogs_base, 2)
-            ELSE NULL::numeric
-        END AS margin_base,
-        CASE
-            WHEN i.cogs_complete AND i.total > 0::numeric THEN round(100.0 * (i.total - i.cogs_base) / i.total, 2)
-            ELSE NULL::numeric
-        END AS margin_pct
-   FROM crm_invoices i
-     LEFT JOIN customers c ON c.id = i.customer_id
-  WHERE i.doc_status = 'posted'::text;
-
-CREATE OR REPLACE VIEW public.v_purchase_documents WITH (security_invoker = true) AS
- SELECT purchase_orders.id,
-    'purchase_order'::text AS doc_type,
-    purchase_orders.po_code AS doc_code,
-    purchase_orders.vendor_id,
-    purchase_orders.created_by,
-    purchase_orders.status AS doc_status,
-    NULL::text AS payment_status,
-    purchase_orders.total,
-    purchase_orders.currency,
-    purchase_orders.exchange_rate,
-    purchase_orders.total_base,
-    purchase_orders.created_at,
-    purchase_orders.updated_at,
-    purchase_orders.expected_delivery_date AS type_specific_date,
-    'expected_delivery_date'::text AS type_specific_date_label,
-    purchase_orders.archived,
-    purchase_orders.archived_at
-   FROM purchase_orders
-UNION ALL
- SELECT vendor_invoices.id,
-    'vendor_invoice'::text AS doc_type,
-    vendor_invoices.vi_code AS doc_code,
-    vendor_invoices.vendor_id,
-    vendor_invoices.created_by,
-    vendor_invoices.status AS doc_status,
-    vendor_invoices.payment_status,
-    vendor_invoices.total,
-    vendor_invoices.currency,
-    vendor_invoices.exchange_rate,
-    vendor_invoices.total_base,
-    vendor_invoices.created_at,
-    NULL::timestamp with time zone AS updated_at,
-    vendor_invoices.due_date AS type_specific_date,
-    'due_date'::text AS type_specific_date_label,
-    vendor_invoices.archived,
-    vendor_invoices.archived_at
-   FROM vendor_invoices;
-
-CREATE OR REPLACE VIEW public.v_sales_documents WITH (security_invoker = true) AS
- SELECT quotations.id,
-    'quotation'::text AS doc_type,
-    quotations.qt_code AS doc_code,
-    quotations.customer_id,
-    quotations.assigned_rep,
-    quotations.created_by,
-    quotations.status AS doc_status,
-    NULL::text AS payment_status,
-    quotations.total,
-    quotations.created_at,
-    quotations.updated_at,
-    quotations.validity_until AS type_specific_date,
-    'validity_until'::text AS type_specific_date_label,
-    quotations.archived,
-    quotations.archived_at
-   FROM quotations
-UNION ALL
- SELECT sales_orders.id,
-    'sales_order'::text AS doc_type,
-    sales_orders.so_code AS doc_code,
-    sales_orders.customer_id,
-    sales_orders.assigned_rep,
-    sales_orders.created_by,
-    sales_orders.status AS doc_status,
-    NULL::text AS payment_status,
-    sales_orders.total,
-    sales_orders.created_at,
-    sales_orders.updated_at,
-    sales_orders.delivery_date AS type_specific_date,
-    'delivery_date'::text AS type_specific_date_label,
-    sales_orders.archived,
-    sales_orders.archived_at
-   FROM sales_orders
-UNION ALL
- SELECT crm_invoices.id,
-    'invoice'::text AS doc_type,
-    crm_invoices.inv_code AS doc_code,
-    crm_invoices.customer_id,
-    crm_invoices.assigned_rep,
-    crm_invoices.created_by,
-    crm_invoices.doc_status,
-    crm_invoices.payment_status,
-    crm_invoices.total,
-    crm_invoices.created_at,
-    crm_invoices.updated_at,
-    crm_invoices.due_date AS type_specific_date,
-    'due_date'::text AS type_specific_date_label,
-    crm_invoices.archived,
-    crm_invoices.archived_at
-   FROM crm_invoices
-UNION ALL
- SELECT credit_notes.id,
-    'credit_note'::text AS doc_type,
-    credit_notes.cn_code AS doc_code,
-    credit_notes.customer_id,
-    credit_notes.assigned_rep,
-    credit_notes.created_by,
-    credit_notes.status AS doc_status,
-    NULL::text AS payment_status,
-    credit_notes.total,
-    credit_notes.created_at,
-    credit_notes.updated_at,
-    credit_notes.issued_at AS type_specific_date,
-    'issued_date'::text AS type_specific_date_label,
-    credit_notes.archived,
-    credit_notes.archived_at
-   FROM credit_notes;
-
-CREATE OR REPLACE VIEW public.v_sales_rep_performance WITH (security_invoker = true) AS
- SELECT COALESCE(assigned_rep, '(unassigned)'::text) AS assigned_rep,
-    count(*) AS invoices_total,
-    count(*) FILTER (WHERE cogs_complete) AS invoices_costed,
-    count(*) FILTER (WHERE NOT cogs_complete) AS invoices_cost_unknown,
-    round(COALESCE(sum(revenue_base), 0::numeric), 2) AS revenue_base,
-    round(COALESCE(sum(revenue_base) FILTER (WHERE cogs_complete), 0::numeric), 2) AS costed_revenue_base,
-    round(COALESCE(sum(cogs_base) FILTER (WHERE cogs_complete), 0::numeric), 2) AS cogs_base,
-    round(COALESCE(sum(margin_base), 0::numeric), 2) AS margin_base,
-        CASE
-            WHEN COALESCE(sum(revenue_base) FILTER (WHERE cogs_complete), 0::numeric) > 0::numeric THEN round(100.0 * COALESCE(sum(margin_base), 0::numeric) / sum(revenue_base) FILTER (WHERE cogs_complete), 2)
-            ELSE NULL::numeric
-        END AS margin_pct,
-    min(posted_at) AS first_sale,
-    max(posted_at) AS last_sale
-   FROM v_invoice_margin m
-  GROUP BY (COALESCE(assigned_rep, '(unassigned)'::text));
-
-CREATE OR REPLACE VIEW public.v_vendor_ledger WITH (security_invoker = true) AS
- SELECT vendor_invoices.id,
-    'vendor_invoice'::text AS entry_type,
-    vendor_invoices.vi_code AS entry_code,
-    vendor_invoices.vendor_id,
-    vendor_invoices.total AS amount,
-    vendor_invoices.currency,
-    vendor_invoices.total_base AS amount_base,
-    vendor_invoices.status,
-    vendor_invoices.due_date,
-    COALESCE(vendor_invoices.approved_at, vendor_invoices.created_at) AS entry_date,
-    vendor_invoices.created_at
-   FROM vendor_invoices
-  WHERE vendor_invoices.status = ANY (ARRAY['approved'::text, 'partially_received'::text, 'received'::text])
-UNION ALL
- SELECT vendor_payments.id,
-    'vendor_payment'::text AS entry_type,
-    vendor_payments.payment_code AS entry_code,
-    vendor_payments.vendor_id,
-    - vendor_payments.amount AS amount,
-    vendor_payments.currency,
-    - vendor_payments.amount_base AS amount_base,
-    vendor_payments.status,
-    NULL::date AS due_date,
-    COALESCE(vendor_payments.payment_date::timestamp with time zone, vendor_payments.created_at) AS entry_date,
-    vendor_payments.created_at
-   FROM vendor_payments
-  WHERE vendor_payments.status = 'active'::text;
-
--- Triggers
+-- ── Triggers ────────────────────────────────────────────────────────────────
+CREATE TRIGGER company_documents_updated_at BEFORE UPDATE ON public.company_documents FOR EACH ROW EXECUTE FUNCTION set_updated_at_col();
 CREATE TRIGGER guard_converted_lead_trigger BEFORE UPDATE ON public.leads FOR EACH ROW EXECUTE FUNCTION guard_converted_lead();
 CREATE TRIGGER invoices_updated_date BEFORE UPDATE ON public.invoices FOR EACH ROW EXECUTE FUNCTION set_updated_date();
 CREATE TRIGGER parts_updated_date BEFORE UPDATE ON public.parts FOR EACH ROW EXECUTE FUNCTION set_updated_date();
@@ -5395,34 +8659,54 @@ CREATE TRIGGER trg_assert_po_status_transition BEFORE UPDATE OF status ON public
 CREATE TRIGGER trg_assert_tracking_mode_change_is_safe BEFORE UPDATE OF stock_tracking_mode ON public.products FOR EACH ROW EXECUTE FUNCTION assert_tracking_mode_change_is_safe();
 CREATE TRIGGER trg_assert_vi_status_transition BEFORE UPDATE OF status ON public.vendor_invoices FOR EACH ROW EXECUTE FUNCTION assert_purchase_status_transition();
 CREATE TRIGGER trg_charges_before_receipt BEFORE INSERT OR DELETE OR UPDATE ON public.vendor_invoice_charges FOR EACH ROW EXECUTE FUNCTION rma_guard_charges_before_receipt();
+CREATE TRIGGER trg_credit_notes_assert_transition BEFORE UPDATE ON public.credit_notes FOR EACH ROW EXECUTE FUNCTION rma_assert_sales_status_transition();
+CREATE TRIGGER trg_credit_notes_lock_settled BEFORE UPDATE ON public.credit_notes FOR EACH ROW EXECUTE FUNCTION rma_guard_settled_document('status', 'restock_status');
 CREATE TRIGGER trg_credit_notes_updated_at BEFORE UPDATE ON public.credit_notes FOR EACH ROW EXECUTE FUNCTION set_credit_notes_updated_at();
+CREATE TRIGGER trg_crm_invoices_assert_transition BEFORE UPDATE ON public.crm_invoices FOR EACH ROW EXECUTE FUNCTION rma_assert_sales_status_transition();
+CREATE TRIGGER trg_crm_invoices_due_date BEFORE INSERT OR UPDATE ON public.crm_invoices FOR EACH ROW EXECUTE FUNCTION rma_fill_invoice_due_date();
+CREATE TRIGGER trg_crm_invoices_lock_settled BEFORE UPDATE ON public.crm_invoices FOR EACH ROW EXECUTE FUNCTION rma_guard_settled_document('doc_status');
 CREATE TRIGGER trg_crm_invoices_updated_at BEFORE UPDATE ON public.crm_invoices FOR EACH ROW EXECUTE FUNCTION set_crm_invoices_updated_at();
+CREATE TRIGGER trg_deals_status_follows_stage BEFORE INSERT OR UPDATE ON public.deals FOR EACH ROW EXECUTE FUNCTION rma_deal_status_follows_stage();
 CREATE TRIGGER trg_guard_base_currency BEFORE INSERT OR UPDATE ON public.rma_config FOR EACH ROW EXECUTE FUNCTION rma_guard_base_currency();
 CREATE TRIGGER trg_guard_custom_role_delete BEFORE DELETE ON public.custom_roles FOR EACH ROW EXECUTE FUNCTION rma_guard_custom_role_delete();
 CREATE TRIGGER trg_guard_po_rate BEFORE INSERT OR UPDATE OF currency, exchange_rate ON public.purchase_orders FOR EACH ROW EXECUTE FUNCTION rma_guard_document_rate();
 CREATE TRIGGER trg_guard_vendor_payment_rate BEFORE INSERT OR UPDATE OF currency, exchange_rate ON public.vendor_payments FOR EACH ROW EXECUTE FUNCTION rma_guard_document_rate();
 CREATE TRIGGER trg_guard_vi_rate BEFORE INSERT OR UPDATE OF currency, exchange_rate ON public.vendor_invoices FOR EACH ROW EXECUTE FUNCTION rma_guard_document_rate();
+CREATE TRIGGER trg_inventory_units_guard_ledger BEFORE UPDATE ON public.inventory_units FOR EACH ROW EXECUTE FUNCTION rma_guard_inventory_ledger_columns();
+CREATE TRIGGER trg_inventory_units_guard_warehouse_move BEFORE UPDATE ON public.inventory_units FOR EACH ROW EXECUTE FUNCTION rma_guard_direct_warehouse_move();
 CREATE TRIGGER trg_notif_settings_updated_at BEFORE UPDATE ON public.notification_settings FOR EACH ROW EXECUTE FUNCTION set_updated_at_col();
+CREATE TRIGGER trg_notifications_stamp_created_by BEFORE INSERT ON public.notifications FOR EACH ROW EXECUTE FUNCTION rma_stamp_created_by();
 CREATE TRIGGER trg_payments_updated_at BEFORE UPDATE ON public.payments FOR EACH ROW EXECUTE FUNCTION set_payments_updated_at();
 CREATE TRIGGER trg_protect_last_super_admin BEFORE DELETE OR UPDATE ON public.user_roles FOR EACH ROW EXECUTE FUNCTION rma_protect_last_super_admin();
 CREATE TRIGGER trg_protect_system_warehouse BEFORE DELETE OR UPDATE ON public.warehouses FOR EACH ROW WHEN (old.is_system) EXECUTE FUNCTION protect_system_warehouse();
+CREATE TRIGGER trg_purchase_orders_approval_authority BEFORE UPDATE ON public.purchase_orders FOR EACH ROW EXECUTE FUNCTION rma_guard_approval_authority();
+CREATE TRIGGER trg_quotations_approval_authority BEFORE UPDATE ON public.quotations FOR EACH ROW EXECUTE FUNCTION rma_guard_approval_authority();
+CREATE TRIGGER trg_quotations_assert_transition BEFORE UPDATE ON public.quotations FOR EACH ROW EXECUTE FUNCTION rma_assert_sales_status_transition();
 CREATE TRIGGER trg_quotations_updated_at BEFORE UPDATE ON public.quotations FOR EACH ROW EXECUTE FUNCTION set_quotations_updated_at();
+CREATE TRIGGER trg_rma_tickets_assign_number BEFORE INSERT ON public.rma_tickets FOR EACH ROW EXECUTE FUNCTION rma_assign_ticket_number();
+CREATE TRIGGER trg_sales_orders_guard_status BEFORE UPDATE ON public.sales_orders FOR EACH ROW EXECUTE FUNCTION rma_guard_sales_order_status();
 CREATE TRIGGER trg_sales_orders_updated_at BEFORE UPDATE ON public.sales_orders FOR EACH ROW EXECUTE FUNCTION set_sales_orders_updated_at();
 CREATE TRIGGER trg_stock_moves_stamp_actor BEFORE INSERT ON public.stock_moves FOR EACH ROW EXECUTE FUNCTION stock_moves_stamp_actor();
 CREATE TRIGGER trg_sync_cn_balance AFTER INSERT OR DELETE OR UPDATE OF amount_applied ON public.credit_note_applications FOR EACH ROW EXECUTE FUNCTION sync_credit_note_balance();
 CREATE TRIGGER trg_sync_payment_balance AFTER INSERT OR DELETE OR UPDATE OF amount_applied ON public.payment_applications FOR EACH ROW EXECUTE FUNCTION sync_payment_balance();
 CREATE TRIGGER trg_sync_vendor_payment_balance AFTER INSERT OR DELETE OR UPDATE OF amount_applied ON public.vendor_payment_applications FOR EACH ROW EXECUTE FUNCTION sync_vendor_payment_balance();
+CREATE TRIGGER trg_ticket_parts_return_stock AFTER DELETE ON public.ticket_parts FOR EACH ROW EXECUTE FUNCTION rma_ticket_parts_return_stock();
+CREATE TRIGGER trg_ticket_resolutions_stamp_created_by BEFORE INSERT ON public.ticket_resolutions FOR EACH ROW EXECUTE FUNCTION rma_stamp_created_by();
+CREATE TRIGGER trg_user_activity_log_stamp_actor BEFORE INSERT ON public.user_activity_log FOR EACH ROW EXECUTE FUNCTION rma_stamp_activity_actor();
+CREATE TRIGGER trg_user_roles_end_sessions_on_access_loss AFTER DELETE OR UPDATE OF status, access_expires_at, user_email ON public.user_roles FOR EACH ROW EXECUTE FUNCTION rma_user_roles_end_sessions_on_access_loss();
 CREATE TRIGGER trg_validate_user_role BEFORE INSERT OR UPDATE OF role ON public.user_roles FOR EACH ROW EXECUTE FUNCTION rma_validate_user_role();
+CREATE TRIGGER trg_vendor_invoices_approval_authority BEFORE UPDATE ON public.vendor_invoices FOR EACH ROW EXECUTE FUNCTION rma_guard_approval_authority();
 CREATE TRIGGER trg_vendor_payments_updated_at BEFORE UPDATE ON public.vendor_payments FOR EACH ROW EXECUTE FUNCTION set_vendor_payments_updated_at();
 CREATE TRIGGER trg_wa_templates_updated_at BEFORE UPDATE ON public.whatsapp_templates FOR EACH ROW EXECUTE FUNCTION set_updated_at_col();
 CREATE TRIGGER trg_warehouse_stock_hold_unit_cost BEFORE UPDATE ON public.warehouse_stock FOR EACH ROW EXECUTE FUNCTION rma_hold_unit_cost();
 
--- Row level security
+-- ── Row level security ──────────────────────────────────────────────────────
 ALTER TABLE public.activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.branding_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.brands ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.company_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.countries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.country_area_codes ENABLE ROW LEVEL SECURITY;
@@ -5456,8 +8740,10 @@ ALTER TABLE public.pipelines ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.public_track_rate_limit ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.purchase_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quotations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.restore_staging ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rma_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rma_tickets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales_orders ENABLE ROW LEVEL SECURITY;
@@ -5481,7 +8767,7 @@ ALTER TABLE public.warehouses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.webhooks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.whatsapp_templates ENABLE ROW LEVEL SECURITY;
 
--- Policies
+-- ── Policies ────────────────────────────────────────────────────────────────
 CREATE POLICY activities_insert ON public.activities FOR INSERT TO authenticated WITH CHECK ((rma_is_manager_or_above() OR (rma_user_role() = 'sales_rep'::text)));
 CREATE POLICY activities_read ON public.activities FOR SELECT TO authenticated USING ((rma_is_manager_or_above() OR ((rma_user_role() = 'sales_rep'::text) AND (assigned_rep = rma_current_user_email()))));
 CREATE POLICY activities_update ON public.activities FOR UPDATE TO authenticated USING ((rma_is_manager_or_above() OR ((rma_user_role() = 'sales_rep'::text) AND (assigned_rep = rma_current_user_email())))) WITH CHECK ((rma_is_manager_or_above() OR ((rma_user_role() = 'sales_rep'::text) AND (assigned_rep = rma_current_user_email()))));
@@ -5498,6 +8784,8 @@ CREATE POLICY admin_delete ON public.categories FOR DELETE TO authenticated USIN
 CREATE POLICY admin_update ON public.categories FOR UPDATE TO authenticated USING (rma_is_admin()) WITH CHECK (rma_is_admin());
 CREATE POLICY admin_write ON public.categories FOR INSERT TO authenticated WITH CHECK (rma_is_admin());
 CREATE POLICY staff_read ON public.categories FOR SELECT TO authenticated USING (rma_is_staff());
+CREATE POLICY company_documents_manager_write ON public.company_documents FOR ALL TO authenticated USING (rma_is_manager_or_above()) WITH CHECK (rma_is_manager_or_above());
+CREATE POLICY company_documents_staff_read ON public.company_documents FOR SELECT TO authenticated USING (rma_is_staff());
 CREATE POLICY admin_delete ON public.contacts FOR DELETE TO authenticated USING (rma_is_admin());
 CREATE POLICY manager_insert ON public.contacts FOR INSERT TO authenticated WITH CHECK (rma_is_manager_or_above());
 CREATE POLICY manager_update ON public.contacts FOR UPDATE TO authenticated USING (rma_is_manager_or_above()) WITH CHECK (rma_is_manager_or_above());
@@ -5506,19 +8794,17 @@ CREATE POLICY countries_admin_write ON public.countries FOR ALL TO authenticated
 CREATE POLICY countries_staff_read ON public.countries FOR SELECT TO authenticated USING (rma_is_staff());
 CREATE POLICY area_codes_admin_write ON public.country_area_codes FOR ALL TO authenticated USING (rma_is_admin()) WITH CHECK (rma_is_admin());
 CREATE POLICY area_codes_staff_read ON public.country_area_codes FOR SELECT TO authenticated USING (rma_is_staff());
-CREATE POLICY admin_delete_cn_applications ON public.credit_note_applications FOR DELETE TO PUBLIC USING (rma_is_admin());
-CREATE POLICY manager_insert_cn_applications ON public.credit_note_applications FOR INSERT TO PUBLIC WITH CHECK (rma_is_manager_or_above());
 CREATE POLICY staff_read_cn_applications ON public.credit_note_applications FOR SELECT TO PUBLIC USING (rma_is_staff());
 CREATE POLICY accountant_read_credit_notes ON public.credit_notes FOR SELECT TO PUBLIC USING ((rma_user_role() = 'accountant'::text));
 CREATE POLICY admin_delete_credit_notes ON public.credit_notes FOR DELETE TO PUBLIC USING (rma_is_admin());
-CREATE POLICY manager_update_credit_notes ON public.credit_notes FOR UPDATE TO PUBLIC USING ((rma_is_manager_or_above() OR (assigned_rep = rma_current_user_email()) OR (created_by = rma_current_user_email())));
 CREATE POLICY sales_insert_credit_notes ON public.credit_notes FOR INSERT TO PUBLIC WITH CHECK ((rma_is_manager_or_above() OR (rma_user_role() = 'sales_rep'::text)));
 CREATE POLICY sales_rep_read_credit_notes ON public.credit_notes FOR SELECT TO PUBLIC USING ((rma_is_manager_or_above() OR ((rma_user_role() = 'sales_rep'::text) AND ((assigned_rep = rma_current_user_email()) OR (created_by = rma_current_user_email())))));
+CREATE POLICY sales_update_credit_notes ON public.credit_notes FOR UPDATE TO PUBLIC USING ((rma_is_manager_or_above() OR ((rma_user_role() = 'sales_rep'::text) AND ((assigned_rep = rma_current_user_email()) OR (created_by = rma_current_user_email()))))) WITH CHECK ((rma_is_manager_or_above() OR ((rma_user_role() = 'sales_rep'::text) AND ((assigned_rep = rma_current_user_email()) OR (created_by = rma_current_user_email())))));
 CREATE POLICY accountant_read_crm_invoices ON public.crm_invoices FOR SELECT TO PUBLIC USING ((rma_user_role() = 'accountant'::text));
 CREATE POLICY admin_delete_crm_invoices ON public.crm_invoices FOR DELETE TO PUBLIC USING (rma_is_admin());
-CREATE POLICY manager_update_crm_invoices ON public.crm_invoices FOR UPDATE TO PUBLIC USING ((rma_is_manager_or_above() OR (assigned_rep = rma_current_user_email()) OR (created_by = rma_current_user_email())));
 CREATE POLICY sales_insert_crm_invoices ON public.crm_invoices FOR INSERT TO PUBLIC WITH CHECK ((rma_is_manager_or_above() OR (rma_user_role() = 'sales_rep'::text)));
 CREATE POLICY sales_rep_read_crm_invoices ON public.crm_invoices FOR SELECT TO PUBLIC USING ((rma_is_manager_or_above() OR ((rma_user_role() = 'sales_rep'::text) AND ((assigned_rep = rma_current_user_email()) OR (created_by = rma_current_user_email())))));
+CREATE POLICY sales_update_crm_invoices ON public.crm_invoices FOR UPDATE TO PUBLIC USING ((rma_is_manager_or_above() OR ((rma_user_role() = 'sales_rep'::text) AND ((assigned_rep = rma_current_user_email()) OR (created_by = rma_current_user_email()))))) WITH CHECK ((rma_is_manager_or_above() OR ((rma_user_role() = 'sales_rep'::text) AND ((assigned_rep = rma_current_user_email()) OR (created_by = rma_current_user_email())))));
 CREATE POLICY currencies_admin_write ON public.currencies FOR ALL TO authenticated USING (rma_is_admin()) WITH CHECK (rma_is_admin());
 CREATE POLICY currencies_staff_read ON public.currencies FOR SELECT TO authenticated USING (rma_is_staff());
 CREATE POLICY admin_all ON public.custom_field_definitions FOR ALL TO authenticated USING (rma_is_admin()) WITH CHECK (rma_is_admin());
@@ -5540,7 +8826,7 @@ CREATE POLICY deals_read ON public.deals FOR SELECT TO authenticated USING ((rma
 CREATE POLICY deals_update ON public.deals FOR UPDATE TO authenticated USING ((rma_is_manager_or_above() OR ((rma_user_role() = 'sales_rep'::text) AND (assigned_rep = rma_current_user_email())))) WITH CHECK ((rma_is_manager_or_above() OR ((rma_user_role() = 'sales_rep'::text) AND (assigned_rep = rma_current_user_email()))));
 CREATE POLICY no_direct_client_access ON public.document_sequences FOR ALL TO PUBLIC USING (false);
 CREATE POLICY email_queue_admin_read ON public.email_queue FOR SELECT TO authenticated USING (rma_is_admin());
-CREATE POLICY staff_insert_email_queue ON public.email_queue FOR INSERT TO authenticated WITH CHECK (rma_is_staff());
+CREATE POLICY staff_insert_email_queue ON public.email_queue FOR INSERT TO PUBLIC WITH CHECK ((rma_is_staff() AND (rma_user_role() <> 'viewer'::text)));
 CREATE POLICY admin_all ON public.email_settings FOR ALL TO authenticated USING (rma_is_admin()) WITH CHECK (rma_is_admin());
 CREATE POLICY admin_all ON public.email_templates FOR ALL TO authenticated USING (rma_is_admin()) WITH CHECK (rma_is_admin());
 CREATE POLICY staff_read_email_templates ON public.email_templates FOR SELECT TO authenticated USING (rma_is_staff());
@@ -5565,28 +8851,20 @@ CREATE POLICY staff_update ON public.manufacturer_batches FOR UPDATE TO authenti
 CREATE POLICY staff_write ON public.manufacturer_batches FOR INSERT TO authenticated WITH CHECK ((rma_is_staff() AND (rma_user_role() <> 'viewer'::text)));
 CREATE POLICY notif_logs_manager_update ON public.notification_logs FOR UPDATE TO authenticated USING (rma_is_manager_or_above()) WITH CHECK (rma_is_manager_or_above());
 CREATE POLICY notif_logs_staff_read ON public.notification_logs FOR SELECT TO authenticated USING (rma_is_staff());
-CREATE POLICY "Users can insert their own preferences" ON public.notification_preferences FOR INSERT TO authenticated WITH CHECK ((user_email = auth.email()));
-CREATE POLICY "Users can read their own preferences" ON public.notification_preferences FOR SELECT TO authenticated USING ((user_email = auth.email()));
-CREATE POLICY "Users can update their own preferences" ON public.notification_preferences FOR UPDATE TO authenticated USING ((user_email = auth.email())) WITH CHECK ((user_email = auth.email()));
-CREATE POLICY user_own ON public.notification_preferences FOR ALL TO authenticated USING (((user_email = rma_current_user_email()) OR rma_is_admin())) WITH CHECK (((user_email = rma_current_user_email()) OR rma_is_admin()));
+CREATE POLICY user_own ON public.notification_preferences FOR ALL TO PUBLIC USING (((user_email = rma_current_user_email()) OR rma_is_admin())) WITH CHECK (((user_email = rma_current_user_email()) OR rma_is_admin()));
 CREATE POLICY admin_read_notif_queue ON public.notification_queue FOR SELECT TO PUBLIC USING (rma_is_admin());
-CREATE POLICY staff_insert_notif_queue ON public.notification_queue FOR INSERT TO PUBLIC WITH CHECK (rma_is_staff());
+CREATE POLICY admin_update_notif_queue ON public.notification_queue FOR UPDATE TO PUBLIC USING (rma_is_admin()) WITH CHECK (rma_is_admin());
+CREATE POLICY staff_insert_notif_queue ON public.notification_queue FOR INSERT TO PUBLIC WITH CHECK ((rma_is_staff() AND (rma_user_role() <> 'viewer'::text)));
 CREATE POLICY admin_rw_notif_settings ON public.notification_settings FOR ALL TO PUBLIC USING (rma_is_admin());
 CREATE POLICY admin_delete ON public.notifications FOR DELETE TO authenticated USING (rma_is_admin());
-CREATE POLICY staff_insert ON public.notifications FOR INSERT TO authenticated WITH CHECK (rma_is_staff());
+CREATE POLICY staff_insert ON public.notifications FOR INSERT TO PUBLIC WITH CHECK ((rma_is_staff() AND (rma_user_role() <> 'viewer'::text)));
 CREATE POLICY user_read_targeted ON public.notifications FOR SELECT TO authenticated USING ((rma_is_staff() AND ((target_roles IS NULL) OR (array_length(target_roles, 1) IS NULL) OR (rma_user_role() = ANY (target_roles)) OR ((target_emails IS NOT NULL) AND (rma_current_user_email() = ANY (target_emails))))));
-CREATE POLICY user_update_read ON public.notifications FOR UPDATE TO authenticated USING (rma_is_staff()) WITH CHECK (rma_is_staff());
 CREATE POLICY admin_delete ON public.parts FOR DELETE TO authenticated USING (rma_is_admin());
 CREATE POLICY staff_read ON public.parts FOR SELECT TO authenticated USING (rma_is_staff());
 CREATE POLICY staff_update ON public.parts FOR UPDATE TO authenticated USING ((rma_is_staff() AND (rma_user_role() <> 'viewer'::text))) WITH CHECK ((rma_is_staff() AND (rma_user_role() <> 'viewer'::text)));
 CREATE POLICY staff_write ON public.parts FOR INSERT TO authenticated WITH CHECK ((rma_is_staff() AND (rma_user_role() <> 'viewer'::text)));
-CREATE POLICY admin_delete_payment_applications ON public.payment_applications FOR DELETE TO PUBLIC USING (rma_is_admin());
-CREATE POLICY manager_insert_payment_applications ON public.payment_applications FOR INSERT TO PUBLIC WITH CHECK (rma_is_manager_or_above());
 CREATE POLICY staff_read_payment_applications ON public.payment_applications FOR SELECT TO PUBLIC USING (rma_is_staff());
 CREATE POLICY accountant_read_payments ON public.payments FOR SELECT TO PUBLIC USING ((rma_user_role() = 'accountant'::text));
-CREATE POLICY admin_delete_payments ON public.payments FOR DELETE TO PUBLIC USING (rma_is_admin());
-CREATE POLICY manager_update_payments ON public.payments FOR UPDATE TO PUBLIC USING ((rma_is_manager_or_above() OR (created_by = rma_current_user_email())));
-CREATE POLICY staff_insert_payments ON public.payments FOR INSERT TO PUBLIC WITH CHECK (rma_is_staff());
 CREATE POLICY staff_read_payments ON public.payments FOR SELECT TO PUBLIC USING ((rma_is_manager_or_above() OR (rma_is_staff() AND (created_by = rma_current_user_email()))));
 CREATE POLICY admin_delete ON public.pipelines FOR DELETE TO authenticated USING (rma_is_admin());
 CREATE POLICY admin_insert ON public.pipelines FOR INSERT TO authenticated WITH CHECK (rma_is_admin());
@@ -5611,7 +8889,6 @@ CREATE POLICY sales_rep_read_quotations ON public.quotations FOR SELECT TO PUBLI
 CREATE POLICY sales_update_quotations ON public.quotations FOR UPDATE TO PUBLIC USING ((rma_is_manager_or_above() OR ((rma_user_role() = 'sales_rep'::text) AND ((assigned_rep = rma_current_user_email()) OR (created_by = rma_current_user_email()))))) WITH CHECK ((rma_is_manager_or_above() OR ((rma_user_role() = 'sales_rep'::text) AND ((assigned_rep = rma_current_user_email()) OR (created_by = rma_current_user_email())))));
 CREATE POLICY admin_all ON public.rma_config FOR ALL TO authenticated USING (rma_is_admin()) WITH CHECK (rma_is_admin());
 CREATE POLICY staff_read_appearance_settings ON public.rma_config FOR SELECT TO PUBLIC USING ((rma_is_staff() AND (config_key = 'appearance_settings'::text)));
-CREATE POLICY staff_write_appearance_settings ON public.rma_config FOR ALL TO PUBLIC USING ((rma_is_staff() AND (config_key = 'appearance_settings'::text))) WITH CHECK ((rma_is_staff() AND (config_key = 'appearance_settings'::text)));
 CREATE POLICY admin_delete ON public.rma_tickets FOR DELETE TO authenticated USING (rma_is_admin());
 CREATE POLICY manager_insert ON public.rma_tickets FOR INSERT TO authenticated WITH CHECK (rma_is_manager_or_above());
 CREATE POLICY staff_insert_tickets ON public.rma_tickets FOR INSERT TO authenticated WITH CHECK ((rma_is_staff() AND (rma_user_role() <> 'viewer'::text)));
@@ -5635,14 +8912,11 @@ CREATE POLICY admin_delete ON public.ticket_comments FOR DELETE TO authenticated
 CREATE POLICY staff_insert ON public.ticket_comments FOR INSERT TO authenticated WITH CHECK ((rma_is_staff() AND (rma_user_role() <> 'viewer'::text)));
 CREATE POLICY staff_read ON public.ticket_comments FOR SELECT TO authenticated USING (rma_is_staff());
 CREATE POLICY staff_update_comments ON public.ticket_comments FOR UPDATE TO authenticated USING ((rma_is_manager_or_above() OR (user_email = rma_current_user_email()))) WITH CHECK ((rma_is_manager_or_above() OR (user_email = rma_current_user_email())));
-CREATE POLICY admin_delete ON public.ticket_parts FOR DELETE TO authenticated USING (rma_is_admin());
 CREATE POLICY staff_read ON public.ticket_parts FOR SELECT TO authenticated USING (rma_is_staff());
-CREATE POLICY staff_update ON public.ticket_parts FOR UPDATE TO authenticated USING ((rma_is_staff() AND (rma_user_role() <> 'viewer'::text))) WITH CHECK ((rma_is_staff() AND (rma_user_role() <> 'viewer'::text)));
-CREATE POLICY staff_write ON public.ticket_parts FOR INSERT TO authenticated WITH CHECK ((rma_is_staff() AND (rma_user_role() <> 'viewer'::text)));
 CREATE POLICY staff_delete_resolutions ON public.ticket_resolutions FOR DELETE TO PUBLIC USING (rma_is_manager_or_above());
 CREATE POLICY staff_read_resolutions ON public.ticket_resolutions FOR SELECT TO PUBLIC USING (rma_is_staff());
-CREATE POLICY staff_write_resolutions ON public.ticket_resolutions FOR INSERT TO PUBLIC WITH CHECK (rma_is_staff());
-CREATE POLICY staff_write_update_resolutions ON public.ticket_resolutions FOR UPDATE TO PUBLIC USING (rma_is_staff());
+CREATE POLICY staff_write_resolutions ON public.ticket_resolutions FOR INSERT TO PUBLIC WITH CHECK ((rma_user_role() = ANY (ARRAY['super_admin'::text, 'admin'::text, 'manager'::text, 'technician'::text, 'accountant'::text])));
+CREATE POLICY staff_write_update_resolutions ON public.ticket_resolutions FOR UPDATE TO PUBLIC USING ((rma_user_role() = ANY (ARRAY['super_admin'::text, 'admin'::text, 'manager'::text, 'technician'::text, 'accountant'::text])));
 CREATE POLICY admin_delete ON public.time_entries FOR DELETE TO authenticated USING ((rma_is_admin() OR (user_email = rma_current_user_email())));
 CREATE POLICY user_insert_own ON public.time_entries FOR INSERT TO authenticated WITH CHECK (((user_email = rma_current_user_email()) AND rma_is_staff()));
 CREATE POLICY user_read_own ON public.time_entries FOR SELECT TO authenticated USING (((user_email = rma_current_user_email()) OR rma_is_manager_or_above()));
@@ -5650,11 +8924,7 @@ CREATE POLICY user_update_own ON public.time_entries FOR UPDATE TO authenticated
 CREATE POLICY admin_read ON public.user_activity_log FOR SELECT TO authenticated USING (rma_is_admin());
 CREATE POLICY auth_insert ON public.user_activity_log FOR INSERT TO authenticated WITH CHECK (rma_is_authenticated());
 CREATE POLICY legacy_user_permissions_admin ON public.user_permissions FOR ALL TO authenticated USING (rma_is_admin()) WITH CHECK (rma_is_admin());
-CREATE POLICY user_own_preferences_delete ON public.user_preferences FOR DELETE TO PUBLIC USING ((user_email = rma_current_user_email()));
-CREATE POLICY user_own_preferences_insert ON public.user_preferences FOR INSERT TO PUBLIC WITH CHECK ((user_email = rma_current_user_email()));
-CREATE POLICY user_own_preferences_select ON public.user_preferences FOR SELECT TO PUBLIC USING ((user_email = rma_current_user_email()));
-CREATE POLICY user_own_preferences_update ON public.user_preferences FOR UPDATE TO PUBLIC USING ((user_email = rma_current_user_email()));
-CREATE POLICY users_own_prefs ON public.user_preferences FOR ALL TO PUBLIC USING ((user_email = rma_current_user_email()));
+CREATE POLICY user_own_prefs ON public.user_preferences FOR ALL TO PUBLIC USING ((user_email = rma_current_user_email())) WITH CHECK ((user_email = rma_current_user_email()));
 CREATE POLICY admin_delete ON public.user_roles FOR DELETE TO authenticated USING (rma_is_admin());
 CREATE POLICY admin_update ON public.user_roles FOR UPDATE TO authenticated USING (rma_is_admin()) WITH CHECK (rma_is_admin());
 CREATE POLICY admin_write ON public.user_roles FOR INSERT TO authenticated WITH CHECK (rma_is_admin());
@@ -5664,15 +8934,9 @@ CREATE POLICY vi_charges_staff_read ON public.vendor_invoice_charges FOR SELECT 
 CREATE POLICY accountant_read_vendor_invoices ON public.vendor_invoices FOR SELECT TO PUBLIC USING ((rma_user_role() = 'accountant'::text));
 CREATE POLICY manager_read_vendor_invoices ON public.vendor_invoices FOR SELECT TO PUBLIC USING (rma_is_manager_or_above());
 CREATE POLICY manager_write_vendor_invoices ON public.vendor_invoices FOR ALL TO PUBLIC USING (rma_is_manager_or_above()) WITH CHECK (rma_is_manager_or_above());
-CREATE POLICY admin_delete_vendor_payment_applications ON public.vendor_payment_applications FOR DELETE TO PUBLIC USING (rma_is_admin());
-CREATE POLICY manager_insert_vendor_payment_applications ON public.vendor_payment_applications FOR INSERT TO PUBLIC WITH CHECK (rma_is_manager_or_above());
 CREATE POLICY staff_read_vendor_payment_applications ON public.vendor_payment_applications FOR SELECT TO PUBLIC USING (rma_is_staff());
 CREATE POLICY accountant_read_vendor_payments ON public.vendor_payments FOR SELECT TO PUBLIC USING ((rma_user_role() = 'accountant'::text));
-CREATE POLICY admin_delete_vendor_payments ON public.vendor_payments FOR DELETE TO PUBLIC USING (rma_is_admin());
-CREATE POLICY manager_update_vendor_payments ON public.vendor_payments FOR UPDATE TO PUBLIC USING ((rma_is_manager_or_above() OR (created_by = rma_current_user_email())));
-CREATE POLICY staff_insert_vendor_payments ON public.vendor_payments FOR INSERT TO PUBLIC WITH CHECK (rma_is_staff());
 CREATE POLICY staff_read_vendor_payments ON public.vendor_payments FOR SELECT TO PUBLIC USING ((rma_is_manager_or_above() OR (rma_is_staff() AND (created_by = rma_current_user_email()))));
-CREATE POLICY manager_write_warehouse_stock ON public.warehouse_stock FOR ALL TO PUBLIC USING (rma_is_manager_or_above()) WITH CHECK (rma_is_manager_or_above());
 CREATE POLICY staff_read_warehouse_stock ON public.warehouse_stock FOR SELECT TO PUBLIC USING (rma_is_staff());
 CREATE POLICY admin_delete ON public.warehouses FOR DELETE TO authenticated USING (rma_is_admin());
 CREATE POLICY admin_update ON public.warehouses FOR UPDATE TO authenticated USING (rma_is_admin()) WITH CHECK (rma_is_admin());
@@ -5682,8 +8946,7 @@ CREATE POLICY admin_all ON public.webhooks FOR ALL TO authenticated USING (rma_i
 CREATE POLICY admin_write_wa_templates ON public.whatsapp_templates FOR ALL TO PUBLIC USING (rma_is_admin());
 CREATE POLICY staff_read_wa_templates ON public.whatsapp_templates FOR SELECT TO PUBLIC USING (rma_is_staff());
 
--- Grants
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.activities TO anon;
+-- ── Grants ──────────────────────────────────────────────────────────────────
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.activities TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.activities TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.announcements TO authenticated;
@@ -5694,20 +8957,18 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.br
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.brands TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.categories TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.categories TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.contacts TO anon;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.company_documents TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.company_documents TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.contacts TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.contacts TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.countries TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.countries TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.country_area_codes TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.country_area_codes TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.credit_note_applications TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.credit_note_applications TO authenticated;
+GRANT SELECT ON public.credit_note_applications TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.credit_note_applications TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.credit_notes TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.credit_notes TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.credit_notes TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.crm_invoices TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.crm_invoices TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.crm_invoices TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.currencies TO authenticated;
@@ -5720,15 +8981,13 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.cu
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.customer_notes TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.customers TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.customers TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.deals TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.deals TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.deals TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.document_sequences TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.document_sequences TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.document_sequences TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.email_queue TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.email_queue TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.email_settings TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, TRIGGER, TRUNCATE, UPDATE ON public.email_settings TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.email_settings TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.email_templates TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.email_templates TO service_role;
@@ -5736,36 +8995,29 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.in
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.inventory_units TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.invoices TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.invoices TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.kb_articles TO anon;
+GRANT SELECT ON public.kb_articles TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.kb_articles TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.kb_articles TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.leads TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.leads TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.leads TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.manufacturer_batches TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.manufacturer_batches TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_logs TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_logs TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_logs TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_preferences TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_preferences TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_queue TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_queue TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_queue TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_settings TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_settings TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_settings TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notifications TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notifications TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.parts TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.parts TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.payment_applications TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.payment_applications TO authenticated;
+GRANT SELECT ON public.payment_applications TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.payment_applications TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.payments TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.payments TO authenticated;
+GRANT SELECT ON public.payments TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.payments TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pipelines TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pipelines TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pipelines TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_documents TO authenticated;
@@ -5774,20 +9026,18 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_images TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.products TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.products TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.purchase_orders TO anon;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.public_track_rate_limit TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.purchase_orders TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.purchase_orders TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.quotations TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.quotations TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.quotations TO service_role;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.restore_staging TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.rma_config TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.rma_config TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.rma_tickets TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.rma_tickets TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.sales_orders TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.sales_orders TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.sales_orders TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.stock_moves TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.stock_moves TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.stock_moves TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.subcategories TO authenticated;
@@ -5796,9 +9046,8 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ti
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ticket_activity TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ticket_comments TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ticket_comments TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ticket_parts TO authenticated;
+GRANT REFERENCES, SELECT, TRIGGER, TRUNCATE ON public.ticket_parts TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ticket_parts TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ticket_resolutions TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ticket_resolutions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ticket_resolutions TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.time_entries TO authenticated;
@@ -5807,52 +9056,78 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.us
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_activity_log TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_permissions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_permissions TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_preferences TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_preferences TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_preferences TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_roles TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_roles TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_customer_ledger TO anon;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_activities_list TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_activities_list TO service_role;
+GRANT SELECT ON public.v_bulk_stock_reservations TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_bulk_stock_reservations TO service_role;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_customer_activity TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_customer_activity TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_customer_ledger TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_customer_ledger TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_invoice_margin TO anon;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_deals_list TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_deals_list TO service_role;
+GRANT SELECT ON public.v_inventory_product_groups TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_inventory_product_groups TO service_role;
+GRANT SELECT ON public.v_inventory_units TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_inventory_units TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_invoice_margin TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_invoice_margin TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_purchase_documents TO anon;
+GRANT SELECT ON public.v_knowledge_documents TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_knowledge_documents TO service_role;
+GRANT SELECT ON public.v_knowledge_nodes TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_knowledge_nodes TO service_role;
+GRANT SELECT ON public.v_knowledge_product_placement TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_knowledge_product_placement TO service_role;
+GRANT SELECT ON public.v_leads_list TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_leads_list TO service_role;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_payments_list TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_payments_list TO service_role;
+GRANT SELECT ON public.v_product_stock_summary TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_product_stock_summary TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_purchase_documents TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_purchase_documents TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_sales_documents TO anon;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_purchase_documents_list TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_purchase_documents_list TO service_role;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_report_invoices TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_report_invoices TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_sales_documents TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_sales_documents TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_sales_rep_performance TO anon;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_sales_documents_list TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_sales_documents_list TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_sales_rep_performance TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_sales_rep_performance TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_vendor_ledger TO anon;
+GRANT SELECT ON public.v_stock_moves_listing TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_stock_moves_listing TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_vendor_ledger TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_vendor_ledger TO service_role;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_vendor_payments_list TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_vendor_payments_list TO service_role;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_vendors_list TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_vendors_list TO service_role;
+GRANT SELECT ON public.v_warehouse_unit_counts TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_warehouse_unit_counts TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.vendor_invoice_charges TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.vendor_invoice_charges TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.vendor_invoices TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.vendor_invoices TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.vendor_invoices TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.vendor_payment_applications TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.vendor_payment_applications TO authenticated;
+GRANT SELECT ON public.vendor_payment_applications TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.vendor_payment_applications TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.vendor_payments TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.vendor_payments TO authenticated;
+GRANT SELECT ON public.vendor_payments TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.vendor_payments TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.warehouse_stock TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.warehouse_stock TO authenticated;
+GRANT SELECT ON public.warehouse_stock TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.warehouse_stock TO service_role;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.warehouses TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.warehouses TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.webhooks TO authenticated;
+GRANT DELETE, INSERT, REFERENCES, TRIGGER, TRUNCATE, UPDATE ON public.webhooks TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.webhooks TO service_role;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.whatsapp_templates TO anon;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.whatsapp_templates TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.whatsapp_templates TO service_role;
 
--- Comments
+-- ── Comments ────────────────────────────────────────────────────────────────
 COMMENT ON COLUMN public.brands.country_code IS 'Overrides the system default country for phone validation. NULL means use the default.';
 COMMENT ON COLUMN public.countries.landline_digits IS 'National landline length for countries with no area codes. Ignored when has_area_codes is true — the length then varies by area and lives on country_area_codes.';
 COMMENT ON COLUMN public.countries.mobile_digits IS 'Total national digits INCLUDING the prefix. Egypt is 11: 01x plus eight.';
@@ -5873,10 +9148,32 @@ COMMENT ON COLUMN public.vendor_payments.exchange_rate IS 'Rate to the base curr
 COMMENT ON COLUMN public.warehouse_stock.avg_cost_base IS 'Weighted average cost of the COSTED units in this bin. NULL means nothing here has a known cost — it is not zero.';
 COMMENT ON COLUMN public.warehouse_stock.total_cost_base IS 'Base-currency value of the stock on hand. Maintained by rma_hold_unit_cost() unless a receipt or transfer sets it explicitly.';
 COMMENT ON COLUMN public.warehouse_stock.uncosted_quantity IS 'How many of the units on hand have no known cost. Excluded from avg_cost_base, so an unknown never behaves like a cost of zero.';
+COMMENT ON TABLE public.company_documents IS 'Documents that belong to the company as a whole, not to any one product -- price lists, policies, certificates, forms.';
 COMMENT ON TABLE public.countries IS 'Countries this installation deals with, and the phone number rules that apply in each. A table rather than a hardcoded list so a rule can be corrected without a deploy.';
 COMMENT ON TABLE public.country_area_codes IS 'Landline area codes per country — governorates in Egypt. A country with none simply has no rows, and validation falls back to countries.landline_digits.';
 COMMENT ON TABLE public.currencies IS 'ISO 4217 currencies this installation can transact in. A table rather than a config list so documents can reference a real row and formatting can read decimals from data.';
 COMMENT ON TABLE public.product_documents IS 'Datasheets and manuals attached to a product. extracted_text is what makes them searchable and what a language model is later given to read.';
-COMMENT ON VIEW public.v_invoice_margin IS 'Margin on every posted invoice. margin_base is NULL where the cost of goods is incomplete — that is "cannot tell", not "made nothing".';
-COMMENT ON VIEW public.v_sales_rep_performance IS 'Sales performance per rep. margin_pct is measured against costed_revenue_base, not revenue_base, so it means "of what we can cost, this much was margin". invoices_cost_unknown says how much is missing.';
+COMMENT ON TABLE public.public_track_rate_limit IS 'Fixed-window request counts for the public RMA tracker, keyed by a salted hash of the caller''s address. No personal data: the hash is not reversible without the salt, which lives only in the Edge Function environment. (BUG-067.)';
+COMMENT ON TABLE public.restore_staging IS 'Backup chunks uploaded for a restore, applied in one transaction by rma_restore_apply. Reachable only through the rma_restore_* functions. (BUG-025.)';
 COMMENT ON TABLE public.vendor_invoice_charges IS 'Freight, customs and clearance on a vendor invoice. Apportioned across the goods by line value at receipt so they land in unit cost rather than being lost to general expenses.';
+COMMENT ON VIEW public.v_activities_list IS 'Activities with the source, customer name, record code and sort keys the Activities page shows. (BUG-066.)';
+COMMENT ON VIEW public.v_bulk_stock_reservations IS 'Net reserved quantity per bulk product and document, from stock_moves. (BUG-066.)';
+COMMENT ON VIEW public.v_customer_activity IS 'Customer Details activity log: tickets raised, notes added, customer created. (BUG-066.)';
+COMMENT ON VIEW public.v_deals_list IS 'Deals with the customer name and sort keys the Pipeline list shows. (BUG-066.)';
+COMMENT ON VIEW public.v_inventory_product_groups IS 'Unit counts per product name for the Inventory All Units tab. (BUG-066.)';
+COMMENT ON VIEW public.v_inventory_units IS 'Inventory units with brand, grouping key and ticket fields, for paged unit lists. (BUG-066.)';
+COMMENT ON VIEW public.v_invoice_margin IS 'Margin on every posted invoice. margin_base is NULL where the cost of goods is incomplete — that is "cannot tell", not "made nothing".';
+COMMENT ON VIEW public.v_knowledge_documents IS 'Product documents with their product and folder path, for the Knowledge Center. (BUG-066.)';
+COMMENT ON VIEW public.v_knowledge_nodes IS 'Knowledge Center folders with parent, path, child count and rolled-up document totals. (BUG-066.)';
+COMMENT ON VIEW public.v_knowledge_product_placement IS 'Where each product sits in the Knowledge Center folder tree. (BUG-066.)';
+COMMENT ON VIEW public.v_leads_list IS 'Leads with the Name-column sort key (company, else person, lower-cased), for the paged Leads list. (BUG-066.)';
+COMMENT ON VIEW public.v_payments_list IS 'Payments with the customer name the Accounting page shows. (BUG-066.)';
+COMMENT ON VIEW public.v_product_stock_summary IS 'Inventory Overview, one row per product. Main, branches and physical total count stock on hand: delivered units are excluded. (BUG-066; 20260874.)';
+COMMENT ON VIEW public.v_purchase_documents_list IS 'Purchase documents with the vendor name, sort keys and base-currency total the Purchasing page shows. (BUG-066.)';
+COMMENT ON VIEW public.v_report_invoices IS 'Invoices with the customer name the Financial report shows. (BUG-066.)';
+COMMENT ON VIEW public.v_sales_documents_list IS 'Sales documents with the customer name and sort keys the Sales Documents page shows. (BUG-066.)';
+COMMENT ON VIEW public.v_sales_rep_performance IS 'Sales performance per rep. margin_pct is measured against costed_revenue_base, not revenue_base, so it means "of what we can cost, this much was margin". invoices_cost_unknown says how much is missing.';
+COMMENT ON VIEW public.v_stock_moves_listing IS 'Stock moves with a searchable label for what moved, for the Stock Movements tab. (BUG-066.)';
+COMMENT ON VIEW public.v_vendor_payments_list IS 'Vendor payments with the vendor name the Accounting page shows. (BUG-066.)';
+COMMENT ON VIEW public.v_vendors_list IS 'Brands as the Purchasing Vendors tab lists them, with sort keys. (BUG-066.)';
+COMMENT ON VIEW public.v_warehouse_unit_counts IS 'Inventory units per warehouse for the Warehouses tab, excluding units delivered to a customer. (BUG-066; 20260874.)';

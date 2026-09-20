@@ -23,9 +23,11 @@
 -- ── What it covers ───────────────────────────────────────────────────────────
 --
 --   sequences · tables and columns · primary/unique/check constraints ·
---   foreign keys · non-constraint indexes · functions · views (including the
---   security_invoker setting, which 20260778 depends on) · triggers ·
---   RLS enablement · policies · table grants · comments
+--   foreign keys · non-constraint indexes · views (including the
+--   security_invoker setting, which 20260778 depends on) · functions
+--   (after views: some declare RETURNS SETOF <view>, see the note on the
+--   `fns` CTE below) · triggers · RLS enablement · policies · table
+--   grants · comments
 --
 --   Emitted in dependency order, so the output runs top to bottom on an empty
 --   database.
@@ -184,6 +186,17 @@ idx AS (
 
 -- 6. Functions, including the RLS helpers and the SECURITY DEFINER RPCs the
 --    app calls directly. pg_get_functiondef emits CREATE OR REPLACE.
+--
+--    Emitted AFTER views below (found 2026-09-20 regenerating this baseline
+--    against production): a handful of functions declare `RETURNS SETOF
+--    <view_name>` — e.g. rma_deals_matching returns SETOF v_deals_list — which
+--    makes the view's row type a dependency of the function, not the other way
+--    round. With functions first, CREATE FUNCTION fails on "type v_deals_list
+--    does not exist" because the view is not created until later. No view here
+--    calls a function (verified: every function name checked against the
+--    Views block, zero matches), so views-before-functions has no matching
+--    hazard in the other direction. If that ever changes, this ordering will
+--    need to become two passes instead of one swap.
 fns AS (
   SELECT string_agg(pg_get_functiondef(p.oid) || ';', E'\n\n' ORDER BY p.proname) AS sql,
          count(*) AS n
@@ -194,10 +207,65 @@ fns AS (
      AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e')
 ),
 
--- 7. Views. security_invoker is carried over explicitly — without it a view
---    runs as its owner and bypasses RLS entirely, which is the bug 20260778
---    was written to fix. A baseline that dropped the option would reintroduce
---    it silently.
+-- 7. Views, emitted before functions (see the note on 6 above) and in
+--    dependency order among themselves, not just alphabetically.
+--
+--    Found 2026-09-20 regenerating this baseline against production:
+--    v_knowledge_documents and v_knowledge_nodes both select FROM
+--    v_knowledge_product_placement, which sorts alphabetically AFTER them
+--    ("documents"/"nodes" < "product_placement"). Plain `ORDER BY relname`
+--    emitted the dependents first and the baseline died with "relation
+--    v_knowledge_product_placement does not exist". Two other pairs
+--    (v_purchase_documents_list/v_purchase_documents,
+--    v_sales_documents_list/v_sales_documents) happen to be alphabetically
+--    safe today, which is exactly the kind of luck that stops holding the
+--    next time someone names a view — so this orders by real dependency
+--    depth, not by hoping names stay alphabetically convenient.
+--
+--    view_rule/view_deps read the actual dependency from the catalog (a
+--    view's `_RETURN` rule depends on every relation its query touches),
+--    not from matching view names as text — the same reason 20260792's
+--    extension-detection joins pg_depend instead of grepping a function
+--    body. view_depth computes each view's longest dependency chain via a
+--    recursive CTE: every view starts at depth 0, and each dependency edge
+--    proposes dependent-depth = dependency-depth + 1; taking MAX(d) per view
+--    after the recursion settles gives a view depth greater than everything
+--    it depends on, however many links away. Emitting by (depth, relname)
+--    is therefore always safe to run views top-to-bottom, for today's two
+--    dependency levels or any depth a future view adds.
+view_rule AS (
+  SELECT c.oid AS view_oid, c.relname AS view_name, r.oid AS rule_oid
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_rewrite r ON r.ev_class = c.oid AND r.rulename = '_RETURN'
+   WHERE n.nspname = 'public' AND c.relkind = 'v'
+     AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')
+),
+view_deps AS (
+  SELECT vr.view_name AS dependent, c2.relname AS depends_on
+    FROM view_rule vr
+    JOIN pg_depend d ON d.classid = 'pg_rewrite'::regclass
+                     AND d.objid = vr.rule_oid
+                     AND d.deptype = 'n'
+                     AND d.refclassid = 'pg_class'::regclass
+    JOIN pg_class c2 ON c2.oid = d.refobjid AND c2.relkind = 'v'
+    JOIN pg_namespace n2 ON n2.oid = c2.relnamespace AND n2.nspname = 'public'
+   WHERE c2.relname <> vr.view_name
+),
+view_depth AS (
+  SELECT view_name, max(d) AS depth
+    FROM (
+      WITH RECURSIVE depth(view_name, d) AS (
+        SELECT view_name, 0 FROM view_rule
+        UNION
+        SELECT vd.dependent, dep.d + 1
+          FROM view_deps vd
+          JOIN depth dep ON dep.view_name = vd.depends_on
+      )
+      SELECT * FROM depth
+    ) x
+   GROUP BY view_name
+),
 views AS (
   SELECT string_agg(
            format('CREATE OR REPLACE VIEW public.%I%s AS%s%s',
@@ -205,10 +273,11 @@ views AS (
                   CASE WHEN array_to_string(c.reloptions, ',') LIKE '%security_invoker%'
                        THEN ' WITH (security_invoker = true)' ELSE '' END,
                   E'\n', pg_get_viewdef(c.oid, true)),
-           E'\n\n' ORDER BY c.relname) AS sql,
+           E'\n\n' ORDER BY COALESCE(vdp.depth, 0), c.relname) AS sql,
          count(*) AS n
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
+    LEFT JOIN view_depth vdp ON vdp.view_name = c.relname
    WHERE n.nspname = 'public' AND c.relkind = 'v'
      AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')
 ),
@@ -346,8 +415,8 @@ SELECT
   '-- ── Primary keys, unique and check constraints ──────────────────────────────' || E'\n'   || COALESCE(cons_local.sql, '-- none') || E'\n\n' ||
   '-- ── Foreign keys ────────────────────────────────────────────────────────────' || E'\n'   || COALESCE(cons_fk.sql, '-- none')    || E'\n\n' ||
   '-- ── Indexes ─────────────────────────────────────────────────────────────────' || E'\n'   || COALESCE(idx.sql, '-- none')        || E'\n\n' ||
-  '-- ── Functions ───────────────────────────────────────────────────────────────' || E'\n'   || COALESCE(fns.sql, '-- none')        || E'\n\n' ||
   '-- ── Views ───────────────────────────────────────────────────────────────────' || E'\n'   || COALESCE(views.sql, '-- none')      || E'\n\n' ||
+  '-- ── Functions ───────────────────────────────────────────────────────────────' || E'\n'   || COALESCE(fns.sql, '-- none')        || E'\n\n' ||
   '-- ── Triggers ────────────────────────────────────────────────────────────────' || E'\n'   || COALESCE(trgs.sql, '-- none')       || E'\n\n' ||
   '-- ── Row level security ──────────────────────────────────────────────────────' || E'\n'   || COALESCE(rls.sql, '-- none')        || E'\n\n' ||
   '-- ── Policies ────────────────────────────────────────────────────────────────' || E'\n'   || COALESCE(pols.sql, '-- none')       || E'\n\n' ||
