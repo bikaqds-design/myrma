@@ -27,7 +27,8 @@
 --   security_invoker setting, which 20260778 depends on) · functions
 --   (after views: some declare RETURNS SETOF <view>, see the note on the
 --   `fns` CTE below) · triggers · RLS enablement · policies · table
---   grants · comments
+--   grants · function EXECUTE grants (see the note on the `fn_grants` CTE
+--   below -- CREATE FUNCTION alone does not reproduce these) · comments
 --
 --   Emitted in dependency order, so the output runs top to bottom on an empty
 --   database.
@@ -343,6 +344,63 @@ grants AS (
     ) g
 ),
 
+-- 11a. Function EXECUTE grants -- a real gap found 2026-09-20, alongside the
+--      two view/function ordering bugs above, while regenerating this
+--      baseline and testing it on a fresh project. Every function's
+--      privileges here are locked down per-role: `20260752_lockdown_rpc_
+--      execute.sql` REVOKEs PUBLIC/anon and grants only authenticated/
+--      service_role on most RPCs; `20260868`/`20260869` then explicitly
+--      GRANT two of them back to anon so the integration tier can call them
+--      unauthenticated. None of that is a CREATE FUNCTION property --
+--      pg_get_functiondef (used by `fns` above) emits only the definition,
+--      never the grants -- so a baseline built without this section
+--      recreates every function with whatever EXECUTE privilege a fresh
+--      Supabase project happens to default new functions to. On
+--      mycrm-staging that meant the one function meant to be anon-executable
+--      came back denied, while every function actually guarded by an
+--      in-body role check (`rma_is_manager_or_above()` and friends) kept
+--      refusing anon regardless -- because SECURITY DEFINER bodies enforce
+--      authorization themselves, so a missing REVOKE never surfaces as a
+--      passing test turning into a failure for THEM, only for the one
+--      function with no such guard to mask it.
+--
+--      Reads pg_proc.proacl via aclexplode() -- the actual stored ACL, the
+--      same one already verified column-by-column against production before
+--      writing this -- rather than joining information_schema by name,
+--      which would need disambiguating overloaded function names (there are
+--      none today, but a name-matching join would silently mismatch the
+--      moment one is added). Verified on production: every one of its 167
+--      functions already has a non-NULL proacl (all explicitly touched by
+--      the migrations above), so REVOKE ALL FROM PUBLIC before replaying the
+--      exact stored grants is safe to emit unconditionally.
+fn_grants AS (
+  SELECT string_agg(stmt, E'\n' ORDER BY proname, args, ord) AS sql, count(*) AS n
+    FROM (
+      SELECT p.proname, pg_get_function_identity_arguments(p.oid) AS args, 1 AS ord,
+             format('REVOKE ALL ON FUNCTION public.%I(%s) FROM PUBLIC;',
+                    p.proname, pg_get_function_identity_arguments(p.oid)) AS stmt
+        FROM pg_proc p
+        JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = 'public'
+         AND p.prokind IN ('f', 'p')
+         AND p.proacl IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e')
+      UNION ALL
+      SELECT p.proname, pg_get_function_identity_arguments(p.oid), 2,
+             format('GRANT EXECUTE ON FUNCTION public.%I(%s) TO %I;',
+                    p.proname, pg_get_function_identity_arguments(p.oid), r.rolname)
+        FROM pg_proc p
+        JOIN pg_namespace n ON n.oid = p.pronamespace
+        CROSS JOIN LATERAL aclexplode(p.proacl) a
+        JOIN pg_roles r ON r.oid = a.grantee
+       WHERE n.nspname = 'public'
+         AND p.prokind IN ('f', 'p')
+         AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e')
+         AND a.privilege_type = 'EXECUTE'
+         AND r.rolname IN ('anon', 'authenticated', 'service_role')
+    ) x
+),
+
 -- 12. Comments. Several encode why a rule exists, which is worth keeping.
 cmts AS (
   SELECT string_agg(stmt, E'\n' ORDER BY stmt) AS sql, count(*) AS n
@@ -387,8 +445,8 @@ SELECT
          exts.n, seqs.n, tables.n, cons_local.n, cons_fk.n) || E'\n' ||
   format('--   %s indexes, %s functions, %s views, %s triggers,',
          idx.n, fns.n, views.n, trgs.n) || E'\n' ||
-  format('--   %s tables with RLS, %s policies, %s grants, %s comments',
-         rls.n, pols.n, grants.n, cmts.n) || E'\n' ||
+  format('--   %s tables with RLS, %s policies, %s grants, %s function grants, %s comments',
+         rls.n, pols.n, grants.n, fn_grants.n, cmts.n) || E'\n' ||
   '--' || E'\n' ||
   '-- Not included: non-public schemas, roles, storage buckets,' || E'\n' ||
   '-- column-level privileges, and data.' || E'\n' ||
@@ -421,6 +479,7 @@ SELECT
   '-- ── Row level security ──────────────────────────────────────────────────────' || E'\n'   || COALESCE(rls.sql, '-- none')        || E'\n\n' ||
   '-- ── Policies ────────────────────────────────────────────────────────────────' || E'\n'   || COALESCE(pols.sql, '-- none')       || E'\n\n' ||
   '-- ── Grants ──────────────────────────────────────────────────────────────────' || E'\n'   || COALESCE(grants.sql, '-- none')     || E'\n\n' ||
+  '-- ── Function grants ─────────────────────────────────────────────────────────' || E'\n'   || COALESCE(fn_grants.sql, '-- none')  || E'\n\n' ||
   '-- ── Comments ────────────────────────────────────────────────────────────────' || E'\n'   || COALESCE(cmts.sql, '-- none')       || E'\n'
   AS baseline_sql
-FROM exts, seqs, tables, cons_local, cons_fk, idx, fns, views, trgs, rls, pols, grants, cmts;
+FROM exts, seqs, tables, cons_local, cons_fk, idx, fns, views, trgs, rls, pols, grants, fn_grants, cmts;
