@@ -3,9 +3,13 @@ name: CI
 # Runs on the working branch (`test`) and on main, plus any PR. Previously this
 # only triggered on `main` — which the team never pushes to (standing rule:
 # push to `test` only) — so CI effectively never ran (audit HIGH-1).
+#
+# `next` added 2026-09-20: the SaaS upgrade line (docs/SAAS_UPGRADE_PLAN.md).
+# Direct pushes to `next` itself (environment setup, docs) need the same gate
+# as any other branch, not just PRs into it.
 on:
   push:
-    branches: [main, test]
+    branches: [main, test, next]
   pull_request:
 
 jobs:
