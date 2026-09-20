@@ -46,3 +46,6 @@ eslint-ui.json
 # differs per machine.
 eslint-report.json
 supabase/.temp/
+
+# Local staging credentials for scripts/provision-project.mjs
+.env.staging

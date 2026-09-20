@@ -201,10 +201,18 @@ jobs:
     # SUPABASE_TEST_ALLOW_WRITES. Closing that last gap needs a second hosted
     # project to point at, not a change here.
     #
-    # Reuses the same VITE_SUPABASE_* secrets the build job already reads, so
-    # there is nothing new to configure. Both are public-by-design values (the
-    # anon key ships in the browser bundle), but keeping them in secrets means a
-    # fork cannot aim CI at this project. Without them the suite skips itself
+    # TARGET: STAGING, NOT PRODUCTION (changed on the `next` line, 2026-09-20).
+    # Until now this tier pointed at the production project, because it was the
+    # only one with the real schema. `mycrm-staging` is now built from
+    # supabase/migrations/00000000_baseline_schema.sql by
+    # scripts/provision-project.mjs, so CI has a target it may freely break —
+    # which is also what lets the write-path suites (SUPABASE_TEST_ALLOW_WRITES)
+    # ever run. Production keeps its own secrets for the `Migration drift`
+    # workflow, which must read the live ledger.
+    #
+    # STAGING_SUPABASE_URL / STAGING_SUPABASE_ANON_KEY are public-by-design
+    # values (the anon key ships in the browser bundle), but keeping them in
+    # secrets means a fork cannot aim CI at this project. Without them the suite skips itself
     # and the job stays green rather than failing on a fork — note the build
     # job's placeholder fallback is deliberately NOT used here, because a
     # placeholder URL would make every refusal-based assertion pass for the
@@ -230,6 +238,8 @@ jobs:
 
       - name: Run integration tier
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # The suite reads the VITE_* names (same ones the app uses, so a local
+          # .env works); CI feeds them from the staging secrets.
+          VITE_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
         run: npm run test:integration
