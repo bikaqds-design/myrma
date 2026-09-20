@@ -13,8 +13,8 @@
  *
  * The historical migrations (20260524…) must NOT be replayed afterwards: the
  * baseline already reflects their end state, and re-running them would re-apply
- * ALTERs against a schema that has them. This script therefore applies exactly
- * the two baseline files, in order, and nothing else.
+ * ALTERs against a schema that has them. This script therefore applies the two
+ * baseline files, then only migrations newer than BASELINE_THROUGH, in order.
  *
  * USAGE
  *
@@ -29,14 +29,30 @@
  * --force is passed, so it cannot be pointed at production by accident. Each
  * file runs inside its own transaction: a failure leaves nothing half-applied.
  */
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import pg from 'pg'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const MIGRATIONS = path.join(HERE, '..', 'supabase', 'migrations')
-const FILES = ['00000000_baseline_schema.sql', '00000001_baseline_reference_data.sql']
+const BASELINE_FILES = ['00000000_baseline_schema.sql', '00000001_baseline_reference_data.sql']
+
+/**
+ * The baseline was generated from production on 2026-09-20 and reflects every
+ * migration up to and including this version. Anything newer is applied on top,
+ * in order. Historical migrations at or below it must NOT be replayed: the
+ * baseline already contains their end state. Move this forward whenever the
+ * baseline is regenerated.
+ */
+const BASELINE_THROUGH = '20260874'
+
+async function migrationFiles() {
+  const newer = (await readdir(MIGRATIONS))
+    .filter((f) => /^[0-9]{8,}.*\.sql$/.test(f) && f.slice(0, 8) > BASELINE_THROUGH)
+    .sort()
+  return [...BASELINE_FILES, ...newer]
+}
 
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`)
@@ -97,7 +113,7 @@ async function main() {
     process.exit(1)
   }
 
-  for (const file of FILES) {
+  for (const file of await migrationFiles()) {
     const sql = await readFile(path.join(MIGRATIONS, file), 'utf8')
     process.stdout.write(`Applying ${file} … `)
     try {
