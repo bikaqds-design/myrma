@@ -2,7 +2,7 @@
 -- 00000000_baseline_schema.sql
 --
 -- Generated from the live database by supabase/manual/GENERATE_baseline_schema.sql
--- Generated at: 2026-09-20 10:06:57.012813+00
+-- Generated at: 2026-09-20 10:16:47.811244+00
 --
 -- The complete public schema. Twenty of these tables were created by no
 -- migration in this repo, so before this file existed a clean Supabase
@@ -13,7 +13,7 @@
 -- would re-apply ALTERs against a schema that already has them.
 --
 -- Objects emitted:
---   2 extensions, 2 sequences, 65 tables, 170 pk/unique/check, 64 foreign keys,
+--   2 extensions, 3 schema grants, 2 sequences, 65 tables, 170 pk/unique/check, 64 foreign keys,
 --   109 indexes, 167 functions, 25 views, 50 triggers,
 --   65 tables with RLS, 177 policies, 179 grants, 445 function grants, 49 comments
 --
@@ -31,6 +31,11 @@ SET check_function_bodies = false;
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
+-- ── Schema grants ───────────────────────────────────────────────────────────
+GRANT USAGE ON SCHEMA public TO anon;
+GRANT USAGE ON SCHEMA public TO authenticated;
+GRANT USAGE ON SCHEMA public TO service_role;
 
 -- ── Sequences ───────────────────────────────────────────────────────────────
 CREATE SEQUENCE IF NOT EXISTS public.restore_staging_seq_seq;

@@ -22,9 +22,12 @@
 --
 -- ── What it covers ───────────────────────────────────────────────────────────
 --
---   sequences · tables and columns · primary/unique/check constraints ·
---   foreign keys · non-constraint indexes · views (including the
---   security_invoker setting, which 20260778 depends on) · functions
+--   USAGE on schema `public` itself for anon/authenticated/service_role (see
+--   the note on `schema_grants` below -- a fresh project does not grant this
+--   by default, and without it nothing else here is reachable regardless of
+--   any other grant) · sequences · tables and columns · primary/unique/check
+--   constraints · foreign keys · non-constraint indexes · views (including
+--   the security_invoker setting, which 20260778 depends on) · functions
 --   (after views: some declare RETURNS SETOF <view>, see the note on the
 --   `fns` CTE below) · triggers · RLS enablement · policies · table
 --   grants · function EXECUTE grants (see the note on the `fn_grants` CTE
@@ -95,6 +98,47 @@ exts AS (
               AND pg_get_expr(ad.adbin, ad.adrelid) LIKE '%' || pr.proname || '(%'
          )
     ) x
+),
+
+-- 0a. USAGE on the `public` schema itself -- the single biggest gap found
+--     2026-09-20 regenerating this baseline, bigger than the table-grants and
+--     function-grants gaps found alongside it: without it, NOTHING in public
+--     is reachable through the Data API, no matter what table or function
+--     grants say. A fresh Supabase project's `public` schema starts with
+--     `nspacl IS NULL` -- production's has been touched and explicitly lists
+--     anon/authenticated/service_role; empirically (has_schema_privilege(),
+--     checked directly rather than trusted from memory) a fresh project's
+--     NULL-acl `public` schema does NOT grant anon or authenticated USAGE by
+--     default. Every anon call failed with "permission denied for schema
+--     public" on mycrm-staging until this was added -- including calls to
+--     functions whose own EXECUTE grant was already correct, which is why
+--     this is its own section rather than folded into fn_grants: the two
+--     failures look identical from the caller's side but are different
+--     catalogs (pg_namespace.nspacl vs pg_proc.proacl).
+--
+--     Explains something odd noticed while chasing the fn_grants bug: most
+--     "refuses an anonymous caller" integration tests kept passing even
+--     before fn_grants existed. They were never exercising the grant at all
+--     -- an anon call denied at the schema level errors exactly like one
+--     denied by an in-body role check, so a test that only asserts "anon
+--     gets an error" cannot tell a real refusal from every anon call failing
+--     for the wrong reason. Only the one test that asserts anon
+--     successfully gets a real answer back exposed it.
+--
+--     Read via aclexplode(), the same pattern as fn_grants, so this stays
+--     correct if production's schema grants ever change instead of the three
+--     roles being hardcoded here.
+schema_grants AS (
+  SELECT string_agg(
+           format('GRANT USAGE ON SCHEMA public TO %I;', r.rolname),
+           E'\n' ORDER BY r.rolname) AS sql,
+         count(*) AS n
+    FROM pg_namespace n
+    CROSS JOIN LATERAL aclexplode(n.nspacl) a
+    JOIN pg_roles r ON r.oid = a.grantee
+   WHERE n.nspname = 'public'
+     AND a.privilege_type = 'USAGE'
+     AND r.rolname IN ('anon', 'authenticated', 'service_role')
 ),
 
 -- 1. Sequences. Emitted before the tables whose defaults call nextval().
@@ -441,8 +485,8 @@ SELECT
   '-- would re-apply ALTERs against a schema that already has them.' || E'\n' ||
   '--' || E'\n' ||
   '-- Objects emitted:' || E'\n' ||
-  format('--   %s extensions, %s sequences, %s tables, %s pk/unique/check, %s foreign keys,',
-         exts.n, seqs.n, tables.n, cons_local.n, cons_fk.n) || E'\n' ||
+  format('--   %s extensions, %s schema grants, %s sequences, %s tables, %s pk/unique/check, %s foreign keys,',
+         exts.n, schema_grants.n, seqs.n, tables.n, cons_local.n, cons_fk.n) || E'\n' ||
   format('--   %s indexes, %s functions, %s views, %s triggers,',
          idx.n, fns.n, views.n, trgs.n) || E'\n' ||
   format('--   %s tables with RLS, %s policies, %s grants, %s function grants, %s comments',
@@ -468,6 +512,7 @@ SELECT
 ' || COALESCE(exts.sql, '-- none') || E'
 
 ' ||
+  '-- ── Schema grants ───────────────────────────────────────────────────────────' || E'\n'   || COALESCE(schema_grants.sql, '-- none') || E'\n\n' ||
   '-- ── Sequences ───────────────────────────────────────────────────────────────' || E'\n'   || COALESCE(seqs.sql, '-- none')       || E'\n\n' ||
   '-- ── Tables ──────────────────────────────────────────────────────────────────' || E'\n'   || COALESCE(tables.sql, '-- none')     || E'\n\n' ||
   '-- ── Primary keys, unique and check constraints ──────────────────────────────' || E'\n'   || COALESCE(cons_local.sql, '-- none') || E'\n\n' ||
@@ -482,4 +527,4 @@ SELECT
   '-- ── Function grants ─────────────────────────────────────────────────────────' || E'\n'   || COALESCE(fn_grants.sql, '-- none')  || E'\n\n' ||
   '-- ── Comments ────────────────────────────────────────────────────────────────' || E'\n'   || COALESCE(cmts.sql, '-- none')       || E'\n'
   AS baseline_sql
-FROM exts, seqs, tables, cons_local, cons_fk, idx, fns, views, trgs, rls, pols, grants, fn_grants, cmts;
+FROM exts, schema_grants, seqs, tables, cons_local, cons_fk, idx, fns, views, trgs, rls, pols, grants, fn_grants, cmts;
