@@ -28,8 +28,8 @@ function statement(table) {
 describe('provisioning applies the seed', () => {
   it('lists the seed file after the schema and the reference data', () => {
     // The seed inserts into tables the schema creates, so order is the contract.
-    const list = provisioner.match(/const ALL_FILES = \[([^\]]*)\]/)
-    expect(list, 'ALL_FILES not found').not.toBeNull()
+    const list = provisioner.match(/const BASELINE_FILES = \[([^\]]*)\]/)
+    expect(list, 'BASELINE_FILES not found').not.toBeNull()
     expect(list[1].replace(/\s+/g, ' ').trim()).toBe(
       "'00000000_baseline_schema.sql', '00000001_baseline_reference_data.sql', SEED_FILE"
     )
@@ -155,8 +155,8 @@ describe('the provisioner is all-or-nothing', () => {
   it('opens one transaction around every file and commits once, after the last', () => {
     expect((provisioner.match(/query\('begin'\)/g) ?? []).length).toBe(1)
     expect((provisioner.match(/query\('commit'\)/g) ?? []).length).toBe(1)
-    expect(provisioner.indexOf("query('begin')")).toBeLessThan(provisioner.indexOf('for (const file of FILES)'))
-    expect(provisioner.indexOf("query('commit')")).toBeGreaterThan(provisioner.indexOf('for (const file of FILES)'))
+    expect(provisioner.indexOf("query('begin')")).toBeLessThan(provisioner.indexOf('for (const file of await migrationFiles())'))
+    expect(provisioner.indexOf("query('commit')")).toBeGreaterThan(provisioner.indexOf('for (const file of await migrationFiles())'))
   })
 
   it('offers --no-seed for a project that will be filled from a backup', () => {
