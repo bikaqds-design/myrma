@@ -16,7 +16,7 @@ import Modal from '../../components/Modal'
 import { downloadPOPDF } from '../../lib/purchaseOrderPdf'
 import { downloadVIPDF } from '../../lib/vendorInvoicePdf'
 import { destinationWarehouses } from '../../lib/warehouseDestinations'
-import { CreatePurchaseOrderModal, VendorInvoiceFormModal, RecordVendorPaymentModal } from './_modals'
+import { CreatePurchaseOrderModal, VendorInvoiceFormModal, RecordVendorPaymentModal, AmendPurchaseOrderModal, ReasonPromptModal } from './_modals'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { useConfirm } from '../../hooks/useConfirm'
 import { DetailSkeleton } from '../../components/Skeleton'
@@ -117,6 +117,8 @@ export default function PurchaseDocumentDetail({
   const [showReceive, setShowReceive] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [showPayment, setShowPayment] = useState(false)
+  const [showAmend, setShowAmend] = useState(false)
+  const [showDuplicate, setShowDuplicate] = useState(false)
 
   const { data: doc, isLoading, isError } = useQuery({
     queryKey: ['purchase-document', docType, docId],
@@ -135,6 +137,13 @@ export default function PurchaseDocumentDetail({
     queryKey: ['purchase-document', 'purchase_order', doc?.purchase_order_id],
     queryFn: () => db.purchaseOrders.get(doc.purchase_order_id),
     enabled: isVI && !!doc?.purchase_order_id,
+  })
+
+  // Earlier versions of an amended order (20260881), for the history below.
+  const { data: revisions = EMPTY_ARRAY } = useQuery({
+    queryKey: ['po-revisions', docId],
+    queryFn: () => db.purchaseOrders.revisions(docId),
+    enabled: isPO && !!docId && (doc?.revision_no || 1) > 1,
   })
 
   // For PO detail: has a Vendor Invoice already been created from this PO?
@@ -238,12 +247,34 @@ export default function PurchaseDocumentDetail({
       created_by: currentUserEmail,
     }).catch((err) => { console.error('VI approval activity failed', err); toast.error(t('purchasing.approvalActivityFailed')) })
   }
-  const handleSubmitForApproval = () => runAction(async () => {
-    await db.vendorInvoices.submitForApproval(doc.id)
+  const submitVI = (duplicateReason) => runAction(async () => {
+    try {
+      await db.vendorInvoices.submitForApproval(doc.id, duplicateReason)
+    } catch (err) {
+      // "Looks like a duplicate of ...": the database asks for a reason, so ask
+      // for one, rather than showing a dead end. Any other refusal (no supplier
+      // number, no reason on a non-PO invoice, ...) is shown as it is.
+      if (err?.code === 'P0001' && /looks like a duplicate/i.test(err?.message || '')) {
+        toast(err.message, { duration: 6000 })
+        setShowDuplicate(true)
+        return
+      }
+      throw err
+    }
     logVI('vi_submitted_for_approval')
     await createVIApprovalActivity()
     toast.success(t('purchasing.statusUpdated'))
   })
+  const handleSubmitForApproval = () => submitVI()
+  const handleAmended = async (row) => {
+    setShowAmend(false)
+    logPO('po_amended')
+    // Back to pending_confirmation means an administrator has to confirm it
+    // again, so it goes into the approval pool like any other order.
+    if (row?.status === 'pending_confirmation') await createPOApprovalActivity()
+    queryClient.invalidateQueries({ queryKey: ['po-revisions', doc.id] })
+    refresh()
+  }
   const handleVICancel = () => {
     confirm({
       title: t('purchasing.cancelTitle'),
@@ -309,6 +340,9 @@ export default function PurchaseDocumentDetail({
               {!poIsConverted && ['confirmed', 'partially_completed'].includes(doc.status) && (
                 <Button disabled={!canCreatePurchase} size="sm" onClick={handleConvertToVI} loading={busy}>{t('purchasing.createVendorInvoice')}</Button>
               )}
+              {!poIsConverted && doc.status === 'confirmed' && (
+                <Button disabled={!canEditPurchase} variant="secondary" size="sm" onClick={() => setShowAmend(true)}>{t('purchasing.amendOrder')}</Button>
+              )}
               {!poIsConverted && ['draft', 'sent', 'confirmed'].includes(doc.status) && (
                 <Button disabled={!canCancelPurchase} variant="danger" size="sm" onClick={handlePOCancel} loading={busy}>{t('common.cancel')}</Button>
               )}
@@ -357,6 +391,25 @@ export default function PurchaseDocumentDetail({
           onClose={() => setShowEdit(false)}
           userEmail={currentUserEmail}
           onSuccess={() => { setShowEdit(false); refresh() }}
+        />
+      )}
+      {showAmend && isPO && (
+        <AmendPurchaseOrderModal
+          po={doc}
+          userEmail={currentUserEmail}
+          onClose={() => setShowAmend(false)}
+          onSuccess={handleAmended}
+        />
+      )}
+      {showDuplicate && isVI && (
+        <ReasonPromptModal
+          title={t('purchasing.duplicateTitle')}
+          body={t('purchasing.duplicateBody')}
+          label={t('purchasing.duplicateReason')}
+          placeholder={t('purchasing.duplicatePlaceholder')}
+          confirmLabel={t('purchasing.duplicateConfirm')}
+          onClose={() => setShowDuplicate(false)}
+          onConfirm={(reason) => { setShowDuplicate(false); submitVI(reason) }}
         />
       )}
       {showEdit && isVI && (
@@ -453,6 +506,12 @@ export default function PurchaseDocumentDetail({
           {vendor?.contact_person && <Field label={t('purchasing.contactPerson')} value={vendor.contact_person} />}
           {isPO && <Field label={t('purchasing.issueDate')} value={fmtDate(doc.issue_date)} />}
           {isPO && <Field label={t('purchasing.expectedDeliveryDate')} value={fmtDate(doc.expected_delivery_date)} />}
+          {isVI && <Field label={t('purchasing.supplierInvoiceNo')} value={doc.supplier_invoice_no || '—'} />}
+          {isVI && doc.supplier_invoice_date && <Field label={t('purchasing.supplierInvoiceDate')} value={fmtDate(doc.supplier_invoice_date)} />}
+          {isVI && !doc.purchase_order_id && doc.non_po_reason && <Field label={t('purchasing.nonPoReason')} value={doc.non_po_reason} />}
+          {isVI && doc.duplicate_override_reason && <Field label={t('purchasing.duplicateReason')} value={doc.duplicate_override_reason} />}
+          {isVI && doc.approved_by && <Field label={t('purchasing.approvedBy')} value={doc.approved_by} />}
+          {isPO && (doc.revision_no || 1) > 1 && <Field label={t('purchasing.revision')} value={String(doc.revision_no)} />}
           {isVI && <Field label={t('purchasing.invoiceDate')} value={fmtDate(doc.invoice_date)} />}
           {isVI && <Field label={t('purchasing.dueDate')} value={fmtDate(doc.due_date)} />}
           {doc.currency && <Field label={t('purchasing.currency')} value={doc.currency} />}
@@ -475,6 +534,21 @@ export default function PurchaseDocumentDetail({
             </>
           )}
         </div>
+
+        {isPO && revisions.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-[#e6e9ef] dark:border-[#212a38]">
+            <h3 className="text-xs font-semibold uppercase text-[#6c6760] dark:text-[#9aa4b2] mb-2">{t('purchasing.revisionHistory')}</h3>
+            <ul className="space-y-2">
+              {revisions.map((r) => (
+                <li key={r.id} className="text-sm text-[#211f1b] dark:text-[#e8ebf0]">
+                  <span className="font-semibold">{t('purchasing.revisionLabel', { rev: r.rev_no })}</span>
+                  {' · '}{fmtDate(r.created_at)}{' · '}{r.created_by}
+                  <div className="text-[#6c6760] dark:text-[#9aa4b2]">{r.reason}</div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {isPO && (doc.shipping_address || doc.billing_address) && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-4 border-t border-[#e6e9ef] dark:border-[#212a38]">
