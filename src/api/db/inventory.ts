@@ -205,12 +205,9 @@ export const inventory = {
    * (docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md §2) and are fixed here:
    *
    *  1. **All-or-nothing.** Every unit went in as one `.insert(units)` batch, so
-   *     a single duplicate serial discarded the whole ticket's units. The batch
-   *     is still attempted first (one round trip, the overwhelmingly common
-   *     case), but on failure each row is retried individually so a bad row
-   *     only costs itself. A multi-row INSERT is a single atomic statement, so
-   *     nothing was written when the batch errored — the retry cannot duplicate
-   *     a row the batch already inserted.
+   *     a single duplicate serial discarded the whole ticket's units. Creation
+   *     is now one RPC that inserts each unit in its own subtransaction and
+   *     returns which succeeded and which failed, so a bad row only costs itself.
    *
    *  2. **Silent failure.** This used to `return []` on any error, leaving the
    *     UI to report success while no unit existed and no stock move was
@@ -261,26 +258,42 @@ export const inventory = {
     const units = buildTicketUnits(ticketId, rmaNumber, products, undefined, catalog)
     if (!units.length) return { created: [], failed: [], missing: false }
 
-    const batch = await supabase.from('inventory_units').insert(units).select()
-    if (!batch.error) return { created: batch.data || [], failed: [], missing: false }
-    if (batch.error.code === '42P01') return { created: [], failed: [], missing: true }
+    // The database is the only writer of new units (rma_create_units_from_ticket,
+    // 20260877): it forces active_rma, writes the stock_moves row and reports each
+    // unit's success or failure separately, so one duplicate serial still costs
+    // only itself. There is no client INSERT any more, so no retry loop here.
+    const { data, error } = await supabase.rpc('rma_create_units_from_ticket', {
+      p_ticket_id: ticketId,
+      p_units: units,
+    })
 
-    const created: InventoryUnitRow[] = []
-    const failed: FailedUnitInsert[] = []
-    for (const unit of units) {
-      const { data, error } = await supabase.from('inventory_units').insert([unit]).select()
-      if (error) {
-        failed.push({
+    if (error) {
+      if (error.code === '42P01') return { created: [], failed: [], missing: true }
+      // The whole call failed (permission, network): every unit is reported, so
+      // the caller cannot mistake it for success.
+      return {
+        created: [],
+        failed: units.map((unit) => ({
           product_name: unit.product_name,
           serial_number: unit.serial_number,
           message: error.message,
           code: error.code ?? null,
-        })
-      } else if (data?.length) {
-        created.push(...data)
+        })),
+        missing: false,
       }
     }
-    return { created, failed, missing: false }
+
+    const result = (data || {}) as { created?: InventoryUnitRow[]; failed?: Partial<FailedUnitInsert>[] }
+    return {
+      created: result.created || [],
+      failed: (result.failed || []).map((f) => ({
+        product_name: f.product_name ?? '',
+        serial_number: f.serial_number ?? '',
+        message: f.message ?? '',
+        code: f.code ?? null,
+      })),
+      missing: false,
+    }
   },
 
   /**

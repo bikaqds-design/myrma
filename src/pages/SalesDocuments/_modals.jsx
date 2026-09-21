@@ -7,6 +7,7 @@ import { ModalOverlay, ModalCard, Button, Label, Input } from '../../components/
 import SalesDocumentForm from './SalesDocumentForm'
 import { ProductSearchInput } from '../Pipeline/_shared'
 import { computeLineTotal } from '../../api/db/_documentTotals'
+import { CREDIT_NOTE_REASON_CODES } from '../../api/db/creditNotes'
 
 // ── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -197,6 +198,55 @@ export function VoidModal({ requireReason = true, onClose, onConfirm }) {
             <Button variant="secondary" size="sm" onClick={onClose}>{t('common.cancel')}</Button>
             <Button variant="danger" size="sm" disabled={!isValid} onClick={() => onConfirm(reason.trim())}>
               {t('salesDocuments.voidConfirm')}
+            </Button>
+          </div>
+        </div>
+      </ModalCard>
+    </ModalOverlay>
+  )
+}
+
+// ── OverrideReasonModal ──────────────────────────────────────────────────────
+// Converting an EXPIRED quotation is the one conversion a manager can still do,
+// and only with a stated reason, which the database keeps on the sales order.
+
+export const OVERRIDE_REASON_MIN = 10
+
+export function OverrideReasonModal({ validUntil, onClose, onConfirm }) {
+  const { t } = useTranslation()
+  const [reason, setReason] = useState('')
+  const isValid = reason.trim().length >= OVERRIDE_REASON_MIN
+
+  return (
+    <ModalOverlay onClose={onClose}>
+      <ModalCard
+        aria-label={t('salesDocuments.convertExpiredTitle')}
+        className="dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] max-w-md w-full"
+      >
+        <ModalHeader title={t('salesDocuments.convertExpiredTitle')} onClose={onClose} />
+        <div className="px-5 py-5 space-y-4">
+          <p className="text-sm text-[#211f1b] dark:text-[#e8ebf0] leading-relaxed">
+            {t('salesDocuments.convertExpiredBody', { date: validUntil })}
+          </p>
+          <div>
+            <label htmlFor="override-reason" className="block text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase mb-1.5">
+              {t('salesDocuments.convertExpiredReason')} *
+            </label>
+            <textarea
+              id="override-reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder={t('salesDocuments.convertExpiredPlaceholder')}
+              rows={3}
+              className="w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none resize-none placeholder:text-[#746f65] dark:placeholder:text-[#a4acb7]"
+              autoFocus
+            />
+            <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2] mt-1">{t('salesDocuments.convertExpiredMin')}</p>
+          </div>
+          <div className="flex gap-2 justify-end pt-2">
+            <Button variant="secondary" size="sm" onClick={onClose}>{t('common.cancel')}</Button>
+            <Button size="sm" disabled={!isValid} onClick={() => onConfirm(reason.trim())}>
+              {t('salesDocuments.convertExpiredConfirm')}
             </Button>
           </div>
         </div>
@@ -403,6 +453,7 @@ export function CreateStandaloneCreditNoteModal({
   const [customerOpen, setCustomerOpen] = useState(false)
   const [cnType, setCnType] = useState(initialType)
   const [reason, setReason] = useState('')
+  const [reasonCode, setReasonCode] = useState('')
   const [lines, setLines] = useState([{ ...EMPTY_CN_LINE }])
   const [saving, setSaving] = useState(false)
 
@@ -449,7 +500,7 @@ export function CreateStandaloneCreditNoteModal({
   const grandTotal = lines.reduce((sum, l) => sum + lineTotal(l), 0)
 
   const cleanedLines = lines.filter((l) => l.product_name.trim() && (Number(l.qty) || 0) > 0)
-  const isValid = !!customerId && reason.trim().length > 0 && cleanedLines.length > 0 && (!linkInvoice || !!invoiceId)
+  const isValid = !!customerId && !!reasonCode && reason.trim().length > 0 && cleanedLines.length > 0 && (!linkInvoice || !!invoiceId)
 
   const TYPE_LABEL_KEY = {
     rma_return: 'salesDocuments.cnTypeRmaReturn',
@@ -467,6 +518,7 @@ export function CreateStandaloneCreditNoteModal({
         type: cnType,
         customer_id: customerId,
         reason: reason.trim(),
+        reason_code: reasonCode,
         created_by: currentUserEmail,
         line_items: cleanedLines.map((l) => ({
           product_id: l.product_id ?? null,
@@ -538,6 +590,20 @@ export function CreateStandaloneCreditNoteModal({
               >
                 {ALL_CN_TYPES.map((ty) => (
                   <option key={ty} value={ty}>{t(TYPE_LABEL_KEY[ty])}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="sm:col-span-2">
+              <Label required>{t('salesDocuments.cnReasonCode')}</Label>
+              <select aria-label={t('salesDocuments.cnReasonCode')}
+                value={reasonCode}
+                onChange={(e) => setReasonCode(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('salesDocuments.cnReasonCodeChoose')}</option>
+                {CREDIT_NOTE_REASON_CODES.map((rc) => (
+                  <option key={rc} value={rc}>{t('salesDocuments.cnReasonCode_' + rc)}</option>
                 ))}
               </select>
             </div>

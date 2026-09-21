@@ -36,6 +36,11 @@ export function versionOf(fileName) {
   return m ? m[1] : null
 }
 
+/** Provisioning baselines are versioned 00000000, 00000001, ... (seven zeros and a digit). */
+export function isBaseline(version) {
+  return /^0{7}\d$/.test(version)
+}
+
 /**
  * Compare migration file names with the versions production has applied.
  * Pure, so the rules are unit-tested without a database.
@@ -50,10 +55,16 @@ export function compareMigrations(fileNames, appliedVersions) {
       unversioned.push(name)
       continue
     }
+    // Baseline files (0000000N_*) build a NEW project from scratch. They are
+    // not migrations production ever ran, so they have no ledger row to match.
+    if (isBaseline(v)) continue
     byVersion.set(v, [...(byVersion.get(v) ?? []), name])
   }
 
-  const applied = new Set(appliedVersions)
+  // A baseline version in the ledger (00000000 and 00000001 were recorded by
+  // hand when they landed) is equally out of scope, or it would read as
+  // "applied but no file" the moment the file is skipped above.
+  const applied = new Set([...appliedVersions].filter((v) => !isBaseline(v)))
   const unapplied = [...byVersion.entries()]
     .filter(([v]) => !applied.has(v))
     .map(([, names]) => names[0])

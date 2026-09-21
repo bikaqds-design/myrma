@@ -47,7 +47,10 @@ export default function RegionalSettings({ currentUserEmail }) {
   const timezone = useConfigValue('timezone', 'Africa/Cairo')
   const typoWarnings = useConfigValue('email_typo_warnings', true)
 
+  const creditThreshold = useConfigValue('credit_note_approval_threshold', null)
+
   const [draftTax, setDraftTax] = useState(null)
+  const [draftCredit, setDraftCredit] = useState(null)
 
   const write = async (key, value) => {
     setBusy(true)
@@ -66,6 +69,15 @@ export default function RegionalSettings({ currentUserEmail }) {
   const taxValue = draftTax ?? String(taxRate ?? '')
   const taxNumber = Number(taxValue)
   const taxValid = Number.isFinite(taxNumber) && taxNumber >= 0 && taxNumber <= 100
+
+  // Blank means "no limit", stored as an empty string because config_value is
+  // NOT NULL. The database ignores anything that is not a plain non-negative
+  // number, so this refuses to save one rather than let a typo silently switch
+  // the control off.
+  const creditValue = draftCredit ?? (creditThreshold === null || creditThreshold === undefined || creditThreshold === '' ? '' : String(creditThreshold))
+  const creditBlank = creditValue.trim() === ''
+  const creditNumber = Number(creditValue)
+  const creditValid = creditBlank || (/^[0-9]+(\.[0-9]+)?$/.test(creditValue.trim()) && Number.isFinite(creditNumber))
 
   return (
     <div className="space-y-6">
@@ -101,6 +113,37 @@ export default function RegionalSettings({ currentUserEmail }) {
             appears on issued documents. */}
         <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-3">
           {t('cp.setup.taxNotRetroactive')}
+        </p>
+      </SetupCard>
+
+      <SetupCard title={t('cp.setup.creditTitle')}>
+        <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mb-3">
+          {t('cp.setup.creditHint')}
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-40">
+            <Label>{t('cp.setup.creditThreshold')}</Label>
+            <Input
+              aria-label={t('cp.setup.creditThreshold')}
+              type="text"
+              inputMode="decimal"
+              placeholder={t('cp.setup.creditNoLimit')}
+              value={creditValue}
+              onChange={(e) => setDraftCredit(e.target.value)}
+            />
+          </div>
+          <Button
+            onClick={async () => { await write('credit_note_approval_threshold', creditBlank ? '' : creditNumber); setDraftCredit(null) }}
+            disabled={busy || !creditValid || draftCredit === null}
+          >
+            {busy ? t('common.saving') : t('common.save')}
+          </Button>
+          {!creditValid && (
+            <p className="text-xs text-red-600 pb-2">{t('cp.setup.creditInvalid')}</p>
+          )}
+        </div>
+        <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-3">
+          {t('cp.setup.creditAlways')}
         </p>
       </SetupCard>
 

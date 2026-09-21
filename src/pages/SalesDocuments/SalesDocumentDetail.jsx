@@ -17,6 +17,7 @@ import {
   DocumentFormModal,
   RecordPaymentModal,
   VoidModal,
+  OverrideReasonModal,
 } from './_modals'
 
 // ── Status pill ───────────────────────────────────────────────────────────────
@@ -38,6 +39,7 @@ const STATUS_PILL = {
   voided:    'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
   reversed:  'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
   cancelled: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#a4acb7]',
+  pending_approval: 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
   unpaid:    'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
 }
 const statusPillCls = (s) => STATUS_PILL[s] ?? STATUS_PILL.draft
@@ -144,6 +146,7 @@ export default function SalesDocumentDetail({
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [showVoidModal, setShowVoidModal] = useState(false)
+  const [showConvertModal, setShowConvertModal] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
 
   // ── Data ──────────────────────────────────────────────────────────────────
@@ -248,8 +251,30 @@ export default function SalesDocumentDetail({
   const handleConvertToSO = () => {
     const freeLines = db.quotations.freeFormLines(doc)
     if (freeLines.length > 0) { toast.error(t('pipeline.quotationFreeFormError', { count: freeLines.length })); return }
+    // An expired quotation can still be converted, but only by a manager and
+    // only with a reason the database keeps on the order (20260880). "Expired"
+    // is the DATABASE's call, made against the tenant's own date; deciding it
+    // here from the browser's clock got it wrong for a manager whose laptop is
+    // behind the tenant's timezone. So try, and ask for the reason when it says so.
+    const isManager = ['manager', 'admin', 'super_admin'].includes(currentUserRole)
     runAction(async () => {
-      await db.quotations.convertToSalesOrder(doc.id, currentUserEmail)
+      try {
+        await db.quotations.convertToSalesOrder(doc.id, currentUserEmail)
+      } catch (err) {
+        if (isManager && err?.code === 'P0001' && /expired/i.test(err?.message || '')) {
+          setShowConvertModal(true)
+          return
+        }
+        throw err
+      }
+      logQt('quotation_converted')
+      toast.success(t('salesDocuments.statusUpdated'))
+    })
+  }
+  const handleConvertExpired = (reason) => {
+    setShowConvertModal(false)
+    runAction(async () => {
+      await db.quotations.convertToSalesOrder(doc.id, currentUserEmail, reason)
       logQt('quotation_converted')
       toast.success(t('salesDocuments.statusUpdated'))
     })
@@ -367,6 +392,28 @@ export default function SalesDocumentDetail({
   // ── Credit Note lifecycle ─────────────────────────────────────────────────
 
   const handleIssueCN = () => runAction(async () => {
+    // A draft that needs a second person's approval (a rebate or discount with
+    // no invoice, or one above the tenant's threshold) is submitted rather than
+    // issued. The database refuses a direct issue in that case anyway.
+    if (doc.status === 'draft') {
+      const needs = await db.creditNotes.needsApproval(doc.type, !!doc.source_invoice_id, Number(doc.total) || 0)
+      if (needs) {
+        await db.creditNotes.submitForApproval(doc.id, currentUserEmail)
+        const customerName = customer?.company_name || customer?.contact_person || '—'
+        db.activities.create({
+          related_type: 'customer',
+          related_id: doc.customer_id,
+          type: 'approval',
+          title: `approval|credit_note|${doc.id}|${doc.source_invoice_number || '—'}|${doc.total ?? 0}|${customerName}`,
+          due_date: new Date().toISOString(),
+          assigned_rep: doc.assigned_rep || null,
+          outcome_notes: null,
+          created_by: currentUserEmail,
+        }).catch((err) => { console.error('approval activity failed', err); toast.error(t('pipeline.approvalActivityFailed')) })
+        toast.success(t('salesDocuments.cnSubmittedToast'))
+        return
+      }
+    }
     // Second of the two call sites that issued the note and closed the ticket
     // as separate writes (BUG-048). The close now happens inside the RPC, in
     // the same transaction, so the pair cannot come apart.
@@ -377,6 +424,10 @@ export default function SalesDocumentDetail({
     } else {
       toast.success(t('salesDocuments.issuedToast', { code: cnCode }))
     }
+  })
+  const handleReturnCN = () => runAction(async () => {
+    await db.creditNotes.returnToDraft(doc.id, currentUserEmail)
+    toast.success(t('salesDocuments.cnReturnedToast'))
   })
   const handleVoidCN = (reason) => {
     setShowVoidModal(false)
@@ -578,7 +629,25 @@ export default function SalesDocumentDetail({
                   {t('salesDocuments.issueCN')}
                 </Button>
               )}
-              {['draft', 'issued'].includes(n.status) && (
+              {n.status === 'pending_approval' && (
+                <>
+                  <Button
+                    disabled={!canPostDoc || currentUserEmail?.toLowerCase() === doc.created_by?.toLowerCase()}
+                    size="sm"
+                    onClick={handleIssueCN}
+                    loading={busy}
+                  >
+                    {t('salesDocuments.cnApproveIssue')}
+                  </Button>
+                  <Button disabled={!canPostDoc} variant="secondary" size="sm" onClick={handleReturnCN}>
+                    {t('salesDocuments.cnReturnToDraft')}
+                  </Button>
+                  <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2] italic self-center">
+                    {t('salesDocuments.cnAwaitingApproval', { creator: doc.created_by })}
+                  </span>
+                </>
+              )}
+              {['draft', 'pending_approval', 'issued'].includes(n.status) && (
                 <Button disabled={!canCancelDoc} variant="danger" size="sm" onClick={() => setShowVoidModal(true)}>
                   {t('salesDocuments.voidCN')}
                 </Button>
@@ -611,6 +680,13 @@ export default function SalesDocumentDetail({
           invoice={doc}
           onClose={() => setShowPaymentModal(false)}
           onConfirm={handleRecordPayment}
+        />
+      )}
+      {showConvertModal && (
+        <OverrideReasonModal
+          validUntil={doc.validity_until}
+          onClose={() => setShowConvertModal(false)}
+          onConfirm={handleConvertExpired}
         />
       )}
       {showVoidModal && (

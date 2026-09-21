@@ -400,7 +400,9 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
       case 'quotation':      return db.quotations.markDeclined(docId)
       case 'sales_order':    return db.salesOrders.markDeclined(docId, currentUserEmail)
       case 'invoice':        return rejectInvoice(docId)
-      case 'credit_note':    return db.creditNotes.void_(docId, `Rejected by ${currentUserEmail}`, currentUserEmail)
+      // A credit note waiting for approval was never issued: "no" sends it back to
+      // draft for changes (20260880), it does not create a voided document.
+      case 'credit_note':    return db.creditNotes.returnToDraft(docId, currentUserEmail)
       // PO/VI rejection sends them back to draft (editable/resubmittable),
       // not cancelled — user-chosen (2026-07-05/06), unlike the stricter
       // sales-invoice void-on-reject pattern above.
@@ -427,7 +429,9 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
       toast.success(t('activities.approvedToast'))
     } catch (err) {
       console.error('Approve failed', err)
-      toast.error(t('common.error'))
+      // The database explains a refusal ("the person who created a credit note
+      // cannot approve it"); a bare "Error" leaves the person guessing.
+      toast.error(err?.code === 'P0001' && err?.message ? err.message : t('common.error'))
     }
   }
 
@@ -448,6 +452,7 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
       toast.success(t('activities.rejectedToast'))
     } catch (err) {
       console.error('Reject failed', err)
+      if (err?.code === 'P0001' && err?.message) { toast.error(err.message); return }
       toast.error(t('common.error'))
     }
   }

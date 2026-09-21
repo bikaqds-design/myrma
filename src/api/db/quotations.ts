@@ -216,11 +216,16 @@ export const quotations = {
    * inserts the SO and flips qt.status='converted' atomically in one Postgres
    * transaction, with a FOR UPDATE lock that prevents duplicate SOs from
    * concurrent double-clicks (FR-005, FR-006, H4a).
+   *
+   * Only an ACCEPTED quotation converts (20260880). If its validity date has
+   * passed, a manager can still convert it by passing `overrideReason` (at
+   * least 10 characters), which is kept on the sales order.
    */
-  async convertToSalesOrder(quotationId: string, actorEmail: string): Promise<string> {
+  async convertToSalesOrder(quotationId: string, actorEmail: string, overrideReason?: string): Promise<string> {
     const { data, error } = await supabase.rpc('convert_quotation_to_so', {
       p_quotation_id: quotationId,
       p_actor_email: actorEmail,
+      p_override_reason: overrideReason?.trim() ? overrideReason.trim() : null,
     })
     if (error) throw error
     return data as string

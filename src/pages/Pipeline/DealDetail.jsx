@@ -657,8 +657,10 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
       // does change what the deal would be worth once closed.
       await syncDealValue(withQtStatus(qt.id, 'converted'))
       refresh()
-    } catch {
-      toast.error(t('salesDocs.errorConvertFailed'))
+    } catch (err) {
+      // The database explains an expired or not-yet-accepted quotation; a bare
+      // "failed" leaves the person guessing.
+      toast.error(err?.message && err?.code === 'P0001' ? err.message : t('salesDocs.errorConvertFailed'))
     } finally {
       setConvertingSOId(null)
     }
