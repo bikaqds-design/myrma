@@ -482,14 +482,17 @@ export const vendorInvoices = {
   /**
    * receive — the atomic receipt path (Sprint 9, status guard updated by the
    * Purchasing redesign to approved/partially_received). p_receipt_lines shape:
-   * serialized: { productId, warehouseId, serials: string[] }
-   * bulk:       { productId, warehouseId, qty: number }
+   * serialized: { productId, warehouseId, lineIndex?, serials: string[] }
+   * bulk:       { productId, warehouseId, lineIndex?, qty: number }
+   * lineIndex is the 0-based position of the invoice line being received. It
+   * may be left out only when the product is on exactly one line; a product on
+   * several lines is refused without it (20260882).
    * Also syncs the linked Purchase Order's completed/partially_completed
    * status server-side (20260758_receive_vi_po_completion.sql).
    */
   async receive(
     viId: string,
-    receiptLines: Array<{ productId: string; warehouseId: string; serials?: string[]; qty?: number }>,
+    receiptLines: Array<{ productId: string; warehouseId: string; lineIndex?: number; serials?: string[]; qty?: number }>,
     actorEmail: string
   ): Promise<void> {
     const { error } = await supabase.rpc('receive_vendor_invoice', {
@@ -497,6 +500,7 @@ export const vendorInvoices = {
       p_receipt_lines: receiptLines.map((l) => ({
         product_id: l.productId,
         warehouse_id: l.warehouseId,
+        line_index: l.lineIndex,
         serials: l.serials,
         qty: l.qty,
       })),
@@ -702,10 +706,58 @@ export const vendorInvoiceCharges = {
  */
 export async function landedUnitCosts(
   vendorInvoiceId: string
-): Promise<{ product_id: string; unit_cost_base: number }[]> {
+): Promise<LandedUnitCost[]> {
   const { data, error } = await supabase.rpc('rma_vi_landed_unit_costs', {
     p_vi_id: vendorInvoiceId,
   })
   if (error) throw error
-  return (data ?? []) as { product_id: string; unit_cost_base: number }[]
+  return (data ?? []) as LandedUnitCost[]
+}
+
+/** One row per invoice line. unit_cost_base is null when the line carries no price: unknown, never zero. */
+export interface LandedUnitCost {
+  line_index: number
+  product_id: string
+  unit_cost_base: number | null
+}
+
+/** Stock that still has no cost. (20260882.) */
+export interface UncostedStockRow {
+  product_id: string | null
+  product_name: string | null
+  sku: string | null
+  warehouse_id: string | null
+  warehouse_name: string | null
+  tracking: 'bulk' | 'serialized'
+  uncosted_units: number
+  total_units: number
+}
+
+export interface OpeningCostRow {
+  sku: string
+  warehouse: string
+  unit_cost: number
+}
+
+export interface OpeningCostResult {
+  row: number
+  ok: boolean
+  message: string
+}
+
+/** The worklist of stock on hand that has no known cost. Managers and accountants. */
+export async function uncostedStock(): Promise<UncostedStockRow[]> {
+  const { data, error } = await supabase.rpc('rma_uncosted_stock')
+  if (error) throw error
+  return (data ?? []) as UncostedStockRow[]
+}
+
+/**
+ * Value many product/warehouse pairs at once. Each row runs on its own, so one
+ * bad row is reported in its result and does not stop the rest.
+ */
+export async function importOpeningCosts(rows: OpeningCostRow[]): Promise<OpeningCostResult[]> {
+  const { data, error } = await supabase.rpc('rma_import_opening_costs', { p_rows: rows })
+  if (error) throw error
+  return (data ?? []) as OpeningCostResult[]
 }
