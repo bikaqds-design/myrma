@@ -31,6 +31,29 @@ describe('compareMigrations', () => {
     expect(r.ok).toBe(true)
   })
 
+  it('ignores provisioning baselines: they were never run on production', () => {
+    // 00000002 has no ledger row and must not read as an unapplied migration,
+    // or the workflow goes red the day the seed file reaches main.
+    const withBaselines = [
+      '00000000_baseline_schema.sql',
+      '00000001_baseline_reference_data.sql',
+      '00000002_baseline_seed_data.sql',
+      ...files,
+    ]
+    expect(compareMigrations(withBaselines, ['20260865', '20260866', '20260867']).ok).toBe(true)
+  })
+
+  it('ignores a baseline version in the ledger, so 00000000/1 do not read as "no file"', () => {
+    const r = compareMigrations(files, ['00000000', '00000001', '20260865', '20260866', '20260867'])
+    expect(r.unknown).toEqual([])
+    expect(r.ok).toBe(true)
+  })
+
+  it('still flags a real unapplied migration next to the baselines', () => {
+    const r = compareMigrations(['00000002_baseline_seed_data.sql', ...files], ['20260865', '20260866'])
+    expect(r.unapplied).toEqual(['20260867_c.sql'])
+  })
+
   it('flags a file production has not recorded', () => {
     const r = compareMigrations(files, ['20260865', '20260866'])
     expect(r.ok).toBe(false)
