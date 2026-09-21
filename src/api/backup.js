@@ -198,6 +198,12 @@ export const BACKUP_TABLES = [
   // Nothing in purchasing points back: purchase_orders and vendor_invoices
   // reference only brands and each other.
   { table: 'purchase_orders' },
+  {
+    table: 'purchase_order_revisions',
+    restore: false,
+    why:
+      'client writes are revoked by design: only amend_purchase_order writes a revision, as the snapshot of the order it is about to change. Attempting it would report a failure on every restore',
+  },
   { table: 'vendor_invoices' },
   // Freight, customs and clearance. Part of what the goods cost, so losing
   // these in a restore would silently change every landed unit cost derived
@@ -298,7 +304,7 @@ export const BACKUP_MODULES = [
   },
   {
     id: 'purchasing',
-    tables: ['purchase_orders', 'vendor_invoices', 'vendor_invoice_charges', 'vendor_payments', 'vendor_payment_applications'],
+    tables: ['purchase_orders', 'purchase_order_revisions', 'vendor_invoices', 'vendor_invoice_charges', 'vendor_payments', 'vendor_payment_applications'],
   },
   {
     id: 'inventory',

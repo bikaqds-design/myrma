@@ -464,6 +464,12 @@ export function VendorInvoiceFormModal({ mode, initial, vendors, userEmail, onCl
   const [lines, setLines] = useState(initial?.line_items || [])
   const [invoiceDate, setInvoiceDate] = useState(initial?.invoice_date || '')
   const [dueDate, setDueDate] = useState(initial?.due_date || '')
+  // The SUPPLIER's own invoice number (vi_code is ours). Required to submit for
+  // approval and unique per supplier and year, so the same bill cannot be
+  // entered, approved and paid twice (20260881).
+  const [supplierNo, setSupplierNo] = useState(initial?.supplier_invoice_no || '')
+  const [supplierDate, setSupplierDate] = useState(initial?.supplier_invoice_date || '')
+  const [nonPoReason, setNonPoReason] = useState(initial?.non_po_reason || '')
   // The vendor invoice is what actually costs the stock: its rate becomes the
   // landed unit cost of everything it receives, so it matters more here than on
   // the purchase order, which is only an intention to buy.
@@ -491,12 +497,16 @@ export function VendorInvoiceFormModal({ mode, initial, vendors, userEmail, onCl
         row = await db.vendorInvoices.update(initial.id, {
           line_items: lines, invoice_date: invoiceDate || null, due_date: dueDate || null, notes: notes || null,
           currency: cur.payload.currency, exchange_rate: cur.payload.exchangeRate,
+          supplier_invoice_no: supplierNo.trim() || null, supplier_invoice_date: supplierDate || null,
+          non_po_reason: nonPoReason.trim() || null,
         })
       } else {
         row = await db.vendorInvoices.create({
           vendorId, lineItems: lines, ...cur.payload,
           invoiceDate: invoiceDate || undefined, dueDate: dueDate || undefined,
           notes: notes || undefined, createdBy: userEmail,
+          supplierInvoiceNo: supplierNo.trim() || undefined, supplierInvoiceDate: supplierDate || undefined,
+          nonPoReason: nonPoReason.trim() || undefined,
         })
       }
       toast.success(t(mode === 'edit' ? 'purchasing.viUpdated' : 'purchasing.viCreated'))
@@ -533,7 +543,23 @@ export function VendorInvoiceFormModal({ mode, initial, vendors, userEmail, onCl
             <Input aria-label={t('purchasing.dueDate')} type="date" value={dueDate || ''} onChange={(e) => setDueDate(e.target.value)} className="w-full" />
           </div>
           <CurrencyRateFields cx={cur} />
+          <div>
+            <Label>{t('purchasing.supplierInvoiceNo')}</Label>
+            <Input aria-label={t('purchasing.supplierInvoiceNo')} value={supplierNo} onChange={(e) => setSupplierNo(e.target.value)} className="w-full" />
+          </div>
+          <div>
+            <Label>{t('purchasing.supplierInvoiceDate')}</Label>
+            <Input aria-label={t('purchasing.supplierInvoiceDate')} type="date" value={supplierDate || ''} onChange={(e) => setSupplierDate(e.target.value)} className="w-full" />
+          </div>
         </div>
+        <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('purchasing.supplierInvoiceHint')}</p>
+        {!initial?.purchase_order_id && (
+          <div>
+            <Label>{t('purchasing.nonPoReason')}</Label>
+            <Textarea aria-label={t('purchasing.nonPoReason')} value={nonPoReason} onChange={(e) => setNonPoReason(e.target.value)}
+              placeholder={t('purchasing.nonPoReasonPlaceholder')} rows={2} className="w-full" />
+          </div>
+        )}
         <div>
           <Label>{t('purchasing.notes')}</Label>
           <Textarea aria-label={t('purchasing.notes')} value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full" />
@@ -543,6 +569,120 @@ export function VendorInvoiceFormModal({ mode, initial, vendors, userEmail, onCl
           <Button variant="primary" onClick={handleSave} loading={saving} disabled={saving}>
             {t(mode === 'edit' ? 'common.save' : 'common.create')}
           </Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ─── A written reason, asked for before an action that needs one ──────────────
+export const REASON_MIN = 10
+
+export function ReasonPromptModal({ title, body, label, placeholder, confirmLabel, onClose, onConfirm }) {
+  const { t } = useTranslation()
+  const [reason, setReason] = useState('')
+  const ok = reason.trim().length >= REASON_MIN
+  return (
+    <Modal open onClose={onClose} title={title} className="max-w-md">
+      <div className="space-y-4">
+        <p className="text-sm text-[#211f1b] dark:text-[#e8ebf0] leading-relaxed">{body}</p>
+        <div>
+          <Label required>{label}</Label>
+          <Textarea aria-label={label} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={placeholder} rows={3} className="w-full" autoFocus />
+          <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2] mt-1">{t('purchasing.reasonMin')}</p>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="primary" disabled={!ok} onClick={() => onConfirm(reason.trim())}>{confirmLabel}</Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ─── Amend a CONFIRMED purchase order ─────────────────────────────────────────
+// A confirmed order is locked. This is the one way to change it: lines, terms,
+// delivery date and notes, with a reason. The database snapshots the old
+// version, recomputes the totals from the lines, and sends the order back to an
+// administrator when the value goes up or any price, discount or tax changes.
+const priceKey = (l) => [l.product_id, Number(l.unit_cost) || 0, Number(l.discount_pct) || 0, Number(l.tax_pct) || 0].join('|')
+
+export function AmendPurchaseOrderModal({ po, userEmail, onClose, onSuccess }) {
+  const { t } = useTranslation()
+  const [lines, setLines] = useState(po.line_items || [])
+  const [paymentTerms, setPaymentTerms] = useState(po.payment_terms || '')
+  const [deliveryTerms, setDeliveryTerms] = useState(po.delivery_terms || '')
+  const [expectedDate, setExpectedDate] = useState(po.expected_delivery_date || '')
+  const [notes, setNotes] = useState(po.notes || '')
+  const [reason, setReason] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const totals = useMemo(() => computeLineTotals(lines), [lines])
+  const linesChanged = JSON.stringify(lines) !== JSON.stringify(po.line_items || [])
+  // Mirrors the database's rule so the person knows before they save. The
+  // database decides; this is only the forecast.
+  const oldPrices = useMemo(() => new Set((po.line_items || []).map(priceKey)), [po.line_items])
+  const needsApproval = linesChanged && (lines.some((l) => !oldPrices.has(priceKey(l))) || totals.grand > Number(po.total) + 0.004)
+
+  const changes = {}
+  if (linesChanged) changes.line_items = lines
+  if ((paymentTerms || '') !== (po.payment_terms || '')) changes.payment_terms = paymentTerms || null
+  if ((deliveryTerms || '') !== (po.delivery_terms || '')) changes.delivery_terms = deliveryTerms || null
+  if ((expectedDate || '') !== (po.expected_delivery_date || '')) changes.expected_delivery_date = expectedDate || null
+  if ((notes || '') !== (po.notes || '')) changes.notes = notes || null
+  const anyChange = Object.keys(changes).length > 0
+  const valid = anyChange && reason.trim().length >= REASON_MIN && lines.length > 0
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const row = await db.purchaseOrders.amend(po.id, changes, reason.trim(), userEmail)
+      toast.success(t(row.status === 'pending_confirmation' ? 'purchasing.amendedNeedsApprovalToast' : 'purchasing.amendedToast', { rev: row.revision_no }))
+      onSuccess(row)
+    } catch (err) {
+      toast.error(err.message || t('common.error'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={t('purchasing.amendTitle', { code: po.po_code })} className="max-w-3xl">
+      <div className="space-y-4">
+        <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('purchasing.amendHint')}</p>
+        <LineItemsEditor lines={lines} setLines={setLines} vendorId={po.vendor_id} t={t} />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>{t('purchasing.paymentTerms')}</Label>
+            <Input aria-label={t('purchasing.paymentTerms')} value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} className="w-full" />
+          </div>
+          <div>
+            <Label>{t('purchasing.deliveryTerms')}</Label>
+            <Input aria-label={t('purchasing.deliveryTerms')} value={deliveryTerms} onChange={(e) => setDeliveryTerms(e.target.value)} className="w-full" />
+          </div>
+          <div>
+            <Label>{t('purchasing.expectedDeliveryDate')}</Label>
+            <Input aria-label={t('purchasing.expectedDeliveryDate')} type="date" value={expectedDate || ''} onChange={(e) => setExpectedDate(e.target.value)} className="w-full" />
+          </div>
+        </div>
+        <div>
+          <Label>{t('purchasing.notes')}</Label>
+          <Textarea aria-label={t('purchasing.notes')} value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full" />
+        </div>
+        <div>
+          <Label required>{t('purchasing.amendReason')}</Label>
+          <Textarea aria-label={t('purchasing.amendReason')} value={reason} onChange={(e) => setReason(e.target.value)}
+            placeholder={t('purchasing.amendReasonPlaceholder')} rows={2} className="w-full" />
+          <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2] mt-1">{t('purchasing.reasonMin')}</p>
+        </div>
+        {needsApproval && (
+          <p role="status" className="text-sm rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 px-3 py-2">
+            {t('purchasing.amendNeedsApproval')}
+          </p>
+        )}
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="primary" onClick={handleSave} loading={saving} disabled={!valid || saving}>{t('purchasing.amendConfirm')}</Button>
         </div>
       </div>
     </Modal>
