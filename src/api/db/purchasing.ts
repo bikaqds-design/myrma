@@ -25,6 +25,8 @@ export type PurchaseDocType = 'purchase_order' | 'vendor_invoice'
 export interface PurchaseOrderRow {
   id: string
   po_code: string
+  /** 1 until the order is amended; each amendment adds one (20260881). */
+  revision_no: number
   vendor_id: string
   status:
     | 'draft'
@@ -88,6 +90,24 @@ export interface VendorInvoiceRow {
   updated_at: string | null
   approved_at: string | null
   received_at: string | null
+  /** The supplier's OWN invoice number (vi_code is ours). Required to submit; unique per supplier and year. */
+  supplier_invoice_no: string | null
+  supplier_invoice_date: string | null
+  /** Required to submit a vendor invoice that has no purchase order behind it. */
+  non_po_reason: string | null
+  /** Required to submit one that looks like a duplicate (same supplier, amount within 1%, within 30 days). */
+  duplicate_override_reason: string | null
+  approved_by: string | null
+}
+
+export interface PurchaseOrderRevisionRow {
+  id: string
+  po_id: string
+  rev_no: number
+  snapshot: Record<string, unknown>
+  reason: string
+  created_by: string
+  created_at: string
 }
 
 export interface PurchaseDocumentRow {
@@ -323,6 +343,40 @@ export const purchaseOrders = {
     if (error) throw error
     assertAffected(data, 'Purchase order')
   },
+  /**
+   * amend: change a CONFIRMED purchase order (lines, terms, delivery date,
+   * notes) with a written reason. A confirmed order is locked, so this is the
+   * only route. It snapshots the order as a revision, recomputes every total
+   * from the lines, and sends the order back to 'pending_confirmation' for an
+   * administrator if the value goes up or any price, discount or tax changes.
+   * The supplier, currency and status cannot be amended (20260881).
+   */
+  async amend(
+    id: string,
+    changes: Record<string, unknown>,
+    reason: string,
+    actorEmail: string
+  ): Promise<PurchaseOrderRow> {
+    const { data, error } = await supabase.rpc('amend_purchase_order', {
+      p_po_id: id,
+      p_changes: changes,
+      p_reason: reason,
+      p_actor_email: actorEmail,
+    })
+    if (error) throw error
+    return (Array.isArray(data) ? data[0] : data) as PurchaseOrderRow
+  },
+  /** The order as it stood before each amendment, newest first. */
+  async revisions(id: string): Promise<PurchaseOrderRevisionRow[]> {
+    const { data, error } = await supabase
+      .from('purchase_order_revisions')
+      .select('*')
+      .eq('po_id', id)
+      .order('rev_no', { ascending: false })
+      .range(0, 199)
+    if (error) throw error
+    return (data || []) as PurchaseOrderRevisionRow[]
+  },
   async markConfirmed(id: string): Promise<void> {
     const { data, error } = await supabase.from('purchase_orders').update({ status: 'confirmed' }).eq('id', id).select('id')
     if (error) throw error
@@ -418,6 +472,9 @@ export const vendorInvoices = {
      */
     exchangeRate?: number
     notes?: string
+    supplierInvoiceNo?: string
+    supplierInvoiceDate?: string
+    nonPoReason?: string
     createdBy: string
   }): Promise<VendorInvoiceRow> {
     const lineItems = input.lineItems.map((l) => ({ ...l, qty_received: l.qty_received ?? 0 }))
@@ -435,6 +492,9 @@ export const vendorInvoices = {
           invoice_date: input.invoiceDate || null,
           due_date: input.dueDate || null,
           notes: input.notes || null,
+          supplier_invoice_no: input.supplierInvoiceNo || null,
+          supplier_invoice_date: input.supplierInvoiceDate || null,
+          non_po_reason: input.nonPoReason || null,
           created_by: input.createdBy,
         },
       ])
@@ -450,10 +510,18 @@ export const vendorInvoices = {
     if (error) throw error
     return assertUpdated(data, 'Vendor invoice')
   },
-  async submitForApproval(id: string): Promise<void> {
+  /**
+   * submitForApproval. The database refuses without the supplier's invoice
+   * number, without a reason on an invoice that has no purchase order, and
+   * (20260881) on one that looks like a duplicate of another live invoice
+   * unless `duplicateOverrideReason` says why it is a separate bill.
+   */
+  async submitForApproval(id: string, duplicateOverrideReason?: string): Promise<void> {
+    const patch: Record<string, unknown> = { status: 'pending_approval' }
+    if (duplicateOverrideReason?.trim()) patch.duplicate_override_reason = duplicateOverrideReason.trim()
     const { data, error } = await supabase
       .from('vendor_invoices')
-      .update({ status: 'pending_approval' })
+      .update(patch)
       .eq('id', id)
       .select('id')
     if (error) throw error
