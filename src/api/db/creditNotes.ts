@@ -19,6 +19,17 @@ export interface CreditNoteLine {
   tax_pct?: number | null
 }
 
+/** Why a credit note exists. Coded so credits can be reported by reason; `reason` keeps the detail. */
+export const CREDIT_NOTE_REASON_CODES = [
+  'price_adjustment',
+  'return',
+  'damaged',
+  'goodwill',
+  'billing_error',
+  'rebate',
+] as const
+export type CreditNoteReasonCode = (typeof CREDIT_NOTE_REASON_CODES)[number]
+
 export interface CreditNoteRow {
   id: string
   cn_code: string | null
@@ -27,7 +38,7 @@ export interface CreditNoteRow {
   source_invoice_number: string | null
   ticket_id: string | null
   customer_id: string
-  status: 'draft' | 'issued' | 'applied' | 'voided'
+  status: 'draft' | 'pending_approval' | 'issued' | 'applied' | 'voided'
   line_items: CreditNoteLine[]
   subtotal: number
   discount_amount: number
@@ -36,6 +47,9 @@ export interface CreditNoteRow {
   applied_amount: number
   remaining_balance: number
   reason: string
+  reason_code: CreditNoteReasonCode | null
+  approved_by: string | null
+  approved_at: string | null
   affects_inventory: boolean
   restock_status: 'not_applicable' | 'pending' | 'restocked'
   assigned_rep: string | null
@@ -100,6 +114,7 @@ export const creditNotes = {
     type: CreditNoteRow['type']
     customer_id: string
     reason: string
+    reason_code?: CreditNoteReasonCode | null
     created_by: string
     line_items?: CreditNoteLine[]
     source_invoice_id?: string | null
@@ -119,6 +134,7 @@ export const creditNotes = {
         type: input.type,
         customer_id: input.customer_id,
         reason: input.reason,
+        reason_code: input.reason_code ?? null,
         created_by: input.created_by,
         status: 'draft',
         line_items: lines,
@@ -186,6 +202,41 @@ export const creditNotes = {
     })
     if (error) throw error
     return data as string
+  },
+
+  /**
+   * needsApproval: does this credit note need a second person before it can be
+   * issued? True for a rebate or discount with no invoice behind it, and for
+   * anything above the tenant's credit_note_approval_threshold. The database
+   * enforces it either way; asking first lets the screen offer the right
+   * button (20260880).
+   */
+  async needsApproval(type: CreditNoteRow['type'], hasInvoice: boolean, total: number): Promise<boolean> {
+    const { data, error } = await supabase.rpc('rma_credit_note_needs_approval', {
+      p_type: type,
+      p_has_invoice: hasInvoice,
+      p_total: total,
+    })
+    if (error) throw error
+    return data === true
+  },
+
+  /** draft -> pending_approval. Checks the invoice limits now, so a note that can never be issued does not wait in a queue. */
+  async submitForApproval(cnId: string, actorEmail: string): Promise<void> {
+    const { error } = await supabase.rpc('submit_credit_note_for_approval', {
+      p_cn_id: cnId,
+      p_actor_email: actorEmail,
+    })
+    if (error) throw error
+  },
+
+  /** pending_approval -> draft: the approver's "no, change it". */
+  async returnToDraft(cnId: string, actorEmail: string): Promise<void> {
+    const { error } = await supabase.rpc('return_credit_note_to_draft', {
+      p_cn_id: cnId,
+      p_actor_email: actorEmail,
+    })
+    if (error) throw error
   },
 
   /**

@@ -103,6 +103,17 @@ export function TicketDrawer({
       // credit note was already issued and applied while the ticket stayed
       // open, and retrying could not help because the RPC refuses a non-draft
       // note. There was no route back to a consistent state from the interface.
+      // A credit note that needs a second person's approval is submitted, not
+      // issued (20260880). Without this the ticket flow failed with a generic
+      // error the moment a tenant configured an approval threshold, leaving an
+      // orphan draft that could only be progressed from Sales Documents.
+      if (await db.creditNotes.needsApproval(cn.type, !!cn.source_invoice_id, Number(cn.total) || 0)) {
+        await db.creditNotes.submitForApproval(cn.id, userEmail)
+        queryClient.invalidateQueries({ queryKey: ['sales-documents'] })
+        toast.success(t('salesDocuments.cnSubmittedToast'))
+        setShowIssueCNModal(false)
+        return
+      }
       const cnCode = await db.creditNotes.issue(cn.id, userEmail, true)
       logActivity('credit_note_created', `${cnCode} issued — ${cn.reason}`)
       // The close was happening without a status_changed row, so the timeline

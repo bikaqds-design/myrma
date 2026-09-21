@@ -42,6 +42,7 @@ const STATUS_PILL = {
   posted:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
   delivered: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
   issued:    'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
+  pending_approval: 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
   applied:   'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
   paid:      'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
   partial:   'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
