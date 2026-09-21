@@ -26,10 +26,17 @@
 -- Run AFTER 00000000_baseline_schema.sql. Every statement is
 -- ON CONFLICT DO NOTHING, so re-running it changes nothing.
 --
+-- No BEGIN/COMMIT in here on purpose: scripts/provision-project.mjs applies all
+-- the baseline files in ONE transaction, and a COMMIT in this file would commit
+-- the schema before a later file could fail. Run it by hand with psql -1.
+--
+-- Company identity (name, phone, address) in pdf_layout and sales_doc_layout is
+-- left blank: those rows were first exported from QDS Egypt, and every other
+-- tenant would have printed QDS on its own invoices. A tenant sets its own in
+-- Control Panel.
+--
 -- Generated from the live database on 2026-09-01.
 -- ============================================================================
-
-BEGIN;
 
 -- Currencies
 INSERT INTO public.currencies (code, name, symbol, decimals, is_active) VALUES ('AED','UAE Dirham','د.إ',2,'t') ON CONFLICT (code) DO NOTHING;
@@ -93,15 +100,13 @@ INSERT INTO public.rma_config (config_key, config_value) VALUES ('kb_llm_base_ur
 INSERT INTO public.rma_config (config_key, config_value) VALUES ('kb_llm_max_tokens','4096'::jsonb) ON CONFLICT (config_key) DO NOTHING;
 INSERT INTO public.rma_config (config_key, config_value) VALUES ('kb_llm_model','"nvidia/nemotron-3-ultra-550b-a55b"'::jsonb) ON CONFLICT (config_key) DO NOTHING;
 INSERT INTO public.rma_config (config_key, config_value) VALUES ('legal_name','""'::jsonb) ON CONFLICT (config_key) DO NOTHING;
-INSERT INTO public.rma_config (config_key, config_value) VALUES ('pdf_layout','{"font": "Calibri, Candara, sans-serif", "currency": "EGP", "fontSize": 12, "sections": {"products": true, "ticketInfo": true, "accessories": true, "attachments": false, "signatureLine": true, "generalDescription": true}, "showDate": true, "showLogo": true, "paperSize": "A4", "footerText": "Thanks for your business with QDS Egypt", "companyName": "Quality Durable System Egypt ", "headerStyle": "colored", "orientation": "portrait", "companyPhone": "+2027374455", "logoPosition": "left", "primaryColor": "#000000", "sectionOrder": ["ticketInfo", "products", "generalDescription", "accessories", "attachments", "signatureLine"], "showRmaNumber": true, "showWatermark": false, "companyAddress": "20 Ahmed Heshmat, Zamalek, Cairo, Egypt", "showCompanyName": true, "showGeneratedDate": true}'::jsonb) ON CONFLICT (config_key) DO NOTHING;
+INSERT INTO public.rma_config (config_key, config_value) VALUES ('pdf_layout','{"font": "Calibri, Candara, sans-serif", "currency": "EGP", "fontSize": 12, "sections": {"products": true, "ticketInfo": true, "accessories": true, "attachments": false, "signatureLine": true, "generalDescription": true}, "showDate": true, "showLogo": true, "paperSize": "A4", "footerText": "Thanks for your business", "companyName": "", "headerStyle": "colored", "orientation": "portrait", "companyPhone": "", "logoPosition": "left", "primaryColor": "#000000", "sectionOrder": ["ticketInfo", "products", "generalDescription", "accessories", "attachments", "signatureLine"], "showRmaNumber": true, "showWatermark": false, "companyAddress": "", "showCompanyName": true, "showGeneratedDate": true}'::jsonb) ON CONFLICT (config_key) DO NOTHING;
 INSERT INTO public.rma_config (config_key, config_value) VALUES ('purchase_tax_in_cost','false'::jsonb) ON CONFLICT (config_key) DO NOTHING;
 INSERT INTO public.rma_config (config_key, config_value) VALUES ('registered_address','""'::jsonb) ON CONFLICT (config_key) DO NOTHING;
 INSERT INTO public.rma_config (config_key, config_value) VALUES ('role_templates','{"manager": {"products": {"edit": true, "view": true, "create": true, "delete": false, "export": true, "import": true}, "settings": {"edit_branding": false, "view_settings": false, "manage_statuses": false, "view_audit_logs": false, "edit_company_info": false, "manage_categories": false, "manage_priorities": false, "manage_email_templates": false}, "customers": {"edit": true, "view": true, "create": true, "delete": false, "export": true, "import": true, "view_history": true}, "dashboard": {"view_reports": true, "export_reports": true, "view_analytics": true, "view_dashboard": true, "customize_dashboard": false}, "inventory": {"view": true, "delete": false, "export": true, "transfer": true, "resolve_units": true, "manage_batches": true, "manage_warehouses": false}, "rma_tickets": {"assign": true, "create": true, "delete": false, "export": true, "edit_all": true, "view_all": true, "add_comments": true, "attach_files": true, "delete_files": false, "print_labels": true, "change_status": true, "edit_assigned": true, "view_activity": true, "view_assigned": true, "change_priority": true, "delete_comments": false}, "user_management": {"edit_users": false, "view_users": false, "assign_roles": false, "create_roles": false, "create_users": false, "delete_roles": false, "delete_users": false, "manage_permissions": false}}}'::jsonb) ON CONFLICT (config_key) DO NOTHING;
-INSERT INTO public.rma_config (config_key, config_value) VALUES ('sales_doc_layout','{"font": "Calibri, Candara, sans-serif", "currency": "EGP", "fontSize": 13, "footerText": "Thanks for your business", "companyName": "QDS Egypt", "companyPhone": "+20227374455", "primaryColor": "#4338ca", "companyAddress": "20 Ahmed Heshmat, Zamalek, Cairo, Egypt", "showGeneratedDate": true}'::jsonb) ON CONFLICT (config_key) DO NOTHING;
+INSERT INTO public.rma_config (config_key, config_value) VALUES ('sales_doc_layout','{"font": "Calibri, Candara, sans-serif", "currency": "EGP", "fontSize": 13, "footerText": "Thanks for your business", "companyName": "", "companyPhone": "", "primaryColor": "#4338ca", "companyAddress": "", "showGeneratedDate": true}'::jsonb) ON CONFLICT (config_key) DO NOTHING;
 INSERT INTO public.rma_config (config_key, config_value) VALUES ('tax_registration_number','""'::jsonb) ON CONFLICT (config_key) DO NOTHING;
 INSERT INTO public.rma_config (config_key, config_value) VALUES ('timezone','"Africa/Cairo"'::jsonb) ON CONFLICT (config_key) DO NOTHING;
-
-COMMIT;
 
 -- Verification: every row must report PASS.
 SELECT CASE WHEN count(*) > 0  THEN 'PASS' ELSE 'FAIL' END AS result,
