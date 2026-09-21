@@ -10,11 +10,26 @@
  *
  *   supabase/migrations/00000000_baseline_schema.sql         -- structure
  *   supabase/migrations/00000001_baseline_reference_data.sql -- currencies, countries, rma_config
+ *   supabase/migrations/00000002_baseline_seed_data.sql      -- sequences, system warehouses, templates
  *
  * The historical migrations (20260524…) must NOT be replayed afterwards: the
  * baseline already reflects their end state, and re-running them would re-apply
  * ALTERs against a schema that has them. This script therefore applies exactly
- * the two baseline files, in order, and nothing else.
+ * the baseline files, in order, and nothing else.
+ *
+ * ALL of them run in ONE transaction: a failure in the last file rolls the
+ * whole project back to empty, so a re-run starts clean. (The schema file is
+ * not re-runnable -- its ADD CONSTRAINT and CREATE POLICY statements are
+ * unguarded -- so applying it file-by-file left a half-provisioned project
+ * that only a schema drop could recover.)
+ *
+ * --no-seed skips 00000002 (rows the app assumes exist). Use it when the
+ * project will be filled from a BACKUP: the restore upserts on primary key
+ * only, so a backup row with the same natural key under a different id
+ * (a warehouse code, a pipeline name, a template name) is a unique violation
+ * and the whole restore rolls back. After such a restore run
+ *   SELECT public.rma_reconcile_document_sequences();
+ * as an administrator: a backup cannot carry the document counters.
  *
  * USAGE
  *
@@ -26,8 +41,8 @@
  * SAFETY
  *
  * Refuses to run against a database that already has application tables unless
- * --force is passed, so it cannot be pointed at production by accident. Each
- * file runs inside its own transaction: a failure leaves nothing half-applied.
+ * --force is passed, so it cannot be pointed at production by accident. The
+ * files run in one transaction: a failure leaves nothing half-applied.
  */
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
@@ -36,13 +51,15 @@ import pg from 'pg'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const MIGRATIONS = path.join(HERE, '..', 'supabase', 'migrations')
-const FILES = ['00000000_baseline_schema.sql', '00000001_baseline_reference_data.sql']
+const SEED_FILE = '00000002_baseline_seed_data.sql'
+const ALL_FILES = ['00000000_baseline_schema.sql', '00000001_baseline_reference_data.sql', SEED_FILE]
 
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`)
   return i === -1 ? undefined : process.argv[i + 1]
 }
 const hasFlag = (name) => process.argv.includes(`--${name}`)
+const FILES = hasFlag('no-seed') ? ALL_FILES.filter((f) => f !== SEED_FILE) : ALL_FILES
 
 const dbUrl = arg('db-url') || process.env.SUPABASE_DB_URL
 if (!dbUrl) {
@@ -97,22 +114,23 @@ async function main() {
     process.exit(1)
   }
 
+  await client.query('begin')
   for (const file of FILES) {
     const sql = await readFile(path.join(MIGRATIONS, file), 'utf8')
     process.stdout.write(`Applying ${file} … `)
     try {
-      await client.query('begin')
       await client.query(sql)
-      await client.query('commit')
       console.log('ok')
     } catch (err) {
       await client.query('rollback')
       console.log('failed')
       console.error(err.message)
+      console.error('\nEverything was rolled back; the target is as it was. Fix the cause and re-run.')
       await client.end()
       process.exit(1)
     }
   }
+  await client.query('commit')
 
   const after = await fingerprint(client)
   console.log(
@@ -125,7 +143,7 @@ async function main() {
   const EXPECTED_MIN_TABLES = 60
   if (Number(after.tables) < EXPECTED_MIN_TABLES) {
     console.error(
-      `\nOnly ${after.tables} tables after provisioning; the baseline declares 62. Investigate before using this project.`
+      `\nOnly ${after.tables} tables after provisioning; the baseline expects at least ${EXPECTED_MIN_TABLES}. Investigate before using this project.`
     )
     await client.end()
     process.exit(1)
