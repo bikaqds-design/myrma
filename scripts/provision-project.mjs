@@ -10,11 +10,26 @@
  *
  *   supabase/migrations/00000000_baseline_schema.sql         -- structure
  *   supabase/migrations/00000001_baseline_reference_data.sql -- currencies, countries, rma_config
+ *   supabase/migrations/00000002_baseline_seed_data.sql      -- sequences, system warehouses, templates
  *
  * The historical migrations (20260524…) must NOT be replayed afterwards: the
  * baseline already reflects their end state, and re-running them would re-apply
  * ALTERs against a schema that has them. This script therefore applies exactly
- * the two baseline files, in order, and nothing else.
+ * the baseline files, in order, then only migrations newer than BASELINE_THROUGH.
+ *
+ * ALL of them run in ONE transaction: a failure in the last file rolls the
+ * whole project back to empty, so a re-run starts clean. (The schema file is
+ * not re-runnable -- its ADD CONSTRAINT and CREATE POLICY statements are
+ * unguarded -- so applying it file-by-file left a half-provisioned project
+ * that only a schema drop could recover.)
+ *
+ * --no-seed skips 00000002 (rows the app assumes exist). Use it when the
+ * project will be filled from a BACKUP: the restore upserts on primary key
+ * only, so a backup row with the same natural key under a different id
+ * (a warehouse code, a pipeline name, a template name) is a unique violation
+ * and the whole restore rolls back. After such a restore run
+ *   SELECT public.rma_reconcile_document_sequences();
+ * as an administrator: a backup cannot carry the document counters.
  *
  * USAGE
  *
@@ -26,17 +41,35 @@
  * SAFETY
  *
  * Refuses to run against a database that already has application tables unless
- * --force is passed, so it cannot be pointed at production by accident. Each
- * file runs inside its own transaction: a failure leaves nothing half-applied.
+ * --force is passed, so it cannot be pointed at production by accident. The
+ * files run in one transaction: a failure leaves nothing half-applied.
  */
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import pg from 'pg'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const MIGRATIONS = path.join(HERE, '..', 'supabase', 'migrations')
-const FILES = ['00000000_baseline_schema.sql', '00000001_baseline_reference_data.sql']
+const SEED_FILE = '00000002_baseline_seed_data.sql'
+const BASELINE_FILES = ['00000000_baseline_schema.sql', '00000001_baseline_reference_data.sql', SEED_FILE]
+
+/**
+ * The baseline was generated from production on 2026-09-20 and reflects every
+ * migration up to and including this version. Anything newer is applied on top,
+ * in order. Historical migrations at or below it must NOT be replayed: the
+ * baseline already contains their end state. Move this forward whenever the
+ * baseline is regenerated.
+ */
+const BASELINE_THROUGH = '20260874'
+
+async function migrationFiles() {
+  const newer = (await readdir(MIGRATIONS))
+    .filter((f) => /^[0-9]{8,}.*\.sql$/.test(f) && f.slice(0, 8) > BASELINE_THROUGH)
+    .sort()
+  const base = hasFlag('no-seed') ? BASELINE_FILES.filter((f) => f !== SEED_FILE) : BASELINE_FILES
+  return [...base, ...newer]
+}
 
 function arg(name) {
   const i = process.argv.indexOf(`--${name}`)
@@ -97,22 +130,23 @@ async function main() {
     process.exit(1)
   }
 
-  for (const file of FILES) {
+  await client.query('begin')
+  for (const file of await migrationFiles()) {
     const sql = await readFile(path.join(MIGRATIONS, file), 'utf8')
     process.stdout.write(`Applying ${file} … `)
     try {
-      await client.query('begin')
       await client.query(sql)
-      await client.query('commit')
       console.log('ok')
     } catch (err) {
       await client.query('rollback')
       console.log('failed')
       console.error(err.message)
+      console.error('\nEverything was rolled back; the target is as it was. Fix the cause and re-run.')
       await client.end()
       process.exit(1)
     }
   }
+  await client.query('commit')
 
   const after = await fingerprint(client)
   console.log(
@@ -125,7 +159,7 @@ async function main() {
   const EXPECTED_MIN_TABLES = 60
   if (Number(after.tables) < EXPECTED_MIN_TABLES) {
     console.error(
-      `\nOnly ${after.tables} tables after provisioning; the baseline declares 62. Investigate before using this project.`
+      `\nOnly ${after.tables} tables after provisioning; the baseline expects at least ${EXPECTED_MIN_TABLES}. Investigate before using this project.`
     )
     await client.end()
     process.exit(1)
