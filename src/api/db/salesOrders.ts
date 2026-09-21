@@ -169,9 +169,13 @@ export const salesOrders = {
 
   /**
    * markAccepted: delegates to approve_sales_order RPC which reserves every
-   * line's inventory by derived type (serialized → reserve_units; service →
-   * no-op) and sets status='delivered' atomically in one transaction.
-   * Role check (manager+) is enforced server-side. Closes H1, H4a, M1, M5.
+   * line's inventory by derived type (serialized → reserve_units; bulk →
+   * reserve_warehouse_stock; service → no-op) and sets status='confirmed'
+   * atomically in one transaction. 'confirmed', not 'delivered': the stock is
+   * held for the customer but has not left (delivered_at stays empty; the
+   * units move to delivered when the invoice posts). A line with no valid
+   * quantity refuses the approval. Role check (manager+) is enforced
+   * server-side. Closes H1, H4a, M1, M5; BL-04 (20260879).
    */
   async markAccepted(soId: string, actorEmail: string): Promise<SalesOrderRow> {
     const { data, error } = await supabase.rpc('approve_sales_order', {
@@ -185,6 +189,8 @@ export const salesOrders = {
 
   /**
    * markDeclined: delegates to reject_sales_order RPC (role-checked, locked).
+   * Only an order awaiting approval ('sent') can be rejected; one that was
+   * already approved holds stock and has to be cancelled, which releases it.
    */
   async markDeclined(soId: string, actorEmail = 'system'): Promise<SalesOrderRow> {
     const { data, error } = await supabase.rpc('reject_sales_order', {
@@ -198,8 +204,9 @@ export const salesOrders = {
 
   /**
    * cancel: delegates to cancel_sales_order RPC which checks for a live
-   * invoice first, releases serialized unit reservations, then sets
-   * status='cancelled'. Works from any not-yet-invoiced status. Closes H2.
+   * invoice first, releases serialized AND bulk reservations, then sets
+   * status='cancelled'. Works from any not-yet-invoiced status. Closes H2;
+   * bulk release BL-04 (20260879).
    */
   async cancel(soId: string, actorEmail: string): Promise<SalesOrderRow> {
     const { data, error } = await supabase.rpc('cancel_sales_order', {
@@ -220,6 +227,11 @@ export const salesOrders = {
     if (!so) throw new Error('Sales order not found')
     if (so.status === 'cancelled') {
       throw new Error('Cannot invoice a cancelled sales order')
+    }
+    // The database refuses this too (trg_crm_invoices_from_approved_order);
+    // saying so here gives the person the reason before the round trip.
+    if (so.status !== 'confirmed' && so.status !== 'delivered') {
+      throw new Error('Approve the sales order before invoicing it')
     }
 
     // Prevent re-conversion if a non-cancelled invoice already exists for this SO.
