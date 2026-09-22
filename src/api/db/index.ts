@@ -186,7 +186,8 @@ export type {
   PurchaseLine, PurchaseOrderRow, VendorInvoiceRow,
   PurchaseDocType, PurchaseDocumentRow, PurchaseDocumentListRow, PurchaseDocTab, PurchaseDocFilters, PurchaseDocSort, PurchaseDocSummary, PurchaseDocBucket, VendorInvoiceChargeRow, ChargeType,
 } from './purchasing.js'
-export { landedUnitCosts } from './purchasing.js'
+export { landedUnitCosts, uncostedStock, importOpeningCosts } from './purchasing.js'
+export type { LandedUnitCost, UncostedStockRow, OpeningCostRow, OpeningCostResult } from './purchasing.js'
 export type { VendorPaymentRow, VendorPaymentApplicationRow } from './vendorPayments.js'
 export type {
   VendorLedgerEntryRow, VendorLedgerEntryType, ApAgingBucket, ApAgingVendorRow,

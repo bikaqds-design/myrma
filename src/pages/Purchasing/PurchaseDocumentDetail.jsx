@@ -826,10 +826,10 @@ function ReceiveVendorInvoiceModal({ vi, warehouses, onClose, userEmail, onSucce
       if (!entry) continue
       if (product.stock_tracking_mode === 'bulk') {
         const qty = parseInt(entry.qty, 10)
-        if (qty > 0) receiptLines.push({ productId: product.id, warehouseId, qty })
+        if (qty > 0) receiptLines.push({ productId: product.id, warehouseId, lineIndex: line.index, qty })
       } else {
         const serials = (entry.serialsText || '').split('\n').map((s) => s.trim()).filter(Boolean)
-        if (serials.length) receiptLines.push({ productId: product.id, warehouseId, serials })
+        if (serials.length) receiptLines.push({ productId: product.id, warehouseId, lineIndex: line.index, serials })
       }
     }
     if (receiptLines.length === 0) {
