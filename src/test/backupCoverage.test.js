@@ -43,7 +43,7 @@ notification_preferences notification_queue notification_settings notifications 
 payment_applications payments pipelines product_documents product_images products purchase_order_lines purchase_order_revisions purchase_orders quotation_lines quotations
 rma_config rma_tickets sales_order_lines sales_orders stock_moves subcategories ticket_activity ticket_comments
 ticket_parts ticket_resolutions time_entries user_activity_log user_permissions user_preferences
-user_roles vendor_invoice_charges vendor_invoices vendor_payment_applications vendor_payments warehouse_stock warehouses
+user_roles vendor_invoice_charges vendor_invoice_lines vendor_invoices vendor_payment_applications vendor_payments warehouse_stock warehouses
 webhooks whatsapp_templates`
   .split(/\s+/)
   .filter(Boolean)

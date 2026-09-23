@@ -67,6 +67,10 @@ DECLARE
   v_a     text;
   ins_vi  text := $q$INSERT INTO public.vendor_invoices (id, vendor_id, status, line_items, total, subtotal, currency, created_by, supplier_invoice_no, supplier_invoice_date, purchase_order_id, non_po_reason)
                      VALUES (%L, %L, %L, '[]', %s, %s, 'EGP', %L, %L, %s, %L, %L)$q$;
+  -- since 20260889 a client creates a vendor invoice only through create_vendor_invoice;
+  -- ins_vi (run as the owner) sets up fixtures, new_vi tests the creation rules
+  new_vi  text := $q$SELECT public.create_vendor_invoice(%L, jsonb_build_array(jsonb_build_object('product_id', %L, 'qty_ordered', 1, 'unit_cost', %s)),
+                     jsonb_build_object('currency', 'EGP', 'supplier_invoice_no', %L, 'supplier_invoice_date', %s, 'non_po_reason', %L), 'ignored')$q$;
 BEGIN
   INSERT INTO public.user_roles (user_email, role, status)
   VALUES (v_mgr, 'manager', 'active'), (v_adm, 'admin', 'active'), (v_adm2, 'admin', 'active'), (v_tech, 'technician', 'active');
@@ -76,19 +80,19 @@ BEGIN
 
   -- ══ 1. Supplier invoice number: required, and unique per supplier and year ══
   RAISE NOTICE '--- 1. Supplier invoice identity ---';
-  v_vi := gen_random_uuid();
-  v_out := pg_temp.call(v_mgr, format(ins_vi, v_vi, v_v1, 'draft', 1000, 1000, v_mgr, 'INV-778', 'current_date', NULL, 'stock top-up'));
-  RAISE NOTICE '%', pg_temp.check('a draft vendor invoice with a supplier number is created', v_out = 'ok', '-> ' || v_out);
+  v_out := pg_temp.call(v_mgr, format(new_vi, v_v1, v_p1, 1000, 'INV-778', 'current_date', 'stock top-up'));
+  SELECT id INTO v_vi FROM public.vendor_invoices WHERE vendor_id = v_v1 AND supplier_invoice_no = 'INV-778';
+  RAISE NOTICE '%', pg_temp.check('a draft vendor invoice with a supplier number is created', v_out = 'ok' AND v_vi IS NOT NULL, '-> ' || v_out);
   v_out := pg_temp.call(v_mgr, format('UPDATE public.vendor_invoices SET status = ''pending_approval'' WHERE id = %L', v_vi));
   RAISE NOTICE '%', pg_temp.check('and can be submitted for approval', v_out = 'ok' AND pg_temp.vi_status(v_vi) = 'pending_approval', '-> ' || v_out);
 
-  v_out := pg_temp.call(v_mgr, format(ins_vi, gen_random_uuid(), v_v1, 'draft', 5000, 5000, v_mgr, 'INV-778', 'current_date', NULL, 'stock top-up'));
+  v_out := pg_temp.call(v_mgr, format(new_vi, v_v1, v_p1, 5000, 'INV-778', 'current_date', 'stock top-up'));
   RAISE NOTICE '%', pg_temp.check('entering INV-778 twice for the same supplier is refused', v_out LIKE 'err:P0001%INV-778%', '-> ' || v_out);
-  v_out := pg_temp.call(v_mgr, format(ins_vi, gen_random_uuid(), v_v1, 'draft', 5000, 5000, v_mgr, '  inv- 778 ', 'current_date', NULL, 'stock top-up'));
+  v_out := pg_temp.call(v_mgr, format(new_vi, v_v1, v_p1, 5000, '  inv- 778 ', 'current_date', 'stock top-up'));
   RAISE NOTICE '%', pg_temp.check('...however it is spaced or capitalised', v_out LIKE 'err:P0001%', '-> ' || v_out);
-  v_out := pg_temp.call(v_mgr, format(ins_vi, gen_random_uuid(), v_v2, 'draft', 5000, 5000, v_mgr, 'INV-778', 'current_date', NULL, 'stock top-up'));
+  v_out := pg_temp.call(v_mgr, format(new_vi, v_v2, v_p1, 5000, 'INV-778', 'current_date', 'stock top-up'));
   RAISE NOTICE '%', pg_temp.check('the same number from a DIFFERENT supplier is fine', v_out = 'ok', '-> ' || v_out);
-  v_out := pg_temp.call(v_mgr, format(ins_vi, gen_random_uuid(), v_v1, 'draft', 5000, 5000, v_mgr, 'INV-778', '(current_date - interval ''400 days'')::date', NULL, 'stock top-up'));
+  v_out := pg_temp.call(v_mgr, format(new_vi, v_v1, v_p1, 5000, 'INV-778', '(current_date - interval ''400 days'')::date', 'stock top-up'));
   RAISE NOTICE '%', pg_temp.check('the same number is a duplicate whatever invoice date is typed (the year is the year it was entered)', v_out LIKE 'err:P0001%', '-> ' || v_out);
 
   -- the database itself, not just the friendly check
@@ -97,12 +101,12 @@ BEGIN
 
   -- a cancelled invoice frees its number
   PERFORM pg_temp.call(v_mgr, format('UPDATE public.vendor_invoices SET status = ''cancelled'' WHERE id = %L', v_vi));
-  v_out := pg_temp.call(v_mgr, format(ins_vi, gen_random_uuid(), v_v1, 'draft', 1000, 1000, v_mgr, 'INV-778', 'current_date', NULL, 'stock top-up'));
+  v_out := pg_temp.call(v_mgr, format(new_vi, v_v1, v_p1, 1000, 'INV-778', 'current_date', 'stock top-up'));
   RAISE NOTICE '%', pg_temp.check('cancelling a vendor invoice frees its supplier number', pg_temp.vi_status(v_vi) = 'cancelled' AND v_out = 'ok', '-> ' || v_out);
 
   -- required from pending_approval
   v_vi := gen_random_uuid();
-  PERFORM pg_temp.call(v_mgr, format(ins_vi, v_vi, v_v2, 'draft', 300, 300, v_mgr, NULL, 'NULL', NULL, 'reason for non po'));
+  PERFORM pg_temp.call(NULL, format(ins_vi, v_vi, v_v2, 'draft', 300, 300, v_mgr, NULL, 'NULL', NULL, 'reason for non po'));
   v_out := pg_temp.call(v_mgr, format('UPDATE public.vendor_invoices SET status = ''pending_approval'' WHERE id = %L', v_vi));
   RAISE NOTICE '%', pg_temp.check('a draft with no supplier number cannot be submitted for approval', v_out LIKE 'err:P0001%' AND pg_temp.vi_status(v_vi) = 'draft', '-> ' || v_out);
   v_out := pg_temp.call(v_mgr, format('UPDATE public.vendor_invoices SET supplier_invoice_no = ''   '', status = ''pending_approval'' WHERE id = %L', v_vi));
@@ -113,10 +117,10 @@ BEGIN
   -- ══ 2. Near-duplicates ═══════════════════════════════════════════════════
   RAISE NOTICE '--- 2. A different number, but the same bill ---';
   v_vi := gen_random_uuid();
-  PERFORM pg_temp.call(v_mgr, format(ins_vi, v_vi, v_v2, 'draft', 10000, 10000, v_mgr, 'A-1001', 'current_date', NULL, 'stock top-up'));
+  PERFORM pg_temp.call(NULL, format(ins_vi, v_vi, v_v2, 'draft', 10000, 10000, v_mgr, 'A-1001', 'current_date', NULL, 'stock top-up'));
   PERFORM pg_temp.call(v_mgr, format('UPDATE public.vendor_invoices SET status = ''pending_approval'' WHERE id = %L', v_vi));
   v_vi2 := gen_random_uuid();
-  PERFORM pg_temp.call(v_mgr, format(ins_vi, v_vi2, v_v2, 'draft', 10050, 10050, v_mgr, 'A-1002', 'current_date', NULL, 'stock top-up'));
+  PERFORM pg_temp.call(NULL, format(ins_vi, v_vi2, v_v2, 'draft', 10050, 10050, v_mgr, 'A-1002', 'current_date', NULL, 'stock top-up'));
   v_out := pg_temp.call(v_mgr, format('UPDATE public.vendor_invoices SET status = ''pending_approval'' WHERE id = %L', v_vi2));
   RAISE NOTICE '%', pg_temp.check('same supplier, amount within 1%, close in time, another number: needs a reason', v_out LIKE 'err:P0001%' AND pg_temp.vi_status(v_vi2) = 'draft', '-> ' || v_out);
   v_out := pg_temp.call(v_mgr, format('UPDATE public.vendor_invoices SET duplicate_override_reason = ''short'', status = ''pending_approval'' WHERE id = %L', v_vi2));
@@ -126,11 +130,11 @@ BEGIN
     AND (SELECT duplicate_override_reason FROM public.vendor_invoices WHERE id = v_vi2) LIKE 'Second delivery%', '-> ' || v_out);
 
   v_vi2 := gen_random_uuid();
-  PERFORM pg_temp.call(v_mgr, format(ins_vi, v_vi2, v_v2, 'draft', 12000, 12000, v_mgr, 'A-1003', 'current_date', NULL, 'stock top-up'));
+  PERFORM pg_temp.call(NULL, format(ins_vi, v_vi2, v_v2, 'draft', 12000, 12000, v_mgr, 'A-1003', 'current_date', NULL, 'stock top-up'));
   v_out := pg_temp.call(v_mgr, format('UPDATE public.vendor_invoices SET status = ''pending_approval'' WHERE id = %L', v_vi2));
   RAISE NOTICE '%', pg_temp.check('a clearly different amount is not flagged', v_out = 'ok', '-> ' || v_out);
   v_vi2 := gen_random_uuid();
-  PERFORM pg_temp.call(v_mgr, format(ins_vi, v_vi2, v_v1, 'draft', 10000, 10000, v_mgr, 'A-2001', 'current_date', NULL, 'stock top-up'));
+  PERFORM pg_temp.call(NULL, format(ins_vi, v_vi2, v_v1, 'draft', 10000, 10000, v_mgr, 'A-2001', 'current_date', NULL, 'stock top-up'));
   v_out := pg_temp.call(v_mgr, format('UPDATE public.vendor_invoices SET status = ''pending_approval'' WHERE id = %L', v_vi2));
   RAISE NOTICE '%', pg_temp.check('the same amount from a DIFFERENT supplier is not flagged', v_out = 'ok', '-> ' || v_out);
 
@@ -138,7 +142,7 @@ BEGIN
   RAISE NOTICE '--- 3. Creating past the approval ---';
   FOREACH v_a IN ARRAY ARRAY['pending_approval', 'approved', 'partially_received', 'received'] LOOP
     v_out := pg_temp.call(v_mgr, format(ins_vi, gen_random_uuid(), v_v1, v_a, 100, 100, v_mgr, 'X-' || v_a, 'current_date', NULL, 'stock top-up'));
-    RAISE NOTICE '%', pg_temp.check(format('a manager cannot insert a vendor invoice already "%s"', v_a), v_out LIKE 'err:P0001%', '-> ' || v_out);
+    RAISE NOTICE '%', pg_temp.check(format('a manager cannot insert a vendor invoice already "%s" (no client INSERT since 20260889)', v_a), v_out LIKE 'err:%', '-> ' || v_out);
   END LOOP;
   v_out := pg_temp.call(v_mgr, $q$INSERT INTO public.purchase_orders (vendor_id, status, line_items, total, subtotal, currency, created_by, po_code) VALUES ($q$ || quote_literal(v_v1) || $q$, 'confirmed', '[]', 1, 1, 'EGP', 'x', 'PO-T-CONF')$q$);
   -- since 20260888 no client INSERTs a purchase order at all (create_purchase_order does)
@@ -152,15 +156,17 @@ BEGIN
   -- ══ 4. A vendor invoice with no purchase order ═══════════════════════════
   RAISE NOTICE '--- 4. Non-PO vendor invoices ---';
   v_vi := gen_random_uuid();
-  PERFORM pg_temp.call(v_mgr, format(ins_vi, v_vi, v_v2, 'draft', 777, 777, v_mgr, 'NP-1', 'current_date', NULL, NULL));
+  PERFORM pg_temp.call(NULL, format(ins_vi, v_vi, v_v2, 'draft', 777, 777, v_mgr, 'NP-1', 'current_date', NULL, NULL));
   v_out := pg_temp.call(v_mgr, format('UPDATE public.vendor_invoices SET status = ''pending_approval'' WHERE id = %L', v_vi));
   RAISE NOTICE '%', pg_temp.check('with no PO and no reason it cannot be submitted', v_out LIKE 'err:P0001%' AND pg_temp.vi_status(v_vi) = 'draft', '-> ' || v_out);
-  v_out := pg_temp.call(v_mgr, format('UPDATE public.vendor_invoices SET non_po_reason = ''Emergency freight, no time for a PO'', status = ''pending_approval'' WHERE id = %L', v_vi));
+  -- the reason is written through the form (update_vendor_invoice, 20260889), then it is submitted
+  PERFORM pg_temp.call(v_mgr, format($q$SELECT public.update_vendor_invoice(%L, NULL, '{"non_po_reason":"Emergency freight, no time for a PO"}'::jsonb, 'x')$q$, v_vi));
+  v_out := pg_temp.call(v_mgr, format('UPDATE public.vendor_invoices SET status = ''pending_approval'' WHERE id = %L', v_vi));
   RAISE NOTICE '%', pg_temp.check('with a reason it can', v_out = 'ok', '-> ' || v_out);
 
   -- its creator, even as an administrator, cannot approve it
   v_vi := gen_random_uuid();
-  PERFORM pg_temp.call(v_adm, format(ins_vi, v_vi, v_v2, 'draft', 888, 888, v_adm, 'NP-2', 'current_date', NULL, 'Emergency freight, no time for a PO'));
+  PERFORM pg_temp.call(NULL, format(ins_vi, v_vi, v_v2, 'draft', 888, 888, v_adm, 'NP-2', 'current_date', NULL, 'Emergency freight, no time for a PO'));
   PERFORM pg_temp.call(v_adm, format('UPDATE public.vendor_invoices SET status = ''pending_approval'' WHERE id = %L', v_vi));
   v_out := pg_temp.call(v_adm, format('UPDATE public.vendor_invoices SET status = ''approved'' WHERE id = %L', v_vi));
   RAISE NOTICE '%', pg_temp.check('an administrator cannot approve a non-PO invoice they created', v_out LIKE 'err:P0001%' AND pg_temp.vi_status(v_vi) = 'pending_approval', '-> ' || v_out);
@@ -171,7 +177,7 @@ BEGIN
   RAISE NOTICE '%', pg_temp.check('a client cannot rewrite the approver afterwards', (SELECT approved_by FROM public.vendor_invoices WHERE id = v_vi) = v_adm2, '-> ' || v_out);
   -- a manager still cannot approve at all (existing rule)
   v_vi := gen_random_uuid();
-  PERFORM pg_temp.call(v_mgr, format(ins_vi, v_vi, v_v2, 'draft', 999, 999, v_mgr, 'NP-3', 'current_date', NULL, 'Emergency freight, no time for a PO'));
+  PERFORM pg_temp.call(NULL, format(ins_vi, v_vi, v_v2, 'draft', 999, 999, v_mgr, 'NP-3', 'current_date', NULL, 'Emergency freight, no time for a PO'));
   PERFORM pg_temp.call(v_mgr, format('UPDATE public.vendor_invoices SET status = ''pending_approval'' WHERE id = %L', v_vi));
   v_out := pg_temp.call(v_mgr, format('UPDATE public.vendor_invoices SET status = ''approved'' WHERE id = %L', v_vi));
   RAISE NOTICE '%', pg_temp.check('a manager still cannot approve a vendor invoice (existing rule)', v_out LIKE 'err:P0001%', '-> ' || v_out);
@@ -264,7 +270,7 @@ BEGIN
 
   -- an invoice already raised against the PO
   v_vi := gen_random_uuid();
-  PERFORM pg_temp.call(v_mgr, format(ins_vi, v_vi, v_v1, 'draft', 100, 100, v_mgr, 'PO-LINKED-1', 'current_date', v_po, NULL));
+  PERFORM pg_temp.call(NULL, format(ins_vi, v_vi, v_v1, 'draft', 100, 100, v_mgr, 'PO-LINKED-1', 'current_date', v_po, NULL));
   v_out := pg_temp.call(v_mgr, format($q$SELECT public.amend_purchase_order(%L, '{"payment_terms":"net 30"}'::jsonb, 'Amending with an invoice open', %L)$q$, v_po, v_mgr));
   RAISE NOTICE '%', pg_temp.check('a PO with a live vendor invoice against it cannot be amended', v_out LIKE 'err:P0001%', '-> ' || v_out);
   PERFORM pg_temp.call(v_mgr, format('UPDATE public.vendor_invoices SET status = ''cancelled'' WHERE id = %L', v_vi));
@@ -289,7 +295,7 @@ BEGIN
   -- ══ 7. Security review findings (bypasses of sections 1-4) ═══════════════
   RAISE NOTICE '--- 7. Review findings ---';
   v_vi := gen_random_uuid();
-  PERFORM pg_temp.call(v_adm, format(ins_vi, v_vi, v_v2, 'draft', 3000, 3000, v_adm, 'S7-1', 'current_date', NULL, 'Emergency freight, no time for a PO'));
+  PERFORM pg_temp.call(NULL, format(ins_vi, v_vi, v_v2, 'draft', 3000, 3000, v_adm, 'S7-1', 'current_date', NULL, 'Emergency freight, no time for a PO'));
   PERFORM pg_temp.call(v_adm, format('UPDATE public.vendor_invoices SET status = ''pending_approval'' WHERE id = %L', v_vi));
   v_out := pg_temp.call(v_adm, format('UPDATE public.vendor_invoices SET status = ''approved'', created_by = %L WHERE id = %L', v_adm2, v_vi));
   RAISE NOTICE '%', pg_temp.check('rewriting created_by in the approving statement does not defeat self-approval', v_out LIKE 'err:%' AND pg_temp.vi_status(v_vi) = 'pending_approval', '-> ' || v_out);
@@ -307,9 +313,9 @@ BEGIN
   v_out := pg_temp.call(v_adm2, format('UPDATE public.vendor_invoices SET line_items = ''[{"x":1}]'' WHERE id = %L', v_vi));
   RAISE NOTICE '%', pg_temp.check('nor its lines', v_out LIKE 'err:P0001%', '-> ' || v_out);
   v_vi2 := gen_random_uuid();
-  v_out := pg_temp.call(v_mgr, format(ins_vi, v_vi2, v_v2, 'draft', 3000, 3000, v_mgr, 'S7-1', quote_literal('2020-01-01'), NULL, 'Emergency freight, no time for a PO'));
+  v_out := pg_temp.call(v_mgr, format(new_vi, v_v2, v_p1, 3000, 'S7-1', quote_literal('2020-01-01'), 'Emergency freight, no time for a PO'));
   RAISE NOTICE '%', pg_temp.check('the same number with a different invoice date is still a duplicate', v_out LIKE 'err:%', '-> ' || v_out);
-  v_out := pg_temp.call(v_mgr, format(ins_vi, v_vi2, v_v2, 'draft', 3000, 3000, v_mgr, 'S7' || chr(160) || '-1', 'current_date', NULL, 'Emergency freight, no time for a PO'));
+  v_out := pg_temp.call(v_mgr, format(new_vi, v_v2, v_p1, 3000, 'S7' || chr(160) || '-1', 'current_date', 'Emergency freight, no time for a PO'));
   RAISE NOTICE '%', pg_temp.check('a non-breaking space does not make it a different number', v_out LIKE 'err:%', '-> ' || v_out);
 
   RAISE EXCEPTION 'BL10_TEST_DONE — rolling back fixtures (this is not a real failure)';

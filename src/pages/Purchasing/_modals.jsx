@@ -499,7 +499,7 @@ export function VendorInvoiceFormModal({ mode, initial, vendors, userEmail, onCl
           currency: cur.payload.currency, exchange_rate: cur.payload.exchangeRate,
           supplier_invoice_no: supplierNo.trim() || null, supplier_invoice_date: supplierDate || null,
           non_po_reason: nonPoReason.trim() || null,
-        })
+        }, userEmail)
       } else {
         row = await db.vendorInvoices.create({
           vendorId, lineItems: lines, ...cur.payload,
