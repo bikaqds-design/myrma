@@ -58,11 +58,17 @@ describe('the RPCs', () => {
     }
   })
 
-  it('edit a draft only, and never the products, quantities or prices of an order\'s invoice', () => {
+  it('edit a draft only, and never the products, quantities, prices, name or description of an order\'s invoice', () => {
     const upd = fn('update_crm_invoice')
     expect(upd).toContain("IF v_inv.doc_status <> 'draft' THEN")
     expect(upd).toContain('IF v_inv.so_id IS NOT NULL AND p_lines IS NOT NULL THEN')
     expect(upd).toContain('made from a sales order')
+    // product_name/description are part of the frozen fingerprint too — a
+    // client could otherwise relabel a line while product/qty/price stayed
+    // identical, and the earlier version of this check missed it (review).
+    expect(upd).toContain("lower(btrim(COALESCE(e.l->>'product_name', '')))")
+    expect(upd).toContain("lower(btrim(COALESCE(e.l->>'description', '')))")
+    expect(upd).toContain('lower(btrim(l.product_name)), lower(btrim(COALESCE(l.description, \'\')))')
   })
 
   it('require every line to be a catalogue product, and total from the stored rows', () => {

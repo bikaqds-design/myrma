@@ -17,10 +17,20 @@
 --     so_id): an invoice is tied to an order only by convert_so_to_invoice.
 --   * Lines must be catalogue products, as on orders.
 --   * An invoice made from an order carries what the customer accepted and the
---     stock reserved for it: its products, quantities and prices cannot be
---     edited (partial invoicing is P-02's, and will be designed there).
---   * Draft invoices whose historical lines the backfill corrected are rebuilt
---     from their rows; posted invoices keep their figures as issued.
+--     stock reserved for it: its products, quantities, prices AND the printed
+--     name/description of each line cannot be edited — not just the money
+--     fields, or a client could relabel what an order's invoice says it bills
+--     while product/qty/price stayed identical (found on review; partial
+--     invoicing is P-02's, and will be designed there).
+--   * Every DRAFT invoice's mirror and totals are rebuilt from its rows (8);
+--     this reformats the stored JSON even where nothing was actually wrong, so
+--     the row count it reports is "drafts synced," not "drafts that needed
+--     fixing." Posted, paid and void invoices are untouched — only
+--     doc_status = 'draft' is ever written here.
+--   * Reopening a cancelled invoice to draft is not a client-reachable
+--     transition (rma_assert_sales_status_transition allows only draft →
+--     cancelled), so a cancelled invoice cannot be used to invoice its order
+--     a second time. Checked on review, not changed by this migration.
 --
 -- post_invoice (stock and cost of goods), the credit-note caps
 -- (_credit_note_assert_within_caps, issue_credit_note) and
@@ -357,7 +367,12 @@ BEGIN
                round(COALESCE(NULLIF(btrim(COALESCE(e.l->>'qty', '')), ''), '0')::numeric, 4),
                round(COALESCE(NULLIF(btrim(COALESCE(e.l->>'unit_price', '')), ''), '0')::numeric, 4),
                round(COALESCE(NULLIF(btrim(COALESCE(e.l->>'discount_pct', '')), ''), '0')::numeric, 2),
-               round(COALESCE(NULLIF(btrim(COALESCE(e.l->>'tax_pct', '')), ''), '0')::numeric, 2)), ';' ORDER BY e.o)
+               round(COALESCE(NULLIF(btrim(COALESCE(e.l->>'tax_pct', '')), ''), '0')::numeric, 2),
+               -- the printed name and description are frozen too: a client
+               -- could otherwise relabel what an order's invoice says it bills
+               -- while product/qty/price stay identical (found on review).
+               lower(btrim(COALESCE(e.l->>'product_name', ''))),
+               lower(btrim(COALESCE(e.l->>'description', '')))), ';' ORDER BY e.o)
         INTO v_new
         FROM jsonb_array_elements(p_lines) WITH ORDINALITY AS e(l, o);
     EXCEPTION WHEN OTHERS THEN
@@ -365,7 +380,8 @@ BEGIN
     END;
     SELECT string_agg(concat_ws('|',
              COALESCE(lower(l.product_id::text), ''),
-             round(l.qty::numeric, 4), round(l.unit_price, 4), round(l.discount_pct, 2), round(l.tax_pct, 2)), ';' ORDER BY l.line_no)
+             round(l.qty::numeric, 4), round(l.unit_price, 4), round(l.discount_pct, 2), round(l.tax_pct, 2),
+             lower(btrim(l.product_name)), lower(btrim(COALESCE(l.description, '')))), ';' ORDER BY l.line_no)
       INTO v_old
       FROM public.crm_invoice_lines l WHERE l.crm_invoice_id = p_id;
     IF v_new IS DISTINCT FROM v_old THEN

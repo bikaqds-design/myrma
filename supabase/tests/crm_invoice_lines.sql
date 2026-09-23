@@ -125,6 +125,16 @@ BEGIN
     format('-> %s vs %s', v_inv.total, v_so.total));
   v_out := pg_temp.call(v_rep, format($q$SELECT public.convert_so_to_invoice(%L, %L)$q$, v_so.id, v_rep));
   RAISE NOTICE '%', pg_temp.check('a second conversion is refused (the order row is locked while it checks)', v_out LIKE 'err:P0001%already been converted%', '-> ' || v_out);
+  -- cannot reopen a cancelled invoice as a draft and convert its order again (would double-invoice it)
+  PERFORM pg_temp.as_user(v_rep);
+  v_so2 := public.create_sales_order(v_cust, v_lines, NULL, NULL, NULL, NULL, v_rep, v_rep);
+  PERFORM pg_temp.as_owner();
+  PERFORM pg_temp.call(v_rep, format($q$UPDATE public.sales_orders SET status = 'sent' WHERE id = %L$q$, v_so2.id));
+  PERFORM pg_temp.call(v_mgr, format($q$SELECT public.approve_sales_order(%L, %L)$q$, v_so2.id, v_mgr));
+  PERFORM pg_temp.call(v_rep, format($q$SELECT public.convert_so_to_invoice(%L, %L)$q$, v_so2.id, v_rep));
+  PERFORM pg_temp.call(v_rep, format($q$UPDATE public.crm_invoices SET doc_status = 'cancelled', void_reason = 'test' WHERE so_id = %L AND doc_status = 'draft'$q$, v_so2.id));
+  v_out := pg_temp.call(v_mgr, format($q$UPDATE public.crm_invoices SET doc_status = 'draft' WHERE so_id = %L$q$, v_so2.id));
+  RAISE NOTICE '%', pg_temp.check('a cancelled invoice cannot be reopened to draft by a client (so an order can''t be double-invoiced this way)', v_out LIKE 'err:P0001%', '-> ' || v_out);
 
   -- an order's invoice keeps what was ordered
   SELECT jsonb_agg(jsonb_build_object('product_id', l.product_id, 'product_name', l.product_name, 'qty', l.qty,
@@ -135,6 +145,8 @@ BEGIN
     AND (SELECT due_date = '2026-12-31'::date FROM public.crm_invoices WHERE id = v_inv.id), '-> ' || v_out);
   v_out := pg_temp.call(v_mgr, format($q$SELECT public.update_crm_invoice(%L, %L::jsonb, '{}'::jsonb, %L)$q$, v_inv.id, jsonb_set(v_rows, '{0,unit_price}', '1'::jsonb), v_mgr));
   RAISE NOTICE '%', pg_temp.check('...but not its prices, even by a manager', v_out LIKE 'err:P0001%made from a sales order%', '-> ' || v_out);
+  v_out := pg_temp.call(v_rep, format($q$SELECT public.update_crm_invoice(%L, %L::jsonb, '{}'::jsonb, %L)$q$, v_inv.id, jsonb_set(v_rows, '{0,product_name}', '"Something else entirely"'::jsonb), v_rep));
+  RAISE NOTICE '%', pg_temp.check('...nor the printed product name, even with the same product/qty/price (it would misrepresent what was billed)', v_out LIKE 'err:P0001%made from a sales order%', '-> ' || v_out);
 
   -- ══ 4. Posting still works; a posted invoice is locked ═════════════════════
   RAISE NOTICE '--- 4. Posting ---';
