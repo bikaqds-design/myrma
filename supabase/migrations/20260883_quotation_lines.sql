@@ -19,19 +19,27 @@
 --     and — in the SAME transaction — write quotations.line_items as a
 --     projection of the rows just written, byte-for-byte the same shape as
 --     before.
---   * A client-surface trigger pins line_items/subtotal/discount_amount/
---     tax_amount/total/customer_id/deal_id/qt_code/created_by on any UPDATE
---     that does not go through update_quotation, so the RPC is the only way
---     those fields change; INSERT is revoked from authenticated entirely, so
---     a quotation can only be created via create_quotation.
---   * A DB-level guard on which statuses can still have their lines changed
---     (draft/sent) — previously "enforced in app layer" only, per the RLS
---     policy's own comment.
+--   * Who may write matches the policies this replaces (20260781): a manager,
+--     or a sales rep — creating any, editing only their own. A quotation's
+--     deal must belong to its customer.
+--   * A client-surface trigger refuses any direct UPDATE that changes more than
+--     the status or the archive flag, and INSERT is revoked from
+--     authenticated, so every other change goes through the two RPCs. That
+--     also closes a gap from before this migration: an owner could move an
+--     expired quotation's validity date forward directly and convert it past
+--     20260880's manager-plus-reason rule.
+--   * Lines can be changed only on a draft or sent quotation — previously
+--     "enforced in app layer" only, per the original RLS policy's comment.
+--   * NOT closed here: a SENT quotation is still editable while its approval
+--     is pending, so an approver can accept figures that changed after the
+--     request was raised. Credit notes solve this with a fingerprint checked
+--     at approval; quotations need the same (tracked as a follow-up).
 --
 -- SCOPE DECISION (read this before assuming "the JSON path is gone"):
 -- `line_items` is KEPT, not dropped. It is now a server-maintained mirror of
 -- quotation_lines, written by the RPC in the same transaction as the rows it
--- reflects, so it can never drift from them. Every existing reader —
+-- reflects, so for every quotation written from now on it cannot drift from
+-- them (historical rows: see the backfill, section 6). Every existing reader —
 -- convert_quotation_to_so, quotationPdf.js, DealDetail.jsx, the Sales
 -- Documents screens, margin/reports — keeps reading it unchanged; NONE of
 -- them needed to change for this migration. Pointing those readers directly
@@ -101,29 +109,32 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE public.quo
 GRANT SELECT ON TABLE public.quotation_lines TO authenticated;
 GRANT ALL ON TABLE public.quotation_lines TO service_role;
 
--- ── 2. the guard: a quotation is created and its money fields are changed
---      only through the two RPCs below ────────────────────────────────────
+-- ── 2. the guard: outside the RPCs a client may change only the status and
+--      the archive flag ─────────────────────────────────────────────────────
+-- An allowlist, not a list of pinned columns: a column added later is protected
+-- by default. Status stays a plain UPDATE (send / accept / decline / cancel /
+-- reopen), policed by rma_assert_sales_status_transition; archiving is
+-- salesDocuments.setArchived. Everything else — lines, totals, customer, deal,
+-- code, creator, and also validity_until, whose direct edit let an owner move an
+-- expired quotation's date forward and convert it past 20260880's manager-plus-
+-- reason rule — changes only through update_quotation. A refusal is loud: a
+-- write that silently did nothing would look like a save.
 CREATE OR REPLACE FUNCTION public.rma_guard_quotation_client_writes()
  RETURNS trigger
  LANGUAGE plpgsql
  SET search_path TO 'public', 'pg_temp'
 AS $function$
+DECLARE
+  v_open text[] := ARRAY['status', 'archived', 'archived_at', 'archived_by', 'updated_at'];
 BEGIN
   -- Client surface only. create_quotation/update_quotation run as the owner.
   IF current_user NOT IN ('authenticated', 'anon') THEN
     RETURN NEW;
   END IF;
 
-  IF TG_OP = 'UPDATE' THEN
-    NEW.line_items       := OLD.line_items;
-    NEW.subtotal         := OLD.subtotal;
-    NEW.discount_amount  := OLD.discount_amount;
-    NEW.tax_amount       := OLD.tax_amount;
-    NEW.total            := OLD.total;
-    NEW.customer_id      := OLD.customer_id;
-    NEW.deal_id          := OLD.deal_id;
-    NEW.qt_code          := OLD.qt_code;
-    NEW.created_by       := OLD.created_by;
+  IF (to_jsonb(NEW) - v_open) IS DISTINCT FROM (to_jsonb(OLD) - v_open) THEN
+    RAISE EXCEPTION 'A quotation''s lines, amounts and details are changed through the quotation form (update_quotation), not directly.'
+      USING ERRCODE = 'P0001';
   END IF;
   RETURN NEW;
 END
@@ -138,15 +149,15 @@ CREATE TRIGGER trg_quotations_client_writes
   FOR EACH ROW EXECUTE FUNCTION public.rma_guard_quotation_client_writes();
 
 -- A quotation can no longer be INSERTed directly — only create_quotation does
--- that now. Status transitions (send/accept/decline/cancel/reopen) keep using
--- a plain UPDATE, unaffected by this: they never touch the pinned columns.
+-- that now.
 REVOKE INSERT ON TABLE public.quotations FROM authenticated;
 
 -- ── 3. writing the lines (shared by both RPCs, not client-callable) ─────────
 -- Replaces a quotation's lines with p_lines, validates each one, and returns
 -- the totals with the same formula as src/api/db/_documentTotals.ts: discount
 -- on the line base, tax on the discounted amount, summed raw and rounded once
--- at the end (rounding per line drifts a cent from the browser's preview).
+-- at the end (rounding per line drifts a cent from the browser's preview) —
+-- over the rows as stored.
 --
 -- An empty string for unit_price / discount_pct / tax_pct means "not entered"
 -- (0), which is what the Deal screen sends for a cleared field and what the
@@ -168,8 +179,6 @@ DECLARE
   v_sub   numeric := 0;
   v_dsum  numeric := 0;
   v_tsum  numeric := 0;
-  v_base  numeric;
-  v_disc  numeric;
 BEGIN
   IF jsonb_typeof(p_lines) IS DISTINCT FROM 'array' OR jsonb_array_length(p_lines) = 0 THEN
     RAISE EXCEPTION 'At least one line item is required' USING ERRCODE = 'P0001';
@@ -229,13 +238,20 @@ BEGIN
         RAISE EXCEPTION 'Line "%": that product does not exist', v_name USING ERRCODE = 'P0001';
     END;
 
-    v_base := v_qty::numeric * v_price::numeric;
-    v_disc := v_base * v_dpct::numeric / 100;
-    v_sub  := v_sub + v_base;
-    v_dsum := v_dsum + v_disc;
-    v_tsum := v_tsum + (v_base - v_disc) * v_tpct::numeric / 100;
-    v_no   := v_no + 1;
+    v_no := v_no + 1;
   END LOOP;
+
+  -- From the rows as STORED, not the text the caller sent: a price of 0.00005
+  -- is kept as 0.0001 and a discount of 10.555 as 10.56, and totals worked out
+  -- from the raw input would disagree with the lines beside them.
+  SELECT COALESCE(sum(b.base), 0),
+         COALESCE(sum(b.disc), 0),
+         COALESCE(sum((b.base - b.disc) * b.tax_pct / 100), 0)
+    INTO v_sub, v_dsum, v_tsum
+    FROM (SELECT l.qty * l.unit_price                        AS base,
+                 l.qty * l.unit_price * l.discount_pct / 100 AS disc,
+                 l.tax_pct
+            FROM public.quotation_lines l WHERE l.quotation_id = p_qt_id) b;
 
   RETURN QUERY
   SELECT round(v_sub, 2), round(v_dsum, 2), round(v_tsum, 2), round(v_sub - v_dsum + v_tsum, 2),
@@ -278,7 +294,9 @@ DECLARE
   v_t     record;
   v_row   public.quotations;
 BEGIN
-  IF NOT COALESCE(public.rma_is_staff(), false) THEN
+  -- Who may create one: exactly the INSERT policy this replaces
+  -- (sales_insert_quotations, 20260781) — manager and above, or a sales rep.
+  IF NOT COALESCE(public.rma_is_manager_or_above() OR public.rma_user_role() = 'sales_rep', false) THEN
     RAISE EXCEPTION 'Not authorized to create a quotation' USING ERRCODE = 'P0001';
   END IF;
   IF v_actor IS NULL THEN
@@ -286,6 +304,13 @@ BEGIN
   END IF;
   IF p_customer_id IS NULL THEN
     RAISE EXCEPTION 'A customer is required' USING ERRCODE = 'P0001';
+  END IF;
+  -- A quotation adds to its deal's value (dealValue.ts), so it must be a deal
+  -- for the same customer. This runs as the owner, past RLS, so it is checked
+  -- here rather than left to the foreign key.
+  IF p_deal_id IS NOT NULL AND NOT EXISTS (
+       SELECT 1 FROM public.deals d WHERE d.id = p_deal_id AND d.customer_id = p_customer_id) THEN
+    RAISE EXCEPTION 'That deal does not exist or belongs to another customer' USING ERRCODE = 'P0001';
   END IF;
 
   -- The parent row must exist before a line can reference it (a real FK now,
@@ -317,11 +342,12 @@ REVOKE ALL ON FUNCTION public.create_quotation(uuid, uuid, jsonb, date, text, te
 GRANT EXECUTE ON FUNCTION public.create_quotation(uuid, uuid, jsonb, date, text, text, text, text, text) TO authenticated, service_role;
 
 -- ── 5. update_quotation ──────────────────────────────────────────────────────
--- Replaces the whole line set, and sets ONLY the header fields present as keys
--- in p_fields (a key with a null value blanks that field). The Deal screen
--- sends lines, validity, terms and notes but not reference_po or
--- assigned_rep; setting every column from a parameter would blank those two on
--- every save from there.
+-- Sets ONLY the header fields present as keys in p_fields (a key with a null
+-- value blanks that field): the Deal screen sends lines, validity, terms and
+-- notes but not reference_po or assigned_rep, and setting every column from a
+-- parameter would blank those two on every save from there. p_lines NULL keeps
+-- the lines as they are, so every field edit a client makes comes through here
+-- (the trigger above refuses them anywhere else).
 DROP FUNCTION IF EXISTS public.update_quotation(uuid, jsonb, date, text, text, text, text, text);
 
 CREATE OR REPLACE FUNCTION public.update_quotation(
@@ -340,11 +366,17 @@ DECLARE
   v_allowed text[] := ARRAY['validity_until', 'payment_terms', 'reference_po', 'notes', 'assigned_rep'];
   v_key     text;
   v_qt      public.quotations;
-  v_t       record;
   v_f       jsonb := COALESCE(p_fields, '{}'::jsonb);
+  v_rep     text;
+  v_valid   date;
+  v_items   jsonb;
+  v_sub     numeric;
+  v_dis     numeric;
+  v_tax     numeric;
+  v_tot     numeric;
   v_row     public.quotations;
 BEGIN
-  IF NOT COALESCE(public.rma_is_staff(), false) OR v_actor IS NULL THEN
+  IF v_actor IS NULL THEN
     RAISE EXCEPTION 'Not authorized to edit a quotation' USING ERRCODE = 'P0001';
   END IF;
   IF jsonb_typeof(v_f) IS DISTINCT FROM 'object' THEN
@@ -361,35 +393,57 @@ BEGIN
     RAISE EXCEPTION 'Quotation % not found', p_id USING ERRCODE = 'P0001';
   END IF;
 
-  -- COALESCE: with no assigned rep, "assigned_rep = me" is NULL, and an IF on
-  -- NULL does not fire (BUG-087) — any staff member could have edited it.
-  IF NOT COALESCE(public.rma_is_manager_or_above()
-                  OR v_qt.assigned_rep = v_actor
-                  OR v_qt.created_by   = v_actor, false) THEN
+  v_rep := CASE WHEN v_f ? 'assigned_rep' THEN NULLIF(btrim(COALESCE(v_f->>'assigned_rep', '')), '') ELSE v_qt.assigned_rep END;
+
+  -- Exactly the UPDATE policy this replaces (sales_update_quotations, 20260781):
+  -- a manager, or a sales rep who owns it — both before (USING) and after
+  -- (WITH CHECK), so a rep cannot hand a quotation they only hold as assignee
+  -- to somebody else. COALESCE: with no assigned rep, "assigned_rep = me" is
+  -- NULL, and an IF on NULL does not fire (BUG-087).
+  IF NOT COALESCE(
+       public.rma_is_manager_or_above()
+       OR (public.rma_user_role() = 'sales_rep'
+           AND (v_qt.assigned_rep = v_actor OR v_qt.created_by = v_actor)
+           AND (v_rep = v_actor OR v_qt.created_by = v_actor)),
+       false) THEN
     RAISE EXCEPTION 'Not authorized to edit this quotation' USING ERRCODE = 'P0001';
   END IF;
 
-  -- Was "enforced in app layer" only (the manager_update_quotations policy's
-  -- own comment): an accepted quote's approved figures and the Sales Order
+  -- Was "enforced in app layer" only (the original update policy's own
+  -- comment): an accepted quote's approved figures and the Sales Order
   -- converted from it could diverge.
   IF v_qt.status NOT IN ('draft', 'sent') THEN
     RAISE EXCEPTION 'This quotation is % and can no longer be edited', v_qt.status USING ERRCODE = 'P0001';
   END IF;
 
-  SELECT * INTO v_t FROM public._quotation_write_lines(p_id, p_lines);
+  IF v_f ? 'validity_until' THEN
+    BEGIN
+      v_valid := NULLIF(btrim(COALESCE(v_f->>'validity_until', '')), '')::date;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE EXCEPTION 'The validity date is not a date' USING ERRCODE = 'P0001';
+    END;
+  END IF;
+
+  -- With no lines sent, the lines and their totals stay as they are.
+  v_items := v_qt.line_items; v_sub := v_qt.subtotal; v_dis := v_qt.discount_amount;
+  v_tax := v_qt.tax_amount;   v_tot := v_qt.total;
+  IF p_lines IS NOT NULL THEN
+    SELECT w.line_items, w.subtotal, w.discount_amount, w.tax_amount, w.total
+      INTO v_items, v_sub, v_dis, v_tax, v_tot
+      FROM public._quotation_write_lines(p_id, p_lines) w;
+  END IF;
 
   UPDATE public.quotations SET
-    line_items      = v_t.line_items,
-    subtotal        = v_t.subtotal,
-    discount_amount = v_t.discount_amount,
-    tax_amount      = v_t.tax_amount,
-    total           = v_t.total,
-    validity_until  = CASE WHEN v_f ? 'validity_until'
-                           THEN NULLIF(v_f->>'validity_until', '')::date ELSE validity_until END,
-    payment_terms   = CASE WHEN v_f ? 'payment_terms' THEN v_f->>'payment_terms' ELSE payment_terms END,
-    reference_po    = CASE WHEN v_f ? 'reference_po'  THEN v_f->>'reference_po'  ELSE reference_po  END,
-    notes           = CASE WHEN v_f ? 'notes'         THEN v_f->>'notes'         ELSE notes         END,
-    assigned_rep    = CASE WHEN v_f ? 'assigned_rep'  THEN v_f->>'assigned_rep'  ELSE assigned_rep  END
+    line_items      = v_items,
+    subtotal        = v_sub,
+    discount_amount = v_dis,
+    tax_amount      = v_tax,
+    total           = v_tot,
+    validity_until  = CASE WHEN v_f ? 'validity_until' THEN v_valid                ELSE validity_until END,
+    payment_terms   = CASE WHEN v_f ? 'payment_terms'  THEN v_f->>'payment_terms'  ELSE payment_terms  END,
+    reference_po    = CASE WHEN v_f ? 'reference_po'   THEN v_f->>'reference_po'   ELSE reference_po   END,
+    notes           = CASE WHEN v_f ? 'notes'          THEN v_f->>'notes'          ELSE notes          END,
+    assigned_rep    = v_rep
   WHERE id = p_id
   RETURNING * INTO v_row;
 
@@ -401,22 +455,36 @@ REVOKE ALL ON FUNCTION public.update_quotation(uuid, jsonb, jsonb, text) FROM PU
 GRANT EXECUTE ON FUNCTION public.update_quotation(uuid, jsonb, jsonb, text) TO authenticated, service_role;
 
 -- ── 6. backfill existing rows ────────────────────────────────────────────────
--- One-time, idempotent (guarded by NOT EXISTS so a re-run of this migration
--- file does not duplicate rows). line_items is left exactly as it already is —
--- it already has the right shape, this only gives it a relational shadow.
+-- One-time and idempotent (NOT EXISTS: a re-run adds nothing). line_items and
+-- the stored totals of existing quotations are NOT rewritten — some are
+-- accepted or converted documents, and their figures stand as issued. So for
+-- historical rows the relational copy is best-effort: where the old jsonb broke
+-- a rule the table now enforces, the row is brought inside it and the change is
+-- reported, and every quotation whose lines no longer add up to its stored
+-- total is counted at the end rather than silently left to disagree.
 --
--- A cast that would abort the whole migration on ONE bad historical row (a
--- garbage product_id, a non-numeric qty) is caught per row instead: the line
--- still gets a row (product_id NULL / qty defaulted to 1), and which
--- quotation it was is on the warning, not lost in a rolled-back migration.
-CREATE FUNCTION pg_temp.safe_uuid(p text) RETURNS uuid LANGUAGE plpgsql AS $f$
-BEGIN RETURN NULLIF(p, '')::uuid; EXCEPTION WHEN OTHERS THEN RETURN NULL; END $f$;
+-- Each line is read as text and checked before any cast, so one bad value
+-- costs only that value: a product id that is malformed, or whose product was
+-- deleted, becomes NULL and the line keeps its name, quantity and price.
+CREATE OR REPLACE FUNCTION pg_temp.qt_bf_num(p text, p_default numeric) RETURNS numeric LANGUAGE plpgsql AS $f$
+BEGIN
+  IF btrim(COALESCE(p, '')) ~ '^-?[0-9]+(\.[0-9]+)?$' THEN RETURN btrim(p)::numeric; END IF;
+  RETURN p_default;
+END $f$;
 
 DO $$
 DECLARE
-  v_q record;
-  v_t record;
-  v_no integer;
+  v_q        record;
+  v_t        record;
+  v_no       integer;
+  v_pid      uuid;
+  v_qty      numeric;
+  v_price    numeric;
+  v_dpct     numeric;
+  v_tpct     numeric;
+  v_changed  integer := 0;
+  v_lines    integer := 0;
+  v_drift    integer;
 BEGIN
   FOR v_q IN
     SELECT q.id, q.line_items FROM public.quotations q
@@ -424,29 +492,54 @@ BEGIN
        AND jsonb_typeof(q.line_items) = 'array'   -- a non-array blob would abort the whole migration
   LOOP
     v_no := 0;
-    FOR v_t IN SELECT * FROM jsonb_array_elements(COALESCE(v_q.line_items, '[]'::jsonb)) AS l
+    FOR v_t IN SELECT e.l FROM jsonb_array_elements(v_q.line_items) AS e(l)
     LOOP
-      BEGIN
-        INSERT INTO public.quotation_lines
-          (quotation_id, line_no, product_id, product_name, description, qty, unit_price, discount_pct, tax_pct)
-        VALUES (
-          v_q.id, v_no,
-          pg_temp.safe_uuid(v_t.l->>'product_id'),
-          COALESCE(NULLIF(btrim(COALESCE(v_t.l->>'product_name', '')), ''), '(unnamed line)'),
-          NULLIF(btrim(COALESCE(v_t.l->>'description', '')), ''),
-          GREATEST(1, COALESCE((v_t.l->>'qty')::numeric, 1)::integer),
-          GREATEST(0, COALESCE((v_t.l->>'unit_price')::numeric, 0)),
-          LEAST(100, GREATEST(0, COALESCE((v_t.l->>'discount_pct')::numeric, 0))),
-          LEAST(100, GREATEST(0, COALESCE((v_t.l->>'tax_pct')::numeric, 0)))
-        );
-      EXCEPTION WHEN OTHERS THEN
-        RAISE WARNING 'quotation_lines backfill: quotation % line % skipped fields that would not cast (%), inserted with defaults', v_q.id, v_no, SQLERRM;
-        INSERT INTO public.quotation_lines (quotation_id, line_no, product_name, qty, unit_price)
-        VALUES (v_q.id, v_no, '(unreadable line)', 1, 0);
-      END;
+      IF jsonb_typeof(v_t.l) IS DISTINCT FROM 'object' THEN
+        v_t.l := '{}'::jsonb;
+      END IF;
+
+      v_pid := NULL;
+      IF btrim(COALESCE(v_t.l->>'product_id', '')) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+        SELECT p.id INTO v_pid FROM public.products p WHERE p.id = btrim(v_t.l->>'product_id')::uuid;
+      END IF;
+
+      v_qty   := pg_temp.qt_bf_num(v_t.l->>'qty', 1);
+      v_price := pg_temp.qt_bf_num(v_t.l->>'unit_price', 0);
+      v_dpct  := pg_temp.qt_bf_num(v_t.l->>'discount_pct', 0);
+      v_tpct  := pg_temp.qt_bf_num(v_t.l->>'tax_pct', 0);
+
+      IF v_qty <> round(v_qty) OR v_qty < 1 OR v_price < 0 OR v_dpct NOT BETWEEN 0 AND 100 OR v_tpct NOT BETWEEN 0 AND 100
+         OR (btrim(COALESCE(v_t.l->>'product_id', '')) <> '' AND v_pid IS NULL) THEN
+        v_changed := v_changed + 1;
+        RAISE WARNING 'quotation_lines backfill: quotation % line % had values outside the new rules (qty %, price %, discount %, tax %, product %); stored inside them',
+          v_q.id, v_no + 1, v_t.l->>'qty', v_t.l->>'unit_price', v_t.l->>'discount_pct', v_t.l->>'tax_pct', COALESCE(v_t.l->>'product_id', '-');
+      END IF;
+
+      INSERT INTO public.quotation_lines
+        (quotation_id, line_no, product_id, product_name, description, qty, unit_price, discount_pct, tax_pct)
+      VALUES (
+        v_q.id, v_no, v_pid,
+        COALESCE(NULLIF(btrim(COALESCE(v_t.l->>'product_name', '')), ''), '(unnamed line)'),
+        NULLIF(btrim(COALESCE(v_t.l->>'description', '')), ''),
+        GREATEST(1, LEAST(999999999, round(v_qty)))::integer,
+        GREATEST(0, LEAST(9999999999, v_price)),
+        LEAST(100, GREATEST(0, v_dpct)),
+        LEAST(100, GREATEST(0, v_tpct))
+      );
+      v_lines := v_lines + 1;
       v_no := v_no + 1;
     END LOOP;
   END LOOP;
+
+  SELECT count(*) INTO v_drift
+    FROM public.quotations q
+    JOIN LATERAL (
+      SELECT round(COALESCE(sum(l.qty * l.unit_price * (1 - l.discount_pct / 100) * (1 + l.tax_pct / 100)), 0), 2) AS t
+        FROM public.quotation_lines l WHERE l.quotation_id = q.id) s ON true
+   WHERE abs(s.t - q.total) > 0.01;
+
+  RAISE NOTICE 'quotation_lines backfill: % lines written, % brought inside the new rules, % quotations whose lines no longer add up to their stored total',
+    v_lines, v_changed, v_drift;
 END $$;
 
 -- ── guard: nothing new is anon-executable ───────────────────────────────────

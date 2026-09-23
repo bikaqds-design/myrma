@@ -47,15 +47,12 @@ describe('the client surface of quotations', () => {
     expect(sql).toMatch(/REVOKE INSERT ON TABLE public\.quotations FROM authenticated/)
   })
 
-  it('pins the money and identity columns on any update that is not the RPC', () => {
+  it('refuses any direct update beyond status and the archive flag (an allowlist, so new columns are covered)', () => {
     const body = fn('rma_guard_quotation_client_writes')
     expect(body).toMatch(/current_user NOT IN \('authenticated', 'anon'\)/)
     expect(header('rma_guard_quotation_client_writes')).not.toMatch(/SECURITY DEFINER/)
-    for (const c of ['line_items', 'subtotal', 'discount_amount', 'tax_amount', 'total', 'customer_id', 'deal_id', 'qt_code', 'created_by']) {
-      expect(body, c).toMatch(new RegExp('NEW\\.' + c + '\\s+:= OLD\\.' + c))
-    }
-    // status is not pinned: send/accept/decline/cancel/reopen are plain updates
-    expect(body).not.toMatch(/NEW\.status\s+:=/)
+    expect(body).toContain("v_open text[] := ARRAY['status', 'archived', 'archived_at', 'archived_by', 'updated_at']")
+    expect(body).toMatch(/IF \(to_jsonb\(NEW\) - v_open\) IS DISTINCT FROM \(to_jsonb\(OLD\) - v_open\) THEN\s+RAISE EXCEPTION/)
   })
 })
 
@@ -66,10 +63,11 @@ describe('writing the lines', () => {
     expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\._quotation_write_lines\(uuid, jsonb\) FROM PUBLIC, anon, authenticated/)
   })
 
-  it('computes totals with the same formula as the browser, rounding once at the end', () => {
-    expect(body).toMatch(/v_disc := v_base \* v_dpct::numeric \/ 100/)
-    expect(body).toMatch(/v_tsum := v_tsum \+ \(v_base - v_disc\) \* v_tpct::numeric \/ 100/)
-    expect(body).toMatch(/round\(v_sub - v_dsum \+ v_tsum, 2\)/)
+  it("computes totals from the rows as stored, with the browser's formula, rounding once at the end", () => {
+    expect(body).toContain('l.qty * l.unit_price * l.discount_pct / 100 AS disc')
+    expect(body).toContain('sum((b.base - b.disc) * b.tax_pct / 100)')
+    expect(body).toContain('FROM public.quotation_lines l WHERE l.quotation_id = p_qt_id) b')
+    expect(body).toContain('round(v_sub - v_dsum + v_tsum, 2)')
   })
 
   it('checks numbers as text first, so NaN and Infinity are refused', () => {
@@ -95,8 +93,22 @@ describe('create_quotation and update_quotation', () => {
     }
   })
 
-  it('wraps the ownership check so an empty assigned_rep cannot let a caller through (BUG-087)', () => {
-    expect(fn('update_quotation')).toMatch(/IF NOT COALESCE\(public\.rma_is_manager_or_above\(\)\s+OR v_qt\.assigned_rep = v_actor\s+OR v_qt\.created_by\s+= v_actor, false\) THEN/)
+  it('lets create exactly who the replaced policy did (20260781): a manager or a sales rep', () => {
+    expect(fn('create_quotation')).toContain("IF NOT COALESCE(public.rma_is_manager_or_above() OR public.rma_user_role() = 'sales_rep', false) THEN")
+  })
+
+  it('lets edit a manager, or a sales rep who owns it before and after, all COALESCE-wrapped (BUG-087)', () => {
+    const body = fn('update_quotation')
+    expect(body).toMatch(/IF NOT COALESCE\(\s+public\.rma_is_manager_or_above\(\)\s+OR \(public\.rma_user_role\(\) = 'sales_rep'/)
+    expect(body).toMatch(/AND \(v_qt\.assigned_rep = v_actor OR v_qt\.created_by = v_actor\)\s+AND \(v_rep = v_actor OR v_qt\.created_by = v_actor\)\),\s+false\) THEN/)
+  })
+
+  it("requires the deal to belong to the quotation's customer", () => {
+    expect(fn('create_quotation')).toContain('d.id = p_deal_id AND d.customer_id = p_customer_id')
+  })
+
+  it('keeps lines and totals when no lines are sent', () => {
+    expect(fn('update_quotation')).toMatch(/IF p_lines IS NOT NULL THEN\s+SELECT w\.line_items/)
   })
 
   it('edits only a draft or sent quotation, under a row lock', () => {
@@ -120,8 +132,18 @@ describe('create_quotation and update_quotation', () => {
   })
 
   it('backfills existing quotations one row at a time, skipping blobs that are not a list', () => {
-    expect(sql).toMatch(/AND jsonb_typeof\(q\.line_items\) = 'array'/)
-    expect(sql).toMatch(/WHERE NOT EXISTS \(SELECT 1 FROM public\.quotation_lines ql WHERE ql\.quotation_id = q\.id\)/)
+    expect(sql).toContain("AND jsonb_typeof(q.line_items) = 'array'")
+    expect(sql).toContain('WHERE NOT EXISTS (SELECT 1 FROM public.quotation_lines ql WHERE ql.quotation_id = q.id)')
+  })
+
+  it('reads each element by its real column name, not a record field that does not exist', () => {
+    // "FROM jsonb_array_elements(...) AS l" names the column value, so v_t.l
+    // failed for every line and the first backfill stored all of them as blanks.
+    expect(sql).toContain('FOR v_t IN SELECT e.l FROM jsonb_array_elements(v_q.line_items) AS e(l)')
+  })
+
+  it('keeps a line whose product was deleted, dropping only the product link', () => {
+    expect(sql).toContain("SELECT p.id INTO v_pid FROM public.products p WHERE p.id = btrim(v_t.l->>'product_id')::uuid")
   })
 })
 
@@ -168,10 +190,10 @@ describe('quotations client', () => {
     })
   })
 
-  it('without lines, updates the plain fields directly', async () => {
+  it('without lines, still goes through update_quotation and keeps the lines (p_lines null)', async () => {
     await quotations.update('q1', { notes: 'only a note' })
-    expect(mocks.rpc).toEqual([])
-    expect(mocks.updates).toEqual([{ notes: 'only a note' }])
+    expect(mocks.updates).toEqual([])
+    expect(mocks.rpc[0].args).toMatchObject({ p_id: 'q1', p_lines: null, p_fields: { notes: 'only a note' } })
   })
 
   it('throws the database refusal', async () => {
@@ -184,5 +206,16 @@ describe('the screens pass the editor along', () => {
   it('the shared form and the Deal screen', () => {
     expect(readFileSync('src/pages/SalesDocuments/SalesDocumentForm.jsx', 'utf8')).toContain('MODULE.update(initial.id, editFields, currentUserEmail)')
     expect(readFileSync('src/pages/Pipeline/DealDetail.jsx', 'utf8')).toContain('db.quotations.update(editingQtId, fields, currentUserEmail)')
+  })
+})
+
+describe('the backfill probe tests the real backfill', () => {
+  it('its copy of section 6 is the migration text, byte for byte', () => {
+    const probe = readFileSync('supabase/tests/quotation_lines_backfill.sql', 'utf8').replace(/\r\n/g, '\n')
+    const copy = probe.slice(probe.indexOf('-- BEGIN copy of 20260883 section 6\n') + '-- BEGIN copy of 20260883 section 6\n'.length, probe.indexOf('-- END copy of 20260883 section 6'))
+    const m = sql.replace(/\r\n/g, '\n')
+    const section = m.slice(m.indexOf('CREATE OR REPLACE FUNCTION pg_temp.qt_bf_num'), m.indexOf('-- ── guard: nothing new is anon-executable'))
+    expect(copy.length).toBeGreaterThan(1000)
+    expect(copy).toBe(section)
   })
 })

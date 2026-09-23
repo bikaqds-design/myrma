@@ -126,13 +126,11 @@ export const quotations = {
   },
 
   /**
-   * With `line_items`: replaces the whole line set and the header fields that
-   * were passed, in one atomic call through `update_quotation`, and only while
-   * the quotation is `draft`/`sent` (the database now enforces what was
-   * previously "enforced in app layer" only). Without `line_items` (no
-   * current caller does this, but the signature allows it), falls back to a
-   * plain field update — those columns carry no derived totals.
-   * `actorEmail` is display-only: the database takes the editor from the login.
+   * Every edit goes through `update_quotation` (a direct UPDATE of anything
+   * but status or the archive flag is refused, 20260883): with `line_items`
+   * it replaces the whole line set, and it sets the header fields that were
+   * passed — only while the quotation is `draft`/`sent`. `actorEmail` is
+   * display-only: the database takes the editor from the login.
    */
   async update(
     id: string,
@@ -149,28 +147,19 @@ export const quotations = {
     >,
     actorEmail?: string
   ): Promise<QuotationRow> {
-    if (fields.line_items) {
-      // Only the header fields the caller actually passed: the Deal screen
-      // sends no reference_po / assigned_rep, and sending them as null would
-      // blank them. A key present with a null value does blank its field.
-      const { line_items, ...header } = fields
-      const { data, error } = await supabase.rpc('update_quotation', {
-        p_id: id,
-        p_lines: line_items,
-        p_fields: Object.fromEntries(Object.entries(header).filter(([, v]) => v !== undefined)),
-        p_actor_email: actorEmail ?? null,
-      })
-      if (error) throw error
-      return data as QuotationRow
-    }
-
-    const { data, error } = await supabase
-      .from('quotations')
-      .update(fields)
-      .eq('id', id)
-      .select()
+    // Only the header fields the caller actually passed: the Deal screen sends
+    // no reference_po / assigned_rep, and sending them as null would blank
+    // them. A key present with a null value does blank its field. With no
+    // line_items the lines are left as they are (p_lines null).
+    const { line_items, ...header } = fields
+    const { data, error } = await supabase.rpc('update_quotation', {
+      p_id: id,
+      p_lines: line_items ?? null,
+      p_fields: Object.fromEntries(Object.entries(header).filter(([, v]) => v !== undefined)),
+      p_actor_email: actorEmail ?? null,
+    })
     if (error) throw error
-    return assertUpdated(data as QuotationRow[] | null, 'Quotation')
+    return data as QuotationRow
   },
 
   /** The relational lines directly (20260883) — quotation_lines, not the line_items mirror. */
