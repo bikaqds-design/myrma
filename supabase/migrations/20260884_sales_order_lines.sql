@@ -31,6 +31,12 @@
 --   * INSERT on sales_orders is revoked from authenticated, and a client-surface
 --     trigger refuses any direct UPDATE beyond status and the archive flag
 --     (status itself stays policed by rma_guard_sales_order_status).
+--   * An order converted from a quotation keeps the lines the customer
+--     accepted: its products, quantities and prices cannot be edited.
+--   * convert_quotation_to_so takes the actor from the login only, and a sales
+--     rep converts only a quotation they own (by id alone, any rep could).
+--   * Draft and sent orders and quotations whose historical lines the backfill
+--     had to correct get their mirror and totals rebuilt from the rows (8).
 -- ============================================================================
 
 -- ── 1. the table ─────────────────────────────────────────────────────────────
@@ -313,6 +319,8 @@ DECLARE
   v_dis     numeric;
   v_tax     numeric;
   v_tot     numeric;
+  v_new     text;
+  v_old     text;
   v_row     public.sales_orders;
 BEGIN
   IF v_actor IS NULL THEN
@@ -349,6 +357,35 @@ BEGIN
   -- confirmed one holds stock reserved for the lines it has now.
   IF v_so.status <> 'draft' THEN
     RAISE EXCEPTION 'This sales order is % and can no longer be edited', v_so.status USING ERRCODE = 'P0001';
+  END IF;
+
+  -- An order converted from a quotation carries what the customer accepted —
+  -- and, for an expired quotation, what a manager overrode with a reason. Its
+  -- products, quantities, prices, discounts and taxes cannot change here; the
+  -- header (delivery date, terms, notes, rep) still can. The form always sends
+  -- the lines back, so an unchanged set passes: only a real change is refused.
+  IF v_so.quotation_id IS NOT NULL AND p_lines IS NOT NULL THEN
+    BEGIN
+      SELECT string_agg(concat_ws('|',
+               lower(btrim(COALESCE(e.l->>'product_id', ''))),
+               round(COALESCE(NULLIF(btrim(COALESCE(e.l->>'qty', '')), ''), '0')::numeric, 4),
+               round(COALESCE(NULLIF(btrim(COALESCE(e.l->>'unit_price', '')), ''), '0')::numeric, 4),
+               round(COALESCE(NULLIF(btrim(COALESCE(e.l->>'discount_pct', '')), ''), '0')::numeric, 2),
+               round(COALESCE(NULLIF(btrim(COALESCE(e.l->>'tax_pct', '')), ''), '0')::numeric, 2)), ';' ORDER BY e.o)
+        INTO v_new
+        FROM jsonb_array_elements(p_lines) WITH ORDINALITY AS e(l, o);
+    EXCEPTION WHEN OTHERS THEN
+      v_new := NULL;   -- unreadable lines are a change
+    END;
+    SELECT string_agg(concat_ws('|',
+             COALESCE(lower(l.product_id::text), ''),
+             round(l.qty::numeric, 4), round(l.unit_price, 4), round(l.discount_pct, 2), round(l.tax_pct, 2)), ';' ORDER BY l.line_no)
+      INTO v_old
+      FROM public.sales_order_lines l WHERE l.sales_order_id = p_id;
+    IF v_new IS DISTINCT FROM v_old THEN
+      RAISE EXCEPTION 'This order was converted from a quotation, and its products, quantities and prices are what the customer accepted. Cancel the order and revise the quotation instead.'
+        USING ERRCODE = 'P0001';
+    END IF;
   END IF;
 
   IF v_f ? 'delivery_date' THEN
@@ -404,7 +441,7 @@ DECLARE
   v_src        jsonb;
   v_w          record;
   v_null_lines bigint;
-  v_actor      text := COALESCE(public.rma_current_user_email(), p_actor_email);
+  v_actor      text := public.rma_current_user_email();   -- 20260884: never the caller's parameter
   v_reason     text := btrim(COALESCE(p_override_reason, ''));
   v_override   text;
 BEGIN
@@ -412,10 +449,22 @@ BEGIN
     RAISE EXCEPTION 'Not authorized to convert quotations' USING ERRCODE = 'P0001';
   END IF;
 
+  IF v_actor IS NULL THEN
+    RAISE EXCEPTION 'Your login has no email, so this conversion cannot be attributed' USING ERRCODE = 'P0001';
+  END IF;
+
   SELECT * INTO v_qt FROM public.quotations WHERE id = p_quotation_id FOR UPDATE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Quotation not found: %', p_quotation_id;
+  END IF;
+
+  -- 20260884: a sales rep converts only a quotation they own — the one they
+  -- can read (sales_rep_read_quotations). By id alone, any rep could convert
+  -- any accepted quotation and then own the order it produced.
+  IF NOT COALESCE(public.rma_is_manager_or_above()
+                  OR (v_qt.assigned_rep = v_actor OR v_qt.created_by = v_actor), false) THEN
+    RAISE EXCEPTION 'Not authorized to convert this quotation' USING ERRCODE = 'P0001';
   END IF;
 
   -- Not merely "not cancelled, declined or converted": only an ACCEPTED quote
@@ -438,7 +487,7 @@ BEGIN
   END IF;
 
   SELECT count(*) INTO v_null_lines
-  FROM jsonb_array_elements(v_qt.line_items) AS line
+  FROM jsonb_array_elements(CASE WHEN jsonb_typeof(v_qt.line_items) = 'array' THEN v_qt.line_items ELSE '[]'::jsonb END) AS line
   WHERE (line->>'product_id') IS NULL OR (line->>'product_id') = '';
 
   IF v_null_lines > 0 THEN
@@ -521,6 +570,7 @@ DECLARE
   v_price    numeric;
   v_dpct     numeric;
   v_tpct     numeric;
+  v_unread   boolean;
   v_changed  integer := 0;
   v_lines    integer := 0;
   v_drift    integer;
@@ -547,7 +597,12 @@ BEGIN
       v_dpct  := pg_temp.so_bf_num(v_t.l->>'discount_pct', 0);
       v_tpct  := pg_temp.so_bf_num(v_t.l->>'tax_pct', 0);
 
-      IF v_qty <> round(v_qty) OR v_qty < 1 OR v_price < 0 OR v_dpct NOT BETWEEN 0 AND 100 OR v_tpct NOT BETWEEN 0 AND 100
+      -- A value that is there but could not be read ("1,000", "$10", "1e3") fell
+      -- back to a default: that is a change too, and is reported like one.
+      v_unread := EXISTS (SELECT 1 FROM unnest(ARRAY['qty', 'unit_price', 'discount_pct', 'tax_pct']) k
+                           WHERE v_t.l->>k IS NOT NULL AND btrim(v_t.l->>k) !~ '^-?[0-9]+(\.[0-9]+)?$');
+
+      IF v_unread OR v_qty <> round(v_qty) OR v_qty < 1 OR v_price < 0 OR v_dpct NOT BETWEEN 0 AND 100 OR v_tpct NOT BETWEEN 0 AND 100
          OR v_pid IS NULL THEN
         v_changed := v_changed + 1;
         RAISE WARNING 'sales_order_lines backfill: order % line % had values outside the new rules (qty %, price %, discount %, tax %, product %); stored inside them',
@@ -579,6 +634,56 @@ BEGIN
 
   RAISE NOTICE 'sales_order_lines backfill: % lines written, % brought inside the new rules, % orders whose lines no longer add up to their stored total',
     v_lines, v_changed, v_drift;
+END $$;
+
+-- ── 8. unsettled documents agree with their rows ─────────────────────────────
+-- A draft or sent sales order or quotation is not yet an issued figure, and
+-- approve_sales_order reserves stock from the order's line_items. Where the
+-- backfill had to bring a historical line inside the rules, the mirror and
+-- totals of these documents are rebuilt from the rows so that everything
+-- downstream acts on the same lines. Confirmed, delivered, accepted and
+-- converted documents keep their figures as issued. (Quotations are included
+-- because 20260883 left theirs as they were.)
+DO $$
+DECLARE v_so integer; v_qt integer;
+BEGIN
+  WITH r AS (
+    SELECT l.sales_order_id AS id,
+           jsonb_agg(jsonb_build_object(
+             'product_id', l.product_id, 'product_name', l.product_name, 'description', l.description,
+             'qty', l.qty, 'unit_price', l.unit_price, 'discount_pct', l.discount_pct, 'tax_pct', l.tax_pct)
+             ORDER BY l.line_no) AS items,
+           sum(l.qty * l.unit_price) AS sub,
+           sum(l.qty * l.unit_price * l.discount_pct / 100) AS dis,
+           sum((l.qty * l.unit_price - l.qty * l.unit_price * l.discount_pct / 100) * l.tax_pct / 100) AS tax
+      FROM public.sales_order_lines l GROUP BY l.sales_order_id)
+  UPDATE public.sales_orders o SET
+    line_items = r.items, subtotal = round(r.sub, 2), discount_amount = round(r.dis, 2),
+    tax_amount = round(r.tax, 2), total = round(r.sub - r.dis + r.tax, 2)
+  FROM r
+  WHERE o.id = r.id AND o.status IN ('draft', 'sent')
+    AND (o.line_items IS DISTINCT FROM r.items OR o.total IS DISTINCT FROM round(r.sub - r.dis + r.tax, 2));
+  GET DIAGNOSTICS v_so = ROW_COUNT;
+
+  WITH r AS (
+    SELECT l.quotation_id AS id,
+           jsonb_agg(jsonb_build_object(
+             'product_id', l.product_id, 'product_name', l.product_name, 'description', l.description,
+             'qty', l.qty, 'unit_price', l.unit_price, 'discount_pct', l.discount_pct, 'tax_pct', l.tax_pct)
+             ORDER BY l.line_no) AS items,
+           sum(l.qty * l.unit_price) AS sub,
+           sum(l.qty * l.unit_price * l.discount_pct / 100) AS dis,
+           sum((l.qty * l.unit_price - l.qty * l.unit_price * l.discount_pct / 100) * l.tax_pct / 100) AS tax
+      FROM public.quotation_lines l GROUP BY l.quotation_id)
+  UPDATE public.quotations q SET
+    line_items = r.items, subtotal = round(r.sub, 2), discount_amount = round(r.dis, 2),
+    tax_amount = round(r.tax, 2), total = round(r.sub - r.dis + r.tax, 2)
+  FROM r
+  WHERE q.id = r.id AND q.status IN ('draft', 'sent')
+    AND (q.line_items IS DISTINCT FROM r.items OR q.total IS DISTINCT FROM round(r.sub - r.dis + r.tax, 2));
+  GET DIAGNOSTICS v_qt = ROW_COUNT;
+
+  RAISE NOTICE 'unsettled documents rebuilt from their rows: % sales orders, % quotations', v_so, v_qt;
 END $$;
 
 -- ── guard: nothing new is reachable by anon or callable where it should not be

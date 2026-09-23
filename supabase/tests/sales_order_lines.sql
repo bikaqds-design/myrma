@@ -60,6 +60,8 @@ DECLARE
   v_out    text;
   v_n      integer;
   v_lines  jsonb;
+  v_rows   jsonb;
+  v_qt2    public.quotations;
 BEGIN
   INSERT INTO public.user_roles (user_email, role, status)
   VALUES (v_rep, 'sales_rep', 'active'), (v_rep2, 'sales_rep', 'active'), (v_mgr, 'manager', 'active'),
@@ -157,6 +159,33 @@ BEGIN
     AND (SELECT array_agg(product_id ORDER BY line_no) FROM public.sales_order_lines WHERE sales_order_id = v_so.id)
       = (SELECT array_agg(product_id ORDER BY line_no) FROM public.quotation_lines WHERE quotation_id = v_qt.id),
     format('-> %s vs %s', v_so.total, v_qt.total));
+
+  -- ══ 4b. Review findings on the conversion path ═════════════════════════════
+  RAISE NOTICE '--- 4b. Converted orders ---';
+  -- the lines exactly as the order holds them, sent back the way the form does
+  SELECT jsonb_agg(jsonb_build_object('product_id', l.product_id, 'product_name', l.product_name, 'qty', l.qty,
+                                      'unit_price', l.unit_price, 'discount_pct', l.discount_pct, 'tax_pct', l.tax_pct) ORDER BY l.line_no)
+    INTO v_rows FROM public.sales_order_lines l WHERE l.sales_order_id = v_so.id;
+  v_out := pg_temp.call(v_rep, format($q$SELECT public.update_sales_order(%L, %L::jsonb, '{"notes":"deliver after 5pm"}'::jsonb, %L)$q$, v_so.id, v_rows, v_rep));
+  RAISE NOTICE '%', pg_temp.check('a converted order''s header can change when its lines come back unchanged', v_out = 'ok'
+    AND (SELECT notes = 'deliver after 5pm' FROM public.sales_orders WHERE id = v_so.id), '-> ' || v_out);
+  v_out := pg_temp.call(v_rep, format($q$SELECT public.update_sales_order(%L, %L::jsonb, '{}'::jsonb, %L)$q$, v_so.id,
+    jsonb_set(v_rows, '{0,unit_price}', '0'::jsonb), v_rep));
+  RAISE NOTICE '%', pg_temp.check('...but not its prices (what the customer accepted)', v_out LIKE 'err:P0001%converted from a quotation%', '-> ' || v_out);
+  v_out := pg_temp.call(v_mgr, format($q$SELECT public.update_sales_order(%L, %L::jsonb, '{}'::jsonb, %L)$q$, v_so.id,
+    jsonb_set(v_rows, '{0,qty}', '1'::jsonb), v_mgr));
+  RAISE NOTICE '%', pg_temp.check('...nor its quantities, even by a manager', v_out LIKE 'err:P0001%converted from a quotation%', '-> ' || v_out);
+  RAISE NOTICE '%', pg_temp.check('...and the lines are as they were', (SELECT total FROM public.sales_orders WHERE id = v_so.id) = v_qt.total);
+
+  -- a rep converts only a quotation they own
+  PERFORM pg_temp.as_user(v_rep);
+  v_qt2 := public.create_quotation(v_cust, NULL, v_lines, (current_date + 30), NULL, NULL, NULL, v_rep, v_rep);
+  PERFORM pg_temp.as_owner();
+  UPDATE public.quotations SET status = 'accepted' WHERE id = v_qt2.id;
+  v_out := pg_temp.call(v_rep2, format($q$SELECT public.convert_quotation_to_so(%L, %L, NULL)$q$, v_qt2.id, v_rep2));
+  RAISE NOTICE '%', pg_temp.check('another sales rep cannot convert a quotation they do not own', v_out LIKE 'err:P0001%', '-> ' || v_out);
+  v_out := pg_temp.call(v_rep, format($q$SELECT public.convert_quotation_to_so(%L, %L, NULL)$q$, v_qt2.id, v_rep));
+  RAISE NOTICE '%', pg_temp.check('its owner can', v_out = 'ok', '-> ' || v_out);
 
   -- ══ 5. Read access follows the order ═══════════════════════════════════════
   RAISE NOTICE '--- 5. Read access ---';

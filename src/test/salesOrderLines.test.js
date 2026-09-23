@@ -3,8 +3,9 @@
  * salesOrderLines.test.js — W2 / L-01, second document type (20260884).
  *
  * Proven against a real database in supabase/tests/sales_order_lines.sql
- * (31/31 on staging; with the new guard dropped and INSERT re-granted, the
- * three checks it exists for fail) and sales_order_lines_backfill.sql (6/6).
+ * (37/37 on staging; with the new guard dropped and INSERT re-granted, the
+ * three checks it exists for fail, and the review-finding checks fail against
+ * the pre-fix migration) and sales_order_lines_backfill.sql (9/9).
  * Pinned here: what makes a sales order's lines guarded, and the client
  * contract.
  */
@@ -80,6 +81,13 @@ describe('create_sales_order and update_sales_order', () => {
     expect(fn('update_sales_order')).toContain("IF v_so.status <> 'draft' THEN")
   })
 
+  it('never change the products, quantities or prices of an order converted from a quotation', () => {
+    const upd = fn('update_sales_order')
+    expect(upd).toContain('IF v_so.quotation_id IS NOT NULL AND p_lines IS NOT NULL THEN')
+    expect(upd).toContain('IF v_new IS DISTINCT FROM v_old THEN')
+    expect(upd).toContain('converted from a quotation')
+  })
+
   it('set only the fields sent, and keep the lines when none are sent', () => {
     const upd = fn('update_sales_order')
     expect(upd).toContain("v_allowed text[] := ARRAY['delivery_date', 'payment_terms', 'reference_po', 'notes', 'assigned_rep']")
@@ -101,6 +109,12 @@ describe('convert_quotation_to_so', () => {
     expect(body).toMatch(/UPDATE public\.sales_orders SET\s+line_items\s+= v_w\.line_items,[\s\S]*total\s+= v_w\.total\s+WHERE id = v_so_id;/)
   })
 
+  it('takes the actor from the login only, and lets a sales rep convert only a quotation they own', () => {
+    expect(body).toMatch(/v_actor\s+text := public\.rma_current_user_email\(\);/)
+    expect(body).not.toContain('COALESCE(public.rma_current_user_email(), p_actor_email)')
+    expect(body).toMatch(/IF NOT COALESCE\(public\.rma_is_manager_or_above\(\)\s+OR \(v_qt\.assigned_rep = v_actor OR v_qt\.created_by = v_actor\), false\) THEN/)
+  })
+
   it('keeps every rule it already had (accepted only; expired needs a manager and a reason; no free-text lines)', () => {
     expect(body).toContain('have no product')
     expect(body).toContain("'Quotation already converted to a sales order'")
@@ -109,10 +123,10 @@ describe('convert_quotation_to_so', () => {
 })
 
 describe('the backfill probe tests the real backfill', () => {
-  it('its copy of section 7 is the migration text, byte for byte', () => {
+  it('its copy of sections 7-8 is the migration text, byte for byte', () => {
     const probe = readFileSync('supabase/tests/sales_order_lines_backfill.sql', 'utf8').replace(/\r\n/g, '\n')
-    const begin = '-- BEGIN copy of 20260884 section 7\n'
-    const copy = probe.slice(probe.indexOf(begin) + begin.length, probe.indexOf('-- END copy of 20260884 section 7'))
+    const begin = '-- BEGIN copy of 20260884 sections 7-8\n'
+    const copy = probe.slice(probe.indexOf(begin) + begin.length, probe.indexOf('-- END copy of 20260884 sections 7-8'))
     const m = sql.replace(/\r\n/g, '\n')
     const section = m.slice(m.indexOf('CREATE OR REPLACE FUNCTION pg_temp.so_bf_num'), m.indexOf('-- ── guard: nothing new is reachable by anon'))
     expect(copy.length).toBeGreaterThan(1000)
@@ -121,6 +135,16 @@ describe('the backfill probe tests the real backfill', () => {
 
   it('reads each element by its real column name', () => {
     expect(sql).toContain('FOR v_t IN SELECT e.l FROM jsonb_array_elements(v_o.line_items) AS e(l)')
+  })
+
+  it('reports a present value it could not read, instead of defaulting it silently', () => {
+    expect(sql).toContain("v_unread := EXISTS (SELECT 1 FROM unnest(ARRAY['qty', 'unit_price', 'discount_pct', 'tax_pct']) k")
+    expect(sql).toContain('IF v_unread OR v_qty <> round(v_qty)')
+  })
+
+  it('rebuilds only unsettled documents (draft, sent) from their rows', () => {
+    expect(sql).toContain("WHERE o.id = r.id AND o.status IN ('draft', 'sent')")
+    expect(sql).toContain("WHERE q.id = r.id AND q.status IN ('draft', 'sent')")
   })
 })
 
