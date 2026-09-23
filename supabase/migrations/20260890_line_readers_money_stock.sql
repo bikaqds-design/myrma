@@ -5,7 +5,9 @@
 -- the line_items copy.
 --
 --   approve_sales_order          reserves stock for each order line
---   post_invoice                 ships stock and books cost of goods
+--   post_invoice                 its "the stock it bills was reserved" check
+--                                (cost of goods comes from rma_invoice_cogs,
+--                                which reads reservations and the ledger)
 --   _credit_note_assert_within_caps   the value / per-product caps
 --   rma_reservation_integrity    compares reservations with what was sold
 --   rma_vi_landed_unit_costs     the cost each received unit carries
