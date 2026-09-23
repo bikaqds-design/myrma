@@ -1,6 +1,5 @@
 import { supabase } from '../client.js'
-import { assertAffected, assertUpdated } from './_assertUpdated.js'
-import { computeDocumentTotals } from './_documentTotals.js'
+import { assertUpdated } from './_assertUpdated.js'
 import { fetchAllRows } from './_paging.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -13,6 +12,20 @@ export interface CrmInvoiceLine {
   unit_price: number
   discount_pct?: number | null
   tax_pct?: number | null
+}
+
+/** A row of `crm_invoice_lines` (20260885) — the source of truth behind `line_items`. */
+export interface CrmInvoiceLineRow {
+  id: string
+  crm_invoice_id: string
+  line_no: number
+  product_id: string | null
+  product_name: string
+  description: string | null
+  qty: number
+  unit_price: number
+  discount_pct: number
+  tax_pct: number
 }
 
 export interface CrmInvoiceRow {
@@ -80,9 +93,16 @@ export const crmInvoices = {
     return data as CrmInvoiceRow
   },
 
+  /**
+   * A manual invoice, through `create_crm_invoice` (20260885): the lines land in
+   * `crm_invoice_lines` (each a real catalogue product), totals are computed in
+   * the database, and `line_items` is kept as a mirror of those rows. An invoice
+   * is tied to a sales order only by `salesOrders.convertToInvoice`
+   * (`convert_so_to_invoice`), so there is no `so_id` here. The number is
+   * assigned when it is posted.
+   */
   async create(input: {
     customer_id: string
-    so_id?: string | null
     line_items?: CrmInvoiceLine[]
     due_date?: string | null
     payment_terms?: string | null
@@ -91,32 +111,26 @@ export const crmInvoices = {
     assigned_rep?: string | null
     created_by: string
   }): Promise<CrmInvoiceRow> {
-    const lines = input.line_items ?? []
-    const totals = computeDocumentTotals(lines)
-
-    const { data, error } = await supabase
-      .from('crm_invoices')
-      .insert({
-        so_id: input.so_id ?? null,
-        customer_id: input.customer_id,
-        doc_status: 'draft',
-        payment_status: 'unpaid',
-        line_items: lines,
-        ...totals,
-        due_date: input.due_date ?? null,
-        payment_terms: input.payment_terms ?? null,
-        reference_po: input.reference_po ?? null,
-        notes: input.notes ?? null,
-        assigned_rep: input.assigned_rep ?? null,
-        created_by: input.created_by,
-      })
-      .select()
-      .single()
+    const { data, error } = await supabase.rpc('create_crm_invoice', {
+      p_customer_id: input.customer_id,
+      p_lines: input.line_items ?? [],
+      p_due_date: input.due_date ?? null,
+      p_payment_terms: input.payment_terms ?? null,
+      p_reference_po: input.reference_po ?? null,
+      p_notes: input.notes ?? null,
+      p_assigned_rep: input.assigned_rep ?? null,
+      p_actor_email: input.created_by,
+    })
     if (error) throw error
     return data as CrmInvoiceRow
   },
 
-  /** update: only allowed while doc_status = 'draft'. Lines lock on post(). */
+  /**
+   * Every edit goes through `update_crm_invoice` — a DRAFT only. With
+   * `line_items` it replaces the line set (not on an invoice made from an order:
+   * those bill what was ordered and reserved); it sets only the header fields
+   * that were passed. `actorEmail` is display-only.
+   */
   async update(
     id: string,
     fields: Partial<
@@ -129,21 +143,30 @@ export const crmInvoices = {
         | 'notes'
         | 'assigned_rep'
       >
-    >
+    >,
+    actorEmail?: string
   ): Promise<CrmInvoiceRow> {
-    const updates: Record<string, unknown> = { ...fields }
-
-    if (fields.line_items) {
-      Object.assign(updates, computeDocumentTotals(fields.line_items))
-    }
-
-    const { data, error } = await supabase
-      .from('crm_invoices')
-      .update(updates)
-      .eq('id', id)
-      .select()
+    const { line_items, ...header } = fields
+    const { data, error } = await supabase.rpc('update_crm_invoice', {
+      p_id: id,
+      p_lines: line_items ?? null,
+      p_fields: Object.fromEntries(Object.entries(header).filter(([, v]) => v !== undefined)),
+      p_actor_email: actorEmail ?? null,
+    })
     if (error) throw error
-    return assertUpdated(data as CrmInvoiceRow[] | null, 'Invoice')
+    return data as CrmInvoiceRow
+  },
+
+  /** The relational lines directly (20260885) — crm_invoice_lines, not the line_items mirror. */
+  async lines(invoiceId: string): Promise<CrmInvoiceLineRow[]> {
+    return fetchAllRows<CrmInvoiceLineRow>((from, to) =>
+      supabase
+        .from('crm_invoice_lines')
+        .select('*')
+        .eq('crm_invoice_id', invoiceId)
+        .order('line_no', { ascending: true })
+        .range(from, to)
+    )
   },
 
   /**
