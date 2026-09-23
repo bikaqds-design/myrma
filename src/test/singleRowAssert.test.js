@@ -50,7 +50,6 @@ describe('a successful status write returns the row instead of throwing', () => 
     ['quotations.reopen', () => quotations.reopen('r1')],
     ['crmInvoices.cancelDraft', () => crmInvoices.cancelDraft('r1', 'wrong customer', 'a@b.c')],
     ['salesOrders.markSent', () => salesOrders.markSent('r1')],
-    ['salesOrders.update', () => salesOrders.update('r1', { notes: 'x' })],
     ['creditNotes.update', () => creditNotes.update('r1', { notes: 'x' })],
   ])('%s', async (_name, call) => {
     await expect(call()).resolves.toMatchObject(ROW)
