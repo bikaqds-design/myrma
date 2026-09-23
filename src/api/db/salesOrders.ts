@@ -233,55 +233,18 @@ export const salesOrders = {
   },
 
   /**
-   * convertToInvoice: creates a crm_invoices draft from this sales order.
-   * Returns the new invoice id.
+   * convertToInvoice: a draft invoice for this order, through
+   * `convert_so_to_invoice` (20260885) — in one transaction with the order row
+   * locked, so two clicks (or two people) cannot raise two invoices for one
+   * order. The database refuses an order that is not confirmed/delivered, one
+   * already invoiced, and a rep who does not own it. Returns the new invoice id.
    */
   async convertToInvoice(soId: string, actorEmail: string): Promise<string> {
-    const so = await salesOrders.get(soId)
-    if (!so) throw new Error('Sales order not found')
-    if (so.status === 'cancelled') {
-      throw new Error('Cannot invoice a cancelled sales order')
-    }
-    // The database refuses this too (trg_crm_invoices_from_approved_order);
-    // saying so here gives the person the reason before the round trip.
-    if (so.status !== 'confirmed' && so.status !== 'delivered') {
-      throw new Error('Approve the sales order before invoicing it')
-    }
-
-    // Prevent re-conversion if a non-cancelled invoice already exists for this SO.
-    const { data: existingInv } = await supabase
-      .from('crm_invoices')
-      .select('id')
-      .eq('so_id', soId)
-      .neq('doc_status', 'cancelled')
-      .limit(1)
-    if (existingInv && existingInv.length > 0) {
-      throw new Error('This sales order has already been converted to an invoice')
-    }
-
-    // inv_code stays NULL on draft — it is assigned only on post() via
-    // the nextval_for_type RPC (gapless sequential requirement).
-    const { data, error } = await supabase
-      .from('crm_invoices')
-      .insert({
-        so_id: soId,
-        customer_id: so.customer_id,
-        doc_status: 'draft',
-        payment_status: 'unpaid',
-        line_items: so.line_items,
-        subtotal: so.subtotal,
-        discount_amount: so.discount_amount,
-        tax_amount: so.tax_amount,
-        total: so.total,
-        payment_terms: so.payment_terms,
-        reference_po: so.reference_po,
-        notes: so.notes,
-        assigned_rep: so.assigned_rep ?? actorEmail,
-        created_by: actorEmail,
-      })
-      .select('id')
-      .single()
+    const { data, error } = await supabase.rpc('convert_so_to_invoice', {
+      p_so_id: soId,
+      p_actor_email: actorEmail,
+    })
     if (error) throw error
-    return (data as { id: string }).id
+    return data as string
   },
 }

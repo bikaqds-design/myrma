@@ -35,7 +35,7 @@ import { BACKUP_TABLES, INTENTIONALLY_NOT_BACKED_UP } from '../api/backup.js'
  * rather than silently passing.
  */
 const LIVE_PUBLIC_TABLES = `activities announcements branding_settings brands categories contacts
-countries country_area_codes credit_note_applications credit_notes crm_invoices currencies
+countries country_area_codes credit_note_applications credit_notes crm_invoice_lines crm_invoices currencies
 custom_field_definitions custom_roles
 customer_notes customers deals document_sequences email_queue email_settings email_templates
 inventory_units invoices kb_articles leads manufacturer_batches notification_logs

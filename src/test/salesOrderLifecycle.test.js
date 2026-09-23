@@ -192,26 +192,24 @@ describe('the integrity reports', () => {
   })
 })
 
-// ── The browser client agrees ───────────────────────────────────────────────
-const mocks = vi.hoisted(() => ({ so: null, inserted: [] }))
+// ── The browser client ──────────────────────────────────────────────────────
+// Since 20260885 the browser no longer reads the order, checks it and inserts
+// the invoice itself (two clicks made two invoices): convertToInvoice is one
+// call to convert_so_to_invoice, which refuses an order that is not
+// confirmed/delivered with "Approve the sales order before invoicing it".
+// That rule is pinned in src/test/crmInvoiceLines.test.js and proven in
+// supabase/tests/crm_invoice_lines.sql.
+const mocks = vi.hoisted(() => ({ rpc: [], writes: [], result: { data: 'inv-1', error: null } }))
 
 vi.mock('../api/client.js', () => ({
   supabase: {
-    rpc: vi.fn(),
+    rpc: (name, args) => {
+      mocks.rpc.push({ name, args })
+      return Promise.resolve(mocks.result)
+    },
     from: (table) => {
-      if (table === 'sales_orders') {
-        return { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: mocks.so, error: null }), single: () => Promise.resolve({ data: mocks.so, error: null }) }) }) }
-      }
-      if (table === 'crm_invoices') {
-        return {
-          select: () => ({ eq: () => ({ neq: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }) }) }),
-          insert: (row) => {
-            mocks.inserted.push(row)
-            return { select: () => ({ single: () => Promise.resolve({ data: { id: 'inv-1' }, error: null }) }) }
-          },
-        }
-      }
-      throw new Error('unexpected table ' + table)
+      mocks.writes.push(table)
+      throw new Error('convertToInvoice must not touch ' + table + ' directly')
     },
   },
 }))
@@ -220,25 +218,19 @@ const { salesOrders } = await import('../api/db/salesOrders')
 
 describe('salesOrders.convertToInvoice', () => {
   beforeEach(() => {
-    mocks.inserted.length = 0
+    mocks.rpc.length = 0
+    mocks.writes.length = 0
+    mocks.result = { data: 'inv-1', error: null }
   })
 
-  const so = (status) => ({ id: 'so-1', status, customer_id: 'c1', line_items: [], subtotal: 0, discount_amount: 0, tax_amount: 0, total: 0 })
-
-  it.each(['draft', 'sent', 'accepted', 'declined', 'cancelled'])('refuses a %s order before any insert', async (status) => {
-    mocks.so = so(status)
-    await expect(salesOrders.convertToInvoice('so-1', 'a@b.c')).rejects.toThrow()
-    expect(mocks.inserted).toEqual([])
+  it('is one call to convert_so_to_invoice — no browser read, check or insert', async () => {
+    await expect(salesOrders.convertToInvoice('so-1', 'a@b.c')).resolves.toBe('inv-1')
+    expect(mocks.rpc).toEqual([{ name: 'convert_so_to_invoice', args: { p_so_id: 'so-1', p_actor_email: 'a@b.c' } }])
+    expect(mocks.writes).toEqual([])
   })
 
-  it('explains what to do, rather than surfacing a database error', async () => {
-    mocks.so = so('sent')
-    await expect(salesOrders.convertToInvoice('so-1', 'a@b.c')).rejects.toThrow(/Approve the sales order before invoicing/)
-  })
-
-  it.each(['confirmed', 'delivered'])('lets a %s order through', async (status) => {
-    mocks.so = so(status)
-    await salesOrders.convertToInvoice('so-1', 'a@b.c').catch(() => {})
-    expect(mocks.inserted.length).toBe(1)
+  it("passes on the database's explanation for an order that is not approved", async () => {
+    mocks.result = { data: null, error: { code: 'P0001', message: 'Approve the sales order before invoicing it (it is sent)' } }
+    await expect(salesOrders.convertToInvoice('so-1', 'a@b.c')).rejects.toMatchObject({ message: expect.stringMatching(/Approve the sales order before invoicing/) })
   })
 })

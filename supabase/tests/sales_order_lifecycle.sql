@@ -207,59 +207,59 @@ BEGIN
   RAISE NOTICE '%', pg_temp.check('the bulk counter never goes negative', v_n = 0, '-> ' || v_n);
 
   -- ══ 4. An invoice needs a confirmed order ════════════════════════════════════
+  -- Since 20260885 a client cannot INSERT an invoice at all: an order's invoice
+  -- is made by convert_so_to_invoice (one transaction, the order locked) and a
+  -- standalone one by create_crm_invoice. The rules below are the same ones,
+  -- checked through the path that now exists. One is deliberately stricter: a
+  -- rep can no longer invoice another rep's order by knowing its id, even a
+  -- confirmed one.
   RAISE NOTICE '--- 4. Invoicing an order that was never approved ---';
-  FOREACH v_a IN ARRAY ARRAY['draft', 'sent', 'declined', 'cancelled'] LOOP
-    v_so2 := pg_temp.new_so(v_cust, v_a, '[]'::jsonb, v_mgr);
+  DECLARE
+    v_svc   uuid := gen_random_uuid();
+    v_ilns  jsonb;
+  BEGIN
+    INSERT INTO public.products (id, sku, product_name, product_type) VALUES (v_svc, 'BL04-SVC', 'BL04 service', 'service');
+    v_ilns := jsonb_build_array(jsonb_build_object('product_id', v_svc, 'product_name', 'BL04 service', 'qty', 1, 'unit_price', 10));
+
+    FOREACH v_a IN ARRAY ARRAY['draft', 'sent', 'declined', 'cancelled'] LOOP
+      v_so2 := pg_temp.new_so(v_cust, v_a, v_ilns, v_mgr);
+      v_out := pg_temp.call(v_mgr, format('SELECT public.convert_so_to_invoice(%L, %L)', v_so2, v_mgr));
+      RAISE NOTICE '%', pg_temp.check(format('no invoice from a %s order', v_a), v_out LIKE 'err:P0001%', '-> ' || v_out);
+    END LOOP;
+    FOREACH v_a IN ARRAY ARRAY['confirmed', 'delivered'] LOOP
+      v_so2 := pg_temp.new_so(v_cust, v_a, v_ilns, v_mgr);
+      v_out := pg_temp.call(v_mgr, format('SELECT public.convert_so_to_invoice(%L, %L)', v_so2, v_mgr));
+      RAISE NOTICE '%', pg_temp.check(format('an invoice from a %s order is allowed', v_a), v_out = 'ok', '-> ' || v_out);
+    END LOOP;
+    -- an invoice with no order behind it (a standalone invoice) is not this rule's business
+    v_out := pg_temp.call(v_mgr, format('SELECT public.create_crm_invoice(%L, %L::jsonb, NULL, NULL, NULL, NULL, NULL, %L)', v_cust, v_ilns, v_mgr));
+    RAISE NOTICE '%', pg_temp.check('a standalone invoice (no order) is unaffected', v_out = 'ok', '-> ' || v_out);
     v_out := pg_temp.call(v_mgr, format(
-      'INSERT INTO public.crm_invoices (so_id, customer_id, doc_status, subtotal, total, created_by) VALUES (%L, %L, ''draft'', 10, 10, %L)',
-      v_so2, v_cust, v_mgr));
-    RAISE NOTICE '%', pg_temp.check(format('no invoice from a %s order', v_a), v_out LIKE 'err:P0001%', '-> ' || v_out);
-  END LOOP;
-  FOREACH v_a IN ARRAY ARRAY['confirmed', 'delivered'] LOOP
-    v_so2 := pg_temp.new_so(v_cust, v_a, '[]'::jsonb, v_mgr);
-    v_out := pg_temp.call(v_mgr, format(
-      'INSERT INTO public.crm_invoices (so_id, customer_id, doc_status, subtotal, total, created_by) VALUES (%L, %L, ''draft'', 10, 10, %L)',
-      v_so2, v_cust, v_mgr));
-    RAISE NOTICE '%', pg_temp.check(format('an invoice from a %s order is allowed', v_a), v_out = 'ok', '-> ' || v_out);
-  END LOOP;
-  -- an invoice with no order behind it (a standalone invoice) is not this rule's business
-  v_out := pg_temp.call(v_mgr, format(
-    'INSERT INTO public.crm_invoices (customer_id, doc_status, subtotal, total, created_by) VALUES (%L, ''draft'', 10, 10, %L)', v_cust, v_mgr));
-  RAISE NOTICE '%', pg_temp.check('a standalone invoice (no order) is unaffected', v_out = 'ok', '-> ' || v_out);
-  -- The guard exists for the sales rep: the only non-manager role that can insert an invoice.
-  -- A rep cannot READ another rep's order (RLS), so a guard that looked the order up as the
-  -- caller saw "not found" and let the invoice through.
-  v_so2 := pg_temp.new_so(v_cust, 'draft', '[]'::jsonb, v_mgr);          -- somebody else's draft
-  v_out := pg_temp.call(v_rep, format(
-    'INSERT INTO public.crm_invoices (so_id, customer_id, doc_status, subtotal, total, created_by) VALUES (%L, %L, ''draft'', 10, 10, %L)',
-    v_so2, v_cust, v_rep));
-  RAISE NOTICE '%', pg_temp.check('a rep cannot invoice ANOTHER rep''s unapproved order (RLS hides it from them)', v_out LIKE 'err:P0001%', '-> ' || v_out);
-  v_so2 := pg_temp.new_so(v_cust, 'confirmed', '[]'::jsonb, v_mgr);      -- somebody else's approved order
-  v_out := pg_temp.call(v_rep, format(
-    'INSERT INTO public.crm_invoices (so_id, customer_id, doc_status, subtotal, total, created_by) VALUES (%L, %L, ''draft'', 10, 10, %L)',
-    v_so2, v_cust, v_rep));
-  RAISE NOTICE '%', pg_temp.check('...and an order they can''t see is judged by its real status (confirmed passes)', v_out = 'ok', '-> ' || v_out);
-  v_so2 := pg_temp.new_so(v_cust, 'sent', '[]'::jsonb, v_rep);           -- the rep's own, not yet approved
-  v_out := pg_temp.call(v_rep, format(
-    'INSERT INTO public.crm_invoices (so_id, customer_id, doc_status, subtotal, total, created_by) VALUES (%L, %L, ''draft'', 10, 10, %L)',
-    v_so2, v_cust, v_rep));
-  RAISE NOTICE '%', pg_temp.check('a rep cannot invoice their OWN unapproved order', v_out LIKE 'err:P0001%', '-> ' || v_out);
-  v_so2 := pg_temp.new_so(v_cust, 'confirmed', '[]'::jsonb, v_rep);      -- the rep's own, approved
-  v_out := pg_temp.call(v_rep, format(
-    'INSERT INTO public.crm_invoices (so_id, customer_id, doc_status, subtotal, total, created_by) VALUES (%L, %L, ''draft'', 10, 10, %L)',
-    v_so2, v_cust, v_rep));
-  RAISE NOTICE '%', pg_temp.check('a rep can invoice their own approved order (control)', v_out = 'ok', '-> ' || v_out);
-  -- Backup & Restore goes through rma_restore_apply, a SECURITY DEFINER RPC (the owner), so an
-  -- administrator has no need of an exemption: signed in as one, the rule applies.
-  v_so2 := pg_temp.new_so(v_cust, 'cancelled', '[]'::jsonb, v_mgr);
-  v_out := pg_temp.call(v_admin, format(
-    'INSERT INTO public.crm_invoices (so_id, customer_id, doc_status, subtotal, total, created_by) VALUES (%L, %L, ''draft'', 10, 10, %L)',
-    v_so2, v_cust, v_admin));
-  RAISE NOTICE '%', pg_temp.check('an administrator signed in is held to the same rule', v_out LIKE 'err:P0001%', '-> ' || v_out);
-  v_out := pg_temp.call(NULL, format(
-    'INSERT INTO public.crm_invoices (so_id, customer_id, doc_status, subtotal, total, created_by) VALUES (%L, %L, ''draft'', 10, 10, ''system'')',
-    v_so2, v_cust));
-  RAISE NOTICE '%', pg_temp.check('an RPC (the owner) is not blocked', v_out = 'ok', '-> ' || v_out);
+      'INSERT INTO public.crm_invoices (so_id, customer_id, doc_status, subtotal, total, created_by) VALUES (NULL, %L, ''draft'', 10, 10, %L)', v_cust, v_mgr));
+    RAISE NOTICE '%', pg_temp.check('a direct INSERT of an invoice is refused to every client (20260885)', v_out LIKE 'err:42501%', '-> ' || v_out);
+
+    v_so2 := pg_temp.new_so(v_cust, 'draft', v_ilns, v_mgr);          -- somebody else's draft
+    v_out := pg_temp.call(v_rep, format('SELECT public.convert_so_to_invoice(%L, %L)', v_so2, v_rep));
+    RAISE NOTICE '%', pg_temp.check('a rep cannot invoice ANOTHER rep''s unapproved order', v_out LIKE 'err:P0001%', '-> ' || v_out);
+    v_so2 := pg_temp.new_so(v_cust, 'confirmed', v_ilns, v_mgr);      -- somebody else's approved order
+    v_out := pg_temp.call(v_rep, format('SELECT public.convert_so_to_invoice(%L, %L)', v_so2, v_rep));
+    RAISE NOTICE '%', pg_temp.check('...nor another rep''s APPROVED one (stricter since 20260885: they can''t even read it)', v_out LIKE 'err:P0001%', '-> ' || v_out);
+    v_so2 := pg_temp.new_so(v_cust, 'sent', v_ilns, v_rep);           -- the rep's own, not yet approved
+    v_out := pg_temp.call(v_rep, format('SELECT public.convert_so_to_invoice(%L, %L)', v_so2, v_rep));
+    RAISE NOTICE '%', pg_temp.check('a rep cannot invoice their OWN unapproved order', v_out LIKE 'err:P0001%', '-> ' || v_out);
+    v_so2 := pg_temp.new_so(v_cust, 'confirmed', v_ilns, v_rep);      -- the rep's own, approved
+    v_out := pg_temp.call(v_rep, format('SELECT public.convert_so_to_invoice(%L, %L)', v_so2, v_rep));
+    RAISE NOTICE '%', pg_temp.check('a rep can invoice their own approved order (control)', v_out = 'ok', '-> ' || v_out);
+    -- Backup & Restore goes through rma_restore_apply, a SECURITY DEFINER RPC (the owner), so an
+    -- administrator has no need of an exemption: signed in as one, the rule applies.
+    v_so2 := pg_temp.new_so(v_cust, 'cancelled', v_ilns, v_mgr);
+    v_out := pg_temp.call(v_admin, format('SELECT public.convert_so_to_invoice(%L, %L)', v_so2, v_admin));
+    RAISE NOTICE '%', pg_temp.check('an administrator signed in is held to the same rule', v_out LIKE 'err:P0001%', '-> ' || v_out);
+    v_out := pg_temp.call(NULL, format(
+      'INSERT INTO public.crm_invoices (so_id, customer_id, doc_status, subtotal, total, created_by) VALUES (%L, %L, ''draft'', 10, 10, ''system'')',
+      v_so2, v_cust));
+    RAISE NOTICE '%', pg_temp.check('an RPC (the owner) is not blocked', v_out = 'ok', '-> ' || v_out);
+  END;
 
   -- ══ 5. Sequential document codes ═════════════════════════════════════════════
   RAISE NOTICE '--- 5. QT / SO / PO codes ---';
