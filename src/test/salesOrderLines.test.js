@@ -202,3 +202,13 @@ describe('salesOrders client', () => {
     await expect(salesOrders.update('so1', { notes: 'x' })).rejects.toMatchObject({ code: 'P0001' })
   })
 })
+
+describe('generated columns do not turn every status update into a refusal', () => {
+  it('both allowlist guards leave stored generated columns out (they read as NULL in a BEFORE trigger)', () => {
+    for (const name of ['rma_guard_sales_order_client_writes', 'rma_guard_quotation_client_writes']) {
+      const body = fn(name)
+      expect(body, name).toContain("WHERE a.attrelid = TG_RELID AND a.attnum > 0 AND NOT a.attisdropped AND a.attgenerated <> ''")
+      expect(body.indexOf('a.attgenerated'), name).toBeLessThan(body.indexOf('IF (to_jsonb(NEW) - v_open)'))
+    }
+  })
+})

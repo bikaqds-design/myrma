@@ -102,6 +102,14 @@ BEGIN
     RETURN NEW;
   END IF;
 
+  -- A stored generated column reads as NULL in NEW inside a BEFORE trigger, so
+  -- it would look changed on every update (crm_invoices.cogs_complete does).
+  -- No client can write one, and each derives from columns guarded here.
+  SELECT v_open || COALESCE(array_agg(a.attname::text), ARRAY[]::text[])
+    INTO v_open
+    FROM pg_attribute a
+   WHERE a.attrelid = TG_RELID AND a.attnum > 0 AND NOT a.attisdropped AND a.attgenerated <> '';
+
   IF (to_jsonb(NEW) - v_open) IS DISTINCT FROM (to_jsonb(OLD) - v_open) THEN
     RAISE EXCEPTION 'A sales order''s lines, amounts and details are changed through the order form (update_sales_order), not directly.'
       USING ERRCODE = 'P0001';
@@ -120,6 +128,38 @@ CREATE TRIGGER trg_sales_orders_client_writes
 
 -- An order is created by create_sales_order or convert_quotation_to_so only.
 REVOKE INSERT ON TABLE public.sales_orders FROM authenticated;
+
+-- The quotation guard (20260883) gets the same generated-column exclusion, so a
+-- generated column added to quotations later cannot turn every status update
+-- into a refusal. Behaviour is otherwise unchanged.
+CREATE OR REPLACE FUNCTION public.rma_guard_quotation_client_writes()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_open text[] := ARRAY['status', 'archived', 'archived_at', 'archived_by', 'updated_at'];
+BEGIN
+  -- Client surface only. create_quotation/update_quotation run as the owner.
+  IF current_user NOT IN ('authenticated', 'anon') THEN
+    RETURN NEW;
+  END IF;
+
+  -- A stored generated column reads as NULL in NEW inside a BEFORE trigger, so
+  -- it would look changed on every update (crm_invoices.cogs_complete does).
+  -- No client can write one, and each derives from columns guarded here.
+  SELECT v_open || COALESCE(array_agg(a.attname::text), ARRAY[]::text[])
+    INTO v_open
+    FROM pg_attribute a
+   WHERE a.attrelid = TG_RELID AND a.attnum > 0 AND NOT a.attisdropped AND a.attgenerated <> '';
+
+  IF (to_jsonb(NEW) - v_open) IS DISTINCT FROM (to_jsonb(OLD) - v_open) THEN
+    RAISE EXCEPTION 'A quotation''s lines, amounts and details are changed through the quotation form (update_quotation), not directly.'
+      USING ERRCODE = 'P0001';
+  END IF;
+  RETURN NEW;
+END
+$function$;
 
 -- ── 3. writing the lines (internal) ──────────────────────────────────────────
 -- As _quotation_write_lines, except that every line must name an existing
