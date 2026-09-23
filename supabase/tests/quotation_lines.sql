@@ -38,6 +38,7 @@ DECLARE
   v_rep2   text := 'bl11-rep2@test.local';
   v_mgr    text := 'bl11-mgr@test.local';
   v_tech   text := 'bl11-tech@test.local';
+  v_acct   text := 'bl11-acct@test.local';
   v_cust   uuid;
   v_p1     uuid := gen_random_uuid();
   v_qt     public.quotations;
@@ -51,7 +52,7 @@ DECLARE
 BEGIN
   INSERT INTO public.user_roles (user_email, role, status)
   VALUES (v_rep, 'sales_rep', 'active'), (v_rep2, 'sales_rep', 'active'),
-         (v_mgr, 'manager', 'active'), (v_tech, 'technician', 'active');
+         (v_mgr, 'manager', 'active'), (v_tech, 'technician', 'active'), (v_acct, 'accountant', 'active');
   INSERT INTO public.products (id, sku, product_name, product_type)
   VALUES (v_p1, 'BL11-P1', 'BL11 product 1', 'hardware');
   INSERT INTO public.customers (id, company_name, customer_code, customer_type)
@@ -247,6 +248,18 @@ BEGIN
   SELECT count(*)::integer INTO v_n FROM public.quotation_lines WHERE quotation_id = v_qt.id;
   EXECUTE 'RESET ROLE'; PERFORM set_config('request.jwt.claims', '', true);
   RAISE NOTICE '%', pg_temp.check('a manager sees every quotation''s lines', v_n = 1, '-> ' || v_n);
+
+  PERFORM set_config('request.jwt.claims', json_build_object('email', v_acct, 'role', 'authenticated')::text, true);
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  SELECT count(*)::integer INTO v_n FROM public.quotation_lines WHERE quotation_id = v_qt.id;
+  EXECUTE 'RESET ROLE'; PERFORM set_config('request.jwt.claims', '', true);
+  RAISE NOTICE '%', pg_temp.check('an accountant, who can read every quotation, sees its lines too', v_n = 1, '-> ' || v_n);
+
+  PERFORM set_config('request.jwt.claims', json_build_object('email', v_tech, 'role', 'authenticated')::text, true);
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  SELECT count(*)::integer INTO v_n FROM public.quotation_lines WHERE quotation_id = v_qt.id;
+  EXECUTE 'RESET ROLE'; PERFORM set_config('request.jwt.claims', '', true);
+  RAISE NOTICE '%', pg_temp.check('a technician, who cannot read the quotation, sees none of its lines', v_n = 0, '-> ' || v_n);
 
   -- ══ 7. FK behaviour ═══════════════════════════════════════════════════════
   RAISE NOTICE '--- 7. FK ---';

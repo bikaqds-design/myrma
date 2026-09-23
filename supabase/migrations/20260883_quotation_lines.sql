@@ -81,7 +81,10 @@ CREATE INDEX IF NOT EXISTS quotation_lines_product_id_idx   ON public.quotation_
 COMMENT ON TABLE public.quotation_lines IS
   'One row per quotation line. Source of truth for a quotation''s lines; quotations.line_items is a read-only mirror maintained by create_quotation/update_quotation. Client writes are revoked — only those two RPCs write here.';
 
--- RLS: readable the same way the header is; no client write grant at all
+-- RLS: a line is readable exactly when its quotation is. The subquery runs
+-- under the caller's own policies on quotations, so this follows them —
+-- including the accountant's read-all (20260781) and any later change —
+-- instead of copying one version of them. No client write grant at all
 -- (procedure-only, the same pattern as payments/warehouse_stock/the three
 -- application tables since 20260850/20260872).
 ALTER TABLE public.quotation_lines ENABLE ROW LEVEL SECURITY;
@@ -90,19 +93,7 @@ DROP POLICY IF EXISTS "read_quotation_lines" ON public.quotation_lines;
 CREATE POLICY "read_quotation_lines"
   ON public.quotation_lines
   FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.quotations q
-       WHERE q.id = quotation_lines.quotation_id
-         AND (
-           public.rma_is_manager_or_above()
-           OR (
-             public.rma_is_staff()
-             AND (q.assigned_rep = public.rma_current_user_email() OR q.created_by = public.rma_current_user_email())
-           )
-         )
-    )
-  );
+  USING (EXISTS (SELECT 1 FROM public.quotations q WHERE q.id = quotation_lines.quotation_id));
 
 REVOKE ALL ON TABLE public.quotation_lines FROM PUBLIC, anon;
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE public.quotation_lines FROM authenticated;

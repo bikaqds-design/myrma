@@ -38,7 +38,8 @@ describe('the quotation_lines table', () => {
     expect(sql).toMatch(/REVOKE ALL ON TABLE public\.quotation_lines FROM PUBLIC, anon/)
     expect(sql).toMatch(/REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE public\.quotation_lines FROM authenticated/)
     expect(sql).toMatch(/GRANT SELECT ON TABLE public\.quotation_lines TO authenticated/)
-    expect(sql).toMatch(/CREATE POLICY "read_quotation_lines"[\s\S]{0,300}q\.assigned_rep = public\.rma_current_user_email\(\) OR q\.created_by = public\.rma_current_user_email\(\)/)
+    // follows the quotation's own read policies rather than copying one version of them
+    expect(sql).toMatch(/CREATE POLICY "read_quotation_lines"[\s\S]{0,120}USING \(EXISTS \(SELECT 1 FROM public\.quotations q WHERE q\.id = quotation_lines\.quotation_id\)\)/)
   })
 })
 
