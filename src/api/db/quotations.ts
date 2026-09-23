@@ -1,5 +1,5 @@
 import { supabase } from '../client.js'
-import { assertAffected } from './_assertUpdated.js'
+import { assertUpdated } from './_assertUpdated.js'
 import { fetchAllRows } from './_paging.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -169,10 +169,8 @@ export const quotations = {
       .update(fields)
       .eq('id', id)
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Quotation')
-    return data as QuotationRow
+    return assertUpdated(data as QuotationRow[] | null, 'Quotation')
   },
 
   /** The relational lines directly (20260883) — quotation_lines, not the line_items mirror. */
@@ -193,10 +191,8 @@ export const quotations = {
       .update({ status: 'sent' })
       .eq('id', id)
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Quotation')
-    return data as QuotationRow
+    return assertUpdated(data as QuotationRow[] | null, 'Quotation')
   },
 
   async markAccepted(id: string): Promise<QuotationRow> {
@@ -205,10 +201,8 @@ export const quotations = {
       .update({ status: 'accepted' })
       .eq('id', id)
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Quotation')
-    return data as QuotationRow
+    return assertUpdated(data as QuotationRow[] | null, 'Quotation')
   },
 
   async markDeclined(id: string): Promise<QuotationRow> {
@@ -217,10 +211,8 @@ export const quotations = {
       .update({ status: 'declined' })
       .eq('id', id)
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Quotation')
-    return data as QuotationRow
+    return assertUpdated(data as QuotationRow[] | null, 'Quotation')
   },
 
   async cancel(id: string): Promise<QuotationRow> {
@@ -229,10 +221,8 @@ export const quotations = {
       .update({ status: 'cancelled' })
       .eq('id', id)
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Quotation')
-    return data as QuotationRow
+    return assertUpdated(data as QuotationRow[] | null, 'Quotation')
   },
 
   async reopen(id: string): Promise<QuotationRow> {
@@ -241,10 +231,8 @@ export const quotations = {
       .update({ status: 'draft' })
       .eq('id', id)
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Quotation')
-    return data as QuotationRow
+    return assertUpdated(data as QuotationRow[] | null, 'Quotation')
   },
 
   /** Returns any lines that have no product_id (free-form lines). */

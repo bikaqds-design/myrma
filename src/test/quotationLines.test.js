@@ -137,7 +137,7 @@ vi.mock('../api/client.js', () => ({
     from: () => ({
       update: (patch) => {
         mocks.updates.push(patch)
-        return { eq: () => ({ select: () => ({ single: () => Promise.resolve({ data: { id: 'q1' }, error: null }) }) }) }
+        return { eq: () => ({ select: () => Promise.resolve({ data: [{ id: 'q1' }], error: null }) }) }
       },
     }),
   },

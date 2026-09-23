@@ -1,6 +1,6 @@
 import { supabase } from '../client.js'
 import { fetchAllRows } from './_paging.js'
-import { assertAffected } from './_assertUpdated.js'
+import { assertAffected, assertUpdated } from './_assertUpdated.js'
 import { computeDocumentTotals } from './_documentTotals.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -173,10 +173,8 @@ export const creditNotes = {
       .update(updates)
       .eq('id', id)
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Credit note')
-    return data as CreditNoteRow
+    return assertUpdated(data as CreditNoteRow[] | null, 'Credit note')
   },
 
   /**
