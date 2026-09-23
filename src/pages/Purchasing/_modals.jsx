@@ -351,7 +351,7 @@ export function CreatePurchaseOrderModal({ mode = 'create', initial, onClose, ve
           currency: cur.payload.currency, exchange_rate: cur.payload.exchangeRate, payment_terms: paymentTerms || null, delivery_terms: deliveryTerms || null,
           shipping_address: shippingAddress || null, billing_address: billingAddress || null,
           terms_conditions: termsConditions || null, notes: notes || null,
-        })
+        }, userEmail)
       } else {
         row = await db.purchaseOrders.create({ vendorId, ...fields, createdBy: userEmail })
       }

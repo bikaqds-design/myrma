@@ -141,9 +141,11 @@ BEGIN
     RAISE NOTICE '%', pg_temp.check(format('a manager cannot insert a vendor invoice already "%s"', v_a), v_out LIKE 'err:P0001%', '-> ' || v_out);
   END LOOP;
   v_out := pg_temp.call(v_mgr, $q$INSERT INTO public.purchase_orders (vendor_id, status, line_items, total, subtotal, currency, created_by, po_code) VALUES ($q$ || quote_literal(v_v1) || $q$, 'confirmed', '[]', 1, 1, 'EGP', 'x', 'PO-T-CONF')$q$);
-  RAISE NOTICE '%', pg_temp.check('nor a purchase order already "confirmed"', v_out LIKE 'err:P0001%', '-> ' || v_out);
-  v_out := pg_temp.call(v_mgr, $q$INSERT INTO public.purchase_orders (vendor_id, status, line_items, total, subtotal, currency, created_by, po_code) VALUES ($q$ || quote_literal(v_v1) || $q$, 'draft', '[]', 1, 1, 'EGP', 'x', 'PO-T-DRAFT')$q$);
-  RAISE NOTICE '%', pg_temp.check('a draft purchase order is created as before (control)', v_out = 'ok', '-> ' || v_out);
+  -- since 20260888 no client INSERTs a purchase order at all (create_purchase_order does)
+  RAISE NOTICE '%', pg_temp.check('nor a purchase order already "confirmed"', v_out LIKE 'err:%', '-> ' || v_out);
+  v_out := pg_temp.call(v_mgr, format($q$SELECT public.create_purchase_order(%L, %L::jsonb, '{"currency":"EGP"}'::jsonb, %L)$q$, v_v1,
+    jsonb_build_array(jsonb_build_object('product_id', v_p1, 'qty_ordered', 1, 'unit_cost', 1)), v_mgr));
+  RAISE NOTICE '%', pg_temp.check('a draft purchase order is created through create_purchase_order (control)', v_out = 'ok', '-> ' || v_out);
   v_out := pg_temp.call(NULL, format(ins_vi, gen_random_uuid(), v_v1, 'approved', 100, 100, 'restore', 'RESTORED-1', 'current_date', NULL, 'stock top-up'));
   RAISE NOTICE '%', pg_temp.check('an RPC / restore can still insert historical documents', v_out = 'ok', '-> ' || v_out);
 
