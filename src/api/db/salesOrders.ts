@@ -1,5 +1,5 @@
 import { supabase } from '../client.js'
-import { assertAffected } from './_assertUpdated.js'
+import { assertAffected, assertUpdated } from './_assertUpdated.js'
 import { computeDocumentTotals } from './_documentTotals.js'
 import { fetchAllRows, chunksOf } from './_paging.js'
 
@@ -149,10 +149,8 @@ export const salesOrders = {
       .update(updates)
       .eq('id', id)
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Sales order')
-    return data as SalesOrderRow
+    return assertUpdated(data as SalesOrderRow[] | null, 'Sales order')
   },
 
   async markSent(soId: string): Promise<SalesOrderRow> {
@@ -161,10 +159,8 @@ export const salesOrders = {
       .update({ status: 'sent' })
       .eq('id', soId)
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Sales order')
-    return data as SalesOrderRow
+    return assertUpdated(data as SalesOrderRow[] | null, 'Sales order')
   },
 
   /**
