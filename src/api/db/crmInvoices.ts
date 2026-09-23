@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { ROW_LINES, withRowLines } from './_rowLines.js'
 import { assertUpdated } from './_assertUpdated.js'
 import { fetchAllRows } from './_paging.js'
 
@@ -69,8 +70,8 @@ export const crmInvoices = {
     // Every matching invoice — a customer's open invoices for a payment must
     // all be offered, not the first 1 000. (BUG-066.)
     try {
-      return await fetchAllRows<CrmInvoiceRow>((from, to) => {
-        let q = supabase.from('crm_invoices').select('*')
+      const rows = await fetchAllRows<CrmInvoiceRow>((from, to) => {
+        let q = supabase.from('crm_invoices').select(ROW_LINES.crmInvoice.select)
         if (filters?.customerId) q = q.eq('customer_id', filters.customerId)
         if (filters?.docStatus) q = q.eq('doc_status', filters.docStatus)
         if (filters?.paymentStatus) q = q.eq('payment_status', filters.paymentStatus)
@@ -78,6 +79,7 @@ export const crmInvoices = {
         if (filters?.soId) q = q.eq('so_id', filters.soId)
         return q.order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)
       })
+      return rows.map((r) => withRowLines(r, ROW_LINES.crmInvoice))
     } catch (error) {
       if ((error as { code?: string })?.code === '42P01') return []
       throw error
@@ -85,12 +87,12 @@ export const crmInvoices = {
   },
 
   async get(id: string): Promise<CrmInvoiceRow | null> {
-    const { data, error } = await supabase.from('crm_invoices').select('*').eq('id', id).single()
+    const { data, error } = await supabase.from('crm_invoices').select(ROW_LINES.crmInvoice.select).eq('id', id).single()
     if (error) {
       if (error.code === 'PGRST116') return null
       throw error
     }
-    return data as CrmInvoiceRow
+    return withRowLines(data as unknown as CrmInvoiceRow, ROW_LINES.crmInvoice)
   },
 
   /**

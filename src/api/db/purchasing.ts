@@ -2,6 +2,7 @@ import { supabase } from '../client.js'
 import type { PagedResult } from './types.js'
 import { assertAffected } from './_assertUpdated.js'
 import { fetchPage, fetchAllRows } from './_paging.js'
+import { ROW_LINES, withRowLines } from './_rowLines.js'
 import { orIlike } from '../../lib/searchPattern.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -265,19 +266,20 @@ function viewerTimeZone(): string {
 export const purchaseOrders = {
   /** Every purchase order, newest first — all of them, not the first 1 000. (BUG-066.) */
   async list(): Promise<PurchaseOrderRow[]> {
-    return fetchAllRows<PurchaseOrderRow>((from, to) =>
+    const rows = await fetchAllRows<PurchaseOrderRow>((from, to) =>
       supabase
         .from('purchase_orders')
-        .select('*')
+        .select(ROW_LINES.purchaseOrder.select)
         .order('created_at', { ascending: false })
         .order('id', { ascending: true })
         .range(from, to)
     )
+    return rows.map((r) => withRowLines(r, ROW_LINES.purchaseOrder))
   },
   async get(id: string): Promise<PurchaseOrderRow> {
-    const { data, error } = await supabase.from('purchase_orders').select('*').eq('id', id).single()
+    const { data, error } = await supabase.from('purchase_orders').select(ROW_LINES.purchaseOrder.select).eq('id', id).single()
     if (error) throw error
-    return data
+    return withRowLines(data as unknown as PurchaseOrderRow, ROW_LINES.purchaseOrder)
   },
   async create(input: {
     vendorId: string
@@ -443,18 +445,19 @@ export const vendorInvoices = {
    * payment's open invoices are read for that vendor alone. (BUG-066.)
    */
   async list(filters?: { purchaseOrderId?: string; vendorId?: string; statuses?: string[] }): Promise<VendorInvoiceRow[]> {
-    return fetchAllRows<VendorInvoiceRow>((from, to) => {
-      let q = supabase.from('vendor_invoices').select('*')
+    const rows = await fetchAllRows<VendorInvoiceRow>((from, to) => {
+      let q = supabase.from('vendor_invoices').select(ROW_LINES.vendorInvoice.select)
       if (filters?.purchaseOrderId) q = q.eq('purchase_order_id', filters.purchaseOrderId)
       if (filters?.vendorId) q = q.eq('vendor_id', filters.vendorId)
       if (filters?.statuses?.length) q = q.in('status', filters.statuses)
       return q.order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)
     })
+    return rows.map((r) => withRowLines(r, ROW_LINES.vendorInvoice))
   },
   async get(id: string): Promise<VendorInvoiceRow> {
-    const { data, error } = await supabase.from('vendor_invoices').select('*').eq('id', id).single()
+    const { data, error } = await supabase.from('vendor_invoices').select(ROW_LINES.vendorInvoice.select).eq('id', id).single()
     if (error) throw error
-    return data
+    return withRowLines(data as unknown as VendorInvoiceRow, ROW_LINES.vendorInvoice)
   },
   /**
    * `create_vendor_invoice` (20260889): an invoice not raised from an order
