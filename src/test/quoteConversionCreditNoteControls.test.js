@@ -268,7 +268,10 @@ describe('creditNotes client', () => {
 
   it('sends the reason code when it creates a credit note', async () => {
     await creditNotes.create({ type: 'discount', customer_id: 'c1', reason: 'r', reason_code: 'goodwill', created_by: 'a@b.c', line_items: [] })
-    expect(mocks.inserted[0].reason_code).toBe('goodwill')
+    // since 20260887 through create_credit_note, not a direct insert
+    expect(mocks.inserted).toEqual([])
+    expect(mocks.rpcCalls[0].name).toBe('create_credit_note')
+    expect(mocks.rpcCalls[0].args.p_reason_code).toBe('goodwill')
   })
 
   it('submits, returns and asks about approval through the RPCs', async () => {

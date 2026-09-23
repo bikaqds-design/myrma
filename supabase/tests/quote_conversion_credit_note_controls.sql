@@ -310,17 +310,21 @@ BEGIN
   -- ══ 7. A credit note cannot be created already issued, or in someone else's name ══
   RAISE NOTICE '--- 7. Creating a credit note ---';
   -- Every control above lives in issue_credit_note. A signed-in user could INSERT a row that is
-  -- already 'issued' (with a balance of their choosing), skipping all of it.
+  -- already 'issued' (with a balance of their choosing), skipping all of it. Since 20260887 no
+  -- client can INSERT a credit note at all — create_credit_note is the only way in — so these
+  -- checks go through that path; each keeps the property it was written for.
   v_out := pg_temp.call(v_rep, format($q$INSERT INTO public.credit_notes (type, customer_id, status, line_items, subtotal, total, remaining_balance, reason, reason_code, created_by, cn_code)
     VALUES ('discount', %L, 'issued', '[]', 900, 900, 900, 'self-issued', 'goodwill', %L, 'CN-FAKE-1')$q$, v_cust, v_rep));
-  RAISE NOTICE '%', pg_temp.check('a rep cannot insert a credit note that is already issued', v_out LIKE 'err:P0001%', '-> ' || v_out);
+  RAISE NOTICE '%', pg_temp.check('a rep cannot insert a credit note that is already issued', v_out LIKE 'err:%'
+    AND NOT EXISTS (SELECT 1 FROM public.credit_notes WHERE cn_code = 'CN-FAKE-1'), '-> ' || v_out);
   v_out := pg_temp.call(v_m1, format($q$INSERT INTO public.credit_notes (type, customer_id, status, line_items, subtotal, total, reason, reason_code, created_by)
     VALUES ('discount', %L, 'pending_approval', '[]', 9, 9, 'skip the queue', 'goodwill', %L)$q$, v_cust, v_m1));
-  RAISE NOTICE '%', pg_temp.check('nor one that is already waiting for approval', v_out LIKE 'err:P0001%', '-> ' || v_out);
+  RAISE NOTICE '%', pg_temp.check('nor one that is already waiting for approval', v_out LIKE 'err:%'
+    AND NOT EXISTS (SELECT 1 FROM public.credit_notes WHERE reason = 'skip the queue'), '-> ' || v_out);
 
   -- created_by names the maker; the approval rule is "not the same person". It must come from the login.
-  v_out := pg_temp.call(v_m1, format($q$INSERT INTO public.credit_notes (id, type, customer_id, status, line_items, subtotal, total, reason, reason_code, created_by)
-    VALUES (%L, 'discount', %L, 'draft', '[]', 5, 5, 'forged maker', 'goodwill', 'somebody.else@test.local')$q$, gen_random_uuid(), v_cust));
+  v_out := pg_temp.call(v_m1, format($q$SELECT public.create_credit_note('discount', %L, 'forged maker', 'goodwill',
+    '[{"product_name":"Goodwill","qty":1,"unit_price":5}]'::jsonb, NULL, NULL, NULL, 'somebody.else@test.local')$q$, v_cust));
   SELECT created_by INTO v_a FROM public.credit_notes WHERE reason = 'forged maker';
   RAISE NOTICE '%', pg_temp.check('created_by is taken from the login, not from what the browser sent', v_out = 'ok' AND v_a = v_m1, '-> ' || coalesce(v_a, '<none>'));
   -- so a manager cannot dodge "not the creator" by writing another name
@@ -329,22 +333,26 @@ BEGIN
   v_out := pg_temp.call(v_m1, format('SELECT public.issue_credit_note(%L, %L)', v_cn, v_m1));
   RAISE NOTICE '%', pg_temp.check('...so the forger still cannot approve their own note', v_out LIKE 'err:P0001%' AND pg_temp.cn_status(v_cn) = 'pending_approval', '-> ' || v_out);
 
-  -- fields only the RPCs may set are ignored on insert
-  v_out := pg_temp.call(v_m1, format($q$INSERT INTO public.credit_notes (type, customer_id, status, line_items, subtotal, total, remaining_balance, applied_amount, reason, reason_code, created_by, approved_by, approved_at, issued_at, cn_code)
-    VALUES ('discount', %L, 'draft', '[]', 7, 7, 700, 300, 'sneaky fields', 'goodwill', %L, 'boss@test.local', now(), now(), 'CN-FAKE-2')$q$, v_cust, v_m1));
+  -- fields only the RPCs may set cannot be sent at all: create_credit_note has no parameter for them
+  v_out := pg_temp.call(v_m1, format($q$SELECT public.create_credit_note('discount', %L, 'sneaky fields', 'goodwill',
+    '[{"product_name":"Goodwill","qty":1,"unit_price":7}]'::jsonb, NULL, NULL, NULL, %L)$q$, v_cust, v_m1));
   SELECT * INTO v_row FROM public.credit_notes WHERE reason = 'sneaky fields';
-  RAISE NOTICE '%', pg_temp.check('approved_by, issued_at, cn_code, balances written by a client are discarded',
+  RAISE NOTICE '%', pg_temp.check('approved_by, issued_at, cn_code, balances start empty on a new note',
     v_out = 'ok' AND v_row.approved_by IS NULL AND v_row.approved_at IS NULL AND v_row.issued_at IS NULL AND v_row.cn_code IS NULL
-    AND v_row.remaining_balance = 0 AND v_row.applied_amount = 0, '-> ' || v_out);
+    AND v_row.remaining_balance = 0 AND v_row.applied_amount = 0 AND v_row.total = 7, '-> ' || v_out);
 
-  -- ...and they cannot be rewritten afterwards either (a draft is editable, so this matters)
+  -- ...and they cannot be rewritten afterwards either; a draft's reason changes through update_credit_note
   SELECT id INTO v_cn FROM public.credit_notes WHERE reason = 'sneaky fields';
   v_out := pg_temp.call(v_m1, format($q$UPDATE public.credit_notes SET created_by = 'other@test.local', approved_by = 'boss@test.local',
     approved_at = now(), cn_code = 'CN-FAKE-3', remaining_balance = 5000, applied_amount = 1, issued_at = now(), reason = 'edited reason' WHERE id = %L$q$, v_cn));
   SELECT * INTO v_row FROM public.credit_notes WHERE id = v_cn;
-  RAISE NOTICE '%', pg_temp.check('a draft can still be edited (its reason), but the RPC-owned fields do not move',
-    v_out = 'ok' AND v_row.reason = 'edited reason' AND v_row.created_by = v_m1 AND v_row.approved_by IS NULL
+  RAISE NOTICE '%', pg_temp.check('a direct UPDATE of the RPC-owned fields is refused, and nothing moves', v_out LIKE 'err:P0001%'
+    AND v_row.reason = 'sneaky fields' AND v_row.created_by = v_m1 AND v_row.approved_by IS NULL
     AND v_row.cn_code IS NULL AND v_row.remaining_balance = 0 AND v_row.applied_amount = 0 AND v_row.issued_at IS NULL, '-> ' || v_out);
+  v_out := pg_temp.call(v_m1, format($q$SELECT public.update_credit_note(%L, NULL, '{"reason":"edited reason"}'::jsonb, %L)$q$, v_cn, v_m1));
+  SELECT * INTO v_row FROM public.credit_notes WHERE id = v_cn;
+  RAISE NOTICE '%', pg_temp.check('a draft can still be edited (its reason) through update_credit_note', v_out = 'ok'
+    AND v_row.reason = 'edited reason' AND v_row.created_by = v_m1 AND v_row.cn_code IS NULL, '-> ' || v_out);
 
   -- the owner (RPCs, backup restore) is not affected
   v_out := pg_temp.call(NULL, format($q$INSERT INTO public.credit_notes (type, customer_id, status, line_items, subtotal, total, reason, reason_code, created_by, cn_code)

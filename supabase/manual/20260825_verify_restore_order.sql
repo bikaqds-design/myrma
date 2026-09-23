@@ -76,12 +76,13 @@ WITH manifest(ord, tbl) AS (
     (57, 'payments'),
     (58, 'payment_applications'),
     (59, 'credit_notes'),
-    (60, 'credit_note_applications'),
-    (61, 'activities'),
-    (62, 'notifications'),
-    (63, 'user_activity_log'),
-    (64, 'notification_logs'),
-    (65, 'notification_queue')
+    (60, 'credit_note_lines'),
+    (61, 'credit_note_applications'),
+    (62, 'activities'),
+    (63, 'notifications'),
+    (64, 'user_activity_log'),
+    (65, 'notification_logs'),
+    (66, 'notification_queue')
 ),
 fk AS (
   SELECT c.relname  AS child,

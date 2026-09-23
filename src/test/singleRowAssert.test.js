@@ -39,7 +39,6 @@ vi.mock('../api/client.js', () => {
 const { quotations } = await import('../api/db/quotations')
 const { salesOrders } = await import('../api/db/salesOrders')
 const { crmInvoices } = await import('../api/db/crmInvoices')
-const { creditNotes } = await import('../api/db/creditNotes')
 
 describe('a successful status write returns the row instead of throwing', () => {
   it.each([
@@ -50,7 +49,6 @@ describe('a successful status write returns the row instead of throwing', () => 
     ['quotations.reopen', () => quotations.reopen('r1')],
     ['crmInvoices.cancelDraft', () => crmInvoices.cancelDraft('r1', 'wrong customer', 'a@b.c')],
     ['salesOrders.markSent', () => salesOrders.markSent('r1')],
-    ['creditNotes.update', () => creditNotes.update('r1', { notes: 'x' })],
   ])('%s', async (_name, call) => {
     await expect(call()).resolves.toMatchObject(ROW)
   })

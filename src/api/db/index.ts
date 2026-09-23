@@ -178,7 +178,7 @@ export type { ActivityRow, ActivityAttachment, ActivityCreateInput } from './act
 export type { QuotationRow, QuotationLine, QuotationLineRow } from './quotations.js'
 export type { SalesOrderRow, SalesOrderLine, SalesOrderLineRow } from './salesOrders.js'
 export type { CrmInvoiceRow, CrmInvoiceLine, CrmInvoiceLineRow } from './crmInvoices.js'
-export type { CreditNoteRow, CreditNoteLine, CreditNoteApplicationRow } from './creditNotes.js'
+export type { CreditNoteRow, CreditNoteLine, CreditNoteLineRow, CreditNoteApplicationRow } from './creditNotes.js'
 export type { SalesDocumentRow, SalesDocType } from './salesDocuments.js'
 export type { PaymentRow, PaymentApplicationRow } from './payments.js'
 export type { LedgerEntryRow, LedgerEntryType, AgingBucket, AgingCustomerRow } from './customerLedger.js'
