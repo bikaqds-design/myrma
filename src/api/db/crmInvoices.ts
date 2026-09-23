@@ -1,5 +1,5 @@
 import { supabase } from '../client.js'
-import { assertAffected } from './_assertUpdated.js'
+import { assertAffected, assertUpdated } from './_assertUpdated.js'
 import { computeDocumentTotals } from './_documentTotals.js'
 import { fetchAllRows } from './_paging.js'
 
@@ -142,10 +142,8 @@ export const crmInvoices = {
       .update(updates)
       .eq('id', id)
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Invoice')
-    return data as CrmInvoiceRow
+    return assertUpdated(data as CrmInvoiceRow[] | null, 'Invoice')
   },
 
   /**
@@ -209,12 +207,10 @@ export const crmInvoices = {
       // path must go through void_invoice so inventory is restored.
       .eq('doc_status', 'draft')
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Invoice')
 
     void actorEmail // audit trail hook, mirrors void_/post
-    return data as CrmInvoiceRow
+    return assertUpdated(data as CrmInvoiceRow[] | null, 'Invoice')
   },
 
   /** listBySalesDocument: fetch all invoices for the unified All-tab view. */

@@ -1,5 +1,5 @@
 import { supabase } from '../client.js'
-import { assertAffected } from './_assertUpdated.js'
+import { assertAffected, assertUpdated } from './_assertUpdated.js'
 import { computeDocumentTotals } from './_documentTotals.js'
 import { fetchAllRows } from './_paging.js'
 
@@ -140,10 +140,8 @@ export const quotations = {
       .update(updates)
       .eq('id', id)
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Quotation')
-    return data as QuotationRow
+    return assertUpdated(data as QuotationRow[] | null, 'Quotation')
   },
 
   async markSent(id: string): Promise<QuotationRow> {
@@ -152,10 +150,8 @@ export const quotations = {
       .update({ status: 'sent' })
       .eq('id', id)
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Quotation')
-    return data as QuotationRow
+    return assertUpdated(data as QuotationRow[] | null, 'Quotation')
   },
 
   async markAccepted(id: string): Promise<QuotationRow> {
@@ -164,10 +160,8 @@ export const quotations = {
       .update({ status: 'accepted' })
       .eq('id', id)
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Quotation')
-    return data as QuotationRow
+    return assertUpdated(data as QuotationRow[] | null, 'Quotation')
   },
 
   async markDeclined(id: string): Promise<QuotationRow> {
@@ -176,10 +170,8 @@ export const quotations = {
       .update({ status: 'declined' })
       .eq('id', id)
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Quotation')
-    return data as QuotationRow
+    return assertUpdated(data as QuotationRow[] | null, 'Quotation')
   },
 
   async cancel(id: string): Promise<QuotationRow> {
@@ -188,10 +180,8 @@ export const quotations = {
       .update({ status: 'cancelled' })
       .eq('id', id)
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Quotation')
-    return data as QuotationRow
+    return assertUpdated(data as QuotationRow[] | null, 'Quotation')
   },
 
   async reopen(id: string): Promise<QuotationRow> {
@@ -200,10 +190,8 @@ export const quotations = {
       .update({ status: 'draft' })
       .eq('id', id)
       .select()
-      .single()
     if (error) throw error
-    assertAffected(data, 'Quotation')
-    return data as QuotationRow
+    return assertUpdated(data as QuotationRow[] | null, 'Quotation')
   },
 
   /** Returns any lines that have no product_id (free-form lines). */
