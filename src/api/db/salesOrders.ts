@@ -1,6 +1,5 @@
 import { supabase } from '../client.js'
-import { assertAffected, assertUpdated } from './_assertUpdated.js'
-import { computeDocumentTotals } from './_documentTotals.js'
+import { assertUpdated } from './_assertUpdated.js'
 import { fetchAllRows, chunksOf } from './_paging.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -13,6 +12,20 @@ export interface SalesOrderLine {
   unit_price: number
   discount_pct?: number | null
   tax_pct?: number | null
+}
+
+/** A row of `sales_order_lines` (20260884) — the source of truth behind `line_items`. */
+export interface SalesOrderLineRow {
+  id: string
+  sales_order_id: string
+  line_no: number
+  product_id: string | null
+  product_name: string
+  description: string | null
+  qty: number
+  unit_price: number
+  discount_pct: number
+  tax_pct: number
 }
 
 export interface SalesOrderRow {
@@ -83,9 +96,15 @@ export const salesOrders = {
     return data as SalesOrderRow
   },
 
+  /**
+   * Writes the order and its lines atomically through `create_sales_order`
+   * (20260884): the lines land in `sales_order_lines` (each a real catalogue
+   * product), totals are computed in the database, and `line_items` is kept as
+   * a mirror of those rows. An order is linked to a quotation only by
+   * `convert_quotation_to_so`, so there is no `quotation_id` here.
+   */
   async create(input: {
     customer_id: string
-    quotation_id?: string | null
     line_items?: SalesOrderLine[]
     delivery_date?: string | null
     payment_terms?: string | null
@@ -94,36 +113,26 @@ export const salesOrders = {
     assigned_rep?: string | null
     created_by: string
   }): Promise<SalesOrderRow> {
-    const { data: codeData, error: codeErr } = await supabase.rpc('generate_doc_code', {
-      p_prefix: 'SO',
+    const { data, error } = await supabase.rpc('create_sales_order', {
+      p_customer_id: input.customer_id,
+      p_lines: input.line_items ?? [],
+      p_delivery_date: input.delivery_date ?? null,
+      p_payment_terms: input.payment_terms ?? null,
+      p_reference_po: input.reference_po ?? null,
+      p_notes: input.notes ?? null,
+      p_assigned_rep: input.assigned_rep ?? null,
+      p_actor_email: input.created_by,
     })
-    if (codeErr) throw codeErr
-
-    const lines = input.line_items ?? []
-    const totals = computeDocumentTotals(lines)
-
-    const { data, error } = await supabase
-      .from('sales_orders')
-      .insert({
-        so_code: codeData as string,
-        quotation_id: input.quotation_id ?? null,
-        customer_id: input.customer_id,
-        status: 'draft',
-        line_items: lines,
-        ...totals,
-        delivery_date: input.delivery_date ?? null,
-        payment_terms: input.payment_terms ?? null,
-        reference_po: input.reference_po ?? null,
-        notes: input.notes ?? null,
-        assigned_rep: input.assigned_rep ?? null,
-        created_by: input.created_by,
-      })
-      .select()
-      .single()
     if (error) throw error
     return data as SalesOrderRow
   },
 
+  /**
+   * Every edit goes through `update_sales_order` — only on a DRAFT order (a sent
+   * one awaits approval; a confirmed one holds stock for its lines). With
+   * `line_items` it replaces the line set; it sets only the header fields that
+   * were passed (a key with null blanks it). `actorEmail` is display-only.
+   */
   async update(
     id: string,
     fields: Partial<
@@ -136,21 +145,30 @@ export const salesOrders = {
         | 'notes'
         | 'assigned_rep'
       >
-    >
+    >,
+    actorEmail?: string
   ): Promise<SalesOrderRow> {
-    const updates: Record<string, unknown> = { ...fields }
-
-    if (fields.line_items) {
-      Object.assign(updates, computeDocumentTotals(fields.line_items))
-    }
-
-    const { data, error } = await supabase
-      .from('sales_orders')
-      .update(updates)
-      .eq('id', id)
-      .select()
+    const { line_items, ...header } = fields
+    const { data, error } = await supabase.rpc('update_sales_order', {
+      p_id: id,
+      p_lines: line_items ?? null,
+      p_fields: Object.fromEntries(Object.entries(header).filter(([, v]) => v !== undefined)),
+      p_actor_email: actorEmail ?? null,
+    })
     if (error) throw error
-    return assertUpdated(data as SalesOrderRow[] | null, 'Sales order')
+    return data as SalesOrderRow
+  },
+
+  /** The relational lines directly (20260884) — sales_order_lines, not the line_items mirror. */
+  async lines(salesOrderId: string): Promise<SalesOrderLineRow[]> {
+    return fetchAllRows<SalesOrderLineRow>((from, to) =>
+      supabase
+        .from('sales_order_lines')
+        .select('*')
+        .eq('sales_order_id', salesOrderId)
+        .order('line_no', { ascending: true })
+        .range(from, to)
+    )
   },
 
   async markSent(soId: string): Promise<SalesOrderRow> {

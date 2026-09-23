@@ -227,6 +227,7 @@ export const BACKUP_TABLES = [
   { table: 'quotations' },
   { table: 'quotation_lines' },
   { table: 'sales_orders' },
+  { table: 'sales_order_lines' },
   { table: 'crm_invoices' },
   { table: 'invoices' },
   { table: 'payments' },
@@ -314,7 +315,7 @@ export const BACKUP_MODULES = [
   {
     id: 'sales',
     tables: [
-      'quotations', 'quotation_lines', 'sales_orders', 'crm_invoices', 'invoices',
+      'quotations', 'quotation_lines', 'sales_orders', 'sales_order_lines', 'crm_invoices', 'invoices',
       'payments', 'payment_applications', 'credit_notes', 'credit_note_applications',
     ],
   },
