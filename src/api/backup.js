@@ -206,6 +206,7 @@ export const BACKUP_TABLES = [
       'client writes are revoked by design: only amend_purchase_order writes a revision, as the snapshot of the order it is about to change. Attempting it would report a failure on every restore',
   },
   { table: 'vendor_invoices' },
+  { table: 'vendor_invoice_lines' },
   // Freight, customs and clearance. Part of what the goods cost, so losing
   // these in a restore would silently change every landed unit cost derived
   // from them.
@@ -309,7 +310,7 @@ export const BACKUP_MODULES = [
   },
   {
     id: 'purchasing',
-    tables: ['purchase_orders', 'purchase_order_lines', 'purchase_order_revisions', 'vendor_invoices', 'vendor_invoice_charges', 'vendor_payments', 'vendor_payment_applications'],
+    tables: ['purchase_orders', 'purchase_order_lines', 'purchase_order_revisions', 'vendor_invoices', 'vendor_invoice_lines', 'vendor_invoice_charges', 'vendor_payments', 'vendor_payment_applications'],
   },
   {
     id: 'inventory',

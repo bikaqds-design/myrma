@@ -263,8 +263,10 @@ describe('purchasing client', () => {
       vendorId: 'v1', lineItems: [], currency: 'EGP', createdBy: 'a@b.c',
       supplierInvoiceNo: 'INV-778', supplierInvoiceDate: '2026-09-01', nonPoReason: 'Emergency freight, no PO',
     })
-    const row = mocks.inserted[0].rows[0]
-    expect(row).toMatchObject({ supplier_invoice_no: 'INV-778', supplier_invoice_date: '2026-09-01', non_po_reason: 'Emergency freight, no PO' })
+    // since 20260889 through create_vendor_invoice, not a direct insert
+    expect(mocks.inserted).toEqual([])
+    expect(mocks.rpcCalls[0].name).toBe('create_vendor_invoice')
+    expect(mocks.rpcCalls[0].args.p_fields).toMatchObject({ supplier_invoice_no: 'INV-778', supplier_invoice_date: '2026-09-01', non_po_reason: 'Emergency freight, no PO' })
   })
 
   it('submits for approval with no override by default, and with a trimmed one when given', async () => {

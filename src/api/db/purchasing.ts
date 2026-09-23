@@ -1,6 +1,6 @@
 import { supabase } from '../client.js'
 import type { PagedResult } from './types.js'
-import { assertUpdated, assertAffected } from './_assertUpdated.js'
+import { assertAffected } from './_assertUpdated.js'
 import { fetchPage, fetchAllRows } from './_paging.js'
 import { orIlike } from '../../lib/searchPattern.js'
 
@@ -29,6 +29,21 @@ export interface PurchaseOrderLineRow {
   product_name: string
   description: string | null
   qty_ordered: number
+  unit_cost: number
+  discount_pct: number
+  tax_pct: number
+}
+
+/** A row of `vendor_invoice_lines` (20260889) — the source of truth behind `line_items`. */
+export interface VendorInvoiceLineRow {
+  id: string
+  vendor_invoice_id: string
+  line_no: number
+  product_id: string | null
+  product_name: string
+  description: string | null
+  qty_ordered: number
+  qty_received: number
   unit_cost: number
   discount_pct: number
   tax_pct: number
@@ -243,36 +258,6 @@ function viewerTimeZone(): string {
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function computeTotals(lines: PurchaseLine[]): {
-  subtotal: number
-  discount_amount: number
-  tax_amount: number
-  total: number
-} {
-  let subtotal = 0
-  let discount_amount = 0
-  let tax_amount = 0
-
-  for (const line of lines) {
-    const lineBase = line.qty_ordered * line.unit_cost
-    const disc = lineBase * ((line.discount_pct ?? 0) / 100)
-    const afterDisc = lineBase - disc
-    const tax = afterDisc * ((line.tax_pct ?? 0) / 100)
-    subtotal += lineBase
-    discount_amount += disc
-    tax_amount += tax
-  }
-
-  return {
-    subtotal: Math.round(subtotal * 100) / 100,
-    discount_amount: Math.round(discount_amount * 100) / 100,
-    tax_amount: Math.round(tax_amount * 100) / 100,
-    total: Math.round((subtotal - discount_amount + tax_amount) * 100) / 100,
-  }
-}
-
 // ── Purchase Orders ───────────────────────────────────────────────────────────
 // Non-financial — never touches inventory. completed/partially_completed are
 // set server-side by receive_vendor_invoice when a linked VI is received.
@@ -430,42 +415,20 @@ export const purchaseOrders = {
     assertAffected(data, 'Purchase order')
   },
   /**
-   * convertToVendorInvoice — preserves vendor/lines/notes/totals and keeps the
-   * purchase_order_id link; caller may pass `overrides` to change fields
-   * (e.g. from a "review before saving" edit step) before insert. Lands in
-   * 'draft' (the DB default) — a Vendor Invoice always needs its own
-   * submit-for-approval step, even converted from an already-confirmed PO.
+   * convertToVendorInvoice — `convert_po_to_vendor_invoice` (20260889): one
+   * transaction with the order locked, so a double click cannot raise two. The
+   * invoice takes the order's rows, currency and exchange rate (the browser
+   * version never sent a currency — the column is NOT NULL — so it always
+   * failed) and lands in 'draft': a vendor invoice needs its own approval even
+   * from a confirmed order. Its lines stay editable while it is a draft.
    */
-  async convertToVendorInvoice(
-    poId: string,
-    createdBy: string,
-    overrides?: Partial<{
-      lineItems: PurchaseLine[]
-      invoiceDate: string
-      dueDate: string
-      notes: string
-    }>
-  ): Promise<VendorInvoiceRow> {
-    const po = await purchaseOrders.get(poId)
-    const lineItems = (overrides?.lineItems ?? po.line_items).map((l) => ({ ...l, qty_received: 0 }))
-    const totals = computeTotals(lineItems)
-    const { data, error } = await supabase
-      .from('vendor_invoices')
-      .insert([
-        {
-          purchase_order_id: poId,
-          vendor_id: po.vendor_id,
-          line_items: lineItems,
-          ...totals,
-          invoice_date: overrides?.invoiceDate || null,
-          due_date: overrides?.dueDate || null,
-          notes: overrides?.notes ?? po.notes,
-          created_by: createdBy,
-        },
-      ])
-      .select()
+  async convertToVendorInvoice(poId: string, actorEmail: string): Promise<VendorInvoiceRow> {
+    const { data, error } = await supabase.rpc('convert_po_to_vendor_invoice', {
+      p_po_id: poId,
+      p_actor_email: actorEmail,
+    })
     if (error) throw error
-    return data[0]
+    return data as VendorInvoiceRow
   },
 }
 
@@ -493,9 +456,14 @@ export const vendorInvoices = {
     if (error) throw error
     return data
   },
+  /**
+   * `create_vendor_invoice` (20260889): an invoice not raised from an order
+   * (one from an order is `purchaseOrders.convertToVendorInvoice`). The lines
+   * land in `vendor_invoice_lines`, the totals are computed in the database,
+   * `line_items` is kept as a mirror; the maker is the login.
+   */
   async create(input: {
     vendorId: string
-    purchaseOrderId?: string
     lineItems: PurchaseLine[]
     invoiceDate?: string
     dueDate?: string
@@ -513,38 +481,56 @@ export const vendorInvoices = {
     nonPoReason?: string
     createdBy: string
   }): Promise<VendorInvoiceRow> {
-    const lineItems = input.lineItems.map((l) => ({ ...l, qty_received: l.qty_received ?? 0 }))
-    const totals = computeTotals(lineItems)
-    const { data, error } = await supabase
-      .from('vendor_invoices')
-      .insert([
-        {
-          purchase_order_id: input.purchaseOrderId || null,
-          vendor_id: input.vendorId,
-          line_items: lineItems,
-          ...totals,
-          currency: input.currency,
-          exchange_rate: input.exchangeRate ?? 1,
-          invoice_date: input.invoiceDate || null,
-          due_date: input.dueDate || null,
-          notes: input.notes || null,
-          supplier_invoice_no: input.supplierInvoiceNo || null,
-          supplier_invoice_date: input.supplierInvoiceDate || null,
-          non_po_reason: input.nonPoReason || null,
-          created_by: input.createdBy,
-        },
-      ])
-      .select()
+    const { data, error } = await supabase.rpc('create_vendor_invoice', {
+      p_vendor_id: input.vendorId,
+      p_lines: input.lineItems,
+      p_fields: {
+        currency: input.currency,
+        exchange_rate: input.exchangeRate ?? 1,
+        invoice_date: input.invoiceDate || null,
+        due_date: input.dueDate || null,
+        notes: input.notes || null,
+        supplier_invoice_no: input.supplierInvoiceNo || null,
+        supplier_invoice_date: input.supplierInvoiceDate || null,
+        non_po_reason: input.nonPoReason || null,
+      },
+      p_actor_email: input.createdBy,
+    })
     if (error) throw error
-    return data[0]
+    return data as VendorInvoiceRow
   },
-  /** update — intended for pre-approval edits only; the UI gates this by status. */
-  async update(id: string, fields: Partial<VendorInvoiceRow>): Promise<VendorInvoiceRow> {
-    const patch = { ...fields } as Partial<VendorInvoiceRow>
-    if (patch.line_items) Object.assign(patch, computeTotals(patch.line_items))
-    const { data, error } = await supabase.from('vendor_invoices').update(patch).eq('id', id).select()
+  /**
+   * Every edit goes through `update_vendor_invoice` — a DRAFT only. With
+   * `line_items` it replaces the line set; it sets only the header fields
+   * passed (a field passed as null is blanked).
+   */
+  async update(
+    id: string,
+    fields: Partial<Pick<VendorInvoiceRow,
+      'line_items' | 'currency' | 'exchange_rate' | 'invoice_date' | 'due_date' | 'notes' |
+      'supplier_invoice_no' | 'supplier_invoice_date' | 'non_po_reason'>>,
+    actorEmail?: string
+  ): Promise<VendorInvoiceRow> {
+    const { line_items, ...header } = fields
+    const { data, error } = await supabase.rpc('update_vendor_invoice', {
+      p_id: id,
+      p_lines: line_items ?? null,
+      p_fields: Object.fromEntries(Object.entries(header).filter(([, v]) => v !== undefined)),
+      p_actor_email: actorEmail ?? null,
+    })
     if (error) throw error
-    return assertUpdated(data, 'Vendor invoice')
+    return data as VendorInvoiceRow
+  },
+  /** The relational lines directly (20260889) — vendor_invoice_lines, not the line_items mirror. */
+  async lines(vendorInvoiceId: string): Promise<VendorInvoiceLineRow[]> {
+    return fetchAllRows<VendorInvoiceLineRow>((from, to) =>
+      supabase
+        .from('vendor_invoice_lines')
+        .select('*')
+        .eq('vendor_invoice_id', vendorInvoiceId)
+        .order('line_no', { ascending: true })
+        .range(from, to)
+    )
   },
   /**
    * submitForApproval. The database refuses without the supplier's invoice
