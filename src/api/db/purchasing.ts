@@ -20,6 +20,20 @@ export interface PurchaseLine {
   tax_pct?: number | null
 }
 
+/** A row of `purchase_order_lines` (20260888) — the source of truth behind `line_items`. */
+export interface PurchaseOrderLineRow {
+  id: string
+  purchase_order_id: string
+  line_no: number
+  product_id: string | null
+  product_name: string
+  description: string | null
+  qty_ordered: number
+  unit_cost: number
+  discount_pct: number
+  tax_pct: number
+}
+
 export type PurchaseDocType = 'purchase_order' | 'vendor_invoice'
 
 export interface PurchaseOrderRow {
@@ -302,40 +316,62 @@ export const purchaseOrders = {
     notes?: string
     createdBy: string
   }): Promise<PurchaseOrderRow> {
-    const { data: code, error: codeErr } = await supabase.rpc('generate_doc_code', { p_prefix: 'PO' })
-    if (codeErr) throw codeErr
-    const totals = computeTotals(input.lineItems)
-    const { data: row, error } = await supabase
-      .from('purchase_orders')
-      .insert([
-        {
-          po_code: code,
-          vendor_id: input.vendorId,
-          line_items: input.lineItems,
-          ...totals,
-          issue_date: input.issueDate || null,
-          expected_delivery_date: input.expectedDeliveryDate || null,
-          currency: input.currency,
-          exchange_rate: input.exchangeRate ?? 1,
-          payment_terms: input.paymentTerms || null,
-          delivery_terms: input.deliveryTerms || null,
-          shipping_address: input.shippingAddress || null,
-          billing_address: input.billingAddress || null,
-          terms_conditions: input.termsConditions || null,
-          notes: input.notes || null,
-          created_by: input.createdBy,
-        },
-      ])
-      .select()
+    // create_purchase_order (20260888): the lines land in purchase_order_lines,
+    // the totals are computed in the database from them, and line_items is
+    // kept as a mirror; the maker is the login, not `createdBy`.
+    const { data, error } = await supabase.rpc('create_purchase_order', {
+      p_vendor_id: input.vendorId,
+      p_lines: input.lineItems,
+      p_fields: {
+        currency: input.currency,
+        exchange_rate: input.exchangeRate ?? 1,
+        issue_date: input.issueDate || null,
+        expected_delivery_date: input.expectedDeliveryDate || null,
+        payment_terms: input.paymentTerms || null,
+        delivery_terms: input.deliveryTerms || null,
+        shipping_address: input.shippingAddress || null,
+        billing_address: input.billingAddress || null,
+        terms_conditions: input.termsConditions || null,
+        notes: input.notes || null,
+      },
+      p_actor_email: input.createdBy,
+    })
     if (error) throw error
-    return row[0]
+    return data as PurchaseOrderRow
   },
-  async update(id: string, fields: Partial<PurchaseOrderRow>): Promise<PurchaseOrderRow> {
-    const patch = { ...fields } as Partial<PurchaseOrderRow>
-    if (patch.line_items) Object.assign(patch, computeTotals(patch.line_items))
-    const { data, error } = await supabase.from('purchase_orders').update(patch).eq('id', id).select()
+  /**
+   * Every edit goes through `update_purchase_order` — a DRAFT only (a sent or
+   * pending order awaits confirmation of exactly these figures; a confirmed one
+   * is amended). With `line_items` it replaces the line set; it sets only the
+   * header fields passed (a field passed as null is blanked).
+   */
+  async update(
+    id: string,
+    fields: Partial<Pick<PurchaseOrderRow,
+      'line_items' | 'currency' | 'exchange_rate' | 'issue_date' | 'expected_delivery_date' | 'payment_terms' |
+      'delivery_terms' | 'shipping_address' | 'billing_address' | 'terms_conditions' | 'notes'>>,
+    actorEmail?: string
+  ): Promise<PurchaseOrderRow> {
+    const { line_items, ...header } = fields
+    const { data, error } = await supabase.rpc('update_purchase_order', {
+      p_id: id,
+      p_lines: line_items ?? null,
+      p_fields: Object.fromEntries(Object.entries(header).filter(([, v]) => v !== undefined)),
+      p_actor_email: actorEmail ?? null,
+    })
     if (error) throw error
-    return assertUpdated(data, 'Purchase order')
+    return data as PurchaseOrderRow
+  },
+  /** The relational lines directly (20260888) — purchase_order_lines, not the line_items mirror. */
+  async lines(purchaseOrderId: string): Promise<PurchaseOrderLineRow[]> {
+    return fetchAllRows<PurchaseOrderLineRow>((from, to) =>
+      supabase
+        .from('purchase_order_lines')
+        .select('*')
+        .eq('purchase_order_id', purchaseOrderId)
+        .order('line_no', { ascending: true })
+        .range(from, to)
+    )
   },
   /** markSent — also used as the "Send for Approval" step; the PO sits here until a manager approves it (via Activities) into Confirmed. */
   async markSent(id: string): Promise<void> {

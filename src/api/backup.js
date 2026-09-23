@@ -198,6 +198,7 @@ export const BACKUP_TABLES = [
   // Nothing in purchasing points back: purchase_orders and vendor_invoices
   // reference only brands and each other.
   { table: 'purchase_orders' },
+  { table: 'purchase_order_lines' },
   {
     table: 'purchase_order_revisions',
     restore: false,
@@ -308,7 +309,7 @@ export const BACKUP_MODULES = [
   },
   {
     id: 'purchasing',
-    tables: ['purchase_orders', 'purchase_order_revisions', 'vendor_invoices', 'vendor_invoice_charges', 'vendor_payments', 'vendor_payment_applications'],
+    tables: ['purchase_orders', 'purchase_order_lines', 'purchase_order_revisions', 'vendor_invoices', 'vendor_invoice_charges', 'vendor_payments', 'vendor_payment_applications'],
   },
   {
     id: 'inventory',
