@@ -18,6 +18,15 @@
 import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { provenTicketId, escapeLikePattern } from '../../supabase/functions/_shared/trackerProof.ts'
+import { rmaTracker } from '../api/db/tickets'
+
+// Mocked and imported at file level, not inside the test: loading tickets.ts
+// (and @sentry/react behind it) cold can take over 5 s under a full parallel
+// run, and inside a test body that time counted against the test's timeout.
+const { invoke } = vi.hoisted(() => ({
+  invoke: vi.fn(async () => ({ data: { comments: [], comment: { id: 'c' } }, error: null })),
+}))
+vi.mock('../api/client.js', () => ({ supabase: { functions: { invoke } } }))
 
 const ID = '11111111-1111-1111-1111-111111111111'
 const OTHER = '22222222-2222-2222-2222-222222222222'
@@ -108,9 +117,7 @@ describe('the tracker sends the RMA number', () => {
   })
 
   it('the client API puts it in both request bodies', async () => {
-    const invoke = vi.fn(async () => ({ data: { comments: [], comment: { id: 'c' } }, error: null }))
-    vi.doMock('../api/client.js', () => ({ supabase: { functions: { invoke } } }))
-    const { rmaTracker } = await import('../api/db/tickets')
+    invoke.mockClear()
     await rmaTracker.getPublicComments(ID, 'RMA-15092026-0001')
     await rmaTracker.addComment(ID, 'RMA-15092026-0001', 'Ann', 'ann@example.com', 'hello')
     expect(invoke.mock.calls[0][1].body).toEqual({ action: 'comments', ticketId: ID, rmaNumber: 'RMA-15092026-0001' })
