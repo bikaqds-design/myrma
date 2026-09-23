@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { ROW_LINES, withRowLines } from './_rowLines.js'
 import { assertUpdated } from './_assertUpdated.js'
 import { fetchAllRows, chunksOf } from './_paging.js'
 
@@ -68,7 +69,7 @@ export const salesOrders = {
     // quotationIds list asked for in chunks. (BUG-066.)
     const read = (quotationIds?: string[]) =>
       fetchAllRows<SalesOrderRow>((from, to) => {
-        let q = supabase.from('sales_orders').select('*')
+        let q = supabase.from('sales_orders').select(ROW_LINES.salesOrder.select)
         if (filters?.customerId) q = q.eq('customer_id', filters.customerId)
         if (filters?.status) q = q.eq('status', filters.status)
         if (filters?.assignedRep) q = q.eq('assigned_rep', filters.assignedRep)
@@ -77,10 +78,10 @@ export const salesOrders = {
         return q.order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)
       })
     try {
-      if (!filters?.quotationIds) return await read()
+      if (!filters?.quotationIds) return (await read()).map((r) => withRowLines(r, ROW_LINES.salesOrder))
       if (filters.quotationIds.length === 0) return []
       const parts = await Promise.all(chunksOf(filters.quotationIds, 100).map((ids) => read(ids)))
-      return parts.flat().sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : a.id < b.id ? -1 : 1))
+      return parts.flat().map((r) => withRowLines(r, ROW_LINES.salesOrder)).sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : a.id < b.id ? -1 : 1))
     } catch (error) {
       if ((error as { code?: string })?.code === '42P01') return []
       throw error
@@ -88,12 +89,12 @@ export const salesOrders = {
   },
 
   async get(id: string): Promise<SalesOrderRow | null> {
-    const { data, error } = await supabase.from('sales_orders').select('*').eq('id', id).single()
+    const { data, error } = await supabase.from('sales_orders').select(ROW_LINES.salesOrder.select).eq('id', id).single()
     if (error) {
       if (error.code === 'PGRST116') return null
       throw error
     }
-    return data as SalesOrderRow
+    return withRowLines(data as unknown as SalesOrderRow, ROW_LINES.salesOrder)
   },
 
   /**

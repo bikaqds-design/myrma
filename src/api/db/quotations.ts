@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { ROW_LINES, withRowLines } from './_rowLines.js'
 import { assertUpdated } from './_assertUpdated.js'
 import { fetchAllRows } from './_paging.js'
 
@@ -68,14 +69,15 @@ export const quotations = {
   }): Promise<QuotationRow[]> {
     // Every matching quotation, newest first — not the first 1 000. (BUG-066.)
     try {
-      return await fetchAllRows<QuotationRow>((from, to) => {
-        let q = supabase.from('quotations').select('*')
+      const rows = await fetchAllRows<QuotationRow>((from, to) => {
+        let q = supabase.from('quotations').select(ROW_LINES.quotation.select)
         if (filters?.dealId) q = q.eq('deal_id', filters.dealId)
         if (filters?.customerId) q = q.eq('customer_id', filters.customerId)
         if (filters?.status) q = q.eq('status', filters.status)
         if (filters?.assignedRep) q = q.eq('assigned_rep', filters.assignedRep)
         return q.order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)
       })
+      return rows.map((r) => withRowLines(r, ROW_LINES.quotation))
     } catch (error) {
       if ((error as { code?: string })?.code === '42P01') return []
       throw error
@@ -83,12 +85,12 @@ export const quotations = {
   },
 
   async get(id: string): Promise<QuotationRow | null> {
-    const { data, error } = await supabase.from('quotations').select('*').eq('id', id).single()
+    const { data, error } = await supabase.from('quotations').select(ROW_LINES.quotation.select).eq('id', id).single()
     if (error) {
       if (error.code === 'PGRST116') return null
       throw error
     }
-    return data as QuotationRow
+    return withRowLines(data as unknown as QuotationRow, ROW_LINES.quotation)
   },
 
   /**

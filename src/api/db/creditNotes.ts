@@ -1,4 +1,5 @@
 import { supabase } from '../client.js'
+import { ROW_LINES, withRowLines } from './_rowLines.js'
 import { fetchAllRows } from './_paging.js'
 import { assertAffected } from './_assertUpdated.js'
 
@@ -101,8 +102,8 @@ export const creditNotes = {
   }): Promise<CreditNoteRow[]> {
     // Every matching credit note, newest first — not the first 1 000. (BUG-066.)
     try {
-      return await fetchAllRows<CreditNoteRow>((from, to) => {
-        let q = supabase.from('credit_notes').select('*')
+      const rows = await fetchAllRows<CreditNoteRow>((from, to) => {
+        let q = supabase.from('credit_notes').select(ROW_LINES.creditNote.select)
         if (filters?.customerId) q = q.eq('customer_id', filters.customerId)
         if (filters?.status) q = q.eq('status', filters.status)
         if (filters?.type) q = q.eq('type', filters.type)
@@ -110,6 +111,7 @@ export const creditNotes = {
         if (filters?.assignedRep) q = q.eq('assigned_rep', filters.assignedRep)
         return q.order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)
       })
+      return rows.map((r) => withRowLines(r, ROW_LINES.creditNote))
     } catch (error) {
       if ((error as { code?: string })?.code === '42P01') return []
       throw error
@@ -117,12 +119,12 @@ export const creditNotes = {
   },
 
   async get(id: string): Promise<CreditNoteRow | null> {
-    const { data, error } = await supabase.from('credit_notes').select('*').eq('id', id).single()
+    const { data, error } = await supabase.from('credit_notes').select(ROW_LINES.creditNote.select).eq('id', id).single()
     if (error) {
       if (error.code === 'PGRST116') return null
       throw error
     }
-    return data as CreditNoteRow
+    return withRowLines(data as unknown as CreditNoteRow, ROW_LINES.creditNote)
   },
 
   /**
