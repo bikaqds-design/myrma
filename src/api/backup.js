@@ -225,6 +225,7 @@ export const BACKUP_TABLES = [
 
   // ── Tier 5: sales documents, each depending on the one above ──────────────
   { table: 'quotations' },
+  { table: 'quotation_lines' },
   { table: 'sales_orders' },
   { table: 'crm_invoices' },
   { table: 'invoices' },
@@ -313,7 +314,7 @@ export const BACKUP_MODULES = [
   {
     id: 'sales',
     tables: [
-      'quotations', 'sales_orders', 'crm_invoices', 'invoices',
+      'quotations', 'quotation_lines', 'sales_orders', 'crm_invoices', 'invoices',
       'payments', 'payment_applications', 'credit_notes', 'credit_note_applications',
     ],
   },
