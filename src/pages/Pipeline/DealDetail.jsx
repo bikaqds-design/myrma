@@ -543,7 +543,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
         toast.success(t('salesDocs.successCreated'))
         logEvent(`quotation_created|${saved.qt_code}`)
       } else {
-        saved = await db.quotations.update(editingQtId, fields)
+        saved = await db.quotations.update(editingQtId, fields, currentUserEmail)
         toast.success(t('salesDocs.successUpdated'))
       }
       // Deal value = sum of every open quotation, so replace this one's contribution

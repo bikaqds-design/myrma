@@ -151,7 +151,7 @@ export default function SalesDocumentForm({ docType, initial = null, salesReps =
     setSaving(true)
     try {
       if (isEdit) {
-        await MODULE.update(initial.id, editFields)
+        await MODULE.update(initial.id, editFields, currentUserEmail)
         toast.success(t('salesDocuments.savedToast'))
       } else {
         const created = await MODULE.create(createPayload)

@@ -1,6 +1,5 @@
 import { supabase } from '../client.js'
-import { assertAffected, assertUpdated } from './_assertUpdated.js'
-import { computeDocumentTotals } from './_documentTotals.js'
+import { assertUpdated } from './_assertUpdated.js'
 import { fetchAllRows } from './_paging.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
@@ -13,6 +12,26 @@ export interface QuotationLine {
   unit_price: number
   discount_pct?: number | null
   tax_pct?: number | null
+}
+
+/**
+ * A row of `quotation_lines` (20260883, W2/L-01) — the real, FK-enforced,
+ * per-line source of truth. `quotations.line_items` (the QuotationLine shape
+ * above) is a server-maintained mirror of these rows, kept for every existing
+ * reader (the shared Sales Documents form, quotationPdf.js, DealDetail.jsx,
+ * convert_quotation_to_so); this is the same data, with an id and FK.
+ */
+export interface QuotationLineRow {
+  id: string
+  quotation_id: string
+  line_no: number
+  product_id: string | null
+  product_name: string
+  description: string | null
+  qty: number
+  unit_price: number
+  discount_pct: number
+  tax_pct: number
 }
 
 export interface QuotationRow {
@@ -72,6 +91,14 @@ export const quotations = {
     return data as QuotationRow
   },
 
+  /**
+   * Writes the header AND the lines atomically through `create_quotation`
+   * (20260883): the lines land in `quotation_lines` (FK'd to products,
+   * CHECK-constrained), totals are computed server-side from them, and
+   * `line_items` is filled in as a mirror of those rows — so nothing that
+   * reads `line_items` had to change for this to be true relational storage
+   * underneath. The signature is unchanged; only the write path is new.
+   */
   async create(input: {
     customer_id: string
     deal_id?: string | null
@@ -83,37 +110,28 @@ export const quotations = {
     assigned_rep?: string | null
     created_by: string
   }): Promise<QuotationRow> {
-    // Generate QT- code server-side via the generate_doc_code RPC
-    const { data: codeData, error: codeErr } = await supabase.rpc('generate_doc_code', {
-      p_prefix: 'QT',
+    const { data, error } = await supabase.rpc('create_quotation', {
+      p_customer_id: input.customer_id,
+      p_deal_id: input.deal_id ?? null,
+      p_lines: input.line_items ?? [],
+      p_validity_until: input.validity_until ?? null,
+      p_payment_terms: input.payment_terms ?? null,
+      p_reference_po: input.reference_po ?? null,
+      p_notes: input.notes ?? null,
+      p_assigned_rep: input.assigned_rep ?? null,
+      p_actor_email: input.created_by,
     })
-    if (codeErr) throw codeErr
-
-    const lines = input.line_items ?? []
-    const totals = computeDocumentTotals(lines)
-
-    const { data, error } = await supabase
-      .from('quotations')
-      .insert({
-        qt_code: codeData as string,
-        deal_id: input.deal_id ?? null,
-        customer_id: input.customer_id,
-        status: 'draft',
-        line_items: lines,
-        ...totals,
-        validity_until: input.validity_until ?? null,
-        payment_terms: input.payment_terms ?? null,
-        reference_po: input.reference_po ?? null,
-        notes: input.notes ?? null,
-        assigned_rep: input.assigned_rep ?? null,
-        created_by: input.created_by,
-      })
-      .select()
-      .single()
     if (error) throw error
     return data as QuotationRow
   },
 
+  /**
+   * Every edit goes through `update_quotation` (a direct UPDATE of anything
+   * but status or the archive flag is refused, 20260883): with `line_items`
+   * it replaces the whole line set, and it sets the header fields that were
+   * passed — only while the quotation is `draft`/`sent`. `actorEmail` is
+   * display-only: the database takes the editor from the login.
+   */
   async update(
     id: string,
     fields: Partial<
@@ -126,22 +144,34 @@ export const quotations = {
         | 'notes'
         | 'assigned_rep'
       >
-    >
+    >,
+    actorEmail?: string
   ): Promise<QuotationRow> {
-    const updates: Record<string, unknown> = { ...fields }
-
-    // Recompute totals whenever line_items change
-    if (fields.line_items) {
-      Object.assign(updates, computeDocumentTotals(fields.line_items))
-    }
-
-    const { data, error } = await supabase
-      .from('quotations')
-      .update(updates)
-      .eq('id', id)
-      .select()
+    // Only the header fields the caller actually passed: the Deal screen sends
+    // no reference_po / assigned_rep, and sending them as null would blank
+    // them. A key present with a null value does blank its field. With no
+    // line_items the lines are left as they are (p_lines null).
+    const { line_items, ...header } = fields
+    const { data, error } = await supabase.rpc('update_quotation', {
+      p_id: id,
+      p_lines: line_items ?? null,
+      p_fields: Object.fromEntries(Object.entries(header).filter(([, v]) => v !== undefined)),
+      p_actor_email: actorEmail ?? null,
+    })
     if (error) throw error
-    return assertUpdated(data as QuotationRow[] | null, 'Quotation')
+    return data as QuotationRow
+  },
+
+  /** The relational lines directly (20260883) — quotation_lines, not the line_items mirror. */
+  async lines(quotationId: string): Promise<QuotationLineRow[]> {
+    return fetchAllRows<QuotationLineRow>((from, to) =>
+      supabase
+        .from('quotation_lines')
+        .select('*')
+        .eq('quotation_id', quotationId)
+        .order('line_no', { ascending: true })
+        .range(from, to)
+    )
   },
 
   async markSent(id: string): Promise<QuotationRow> {
