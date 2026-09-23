@@ -1,7 +1,6 @@
 import { supabase } from '../client.js'
 import { fetchAllRows } from './_paging.js'
-import { assertAffected, assertUpdated } from './_assertUpdated.js'
-import { computeDocumentTotals } from './_documentTotals.js'
+import { assertAffected } from './_assertUpdated.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
@@ -29,6 +28,22 @@ export const CREDIT_NOTE_REASON_CODES = [
   'rebate',
 ] as const
 export type CreditNoteReasonCode = (typeof CREDIT_NOTE_REASON_CODES)[number]
+
+/** A row of `credit_note_lines` (20260887) — the source of truth behind `line_items`. */
+export interface CreditNoteLineRow {
+  id: string
+  credit_note_id: string
+  line_no: number
+  product_id: string | null
+  product_name: string
+  description: string | null
+  qty: number
+  unit_price: number
+  discount_pct: number
+  tax_pct: number
+  restock: boolean
+  warehouse_id: string | null
+}
 
 export interface CreditNoteRow {
   id: string
@@ -110,6 +125,15 @@ export const creditNotes = {
     return data as CreditNoteRow
   },
 
+  /**
+   * Through `create_credit_note` (20260887): the lines land in
+   * `credit_note_lines`, the totals are computed in the database from them —
+   * the total is what `issue_credit_note` credits, so the browser no longer
+   * decides it — and `line_items` is kept as a mirror of those rows. The
+   * invoice number is copied from the invoice; `source_invoice_number` and
+   * `created_by` are accepted for the calling convention only (the maker is the
+   * login).
+   */
   async create(input: {
     type: CreditNoteRow['type']
     customer_id: string
@@ -122,59 +146,52 @@ export const creditNotes = {
     ticket_id?: string | null
     assigned_rep?: string | null
   }): Promise<CreditNoteRow> {
-    const lines = input.line_items ?? []
-    // Was: subtotal = sum(qty * unit_price), tax_amount hard-coded to 0, and
-    // total = subtotal — so any discount or tax on the credited invoice line
-    // was thrown away and the customer was under- or over-credited (BUG-013).
-    const totals = computeDocumentTotals(lines)
-
-    const { data, error } = await supabase
-      .from('credit_notes')
-      .insert({
-        type: input.type,
-        customer_id: input.customer_id,
-        reason: input.reason,
-        reason_code: input.reason_code ?? null,
-        created_by: input.created_by,
-        status: 'draft',
-        line_items: lines,
-        subtotal: totals.subtotal,
-        discount_amount: totals.discount_amount,
-        tax_amount: totals.tax_amount,
-        total: totals.total,
-        applied_amount: 0,
-        remaining_balance: 0,
-        restock_status: input.type === 'rma_return' ? 'pending' : 'not_applicable',
-        source_invoice_id: input.source_invoice_id ?? null,
-        source_invoice_number: input.source_invoice_number ?? null,
-        ticket_id: input.ticket_id ?? null,
-        assigned_rep: input.assigned_rep ?? null,
-      })
-      .select()
-      .single()
+    const { data, error } = await supabase.rpc('create_credit_note', {
+      p_type: input.type,
+      p_customer_id: input.customer_id,
+      p_reason: input.reason,
+      p_reason_code: input.reason_code ?? null,
+      p_lines: input.line_items ?? [],
+      p_source_invoice_id: input.source_invoice_id ?? null,
+      p_ticket_id: input.ticket_id ?? null,
+      p_assigned_rep: input.assigned_rep ?? null,
+      p_actor_email: input.created_by,
+    })
     if (error) throw error
     return data as CreditNoteRow
   },
 
+  /**
+   * Every edit goes through `update_credit_note` — a DRAFT only (a note awaiting
+   * approval is fingerprinted; an issued one is money already credited). With
+   * `line_items` it replaces the line set; it sets only the fields passed.
+   */
   async update(
     id: string,
-    fields: Partial<
-      Pick<CreditNoteRow, 'line_items' | 'reason' | 'assigned_rep' | 'source_invoice_number'>
-    >
+    fields: Partial<Pick<CreditNoteRow, 'line_items' | 'reason' | 'reason_code' | 'assigned_rep'>>,
+    actorEmail?: string
   ): Promise<CreditNoteRow> {
-    const updates: Record<string, unknown> = { ...fields }
-
-    if (fields.line_items) {
-      Object.assign(updates, computeDocumentTotals(fields.line_items))
-    }
-
-    const { data, error } = await supabase
-      .from('credit_notes')
-      .update(updates)
-      .eq('id', id)
-      .select()
+    const { line_items, ...header } = fields
+    const { data, error } = await supabase.rpc('update_credit_note', {
+      p_id: id,
+      p_lines: line_items ?? null,
+      p_fields: Object.fromEntries(Object.entries(header).filter(([, v]) => v !== undefined)),
+      p_actor_email: actorEmail ?? null,
+    })
     if (error) throw error
-    return assertUpdated(data as CreditNoteRow[] | null, 'Credit note')
+    return data as CreditNoteRow
+  },
+
+  /** The relational lines directly (20260887) — credit_note_lines, not the line_items mirror. */
+  async lines(creditNoteId: string): Promise<CreditNoteLineRow[]> {
+    return fetchAllRows<CreditNoteLineRow>((from, to) =>
+      supabase
+        .from('credit_note_lines')
+        .select('*')
+        .eq('credit_note_id', creditNoteId)
+        .order('line_no', { ascending: true })
+        .range(from, to)
+    )
   },
 
   /**

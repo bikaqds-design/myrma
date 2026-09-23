@@ -3810,6 +3810,7 @@
     "qtViewSO": "View Sales Order",
     "viewInvoice": "View Invoice",
     "cnLinkInvoice": "Link to an open invoice (applies this credit note as a payment)",
+    "cnReturnNeedsInvoice": "An RMA return raised here must be linked to the invoice the goods were sold on.",
     "cnNoOpenInvoices": "This customer has no open invoices with a remaining balance.",
     "cnSelectInvoice": "Select an invoice…",
     "cnRemainingSuffix": "remaining",

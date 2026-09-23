@@ -3994,6 +3994,7 @@
     "qtViewSO": "عرض أمر البيع",
     "viewInvoice": "عرض الفاتورة",
     "cnLinkInvoice": "ربط بفاتورة مفتوحة (يُطبَّق هذا الإشعار كدفعة)",
+    "cnReturnNeedsInvoice": "يجب ربط مرتجع RMA المُنشأ هنا بالفاتورة التي بيعت بها البضاعة.",
     "cnNoOpenInvoices": "لا توجد لدى هذا العميل فواتير مفتوحة برصيد متبقٍ.",
     "cnSelectInvoice": "اختر فاتورة…",
     "cnRemainingSuffix": "متبقٍ",

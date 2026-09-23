@@ -500,7 +500,11 @@ export function CreateStandaloneCreditNoteModal({
   const grandTotal = lines.reduce((sum, l) => sum + lineTotal(l), 0)
 
   const cleanedLines = lines.filter((l) => l.product_name.trim() && (Number(l.qty) || 0) > 0)
-  const isValid = !!customerId && !!reasonCode && reason.trim().length > 0 && cleanedLines.length > 0 && (!linkInvoice || !!invoiceId)
+  // An RMA return credits goods coming back: the database (20260887) wants a
+  // ticket or an invoice behind it, since it is exempt from second approval.
+  const returnNeedsInvoice = cnType === 'rma_return' && !initialTicketId
+  const isValid = !!customerId && !!reasonCode && reason.trim().length > 0 && cleanedLines.length > 0
+    && (!linkInvoice || !!invoiceId) && (!returnNeedsInvoice || (linkInvoice && !!invoiceId))
 
   const TYPE_LABEL_KEY = {
     rma_return: 'salesDocuments.cnTypeRmaReturn',
@@ -535,7 +539,8 @@ export function CreateStandaloneCreditNoteModal({
       onCreated?.(cn)
     } catch (err) {
       console.error('Create standalone credit note failed', err)
-      toast.error(t('salesDocuments.createFailed'))
+      // The database's own refusal (P0001) says what to fix.
+      toast.error(err?.code === 'P0001' && err.message ? err.message : t('salesDocuments.createFailed'))
     } finally {
       setSaving(false)
     }
@@ -688,6 +693,9 @@ export function CreateStandaloneCreditNoteModal({
               />
               {t('salesDocuments.cnLinkInvoice')}
             </label>
+            {returnNeedsInvoice && !linkInvoice && (
+              <div className="mt-2 text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.cnReturnNeedsInvoice')}</div>
+            )}
             {linkInvoice && (
               <div className="mt-3">
                 {loadingInvoices ? (

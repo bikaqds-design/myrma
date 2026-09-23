@@ -234,6 +234,7 @@ export const BACKUP_TABLES = [
   { table: 'payments' },
   { table: 'payment_applications' },
   { table: 'credit_notes' },
+  { table: 'credit_note_lines' },
   { table: 'credit_note_applications' },
 
   // ── Tier 7: history. activities is polymorphic — related_id points at a
@@ -317,7 +318,7 @@ export const BACKUP_MODULES = [
     id: 'sales',
     tables: [
       'quotations', 'quotation_lines', 'sales_orders', 'sales_order_lines', 'crm_invoices', 'crm_invoice_lines', 'invoices',
-      'payments', 'payment_applications', 'credit_notes', 'credit_note_applications',
+      'payments', 'payment_applications', 'credit_notes', 'credit_note_lines', 'credit_note_applications',
     ],
   },
   {
