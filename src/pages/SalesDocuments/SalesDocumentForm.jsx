@@ -151,8 +151,13 @@ export default function SalesDocumentForm({ docType, initial = null, salesReps =
     setSaving(true)
     try {
       if (isEdit) {
-        await MODULE.update(initial.id, editFields, currentUserEmail)
+        const saved = await MODULE.update(initial.id, editFields, currentUserEmail)
         toast.success(t('salesDocuments.savedToast'))
+        // Changing the offer of a quote awaiting approval sends it back to
+        // draft and withdraws the approval request (20260893) — say so.
+        if (isQuotation && initial.status === 'sent' && saved?.status === 'draft') {
+          toast(t('salesDocuments.qtBackToDraft'), { duration: 6000 })
+        }
       } else {
         const created = await MODULE.create(createPayload)
         if (docType === 'invoice') await createInvoiceApprovalActivity(created)
