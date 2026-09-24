@@ -466,6 +466,77 @@ BEGIN
   EXECUTE replace(v_def, v_old, v_new);
 END $$;
 
+-- ── 8. cancelling an order, the integrity report, the audit log (review) ─────
+-- cancel_sales_order checked only "an invoice exists", so an order whose goods
+-- had left on a delivery (not invoiced yet) could be cancelled, and then could
+-- never be invoiced. It now refuses an order with a confirmed delivery and
+-- takes its draft deliveries with it. Its own-order check for a sales rep was
+-- also a bare (a OR b OR c): with no assigned rep, "assigned_rep = me" is NULL,
+-- the whole test NULL, and IF NOT NULL does not fire — a rep could cancel any
+-- colleague's unassigned order. Now COALESCE-wrapped.
+DO $$
+DECLARE
+  v_def  text;
+  v_have integer;
+  v_old_guard text := E'IF NOT (public.rma_is_manager_or_above()\n          OR v_so.assigned_rep = v_email\n          OR v_so.created_by  = v_email) THEN';
+  v_new_guard text := E'IF NOT COALESCE(public.rma_is_manager_or_above()\n          OR v_so.assigned_rep = v_email\n          OR v_so.created_by  = v_email, false) THEN';
+  v_anchor text := E'  PERFORM public.release_units(''sales_order'', p_so_id, p_actor_email);';
+  v_add text := E'  -- 20260894: goods that left on a delivery are not cancelled by cancelling\n'
+             || E'  -- the order (a return is P-05); draft deliveries go with the order.\n'
+             || E'  IF EXISTS (SELECT 1 FROM public.deliveries WHERE sales_order_id = p_so_id AND status = ''confirmed'') THEN\n'
+             || E'    RAISE EXCEPTION ''Goods have been delivered on this order; it can no longer be cancelled'' USING ERRCODE = ''P0001'';\n'
+             || E'  END IF;\n'
+             || E'  UPDATE public.deliveries SET status = ''cancelled'', cancelled_by = v_email, cancelled_at = now(), updated_at = now()\n'
+             || E'   WHERE sales_order_id = p_so_id AND status = ''draft'';\n\n';
+BEGIN
+  SELECT replace(pg_get_functiondef('public.cancel_sales_order'::regproc), E'\r\n', E'\n') INTO v_def;
+  IF v_def LIKE '%Goods have been delivered on this order%' THEN
+    RETURN;
+  END IF;
+  v_have := (length(v_def) - length(replace(v_def, v_old_guard, ''))) / length(v_old_guard);
+  IF v_have <> 1 THEN
+    RAISE EXCEPTION 'Refusing to apply: cancel_sales_order holds its own-order check % time(s), expected 1', v_have;
+  END IF;
+  v_have := (length(v_def) - length(replace(v_def, v_anchor, ''))) / length(v_anchor);
+  IF v_have <> 1 THEN
+    RAISE EXCEPTION 'Refusing to apply: cancel_sales_order releases units % time(s), expected 1', v_have;
+  END IF;
+  EXECUTE replace(replace(v_def, v_old_guard, v_new_guard), v_anchor, v_add || v_anchor);
+END $$;
+
+-- rma_reservation_integrity's "confirmed order holds less than it sold" did
+-- not count what confirmed deliveries already took, so every partly
+-- delivered order was reported.
+DO $$
+DECLARE
+  v_def  text;
+  v_have integer;
+  v_old  text := E'AND m.ref_type = ''warehouse_stock''), 0)::numeric AS qty';
+  v_new  text := E'AND m.ref_type = ''warehouse_stock''), 0)::numeric\n'
+              || E'           -- 20260894: what confirmed deliveries took was sold and has left\n'
+              || E'           + COALESCE((SELECT SUM(dl.qty) FROM public.delivery_lines dl\n'
+              || E'                         JOIN public.deliveries d ON d.id = dl.delivery_id\n'
+              || E'                        WHERE d.sales_order_id = so.id AND d.status = ''confirmed''), 0)::numeric AS qty';
+BEGIN
+  SELECT replace(pg_get_functiondef('public.rma_reservation_integrity'::regproc), E'\r\n', E'\n') INTO v_def;
+  IF v_def LIKE '%what confirmed deliveries took%' THEN
+    RETURN;
+  END IF;
+  v_have := (length(v_def) - length(replace(v_def, v_old, ''))) / length(v_old);
+  IF v_have <> 1 THEN
+    RAISE EXCEPTION 'Refusing to apply: rma_reservation_integrity holds its held-quantity sum % time(s), expected 1', v_have;
+  END IF;
+  EXECUTE replace(v_def, v_old, v_new);
+END $$;
+
+-- The server audit log (20260876) records deliveries like every other document.
+DROP TRIGGER IF EXISTS trg_audit_deliveries ON public.deliveries;
+CREATE TRIGGER trg_audit_deliveries AFTER INSERT OR DELETE OR UPDATE ON public.deliveries
+  FOR EACH ROW EXECUTE FUNCTION public.rma_audit_row();
+DROP TRIGGER IF EXISTS trg_audit_truncate_deliveries ON public.deliveries;
+CREATE TRIGGER trg_audit_truncate_deliveries AFTER TRUNCATE ON public.deliveries
+  FOR EACH STATEMENT EXECUTE FUNCTION public.rma_audit_truncate();
+
 -- ── guard ────────────────────────────────────────────────────────────────────
 DO $$
 BEGIN
@@ -478,5 +549,10 @@ BEGIN
   IF pg_get_functiondef('public.nextval_for_type'::regproc) NOT LIKE '%WHEN ''delivery''       THEN ''DN''%'
      OR NOT EXISTS (SELECT 1 FROM public.document_sequences WHERE seq_type = 'delivery') THEN
     RAISE EXCEPTION 'Refusing to finish: the delivery sequence is not registered as DN-';
+  END IF;
+  IF pg_get_functiondef('public.cancel_sales_order'::regproc) NOT LIKE '%Goods have been delivered on this order%'
+     OR pg_get_functiondef('public.cancel_sales_order'::regproc) NOT LIKE '%IF NOT COALESCE(public.rma_is_manager_or_above()%'
+     OR pg_get_functiondef('public.rma_reservation_integrity'::regproc) NOT LIKE '%what confirmed deliveries took%' THEN
+    RAISE EXCEPTION 'Refusing to finish: cancel_sales_order or rma_reservation_integrity was not updated';
   END IF;
 END $$;

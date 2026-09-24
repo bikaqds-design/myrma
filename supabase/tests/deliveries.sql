@@ -46,6 +46,9 @@ DO $do$
 DECLARE
   v_mgr   text := 'p01-mgr@test.local';
   v_rep   text := 'p01-rep@test.local';
+  v_rep2  text := 'p01-rep2@test.local';
+  v_so3   public.sales_orders;
+  v_so4   public.sales_orders;
   v_cust  uuid;
   v_wh    uuid := gen_random_uuid();
   v_ser   uuid := gen_random_uuid();
@@ -62,7 +65,7 @@ DECLARE
   v_out   text;
   v_n     numeric;
 BEGIN
-  INSERT INTO public.user_roles (user_email, role, status) VALUES (v_mgr, 'manager', 'active'), (v_rep, 'sales_rep', 'active');
+  INSERT INTO public.user_roles (user_email, role, status) VALUES (v_mgr, 'manager', 'active'), (v_rep, 'sales_rep', 'active'), (v_rep2, 'sales_rep', 'active');
   INSERT INTO public.customers (company_name, customer_code, customer_type) VALUES ('P01 Co', 'P01-C1', 'B2B') RETURNING id INTO v_cust;
   INSERT INTO public.warehouses (id, name, code, warehouse_type) VALUES (v_wh, 'P01 WH', 'P01-WH', 'main');
   INSERT INTO public.products (id, sku, product_name, product_type, stock_tracking_mode) VALUES
@@ -188,6 +191,41 @@ BEGIN
   v_out := pg_temp.call(v_mgr, format($q$SELECT public.create_delivery(%L, %L::jsonb, NULL, %L)$q$, v_so2.id,
     jsonb_build_array(jsonb_build_object('sales_order_line_id', (SELECT id FROM public.sales_order_lines WHERE sales_order_id = v_so2.id), 'qty', 1)), v_mgr));
   RAISE NOTICE '%', pg_temp.check('and once invoiced whole, it cannot get deliveries', v_out LIKE 'err:P0001%invoiced as a whole%', '-> ' || v_out);
+
+  -- ══ 4b. an order with shipped goods (review of 809aa09) ═════════════════════
+  RAISE NOTICE '--- 4b. cancelling an order, integrity report ---';
+  v_out := pg_temp.call(v_mgr, format('SELECT public.cancel_sales_order(%L, %L)', v_so.id, v_mgr));
+  RAISE NOTICE '%', pg_temp.check('an order whose goods have been delivered cannot be cancelled', v_out LIKE 'err:P0001%delivered%', '-> ' || v_out);
+
+  PERFORM pg_temp.as_user(v_rep);
+  v_so3 := public.create_sales_order(v_cust, jsonb_build_array(jsonb_build_object('product_id', v_bulk, 'qty', 3, 'unit_price', 20)), NULL, NULL, NULL, NULL, v_rep, v_rep);
+  v_so4 := public.create_sales_order(v_cust, jsonb_build_array(jsonb_build_object('product_id', v_bulk, 'qty', 1, 'unit_price', 20)), NULL, NULL, NULL, NULL, v_rep, v_rep);
+  PERFORM pg_temp.as_owner();
+  UPDATE public.sales_orders SET status = 'sent' WHERE id IN (v_so3.id, v_so4.id);
+  PERFORM pg_temp.call(v_mgr, format('SELECT public.approve_sales_order(%L, %L)', v_so3.id, v_mgr));
+  PERFORM pg_temp.call(v_mgr, format('SELECT public.approve_sales_order(%L, %L)', v_so4.id, v_mgr));
+  PERFORM pg_temp.as_user(v_mgr);
+  v_d := public.create_delivery(v_so3.id, jsonb_build_array(jsonb_build_object('sales_order_line_id',
+           (SELECT id FROM public.sales_order_lines WHERE sales_order_id = v_so3.id), 'qty', 1)), NULL, v_mgr);
+  v_d := public.confirm_delivery(v_d.id, v_mgr);
+  PERFORM pg_temp.as_owner();
+  RAISE NOTICE '%', pg_temp.check('a partly delivered order is not reported as holding less than it sold',
+    NOT EXISTS (SELECT 1 FROM public.rma_reservation_integrity() r WHERE r.entity_id = v_so3.id),
+    '-> ' || COALESCE((SELECT string_agg(r.detail, '; ') FROM public.rma_reservation_integrity() r WHERE r.entity_id = v_so3.id), ''));
+  PERFORM pg_temp.as_user(v_mgr);
+  v_d2 := public.create_delivery(v_so4.id, jsonb_build_array(jsonb_build_object('sales_order_line_id',
+           (SELECT id FROM public.sales_order_lines WHERE sales_order_id = v_so4.id), 'qty', 1)), NULL, v_mgr);
+  PERFORM pg_temp.as_owner();
+  v_out := pg_temp.call(v_mgr, format('SELECT public.cancel_sales_order(%L, %L)', v_so4.id, v_mgr));
+  RAISE NOTICE '%', pg_temp.check('an order with only a draft delivery can be cancelled, and the draft goes with it',
+    v_out = 'ok' AND (SELECT status FROM public.deliveries WHERE id = v_d2.id) = 'cancelled', '-> ' || v_out);
+
+  PERFORM pg_temp.as_user(v_rep);
+  v_so4 := public.create_sales_order(v_cust, jsonb_build_array(jsonb_build_object('product_id', v_bulk, 'qty', 1, 'unit_price', 20)), NULL, NULL, NULL, NULL, v_rep, v_rep);
+  PERFORM pg_temp.as_owner();
+  UPDATE public.sales_orders SET assigned_rep = NULL WHERE id = v_so4.id;
+  v_out := pg_temp.call(v_rep2, format('SELECT public.cancel_sales_order(%L, %L)', v_so4.id, v_rep2));
+  RAISE NOTICE '%', pg_temp.check('a sales rep cannot cancel another rep''s unassigned order', v_out LIKE 'err:P0001%Not authorized%', '-> ' || v_out);
 
   -- ══ 5. access ═════════════════════════════════════════════════════════════
   v_out := pg_temp.call(v_mgr, format($q$INSERT INTO public.deliveries (sales_order_id, customer_id, created_by) VALUES (%L, %L, 'x')$q$, v_so.id, v_cust));

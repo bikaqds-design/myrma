@@ -26,7 +26,10 @@ be recorded, and an order can only be billed in one go.
   delivery tables say which delivery took them.
 - An order's delivered quantity per line is the sum of its **confirmed**
   deliveries. When every stock line is fully delivered the order becomes
-  `delivered` (it is `confirmed` until then; no new status).
+  `delivered` (it is `confirmed` until then; no new status). An order of
+  services only has nothing to deliver and stays `confirmed`.
+- An order with a confirmed delivery cannot be cancelled (the goods have left;
+  a return is P-05). Cancelling an order cancels its draft deliveries.
 
 ## Two paths, never mixed on one order
 

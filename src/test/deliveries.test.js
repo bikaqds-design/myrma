@@ -35,6 +35,16 @@ describe('20260894 deliveries', () => {
     expect(sql).toMatch(/rma_reconcile_document_sequences/)
   })
 
+  it('an order with shipped goods cannot be cancelled, and the rep check fails closed (review)', () => {
+    expect(sql).toMatch(/Goods have been delivered on this order/)
+    // the migration writes the new guard as an E'' string, so its newlines are the two characters \n
+    expect(sql).toContain(
+      String.raw`IF NOT COALESCE(public.rma_is_manager_or_above()\n          OR v_so.assigned_rep = v_email\n          OR v_so.created_by  = v_email, false) THEN`,
+    )
+    expect(sql).toMatch(/what confirmed deliveries took/)
+    expect(sql).toContain('CREATE TRIGGER trg_audit_deliveries AFTER INSERT OR DELETE OR UPDATE ON public.deliveries')
+  })
+
   it('the delivery tables are procedure-only', () => {
     expect(sql).toMatch(/REVOKE INSERT, UPDATE, DELETE, TRUNCATE[^;]*FROM authenticated/)
     const loop = sql.slice(sql.indexOf('REVOKE INSERT, UPDATE, DELETE, TRUNCATE') - 400, sql.indexOf('REVOKE INSERT, UPDATE, DELETE, TRUNCATE'))
