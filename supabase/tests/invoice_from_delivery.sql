@@ -58,6 +58,9 @@ DECLARE
   v_out   text;
   v_n     numeric;
   v_m     numeric;
+  v_flag  boolean;
+  v_unit_a uuid;
+  v_unit_b uuid;
 BEGIN
   INSERT INTO public.user_roles (user_email, role, status) VALUES
     (v_mgr, 'manager', 'active'), (v_rep, 'sales_rep', 'active'), (v_rep2, 'sales_rep', 'active');
@@ -136,6 +139,19 @@ BEGIN
   PERFORM pg_temp.as_owner();
   RAISE NOTICE '%', pg_temp.check('rma_invoice_cogs reports the same', v_m = 500, '-> ' || v_m);
 
+  -- review of 7764467: once one delivery is invoiced, the rest of the order is
+  -- still watched — a lost reservation on the back-order is reported
+  BEGIN
+    UPDATE public.inventory_units SET reservation_status = 'available', reserved_by_doc_type = NULL, reserved_by_doc_id = NULL
+     WHERE id = (SELECT id FROM public.inventory_units WHERE reserved_by_doc_id = v_so.id AND reservation_status = 'reserved' LIMIT 1);
+    v_flag := EXISTS (SELECT 1 FROM public.rma_reservation_integrity() r WHERE r.entity_id = v_so.id AND r.check_name = 'confirmed_order_under_reserved');
+    RAISE EXCEPTION 'undo';
+  EXCEPTION WHEN raise_exception THEN NULL;
+  END;
+  RAISE NOTICE '%', pg_temp.check('with one delivery invoiced, a lost reservation on the back-order is still reported', v_flag);
+  v_out := pg_temp.call(v_rep, format('SELECT * FROM public.rma_invoice_cogs(%L)', v_inv));
+  RAISE NOTICE '%', pg_temp.check('a sales rep cannot read an invoice''s cost of goods', v_out LIKE 'err:P0001%', '-> ' || v_out);
+
   -- ══ 3. voiding it restocks nothing; the delivery can be invoiced again ════
   RAISE NOTICE '--- 3. void_invoice ---';
   PERFORM pg_temp.as_user(v_mgr);
@@ -171,6 +187,15 @@ BEGIN
     (SELECT status FROM public.sales_orders WHERE id = v_so.id) = 'delivered'
     AND (SELECT reserved_quantity FROM public.warehouse_stock WHERE id = v_ws) = 0
     AND NOT EXISTS (SELECT 1 FROM public.inventory_units WHERE reserved_by_doc_id = v_so.id AND reservation_status = 'reserved'));
+
+  -- review of 7764467: a return against one delivery's invoice restores only
+  -- units that delivery shipped
+  SELECT u.unit_id INTO v_unit_a FROM public.delivery_line_units u JOIN public.delivery_lines l ON l.id = u.delivery_line_id WHERE l.delivery_id = v_da.id LIMIT 1;
+  SELECT u.unit_id INTO v_unit_b FROM public.delivery_line_units u JOIN public.delivery_lines l ON l.id = u.delivery_line_id WHERE l.delivery_id = v_db.id LIMIT 1;
+  v_out := pg_temp.call(v_mgr, format('SELECT public.restore_units(ARRAY[%L]::uuid[], %L, %L, %L)', v_unit_b, 'invoice', v_inv2, v_mgr));
+  RAISE NOTICE '%', pg_temp.check('a unit shipped on delivery B cannot be restored against delivery A''s invoice', v_out LIKE 'err:P0001%not delivered by this document%', '-> ' || v_out);
+  v_out := pg_temp.call(v_mgr, format('SELECT public.restore_units(ARRAY[%L]::uuid[], %L, %L, %L)', v_unit_a, 'invoice', v_inv2, v_mgr));
+  RAISE NOTICE '%', pg_temp.check('a unit shipped on delivery A can', v_out = 'ok', '-> ' || v_out);
 
   -- ══ 5. access ═════════════════════════════════════════════════════════════
   RAISE NOTICE '%', pg_temp.check('anon cannot invoice a delivery',

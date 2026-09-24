@@ -42,6 +42,17 @@ describe('20260896 invoice from a delivery', () => {
     expect(sql).toMatch(/rma_invoice_cogs/)
   })
 
+  it("a return against one delivery's invoice restores only units that delivery shipped (review)", () => {
+    expect(sql).toContain('SELECT i.so_id, i.delivery_id INTO v_so_id, v_delivery_id FROM public.crm_invoices i WHERE i.id = p_doc_id;')
+    expect(sql).toContain('OR (v_delivery_id IS NOT NULL AND NOT EXISTS (')
+    expect(sql).toContain('WHERE dl.delivery_id = v_delivery_id AND dlu.unit_id = u.unit_id')
+  })
+
+  it('only a whole-order invoice ends the back-order integrity check; cost is manager/accountant only (review)', () => {
+    expect(sql).toContain('WHERE i.so_id = so.id AND i.delivery_id IS NULL);')
+    expect(sql).toContain("IF NOT COALESCE(public.rma_is_manager_or_above() OR public.rma_user_role() = ''accountant'', false) THEN")
+  })
+
   it('anon cannot execute it', () => {
     expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\.create_invoice_from_delivery\(uuid, text\) FROM PUBLIC, anon;/)
   })

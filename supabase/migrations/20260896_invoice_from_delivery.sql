@@ -206,6 +206,80 @@ BEGIN
     || E'  END IF;');
 END $$;
 
+-- ── 6. review of the first version ───────────────────────────────────────────
+-- (a) restore_units proved "this document delivered the unit" through the
+--     invoice's order. With one invoice per delivery that is every delivery on
+--     the order: a return against delivery A's invoice could put back a unit
+--     that left on delivery B, which would then still be billed. For an invoice
+--     of a delivery (or a credit note on one) the unit must be one that
+--     delivery shipped.
+DO $$
+DECLARE
+  v_def  text;
+  v_pairs text[][] := ARRAY[
+    ARRAY[E'  v_so_id    uuid;\n', E'  v_so_id    uuid;\n  v_delivery_id uuid;   -- 20260896\n'],
+    ARRAY[E'    SELECT i.so_id INTO v_so_id\n      FROM public.credit_notes cn',
+          E'    SELECT i.so_id, i.delivery_id INTO v_so_id, v_delivery_id\n      FROM public.credit_notes cn'],
+    ARRAY[E'    SELECT i.so_id INTO v_so_id FROM public.crm_invoices i WHERE i.id = p_doc_id;',
+          E'    SELECT i.so_id, i.delivery_id INTO v_so_id, v_delivery_id FROM public.crm_invoices i WHERE i.id = p_doc_id;'],
+    ARRAY[E'              AND iu.reservation_status = ''delivered''\n         );',
+          E'              AND iu.reservation_status = ''delivered''\n         )\n'
+       || E'      -- 20260896: an invoice of one delivery vouches only for what that delivery shipped\n'
+       || E'      OR (v_delivery_id IS NOT NULL AND NOT EXISTS (\n'
+       || E'           SELECT 1 FROM public.delivery_line_units dlu\n'
+       || E'             JOIN public.delivery_lines dl ON dl.id = dlu.delivery_line_id\n'
+       || E'            WHERE dl.delivery_id = v_delivery_id AND dlu.unit_id = u.unit_id));']];
+  i integer;
+BEGIN
+  SELECT replace(pg_get_functiondef('public.restore_units'::regproc), E'\r\n', E'\n') INTO v_def;
+  IF v_def LIKE '%v_delivery_id%' THEN
+    RETURN;
+  END IF;
+  FOR i IN 1 .. array_length(v_pairs, 1) LOOP
+    IF (length(v_def) - length(replace(v_def, v_pairs[i][1], ''))) / length(v_pairs[i][1]) <> 1 THEN
+      RAISE EXCEPTION 'Refusing to apply: restore_units does not read as expected (piece %)', i;
+    END IF;
+    v_def := replace(v_def, v_pairs[i][1], v_pairs[i][2]);
+  END LOOP;
+  EXECUTE v_def;
+END $$;
+
+-- (b) rma_reservation_integrity skipped an order with ANY invoice; the first
+--     delivery invoice then silenced the check for the rest of the order.
+--     Only a whole-order invoice ends it now.
+DO $$
+DECLARE
+  v_def text;
+  v_old text := 'AND NOT EXISTS (SELECT 1 FROM public.crm_invoices i WHERE i.so_id = so.id);';
+BEGIN
+  SELECT replace(pg_get_functiondef('public.rma_reservation_integrity'::regproc), E'\r\n', E'\n') INTO v_def;
+  IF v_def LIKE '%i.so_id = so.id AND i.delivery_id IS NULL%' THEN
+    RETURN;
+  END IF;
+  IF (length(v_def) - length(replace(v_def, v_old, ''))) / length(v_old) <> 1 THEN
+    RAISE EXCEPTION 'Refusing to apply: rma_reservation_integrity does not read as expected';
+  END IF;
+  EXECUTE replace(v_def, v_old, 'AND NOT EXISTS (SELECT 1 FROM public.crm_invoices i WHERE i.so_id = so.id AND i.delivery_id IS NULL);');
+END $$;
+
+-- (c) cost of goods is for managers and accountants (as the delivery unit and
+--     bin tables are); rma_invoice_cogs let any staff role read it. Its only
+--     caller is post_invoice, which runs as a manager.
+DO $$
+DECLARE
+  v_def text;
+  v_old text := '  IF NOT public.rma_is_staff() THEN';
+BEGIN
+  SELECT replace(pg_get_functiondef('public.rma_invoice_cogs'::regproc), E'\r\n', E'\n') INTO v_def;
+  IF v_def LIKE '%rma_user_role() = ''accountant''%' THEN
+    RETURN;
+  END IF;
+  IF (length(v_def) - length(replace(v_def, v_old, ''))) / length(v_old) <> 1 THEN
+    RAISE EXCEPTION 'Refusing to apply: rma_invoice_cogs does not read as expected';
+  END IF;
+  EXECUTE replace(v_def, v_old, '  IF NOT COALESCE(public.rma_is_manager_or_above() OR public.rma_user_role() = ''accountant'', false) THEN');
+END $$;
+
 -- ── guard ────────────────────────────────────────────────────────────────────
 DO $$
 BEGIN
@@ -216,5 +290,10 @@ BEGIN
      OR pg_get_functiondef('public.void_invoice'::regproc) NOT LIKE '%v_inv.delivery_id IS NULL%'
      OR pg_get_functiondef('public.rma_invoice_cogs'::regproc) NOT LIKE '%v_inv.delivery_id IS NOT NULL%' THEN
     RAISE EXCEPTION 'Refusing to finish: post_invoice, void_invoice or rma_invoice_cogs was not updated';
+  END IF;
+  IF pg_get_functiondef('public.restore_units'::regproc) NOT LIKE '%v_delivery_id IS NOT NULL AND NOT EXISTS%'
+     OR pg_get_functiondef('public.rma_reservation_integrity'::regproc) NOT LIKE '%i.so_id = so.id AND i.delivery_id IS NULL%'
+     OR pg_get_functiondef('public.rma_invoice_cogs'::regproc) NOT LIKE '%rma_user_role() = ''accountant''%' THEN
+    RAISE EXCEPTION 'Refusing to finish: the review fixes (restore_units, integrity, cost access) did not apply';
   END IF;
 END $$;
