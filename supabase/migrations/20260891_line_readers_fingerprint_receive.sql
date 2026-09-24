@@ -8,14 +8,19 @@
 --     over the note's rows (rma_credit_note_lines_json, 20260890); issue
 --     re-checks it the same way. A note submitted BEFORE this migration was
 --     fingerprinted over its copy: issue still accepts it, but only if that
---     copy is still identical to the rows — a note whose copy and rows
---     disagree (possible only for data the 20260887 backfill corrected) is
---     refused with a plain message to return it to draft and submit again.
+--     copy is still identical to the rows. A note whose copy and rows disagree is
+--     refused with a plain message to return it to draft and submit again —
+--     that includes data the 20260887 backfill corrected AND any note still
+--     pending since before 20260887 (its copy was written by the browser, with
+--     other keys). Both fail closed. Every note submitted through the RPCs has
+--     a copy built by the same jsonb_build_object as the rows, so it passes.
 --   * receive_vendor_invoice reads the invoice's lines once, from the rows
 --     (rma_vendor_invoice_lines_json), wherever it read the copy: the line
 --     count, the product on a line, which line a product is on, and what a
 --     line has left to receive. It still writes the copy (rebuilt from the
---     rows it read) and the rows, as 20260889 made it.
+--     rows it read) and the rows, as 20260889 made it. On a legacy invoice's
+--     first receipt this rewrites its copy in the rows' shape (extra keys the
+--     old copy carried are dropped; a deleted product reads as null).
 --
 -- As in 20260867 / 20260890, only the listed expressions change in the live
 -- definitions, each counted before anything is replaced.
