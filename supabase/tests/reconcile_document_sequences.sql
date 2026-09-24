@@ -79,7 +79,7 @@ BEGIN
   DELETE FROM public.document_sequences;
   PERFORM public.rma_reconcile_document_sequences();
   RAISE NOTICE '%', pg_temp.check('it recreates missing rows (a --no-seed project)',
-    (SELECT count(*) FROM public.document_sequences) = 6 AND pg_temp.counter('invoice') = 42,
+    (SELECT count(*) FROM public.document_sequences) = 7 AND EXISTS (SELECT 1 FROM public.document_sequences WHERE seq_type = 'delivery') AND pg_temp.counter('invoice') = 42,
     '-> ' || (SELECT count(*) FROM public.document_sequences) || ' rows');
 
   -- ── authorisation ─────────────────────────────────────────────────────────
