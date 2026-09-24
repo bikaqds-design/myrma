@@ -9,7 +9,9 @@
 -- total), the validity date or the payment terms — sends a sent quotation
 -- back to 'draft' in the same statement. It must be sent for approval again,
 -- and an approval clicked on the old request is refused by the transition
--- guard (draft -> accepted is not a legal move). Notes, the customer
+-- guard (draft -> accepted is not a legal move), and that open approval
+-- request is closed with a note, so it cannot approve the changed offer after
+-- the quote is sent again. Notes, the customer
 -- reference and the assigned rep do not affect what is approved and leave
 -- it 'sent'. The screens send the lines back on every save; an unchanged set
 -- rebuilds an identical copy, so saving without changing the offer keeps the
@@ -38,7 +40,19 @@ DECLARE
                                  OR (v_f ? ''payment_terms'' AND (v_f->>''payment_terms'') IS DISTINCT FROM v_qt.payment_terms))
                            THEN ''draft'' ELSE status END
   WHERE id = p_id
-  RETURNING * INTO v_row;';
+  RETURNING * INTO v_row;
+
+  -- ...and the approval request raised when it was sent is closed, so it
+  -- cannot later approve the changed offer once the quote is sent again
+  -- (review). Pending approvals are the activities with no completed_at.
+  IF v_qt.status = ''sent'' AND v_row.status = ''draft'' THEN
+    UPDATE public.activities
+       SET completed_at  = now(),
+           outcome_notes = ''Withdrawn: the quotation changed while awaiting approval and went back to draft.''
+     WHERE type = ''approval''
+       AND completed_at IS NULL
+       AND title LIKE ''approval|quotation|'' || p_id::text || ''|%'';
+  END IF;';
   v_have integer;
 BEGIN
   SELECT pg_get_functiondef(p.oid) INTO STRICT v_def

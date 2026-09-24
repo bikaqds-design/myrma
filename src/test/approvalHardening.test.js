@@ -32,6 +32,12 @@ describe('a quote awaiting approval', () => {
     ]) expect(qt, s).toContain(s)
   })
 
+  it('closes the approval request raised when it was sent, so it cannot approve the changed offer later', () => {
+    expect(qt).toContain("IF v_qt.status = ''sent'' AND v_row.status = ''draft'' THEN")
+    expect(qt).toContain("AND title LIKE ''approval|quotation|'' || p_id::text || ''|%''")
+    expect(qt).toContain('AND completed_at IS NULL')
+  })
+
   it('the rewrite is counted before it is applied, and the migration checks the result', () => {
     expect(qt).toContain("IF v_have <> 1 THEN")
     expect(qt).toContain("does not send a changed sent quotation back to draft")

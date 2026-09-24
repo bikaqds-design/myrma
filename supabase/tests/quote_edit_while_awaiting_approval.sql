@@ -67,10 +67,15 @@ BEGIN
   v_out := pg_temp.call(v_rep, format($q$SELECT public.update_quotation(%L, %L::jsonb, '{"notes":"called the buyer"}'::jsonb, %L)$q$, v_qt.id, v_lines, v_rep));
   RAISE NOTICE '%', pg_temp.check('saving the same lines with a new note keeps it awaiting approval', v_out = 'ok' AND pg_temp.qt_status(v_qt.id) = 'sent', '-> ' || v_out || ' / ' || pg_temp.qt_status(v_qt.id));
 
-  -- 2. changing the price sends it back to draft
+  -- 2. changing the price sends it back to draft, and closes its approval request
+  INSERT INTO public.activities (related_type, related_id, type, title, created_by)
+  VALUES ('deal', gen_random_uuid(), 'approval', 'approval|quotation|' || v_qt.id || '|QT-X|200|QEA Co', v_rep);
   v_out := pg_temp.call(v_rep, format($q$SELECT public.update_quotation(%L, %L::jsonb, '{}'::jsonb, %L)$q$, v_qt.id,
     jsonb_set(v_lines, '{0,unit_price}', '60'), v_rep));
   RAISE NOTICE '%', pg_temp.check('changing a price while it awaits approval sends it back to draft', v_out = 'ok' AND pg_temp.qt_status(v_qt.id) = 'draft', '-> ' || v_out || ' / ' || pg_temp.qt_status(v_qt.id));
+  RAISE NOTICE '%', pg_temp.check('...and the approval request raised when it was sent is closed with a note (review)',
+    NOT EXISTS (SELECT 1 FROM public.activities WHERE type = 'approval' AND completed_at IS NULL AND title LIKE 'approval|quotation|' || v_qt.id || '|%')
+    AND EXISTS (SELECT 1 FROM public.activities WHERE title LIKE 'approval|quotation|' || v_qt.id || '|%' AND outcome_notes LIKE 'Withdrawn:%'));
   v_out := pg_temp.call(v_mgr, format($q$UPDATE public.quotations SET status = 'accepted' WHERE id = %L$q$, v_qt.id));
   RAISE NOTICE '%', pg_temp.check('...so the old approval request can no longer accept it', v_out LIKE 'err:%' AND pg_temp.qt_status(v_qt.id) = 'draft', '-> ' || v_out);
 
