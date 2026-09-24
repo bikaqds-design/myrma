@@ -3637,6 +3637,7 @@
     "lockWarning": "This document is locked and cannot be edited. Issue a credit note to make corrections."
   },
   "salesDocuments": {
+    "qtBackToDraft": "The offer changed while it was awaiting approval, so the quotation is back in draft and its approval request was withdrawn. Send it for approval again.",
     "title": "Sales Documents",
     "subtitle_one": "{{count}} document",
     "subtitle_other": "{{count}} documents",

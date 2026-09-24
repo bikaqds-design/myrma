@@ -543,8 +543,14 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
         toast.success(t('salesDocs.successCreated'))
         logEvent(`quotation_created|${saved.qt_code}`)
       } else {
+        const before = quotations.find((q) => q.id === editingQtId)
         saved = await db.quotations.update(editingQtId, fields, currentUserEmail)
         toast.success(t('salesDocs.successUpdated'))
+        // Changing the offer of a quote awaiting approval sends it back to
+        // draft and withdraws the approval request (20260893) — say so.
+        if (before?.status === 'sent' && saved?.status === 'draft') {
+          toast(t('salesDocuments.qtBackToDraft'), { duration: 6000 })
+        }
       }
       // Deal value = sum of every open quotation, so replace this one's contribution
       // with its new total (the cached list still holds the pre-save figure).
