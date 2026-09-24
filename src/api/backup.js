@@ -230,6 +230,11 @@ export const BACKUP_TABLES = [
   { table: 'quotation_lines' },
   { table: 'sales_orders' },
   { table: 'sales_order_lines' },
+  // P-01 (20260894): after orders, units and bins; before invoices (crm_invoices.delivery_id)
+  { table: 'deliveries' },
+  { table: 'delivery_lines' },
+  { table: 'delivery_line_units' },
+  { table: 'delivery_line_bins' },
   { table: 'crm_invoices' },
   { table: 'crm_invoice_lines' },
   { table: 'invoices' },
@@ -319,7 +324,7 @@ export const BACKUP_MODULES = [
   {
     id: 'sales',
     tables: [
-      'quotations', 'quotation_lines', 'sales_orders', 'sales_order_lines', 'crm_invoices', 'crm_invoice_lines', 'invoices',
+      'quotations', 'quotation_lines', 'sales_orders', 'sales_order_lines', 'deliveries', 'delivery_lines', 'delivery_line_units', 'delivery_line_bins', 'crm_invoices', 'crm_invoice_lines', 'invoices',
       'payments', 'payment_applications', 'credit_notes', 'credit_note_lines', 'credit_note_applications',
     ],
   },
