@@ -26,7 +26,7 @@ invoice can bill for goods that never came.
   serial numbers for a serialized product (scanned on arrival), and at
   confirmation the unit cost it was booked at (`unit_cost_base`: the PO line's
   net price in the base currency; unknown when the line has no price).
-  `qty_invoiced` records how much of it a supplier invoice has billed (P-03b).
+  A supplier invoice bills a receipt line whole (P-03b links them).
 - `goods_receipt_line_units` / `goods_receipt_line_bins` — exactly which units
   and bins it filled, so a later invoice can re-cost what is still on hand.
 - Stock moves use `doc_type = 'goods_receipt'`. New units carry

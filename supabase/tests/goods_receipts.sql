@@ -59,6 +59,7 @@ DECLARE
   v_vi    uuid;
   v_out   text;
   v_n     numeric;
+  v_q     numeric;
 BEGIN
   INSERT INTO public.user_roles (user_email, role, status) VALUES (v_mgr, 'manager', 'active'), (v_rep, 'sales_rep', 'active');
   INSERT INTO public.brands (brand_name) VALUES ('P03 Supplier') RETURNING id INTO v_vendor;
@@ -217,6 +218,59 @@ BEGIN
   PERFORM pg_temp.as_owner();
   RAISE NOTICE '%', pg_temp.check('a draft receipt can be cancelled; its quantity is free again', v_gr2.status = 'cancelled'
     AND public.rma_po_line_received_qty((SELECT id FROM public.purchase_order_lines WHERE purchase_order_id = v_po2.id), true) = 0);
+
+  -- ══ 4b. review of beb376c ═════════════════════════════════════════════════
+  RAISE NOTICE '--- 4b. review ---';
+  PERFORM pg_temp.as_user(v_mgr);
+  v_po2 := public.create_purchase_order(v_vendor, jsonb_build_array(
+    jsonb_build_object('product_id', v_ser,  'qty_ordered', 4, 'unit_cost', 100),
+    jsonb_build_object('product_id', v_bulk, 'qty_ordered', 10, 'unit_cost', 5, 'discount_pct', 100)),
+    '{"currency":"USD","exchange_rate":2}'::jsonb, v_mgr);
+  PERFORM pg_temp.as_owner();
+  UPDATE public.purchase_orders SET status = 'sent' WHERE id = v_po2.id;
+  UPDATE public.purchase_orders SET status = 'confirmed' WHERE id = v_po2.id;
+
+  v_out := pg_temp.call(v_mgr, format($q$SELECT public.create_goods_receipt(%L, %L::jsonb, '{}'::jsonb, %L)$q$, v_po2.id,
+    jsonb_build_array(pg_temp.gr_line((SELECT id FROM public.purchase_order_lines WHERE purchase_order_id = v_po2.id AND product_id = v_ser), '2', v_wh, '[null, null]')), v_mgr));
+  RAISE NOTICE '%', pg_temp.check('a null serial is refused, not stored as a unit with no serial', v_out LIKE 'err:P0001%blank%', '-> ' || v_out);
+
+  -- a free line (100% discount) into a bin already worth 10 each: the free
+  -- units add nothing to its value
+  SELECT total_cost_base, quantity INTO v_n, v_q FROM public.warehouse_stock WHERE product_id = v_bulk AND warehouse_id = v_wh;
+  PERFORM pg_temp.as_user(v_mgr);
+  v_gr2 := public.create_goods_receipt(v_po2.id, jsonb_build_array(
+    pg_temp.gr_line((SELECT id FROM public.purchase_order_lines WHERE purchase_order_id = v_po2.id AND product_id = v_bulk), '10', v_wh)), NULL, v_mgr);
+  v_gr2 := public.confirm_goods_receipt(v_gr2.id, v_mgr);
+  PERFORM pg_temp.as_owner();
+  RAISE NOTICE '%', pg_temp.check('free goods add quantity but no value (they do not take the bin''s average)',
+    (SELECT quantity = v_q + 10 AND total_cost_base = v_n AND uncosted_quantity = 0 FROM public.warehouse_stock WHERE product_id = v_bulk AND warehouse_id = v_wh),
+    '-> ' || (SELECT quantity || ' / ' || total_cost_base FROM public.warehouse_stock WHERE product_id = v_bulk AND warehouse_id = v_wh) || ' (was ' || v_n || ')');
+  RAISE NOTICE '%', pg_temp.check('the flag that says so is off again afterwards', COALESCE(current_setting('rma.cost_stated', true), 'off') <> 'on');
+
+  -- a warehouse archived after the draft was made
+  PERFORM pg_temp.as_user(v_mgr);
+  v_gr2 := public.create_goods_receipt(v_po2.id, jsonb_build_array(
+    pg_temp.gr_line((SELECT id FROM public.purchase_order_lines WHERE purchase_order_id = v_po2.id AND product_id = v_ser), '2', v_wh, '["P03-SNa","P03-SNb"]')), NULL, v_mgr);
+  PERFORM pg_temp.as_owner();
+  UPDATE public.warehouses SET is_active = false WHERE id = v_wh;
+  v_out := pg_temp.call(v_mgr, format('SELECT public.confirm_goods_receipt(%L, %L)', v_gr2.id, v_mgr));
+  RAISE NOTICE '%', pg_temp.check('a receipt does not confirm into a warehouse archived since the draft', v_out LIKE 'err:P0001%can no longer receive goods%', '-> ' || v_out);
+  UPDATE public.warehouses SET is_active = true WHERE id = v_wh;
+
+  -- the invoice path received stock on this order after the draft (the race):
+  -- confirmation looks again under the order's lock
+  -- (simulated: the draft already blocks receiving on the invoice, so only a
+  -- concurrent receive could get here)
+  INSERT INTO public.vendor_invoices (purchase_order_id, vendor_id, status, currency, exchange_rate, line_items, created_by)
+  VALUES (v_po2.id, v_vendor, 'draft', 'USD', 2, '[]', v_mgr) RETURNING id INTO v_vi;
+  INSERT INTO public.vendor_invoice_lines (vendor_invoice_id, line_no, product_id, product_name, qty_ordered, qty_received, unit_cost)
+  VALUES (v_vi, 0, v_ser, 'P03 router', 1, 1, 100);
+  v_out := pg_temp.call(v_mgr, format('SELECT public.confirm_goods_receipt(%L, %L)', v_gr2.id, v_mgr));
+  RAISE NOTICE '%', pg_temp.check('confirmation refuses an order since received on its invoice', v_out LIKE 'err:P0001%since been received on its supplier invoice%', '-> ' || v_out);
+
+
+  RAISE NOTICE '%', pg_temp.check('a client cannot rewrite which receipt a unit came from',
+    pg_get_functiondef('public.rma_guard_inventory_ledger_columns'::regproc) LIKE '%''goods_receipt_id''%');
 
   -- ══ 5. access ═════════════════════════════════════════════════════════════
   v_out := pg_temp.call(v_mgr, format($q$INSERT INTO public.goods_receipts (purchase_order_id, created_by) VALUES (%L, 'x')$q$, v_po.id));

@@ -98,11 +98,9 @@ CREATE TABLE IF NOT EXISTS public.goods_receipt_lines (
   warehouse_id            uuid NOT NULL REFERENCES public.warehouses(id),
   serials                 text[] NOT NULL DEFAULT '{}',
   unit_cost_base          numeric(14,4),              -- set at confirmation; NULL = unknown
-  qty_invoiced            integer NOT NULL DEFAULT 0 CHECK (qty_invoiced >= 0),
   created_at              timestamptz NOT NULL DEFAULT now(),
   UNIQUE (goods_receipt_id, line_no),
-  UNIQUE (goods_receipt_id, purchase_order_line_id),
-  CHECK (qty_invoiced <= qty)
+  UNIQUE (goods_receipt_id, purchase_order_line_id)
 );
 CREATE INDEX IF NOT EXISTS goods_receipt_lines_po_line_idx ON public.goods_receipt_lines (purchase_order_line_id);
 
@@ -198,6 +196,7 @@ DECLARE
   v_sn      text;
   v_no      integer := 0;
   v_seen    uuid[] := '{}';
+  v_all_upper text[] := '{}';
 BEGIN
   IF v_actor IS NULL OR NOT COALESCE(public.rma_is_manager_or_above(), false) THEN
     RAISE EXCEPTION 'Only managers and above can receive goods' USING ERRCODE = 'P0001';
@@ -288,12 +287,16 @@ BEGIN
         RAISE EXCEPTION '%: scan the serial number of each unit', v_pol.product_name USING ERRCODE = 'P0001';
       END IF;
       FOR v_sn IN SELECT btrim(e) FROM jsonb_array_elements_text(v_in->'serials') e LOOP
-        IF v_sn = '' THEN
+        -- a JSON null reads as SQL NULL: "= ''" is NULL for it and would let a
+        -- unit with no serial through (review)
+        IF v_sn IS NULL OR v_sn = '' THEN
           RAISE EXCEPTION '%: a serial number is blank', v_pol.product_name USING ERRCODE = 'P0001';
         END IF;
-        IF upper(v_sn) = ANY (SELECT upper(x) FROM unnest(v_serials) x) THEN
+        -- across every line of this receipt, case ignored
+        IF upper(v_sn) = ANY (v_all_upper) THEN
           RAISE EXCEPTION '%: serial % is entered twice', v_pol.product_name, v_sn USING ERRCODE = 'P0001';
         END IF;
+        v_all_upper := v_all_upper || upper(v_sn);
         v_serials := v_serials || v_sn;
       END LOOP;
       IF cardinality(v_serials) <> v_qty THEN
@@ -363,6 +366,14 @@ BEGIN
   IF v_po.status NOT IN ('confirmed', 'partially_completed') THEN
     RAISE EXCEPTION 'The purchase order is % and can no longer receive goods', v_po.status USING ERRCODE = 'P0001';
   END IF;
+  -- again, under the order's lock: an invoice of this order may have received
+  -- stock since the draft was made (receive_vendor_invoice takes the same lock
+  -- before its own check) — review
+  IF EXISTS (SELECT 1 FROM public.vendor_invoices vi
+               JOIN public.vendor_invoice_lines vl ON vl.vendor_invoice_id = vi.id
+              WHERE vi.purchase_order_id = v_po.id AND vi.status <> 'cancelled' AND vl.qty_received > 0) THEN
+    RAISE EXCEPTION 'This order has since been received on its supplier invoice; cancel this draft receipt' USING ERRCODE = 'P0001';
+  END IF;
 
   SELECT COALESCE((config_value #>> '{}')::boolean, false) INTO v_tax_in_cost
     FROM public.rma_config WHERE config_key = 'purchase_tax_in_cost';
@@ -380,6 +391,13 @@ BEGIN
     IF public.rma_po_line_received_qty(v_l.purchase_order_line_id, false) + v_l.qty > v_l.qty_ordered THEN
       RAISE EXCEPTION '%: more would arrive than was ordered', v_l.product_name USING ERRCODE = 'P0001';
     END IF;
+    -- the warehouse may have been archived or re-typed since the draft (review)
+    IF NOT EXISTS (SELECT 1 FROM public.warehouses w
+                    WHERE w.id = v_l.warehouse_id AND NOT COALESCE(w.is_system, false) AND COALESCE(w.is_active, true)
+                      AND COALESCE(w.warehouse_type, 'main') IN ('main', 'branch')) THEN
+      RAISE EXCEPTION '%: its warehouse can no longer receive goods; cancel this draft and receive into another', v_l.product_name
+        USING ERRCODE = 'P0001';
+    END IF;
 
     -- the PO line's net price in the base currency (as rma_vi_landed_unit_costs
     -- prices an invoice line); no price = unknown cost, never zero
@@ -390,6 +408,10 @@ BEGIN
                               * COALESCE(v_po.exchange_rate, 1), 4) END;
 
     IF v_l.stock_tracking_mode = 'bulk' THEN
+      -- The cost is stated even when it is 0 (a free line): without this,
+      -- rma_hold_unit_cost reads "total unchanged" as "no cost given" and
+      -- values the free units at the bin's average (review).
+      PERFORM set_config('rma.cost_stated', 'on', true);
       SELECT id INTO v_ws_id FROM public.warehouse_stock
        WHERE product_id = v_l.product_id AND warehouse_id = v_l.warehouse_id FOR UPDATE;
       IF NOT FOUND THEN
@@ -412,6 +434,7 @@ BEGIN
       VALUES ('warehouse_stock', v_ws_id, 'goods_receipt', p_receipt_id, 'receive', v_l.qty, NULL, 'available', v_actor);
       INSERT INTO public.goods_receipt_line_bins (goods_receipt_line_id, warehouse_stock_id, qty)
       VALUES (v_l.id, v_ws_id, v_l.qty);
+      PERFORM set_config('rma.cost_stated', 'off', true);
     ELSE
       IF cardinality(v_l.serials) <> v_l.qty THEN
         RAISE EXCEPTION '%: % units need % serial numbers', v_l.product_name, v_l.qty, v_l.qty USING ERRCODE = 'P0001';
@@ -497,27 +520,96 @@ BEGIN
 END $$;
 
 -- ── 8. the two paths never mix; an order with a receipt is not amended ───────
+-- receive_vendor_invoice: (a) it takes the ORDER's lock before looking for
+-- receipts, so it and create_goods_receipt (which locks the order first)
+-- cannot both pass their checks and receive the same goods twice (review);
+-- (b) an order with a receipt is not received on its invoice; (c) the cost it
+-- writes to a bin is stated even when it is 0 (see rma_hold_unit_cost below).
 DO $$
 DECLARE
   v_def  text;
   v_old  text := E'  IF jsonb_typeof(p_receipt_lines) IS DISTINCT FROM ''array'' THEN';
+  -- this file's first version, already on staging: removed before re-adding
+  v_prev text := E'  -- 20260897: an order received by goods receipts is not received again on its invoice\n'
+              || E'  IF v_vi.purchase_order_id IS NOT NULL AND EXISTS (\n'
+              || E'       SELECT 1 FROM public.goods_receipts WHERE purchase_order_id = v_vi.purchase_order_id AND status <> ''cancelled'') THEN\n'
+              || E'    RAISE EXCEPTION ''This order is received by goods receipts; receive the goods there, not on the invoice'' USING ERRCODE = ''P0001'';\n'
+              || E'  END IF;\n';
+  v_tail text := E'  IF v_vi.purchase_order_id IS NOT NULL THEN\n    SELECT status INTO v_po_status';
   v_have integer;
 BEGIN
   SELECT replace(pg_get_functiondef('public.receive_vendor_invoice'::regproc), E'\r\n', E'\n') INTO v_def;
-  IF v_def LIKE '%is received by goods receipts%' THEN
+  IF v_def LIKE '%rma.cost_stated%' THEN
     RETURN;
   END IF;
+  v_def := replace(v_def, v_prev, '');
   v_have := (length(v_def) - length(replace(v_def, v_old, ''))) / length(v_old);
   IF v_have <> 1 THEN
     RAISE EXCEPTION 'Refusing to apply: receive_vendor_invoice holds its line-list check % time(s), expected 1', v_have;
   END IF;
-  EXECUTE replace(v_def, v_old,
-       E'  -- 20260897: an order received by goods receipts is not received again on its invoice\n'
-    || E'  IF v_vi.purchase_order_id IS NOT NULL AND EXISTS (\n'
-    || E'       SELECT 1 FROM public.goods_receipts WHERE purchase_order_id = v_vi.purchase_order_id AND status <> ''cancelled'') THEN\n'
-    || E'    RAISE EXCEPTION ''This order is received by goods receipts; receive the goods there, not on the invoice'' USING ERRCODE = ''P0001'';\n'
+  v_have := (length(v_def) - length(replace(v_def, v_tail, ''))) / length(v_tail);
+  IF v_have <> 1 THEN
+    RAISE EXCEPTION 'Refusing to apply: receive_vendor_invoice holds its order sync % time(s), expected 1', v_have;
+  END IF;
+  v_def := replace(v_def, v_old,
+       E'  -- 20260897: the order''s lock first, then: an order received by goods\n'
+    || E'  -- receipts is not received again on its invoice\n'
+    || E'  IF v_vi.purchase_order_id IS NOT NULL THEN\n'
+    || E'    PERFORM 1 FROM public.purchase_orders WHERE id = v_vi.purchase_order_id FOR UPDATE;\n'
+    || E'    IF EXISTS (SELECT 1 FROM public.goods_receipts WHERE purchase_order_id = v_vi.purchase_order_id AND status <> ''cancelled'') THEN\n'
+    || E'      RAISE EXCEPTION ''This order is received by goods receipts; receive the goods there, not on the invoice'' USING ERRCODE = ''P0001'';\n'
+    || E'    END IF;\n'
     || E'  END IF;\n'
+    || E'  PERFORM set_config(''rma.cost_stated'', ''on'', true);   -- a cost of 0 is stated, not missing\n'
     || v_old);
+  v_def := replace(v_def, v_tail, E'  PERFORM set_config(''rma.cost_stated'', ''off'', true);\n\n' || v_tail);
+  EXECUTE v_def;
+END $$;
+
+-- rma_hold_unit_cost keeps a bin's average when quantity moves and the caller
+-- stated no cost. A receipt of goods that cost 0 changes neither the total nor
+-- the unknown count, so it read as "no cost stated" and the free units took the
+-- bin's average — value from nothing (review). A receiving function now says
+-- it stated the cost with the transaction-local rma.cost_stated.
+DO $$
+DECLARE
+  v_def  text;
+  v_old  text := E'BEGIN\n  -- Only when quantity moved and the caller stated neither a value nor a';
+  v_have integer;
+BEGIN
+  SELECT replace(pg_get_functiondef('public.rma_hold_unit_cost'::regproc), E'\r\n', E'\n') INTO v_def;
+  IF v_def LIKE '%rma.cost_stated%' THEN
+    RETURN;
+  END IF;
+  v_have := (length(v_def) - length(replace(v_def, v_old, ''))) / length(v_old);
+  IF v_have <> 1 THEN
+    RAISE EXCEPTION 'Refusing to apply: rma_hold_unit_cost does not read as expected (% matches)', v_have;
+  END IF;
+  EXECUTE replace(v_def, v_old,
+       E'BEGIN\n'
+    || E'  -- 20260897: a receiving function that states the cost (even 0) says so\n'
+    || E'  IF current_setting(''rma.cost_stated'', true) = ''on'' THEN\n'
+    || E'    RETURN NEW;\n'
+    || E'  END IF;\n\n'
+    || E'  -- Only when quantity moved and the caller stated neither a value nor a');
+END $$;
+
+-- the unit's receipt is a traced fact: not a column a client may rewrite
+DO $$
+DECLARE
+  v_def  text;
+  v_old  text := '''manufacturer_batch_id'',';
+  v_have integer;
+BEGIN
+  SELECT replace(pg_get_functiondef('public.rma_guard_inventory_ledger_columns'::regproc), E'\r\n', E'\n') INTO v_def;
+  IF v_def LIKE '%''goods_receipt_id''%' THEN
+    RETURN;
+  END IF;
+  v_have := (length(v_def) - length(replace(v_def, v_old, ''))) / length(v_old);
+  IF v_have <> 1 THEN
+    RAISE EXCEPTION 'Refusing to apply: rma_guard_inventory_ledger_columns lists manufacturer_batch_id % time(s), expected 1', v_have;
+  END IF;
+  EXECUTE replace(v_def, v_old, v_old || '''goods_receipt_id'',');
 END $$;
 
 DO $$
@@ -542,6 +634,39 @@ BEGIN
     || v_old);
 END $$;
 
+-- ── 9. Backup & Restore can restore what it backs up ─────────────────────────
+-- rma_restore_stage refuses a table not in rma_restore_manifest(), and
+-- rma_restore_apply writes in the manifest's order. The manifest had none of the
+-- line tables (20260883–20260889), deliveries (20260894) or receipts, so a backup
+-- taken since 20260883 could not be restored at all (review). It is now the
+-- restorable entries of src/api/backup.js BACKUP_TABLES, in that order (parents
+-- first); src/test/restoreManifest.test.js fails if the two drift apart.
+CREATE OR REPLACE FUNCTION public.rma_restore_manifest()
+ RETURNS text[]
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public'
+AS $function$
+  SELECT ARRAY[
+    'currencies', 'countries', 'country_area_codes', 'rma_config', 'brands', 'categories',
+    'subcategories', 'warehouses', 'pipelines', 'parts', 'custom_field_definitions',
+    'custom_roles', 'user_roles', 'user_preferences', 'announcements', 'kb_articles',
+    'branding_settings', 'email_templates', 'whatsapp_templates', 'notification_settings',
+    'notification_preferences', 'products', 'product_images', 'product_documents',
+    'company_documents', 'customers', 'contacts', 'customer_notes', 'deals', 'leads',
+    'rma_tickets', 'ticket_comments', 'ticket_activity', 'ticket_parts', 'ticket_resolutions',
+    'time_entries', 'purchase_orders', 'purchase_order_lines', 'vendor_invoices',
+    'vendor_invoice_lines', 'vendor_invoice_charges', 'vendor_payments',
+    'vendor_payment_applications', 'goods_receipts', 'goods_receipt_lines', 'manufacturer_batches',
+    'inventory_units', 'warehouse_stock', 'goods_receipt_line_units', 'goods_receipt_line_bins',
+    'quotations', 'quotation_lines', 'sales_orders', 'sales_order_lines', 'deliveries',
+    'delivery_lines', 'delivery_line_units', 'delivery_line_bins', 'crm_invoices',
+    'crm_invoice_lines', 'invoices', 'payments', 'payment_applications', 'credit_notes',
+    'credit_note_lines', 'credit_note_applications', 'activities', 'notifications',
+    'user_activity_log'
+  ]::text[]
+$function$;
+
 -- ── guard ────────────────────────────────────────────────────────────────────
 DO $$
 BEGIN
@@ -557,7 +682,10 @@ BEGIN
     RAISE EXCEPTION 'Refusing to finish: the goods_receipt sequence is not registered as GRN-';
   END IF;
   IF pg_get_functiondef('public.receive_vendor_invoice'::regproc) NOT LIKE '%is received by goods receipts%'
-     OR pg_get_functiondef('public.amend_purchase_order'::regproc) NOT LIKE '%Goods have been received against it%' THEN
+     OR pg_get_functiondef('public.amend_purchase_order'::regproc) NOT LIKE '%Goods have been received against it%'
+     OR pg_get_functiondef('public.receive_vendor_invoice'::regproc) NOT LIKE '%FROM public.purchase_orders WHERE id = v_vi.purchase_order_id FOR UPDATE%'
+     OR pg_get_functiondef('public.rma_hold_unit_cost'::regproc) NOT LIKE '%rma.cost_stated%'
+     OR pg_get_functiondef('public.rma_guard_inventory_ledger_columns'::regproc) NOT LIKE '%''goods_receipt_id''%' THEN
     RAISE EXCEPTION 'Refusing to finish: receive_vendor_invoice or amend_purchase_order was not updated';
   END IF;
 END $$;
