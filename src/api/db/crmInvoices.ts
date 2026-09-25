@@ -33,6 +33,8 @@ export interface CrmInvoiceRow {
   id: string
   inv_code: string | null
   so_id: string | null
+  /** The delivery this invoice bills (P-02, 20260896); null for a whole-order or manual invoice. */
+  delivery_id?: string | null
   customer_id: string
   doc_status: 'draft' | 'posted' | 'cancelled'
   payment_status: 'unpaid' | 'partial' | 'paid' | 'reversed'

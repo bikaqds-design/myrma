@@ -37,6 +37,7 @@ import { deals } from './deals.js'
 import { activities } from './activities.js'
 import { quotations } from './quotations.js'
 import { salesOrders } from './salesOrders.js'
+import { deliveries } from './deliveries.js'
 import { crmInvoices } from './crmInvoices.js'
 import { creditNotes } from './creditNotes.js'
 import { salesDocuments } from './salesDocuments.js'
@@ -126,6 +127,7 @@ export const db = {
   // Sales documents (Sprint 6)
   quotations,
   salesOrders,
+  deliveries,
   crmInvoices,
   creditNotes,
   salesDocuments,
@@ -177,6 +179,7 @@ export type { DealRow, DealProductLine } from './deals.js'
 export type { ActivityRow, ActivityAttachment, ActivityCreateInput } from './activities.js'
 export type { QuotationRow, QuotationLine, QuotationLineRow } from './quotations.js'
 export type { SalesOrderRow, SalesOrderLine, SalesOrderLineRow } from './salesOrders.js'
+export type { DeliveryRow, DeliveryLineRow, DeliveryLineInput } from './deliveries.js'
 export type { CrmInvoiceRow, CrmInvoiceLine, CrmInvoiceLineRow } from './crmInvoices.js'
 export type { CreditNoteRow, CreditNoteLine, CreditNoteLineRow, CreditNoteApplicationRow } from './creditNotes.js'
 export type { SalesDocumentRow, SalesDocType } from './salesDocuments.js'
