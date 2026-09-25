@@ -32,6 +32,10 @@ BEGIN
   VALUES ('Reconcile Co', 'RECON-001', 'B2B', 'recon@example.invalid')
   RETURNING id INTO v_cust;
 
+  -- Invoices already on the database (staging keeps real test data) would
+  -- collide with the fixtures below; set their codes aside, rolled back.
+  UPDATE public.crm_invoices SET inv_code = 'OLD-' || inv_code WHERE inv_code LIKE 'INV-%';
+
   -- A restored project: documents exist, the counters are back at zero.
   INSERT INTO public.crm_invoices (customer_id, doc_status, subtotal, total, created_by, inv_code)
   VALUES (v_cust, 'posted', 10, 10, 'recon@example.invalid', 'INV-' || v_year || '-00001'),
@@ -79,7 +83,7 @@ BEGIN
   DELETE FROM public.document_sequences;
   PERFORM public.rma_reconcile_document_sequences();
   RAISE NOTICE '%', pg_temp.check('it recreates missing rows (a --no-seed project)',
-    (SELECT count(*) FROM public.document_sequences) = 7 AND EXISTS (SELECT 1 FROM public.document_sequences WHERE seq_type = 'delivery') AND pg_temp.counter('invoice') = 42,
+    (SELECT count(*) FROM public.document_sequences) = 8 AND EXISTS (SELECT 1 FROM public.document_sequences WHERE seq_type = 'delivery') AND EXISTS (SELECT 1 FROM public.document_sequences WHERE seq_type = 'goods_receipt') AND pg_temp.counter('invoice') = 42,
     '-> ' || (SELECT count(*) FROM public.document_sequences) || ' rows');
 
   -- ── authorisation ─────────────────────────────────────────────────────────
