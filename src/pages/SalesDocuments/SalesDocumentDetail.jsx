@@ -13,6 +13,9 @@ import { downloadSOPDF } from '../../lib/salesOrderPdf'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { useConfirm } from '../../hooks/useConfirm'
 import { DetailSkeleton } from '../../components/Skeleton'
+import { ROLES } from '../../lib/constants'
+import DeliveriesPanel from './DeliveriesPanel'
+import { raiseDeliveryInvoiceApproval } from './_deliveries'
 import {
   DocumentFormModal,
   RecordPaymentModal,
@@ -131,6 +134,8 @@ export default function SalesDocumentDetail({
   // it is the accountant's job and not a rep's, so it follows the accounting
   // module rather than `sales`.
   const canTakePayment = canDo(currentUserRole, currentUserPermissions, 'accounting', 'record_payment')
+  // Deliveries are created and confirmed by managers and above (owner decision, P-01).
+  const isManager = [ROLES.MANAGER, ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(currentUserRole)
 
   const { t } = useTranslation()
   const { confirm, confirmDialog } = useConfirm()
@@ -190,14 +195,31 @@ export default function SalesDocumentDetail({
     enabled: isSO && !!doc?.id,
     staleTime: 30_000,
   })
-  const linkedInvoiceFromSO = linkedInvoices.find((inv) => inv.doc_status !== 'cancelled') ?? null
+  // A whole-order invoice; an order that ships by deliveries has one invoice
+  // per delivery instead (P-02), shown in the Deliveries panel.
+  const linkedInvoiceFromSO = linkedInvoices.find((inv) => inv.doc_status !== 'cancelled' && !inv.delivery_id) ?? null
   const soIsInvoiced = isSO && !!linkedInvoiceFromSO
+  const { data: soDeliveries = EMPTY_ARRAY, isLoading: deliveriesLoading } = useQuery({
+    queryKey: ['deliveries', doc?.id],
+    queryFn: () => db.deliveries.listForOrder(doc.id),
+    enabled: isSO && !!doc?.id,
+  })
+  // The database keeps the two paths apart; the screen offers only the open one.
+  // Until the deliveries are known, neither whole-order action is offered.
+  const soShipsByDeliveries = deliveriesLoading || soDeliveries.some((d) => d.status !== 'cancelled')
+  const soHasShipped = deliveriesLoading || soDeliveries.some((d) => d.status === 'confirmed')
+  // The database lets the order's own rep invoice a delivery (20260896), as well as managers.
+  const canInvoiceDelivery = canPostDoc || (currentUserRole === ROLES.SALES_REP
+    && !!doc && [doc.assigned_rep, doc.created_by].includes(currentUserEmail))
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['sales-document', docType, docId] })
     queryClient.invalidateQueries({ queryKey: ['sales-documents'] })
+    // Cancelling an order cancels its draft deliveries on the server (20260894).
+    queryClient.invalidateQueries({ queryKey: ['deliveries', docId] })
+    queryClient.invalidateQueries({ queryKey: ['invoices-by-so', docId] })
   }
 
   const runAction = async (fn) => {
@@ -336,13 +358,13 @@ export default function SalesDocumentDetail({
   // draft invoice exists so a manager sees it on the Activities approval pool.
   // Uses the SO's own code/total/customer (the invoice has no inv_code yet —
   // that's assigned only on post()).
-  const createInvoiceApprovalActivity = (invoiceId) => {
+  const createInvoiceApprovalActivity = (invoiceId, code = doc.so_code, total = doc.total) => {
     const customerName = customer?.company_name || customer?.contact_person || '—'
     return db.activities.create({
       related_type: 'customer',
       related_id: doc.customer_id,
       type: 'approval',
-      title: `approval|invoice|${invoiceId}|${doc.so_code}|${doc.total ?? 0}|${customerName}`,
+      title: `approval|invoice|${invoiceId}|${code}|${total ?? 0}|${customerName}`,
       due_date: new Date().toISOString(),
       assigned_rep: doc.assigned_rep || null,
       outcome_notes: null,
@@ -355,6 +377,18 @@ export default function SalesDocumentDetail({
     toast.success(t('salesDocuments.convertedToInvoiceToast'))
     navigate(`/sales/invoice/${invoiceId}`)
   })
+  // An invoice made from one delivery bills that delivery's quantities, so its
+  // approval request carries the invoice's own total and the delivery's code.
+  const handleDeliveryInvoiced = async (invoiceId, delivery) => {
+    await raiseDeliveryInvoiceApproval({
+      invoiceId,
+      delivery,
+      fallbackCode: doc.so_code,
+      getInvoice: (id) => db.crmInvoices.get(id),
+      createApproval: createInvoiceApprovalActivity,
+    })
+    navigate(`/sales/invoice/${invoiceId}`)
+  }
   const handleDownloadSOPDF = () =>
     downloadSOPDF({
       salesOrder: doc,
@@ -582,7 +616,7 @@ export default function SalesDocumentDetail({
                   {t('salesDocuments.downloadPDF')}
                 </Button>
               )}
-              {!soIsInvoiced && ['confirmed', 'delivered'].includes(n.status) && (
+              {!soIsInvoiced && !soShipsByDeliveries && ['confirmed', 'delivered'].includes(n.status) && (
                 <Button disabled={!canPostDoc} size="sm" onClick={handleConvertToInvoice} loading={busy}>
                   {t('salesDocuments.convertToInvoice')}
                 </Button>
@@ -592,7 +626,7 @@ export default function SalesDocumentDetail({
                   {t('pipeline.reopenForApproval')}
                 </Button>
               )}
-              {!soIsInvoiced && ['draft', 'sent', 'accepted', 'confirmed', 'delivered'].includes(n.status) && (
+              {!soIsInvoiced && !soHasShipped && ['draft', 'sent', 'accepted', 'confirmed', 'delivered'].includes(n.status) && (
                 <Button disabled={!canCancelDoc} variant="danger" size="sm" onClick={handleCancelSO} loading={busy}>
                   {t('common.cancel')}
                 </Button>
@@ -816,6 +850,17 @@ export default function SalesDocumentDetail({
           </div>
         </div>
       </div>
+
+      {/* ── Deliveries (P-01 / P-02) ── */}
+      {isSO && !doc.archived && !soIsInvoiced && ['confirmed', 'delivered'].includes(n.status) && (
+        <DeliveriesPanel
+          so={doc}
+          isManager={isManager}
+          canInvoice={canInvoiceDelivery}
+          currentUserEmail={currentUserEmail}
+          onInvoiceCreated={handleDeliveryInvoiced}
+        />
+      )}
 
       {/* ── Notes ── */}
       {doc.notes && (
