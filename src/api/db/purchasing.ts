@@ -367,6 +367,11 @@ export const purchaseOrders = {
           vendor_id: po.vendor_id,
           line_items: lineItems,
           ...totals,
+          // vendor_invoices.currency is NOT NULL with no default (20260792):
+          // without these the insert always failed. The invoice is in the
+          // order's currency, at the order's rate.
+          currency: po.currency,
+          exchange_rate: po.exchange_rate ?? 1,
           invoice_date: overrides?.invoiceDate || null,
           due_date: overrides?.dueDate || null,
           notes: overrides?.notes ?? po.notes,
