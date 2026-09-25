@@ -9,6 +9,7 @@ import { ModalOverlay, ModalCard, Button, Input, Textarea, Label } from '../../c
 import { useConfirm } from '../../hooks/useConfirm'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { deliveryProgress, validateDeliveryQuantities } from './_deliveries'
+import { downloadDeliveryNotePDF } from '../../lib/deliveryNotePdf'
 
 // Deliveries of one sales order (P-01, 20260894) and invoicing each one
 // (P-02, 20260896). Managers and above create, confirm and cancel a delivery;
@@ -23,7 +24,7 @@ const DLV_PILL = {
   cancelled: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
 }
 
-export default function DeliveriesPanel({ so, isManager, canInvoice, currentUserEmail, onInvoiceCreated }) {
+export default function DeliveriesPanel({ so, customer, isManager, canInvoice, currentUserEmail, onInvoiceCreated }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { confirm, confirmDialog } = useConfirm()
@@ -82,6 +83,7 @@ export default function DeliveriesPanel({ so, isManager, canInvoice, currentUser
       title: t('salesDocuments.dlvConfirmTitle'),
       message: t('salesDocuments.dlvConfirmMsg'),
       confirmLabel: t('salesDocuments.dlvConfirm'),
+      tone: 'primary', // a normal step, not a destructive one
       onConfirm: () => run(() => db.deliveries.confirm(d.id, currentUserEmail), 'salesDocuments.dlvConfirmedToast'),
     })
   const handleCancel = (d) =>
@@ -188,6 +190,18 @@ export default function DeliveriesPanel({ so, isManager, canInvoice, currentUser
                         </Button>
                       </>
                     )}
+                    {d.status === 'confirmed' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          downloadDeliveryNotePDF({ delivery: d, salesOrder: so, customer }).catch((err) =>
+                            toast.error(err?.message || t('salesDocuments.createFailed')))
+                        }
+                      >
+                        {t('salesDocuments.dlvPrintNote')}
+                      </Button>
+                    )}
                     {d.status === 'confirmed' && inv && (
                       <Link
                         to={`/sales/invoice/${inv.id}`}
@@ -222,11 +236,11 @@ function CreateDeliveryModal({ progress, busy, onClose, onSubmit }) {
   const open = progress.filter((p) => p.open > 0)
   const [qty, setQty] = useState(() => Object.fromEntries(open.map((p) => [p.line.id, String(p.open)])))
   const [notes, setNotes] = useState('')
-  const [error, setError] = useState(null)
+  const [error, setError] = useState(null) // { key, lineId? }
 
   const submit = () => {
     const res = validateDeliveryQuantities(open.map((p) => ({ lineId: p.line.id, open: p.open, qty: qty[p.line.id] })))
-    if (res.error) { setError(res.error); return }
+    if (res.error) { setError({ key: res.error, lineId: res.lineId }); return }
     onSubmit(res.lines, notes.trim() || null)
   }
 
@@ -261,9 +275,11 @@ function CreateDeliveryModal({ progress, busy, onClose, onSubmit }) {
                       max={p.open}
                       step={1}
                       aria-label={`${t('salesDocuments.dlvQtyToShip')} — ${p.line.product_name}`}
+                      aria-invalid={error?.lineId === p.line.id || undefined}
+                      aria-describedby={error?.lineId === p.line.id ? 'dlv-qty-error' : undefined}
                       value={qty[p.line.id] ?? ''}
                       onChange={(e) => { setError(null); setQty((q) => ({ ...q, [p.line.id]: e.target.value })) }}
-                      className="w-20 text-center"
+                      className={`w-20 text-center ${error?.lineId === p.line.id ? 'border-red-500 dark:border-red-400 ring-1 ring-red-500' : ''}`}
                     />
                   </td>
                 </tr>
@@ -276,7 +292,14 @@ function CreateDeliveryModal({ progress, busy, onClose, onSubmit }) {
             <Textarea id="dlv-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
           </div>
 
-          {error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{t(error)}</p>}
+          {error && (
+            <p id="dlv-qty-error" role="alert" className="text-xs text-red-600 dark:text-red-400">
+              {(() => {
+                const bad = error.lineId && open.find((p) => p.line.id === error.lineId)
+                return bad ? t(error.key, { product: bad.line.product_name, open: bad.open }) : t(error.key)
+              })()}
+            </p>
+          )}
 
           <div className="flex gap-2 justify-end">
             <Button variant="secondary" size="sm" onClick={onClose}>{t('common.cancel')}</Button>

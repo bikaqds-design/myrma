@@ -4034,8 +4034,10 @@
     "dlvConfirmedToast": "تم تأكيد التسليم — خرجت البضائع من المخزون",
     "dlvCancelledToast": "تم إلغاء التسليم",
     "dlvInvoicedToast": "تم إنشاء فاتورة لهذا التسليم",
-    "dlvQtyInvalid": "أدخل أعدادًا صحيحة لا تتجاوز المتبقي للشحن.",
-    "dlvQtyNone": "أدخل كمية لبند واحد على الأقل."
+    "dlvQtyNone": "أدخل كمية لبند واحد على الأقل.",
+    "dlvPrintNote": "طباعة إذن التسليم",
+    "dlvChip": "التسليم:",
+    "dlvQtyInvalidLine": "{{product}}: أدخل عددًا صحيحًا من 0 إلى {{open}}."
   },
   "accounting": {
     "title": "الحسابات",

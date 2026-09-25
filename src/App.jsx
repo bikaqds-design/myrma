@@ -1033,6 +1033,10 @@ export default function App() {
     if (pathname.startsWith('/leads/')) return t('nav.leadDetails')
     if (pathname.startsWith('/pipeline/')) return t('nav.dealDetails')
     if (pathname.startsWith('/purchasing/vendor/')) return t('purchasing.vendorDetails')
+    // a document page (/sales/:type/:id, /purchasing/:type/:id) — the slug
+    // fallback below printed its raw address, id included
+    if (pathname.startsWith('/sales/')) return t('nav.salesDocument')
+    if (pathname.startsWith('/purchasing/')) return t('nav.purchasing')
     const MAP = {
       '/': t('nav.dashboard'),
       '/dashboard': t('nav.dashboard'),

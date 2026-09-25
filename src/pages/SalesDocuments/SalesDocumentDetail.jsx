@@ -188,6 +188,13 @@ export default function SalesDocumentDetail({
     enabled: isInvoice && !!doc?.so_id,
     staleTime: 5 * 60_000,
   })
+  // An invoice made from a delivery names that delivery (P-02).
+  const { data: sourceDelivery } = useQuery({
+    queryKey: ['delivery', doc?.delivery_id],
+    queryFn: () => db.deliveries.get(doc.delivery_id),
+    enabled: isInvoice && !!doc?.delivery_id,
+    staleTime: 5 * 60_000,
+  })
   // For SO detail: check if an invoice has already been created from this SO.
   const { data: linkedInvoices = EMPTY_ARRAY } = useQuery({
     queryKey: ['invoices-by-so', doc?.id],
@@ -765,6 +772,15 @@ export default function SalesDocumentDetail({
               <span className="font-mono">{linkedFrom.code}</span>
             </button>
           )}
+          {isInvoice && sourceDelivery?.delivery_code && (
+            <button
+              onClick={() => navigate(`/sales/sales_order/${sourceDelivery.sales_order_id}`)}
+              className="inline-flex items-center gap-1 text-xs text-[#6c6760] dark:text-[#9aa4b2] hover:text-[#4338ca] dark:hover:text-[#a5b4fc] transition-colors"
+            >
+              {t('salesDocuments.dlvChip')}
+              <span className="font-mono">{sourceDelivery.delivery_code}</span>
+            </button>
+          )}
           {/* Converted-to trail: SO → Invoice */}
           {soIsInvoiced && linkedInvoiceFromSO && (
             <button
@@ -855,6 +871,7 @@ export default function SalesDocumentDetail({
       {isSO && !doc.archived && !soIsInvoiced && ['confirmed', 'delivered'].includes(n.status) && (
         <DeliveriesPanel
           so={doc}
+          customer={customer}
           isManager={isManager}
           canInvoice={canInvoiceDelivery}
           currentUserEmail={currentUserEmail}

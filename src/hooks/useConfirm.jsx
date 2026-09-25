@@ -44,13 +44,14 @@ export function useConfirm() {
     title: '',
     message: '',
     confirmLabel: undefined,
+    tone: undefined,
     onConfirm: null,
   })
 
   const close = useCallback(() => setState((s) => ({ ...s, open: false })), [])
 
-  const confirm = useCallback(({ title, message, confirmLabel, onConfirm }) => {
-    setState({ open: true, title, message, confirmLabel, onConfirm })
+  const confirm = useCallback(({ title, message, confirmLabel, tone, onConfirm }) => {
+    setState({ open: true, title, message, confirmLabel, tone, onConfirm })
   }, [])
 
   const handleConfirm = useCallback(() => {
@@ -66,6 +67,7 @@ export function useConfirm() {
       title={state.title}
       message={state.message}
       confirmLabel={state.confirmLabel}
+      tone={state.tone}
       onConfirm={handleConfirm}
       onCancel={close}
     />

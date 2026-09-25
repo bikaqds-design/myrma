@@ -120,8 +120,9 @@ export function buildDocumentHTML({
   .dc{font-size:${fs - 1}px;color:#9aa0a6;margin-top:2px;margin-bottom:14px}
   table.meta{margin-left:auto;border-collapse:collapse}
   table.meta td{padding:3px 0;font-size:${fs - 1}px;vertical-align:top}
-  .ml{color:#9aa0a6;text-align:right;padding-right:18px;white-space:nowrap}
-  .mv{color:#211f1b;font-weight:600;text-align:right;white-space:nowrap}
+  /* scoped like the td rule above, or its padding:3px 0 wins and label and value touch */
+  table.meta td.ml{color:#9aa0a6;text-align:right;padding-right:18px;white-space:nowrap}
+  table.meta td.mv{color:#211f1b;font-weight:600;text-align:right;white-space:nowrap}
   .balance{margin-top:10px;margin-left:auto;display:flex;justify-content:space-between;gap:24px;
     background:#f1f2f4;border-radius:6px;padding:8px 14px;min-width:240px}
   .bal-l{font-weight:bold;color:#211f1b;font-size:${fs}px}

@@ -52,6 +52,9 @@ vi.mock('../api/supabaseClient', () => ({
   },
 }))
 
+const printNote = vi.fn(() => Promise.resolve())
+vi.mock('../lib/deliveryNotePdf', () => ({ downloadDeliveryNotePDF: (...a) => printNote(...a) }))
+
 const { default: DeliveriesPanel } = await import('../pages/SalesDocuments/DeliveriesPanel.jsx')
 
 function renderPanel(props = {}) {
@@ -76,6 +79,7 @@ beforeEach(() => {
   invoicesData = []
   Object.values(api).forEach((f) => f.mockClear())
   toastError.mockClear()
+  printNote.mockClear()
 })
 afterEach(cleanup)
 
@@ -110,7 +114,10 @@ describe('DeliveriesPanel', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'salesDocuments.dlvNew' }))
     fireEvent.change(await screen.findByLabelText('salesDocuments.dlvQtyToShip — Router'), { target: { value: '4' } })
     fireEvent.click(screen.getByRole('button', { name: 'salesDocuments.dlvCreate' }))
-    expect((await screen.findByRole('alert')).textContent).toBe('salesDocuments.dlvQtyInvalid')
+    // the message names the line, and that input is marked
+    expect((await screen.findByRole('alert')).textContent).toBe('salesDocuments.dlvQtyInvalidLine:{"product":"Router","open":3}')
+    expect(screen.getByLabelText('salesDocuments.dlvQtyToShip — Router').getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getByLabelText('salesDocuments.dlvQtyToShip — Cable').getAttribute('aria-invalid')).toBeNull()
     expect(api.create).not.toHaveBeenCalled()
   })
 
@@ -135,6 +142,8 @@ describe('DeliveriesPanel', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'salesDocuments.dlvConfirm' }))
     expect(api.confirm).not.toHaveBeenCalled()
     await screen.findByText('salesDocuments.dlvConfirmMsg')
+    // a normal step: the dialog uses the accent colour, not the red delete style
+    expect(screen.getByRole('dialog').querySelector('.bg-indigo-100')).not.toBeNull()
     const buttons = screen.getAllByRole('button', { name: 'salesDocuments.dlvConfirm' })
     fireEvent.click(buttons[buttons.length - 1]) // the dialog's, rendered last
     await waitFor(() => expect(api.confirm).toHaveBeenCalledWith('D1', 'mgr@x'))
@@ -206,5 +215,18 @@ describe('DeliveriesPanel', () => {
     fireEvent.click(btn)
     release()
     await waitFor(() => expect(api.invoice).toHaveBeenCalledTimes(1))
+  })
+
+  it('a confirmed delivery can be printed as a note; a draft cannot', async () => {
+    deliveriesData = [
+      { id: 'D1', delivery_code: 'DN-2026-00001', status: 'confirmed', created_at: '2026-09-24', confirmed_at: '2026-09-24', delivery_lines: [] },
+      { id: 'D2', delivery_code: null, status: 'draft', created_at: '2026-09-24', delivery_lines: [] },
+    ]
+    const customer = { company_name: 'Acme' }
+    renderPanel({ customer })
+    const buttons = await screen.findAllByRole('button', { name: 'salesDocuments.dlvPrintNote' })
+    expect(buttons).toHaveLength(1)
+    fireEvent.click(buttons[0])
+    expect(printNote).toHaveBeenCalledWith({ delivery: expect.objectContaining({ id: 'D1' }), salesOrder: expect.objectContaining({ id: 'SO1' }), customer })
   })
 })

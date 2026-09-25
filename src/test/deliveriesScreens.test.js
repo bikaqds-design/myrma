@@ -83,7 +83,7 @@ describe('validateDeliveryQuantities', () => {
 
   it('refuses fractions, negatives, text and more than is open', () => {
     for (const bad of ['1.5', '-1', 'abc', '1e1', '3']) {
-      expect(validateDeliveryQuantities(rows(bad, '0')).error, bad).toBe('salesDocuments.dlvQtyInvalid')
+      expect(validateDeliveryQuantities(rows(bad, '0')), bad).toEqual({ error: 'salesDocuments.dlvQtyInvalidLine', lineId: 'L1' })
     }
   })
 
