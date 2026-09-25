@@ -3850,8 +3850,10 @@
     "dlvConfirmedToast": "Delivery confirmed — the goods have left stock",
     "dlvCancelledToast": "Delivery cancelled",
     "dlvInvoicedToast": "Invoice created for this delivery",
-    "dlvQtyInvalid": "Enter whole numbers, no more than what is still to ship.",
-    "dlvQtyNone": "Enter a quantity for at least one line."
+    "dlvQtyNone": "Enter a quantity for at least one line.",
+    "dlvPrintNote": "Print note",
+    "dlvChip": "Delivery:",
+    "dlvQtyInvalidLine": "{{product}}: enter a whole number from 0 to {{open}}."
   },
   "accounting": {
     "title": "Accounting",

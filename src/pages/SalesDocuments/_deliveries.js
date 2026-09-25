@@ -29,7 +29,8 @@ export function validateDeliveryQuantities(rows) {
   for (const r of rows) {
     const raw = String(r.qty ?? '').trim()
     if (raw === '' || raw === '0') continue
-    if (!/^\d+$/.test(raw) || Number(raw) > r.open) return { error: 'salesDocuments.dlvQtyInvalid' }
+    // names the line, so the form can point at it
+    if (!/^\d+$/.test(raw) || Number(raw) > r.open) return { error: 'salesDocuments.dlvQtyInvalidLine', lineId: r.lineId }
     lines.push({ sales_order_line_id: r.lineId, qty: Number(raw) })
   }
   if (lines.length === 0) return { error: 'salesDocuments.dlvQtyNone' }

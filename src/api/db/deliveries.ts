@@ -61,6 +61,38 @@ export const deliveries = {
     return rows.map(sortLines)
   },
 
+  /** One delivery with its lines, or null if it does not exist or cannot be read. */
+  async get(deliveryId: string): Promise<DeliveryRow | null> {
+    const { data, error } = await supabase.from('deliveries').select(DELIVERY_SELECT).eq('id', deliveryId).maybeSingle()
+    if (error) throw error
+    return data ? sortLines(data as unknown as DeliveryRow) : null
+  },
+
+  /**
+   * Serial numbers that left on a delivery, by delivery line — for the
+   * delivery note. The rows are readable by managers and accountants only
+   * (they carry cost), so for anyone else this is empty and the note lists
+   * quantities alone. Cost is not selected.
+   */
+  async serials(deliveryId: string): Promise<Record<string, string[]>> {
+    const rows = await fetchAllRows<{ delivery_line_id: string; unit: { serial_number: string | null } | null }>((from, to) =>
+      supabase
+        .from('delivery_line_units')
+        .select('delivery_line_id, unit:inventory_units(serial_number), delivery_line:delivery_lines!inner(delivery_id)')
+        .eq('delivery_line.delivery_id', deliveryId)
+        .order('delivery_line_id', { ascending: true })
+        .order('unit_id', { ascending: true })
+        .range(from, to)
+    )
+    const out: Record<string, string[]> = {}
+    for (const r of rows) {
+      const sn = r.unit?.serial_number
+      if (sn) (out[r.delivery_line_id] ||= []).push(sn)
+    }
+    for (const k of Object.keys(out)) out[k].sort()
+    return out
+  },
+
   /** A draft delivery of the given quantities (never more than a line still has open). */
   async create(salesOrderId: string, lines: DeliveryLineInput[], notes: string | null, actorEmail: string): Promise<DeliveryRow> {
     const { data, error } = await supabase.rpc('create_delivery', {
