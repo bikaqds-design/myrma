@@ -50,7 +50,9 @@ never leave twice.
   `cancel_delivery`, sequence `delivery → DN`, the two-path exclusion.
 - **P-02a (database):** `create_invoice_from_delivery(delivery)`, and
   `post_invoice` leaves stock alone and takes the delivery's cost for such an
-  invoice.
+  invoice. `void_invoice` restocks nothing for it (goods come back by a
+  return, P-05). One live invoice per delivery; an order has as many
+  invoices as deliveries. (20260896)
 - **P-01b / P-02b (screens):** deliveries on the sales-order page (create,
   confirm for managers, cancel, print), "Invoice this delivery"; then the
   legacy convert button is retired.
