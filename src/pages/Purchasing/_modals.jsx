@@ -929,7 +929,7 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
                         const remaining = Math.round(((inv.total ?? 0) - (inv.amount_paid ?? 0)) * 100) / 100
                         return (
                           <tr key={inv.id} className="border-b border-[#f0f2f6] dark:border-[#1a2230] last:border-0">
-                            <td className="px-3 py-2 font-mono text-xs text-[#211f1b] dark:text-[#e8ebf0]">{inv.vi_code || '—'}</td>
+                            <td className="px-3 py-2 font-mono text-xs text-[#211f1b] dark:text-[#e8ebf0]">{inv.vi_code || inv.supplier_invoice_no || '—'}</td>
                             <td className="px-3 py-2 text-[#6c6760] dark:text-[#9aa4b2]">{inv.due_date || '—'}</td>
                             <td className="px-3 py-2 text-end text-[#6c6760] dark:text-[#9aa4b2]">{fmtMoney(remaining)}</td>
                             <td className="px-3 py-2">

@@ -60,7 +60,10 @@ export default function RegionalSettings({ currentUserEmail }) {
     setBusy(true)
     try {
       await saveConfig(key, value, currentUserEmail)
-      queryClient.invalidateQueries({ queryKey: ['rma-config'] })
+      // Awaited: a switch reads the stored value, so until the refetch lands a
+      // second click would write the old value again (a switch that would not
+      // turn off).
+      await queryClient.invalidateQueries({ queryKey: ['rma-config'] })
       toast.success(t('cp.setup.saved'))
     } catch (err) {
       captureException(err)

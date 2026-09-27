@@ -157,5 +157,8 @@ BEGIN
   RAISE NOTICE '%', pg_temp.check('nobody but the database runs the allocation step',
     NOT has_function_privilege('authenticated', 'public._vendor_payment_allocate(uuid, uuid, character, numeric, jsonb, boolean, text, boolean)', 'EXECUTE'));
 
+  RAISE NOTICE '%', pg_temp.check('the rebuilt payment list is not readable by anon',
+    NOT has_table_privilege('anon', 'public.v_vendor_payments_list', 'SELECT'));
+
   RAISE EXCEPTION 'P04B_TEST_DONE — rolling back fixtures (this is not a real failure)';
 END $do$;

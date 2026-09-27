@@ -24,7 +24,7 @@
 --      Pending payments are outside the vendor ledger (it lists active ones)
 --      and cannot be applied (apply_vendor_payment_to_invoice wants active).
 --
--- Pinned by src/test/vendorPaymentControls.test.js; supabase/tests/vendor_payment_controls.sql
+-- Pinned by src/test/vendorPaymentControls.test.jsx; supabase/tests/vendor_payment_controls.sql
 -- is the rolled-back reference script.
 -- ============================================================================
 
@@ -275,4 +275,8 @@ CREATE VIEW public.v_vendor_payments_list WITH (security_invoker = true) AS
          NULLIF(b.brand_name, '') AS vendor_name
     FROM public.vendor_payments vp
     LEFT JOIN public.brands b ON b.id = vp.vendor_id;
+-- a new view is granted to anon by the project's default privileges; 20260861
+-- revoked that, so revoke it again
+REVOKE ALL ON public.v_vendor_payments_list FROM PUBLIC, anon;
 GRANT SELECT ON public.v_vendor_payments_list TO authenticated, service_role;
+COMMENT ON VIEW public.v_vendor_payments_list IS 'Vendor payments with the vendor name the Accounting page shows. (BUG-066; P-04b columns 20260901.)';
