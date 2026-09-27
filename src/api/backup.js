@@ -269,6 +269,9 @@ export const BACKUP_TABLES = [
   // is a soft reference, so only the accounts must exist first)
   { table: 'journal_entries' },
   { table: 'journal_lines' },
+  // A-03 (20260910): month-end close, after the journal it governs
+  { table: 'accounting_periods' },
+  { table: 'period_reopen_requests' },
 
   // ── Tier 7: history. activities is polymorphic — related_id points at a
   //    deal, lead, customer, purchase order or vendor invoice depending on
@@ -357,7 +360,7 @@ export const BACKUP_MODULES = [
   },
   {
     id: 'ledger',
-    tables: ['gl_accounts', 'posting_rules', 'journal_entries', 'journal_lines'],
+    tables: ['gl_accounts', 'posting_rules', 'journal_entries', 'journal_lines', 'accounting_periods', 'period_reopen_requests'],
   },
   {
     id: 'comms',
