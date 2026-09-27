@@ -64,6 +64,8 @@ DECLARE
   v_pay2   uuid := gen_random_uuid();
 BEGIN
   INSERT INTO public.user_roles (user_email, role, status) VALUES (v_mgr, 'manager', 'active'), (v_admin, 'admin', 'active');
+  -- A-04 (20260911): a line is posted only under a tax code for its rate
+  INSERT INTO public.tax_codes (code, name, kind, rate, is_default) VALUES ('VAT10', 'Rate 10%', 'standard', 10, true) ON CONFLICT DO NOTHING;
   INSERT INTO public.brands (brand_name) VALUES ('A01bp Supplier') RETURNING id INTO v_vendor;
   INSERT INTO public.warehouses (id, name, code, warehouse_type) VALUES (v_wh, 'A01bp WH', 'A01BP-WH', 'main');
   INSERT INTO public.products (id, sku, product_name, product_type, stock_tracking_mode)

@@ -62,7 +62,7 @@ BEGIN
 
   -- Types with nothing issued stay at zero and still hand out number 1.
   RAISE NOTICE '%', pg_temp.check('a type with no documents stays at 0',
-    pg_temp.counter('credit_note') = 0 AND pg_temp.counter('payment') = 0);
+    pg_temp.counter('batch') = 0 AND pg_temp.counter('customer_refund') = 0);  -- types staging has never numbered (it has since issued a credit note and a payment)
 
   -- Never lowers a counter: a healthy project is left exactly as it was.
   UPDATE public.document_sequences SET last_value = 500 WHERE seq_type = 'invoice';
@@ -83,7 +83,7 @@ BEGIN
   DELETE FROM public.document_sequences;
   PERFORM public.rma_reconcile_document_sequences();
   RAISE NOTICE '%', pg_temp.check('it recreates missing rows (a --no-seed project)',
-    (SELECT count(*) FROM public.document_sequences) = 8 AND EXISTS (SELECT 1 FROM public.document_sequences WHERE seq_type = 'delivery') AND EXISTS (SELECT 1 FROM public.document_sequences WHERE seq_type = 'goods_receipt') AND pg_temp.counter('invoice') = 42,
+    (SELECT count(*) FROM public.document_sequences) = 11 AND EXISTS (SELECT 1 FROM public.document_sequences WHERE seq_type = 'journal_entry') AND EXISTS (SELECT 1 FROM public.document_sequences WHERE seq_type = 'delivery') AND EXISTS (SELECT 1 FROM public.document_sequences WHERE seq_type = 'goods_receipt') AND pg_temp.counter('invoice') = 42,
     '-> ' || (SELECT count(*) FROM public.document_sequences) || ' rows');
 
   -- ── authorisation ─────────────────────────────────────────────────────────
