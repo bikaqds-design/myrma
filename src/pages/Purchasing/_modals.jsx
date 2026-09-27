@@ -710,6 +710,9 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
   const [openInvoices, setOpenInvoices] = useState([])
   const [loadingInvoices, setLoadingInvoices] = useState(false)
   const [allocations, setAllocations] = useState({})
+  // Paying for goods that have not arrived yet (20260901): the database refuses
+  // it unless the payment says so.
+  const [isPrepayment, setIsPrepayment] = useState(false)
   const [saving, setSaving] = useState(false)
   const cur = useDocumentCurrency()
   // Destructured so the loader effect below can depend on it without depending
@@ -806,7 +809,7 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
     if (!isValid) return
     setSaving(true)
     try {
-      await db.vendorPayments.record({
+      const payment = await db.vendorPayments.record({
         vendor_id: vendorId,
         amount: totalAmount,
         method,
@@ -819,12 +822,17 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
         allocations: Object.entries(allocations)
           .map(([invoice_id, v]) => ({ invoice_id, amount: parseFloat(v) || 0 }))
           .filter((a) => a.amount > 0),
+        isPrepayment,
       })
-      toast.success(t('accounting.recordedToast'))
+      // With second approval on (20260901) it waits for another manager.
+      toast.success(t(payment.status === 'pending_approval' ? 'accounting.vpPendingToast' : 'accounting.recordedToast'))
       onRecorded?.()
     } catch (err) {
       console.error('Record vendor payment failed', err)
-      toast.error(t('accounting.recordFailed'))
+      // The database says why ("goods have not arrived yet: mark it as a
+      // prepayment", a different currency, ...); a bare "failed" leaves the
+      // person guessing.
+      toast.error(err?.code === 'P0001' && err?.message ? err.message : t('accounting.recordFailed'), { duration: 7000 })
     } finally {
       setSaving(false)
     }
@@ -870,6 +878,18 @@ export function RecordVendorPaymentModal({ vendors = [], vendorId: initialVendor
               <Label>{t('salesDocuments.fNotes')}</Label>
               <Textarea aria-label={t('salesDocuments.fNotes')} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
+            <label className="sm:col-span-2 flex items-start gap-2 text-sm text-[#211f1b] dark:text-[#e8ebf0] cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5 accent-[#4338ca]"
+                checked={isPrepayment}
+                onChange={(e) => setIsPrepayment(e.target.checked)}
+              />
+              <span>
+                {t('accounting.vpPrepayment')}
+                <span className="block text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('accounting.vpPrepaymentHint')}</span>
+              </span>
+            </label>
           </div>
 
           {vendorId && (

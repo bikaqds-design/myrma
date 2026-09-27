@@ -50,6 +50,7 @@ export default function RegionalSettings({ currentUserEmail }) {
   const creditThreshold = useConfigValue('credit_note_approval_threshold', null)
 
   const priceTolerance = useConfigValue('purchase_price_tolerance_pct', null)
+  const paymentApproval = useConfigValue('vendor_payment_approval', false)
 
   const [draftTax, setDraftTax] = useState(null)
   const [draftCredit, setDraftCredit] = useState(null)
@@ -183,6 +184,31 @@ export default function RegionalSettings({ currentUserEmail }) {
           {!toleranceValid && (
             <p className="text-xs text-red-600 pb-2">{t('cp.setup.toleranceInvalid')}</p>
           )}
+        </div>
+      </SetupCard>
+
+      {/* 20260901: off by default (owner decision) so a one-manager team can
+          still pay suppliers; on, every payment waits for a second manager. */}
+      <SetupCard title={t('cp.setup.vpApprovalTitle')}>
+        <div className="flex items-start justify-between gap-4">
+          <p className="text-sm text-gray-600 dark:text-[#9aa4b2]">{t('cp.setup.vpApprovalHint')}</p>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={paymentApproval === true || paymentApproval === 'true'}
+            onClick={() => write('vendor_payment_approval', !(paymentApproval === true || paymentApproval === 'true'))}
+            disabled={busy}
+            aria-label={t('cp.setup.vpApprovalTitle')}
+            className={`shrink-0 relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${
+              paymentApproval === true || paymentApproval === 'true' ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-[#2a3441]'
+            }`}
+          >
+            <span
+              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                paymentApproval === true || paymentApproval === 'true' ? 'translate-x-4' : 'translate-x-1'
+              }`}
+            />
+          </button>
         </div>
       </SetupCard>
 

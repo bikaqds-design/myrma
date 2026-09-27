@@ -3313,7 +3313,9 @@
       "toleranceTitle": "Supplier price tolerance",
       "toleranceHint": "How far a supplier bill may price above its purchase order before the person submitting it must say why. Blank or 0 means any higher price needs a reason.",
       "tolerancePct": "Tolerance (%)",
-      "toleranceInvalid": "Enter a number from 0 to 100, or leave it blank."
+      "toleranceInvalid": "Enter a number from 0 to 100, or leave it blank.",
+      "vpApprovalTitle": "Supplier payments need a second manager",
+      "vpApprovalHint": "When on, a supplier payment waits until a manager who did not record it approves it; only then does it get its number and settle bills. Leave off if only one person handles payments."
     }
   },
   "notifications": {
@@ -3915,7 +3917,16 @@
     "bucket31_60": "31-60 Days",
     "bucket61_90": "61-90 Days",
     "bucket90Plus": "90+ Days",
-    "bucketNoDueDate": "No due date"
+    "bucketNoDueDate": "No due date",
+    "vpPrepayment": "This is a prepayment (paying for goods that have not arrived yet)",
+    "vpPrepaymentHint": "A bill whose goods have not all been received can only be paid this way.",
+    "vpPrepaymentBadge": "Prepayment",
+    "vpPendingToast": "Payment saved — it waits for another manager to approve it",
+    "vpApprovedToast": "Payment approved and applied",
+    "vpApprove": "Approve",
+    "vpReject": "Reject",
+    "vpAwaitingOther": "Waiting for another manager",
+    "status_pending_approval": "Awaiting approval"
   },
   "purchasing": {
     "title": "Purchasing",

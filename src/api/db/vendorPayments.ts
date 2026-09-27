@@ -24,7 +24,15 @@ export interface VendorPaymentRow {
   reference_number: string | null
   payment_date: string
   notes: string | null
-  status: 'active' | 'voided'
+  // pending_approval: waiting for a second manager (20260901, when the tenant
+  // turns that on) — no VP- number yet, nothing applied, not on the statement
+  status: 'pending_approval' | 'active' | 'voided'
+  /** Paid before the goods it pays for arrived (20260901). */
+  is_prepayment: boolean
+  approved_by: string | null
+  approved_at: string | null
+  /** While pending, the allocations to apply when approved. */
+  pending_allocations: { invoice_id: string; amount: number }[] | null
   created_by: string
   created_at: string
   updated_at: string
@@ -108,6 +116,8 @@ export const vendorPayments = {
     allocations?: { invoice_id: string; amount: number }[]
     currency?: string | null
     exchangeRate?: number | null
+    /** Paying for goods not yet received needs this (20260901). */
+    isPrepayment?: boolean
   }): Promise<VendorPaymentRow> {
     const allocations = (input.allocations ?? []).filter((a) => a.amount > 0)
     const { data: paymentId, error } = await supabase.rpc('record_vendor_payment', {
@@ -127,11 +137,23 @@ export const vendorPayments = {
       // a rate of 1, so callers that predate the currency engine are unchanged.
       p_currency: input.currency ?? null,
       p_exchange_rate: input.exchangeRate ?? null,
+      p_is_prepayment: input.isPrepayment ?? false,
     })
     if (error) throw error
     const payment = await vendorPayments.get(paymentId as string)
     if (!payment) throw new Error('Vendor payment not found after creation')
     return payment
+  },
+
+  /**
+   * approve: a payment waiting for a second manager (20260901) gets its VP-
+   * number and its allocations are applied, checked again. The person who
+   * recorded it cannot approve it. Turn one down with void_().
+   */
+  async approve(id: string, actorEmail: string): Promise<VendorPaymentRow> {
+    const { data, error } = await supabase.rpc('approve_vendor_payment', { p_payment_id: id, p_actor_email: actorEmail })
+    if (error) throw error
+    return data as VendorPaymentRow
   },
 
   /**
