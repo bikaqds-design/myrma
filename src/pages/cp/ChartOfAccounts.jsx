@@ -4,8 +4,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
 import { Button, Input, Label, Select } from '../../components/ui'
+import { useConfirm } from '../../hooks/useConfirm'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
-import { POSTING_ROLES, accountName, chartRows, validateAccount } from '../Accounting/_ledger'
+import {
+  CHART_COUNTRIES, POSTING_ROLES, accountName, chartRows, parseChartCsv, summarizeImport, validateAccount,
+} from '../Accounting/_ledger'
 
 // Control Panel › Chart of accounts (A-01c). Administrators add accounts,
 // rename them, make them inactive, and choose which account each kind of
@@ -13,6 +16,11 @@ import { POSTING_ROLES, accountName, chartRows, validateAccount } from '../Accou
 // of an account with postings (code, type, becoming a header, deletion) and
 // any rule pointing at a header or an inactive account; its message is shown
 // as it is.
+//
+// A-02: before anything is posted, an administrator can replace the whole chart
+// with a country's template (Egypt, UAE, Saudi Arabia — drafts pending an
+// accountant's review), and at any time import accounts from a CSV file (new
+// codes are created, existing ones renamed; one result per row).
 
 const TYPES = ['asset', 'liability', 'equity', 'income', 'expense']
 const EMPTY_FORM = { code: '', name: '', name_ar: '', account_type: 'asset', parent_id: '', is_postable: true }
@@ -25,9 +33,17 @@ export default function ChartOfAccounts() {
   const [editing, setEditing] = useState(null) // { id, name, name_ar }
   const [busy, setBusy] = useState(false)
   const inFlight = useRef(false)
+  const { confirm, confirmDialog } = useConfirm()
+  const [country, setCountry] = useState('')
+  const [importFile, setImportFile] = useState(null) // { name, rows }
+  const [importError, setImportError] = useState(null)
+  const [importResult, setImportResult] = useState(null) // summarizeImport(...)
 
   const { data: accounts = EMPTY_ARRAY, isLoading } = useQuery({ queryKey: ['ledger', 'accounts'], queryFn: db.ledger.accounts })
   const { data: rules = EMPTY_ARRAY } = useQuery({ queryKey: ['ledger', 'posting-rules'], queryFn: db.ledger.postingRules })
+  const { data: templates = EMPTY_ARRAY } = useQuery({ queryKey: ['ledger', 'chart-templates'], queryFn: db.ledger.chartTemplates })
+  const { data: applied = null } = useQuery({ queryKey: ['ledger', 'chart-template-applied'], queryFn: db.ledger.appliedTemplate })
+  const templateSize = useMemo(() => Object.fromEntries(templates.map((x) => [x.country, x.accounts])), [templates])
 
   const rows = useMemo(() => chartRows(accounts), [accounts])
   const headers = useMemo(() => accounts.filter((a) => !a.is_postable), [accounts])
@@ -75,6 +91,44 @@ export default function ChartOfAccounts() {
     if (ok) setForm(EMPTY_FORM)
   }
 
+  const applyTemplate = () => {
+    if (!country) return
+    confirm({
+      title: t('accounting.glTemplateConfirmTitle'),
+      message: t('accounting.glTemplateConfirm', { country: t(`accounting.glCountry_${country}`) }),
+      confirmLabel: t('accounting.glTemplateApply'),
+      onConfirm: () =>
+        run(async () => {
+          const r = await db.ledger.applyChartTemplate(country)
+          toast.success(t('accounting.glTemplateApplied', r))
+        }),
+    })
+  }
+
+  const pickFile = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    setImportResult(null)
+    setImportFile(null)
+    setImportError(null)
+    if (!file) return
+    const parsed = parseChartCsv(await file.text())
+    if (parsed.error) return setImportError(t(parsed.error))
+    setImportFile({ name: file.name, rows: parsed.rows })
+  }
+
+  const runImport = async () => {
+    if (!importFile) return
+    let results = null
+    const ok = await run(async () => {
+      results = await db.ledger.importChartAccounts(importFile.rows)
+    })
+    if (ok) {
+      setImportResult(summarizeImport(results))
+      setImportFile(null)
+    }
+  }
+
   const saveEdit = async () => {
     const ok = await run(
       () => db.ledger.updateAccount(editing.id, { name: editing.name.trim(), name_ar: editing.name_ar.trim() || null }),
@@ -85,6 +139,61 @@ export default function ChartOfAccounts() {
 
   return (
     <div className="space-y-6">
+      <section className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-[18px]">
+        <h2 className="text-sm font-semibold text-[#211f1b] dark:text-[#e8ebf0] mb-1">{t('accounting.glTemplateTitle')}</h2>
+        <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2] mb-3">{t('accounting.glTemplateHint')}</p>
+        {applied && (
+          <p className="text-xs text-[#211f1b] dark:text-[#e8ebf0] mb-3">
+            {t('accounting.glTemplateCurrent', { country: t(`accounting.glCountry_${applied}`) })}
+          </p>
+        )}
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <Label htmlFor="chart-country">{t('accounting.glTemplateCountry')}</Label>
+            <Select id="chart-country" value={country} onChange={(e) => setCountry(e.target.value)}>
+              <option value="">{t('accounting.glTemplatePick')}</option>
+              {CHART_COUNTRIES.filter((c) => templateSize[c]).map((c) => (
+                <option key={c} value={c}>
+                  {t(`accounting.glCountry_${c}`)} ({t('accounting.glTemplateAccounts', { count: templateSize[c] })})
+                </option>
+              ))}
+            </Select>
+          </div>
+          <Button variant="secondary" onClick={applyTemplate} disabled={busy || !country}>{t('accounting.glTemplateApply')}</Button>
+        </div>
+      </section>
+
+      <section className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-[18px]">
+        <h2 className="text-sm font-semibold text-[#211f1b] dark:text-[#e8ebf0] mb-1">{t('accounting.glImportTitle')}</h2>
+        <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2] mb-3">{t('accounting.glImportHint')}</p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <Label htmlFor="chart-file">{t('accounting.glImportFile')}</Label>
+            <input id="chart-file" type="file" accept=".csv,text/csv" onChange={pickFile} className="block text-sm text-[#211f1b] dark:text-[#e8ebf0]" />
+          </div>
+          {importFile && (
+            <Button onClick={runImport} disabled={busy}>
+              {t('accounting.glImportRun', { count: importFile.rows.length })}
+            </Button>
+          )}
+        </div>
+        {importError && <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">{importError}</p>}
+        {importResult && (
+          <div className="mt-3 text-sm text-[#211f1b] dark:text-[#e8ebf0]" role="status">
+            <p>{t('accounting.glImportDone', { created: importResult.created, updated: importResult.updated, errors: importResult.errors.length })}</p>
+            {importResult.errors.length > 0 && (
+              <ul className="mt-2 list-disc ps-5 text-red-600 dark:text-red-400">
+                {importResult.errors.map((e, i) => (
+                  <li key={`${e.code ?? ''}-${i}`}>
+                    <span className="font-mono">{e.code ?? t('accounting.glImportNoCode')}</span>: {e.message}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </section>
+
       <section className="bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-[18px]">
         <h2 className="text-sm font-semibold text-[#211f1b] dark:text-[#e8ebf0] mb-1">{t('accounting.glRulesTitle')}</h2>
         <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2] mb-3">{t('accounting.glRulesHint')}</p>
@@ -221,6 +330,7 @@ export default function ChartOfAccounts() {
           </tbody>
         </table>
       </section>
+      {confirmDialog}
     </div>
   )
 }

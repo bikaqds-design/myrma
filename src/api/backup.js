@@ -381,6 +381,8 @@ export const INTENTIONALLY_NOT_BACKED_UP = {
     'a transient outbound spool. Restoring it would re-send mail that was pending when the backup was taken; anything still owed will be re-queued by the events that own it.',
   user_permissions:
     'a Base44-era table the application no longer reads. 20260787 closed it to admins; it holds no live state.',
+  gl_chart_templates:
+    'reference data shipped by migrations (20260908), the same on every project; clients cannot write it, and the chart a template produced is backed up as gl_accounts.',
 }
 
 /** Legacy key names used by version 1.0 exports, mapped to their tables. */

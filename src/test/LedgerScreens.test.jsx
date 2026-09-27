@@ -5,7 +5,9 @@
  * journal lists entries, opens one to its lines and links an invoice's entry to
  * the invoice; the trial balance totals and says the books balance; the chart
  * of accounts adds an account, refuses a bad one before the round trip, points
- * a posting rule at another account and shows the database's refusal as it is.
+ * a posting rule at another account and shows the database's refusal as it is;
+ * a country template is applied only after the dialog, and a CSV import sends
+ * the parsed rows and lists the ones the database refused (A-02).
  * i18n echoes the key.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -45,6 +47,13 @@ const api = {
   createAccount: vi.fn(() => Promise.resolve({ id: 'NEW' })),
   updateAccount: vi.fn(() => Promise.resolve({ id: 'A4' })),
   setPostingRule: vi.fn(() => Promise.resolve()),
+  chartTemplates: vi.fn(() => Promise.resolve([{ country: 'AE', accounts: 92 }, { country: 'EG', accounts: 95 }, { country: 'SA', accounts: 95 }])),
+  appliedTemplate: vi.fn(() => Promise.resolve(null)),
+  applyChartTemplate: vi.fn(() => Promise.resolve({ country: 'EG', created: 70, updated: 25, removed: 1 })),
+  importChartAccounts: vi.fn(() => Promise.resolve([
+    { code: '6190', status: 'created' },
+    { code: '1250', status: 'error', message: 'Account 1250: the type must be asset, liability, equity, income or expense.' },
+  ])),
 }
 vi.mock('../api/supabaseClient', () => ({ db: { ledger: new Proxy({}, { get: (_, k) => (...a) => api[k](...a) }) } }))
 
@@ -137,5 +146,59 @@ describe('Chart of accounts', () => {
     fireEvent.click(within(row).getByRole('button', { name: 'accounting.glDeactivate' }))
     await waitFor(() => expect(toastError).toHaveBeenCalledWith(
       'Account 1110 is used by a posting rule; point the rule at another account first.', { duration: 7000 }))
+  })
+})
+
+describe('Chart of accounts: country templates and import (A-02)', () => {
+  const csvFile = (text) => ({ name: 'chart.csv', text: () => Promise.resolve(text) })
+
+  it('applies a country template only after the confirmation dialog', async () => {
+    renderIt(<ChartOfAccounts />)
+    const pick = await screen.findByLabelText('accounting.glTemplateCountry')
+    await waitFor(() => expect(within(pick).getAllByRole('option').map((o) => o.value)).toEqual(['', 'EG', 'AE', 'SA']))
+    fireEvent.change(pick, { target: { value: 'EG' } })
+    fireEvent.click(screen.getByRole('button', { name: 'accounting.glTemplateApply' }))
+    expect(api.applyChartTemplate).not.toHaveBeenCalled()
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'accounting.glTemplateApply' }))
+    await waitFor(() => expect(api.applyChartTemplate).toHaveBeenCalledWith('EG'))
+  })
+
+  it('shows the database refusal once something has been posted', async () => {
+    api.applyChartTemplate.mockImplementationOnce(() =>
+      Promise.reject(new Error('The chart can only be replaced before anything has been posted. Add or rename accounts instead.')))
+    renderIt(<ChartOfAccounts />)
+    const pick = await screen.findByLabelText('accounting.glTemplateCountry')
+    await waitFor(() => expect(within(pick).getAllByRole('option')).toHaveLength(4))
+    fireEvent.change(pick, { target: { value: 'SA' } })
+    fireEvent.click(screen.getByRole('button', { name: 'accounting.glTemplateApply' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'accounting.glTemplateApply' }))
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(
+      'The chart can only be replaced before anything has been posted. Add or rename accounts instead.', { duration: 7000 }))
+  })
+
+  it('imports a CSV file and lists the rows the database refused', async () => {
+    renderIt(<ChartOfAccounts />)
+    await screen.findByText('Assets')
+    fireEvent.change(screen.getByLabelText('accounting.glImportFile'), {
+      target: { files: [csvFile('code,name,type,parent_code\n6190,Staff training,expense,6000\n1250,Bad type,money,1200\n')] },
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'accounting.glImportRun:{"count":2}' }))
+    await waitFor(() => expect(api.importChartAccounts).toHaveBeenCalledWith([
+      { code: '6190', name: 'Staff training', type: 'expense', parent_code: '6000' },
+      { code: '1250', name: 'Bad type', type: 'money', parent_code: '1200' },
+    ]))
+    const status = await screen.findByRole('status')
+    expect(status.textContent).toContain('accounting.glImportDone:{"created":1,"updated":0,"errors":1}')
+    expect(status.textContent).toContain('Account 1250: the type must be asset, liability, equity, income or expense.')
+  })
+
+  it('refuses a file without code and name columns before the round trip', async () => {
+    renderIt(<ChartOfAccounts />)
+    await screen.findByText('Assets')
+    fireEvent.change(screen.getByLabelText('accounting.glImportFile'), { target: { files: [csvFile('number,title\n1,x\n')] } })
+    expect((await screen.findByRole('alert')).textContent).toBe('accounting.glImportErrColumns')
+    expect(screen.queryByRole('button', { name: /accounting\.glImportRun/ })).toBeNull()
+    expect(api.importChartAccounts).not.toHaveBeenCalled()
   })
 })

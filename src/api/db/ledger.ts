@@ -155,4 +155,71 @@ export const ledger = {
     const { error } = await supabase.from('posting_rules').update({ account_id: accountId }).eq('role', role)
     if (error) throw error
   },
+
+  /** The country templates on offer (A-02), with how many accounts each has. */
+  async chartTemplates(): Promise<ChartTemplateSummary[]> {
+    const rows = await fetchAllRows<{ country_code: string; code: string }>((from, to) =>
+      supabase
+        .from('gl_chart_templates')
+        .select('country_code, code')
+        .order('country_code', { ascending: true })
+        .order('code', { ascending: true })
+        .range(from, to)
+    )
+    const counts = new Map<string, number>()
+    for (const r of rows) counts.set(r.country_code, (counts.get(r.country_code) ?? 0) + 1)
+    return [...counts].map(([country, accounts]) => ({ country, accounts }))
+  },
+
+  /** The template last applied to this tenant's chart, if any. */
+  async appliedTemplate(): Promise<string | null> {
+    const { data, error } = await supabase
+      .from('rma_config')
+      .select('config_value')
+      .eq('config_key', 'chart_template')
+      .maybeSingle()
+    if (error) throw error
+    return typeof data?.config_value === 'string' ? data.config_value : null
+  },
+
+  /** Replace the chart with a country's template (administrators, only before anything is posted). */
+  async applyChartTemplate(country: string): Promise<ChartApplyResult> {
+    const { data, error } = await supabase.rpc('rma_apply_chart_template', { p_country: country })
+    if (error) throw error
+    return data as ChartApplyResult
+  },
+
+  /** Create or rename accounts from a parsed file (administrators); one result per row. */
+  async importChartAccounts(rows: ChartImportRow[]): Promise<ChartImportResult[]> {
+    const { data, error } = await supabase.rpc('rma_import_chart_accounts', { p_rows: rows })
+    if (error) throw error
+    return (data ?? []) as ChartImportResult[]
+  },
+}
+
+export interface ChartTemplateSummary {
+  country: string
+  accounts: number
+}
+
+export interface ChartApplyResult {
+  country: string
+  created: number
+  updated: number
+  removed: number
+}
+
+export interface ChartImportRow {
+  code: string
+  name: string
+  name_ar?: string
+  type?: string
+  parent_code?: string
+  header?: string
+}
+
+export interface ChartImportResult {
+  code: string | null
+  status: 'created' | 'updated' | 'error'
+  message?: string
 }

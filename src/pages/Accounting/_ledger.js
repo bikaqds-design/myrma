@@ -110,3 +110,87 @@ export const POSTING_ROLES = [
   'opening_balance_equity',
   'rounding',
 ]
+
+// ── A-02: country templates and importing a chart ────────────────────────────
+
+/** The countries with a chart template, in the order they are offered. */
+export const CHART_COUNTRIES = ['EG', 'AE', 'SA']
+
+/** At most this many accounts per import (rma_import_chart_accounts refuses more). */
+export const CHART_IMPORT_MAX = 2000
+
+// Header names a file may use for each column (lower case, spaces as underscores).
+const CHART_COLUMNS = {
+  code: ['code', 'account_code', 'account'],
+  name: ['name', 'account_name'],
+  name_ar: ['name_ar', 'arabic_name', 'name_arabic'],
+  type: ['type', 'account_type'],
+  parent_code: ['parent_code', 'parent'],
+  header: ['header', 'is_header'],
+}
+
+// One CSV line into fields: quoted fields may hold commas and doubled quotes.
+function parseCsvLine(line) {
+  const out = []
+  let cur = ''
+  let quoted = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') {
+      if (quoted && line[i + 1] === '"') {
+        cur += '"'
+        i++
+      } else {
+        quoted = !quoted
+      }
+    } else if (ch === ',' && !quoted) {
+      out.push(cur.trim())
+      cur = ''
+    } else {
+      cur += ch
+    }
+  }
+  out.push(cur.trim())
+  return out
+}
+
+/**
+ * A chart file (CSV with a header row) into rows for rma_import_chart_accounts.
+ * Returns { rows } or { error } (a translation key). Only the file's shape is
+ * checked here; each row's content is judged by the database, row by row.
+ */
+export function parseChartCsv(text) {
+  const lines = String(text || '')
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/)
+    .filter((l) => l.trim() !== '')
+  if (lines.length < 2) return { error: 'accounting.glImportErrEmpty' }
+  const head = parseCsvLine(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, '_'))
+  const col = {}
+  for (const [key, names] of Object.entries(CHART_COLUMNS)) {
+    const i = head.findIndex((h) => names.includes(h))
+    if (i >= 0) col[key] = i
+  }
+  if (col.code === undefined || col.name === undefined) return { error: 'accounting.glImportErrColumns' }
+  if (lines.length - 1 > CHART_IMPORT_MAX) return { error: 'accounting.glImportErrTooMany' }
+  const rows = lines.slice(1).map((line) => {
+    const v = parseCsvLine(line)
+    const row = {}
+    for (const [key, i] of Object.entries(col)) if (v[i] !== undefined && v[i] !== '') row[key] = v[i]
+    if (row.code === undefined) row.code = ''
+    if (row.name === undefined) row.name = ''
+    return row
+  })
+  return { rows }
+}
+
+/** How an import went: counts per outcome and the rows that failed. */
+export function summarizeImport(results) {
+  const out = { created: 0, updated: 0, errors: [] }
+  for (const r of results || []) {
+    if (r.status === 'created') out.created++
+    else if (r.status === 'updated') out.updated++
+    else out.errors.push(r)
+  }
+  return out
+}

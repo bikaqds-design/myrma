@@ -190,7 +190,9 @@ export type { SalesOrderRow, SalesOrderLine, SalesOrderLineRow } from './salesOr
 export type { DeliveryRow, DeliveryLineRow, DeliveryLineInput } from './deliveries.js'
 export type { CustomerReturnRow, CustomerReturnLineRow, CustomerReturnLineInput, DeliveredUnit, ReturnCreditNote } from './customerReturns.js'
 export type { CustomerRefundRow, RefundSource } from './customerRefunds.js'
-export type { GlAccountRow, PostingRuleRow, JournalEntryRow, JournalLineRow, TrialBalanceRow, AccountType, JournalFilters } from './ledger.js'
+export type { GlAccountRow, PostingRuleRow, JournalEntryRow, JournalLineRow, TrialBalanceRow, AccountType, JournalFilters,
+  ChartTemplateSummary, ChartApplyResult, ChartImportRow, ChartImportResult,
+} from './ledger.js'
 export type { CrmInvoiceRow, CrmInvoiceLine, CrmInvoiceLineRow } from './crmInvoices.js'
 export type { CreditNoteRow, CreditNoteLine, CreditNoteLineRow, CreditNoteApplicationRow } from './creditNotes.js'
 export type { SalesDocumentRow, SalesDocType } from './salesDocuments.js'

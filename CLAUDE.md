@@ -795,6 +795,20 @@ Ledger screens (2026-09-27, `next` line, W4 / A-01c, client only):
 - **Control Panel › Chart of Accounts** (`cp/ChartOfAccounts.jsx`, administrators): the posting rules (one select per role, only active non-header accounts offered — `POSTING_ROLES` must equal the database CHECK list, a test compares them), add an account (code, name, Arabic name, type, header parent, header or not; `validateAccount` names a bad field first), rename, activate / deactivate. The database's refusals (an account with postings keeps its code and type; a rule's account cannot be deactivated) are shown as they are.
 - API: `db.ledger` (`src/api/db/ledger.ts`): `journalPage`, `trialBalance`, `accounts`, `postingRules`, `createAccount`, `updateAccount`, `setPostingRule` — it never writes a journal. Strings `accounting.gl*`, `accounting.tabJournal` / `tabTrialBalance`, `cp.chartOfAccounts*` in en and ar. Pinned by `src/test/ledgerScreens.test.js` (helpers, the role list against the migration, every posting source type named, no screen or API writing a journal) and the render test `src/test/LedgerScreens.test.jsx`. **Not verified in a browser** (no sign-in).
 
+Country charts of accounts (2026-09-27, `next` line, W4 / A-02, `20260908_country_chart_templates.sql`; owner decision: a full chart per country; details in `docs/A01_GENERAL_LEDGER.md` § A-02):
+
+- `gl_chart_templates` holds three **draft** charts: Egypt (95 accounts), UAE (92) and Saudi Arabia (95). Each has the country's own accounts (Egypt's legal reserve and withholding/stamp/salary tax, Saudi zakat and GOSI, UAE corporate tax and gratuity) and the posting roles on the same codes in all three. They need an accountant's review before a tenant relies on them. The table is reference data from the migration: readable by staff, written by no client, not backed up (`INTENTIONALLY_NOT_BACKED_UP`; the resulting chart is `gl_accounts`). `backupCoverage.test.js`'s "every table the app reads" check now also accepts a table named there.
+- `rma_apply_chart_template(country)` (administrators, **only while `journal_lines` is empty**) makes the chart exactly the template: accounts renamed, retyped and re-parented, missing ones created with ids from their code, rules repointed, every other account removed. The choice is remembered in `rma_config.chart_template`. `rma_import_chart_accounts(rows)` (administrators, any time, ≤2000) creates new codes and **only renames** existing ones, with one result per row, so a bad row fails alone.
+- Control Panel › Chart of Accounts has *Start from a country template* (a country picker, then a confirmation dialog) and *Import accounts*. Import reads a CSV with `code, name, name_ar, type, parent_code, header` through `parseChartCsv` in `Accounting/_ledger.js`, then lists the rows the database refused. API: `db.ledger.chartTemplates`, `appliedTemplate`, `applyChartTemplate`, `importChartAccounts`.
+- Pinned by `src/test/countryChartTemplates.test.js`, which reads the seed from the migration and checks, per country:
+  - every role on one postable account;
+  - unique codes;
+  - Arabic names;
+  - header parents of the same type;
+  - type by first digit.
+
+  It also covers the guards and the CSV helpers. The render tests are in `src/test/LedgerScreens.test.jsx`. `supabase/tests/country_chart_templates.sql` (20 checks) is the rolled-back reference script: 20/20 on staging before and after the apply. **Applied to `mycrm-staging` only; screens not verified in a browser.**
+
 Authenticated-role probes (2026-09-16, BUG-061):
 
 - `supabase/tests/authenticated_role_probes.sql` — reference script, **not CI**: reproduces a signed-in call without a password (sets PostgREST's JWT claims + `SET LOCAL ROLE authenticated`) for one active account per role, checks the BUG-001/002/004/010/011/034/087 loopholes are refused and the legitimate action beside each still works, then forces a rollback. Run it by hand after any change to RLS, grants or guard triggers; last run 28/28 (2026-09-17).
