@@ -89,5 +89,9 @@ swapped, as its own event.
   (`20260907`, staging). Freight and duties are credited to a new role,
   `accrued_landed_costs` (2160), because no payable records who is owed them.
   **Done.**
-- **A-01c (screens):** chart of accounts and posting rules (Control Panel),
-  journal list with drill-down to the source, trial balance.
+- **A-01c (screens):** Accounting › Journal (entries with their lines, date
+  and text filters, invoice / credit note / supplier invoice entries link to
+  the document) and Accounting › Trial balance (managers and accountants);
+  Control Panel › Chart of Accounts (administrators: add, rename, activate /
+  deactivate accounts; point each posting rule at an account). **Done**
+  (client only).

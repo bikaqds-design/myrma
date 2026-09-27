@@ -17,6 +17,9 @@ import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { AGING_BUCKETS, emptyAgingTotals } from '../../lib/aging'
 import { SearchInput } from '../../components/SearchInput'
 import RefundsTab from './RefundsTab'
+import JournalTab from './JournalTab'
+import TrialBalanceTab from './TrialBalanceTab'
+import { ROLES } from '../../lib/constants'
 
 const METHOD_LABEL_KEY = {
   cash: 'accounting.methodCash',
@@ -54,6 +57,9 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
   const canReverse = canDo(currentUserRole, currentUserPermissions, 'accounting', 'reverse_payment')
   const queryClient = useQueryClient()
   const [tab, setTab] = useURLTab('tab', 'payments')
+  // The ledger is readable by managers and accountants (rma_can_handle_cash);
+  // the database refuses everyone else, so the tabs are not offered to them.
+  const canSeeLedger = [ROLES.MANAGER, ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.ACCOUNTANT].includes(currentUserRole)
   const [showRecordModal, setShowRecordModal] = useState(false)
   const [showRecordVendorModal, setShowRecordVendorModal] = useState(false)
   const [voidingPaymentId, setVoidingPaymentId] = useState(null)
@@ -216,7 +222,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
           canRecord ? (
             <Button onClick={() => setShowRecordVendorModal(true)}>+ {t('purchasing.recordPayment')}</Button>
           ) : null
-        ) : tab !== 'ap_aging' && tab !== 'refunds' ? (
+        ) : !['ap_aging', 'refunds', 'journal', 'trial_balance'].includes(tab) ? (
           canRecord ? (
             <Button onClick={() => setShowRecordModal(true)}>+ {t('accounting.recordPayment')}</Button>
           ) : null
@@ -262,6 +268,12 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
           { id: 'vendor_payments', label: t('accounting.tabVendorPayments') },
           { id: 'ap_aging', label: t('accounting.tabApAging') },
           { id: 'refunds', label: t('accounting.tabRefunds') },
+          ...(canSeeLedger
+            ? [
+                { id: 'journal', label: t('accounting.tabJournal') },
+                { id: 'trial_balance', label: t('accounting.tabTrialBalance') },
+              ]
+            : []),
         ].map((tb) => (
           <button
             key={tb.id}
@@ -347,6 +359,9 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
           )}
         </>
       )}
+
+      {tab === 'journal' && canSeeLedger && <JournalTab perPage={perPage} setPerPage={setPerPage} />}
+      {tab === 'trial_balance' && canSeeLedger && <TrialBalanceTab />}
 
       {tab === 'refunds' && (
         <RefundsTab currentUserEmail={currentUserEmail} currentUserRole={currentUserRole} perPage={perPage} setPerPage={setPerPage} />

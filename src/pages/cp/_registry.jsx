@@ -356,6 +356,19 @@ export const GROUPS = [
         ),
       },
       {
+        id: 'chart-of-accounts',
+        label: 'Chart of Accounts',
+        labelKey: 'cp.chartOfAccountsLabel',
+        desc: 'Ledger accounts and the posting rules that choose which account each document posts to',
+        descKey: 'cp.chartOfAccountsDesc',
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M4 6h16M4 10h16M4 14h10M4 18h10" />
+          </svg>
+        ),
+      },
+      {
         id: 'audit',
         label: 'Audit Log',
         labelKey: 'cp.auditLogLabel',

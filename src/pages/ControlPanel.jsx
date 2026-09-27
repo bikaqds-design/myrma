@@ -13,6 +13,7 @@ import Integrations from './cp/Integrations'
 import CustomFields from './cp/CustomFields'
 import PDFLayout from './cp/PDFLayout'
 import SystemSetup from './cp/SystemSetup'
+import ChartOfAccounts from './cp/ChartOfAccounts'
 import WASettings from './cp/WASettings'
 import WATemplates from './cp/WATemplates'
 import WALogs from './cp/WALogs'
@@ -148,6 +149,7 @@ export default function ControlPanel({ currentUserRole, currentUserEmail, curren
       {section === 'customfields' && <CustomFields currentUserEmail={currentUserEmail} />}
       {section === 'pdflayout' && <PDFLayout currentUserEmail={currentUserEmail} />}
       {section === 'system-setup' && <SystemSetup currentUserEmail={currentUserEmail} />}
+      {section === 'chart-of-accounts' && <ChartOfAccounts />}
       {section === 'sla' && <SLAPolicies currentUserEmail={currentUserEmail} />}
       {section === 'automation' && <AutomationRules currentUserEmail={currentUserEmail} />}
       {section === 'wa-settings' && <WASettings currentUserEmail={currentUserEmail} />}
