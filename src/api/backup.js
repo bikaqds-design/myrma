@@ -213,11 +213,17 @@ export const BACKUP_TABLES = [
   { table: 'vendor_invoice_charges' },
   { table: 'vendor_payments' },
   { table: 'vendor_payment_applications' },
+  // P-03 (20260897): before stock units (inventory_units.goods_receipt_id
+  // points here); the unit and bin rows follow the units below
+  { table: 'goods_receipts' },
+  { table: 'goods_receipt_lines' },
 
   // ── Tier 5: inventory ─────────────────────────────────────────────────────
   { table: 'manufacturer_batches' },
   { table: 'inventory_units' },
   { table: 'warehouse_stock' },
+  { table: 'goods_receipt_line_units' },
+  { table: 'goods_receipt_line_bins' },
   {
     table: 'stock_moves',
     restore: false,
@@ -315,7 +321,7 @@ export const BACKUP_MODULES = [
   },
   {
     id: 'purchasing',
-    tables: ['purchase_orders', 'purchase_order_lines', 'purchase_order_revisions', 'vendor_invoices', 'vendor_invoice_lines', 'vendor_invoice_charges', 'vendor_payments', 'vendor_payment_applications'],
+    tables: ['purchase_orders', 'purchase_order_lines', 'purchase_order_revisions', 'vendor_invoices', 'vendor_invoice_lines', 'vendor_invoice_charges', 'vendor_payments', 'vendor_payment_applications', 'goods_receipts', 'goods_receipt_lines', 'goods_receipt_line_units', 'goods_receipt_line_bins'],
   },
   {
     id: 'inventory',
