@@ -49,8 +49,11 @@ export default function RegionalSettings({ currentUserEmail }) {
 
   const creditThreshold = useConfigValue('credit_note_approval_threshold', null)
 
+  const priceTolerance = useConfigValue('purchase_price_tolerance_pct', null)
+
   const [draftTax, setDraftTax] = useState(null)
   const [draftCredit, setDraftCredit] = useState(null)
+  const [draftTolerance, setDraftTolerance] = useState(null)
 
   const write = async (key, value) => {
     setBusy(true)
@@ -78,6 +81,14 @@ export default function RegionalSettings({ currentUserEmail }) {
   const creditBlank = creditValue.trim() === ''
   const creditNumber = Number(creditValue)
   const creditValid = creditBlank || (/^[0-9]+(\.[0-9]+)?$/.test(creditValue.trim()) && Number.isFinite(creditNumber))
+
+  // Same rules for the supplier price tolerance (20260900): blank = 0, i.e.
+  // any price above the purchase order needs a reason; the database reads
+  // anything else that is not a plain number as 0 too.
+  const toleranceValue = draftTolerance ?? (priceTolerance === null || priceTolerance === undefined || priceTolerance === '' ? '' : String(priceTolerance))
+  const toleranceBlank = toleranceValue.trim() === ''
+  const toleranceNumber = Number(toleranceValue)
+  const toleranceValid = toleranceBlank || (/^[0-9]+(\.[0-9]+)?$/.test(toleranceValue.trim()) && toleranceNumber <= 100)
 
   return (
     <div className="space-y-6">
@@ -145,6 +156,34 @@ export default function RegionalSettings({ currentUserEmail }) {
         <p className="text-xs text-gray-500 dark:text-[#9aa4b2] mt-3">
           {t('cp.setup.creditAlways')}
         </p>
+      </SetupCard>
+
+      <SetupCard title={t('cp.setup.toleranceTitle')}>
+        <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mb-3">
+          {t('cp.setup.toleranceHint')}
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-40">
+            <Label>{t('cp.setup.tolerancePct')}</Label>
+            <Input
+              aria-label={t('cp.setup.tolerancePct')}
+              type="text"
+              inputMode="decimal"
+              placeholder="0"
+              value={toleranceValue}
+              onChange={(e) => setDraftTolerance(e.target.value)}
+            />
+          </div>
+          <Button
+            onClick={async () => { await write('purchase_price_tolerance_pct', toleranceBlank ? '' : toleranceNumber); setDraftTolerance(null) }}
+            disabled={busy || !toleranceValid || draftTolerance === null}
+          >
+            {busy ? t('common.saving') : t('common.save')}
+          </Button>
+          {!toleranceValid && (
+            <p className="text-xs text-red-600 pb-2">{t('cp.setup.toleranceInvalid')}</p>
+          )}
+        </div>
       </SetupCard>
 
       <SetupCard title={t('cp.setup.fiscalTitle')}>

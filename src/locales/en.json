@@ -3309,7 +3309,11 @@
       "aiMaxTokensHint": "Reasoning models spend this budget thinking before writing. Too small and the answer comes back empty rather than short — 4096 is a safe floor for those, and plenty for ordinary models.",
       "aiMaxTokensRange": "Must be between 256 and 32768",
       "aiModelIsKey": "That looks like an API key, not a model name. Keys must never be stored here — every staff member can read this page and it is included in every backup.",
-      "aiKeyWhyNotHere": "There is deliberately no field for the key on this page. Anything stored here is readable by every staff member and travels in every backup; the function’s secret store is neither."
+      "aiKeyWhyNotHere": "There is deliberately no field for the key on this page. Anything stored here is readable by every staff member and travels in every backup; the function’s secret store is neither.",
+      "toleranceTitle": "Supplier price tolerance",
+      "toleranceHint": "How far a supplier bill may price above its purchase order before the person submitting it must say why. Blank or 0 means any higher price needs a reason.",
+      "tolerancePct": "Tolerance (%)",
+      "toleranceInvalid": "Enter a number from 0 to 100, or leave it blank."
     }
   },
   "notifications": {
@@ -4190,7 +4194,26 @@
     "grnQtyNone": "Enter at least one quantity or serial number.",
     "chargesHintApproval": "Freight, customs and clearance. Added to the cost of the received goods when this invoice is approved, apportioned across the lines by value.",
     "chargesLockedApproval": "This invoice is approved and the cost of its goods is booked, so its charges can no longer change.",
-    "noChargesApproval": "No charges recorded. If this shipment had freight or customs, add them before approval — afterwards the cost is fixed."
+    "noChargesApproval": "No charges recorded. If this shipment had freight or customs, add them before approval — afterwards the cost is fixed.",
+    "priceReasonTitle": "This bill does not match its purchase order",
+    "priceReason": "Why is it priced differently?",
+    "priceReasonPlaceholder": "e.g. supplier surcharge agreed by phone on 20 Sep",
+    "matchTitle": "Order match",
+    "matchIssues": "{{count}} to check",
+    "matchOk": "Matches the order",
+    "matchColProduct": "Product",
+    "matchColOrdered": "Ordered",
+    "matchColReceived": "Received",
+    "matchColBilled": "Billed",
+    "matchColOrderPrice": "Order price",
+    "matchColBilledPrice": "Billed price",
+    "matchColStatus": "Match",
+    "matchIssue_over_billed": "More than ordered or received",
+    "matchIssue_price_above": "Price +{{pct}}%",
+    "matchIssue_not_on_order": "Not on the order",
+    "matchLineOk": "Matches",
+    "matchHint": "Prices are net of the line discount; tax is not compared. A bill that charges for more than was ordered or received cannot be submitted; a higher price or a product not on the order needs a reason.",
+    "priceReasonGiven": "Reason given"
   },
   "resolutionTypeValues": {
     "replacement": "Replacement",

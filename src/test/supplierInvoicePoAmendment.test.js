@@ -289,8 +289,9 @@ describe('the screens', () => {
 
   it('asks for a reason instead of dead-ending on a suspected duplicate', () => {
     expect(detail).toMatch(/looks like a duplicate/i)
-    expect(detail).toContain('setShowDuplicate(true)')
-    expect(detail).toContain('submitVI(reason)')
+    // the reasons already given ride along, so a second prompt (price, 20260900) does not lose this one
+    expect(detail).toContain('setShowDuplicate(reasons)')
+    expect(detail).toContain('submitVI({ ...prev, duplicate: reason })')
   })
 
   it('offers Amend only on a confirmed order, and re-raises the approval when it goes back for one', () => {

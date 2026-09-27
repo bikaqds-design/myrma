@@ -127,7 +127,25 @@ export interface VendorInvoiceRow {
   non_po_reason: string | null
   /** Required to submit one that looks like a duplicate (same supplier, amount within 1%, within 30 days). */
   duplicate_override_reason: string | null
+  /** Required to submit one priced above its order (beyond the tolerance) or billing a product not on it (20260900). */
+  price_variance_reason: string | null
   approved_by: string | null
+}
+
+/** One bill line against its order and receipts — rma_vendor_invoice_match (20260900). */
+export interface VendorInvoiceMatchRow {
+  line_no: number
+  product_id: string | null
+  product_name: string
+  /** Null when the product is not on the order. */
+  ordered_qty: number | null
+  /** What arrived on the goods receipt this line bills; null for a bill converted from the whole order. */
+  received_qty: number | null
+  billed_qty: number
+  order_unit_net: number | null
+  billed_unit_net: number
+  price_diff_pct: number | null
+  issue: 'over_billed' | 'price_above' | 'not_on_order' | null
 }
 
 export interface PurchaseOrderRevisionRow {
@@ -541,9 +559,15 @@ export const vendorInvoices = {
    * (20260881) on one that looks like a duplicate of another live invoice
    * unless `duplicateOverrideReason` says why it is a separate bill.
    */
-  async submitForApproval(id: string, duplicateOverrideReason?: string): Promise<void> {
+  /**
+   * Submit a draft for approval. The database may ask for a reason: a possible
+   * duplicate of another bill (20260881), or prices / products that do not
+   * match the purchase order (20260900). Both are given with the submit.
+   */
+  async submitForApproval(id: string, duplicateOverrideReason?: string, priceVarianceReason?: string): Promise<void> {
     const patch: Record<string, unknown> = { status: 'pending_approval' }
     if (duplicateOverrideReason?.trim()) patch.duplicate_override_reason = duplicateOverrideReason.trim()
+    if (priceVarianceReason?.trim()) patch.price_variance_reason = priceVarianceReason.trim()
     const { data, error } = await supabase
       .from('vendor_invoices')
       .update(patch)
@@ -551,6 +575,17 @@ export const vendorInvoices = {
       .select('id')
     if (error) throw error
     assertAffected(data, 'Vendor invoice')
+  },
+  /**
+   * Each bill line against its purchase order and the goods received
+   * (20260900): ordered, received, billed, the order's net unit price and the
+   * billed one, and an issue if any. Empty for a bill with no order. Managers
+   * and accountants only — anyone else gets an error.
+   */
+  async match(id: string): Promise<VendorInvoiceMatchRow[]> {
+    const { data, error } = await supabase.rpc('rma_vendor_invoice_match', { p_vi_id: id })
+    if (error) throw error
+    return (data || []) as VendorInvoiceMatchRow[]
   },
   async approve(id: string): Promise<void> {
     const { data, error } = await supabase
