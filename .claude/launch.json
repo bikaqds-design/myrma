@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "myrma-staging",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:/Users/bika_/AppData/Local/Temp/claude/D--myrma-app/00448825-37fa-44e0-9d30-3e1ec4028b7c/scratchpad/vite-staging.mjs"],
+      "port": 5174
     }
   ]
 }
