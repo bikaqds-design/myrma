@@ -58,11 +58,13 @@ orders.
 - **P-05a (database):** tables, `create_customer_return`,
   `confirm_customer_return`, `cancel_customer_return`, sequence
   `customer_return → RTN`, `create_invoice_from_delivery` refuses a delivery
-  with a return, Backup & Restore.
+  with a return, Backup & Restore. **Done** (#77, `20260902`).
 - **P-05b (database):** `create_credit_note_from_return` — an `rma_return`
   credit note for exactly the returned lines at the invoice line's price,
   discount and tax, against the delivery's invoice; a return credit note for
   stock lines on a delivery invoice can only be made this way (goods first).
+  **Done** (`20260903`): the note keeps the return's lines, goes through
+  `create_credit_note` (caps and approval unchanged), one live note per return.
 - **P-05c (database):** customer refunds: recorded by a manager from a credit
   note's remaining balance or a payment's unapplied amount, `pending_approval`
   until a **different** manager approves it (then numbered `RF-`, and the
