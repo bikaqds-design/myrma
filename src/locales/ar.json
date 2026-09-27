@@ -3647,6 +3647,7 @@
     "module_purchasing": "المشتريات والموردون",
     "module_inventory": "المخزون",
     "module_sales": "المبيعات والحسابات",
+    "module_ledger": "دفتر الأستاذ العام",
     "module_comms": "المعرفة والإشعارات",
     "moduleTableCount": "{{count}} جدولًا",
     "moduleExported": "تم تصدير {{module}} — {{rows}} صفًا",

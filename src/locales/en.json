@@ -3467,6 +3467,7 @@
     "module_purchasing": "Purchasing & vendors",
     "module_inventory": "Inventory & stock",
     "module_sales": "Sales & accounting",
+    "module_ledger": "General ledger",
     "module_comms": "Knowledge & notifications",
     "moduleTableCount": "{{count}} tables",
     "moduleExported": "{{module}} exported — {{rows}} rows",

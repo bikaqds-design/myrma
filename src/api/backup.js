@@ -123,6 +123,11 @@ export const BACKUP_TABLES = [
       'the table refuses all client access by design, so a restore cannot write it — but it MUST be reinstated by an administrator in SQL. Without it nextval_for_type restarts at 1 and the next invoice, credit note or payment collides with a restored one on its unique code',
   },
   { table: 'rma_config' },
+  // A-01 (20260905): the chart before anything that could post to it; the
+  // seeded accounts share their ids across tenants, so a restore onto a new
+  // tenant's seeded chart matches them by primary key
+  { table: 'gl_accounts' },
+  { table: 'posting_rules' },
   { table: 'brands' },
   { table: 'categories' },
   { table: 'subcategories' },
@@ -260,6 +265,10 @@ export const BACKUP_TABLES = [
   { table: 'credit_note_applications' },
   // P-05c (20260904): after the payments and credit notes it is paid from
   { table: 'customer_refunds' },
+  // A-01 (20260905): the ledger, after every document it can name (source_id
+  // is a soft reference, so only the accounts must exist first)
+  { table: 'journal_entries' },
+  { table: 'journal_lines' },
 
   // ── Tier 7: history. activities is polymorphic — related_id points at a
   //    deal, lead, customer, purchase order or vendor invoice depending on
@@ -345,6 +354,10 @@ export const BACKUP_MODULES = [
       'customer_returns', 'customer_return_lines', 'customer_return_line_units', 'customer_return_line_bins', 'crm_invoices', 'crm_invoice_lines', 'invoices',
       'payments', 'payment_applications', 'credit_notes', 'credit_note_lines', 'credit_note_applications', 'customer_refunds',
     ],
+  },
+  {
+    id: 'ledger',
+    tables: ['gl_accounts', 'posting_rules', 'journal_entries', 'journal_lines'],
   },
   {
     id: 'comms',
