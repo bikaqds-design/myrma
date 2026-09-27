@@ -216,7 +216,8 @@ describe('charges', () => {
 
   it('is locked in the UI on exactly the statuses the database refuses', () => {
     const detail = readFileSync('src/pages/Purchasing/PurchaseDocumentDetail.jsx', 'utf8')
-    expect(detail).toContain("locked={['partially_received', 'received'].includes(doc.status)}")
+    // received goods fix the cost; so does approving an invoice from goods receipts (20260898)
+    expect(detail).toContain("locked={['partially_received', 'received'].includes(doc.status) || (isReceiptInvoice && doc.status === 'approved')}")
   })
 })
 

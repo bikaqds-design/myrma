@@ -31,6 +31,8 @@ export default function LandedCharges({
   vendorInvoiceId,
   currency,
   locked,
+  // an invoice from goods receipts books its cost at approval, not at receipt
+  bookedAtApproval = false,
   canEdit,
   currentUserEmail,
 }) {
@@ -109,7 +111,9 @@ export default function LandedCharges({
             {t('purchasing.landedCharges')}
           </div>
           <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2] mt-0.5">
-            {locked ? t('purchasing.chargesLocked') : t('purchasing.chargesHint')}
+            {bookedAtApproval
+              ? t(locked ? 'purchasing.chargesLockedApproval' : 'purchasing.chargesHintApproval')
+              : t(locked ? 'purchasing.chargesLocked' : 'purchasing.chargesHint')}
           </p>
         </div>
         {canEdit && !locked && !adding && (
@@ -120,7 +124,7 @@ export default function LandedCharges({
       </div>
 
       {charges.length === 0 ? (
-        <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('purchasing.noCharges')}</p>
+        <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t(bookedAtApproval ? 'purchasing.noChargesApproval' : 'purchasing.noCharges')}</p>
       ) : (
         <table className="w-full text-sm">
           <tbody>

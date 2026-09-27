@@ -20,6 +20,8 @@ import { CreatePurchaseOrderModal, VendorInvoiceFormModal, RecordVendorPaymentMo
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { useConfirm } from '../../hooks/useConfirm'
 import { DetailSkeleton } from '../../components/Skeleton'
+import { ROLES } from '../../lib/constants'
+import GoodsReceiptsPanel from './GoodsReceiptsPanel'
 
 const STATUS_PILL = {
   draft: 'bg-gray-100 dark:bg-[#1a2230] text-gray-600 dark:text-[#9aa4b2]',
@@ -158,6 +160,24 @@ export default function PurchaseDocumentDetail({
   })
   const linkedVIFromPO = visFromPO.find((vi) => vi.status !== 'cancelled') ?? null
   const poIsConverted = isPO && !!linkedVIFromPO
+
+  // Goods receipts (P-03c): an order received by receipts is invoiced from
+  // them, never converted whole or amended (20260897/20260898 refuse both), and
+  // may have several invoices — so "converted" above means the older path only
+  // while it has no receipts.
+  const isManager = [ROLES.MANAGER, ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(currentUserRole)
+  const { data: poReceipts = EMPTY_ARRAY, isLoading: receiptsLoading } = useQuery({
+    queryKey: ['goods-receipts', doc?.id],
+    queryFn: () => db.goodsReceipts.listForOrder(doc.id),
+    enabled: isPO && !!doc?.id,
+  })
+  const hasReceipts = poReceipts.some((r) => r.status !== 'cancelled')
+  const convertedWhole = poIsConverted && !hasReceipts
+  const { data: isReceiptInvoice = false } = useQuery({
+    queryKey: ['vendor-invoice-is-receipt', docId],
+    queryFn: () => db.goodsReceipts.isReceiptInvoice(docId),
+    enabled: isVI && !!docId,
+  })
 
   const { data: warehouses = EMPTY_ARRAY } = useQuery({
     queryKey: ['warehouses'],
@@ -337,10 +357,10 @@ export default function PurchaseDocumentDetail({
               {doc.status !== 'draft' && (
                 <Button variant="secondary" size="sm" onClick={handleDownloadPOPDF}>{t('purchasing.downloadPDF')}</Button>
               )}
-              {!poIsConverted && ['confirmed', 'partially_completed'].includes(doc.status) && (
+              {!poIsConverted && !hasReceipts && !receiptsLoading && ['confirmed', 'partially_completed'].includes(doc.status) && (
                 <Button disabled={!canCreatePurchase} size="sm" onClick={handleConvertToVI} loading={busy}>{t('purchasing.createVendorInvoice')}</Button>
               )}
-              {!poIsConverted && doc.status === 'confirmed' && (
+              {!poIsConverted && !hasReceipts && !receiptsLoading && doc.status === 'confirmed' && (
                 <Button disabled={!canEditPurchase} variant="secondary" size="sm" onClick={() => setShowAmend(true)}>{t('purchasing.amendOrder')}</Button>
               )}
               {!poIsConverted && ['draft', 'sent', 'confirmed'].includes(doc.status) && (
@@ -360,7 +380,9 @@ export default function PurchaseDocumentDetail({
               {doc.status === 'pending_approval' && (
                 <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2] italic self-center">{t('salesDocuments.awaitingApproval')}</span>
               )}
-              {['approved', 'partially_received'].includes(doc.status) && (
+              {/* An invoice raised from goods receipts bills goods already in
+                  stock: it is never received itself (the database refuses). */}
+              {!isReceiptInvoice && ['approved', 'partially_received'].includes(doc.status) && (
                 <Button size="sm" onClick={() => setShowReceive(true)}>{t('purchasing.confirmAndReceive')}</Button>
               )}
               {['approved', 'partially_received', 'received'].includes(doc.status) && (
@@ -371,7 +393,9 @@ export default function PurchaseDocumentDetail({
               {['approved', 'partially_received', 'received'].includes(doc.status) && (
                 <Button variant="secondary" size="sm" onClick={handleDownloadVIPDF}>{t('purchasing.downloadPDF')}</Button>
               )}
-              {['draft', 'pending_approval', 'approved'].includes(doc.status) && (
+              {/* Once approved, an invoice from receipts has booked its cost into
+                  the stock and cannot be cancelled (20260898). */}
+              {(isReceiptInvoice ? ['draft', 'pending_approval'] : ['draft', 'pending_approval', 'approved']).includes(doc.status) && (
                 <Button disabled={!canCancelPurchase} variant="danger" size="sm" onClick={handleVICancel} loading={busy}>{t('common.cancel')}</Button>
               )}
             </>
@@ -580,7 +604,8 @@ export default function PurchaseDocumentDetail({
                   {l.description && <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{l.description}</div>}
                 </td>
                 <td className="px-3 py-2.5 text-center text-[#211f1b] dark:text-[#e8ebf0]">{l.qty_ordered}</td>
-                {isVI && <td className="px-3 py-2.5 text-center text-[#211f1b] dark:text-[#e8ebf0]">{l.qty_received || 0}</td>}
+                {/* an invoice from goods receipts bills goods that already arrived */}
+                {isVI && <td className="px-3 py-2.5 text-center text-[#211f1b] dark:text-[#e8ebf0]">{isReceiptInvoice ? l.qty_ordered : (l.qty_received || 0)}</td>}
                 <td className="px-3 py-2.5 text-end text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(l.unit_cost)}</td>
                 <td className="px-3 py-2.5 text-center text-[#6c6760] dark:text-[#9aa4b2]">{l.discount_pct ? l.discount_pct + '%' : '—'}</td>
                 <td className="px-3 py-2.5 text-center text-[#6c6760] dark:text-[#9aa4b2]">{l.tax_pct ? l.tax_pct + '%' : '—'}</td>
@@ -630,6 +655,19 @@ export default function PurchaseDocumentDetail({
         </div>
       )}
 
+      {isPO && !convertedWhole && !receiptsLoading && ['confirmed', 'partially_completed', 'completed'].includes(doc.status) && (
+        <GoodsReceiptsPanel
+          po={doc}
+          vendor={vendor}
+          isManager={isManager}
+          currentUserEmail={currentUserEmail}
+          onInvoiceCreated={(vi) => {
+            logPO('po_invoiced_from_receipts')
+            navigate(`/purchasing/vendor_invoice/${vi.id}`)
+          }}
+        />
+      )}
+
       {isVI && (
         <LandedCharges
           vendorInvoiceId={doc.id}
@@ -637,7 +675,9 @@ export default function PurchaseDocumentDetail({
           // Once any of the goods are in, their cost is fixed and the database
           // refuses a change, so offering the controls would be an offer the
           // server declines.
-          locked={['partially_received', 'received'].includes(doc.status)}
+          // An invoice from receipts books its cost at approval instead.
+          locked={['partially_received', 'received'].includes(doc.status) || (isReceiptInvoice && doc.status === 'approved')}
+          bookedAtApproval={isReceiptInvoice}
           canEdit={canEditPurchase}
           currentUserEmail={currentUserEmail}
         />

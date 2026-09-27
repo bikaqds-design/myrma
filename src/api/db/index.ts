@@ -45,6 +45,7 @@ import { payments } from './payments.js'
 import { customerLedger } from './customerLedger.js'
 import { purchaseOrders, vendorInvoices, purchaseDocuments, vendorInvoiceCharges } from './purchasing.js'
 import { vendorPayments } from './vendorPayments.js'
+import { goodsReceipts } from './goodsReceipts.js'
 import { vendorLedger } from './vendorLedger.js'
 import { margin } from './margin.js'
 import { geo } from './geo.js'
@@ -138,6 +139,7 @@ export const db = {
 
   // Purchase Module (vendors are Brands — see catalog.brands)
   purchaseOrders,
+  goodsReceipts,
   vendorInvoices,
   purchaseDocuments,
   vendorInvoiceCharges,
@@ -192,6 +194,7 @@ export type {
 export { landedUnitCosts, uncostedStock, importOpeningCosts } from './purchasing.js'
 export type { LandedUnitCost, UncostedStockRow, OpeningCostRow, OpeningCostResult } from './purchasing.js'
 export type { VendorPaymentRow, VendorPaymentApplicationRow } from './vendorPayments.js'
+export type { GoodsReceiptRow, GoodsReceiptLineRow, GoodsReceiptLineInput } from './goodsReceipts.js'
 export type {
   VendorLedgerEntryRow, VendorLedgerEntryType, ApAgingBucket, ApAgingVendorRow,
 } from './vendorLedger.js'
