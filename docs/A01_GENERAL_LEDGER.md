@@ -60,8 +60,8 @@ swapped, as its own event.
 | Payment recorded | Dr cash / Cr receivables; voided: reversal (applications do not post — receivables are per customer) |
 | Refund approved | Dr receivables / Cr cash |
 | Goods receipt confirmed | Dr inventory / Cr goods received not invoiced |
-| Supplier invoice approved (from receipts) | Dr goods received not invoiced (receipt value), Dr inventory / cost of goods sold (the re-costing's revaluation / variance), Dr VAT receivable / Cr payables |
-| Supplier invoice received (legacy path) | Dr inventory, Dr VAT receivable / Cr payables |
+| Supplier invoice approved (from receipts) | Dr goods received not invoiced (what the receipts booked), Dr/Cr inventory (revaluation of stock on hand), Dr/Cr purchase price variance (goods already gone + rounding), Dr VAT receivable / Cr payables, Cr accrued freight and duties |
+| Supplier invoice approved (older path) | Dr goods received not invoiced, Dr VAT receivable / Cr payables, Cr accrued freight and duties; each receipt on it: Dr inventory / Cr goods received not invoiced at the landed cost; cancelled from approved: reversed |
 | Vendor payment recorded | Dr payables / Cr cash; voided: reversal |
 | Stock adjustment | waits for cost on the stock ledger (N-03) |
 
@@ -83,7 +83,11 @@ swapped, as its own event.
 - **A-01b (database), sales side:** invoices, credit notes, payments, refunds,
   deliveries and returns post (`20260906`, staging), each from a trigger on
   the step, so every path to it posts. **Done.**
-- **A-01b (database), purchase side:** goods receipts, supplier bills,
-  vendor payments and the re-costing.
+- **A-01b (database), purchase side:** goods receipts, supplier invoices
+  (from receipts: clears what the receipts booked and posts the re-costing;
+  otherwise: clears as the goods are received on the invoice), vendor payments
+  (`20260907`, staging). Freight and duties are credited to a new role,
+  `accrued_landed_costs` (2160), because no payable records who is owed them.
+  **Done.**
 - **A-01c (screens):** chart of accounts and posting rules (Control Panel),
   journal list with drill-down to the source, trial balance.

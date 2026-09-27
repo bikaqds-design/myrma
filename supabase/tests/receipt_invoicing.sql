@@ -34,6 +34,12 @@ BEGIN
   EXECUTE 'RESET ROLE';
   PERFORM set_config('request.jwt.claims', '', true);
 END $f$;
+-- (20260907) the lines of one (source, event) ledger entry as 'code:Dr|Cr amount'
+CREATE FUNCTION pg_temp.entry(p_type text, p_id uuid, p_event text) RETURNS text LANGUAGE sql AS $f$
+  SELECT string_agg(a.code || CASE WHEN l.debit > 0 THEN ':Dr ' || l.debit ELSE ':Cr ' || l.credit END, ' ' ORDER BY a.code, l.debit DESC)
+    FROM public.journal_entries e JOIN public.journal_lines l ON l.entry_id = e.id JOIN public.gl_accounts a ON a.id = l.account_id
+   WHERE e.source_type = p_type AND e.source_id = p_id AND e.event = p_event
+$f$;
 CREATE FUNCTION pg_temp.gr_line(p_line uuid, p_qty text, p_wh uuid, p_serials jsonb DEFAULT '[]') RETURNS jsonb
 LANGUAGE sql AS $f$ SELECT jsonb_build_object('purchase_order_line_id', p_line, 'qty', p_qty, 'warehouse_id', p_wh, 'serials', p_serials) $f$;
 -- a manager submits and approves a supplier invoice the way the screen does
@@ -207,6 +213,28 @@ BEGIN
                   AND old_unit_cost_base IS NULL AND new_unit_cost_base = 8 AND amount_base IS NULL),
     '-> ' || (SELECT uncosted_quantity || ' / ' || total_cost_base FROM public.warehouse_stock WHERE product_id = v_free AND warehouse_id = v_wh));
 
+  -- ══ 4b. the ledger (20260907), through the real RPCs ══════════════════════
+  RAISE NOTICE '--- 4b. general ledger ---';
+  RAISE NOTICE '%', pg_temp.check('each receipt posts what it booked: Dr inventory / Cr goods not invoiced (460, 240)',
+    pg_temp.entry('goods_receipt', v_gr1.id, 'confirmed') = '1300:Dr 460.00 2150:Cr 460.00'
+    AND pg_temp.entry('goods_receipt', v_gr2.id, 'confirmed') = '1300:Dr 240.00 2150:Cr 240.00',
+    '-> ' || COALESCE(pg_temp.entry('goods_receipt', v_gr1.id, 'confirmed'), 'nothing'));
+  RAISE NOTICE '%', pg_temp.check('a receipt at unknown cost posts nothing',
+    pg_temp.entry('goods_receipt', v_gr4.id, 'confirmed') IS NULL);
+  -- 256 USD at 2.0 = 512 payable; clears 460 booked; revalues on hand (20 + 12); 20 variance
+  RAISE NOTICE '%', pg_temp.check('the invoice above the order: Cr payables 512, Dr receipts 460, Dr inventory 32, Dr variance 20',
+    pg_temp.entry('vendor_invoice', v_vi1.id, 'approved') = '1300:Dr 32.00 2100:Cr 512.00 2150:Dr 460.00 5200:Dr 20.00',
+    '-> ' || COALESCE(pg_temp.entry('vendor_invoice', v_vi1.id, 'approved'), 'nothing'));
+  RAISE NOTICE '%', pg_temp.check('the invoice at the order''s price clears exactly what it booked',
+    pg_temp.entry('vendor_invoice', v_vi2.id, 'approved') = '2100:Cr 240.00 2150:Dr 240.00',
+    '-> ' || COALESCE(pg_temp.entry('vendor_invoice', v_vi2.id, 'approved'), 'nothing'));
+  RAISE NOTICE '%', pg_temp.check('goods booked at unknown cost go into inventory at the invoice''s (40)',
+    pg_temp.entry('vendor_invoice', v_vi4.id, 'approved') = '1300:Dr 40.00 2100:Cr 40.00',
+    '-> ' || COALESCE(pg_temp.entry('vendor_invoice', v_vi4.id, 'approved'), 'nothing'));
+  RAISE NOTICE '%', pg_temp.check('goods received not invoiced is cleared for this vendor',
+    (SELECT sum(l.debit - l.credit) FROM public.journal_lines l JOIN public.gl_accounts a ON a.id = l.account_id
+      WHERE a.code = '2150' AND l.vendor_id = v_vendor) = 0);
+
   -- ══ 5. access ═════════════════════════════════════════════════════════════
   PERFORM pg_temp.as_user(v_rep);
   SELECT count(*) INTO v_n FROM public.purchase_cost_adjustments;
@@ -254,6 +282,8 @@ BEGIN
   RAISE NOTICE '%', pg_temp.check('an approval written back by a restore is not re-costed',
     NOT EXISTS (SELECT 1 FROM public.purchase_cost_adjustments WHERE vendor_invoice_id = v_vi5.id)
     AND (SELECT total_cost_base FROM public.warehouse_stock WHERE product_id = v_pool AND warehouse_id = v_wh) = 40);
+  RAISE NOTICE '%', pg_temp.check('... and posts nothing to the ledger (20260907)',
+    pg_temp.entry('vendor_invoice', v_vi5.id, 'approved') IS NULL);
   -- the re-costing an approval runs
   -- (as the trigger does: the owner, with the approver's login)
   PERFORM set_config('request.jwt.claims', json_build_object('email', 'p03b-admin@test.local', 'role', 'authenticated')::text, true);
