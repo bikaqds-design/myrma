@@ -58,6 +58,9 @@ DECLARE
   v_ser   uuid := gen_random_uuid();
   v_bulk  uuid := gen_random_uuid();
   v_free  uuid := gen_random_uuid();
+  v_pool  uuid := gen_random_uuid();
+  v_po5   public.purchase_orders;
+  v_vi5   public.vendor_invoices;
   v_po    public.purchase_orders;
   v_po4   public.purchase_orders;
   v_l_ser uuid;
@@ -208,6 +211,69 @@ BEGIN
   v_out := pg_temp.call(v_mgr, format($q$INSERT INTO public.vendor_invoice_receipt_lines VALUES (%L, 9, %L)$q$, v_vi1.id,
     (SELECT id FROM public.goods_receipt_lines WHERE goods_receipt_id = v_gr2.id LIMIT 1)));
   RAISE NOTICE '%', pg_temp.check('no client links an invoice to a receipt directly', v_out LIKE 'err:42501%', '-> ' || v_out);
+
+  -- ══ 6. review fixes ═══════════════════════════════════════════════════════
+  RAISE NOTICE '--- 6. review fixes ---';
+  -- two receipts of 5 into one bin at 10 base; 6 of the 10 are sold; one
+  -- invoice bills both at 12 base. Only 4 are on hand: 4 revalued, 6 variance.
+  INSERT INTO public.products (id, sku, product_name, product_type, stock_tracking_mode)
+    VALUES (v_pool, 'P03B-POOL', 'P03b patch lead', 'hardware', 'bulk');
+  PERFORM pg_temp.as_user(v_mgr);
+  v_po5 := public.create_purchase_order(v_vendor, jsonb_build_array(
+    jsonb_build_object('product_id', v_pool, 'qty_ordered', 10, 'unit_cost', 5)), '{"currency":"USD","exchange_rate":2}'::jsonb, v_mgr);
+  PERFORM pg_temp.as_owner();
+  UPDATE public.purchase_orders SET status = 'sent' WHERE id = v_po5.id;
+  UPDATE public.purchase_orders SET status = 'confirmed' WHERE id = v_po5.id;
+  PERFORM pg_temp.as_user(v_mgr);
+  PERFORM public.confirm_goods_receipt((public.create_goods_receipt(v_po5.id, jsonb_build_array(
+    pg_temp.gr_line((SELECT id FROM public.purchase_order_lines WHERE purchase_order_id = v_po5.id), '5', v_wh)), NULL, v_mgr)).id, v_mgr);
+  PERFORM public.confirm_goods_receipt((public.create_goods_receipt(v_po5.id, jsonb_build_array(
+    pg_temp.gr_line((SELECT id FROM public.purchase_order_lines WHERE purchase_order_id = v_po5.id), '5', v_wh)), NULL, v_mgr)).id, v_mgr);
+  v_vi5 := public.create_vendor_invoice_from_receipts(v_po5.id, NULL, v_mgr);
+  PERFORM public.update_vendor_invoice(v_vi5.id, jsonb_build_array(
+    jsonb_build_object('product_id', v_pool, 'qty_ordered', 5, 'qty_received', 5, 'unit_cost', 6),
+    jsonb_build_object('product_id', v_pool, 'qty_ordered', 5, 'qty_received', 5, 'unit_cost', 6)), NULL, v_mgr);
+  PERFORM pg_temp.as_owner();
+  UPDATE public.warehouse_stock SET quantity = quantity - 6 WHERE product_id = v_pool AND warehouse_id = v_wh;
+  RAISE NOTICE '%', pg_temp.check('fixture: a bin of 4 patch leads worth 40',
+    (SELECT quantity = 4 AND total_cost_base = 40 FROM public.warehouse_stock WHERE product_id = v_pool AND warehouse_id = v_wh));
+  -- a restore writes an approved invoice back as it was: it is not re-costed again
+  PERFORM pg_temp.as_user(v_mgr);
+  PERFORM public.update_vendor_invoice(v_vi5.id, NULL, jsonb_build_object('supplier_invoice_no', 'SUP-INV-5', 'supplier_invoice_date', '2026-09-25'), v_mgr);
+  PERFORM pg_temp.as_owner();
+  PERFORM set_config('rma.audit_suspended', 'on', true);
+  UPDATE public.vendor_invoices SET status = 'pending_approval' WHERE id = v_vi5.id;
+  UPDATE public.vendor_invoices SET status = 'approved', approved_at = now() WHERE id = v_vi5.id;
+  PERFORM set_config('rma.audit_suspended', '', true);
+  RAISE NOTICE '%', pg_temp.check('an approval written back by a restore is not re-costed',
+    NOT EXISTS (SELECT 1 FROM public.purchase_cost_adjustments WHERE vendor_invoice_id = v_vi5.id)
+    AND (SELECT total_cost_base FROM public.warehouse_stock WHERE product_id = v_pool AND warehouse_id = v_wh) = 40);
+  -- the re-costing an approval runs
+  -- (as the trigger does: the owner, with the approver's login)
+  PERFORM set_config('request.jwt.claims', json_build_object('email', 'p03b-admin@test.local', 'role', 'authenticated')::text, true);
+  PERFORM public.rma_recost_from_vendor_invoice(v_vi5.id);
+  PERFORM pg_temp.as_owner();
+  RAISE NOTICE '%', pg_temp.check('two receipt lines in one bin revalue its 4 units once (40 + 4 x 2 = 48)',
+    (SELECT total_cost_base FROM public.warehouse_stock WHERE product_id = v_pool AND warehouse_id = v_wh) = 48,
+    '-> ' || (SELECT total_cost_base FROM public.warehouse_stock WHERE product_id = v_pool AND warehouse_id = v_wh));
+  RAISE NOTICE '%', pg_temp.check('the other 6 are a variance of 12, and nothing is counted twice',
+    (SELECT sum(qty) FILTER (WHERE kind = 'revalued') = 4 AND sum(qty) FILTER (WHERE kind = 'variance') = 6
+            AND sum(amount_base) FILTER (WHERE kind = 'variance') = 12 AND sum(amount_base) FILTER (WHERE kind = 'revalued') = 8
+       FROM public.purchase_cost_adjustments WHERE vendor_invoice_id = v_vi5.id),
+    '-> ' || (SELECT string_agg(kind || ':' || qty || '/' || amount_base, ',') FROM public.purchase_cost_adjustments WHERE vendor_invoice_id = v_vi5.id));
+
+  v_out := pg_temp.call(v_mgr, format($q$INSERT INTO public.vendor_invoice_charges (vendor_invoice_id, charge_type, amount) VALUES (%L, 'freight', 50)$q$, v_vi1.id));
+  RAISE NOTICE '%', pg_temp.check('freight cannot be added to an approved invoice from receipts (its cost is booked)',
+    v_out LIKE 'err:P0001%cost of its goods is booked%', '-> ' || v_out);
+  v_out := pg_temp.call('p03b-admin@test.local', format($q$UPDATE public.vendor_invoices SET status = 'cancelled' WHERE id = %L$q$, v_vi1.id));
+  RAISE NOTICE '%', pg_temp.check('an approved invoice from receipts cannot be cancelled',
+    v_out LIKE 'err:P0001%cannot be cancelled%', '-> ' || v_out);
+
+  -- a restore writes charges back onto approved and received invoices
+  PERFORM set_config('rma.audit_suspended', 'on', true);
+  INSERT INTO public.vendor_invoice_charges (vendor_invoice_id, charge_type, amount) VALUES (v_vi1.id, 'freight', 50);
+  PERFORM set_config('rma.audit_suspended', '', true);
+  RAISE NOTICE '%', pg_temp.check('a restore can write charges back', EXISTS (SELECT 1 FROM public.vendor_invoice_charges WHERE vendor_invoice_id = v_vi1.id));
 
   RAISE EXCEPTION 'P03B_TEST_DONE — rolling back fixtures (this is not a real failure)';
 END $do$;

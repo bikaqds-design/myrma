@@ -51,4 +51,19 @@ describe('20260898 receipt invoicing', () => {
     expect(sql).toMatch(/ARRAY\['vendor_invoice_receipt_lines', 'purchase_cost_adjustments'\]/)
     expect(sql).toMatch(/CREATE POLICY "read_purchase_cost_adjustments"[\s\S]*?rma_is_manager_or_above\(\) OR public\.rma_user_role\(\) = 'accountant'/)
   })
+
+  it('review: shared bins are revalued once, and nothing is clipped silently', () => {
+    const recost = fn('rma_recost_from_vendor_invoice')
+    expect(recost).toContain('v_seen ->> v_ws.id::text')
+    expect(recost).toContain('v_apply := GREATEST(v_want, -v_ws.total_cost_base)')
+    expect(recost).not.toContain('GREATEST(0, total_cost_base')
+    expect(recost).toContain('IF v_off + v_clip > 0 THEN')
+  })
+
+  it('review: an approved invoice from receipts is fixed, and a restore is exempt and not re-costed', () => {
+    expect(sql).toContain('cost of its goods is booked; its charges can no longer change')
+    expect(sql).toMatch(/CREATE TRIGGER trg_vendor_invoices_receipt_cancel\s+BEFORE UPDATE OF status/)
+    const skips = sql.split("current_setting('rma.audit_suspended', true) = 'on'").length - 1
+    expect(skips).toBeGreaterThanOrEqual(3)
+  })
 })

@@ -22,6 +22,9 @@
 --      cost to the invoice's landed unit cost: units / bin quantity still on
 --      hand take it; what already left is recorded as a price variance.
 --      Every change is a row in purchase_cost_adjustments.
+--   5. (review) Once approved, an invoice from receipts is fixed: its charges
+--      cannot change and it cannot be cancelled. A restore (rma.audit_suspended)
+--      is exempt from both and is never re-costed a second time.
 --
 -- Pinned by src/test/receiptInvoicing.test.js; supabase/tests/receipt_invoicing.sql
 -- is the rolled-back reference script.
@@ -229,6 +232,12 @@ DECLARE
   v_off     integer;
   v_off_amt numeric;
   v_off_unk boolean;
+  v_on_amt  numeric;
+  v_on_unk  boolean;
+  v_want    numeric;
+  v_apply   numeric;
+  v_clip    integer;
+  v_seen    jsonb := '{}';   -- bin -> units already revalued in this call
 BEGIN
   FOR v_k IN
     SELECT k.line_no, g.id AS grl_id, g.product_id, g.unit_cost_base
@@ -246,6 +255,7 @@ BEGIN
 
     -- serialized: each unit that arrived on this line
     v_on := 0; v_on_old := 0; v_off := 0; v_off_amt := 0; v_off_unk := false;
+    v_on_amt := 0; v_on_unk := false; v_clip := 0;
     FOR v_u IN
       SELECT u.id, u.status, u.reservation_status, u.unit_cost_base
         FROM public.goods_receipt_line_units x
@@ -256,6 +266,8 @@ BEGIN
       IF v_u.status = 'company_stock' AND v_u.reservation_status IN ('available', 'reserved') THEN
         UPDATE public.inventory_units SET unit_cost_base = v_new WHERE id = v_u.id;
         v_on := v_on + 1;
+        IF v_u.unit_cost_base IS NULL THEN v_on_unk := true;
+        ELSE v_on_amt := v_on_amt + (v_new - v_u.unit_cost_base); END IF;
       ELSE
         v_off := v_off + 1;
         IF v_u.unit_cost_base IS NULL THEN v_off_unk := true;
@@ -279,11 +291,27 @@ BEGIN
            WHERE id = v_ws.id;
         END IF;
       ELSE
-        v_n := LEAST(v_b.qty, v_ws.quantity - v_ws.uncosted_quantity);
+        -- costed units of this bin not already revalued by an earlier receipt
+        -- line in this call: two lines into one bin must not claim the same
+        -- units (review)
+        v_n := GREATEST(0, LEAST(v_b.qty,
+                 v_ws.quantity - v_ws.uncosted_quantity - COALESCE((v_seen ->> v_ws.id::text)::integer, 0)));
         IF v_n > 0 THEN
+          v_want  := round((v_new - v_old) * v_n, 4);
+          -- a bin pooled with cheaper stock cannot fall below 0: apply what it
+          -- can hold, and report the rest as variance — never clip it silently.
+          -- Such units appear in both rows, each with its own part of the amount.
+          v_apply := GREATEST(v_want, -v_ws.total_cost_base);
           UPDATE public.warehouse_stock
-             SET total_cost_base = GREATEST(0, total_cost_base + round((v_new - v_old) * v_n, 4)), updated_at = now()
+             SET total_cost_base = total_cost_base + v_apply, updated_at = now()
            WHERE id = v_ws.id;
+          v_on_amt := v_on_amt + v_apply;
+          IF v_apply <> v_want THEN
+            v_off_amt := v_off_amt + (v_want - v_apply);
+            v_clip := v_clip + v_n;
+          END IF;
+          v_seen := jsonb_set(v_seen, ARRAY[v_ws.id::text],
+                              to_jsonb(COALESCE((v_seen ->> v_ws.id::text)::integer, 0) + v_n));
         END IF;
       END IF;
       v_n := GREATEST(v_n, 0);
@@ -296,16 +324,18 @@ BEGIN
       END IF;
     END LOOP;
 
+    -- amounts are what was actually applied / left over, not qty x difference
     IF v_on > 0 THEN
       INSERT INTO public.purchase_cost_adjustments
         (vendor_invoice_id, goods_receipt_line_id, product_id, kind, qty, old_unit_cost_base, new_unit_cost_base, amount_base, created_by)
       VALUES (p_vi_id, v_k.grl_id, v_k.product_id, 'revalued', v_on, v_old, v_new,
-              CASE WHEN v_old IS NULL THEN NULL ELSE round(v_on * (v_new - v_old), 4) END, v_actor);
+              CASE WHEN v_old IS NULL OR v_on_unk THEN NULL ELSE round(v_on_amt, 4) END, v_actor);
     END IF;
-    IF v_off > 0 THEN
+    -- goods already gone, plus any revaluation a bin could not absorb
+    IF v_off + v_clip > 0 THEN
       INSERT INTO public.purchase_cost_adjustments
         (vendor_invoice_id, goods_receipt_line_id, product_id, kind, qty, old_unit_cost_base, new_unit_cost_base, amount_base, created_by)
-      VALUES (p_vi_id, v_k.grl_id, v_k.product_id, 'variance', v_off, v_old, v_new,
+      VALUES (p_vi_id, v_k.grl_id, v_k.product_id, 'variance', v_off + v_clip, v_old, v_new,
               CASE WHEN v_off_unk THEN NULL ELSE round(v_off_amt, 4) END, v_actor);
     END IF;
 
@@ -323,6 +353,11 @@ SECURITY DEFINER
 SET search_path TO 'public', 'pg_temp'
 AS $fn$
 BEGIN
+  -- a restore writes rows back as they were, adjustments included; re-costing
+  -- here would add duplicate ones (review). rma_restore_apply sets this flag.
+  IF current_setting('rma.audit_suspended', true) = 'on' THEN
+    RETURN NULL;
+  END IF;
   IF NEW.status = 'approved' AND OLD.status IS DISTINCT FROM 'approved'
      AND EXISTS (SELECT 1 FROM public.vendor_invoice_receipt_lines WHERE vendor_invoice_id = NEW.id) THEN
     PERFORM public.rma_recost_from_vendor_invoice(NEW.id);
@@ -336,6 +371,72 @@ DROP TRIGGER IF EXISTS trg_vendor_invoices_recost_on_approval ON public.vendor_i
 CREATE TRIGGER trg_vendor_invoices_recost_on_approval
   AFTER UPDATE OF status ON public.vendor_invoices
   FOR EACH ROW EXECUTE FUNCTION public.rma_vendor_invoice_recost_on_approval();
+
+-- ── 4b. once its costs are booked, an invoice from receipts is fixed ─────────
+-- (review) A receipt-based invoice stays 'approved' for good, and the charges
+-- guard (20260794) only locked freight once an invoice was received — so freight
+-- edited after approval changed nothing in stock and was recorded nowhere. Its
+-- charges are now fixed from approval on. The same guard now stands aside for a
+-- restore, which writes charges back onto invoices that are already received.
+CREATE OR REPLACE FUNCTION public.rma_guard_charges_before_receipt()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_status text;
+  v_vi     uuid := COALESCE(NEW.vendor_invoice_id, OLD.vendor_invoice_id);
+BEGIN
+  IF current_setting('rma.audit_suspended', true) = 'on' THEN   -- a restore (20260898)
+    RETURN COALESCE(NEW, OLD);
+  END IF;
+
+  SELECT status INTO v_status FROM public.vendor_invoices WHERE id = v_vi;
+
+  IF v_status IN ('partially_received', 'received') THEN
+    RAISE EXCEPTION
+      'This invoice has already been received, so its landed cost is fixed. Changing charges now would not update the cost of the goods already in stock.'
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  -- 20260898: an invoice for goods that arrived by receipts books its cost at
+  -- approval
+  IF v_status NOT IN ('draft', 'pending_approval', 'cancelled')
+     AND EXISTS (SELECT 1 FROM public.vendor_invoice_receipt_lines WHERE vendor_invoice_id = v_vi) THEN
+    RAISE EXCEPTION
+      'This invoice is approved and the cost of its goods is booked; its charges can no longer change.'
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  RETURN COALESCE(NEW, OLD);
+END
+$function$;
+
+-- (review) Cancelling an approved invoice from receipts freed its receipt lines
+-- but left the stock at its price and its adjustments standing, with nothing
+-- owed. It is refused: the cost it booked is part of the stock now.
+CREATE OR REPLACE FUNCTION public.rma_guard_receipt_invoice_cancel()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO 'public', 'pg_temp'
+AS $fn$
+BEGIN
+  IF current_setting('rma.audit_suspended', true) = 'on' THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.status = 'cancelled' AND OLD.status NOT IN ('draft', 'pending_approval', 'cancelled')
+     AND EXISTS (SELECT 1 FROM public.vendor_invoice_receipt_lines WHERE vendor_invoice_id = NEW.id) THEN
+    RAISE EXCEPTION 'This invoice is approved and the cost of its goods is booked, so it cannot be cancelled. Correct a price with a supplier credit note.'
+      USING ERRCODE = 'P0001';
+  END IF;
+  RETURN NEW;
+END
+$fn$;
+DROP TRIGGER IF EXISTS trg_vendor_invoices_receipt_cancel ON public.vendor_invoices;
+CREATE TRIGGER trg_vendor_invoices_receipt_cancel
+  BEFORE UPDATE OF status ON public.vendor_invoices
+  FOR EACH ROW EXECUTE FUNCTION public.rma_guard_receipt_invoice_cancel();
 
 -- ── 5. Backup & Restore knows the two new tables ─────────────────────────────
 -- The manifest is the restorable BACKUP_TABLES in order (20260897;
