@@ -34,6 +34,12 @@ BEGIN
   EXECUTE 'RESET ROLE';
   PERFORM set_config('request.jwt.claims', '', true);
 END $f$;
+-- (20260906) the lines of one (source, event) ledger entry as 'code:Dr|Cr amount'
+CREATE FUNCTION pg_temp.entry(p_type text, p_id uuid, p_event text) RETURNS text LANGUAGE sql AS $f$
+  SELECT string_agg(a.code || CASE WHEN l.debit > 0 THEN ':Dr ' || l.debit ELSE ':Cr ' || l.credit END, ' ' ORDER BY a.code, l.debit DESC)
+    FROM public.journal_entries e JOIN public.journal_lines l ON l.entry_id = e.id JOIN public.gl_accounts a ON a.id = l.account_id
+   WHERE e.source_type = p_type AND e.source_id = p_id AND e.event = p_event
+$f$;
 
 DO $do$
 DECLARE
@@ -197,7 +203,24 @@ BEGIN
   v_out := pg_temp.call(v_mgr, format('SELECT public.restore_units(ARRAY[%L]::uuid[], %L, %L, %L)', v_unit_a, 'invoice', v_inv2, v_mgr));
   RAISE NOTICE '%', pg_temp.check('a unit shipped on delivery A can', v_out = 'ok', '-> ' || v_out);
 
-  -- ══ 5. access ═════════════════════════════════════════════════════════════
+  -- ══ 5. the ledger (20260906), through the real RPCs ══════════════════════
+  RAISE NOTICE '--- 5. general ledger ---';
+  RAISE NOTICE '%', pg_temp.check('delivery A posted its cost of goods (500)',
+    pg_temp.entry('delivery', v_da.id, 'confirmed') = '1300:Cr 500.00 5100:Dr 500.00', '-> ' || COALESCE(pg_temp.entry('delivery', v_da.id, 'confirmed'), 'nothing'));
+  RAISE NOTICE '%', pg_temp.check('delivery B posted its cost of goods (800)',
+    pg_temp.entry('delivery', v_db.id, 'confirmed') = '1300:Cr 800.00 5100:Dr 800.00', '-> ' || COALESCE(pg_temp.entry('delivery', v_db.id, 'confirmed'), 'nothing'));
+  RAISE NOTICE '%', pg_temp.check('the voided invoice posted the sale and its reversal, and no cost of goods (its delivery did)',
+    pg_temp.entry('crm_invoice', v_inv, 'posted') = '1200:Dr 572.00 4100:Cr 572.00'
+    AND pg_temp.entry('crm_invoice', v_inv, 'voided') = '1200:Cr 572.00 4100:Dr 572.00'
+    AND pg_temp.entry('crm_invoice', v_inv, 'cogs') IS NULL);
+  RAISE NOTICE '%', pg_temp.check('the two live invoices post 1680 of sales in all',
+    (SELECT sum(l.credit) FROM public.journal_entries e JOIN public.journal_lines l ON l.entry_id = e.id
+      JOIN public.gl_accounts a ON a.id = l.account_id AND a.code = '4100'
+     WHERE e.source_id IN (v_inv2, v_invb) AND e.event = 'posted') = 1680);
+  RAISE NOTICE '%', pg_temp.check('the customer owes 1680 in the ledger',
+    (SELECT sum(debit) - sum(credit) FROM public.journal_lines WHERE customer_id = v_cust) = 1680);
+
+  -- ══ 6. access ═════════════════════════════════════════════════════════════
   RAISE NOTICE '%', pg_temp.check('anon cannot invoice a delivery',
     NOT has_function_privilege('anon', 'public.create_invoice_from_delivery(uuid, text)', 'EXECUTE'));
 

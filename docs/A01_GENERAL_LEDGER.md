@@ -80,6 +80,10 @@ swapped, as its own event.
 
 - **A-01a (database):** tables, guards, engine, trial balance, default chart,
   Backup & Restore. **Done** (`20260905`, staging).
-- **A-01b (database):** posting from each step in the map above.
+- **A-01b (database), sales side:** invoices, credit notes, payments, refunds,
+  deliveries and returns post (`20260906`, staging), each from a trigger on
+  the step, so every path to it posts. **Done.**
+- **A-01b (database), purchase side:** goods receipts, supplier bills,
+  vendor payments and the re-costing.
 - **A-01c (screens):** chart of accounts and posting rules (Control Panel),
   journal list with drill-down to the source, trial balance.
