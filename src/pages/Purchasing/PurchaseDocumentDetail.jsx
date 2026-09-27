@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useBaseCurrency } from '../../hooks/useBaseCurrency'
 import LandedCharges from './_LandedCharges'
+import BillMatch from './_BillMatch'
 import { hasMissingRate } from './_shared'
 import { formatMoney, toBase } from '../../lib/money'
 import { canDo } from '../../lib/permissions'
@@ -120,7 +121,8 @@ export default function PurchaseDocumentDetail({
   const [showEdit, setShowEdit] = useState(false)
   const [showPayment, setShowPayment] = useState(false)
   const [showAmend, setShowAmend] = useState(false)
-  const [showDuplicate, setShowDuplicate] = useState(false)
+  const [showDuplicate, setShowDuplicate] = useState(false) // false, or the reasons already given
+  const [showPriceReason, setShowPriceReason] = useState(null) // { reasons, message }
 
   const { data: doc, isLoading, isError } = useQuery({
     queryKey: ['purchase-document', docType, docId],
@@ -197,6 +199,7 @@ export default function PurchaseDocumentDetail({
     queryClient.invalidateQueries({ queryKey: ['purchase-document', docType, docId] })
     queryClient.invalidateQueries({ queryKey: ['purchase-documents'] })
     queryClient.invalidateQueries({ queryKey: ['purchase-receipts', docId] })
+    queryClient.invalidateQueries({ queryKey: ['vendor-invoice-match', docId] })
   }
 
   const runAction = async (fn) => {
@@ -207,7 +210,9 @@ export default function PurchaseDocumentDetail({
   }
 
   const logPO = (kind) => db.activities.logSystem('purchase_order', doc.id, `${kind}|${doc.po_code}`, currentUserEmail).catch(() => {})
-  const logVI = (kind) => db.activities.logSystem('vendor_invoice', doc.id, `${kind}|${doc.vi_code || doc.id}`, currentUserEmail).catch(() => {})
+  // A draft has no VI- number yet; the supplier's own number (required to
+  // submit) names it in the history, never the internal id.
+  const logVI = (kind) => db.activities.logSystem('vendor_invoice', doc.id, `${kind}|${doc.vi_code || doc.supplier_invoice_no || '—'}`, currentUserEmail).catch(() => {})
 
   // ── Purchase Order actions ────────────────────────────────────────────────
   // Same approval-pool pattern as Quotation/Sales Order/Invoice: Draft ->
@@ -267,16 +272,23 @@ export default function PurchaseDocumentDetail({
       created_by: currentUserEmail,
     }).catch((err) => { console.error('VI approval activity failed', err); toast.error(t('purchasing.approvalActivityFailed')) })
   }
-  const submitVI = (duplicateReason) => runAction(async () => {
+  // reasons = { duplicate, price }: each is asked for when the database wants
+  // it, and kept so the second prompt does not lose the first answer
+  const submitVI = (reasons = {}) => runAction(async () => {
     try {
-      await db.vendorInvoices.submitForApproval(doc.id, duplicateReason)
+      await db.vendorInvoices.submitForApproval(doc.id, reasons.duplicate, reasons.price)
     } catch (err) {
-      // "Looks like a duplicate of ...": the database asks for a reason, so ask
-      // for one, rather than showing a dead end. Any other refusal (no supplier
-      // number, no reason on a non-PO invoice, ...) is shown as it is.
+      // "Looks like a duplicate of ..." / "does not match its purchase order":
+      // the database asks for a reason, so ask for one, rather than showing a
+      // dead end. Any other refusal (no supplier number, no reason on a non-PO
+      // invoice, billing more than arrived, ...) is shown as it is.
       if (err?.code === 'P0001' && /looks like a duplicate/i.test(err?.message || '')) {
         toast(err.message, { duration: 6000 })
-        setShowDuplicate(true)
+        setShowDuplicate(reasons)
+        return
+      }
+      if (err?.code === 'P0001' && /does not match its purchase order/i.test(err?.message || '')) {
+        setShowPriceReason({ reasons, message: err.message })
         return
       }
       throw err
@@ -285,7 +297,7 @@ export default function PurchaseDocumentDetail({
     await createVIApprovalActivity()
     toast.success(t('purchasing.statusUpdated'))
   })
-  const handleSubmitForApproval = () => submitVI()
+  const handleSubmitForApproval = () => submitVI({})
   const handleAmended = async (row) => {
     setShowAmend(false)
     logPO('po_amended')
@@ -433,7 +445,18 @@ export default function PurchaseDocumentDetail({
           placeholder={t('purchasing.duplicatePlaceholder')}
           confirmLabel={t('purchasing.duplicateConfirm')}
           onClose={() => setShowDuplicate(false)}
-          onConfirm={(reason) => { setShowDuplicate(false); submitVI(reason) }}
+          onConfirm={(reason) => { const prev = showDuplicate; setShowDuplicate(false); submitVI({ ...prev, duplicate: reason }) }}
+        />
+      )}
+      {showPriceReason && isVI && (
+        <ReasonPromptModal
+          title={t('purchasing.priceReasonTitle')}
+          body={showPriceReason.message}
+          label={t('purchasing.priceReason')}
+          placeholder={t('purchasing.priceReasonPlaceholder')}
+          confirmLabel={t('purchasing.duplicateConfirm')}
+          onClose={() => setShowPriceReason(null)}
+          onConfirm={(reason) => { const prev = showPriceReason.reasons; setShowPriceReason(null); submitVI({ ...prev, price: reason }) }}
         />
       )}
       {showEdit && isVI && (
@@ -667,6 +690,8 @@ export default function PurchaseDocumentDetail({
           }}
         />
       )}
+
+      {isVI && <BillMatch vendorInvoice={doc} fmtMoney={fmtMoney} />}
 
       {isVI && (
         <LandedCharges

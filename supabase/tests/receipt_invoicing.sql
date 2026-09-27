@@ -42,7 +42,8 @@ CREATE FUNCTION pg_temp.approve(p_mgr text, p_vi uuid, p_no text) RETURNS void L
 BEGIN
   PERFORM pg_temp.as_user(p_mgr);
   PERFORM public.update_vendor_invoice(p_vi, NULL, jsonb_build_object('supplier_invoice_no', p_no, 'supplier_invoice_date', '2026-09-25'), p_mgr);
-  UPDATE public.vendor_invoices SET status = 'pending_approval' WHERE id = p_vi;
+  -- these bills price above the order on purpose; 20260900 wants a reason
+  UPDATE public.vendor_invoices SET status = 'pending_approval', price_variance_reason = 'Supplier price rose after the order' WHERE id = p_vi;
   PERFORM pg_temp.as_owner();
   PERFORM pg_temp.as_user('p03b-admin@test.local');
   UPDATE public.vendor_invoices SET status = 'approved', approved_at = now() WHERE id = p_vi;

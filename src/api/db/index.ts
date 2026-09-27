@@ -188,7 +188,7 @@ export type { SalesDocumentRow, SalesDocType } from './salesDocuments.js'
 export type { PaymentRow, PaymentApplicationRow } from './payments.js'
 export type { LedgerEntryRow, LedgerEntryType, AgingBucket, AgingCustomerRow } from './customerLedger.js'
 export type {
-  PurchaseLine, PurchaseOrderRow, PurchaseOrderLineRow, VendorInvoiceRow, VendorInvoiceLineRow,
+  PurchaseLine, PurchaseOrderRow, PurchaseOrderLineRow, VendorInvoiceRow, VendorInvoiceLineRow, VendorInvoiceMatchRow,
   PurchaseDocType, PurchaseDocumentRow, PurchaseDocumentListRow, PurchaseDocTab, PurchaseDocFilters, PurchaseDocSort, PurchaseDocSummary, PurchaseDocBucket, VendorInvoiceChargeRow, ChargeType,
 } from './purchasing.js'
 export { landedUnitCosts, uncostedStock, importOpeningCosts } from './purchasing.js'
