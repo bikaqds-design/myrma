@@ -63,6 +63,8 @@ describe('20260898 receipt invoicing', () => {
   it('review: an approved invoice from receipts is fixed, and a restore is exempt and not re-costed', () => {
     expect(sql).toContain('cost of its goods is booked; its charges can no longer change')
     expect(sql).toMatch(/CREATE TRIGGER trg_vendor_invoices_receipt_cancel\s+BEFORE UPDATE OF status/)
+    // a new function is executable by PUBLIC (so anon) unless revoked
+    expect(sql).toContain('REVOKE ALL ON FUNCTION public.rma_guard_receipt_invoice_cancel() FROM PUBLIC, anon, authenticated;')
     const skips = sql.split("current_setting('rma.audit_suspended', true) = 'on'").length - 1
     expect(skips).toBeGreaterThanOrEqual(3)
   })

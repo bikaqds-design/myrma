@@ -433,6 +433,9 @@ BEGIN
   RETURN NEW;
 END
 $fn$;
+-- a trigger function: nobody calls it (a new function is PUBLIC-executable by default)
+REVOKE ALL ON FUNCTION public.rma_guard_receipt_invoice_cancel() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.rma_guard_receipt_invoice_cancel() TO service_role;
 DROP TRIGGER IF EXISTS trg_vendor_invoices_receipt_cancel ON public.vendor_invoices;
 CREATE TRIGGER trg_vendor_invoices_receipt_cancel
   BEFORE UPDATE OF status ON public.vendor_invoices
