@@ -4,7 +4,8 @@ import { todayLocalISO } from '../../lib/dates.js'
 
 // ── Row types ─────────────────────────────────────────────────────────────────
 
-export type LedgerEntryType = 'invoice' | 'credit_note' | 'payment'
+// refund: money paid back to the customer (20260904), shown as a positive entry
+export type LedgerEntryType = 'invoice' | 'credit_note' | 'payment' | 'refund'
 
 export interface LedgerEntryRow {
   id: string

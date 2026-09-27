@@ -258,6 +258,8 @@ export const BACKUP_TABLES = [
   { table: 'credit_notes' },
   { table: 'credit_note_lines' },
   { table: 'credit_note_applications' },
+  // P-05c (20260904): after the payments and credit notes it is paid from
+  { table: 'customer_refunds' },
 
   // ── Tier 7: history. activities is polymorphic — related_id points at a
   //    deal, lead, customer, purchase order or vendor invoice depending on
@@ -341,7 +343,7 @@ export const BACKUP_MODULES = [
     tables: [
       'quotations', 'quotation_lines', 'sales_orders', 'sales_order_lines', 'deliveries', 'delivery_lines', 'delivery_line_units', 'delivery_line_bins',
       'customer_returns', 'customer_return_lines', 'customer_return_line_units', 'customer_return_line_bins', 'crm_invoices', 'crm_invoice_lines', 'invoices',
-      'payments', 'payment_applications', 'credit_notes', 'credit_note_lines', 'credit_note_applications',
+      'payments', 'payment_applications', 'credit_notes', 'credit_note_lines', 'credit_note_applications', 'customer_refunds',
     ],
   },
   {

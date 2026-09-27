@@ -2587,7 +2587,8 @@
     "colLedgerBalance": "الرصيد",
     "ledgerTypeInvoice": "فاتورة",
     "ledgerTypeCreditNote": "إشعار دائن",
-    "ledgerTypePayment": "دفعة"
+    "ledgerTypePayment": "دفعة",
+    "ledgerTypeRefund": "استرداد"
   },
   "branding": {
     "title": "العلامة التجارية والإعدادات",
