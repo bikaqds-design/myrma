@@ -166,7 +166,7 @@ BEGIN
   PERFORM pg_temp.check('a refund waiting for approval posts nothing', pg_temp.entries(v_rf) = 0);
   UPDATE public.customer_refunds SET status = 'approved', refund_code = 'RF-A01B-1', approved_at = now(), approved_by = 'x@y' WHERE id = v_rf;
   PERFORM pg_temp.check('an approved refund: Dr receivables / Cr cash, on its refund date',
-    pg_temp.entry('customer_refund', v_rf, 'approved') = '1110:Cr 30.00 1200:Dr 30.00'
+    pg_temp.entry('customer_refund', v_rf, 'approved') = '1100:Cr 30.00 1200:Dr 30.00'  -- a cash refund: cash on hand (20260909)
     AND (SELECT entry_date FROM public.journal_entries WHERE source_id = v_rf) = DATE '2026-09-21',
     '-> ' || COALESCE(pg_temp.entry('customer_refund', v_rf, 'approved'), 'nothing'));
 

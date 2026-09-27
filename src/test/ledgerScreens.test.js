@@ -23,7 +23,8 @@ describe('ledger helpers', () => {
   })
 
   it('offers exactly the posting roles the database accepts', () => {
-    const sql = readFileSync('supabase/migrations/20260907_gl_purchase_postings.sql', 'utf8')
+    // the latest migration that redefines the role list (20260909 adds bank)
+    const sql = readFileSync('supabase/migrations/20260909_cash_and_bank.sql', 'utf8')
     const check = sql.match(/ADD CONSTRAINT posting_rules_role_check CHECK \(role IN \(([\s\S]*?)\)\);/)[1]
     const roles = [...check.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort()
     expect([...POSTING_ROLES].sort()).toEqual(roles)

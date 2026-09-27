@@ -21,6 +21,12 @@ const rows = [...sql.matchAll(ROW)].map((m) => ({
   postable: m[8] === 'true',
   role: m[9] === 'NULL' ? null : m[10],
 }))
+// 20260909 moves roles in the seeded templates (cash / bank split); apply its
+// UPDATE statements so the charts are checked as they stand after it.
+const split = readFileSync('supabase/migrations/20260909_cash_and_bank.sql', 'utf8')
+for (const [, role, code] of split.matchAll(/UPDATE public\.gl_chart_templates SET role = '([a-z_]+)' WHERE code = '(\d+)'/g)) {
+  for (const r of rows) if (r.code === code) r.role = role
+}
 const TYPE_BY_DIGIT = { 1: 'asset', 2: 'liability', 3: 'equity', 4: 'income', 5: 'expense', 6: 'expense', 7: 'expense' }
 
 describe('country chart templates (migration seed)', () => {

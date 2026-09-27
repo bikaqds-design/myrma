@@ -44,6 +44,17 @@ CREATE FUNCTION pg_temp.rule(p_role text) RETURNS text LANGUAGE sql AS $f$
   SELECT a.code FROM public.posting_rules r JOIN public.gl_accounts a ON a.id = r.account_id WHERE r.role = p_role
 $f$;
 
+-- Applying a template needs an empty journal. Staging keeps real entries (the
+-- journal is immutable), so inside this transaction — which always rolls back
+-- — the journal tables' own triggers are switched off to empty it. Needs the
+-- table owner; nothing here survives the rollback.
+ALTER TABLE public.journal_lines DISABLE TRIGGER USER;    -- the immutability and deferred balance triggers
+ALTER TABLE public.journal_entries DISABLE TRIGGER USER;
+DELETE FROM public.journal_lines;
+DELETE FROM public.journal_entries;
+-- (left off: the queued foreign-key events forbid re-enabling them in this
+-- transaction, and the rollback restores them. The steps below do not rely on them.)
+
 DO $do$
 DECLARE
   v_admin text := 'a02-admin@test.local';
@@ -84,10 +95,10 @@ BEGIN
     NOT EXISTS (SELECT 1 FROM public.gl_accounts a JOIN public.gl_chart_templates t ON t.country_code = 'EG' AND t.code = a.code
                  LEFT JOIN public.gl_accounts p ON p.id = a.parent_id
                 WHERE p.code IS DISTINCT FROM t.parent_code));
-  PERFORM pg_temp.check('the posting rules follow the template (receivables 1210, cash 1130, VAT out 2210, rounding 6990)',
-    pg_temp.rule('accounts_receivable') = '1210' AND pg_temp.rule('cash') = '1130'
+  PERFORM pg_temp.check('the posting rules follow the template (receivables 1210, cash 1110, bank 1130, VAT out 2210, rounding 6990)',
+    pg_temp.rule('accounts_receivable') = '1210' AND pg_temp.rule('cash') = '1110' AND pg_temp.rule('bank') = '1130'  -- 20260909
     AND pg_temp.rule('sales_tax_payable') = '2210' AND pg_temp.rule('rounding') = '6990'
-    AND (SELECT count(*) FROM public.posting_rules) = 16);
+    AND (SELECT count(*) FROM public.posting_rules) = 17);  -- 20260909 adds bank
   PERFORM pg_temp.check('the default chart''s 1200 (receivables) became the Receivables header; Egypt''s own accounts are there',
     (SELECT NOT is_postable AND name = 'Receivables' FROM public.gl_accounts WHERE code = '1200')
     AND EXISTS (SELECT 1 FROM public.gl_accounts WHERE code = '2230' AND name = 'Salary tax payable')

@@ -149,7 +149,8 @@ BEGIN
   PERFORM pg_temp.check('a payment waiting for approval posts nothing',
     NOT EXISTS (SELECT 1 FROM public.journal_entries WHERE source_id = v_pay2));
   UPDATE public.vendor_payments SET status = 'active', payment_code = 'VP-A01BP-2', approved_at = now() WHERE id = v_pay2;
-  PERFORM pg_temp.check('approved: it posts', pg_temp.entry('vendor_payment', v_pay2, 'paid') = '1110:Cr 10.00 2100:Dr 10.00');
+  -- paid in cash: cash on hand (20260909)
+  PERFORM pg_temp.check('approved: it posts', pg_temp.entry('vendor_payment', v_pay2, 'paid') = '1100:Cr 10.00 2100:Dr 10.00');
 
   -- ══ 4. the books balance ══════════════════════════════════════════════════
   PERFORM pg_temp.check('every entry here balances',

@@ -65,7 +65,10 @@ swapped, as its own event.
 | Vendor payment recorded | Dr payables / Cr cash; voided: reversal |
 | Stock adjustment | waits for cost on the stock ledger (N-03) |
 
-## Defaults to confirm (owner)
+## Defaults to confirm (owner) — answered 2026-09-27
+
+Owner: 1 and 2 **confirmed as written**; 3 **changed — split cash and bank now** (`20260909_cash_and_bank.sql`: a payment, refund or supplier payment by method `cash` posts to the `cash` role, every other method to the new `bank` role).
+
 
 1. **Documents before the ledger are not back-posted.** Current data is
    disposable test data; a tenant's opening balances come in through the
