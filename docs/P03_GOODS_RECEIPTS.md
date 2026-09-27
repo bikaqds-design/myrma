@@ -53,12 +53,14 @@ received against).
 
 - **P-03a (database):** tables, `create_goods_receipt`,
   `confirm_goods_receipt`, `cancel_goods_receipt`, sequence `goods_receipt →
-  GRN`, the two-path exclusion.
+  GRN`, the two-path exclusion. **Done** (#72).
 - **P-03b (database):** supplier invoice from receipts (bills received − already
   invoiced; several invoices per order), approval re-costs the stock still on
   hand from each receipt and records the variance on what was already sold.
+  **Done** (#73).
 - **P-03c (screens):** receipts on the purchase-order page (receive, scan
   serials, confirm, cancel, print a receipt note); invoice from receipts.
+  **Done**, with 20260899 (an invoice from receipts is numbered at approval).
 
 ## Not in scope here
 

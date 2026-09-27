@@ -151,6 +151,11 @@ BEGIN
   RAISE NOTICE '--- 3. re-costing on approval ---';
   PERFORM pg_temp.approve(v_mgr, v_vi1.id, 'SUP-INV-1');
   RAISE NOTICE '%', pg_temp.check('the invoice is approved', (SELECT status FROM public.vendor_invoices WHERE id = v_vi1.id) = 'approved');
+  -- 20260899: never received itself, so it is numbered at approval
+  RAISE NOTICE '%', pg_temp.check('an approved invoice from receipts has its VI- number (a draft has none)',
+    (SELECT vi_code FROM public.vendor_invoices WHERE id = v_vi1.id) LIKE 'VI-%'
+    AND (SELECT vi_code FROM public.vendor_invoices WHERE id = v_vi2.id) IS NULL,
+    '-> ' || COALESCE((SELECT vi_code FROM public.vendor_invoices WHERE id = v_vi1.id), 'NULL'));
   RAISE NOTICE '%', pg_temp.check('the router still on hand takes the invoice cost (110 x 2.0 = 220)',
     (SELECT unit_cost_base FROM public.inventory_units WHERE serial_number = 'P03B-SN2') = 220);
   RAISE NOTICE '%', pg_temp.check('the router already sold keeps its cost; the 20 difference is a price variance',

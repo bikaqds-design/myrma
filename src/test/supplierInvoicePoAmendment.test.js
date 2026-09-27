@@ -294,7 +294,8 @@ describe('the screens', () => {
   })
 
   it('offers Amend only on a confirmed order, and re-raises the approval when it goes back for one', () => {
-    expect(detail).toMatch(/!poIsConverted && doc\.status === 'confirmed' && \(\s*<Button[\s\S]{0,160}setShowAmend\(true\)/)
+    // and never once goods have been received on it (20260897 refuses the amendment)
+    expect(detail).toMatch(/!poIsConverted && !hasReceipts && !receiptsLoading && doc\.status === 'confirmed' && \(\s*<Button[\s\S]{0,160}setShowAmend\(true\)/)
     expect(detail).toMatch(/row\?\.status === 'pending_confirmation'\) await createPOApprovalActivity\(\)/)
   })
 

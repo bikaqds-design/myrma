@@ -38,6 +38,16 @@ function parseApprovalTitle(title) {
 
 const NOTE_MAX_LENGTH = 300
 
+const PURCHASE_LOG_KEYS = {
+  po_sent_for_approval: 'activityChatter.logPoSentForApproval',
+  po_cancelled: 'activityChatter.logPoCancelled',
+  po_amended: 'activityChatter.logPoAmended',
+  po_converted_to_vi: 'activityChatter.logPoConvertedToVi',
+  po_invoiced_from_receipts: 'activityChatter.logPoInvoicedFromReceipts',
+  vi_submitted_for_approval: 'activityChatter.logViSubmittedForApproval',
+  vi_cancelled: 'activityChatter.logViCancelled',
+}
+
 // System 'log' entries store a pipe-encoded title so the text stays
 // translatable at render time (the DB never holds a localized string).
 // Stage/status names (a/b below) are baked in as plain text at write time —
@@ -68,6 +78,8 @@ function renderLogTitle(title, t) {
   if (kind === 'quotation_cancelled') return t('activityChatter.logQuotationCancelled',  { code: a })
   if (kind === 'quotation_reopened')  return t('activityChatter.logQuotationReopened',   { code: a })
   if (kind === 'quotation_converted') return t('activityChatter.logQuotationConverted',  { code: a })
+  // purchase orders and supplier invoices (PurchaseDocumentDetail logPO/logVI)
+  if (PURCHASE_LOG_KEYS[kind]) return t(PURCHASE_LOG_KEYS[kind], { code: a })
   return title
 }
 
