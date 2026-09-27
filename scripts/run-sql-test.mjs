@@ -62,7 +62,17 @@ let reachedMarker = false
 try {
   await client.query(await readFile(file, 'utf8'))
 } catch (err) {
-  if (err.message.includes(marker)) reachedMarker = true
+  if (err.message.includes(marker)) {
+    reachedMarker = true
+    // Some scripts also carry every PASS/FAIL line in the marker's message (for
+    // runners that do not show notices). Count those too: a runner that read
+    // only notices reported such a script as passing while two checks failed.
+    for (const line of err.message.split(/\r?\n/)) {
+      const t = line.trim()
+      if (t.startsWith('PASS')) pass++
+      if (t.startsWith('FAIL')) { fail++; console.log(t) }
+    }
+  }
   else console.error(`SCRIPT DIED BEFORE THE MARKER: ${err.message}`)
 }
 await client.query('rollback')

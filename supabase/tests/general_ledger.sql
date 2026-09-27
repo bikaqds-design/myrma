@@ -81,7 +81,8 @@ BEGIN
   PERFORM pg_temp.check('a seeded account has the same id in every tenant (from its code)',
     v_ar = md5('gl_account:1200')::uuid);
   PERFORM pg_temp.check('every posting role has an active account that is posted to',
-    (SELECT count(*) FROM public.posting_rules r JOIN public.gl_accounts a ON a.id = r.account_id AND a.is_postable AND a.is_active) = 15);
+    (SELECT count(*) FROM public.posting_rules r JOIN public.gl_accounts a ON a.id = r.account_id AND a.is_postable AND a.is_active)
+      = (SELECT count(*) FROM public.posting_rules) AND (SELECT count(*) FROM public.posting_rules) >= 15);  -- later migrations add roles (20260907: accrued_landed_costs)
 
   -- ══ 2. posting ════════════════════════════════════════════════════════════
   v_e1 := public._gl_post('test_doc', v_src, 'posted', DATE '2026-09-10', 'TST-1', 'a test sale', jsonb_build_array(
@@ -139,7 +140,7 @@ BEGIN
   v_rev := public._gl_reverse('test_doc', v_src, 'posted', 'voided', DATE '2026-09-11', NULL);
   PERFORM pg_temp.check('a reversal swaps every line and points at the entry it reverses',
     (SELECT reverses_entry_id = v_e1 AND event = 'voided' AND memo LIKE 'Reverses JE-%' FROM public.journal_entries WHERE id = v_rev)
-    AND (SELECT sum(debit) FROM public.journal_lines WHERE entry_id = v_rev AND account_id = v_ar) IS NULL
+    AND (SELECT sum(debit) FROM public.journal_lines WHERE entry_id = v_rev AND account_id = v_ar) = 0  -- debit is NOT NULL DEFAULT 0
     AND (SELECT sum(credit) FROM public.journal_lines WHERE entry_id = v_rev AND account_id = v_ar) = 115
     AND (SELECT count(*) FROM public.journal_lines WHERE entry_id = v_rev AND customer_id IS NOT NULL) = 1);
   PERFORM pg_temp.check('reversing twice returns the first reversal',
