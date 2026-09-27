@@ -105,6 +105,7 @@ export const POSTING_ROLES = [
   'purchase_price_variance',
   'inventory_adjustment',
   'cash',
+  'bank',
   'customer_deposits',
   'retained_earnings',
   'opening_balance_equity',

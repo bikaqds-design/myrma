@@ -4162,7 +4162,7 @@
     "glRole_cost_of_goods_sold": "تكلفة البضاعة المباعة",
     "glRole_purchase_price_variance": "فروق أسعار الشراء",
     "glRole_inventory_adjustment": "تسويات المخزون",
-    "glRole_cash": "النقدية / البنك",
+    "glRole_cash": "النقدية بالصندوق (المدفوعات النقدية)",
     "glRole_customer_deposits": "دفعات مقدمة من العملاء",
     "glRole_retained_earnings": "الأرباح المحتجزة",
     "glRole_opening_balance_equity": "حقوق ملكية الأرصدة الافتتاحية",
@@ -4268,7 +4268,8 @@
     "vpApprove": "اعتماد",
     "vpReject": "رفض",
     "vpAwaitingOther": "بانتظار مدير آخر",
-    "status_pending_approval": "بانتظار الاعتماد"
+    "status_pending_approval": "بانتظار الاعتماد",
+    "glRole_bank": "البنك (التحويلات والشيكات والبطاقات)"
   },
   "purchasing": {
     "title": "المشتريات",

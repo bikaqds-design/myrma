@@ -3978,7 +3978,7 @@
     "glRole_cost_of_goods_sold": "Cost of goods sold",
     "glRole_purchase_price_variance": "Purchase price variance",
     "glRole_inventory_adjustment": "Inventory adjustments",
-    "glRole_cash": "Cash / bank",
+    "glRole_cash": "Cash on hand (cash payments)",
     "glRole_customer_deposits": "Customer deposits",
     "glRole_retained_earnings": "Retained earnings",
     "glRole_opening_balance_equity": "Opening balance equity",
@@ -4084,7 +4084,8 @@
     "vpApprove": "Approve",
     "vpReject": "Reject",
     "vpAwaitingOther": "Waiting for another manager",
-    "status_pending_approval": "Awaiting approval"
+    "status_pending_approval": "Awaiting approval",
+    "glRole_bank": "Bank (transfers, cheques, cards)"
   },
   "purchasing": {
     "title": "Purchasing",
