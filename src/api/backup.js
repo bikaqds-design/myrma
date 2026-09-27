@@ -245,6 +245,11 @@ export const BACKUP_TABLES = [
   { table: 'delivery_lines' },
   { table: 'delivery_line_units' },
   { table: 'delivery_line_bins' },
+  // P-05 (20260902): goods back from a delivery; after its lines, units and bins
+  { table: 'customer_returns' },
+  { table: 'customer_return_lines' },
+  { table: 'customer_return_line_units' },
+  { table: 'customer_return_line_bins' },
   { table: 'crm_invoices' },
   { table: 'crm_invoice_lines' },
   { table: 'invoices' },
@@ -334,7 +339,8 @@ export const BACKUP_MODULES = [
   {
     id: 'sales',
     tables: [
-      'quotations', 'quotation_lines', 'sales_orders', 'sales_order_lines', 'deliveries', 'delivery_lines', 'delivery_line_units', 'delivery_line_bins', 'crm_invoices', 'crm_invoice_lines', 'invoices',
+      'quotations', 'quotation_lines', 'sales_orders', 'sales_order_lines', 'deliveries', 'delivery_lines', 'delivery_line_units', 'delivery_line_bins',
+      'customer_returns', 'customer_return_lines', 'customer_return_line_units', 'customer_return_line_bins', 'crm_invoices', 'crm_invoice_lines', 'invoices',
       'payments', 'payment_applications', 'credit_notes', 'credit_note_lines', 'credit_note_applications',
     ],
   },
