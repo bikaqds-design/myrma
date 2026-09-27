@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
@@ -10,11 +10,16 @@ import { useConfirm } from '../../hooks/useConfirm'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { deliveryProgress, validateDeliveryQuantities } from './_deliveries'
 import { downloadDeliveryNotePDF } from '../../lib/deliveryNotePdf'
+import { downloadReturnNotePDF } from '../../lib/returnNotePdf'
+import ReturnModal from './ReturnModal'
+import { returnableByLine } from './_returns'
 
 // Deliveries of one sales order (P-01, 20260894) and invoicing each one
-// (P-02, 20260896). Managers and above create, confirm and cancel a delivery;
-// the database enforces that and every quantity rule — this screen only
-// offers what the rules allow.
+// (P-02, 20260896), and goods coming back from a delivery (P-05, 20260902 /
+// 20260903): a return is recorded against a delivery whose invoice is posted,
+// confirmed (the goods are back in stock), then credited. Managers and above
+// create, confirm and cancel deliveries and returns; the database enforces that
+// and every quantity rule — this screen only offers what the rules allow.
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : '—')
 
@@ -30,6 +35,8 @@ export default function DeliveriesPanel({ so, customer, isManager, canInvoice, c
   const { confirm, confirmDialog } = useConfirm()
   const [busy, setBusy] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const [returnFor, setReturnFor] = useState(null) // the delivery a return is being recorded for
+  const navigate = useNavigate()
 
   const { data: soLines = EMPTY_ARRAY } = useQuery({
     queryKey: ['sales-order-lines', so.id],
@@ -44,12 +51,31 @@ export default function DeliveriesPanel({ so, customer, isManager, canInvoice, c
     queryFn: () => db.crmInvoices.list({ soId: so.id }),
     staleTime: 30_000,
   })
+  const hasConfirmed = deliveries.some((d) => d.status === 'confirmed')
+  const { data: returns = EMPTY_ARRAY } = useQuery({
+    queryKey: ['customer-returns', so.id],
+    queryFn: () => db.customerReturns.listForOrder(so.id),
+    enabled: hasConfirmed,
+  })
+  const returnIds = useMemo(() => returns.map((r) => r.id), [returns])
+  const { data: returnNotes = EMPTY_ARRAY } = useQuery({
+    queryKey: ['customer-return-credit-notes', ...returnIds],
+    queryFn: () => db.customerReturns.creditNotesFor(returnIds),
+    enabled: returnIds.length > 0,
+  })
   const productsById = useProductsById(soLines.map((l) => l.product_id))
 
   const progress = useMemo(() => deliveryProgress(soLines, deliveries, productsById), [soLines, deliveries, productsById])
   const openTotal = progress.reduce((s, p) => s + p.open, 0)
   const hasServiceLines = soLines.some((l) => l.product_id && productsById[l.product_id]?.product_type === 'service')
   const invoiceFor = (deliveryId) => invoices.find((i) => i.delivery_id === deliveryId && i.doc_status !== 'cancelled') || null
+  const deliveryCode = (deliveryId) => deliveries.find((d) => d.id === deliveryId)?.delivery_code || '—'
+  const noteFor = (returnId) => returnNotes.find((n) => n.customer_return_id === returnId) || null
+  // Goods come back only from a delivery whose invoice is posted (goods
+  // first: the return's credit note credits that invoice), with something left.
+  const canReturn = (d, inv) =>
+    isManager && d.status === 'confirmed' && inv?.doc_status === 'posted'
+    && returnableByLine(d, returns).some((r) => r.left > 0)
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['deliveries', so.id] })
@@ -57,6 +83,8 @@ export default function DeliveriesPanel({ so, customer, isManager, canInvoice, c
     queryClient.invalidateQueries({ queryKey: ['sales-document', 'sales_order', so.id] })
     queryClient.invalidateQueries({ queryKey: ['sales-documents'] })
     queryClient.invalidateQueries({ queryKey: ['inventory'] })
+    queryClient.invalidateQueries({ queryKey: ['customer-returns', so.id] })
+    queryClient.invalidateQueries({ queryKey: ['customer-return-credit-notes'] })
   }
   // A ref, not only the busy state: a second click can land before React has
   // re-rendered the disabled button, and each action must reach the server once.
@@ -99,6 +127,32 @@ export default function DeliveriesPanel({ so, customer, isManager, canInvoice, c
       toast.success(t('salesDocuments.dlvInvoicedToast'))
       refresh()
       await onInvoiceCreated?.(invoiceId, d)
+    })
+  const handleRecordReturn = (lines, fields) =>
+    run(async () => {
+      await db.customerReturns.create(returnFor.id, lines, fields, currentUserEmail)
+      setReturnFor(null)
+    }, 'salesDocuments.rtnCreatedToast')
+  const handleConfirmReturn = (r) =>
+    confirm({
+      title: t('salesDocuments.rtnConfirmTitle'),
+      message: t('salesDocuments.rtnConfirmMsg'),
+      confirmLabel: t('salesDocuments.rtnConfirm'),
+      tone: 'primary',
+      onConfirm: () => run(() => db.customerReturns.confirm(r.id, currentUserEmail), 'salesDocuments.rtnConfirmedToast'),
+    })
+  const handleCancelReturn = (r) =>
+    confirm({
+      title: t('salesDocuments.rtnCancelTitle'),
+      message: t('salesDocuments.rtnCancelMsg'),
+      confirmLabel: t('salesDocuments.rtnCancel'),
+      onConfirm: () => run(() => db.customerReturns.cancel(r.id, currentUserEmail), 'salesDocuments.rtnCancelledToast'),
+    })
+  const handleCreditNote = (r) =>
+    run(async () => {
+      const cnId = await db.customerReturns.creditNote(r.id, currentUserEmail)
+      toast.success(t('salesDocuments.rtnCreditNoteToast'))
+      navigate(`/sales/credit_note/${cnId}`)
     })
   const handleCreate = (lines, notes) =>
     run(async () => {
@@ -210,6 +264,11 @@ export default function DeliveriesPanel({ so, customer, isManager, canInvoice, c
                         {inv.inv_code ? t('salesDocuments.dlvViewInvoice', { code: inv.inv_code }) : t('salesDocuments.dlvInvoiceDraft')}
                       </Link>
                     )}
+                    {canReturn(d, inv) && (
+                      <Button size="sm" variant="secondary" onClick={() => setReturnFor(d)} disabled={busy}>
+                        {t('salesDocuments.rtnRecord')}
+                      </Button>
+                    )}
                     {d.status === 'confirmed' && !inv && (
                       <Button size="sm" variant="secondary" disabled={!canInvoice} onClick={() => handleInvoice(d)} loading={busy}>
                         {t('salesDocuments.dlvInvoice')}
@@ -223,6 +282,69 @@ export default function DeliveriesPanel({ so, customer, isManager, canInvoice, c
         )}
       </div>
 
+      {returns.length > 0 && (
+        <div className="px-4 py-3 border-t border-[#e6e9ef] dark:border-[#212a38]">
+          <h4 className="text-xs font-bold uppercase text-[#6c6760] dark:text-[#9aa4b2] mb-1">{t('salesDocuments.rtnTitle')}</h4>
+          <ul className="divide-y divide-[#f0f2f6] dark:divide-[#1a2230]">
+            {returns.map((r) => {
+              const cn = r.status === 'confirmed' ? noteFor(r.id) : null
+              return (
+                <li key={r.id} className="py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-semibold text-[#211f1b] dark:text-[#e8ebf0]">{r.return_code || '—'}</span>
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${DLV_PILL[r.status] || DLV_PILL.draft}`}>
+                        {t(`salesDocuments.rtnStatus_${r.status}`)}
+                      </span>
+                      <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">
+                        {t('salesDocuments.rtnFromDelivery', { code: deliveryCode(r.delivery_id) })} · {fmtDate(r.confirmed_at || r.created_at)}
+                      </span>
+                    </div>
+                    <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2] mt-0.5 truncate">
+                      {(r.customer_return_lines || []).map((l) => `${l.qty} × ${l.product_name}`).join(' · ')}
+                    </div>
+                    {r.reason && <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2] mt-0.5">{r.reason}</div>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {r.status === 'draft' && isManager && (
+                      <>
+                        <Button size="sm" onClick={() => handleConfirmReturn(r)} loading={busy}>{t('salesDocuments.rtnConfirm')}</Button>
+                        <Button size="sm" variant="secondary" onClick={() => handleCancelReturn(r)} loading={busy}>{t('salesDocuments.rtnCancel')}</Button>
+                      </>
+                    )}
+                    {r.status === 'confirmed' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          downloadReturnNotePDF({ ret: r, deliveryCode: deliveryCode(r.delivery_id), salesOrder: so, customer }).catch((err) =>
+                            toast.error(err?.message || t('salesDocuments.createFailed')))
+                        }
+                      >
+                        {t('salesDocuments.rtnPrintNote')}
+                      </Button>
+                    )}
+                    {cn && (
+                      <Link to={`/sales/credit_note/${cn.id}`} className="text-xs font-semibold text-[#4338ca] dark:text-[#a5b4fc] hover:underline">
+                        {cn.cn_code ? t('salesDocuments.rtnViewCreditNote', { code: cn.cn_code }) : t('salesDocuments.rtnCreditNoteDraft')}
+                      </Link>
+                    )}
+                    {r.status === 'confirmed' && !cn && isManager && (
+                      <Button size="sm" variant="secondary" onClick={() => handleCreditNote(r)} loading={busy}>
+                        {t('salesDocuments.rtnCreditNote')}
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+
+      {returnFor && (
+        <ReturnModal delivery={returnFor} returns={returns} busy={busy} onClose={() => setReturnFor(null)} onSubmit={handleRecordReturn} />
+      )}
       {showCreate && (
         <CreateDeliveryModal progress={progress} busy={busy} onClose={() => setShowCreate(false)} onSubmit={handleCreate} />
       )}

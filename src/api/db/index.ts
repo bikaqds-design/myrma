@@ -38,6 +38,9 @@ import { activities } from './activities.js'
 import { quotations } from './quotations.js'
 import { salesOrders } from './salesOrders.js'
 import { deliveries } from './deliveries.js'
+import { customerReturns } from './customerReturns.js'
+import { customerRefunds } from './customerRefunds.js'
+import { ledger } from './ledger.js'
 import { crmInvoices } from './crmInvoices.js'
 import { creditNotes } from './creditNotes.js'
 import { salesDocuments } from './salesDocuments.js'
@@ -129,6 +132,9 @@ export const db = {
   quotations,
   salesOrders,
   deliveries,
+  customerReturns,
+  customerRefunds,
+  ledger,
   crmInvoices,
   creditNotes,
   salesDocuments,
@@ -182,6 +188,11 @@ export type { ActivityRow, ActivityAttachment, ActivityCreateInput } from './act
 export type { QuotationRow, QuotationLine, QuotationLineRow } from './quotations.js'
 export type { SalesOrderRow, SalesOrderLine, SalesOrderLineRow } from './salesOrders.js'
 export type { DeliveryRow, DeliveryLineRow, DeliveryLineInput } from './deliveries.js'
+export type { CustomerReturnRow, CustomerReturnLineRow, CustomerReturnLineInput, DeliveredUnit, ReturnCreditNote } from './customerReturns.js'
+export type { CustomerRefundRow, RefundSource } from './customerRefunds.js'
+export type { GlAccountRow, PostingRuleRow, JournalEntryRow, JournalLineRow, TrialBalanceRow, AccountType, JournalFilters,
+  ChartTemplateSummary, ChartApplyResult, ChartImportRow, ChartImportResult,
+} from './ledger.js'
 export type { CrmInvoiceRow, CrmInvoiceLine, CrmInvoiceLineRow } from './crmInvoices.js'
 export type { CreditNoteRow, CreditNoteLine, CreditNoteLineRow, CreditNoteApplicationRow } from './creditNotes.js'
 export type { SalesDocumentRow, SalesDocType } from './salesDocuments.js'

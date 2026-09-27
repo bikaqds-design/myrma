@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { canDo } from '../../lib/permissions'
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
@@ -16,6 +16,10 @@ import { RecordVendorPaymentModal } from '../Purchasing/_modals'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { AGING_BUCKETS, emptyAgingTotals } from '../../lib/aging'
 import { SearchInput } from '../../components/SearchInput'
+import RefundsTab from './RefundsTab'
+import JournalTab from './JournalTab'
+import TrialBalanceTab from './TrialBalanceTab'
+import { ROLES } from '../../lib/constants'
 
 const METHOD_LABEL_KEY = {
   cash: 'accounting.methodCash',
@@ -28,6 +32,7 @@ const METHOD_LABEL_KEY = {
 const STATUS_PILL = {
   active: 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400',
   voided: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300',
+  pending_approval: 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400',
 }
 
 // Keys and column order come from src/lib/aging.js, so this page and the two
@@ -51,8 +56,14 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
   // so a sales rep had the ledger.
   const canRecord = canDo(currentUserRole, currentUserPermissions, 'accounting', 'record_payment')
   const canReverse = canDo(currentUserRole, currentUserPermissions, 'accounting', 'reverse_payment')
+  // A supplier payment waiting for a second person (20260901) is approved by a
+  // manager other than the one who recorded it; the database enforces both.
+  const isManager = [ROLES.MANAGER, ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(currentUserRole)
   const queryClient = useQueryClient()
   const [tab, setTab] = useURLTab('tab', 'payments')
+  // The ledger is readable by managers and accountants (rma_can_handle_cash);
+  // the database refuses everyone else, so the tabs are not offered to them.
+  const canSeeLedger = [ROLES.MANAGER, ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.ACCOUNTANT].includes(currentUserRole)
   const [showRecordModal, setShowRecordModal] = useState(false)
   const [showRecordVendorModal, setShowRecordVendorModal] = useState(false)
   const [voidingPaymentId, setVoidingPaymentId] = useState(null)
@@ -185,6 +196,24 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
     queryClient.invalidateQueries({ queryKey: ['purchase-documents'] })
   }
 
+  // A ref, not only a disabled button: a second click can land before the
+  // re-render, and approving must reach the server once.
+  const approving = useRef(false)
+  const handleApproveVendorPayment = (id) => {
+    if (approving.current) return
+    approving.current = true
+    db.vendorPayments
+      .approve(id, currentUserEmail)
+      .then(() => {
+        toast.success(t('accounting.vpApprovedToast'))
+        queryClient.invalidateQueries({ queryKey: ['vendor-payments'] })
+        queryClient.invalidateQueries({ queryKey: ['ap-aging'] })
+        queryClient.invalidateQueries({ queryKey: ['purchase-documents'] })
+      })
+      .catch((err) => toast.error(err?.message || t('common.error'), { duration: 7000 }))
+      .finally(() => { approving.current = false })
+  }
+
   const handleVoidVendorPayment = (reason) => {
     const id = voidingVendorPaymentId
     setVoidingVendorPaymentId(null)
@@ -215,7 +244,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
           canRecord ? (
             <Button onClick={() => setShowRecordVendorModal(true)}>+ {t('purchasing.recordPayment')}</Button>
           ) : null
-        ) : tab !== 'ap_aging' ? (
+        ) : !['ap_aging', 'refunds', 'journal', 'trial_balance'].includes(tab) ? (
           canRecord ? (
             <Button onClick={() => setShowRecordModal(true)}>+ {t('accounting.recordPayment')}</Button>
           ) : null
@@ -260,6 +289,13 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
           { id: 'aging', label: t('accounting.tabAging') },
           { id: 'vendor_payments', label: t('accounting.tabVendorPayments') },
           { id: 'ap_aging', label: t('accounting.tabApAging') },
+          { id: 'refunds', label: t('accounting.tabRefunds') },
+          ...(canSeeLedger
+            ? [
+                { id: 'journal', label: t('accounting.tabJournal') },
+                { id: 'trial_balance', label: t('accounting.tabTrialBalance') },
+              ]
+            : []),
         ].map((tb) => (
           <button
             key={tb.id}
@@ -344,6 +380,13 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
             <Pagination total={paymentsCount} page={paymentsPage} itemsPerPage={perPage} setItemsPerPage={setPerPage} onPage={setPaymentsPage} />
           )}
         </>
+      )}
+
+      {tab === 'journal' && canSeeLedger && <JournalTab perPage={perPage} setPerPage={setPerPage} />}
+      {tab === 'trial_balance' && canSeeLedger && <TrialBalanceTab />}
+
+      {tab === 'refunds' && (
+        <RefundsTab currentUserEmail={currentUserEmail} currentUserRole={currentUserRole} perPage={perPage} setPerPage={setPerPage} />
       )}
 
       {tab === 'aging' && (
@@ -436,7 +479,14 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
                 ) : (
                   filteredVendorPayments.map((p) => (
                     <tr key={p.id} className="border-b border-[#f0f2f6] dark:border-[#1a2230] last:border-0 hover:bg-[#f8f9fb] dark:hover:bg-[#0f1520]">
-                      <td className="px-4 py-3 font-mono text-xs text-[#211f1b] dark:text-[#e8ebf0]">{p.payment_code}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-[#211f1b] dark:text-[#e8ebf0]">
+                        {p.payment_code || '—'}
+                        {p.is_prepayment && (
+                          <span className="ms-2 font-sans inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-900/20 text-[#4338ca] dark:text-[#a5b4fc]">
+                            {t('accounting.vpPrepaymentBadge')}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-[#211f1b] dark:text-[#e8ebf0]">{vendorName(p)}</td>
                       <td className="px-4 py-3 text-[#6c6760] dark:text-[#9aa4b2]">{t(METHOD_LABEL_KEY[p.method] ?? p.method)}</td>
                       <td className="px-4 py-3 text-[#6c6760] dark:text-[#9aa4b2]">{p.reference_number || '—'}</td>
@@ -453,6 +503,19 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
                           <Button disabled={!canReverse} variant="danger" size="sm" onClick={() => setVoidingVendorPaymentId(p.id)}>
                             {t('accounting.voidBtn')}
                           </Button>
+                        )}
+                        {p.status === 'pending_approval' && (
+                          <div className="flex justify-end gap-2">
+                            {/* the recorder cannot approve their own payment */}
+                            {isManager && (p.created_by || '').toLowerCase() !== (currentUserEmail || '').toLowerCase() ? (
+                              <Button size="sm" onClick={() => handleApproveVendorPayment(p.id)}>{t('accounting.vpApprove')}</Button>
+                            ) : (
+                              <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2] italic self-center">{t('accounting.vpAwaitingOther')}</span>
+                            )}
+                            <Button disabled={!canReverse} variant="secondary" size="sm" onClick={() => setVoidingVendorPaymentId(p.id)}>
+                              {t('accounting.vpReject')}
+                            </Button>
+                          </div>
                         )}
                       </td>
                     </tr>
