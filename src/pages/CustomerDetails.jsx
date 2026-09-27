@@ -1428,6 +1428,7 @@ export default function CustomerDetails({
                             invoice: 'customerDetails.ledgerTypeInvoice',
                             credit_note: 'customerDetails.ledgerTypeCreditNote',
                             payment: 'customerDetails.ledgerTypePayment',
+                            refund: 'customerDetails.ledgerTypeRefund',
                           }
                           return (
                             <tr key={entry.id} className="bg-white dark:bg-[#121823]">

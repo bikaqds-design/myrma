@@ -68,7 +68,9 @@ orders.
 - **P-05c (database):** customer refunds: recorded by a manager from a credit
   note's remaining balance or a payment's unapplied amount, `pending_approval`
   until a **different** manager approves it (then numbered `RF-`, and the
-  source balance goes down); rejected = voided.
+  source balance goes down); rejected = voided. **Done** (`20260904`): a
+  refunded payment or credit note can no longer be voided, and the customer
+  statement shows approved refunds.
 - **P-05d (screens):** Returns panel on a delivery (like the Deliveries
   panel), credit note from a return, refunds in Accounting, a printable return
   note.
