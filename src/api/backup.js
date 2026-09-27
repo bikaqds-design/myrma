@@ -217,6 +217,10 @@ export const BACKUP_TABLES = [
   // points here); the unit and bin rows follow the units below
   { table: 'goods_receipts' },
   { table: 'goods_receipt_lines' },
+  // P-03b (20260898): which invoice line bills which receipt line, and the
+  // re-costing record; both after the invoices and the receipt lines
+  { table: 'vendor_invoice_receipt_lines' },
+  { table: 'purchase_cost_adjustments' },
 
   // ── Tier 5: inventory ─────────────────────────────────────────────────────
   { table: 'manufacturer_batches' },
@@ -321,7 +325,7 @@ export const BACKUP_MODULES = [
   },
   {
     id: 'purchasing',
-    tables: ['purchase_orders', 'purchase_order_lines', 'purchase_order_revisions', 'vendor_invoices', 'vendor_invoice_lines', 'vendor_invoice_charges', 'vendor_payments', 'vendor_payment_applications', 'goods_receipts', 'goods_receipt_lines', 'goods_receipt_line_units', 'goods_receipt_line_bins'],
+    tables: ['purchase_orders', 'purchase_order_lines', 'purchase_order_revisions', 'vendor_invoices', 'vendor_invoice_lines', 'vendor_invoice_charges', 'vendor_payments', 'vendor_payment_applications', 'goods_receipts', 'goods_receipt_lines', 'goods_receipt_line_units', 'goods_receipt_line_bins', 'vendor_invoice_receipt_lines', 'purchase_cost_adjustments'],
   },
   {
     id: 'inventory',
