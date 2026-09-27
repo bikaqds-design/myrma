@@ -3885,6 +3885,7 @@
     "rtnCancelTitle": "Cancel this draft return?",
     "rtnCancelMsg": "Nothing has moved yet; its items can be returned again later.",
     "rtnCancelledToast": "Draft return cancelled",
+    "rtnPrintNote": "Print note",
     "rtnCreditNote": "Make credit note",
     "rtnCreditNoteToast": "Draft credit note created for the return",
     "rtnViewCreditNote": "Credit note {{code}}",

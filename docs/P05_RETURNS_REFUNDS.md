@@ -73,9 +73,8 @@ orders.
   statement shows approved refunds.
 - **P-05d (screens):** Returns panel on a delivery (like the Deliveries
   panel), credit note from a return, refunds in Accounting, a printable return
-  note. **Done** except the printable return note: returns are recorded,
-  confirmed and credited from the Deliveries panel; refunds are a tab in
-  Accounting.
+  note. **Done**: returns are recorded, confirmed, printed and credited
+  from the Deliveries panel; refunds are a tab in Accounting.
 
 Not in P-05: returns to suppliers (P-06), inspection/scrap dispositions (RMA
 tickets cover damaged goods), returns against whole-order invoices.

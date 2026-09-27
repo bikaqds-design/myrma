@@ -10,6 +10,7 @@ import { useConfirm } from '../../hooks/useConfirm'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { deliveryProgress, validateDeliveryQuantities } from './_deliveries'
 import { downloadDeliveryNotePDF } from '../../lib/deliveryNotePdf'
+import { downloadReturnNotePDF } from '../../lib/returnNotePdf'
 import ReturnModal from './ReturnModal'
 import { returnableByLine } from './_returns'
 
@@ -310,6 +311,18 @@ export default function DeliveriesPanel({ so, customer, isManager, canInvoice, c
                         <Button size="sm" onClick={() => handleConfirmReturn(r)} loading={busy}>{t('salesDocuments.rtnConfirm')}</Button>
                         <Button size="sm" variant="secondary" onClick={() => handleCancelReturn(r)} loading={busy}>{t('salesDocuments.rtnCancel')}</Button>
                       </>
+                    )}
+                    {r.status === 'confirmed' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          downloadReturnNotePDF({ ret: r, deliveryCode: deliveryCode(r.delivery_id), salesOrder: so, customer }).catch((err) =>
+                            toast.error(err?.message || t('salesDocuments.createFailed')))
+                        }
+                      >
+                        {t('salesDocuments.rtnPrintNote')}
+                      </Button>
                     )}
                     {cn && (
                       <Link to={`/sales/credit_note/${cn.id}`} className="text-xs font-semibold text-[#4338ca] dark:text-[#a5b4fc] hover:underline">

@@ -4069,6 +4069,7 @@
     "rtnCancelTitle": "إلغاء مسودة المرتجع هذه؟",
     "rtnCancelMsg": "لم يتحرك شيء بعد؛ يمكن إرجاع بنودها لاحقًا.",
     "rtnCancelledToast": "تم إلغاء مسودة المرتجع",
+    "rtnPrintNote": "طباعة إذن الإرجاع",
     "rtnCreditNote": "إنشاء إشعار دائن",
     "rtnCreditNoteToast": "تم إنشاء مسودة إشعار دائن للمرتجع",
     "rtnViewCreditNote": "الإشعار الدائن {{code}}",

@@ -84,6 +84,8 @@ vi.mock('react-router-dom', async (orig) => ({ ...(await orig()), useNavigate: (
 
 const printNote = vi.fn(() => Promise.resolve())
 vi.mock('../lib/deliveryNotePdf', () => ({ downloadDeliveryNotePDF: (...a) => printNote(...a) }))
+const printReturnNote = vi.fn(() => Promise.resolve())
+vi.mock('../lib/returnNotePdf', () => ({ downloadReturnNotePDF: (...a) => printReturnNote(...a) }))
 
 const { default: DeliveriesPanel } = await import('../pages/SalesDocuments/DeliveriesPanel.jsx')
 
@@ -357,5 +359,25 @@ describe('DeliveriesPanel', () => {
     const link = await screen.findByRole('link', { name: 'salesDocuments.rtnCreditNoteDraft' })
     expect(link.getAttribute('href')).toBe('/sales/credit_note/CN1')
     expect(screen.queryByRole('button', { name: 'salesDocuments.rtnCreditNote' })).toBeNull()
+  })
+
+  it('a confirmed return prints its note with its delivery; a draft has no note to print', async () => {
+    printReturnNote.mockClear()
+    deliveriesData = [SHIPPED]
+    invoicesData = [{ id: 'I1', delivery_id: 'D1', doc_status: 'posted', inv_code: 'INV-2026-00001' }]
+    returnsData = [
+      { id: 'R1', delivery_id: 'D1', status: 'draft', return_code: null, created_at: '2026-09-25',
+        customer_return_lines: [{ delivery_line_id: 'DL2', qty: 2, unit_ids: [], product_name: 'Cable', line_no: 0 }] },
+      { id: 'R2', delivery_id: 'D1', status: 'confirmed', return_code: 'RTN-2026-00002', created_at: '2026-09-25',
+        customer_return_lines: [{ delivery_line_id: 'DL2', qty: 1, unit_ids: [], product_name: 'Cable', line_no: 0 }] },
+    ]
+    renderPanel()
+    const buttons = await screen.findAllByRole('button', { name: 'salesDocuments.rtnPrintNote' })
+    expect(buttons).toHaveLength(1)
+    fireEvent.click(buttons[0])
+    expect(printReturnNote).toHaveBeenCalledTimes(1)
+    const arg = printReturnNote.mock.calls[0][0]
+    expect(arg.ret.id).toBe('R2')
+    expect(arg.deliveryCode).toBe(SHIPPED.delivery_code)
   })
 })

@@ -29,6 +29,7 @@ export interface CustomerReturnRow {
   notes: string | null
   created_by: string
   created_at: string
+  confirmed_by: string | null
   confirmed_at: string | null
   customer_return_lines: CustomerReturnLineRow[]
 }
@@ -57,7 +58,7 @@ export interface ReturnCreditNote {
 }
 
 const RETURN_SELECT =
-  'id, return_code, delivery_id, sales_order_id, customer_id, status, reason, notes, created_by, created_at, confirmed_at, ' +
+  'id, return_code, delivery_id, sales_order_id, customer_id, status, reason, notes, created_by, created_at, confirmed_by, confirmed_at, ' +
   'customer_return_lines(id, customer_return_id, line_no, delivery_line_id, product_id, product_name, qty, warehouse_id, unit_ids)'
 
 const sortLines = (r: CustomerReturnRow): CustomerReturnRow => ({
