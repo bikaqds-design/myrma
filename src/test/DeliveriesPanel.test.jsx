@@ -30,6 +30,18 @@ const PRODUCTS = [
 ]
 let deliveriesData = []
 let invoicesData = []
+let returnsData = []
+let returnNotes = []
+const DELIVERED_UNITS = [
+  { delivery_line_id: 'DL1', unit_id: 'U1', serial_number: 'SN-1' },
+  { delivery_line_id: 'DL1', unit_id: 'U2', serial_number: 'SN-2' },
+]
+const rtn = {
+  create: vi.fn(() => Promise.resolve({ id: 'R9' })),
+  confirm: vi.fn(() => Promise.resolve({ id: 'R1' })),
+  cancel: vi.fn(() => Promise.resolve({ id: 'R1' })),
+  creditNote: vi.fn(() => Promise.resolve('CN-NEW')),
+}
 const api = {
   create: vi.fn(() => Promise.resolve({ id: 'D9' })),
   confirm: vi.fn(() => Promise.resolve({ id: 'D1' })),
@@ -49,8 +61,26 @@ vi.mock('../api/supabaseClient', () => ({
       cancel: (...a) => api.cancel(...a),
       invoice: (...a) => api.invoice(...a),
     },
+    customerReturns: {
+      listForOrder: () => Promise.resolve(returnsData),
+      creditNotesFor: () => Promise.resolve(returnNotes),
+      deliveredUnits: () => Promise.resolve(DELIVERED_UNITS),
+      create: (...a) => rtn.create(...a),
+      confirm: (...a) => rtn.confirm(...a),
+      cancel: (...a) => rtn.cancel(...a),
+      creditNote: (...a) => rtn.creditNote(...a),
+    },
+    warehouses: {
+      list: () => Promise.resolve({ missing: false, data: [
+        { id: 'W1', name: 'Main', warehouse_type: 'main', is_active: true },
+        { id: 'WS', name: 'Scrap', warehouse_type: 'virtual', is_system: true, is_active: true },
+      ] }),
+    },
   },
 }))
+
+const navigateTo = vi.fn()
+vi.mock('react-router-dom', async (orig) => ({ ...(await orig()), useNavigate: () => navigateTo }))
 
 const printNote = vi.fn(() => Promise.resolve())
 vi.mock('../lib/deliveryNotePdf', () => ({ downloadDeliveryNotePDF: (...a) => printNote(...a) }))
@@ -77,7 +107,11 @@ function renderPanel(props = {}) {
 beforeEach(() => {
   deliveriesData = []
   invoicesData = []
+  returnsData = []
+  returnNotes = []
   Object.values(api).forEach((f) => f.mockClear())
+  Object.values(rtn).forEach((f) => f.mockClear())
+  navigateTo.mockClear()
   toastError.mockClear()
   printNote.mockClear()
 })
@@ -228,5 +262,100 @@ describe('DeliveriesPanel', () => {
     expect(buttons).toHaveLength(1)
     fireEvent.click(buttons[0])
     expect(printNote).toHaveBeenCalledWith({ delivery: expect.objectContaining({ id: 'D1' }), salesOrder: expect.objectContaining({ id: 'SO1' }), customer })
+  })
+
+  // ── returns (P-05d) ────────────────────────────────────────────────────────
+  const SHIPPED = {
+    id: 'D1', delivery_code: 'DN-2026-00001', status: 'confirmed', created_at: '2026-09-24', confirmed_at: '2026-09-24',
+    delivery_lines: [
+      { id: 'DL1', sales_order_line_id: 'L1', qty: 2, product_name: 'Router', line_no: 0 },
+      { id: 'DL2', sales_order_line_id: 'L2', qty: 10, product_name: 'Cable', line_no: 1 },
+    ],
+  }
+
+  it('goods come back only from a delivery whose invoice is posted, and only for a manager', async () => {
+    deliveriesData = [SHIPPED]
+    invoicesData = [{ id: 'I1', delivery_id: 'D1', doc_status: 'draft', inv_code: null }]
+    const { unmount } = renderPanel()
+    await screen.findByText('DN-2026-00001')
+    expect(screen.queryByRole('button', { name: 'salesDocuments.rtnRecord' })).toBeNull()
+    unmount()
+
+    invoicesData = [{ id: 'I1', delivery_id: 'D1', doc_status: 'posted', inv_code: 'INV-2026-00001' }]
+    const rep = renderPanel({ isManager: false })
+    await screen.findByText('DN-2026-00001')
+    await waitFor(() => expect(screen.getByText('salesDocuments.dlvViewInvoice:{"code":"INV-2026-00001"}')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'salesDocuments.rtnRecord' })).toBeNull()
+    rep.unmount()
+
+    renderPanel()
+    expect(await screen.findByRole('button', { name: 'salesDocuments.rtnRecord' })).toBeTruthy()
+  })
+
+  it('records a return: the ticked units and the typed quantity, into a sellable warehouse', async () => {
+    deliveriesData = [SHIPPED]
+    invoicesData = [{ id: 'I1', delivery_id: 'D1', doc_status: 'posted', inv_code: 'INV-2026-00001' }]
+    renderPanel()
+    fireEvent.click(await screen.findByRole('button', { name: 'salesDocuments.rtnRecord' }))
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'SN-2' }))
+    fireEvent.change(screen.getByLabelText('salesDocuments.rtnQty'), { target: { value: '4' } })
+    // the scrap location is never offered (back to stock only)
+    expect(screen.queryByRole('option', { name: 'Scrap' })).toBeNull()
+    fireEvent.change(screen.getByLabelText('salesDocuments.rtnReason'), { target: { value: 'Wrong model' } })
+    fireEvent.click(screen.getByRole('button', { name: 'salesDocuments.rtnCreate' }))
+    await waitFor(() => expect(rtn.create).toHaveBeenCalledWith('D1', [
+      { delivery_line_id: 'DL1', unit_ids: ['U2'], warehouse_id: 'W1' },
+      { delivery_line_id: 'DL2', qty: 4, warehouse_id: 'W1' },
+    ], { reason: 'Wrong model' }, 'mgr@x'))
+  })
+
+  it('refuses more than can come back without calling the database, and offers only units still out', async () => {
+    deliveriesData = [SHIPPED]
+    invoicesData = [{ id: 'I1', delivery_id: 'D1', doc_status: 'posted', inv_code: 'INV-2026-00001' }]
+    returnsData = [{ id: 'R1', delivery_id: 'D1', status: 'confirmed', return_code: 'RTN-2026-00001', created_at: '2026-09-25',
+      customer_return_lines: [{ delivery_line_id: 'DL1', qty: 1, unit_ids: ['U1'], product_name: 'Router', line_no: 0 },
+                              { delivery_line_id: 'DL2', qty: 3, unit_ids: [], product_name: 'Cable', line_no: 1 }] }]
+    renderPanel()
+    fireEvent.click(await screen.findByRole('button', { name: 'salesDocuments.rtnRecord' }))
+    await screen.findByRole('checkbox', { name: 'SN-2' })
+    expect(screen.queryByRole('checkbox', { name: 'SN-1' })).toBeNull() // already back
+    fireEvent.change(screen.getByLabelText('salesDocuments.rtnQty'), { target: { value: '8' } })
+    fireEvent.click(screen.getByRole('button', { name: 'salesDocuments.rtnCreate' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('salesDocuments.rtnQtyInvalidLine:{"product":"Cable","left":7}')
+    expect(rtn.create).not.toHaveBeenCalled()
+  })
+
+  it('a draft return is confirmed after saying yes; a confirmed one is credited and opens its credit note', async () => {
+    deliveriesData = [SHIPPED]
+    invoicesData = [{ id: 'I1', delivery_id: 'D1', doc_status: 'posted', inv_code: 'INV-2026-00001' }]
+    returnsData = [
+      { id: 'R1', delivery_id: 'D1', status: 'draft', return_code: null, created_at: '2026-09-25',
+        customer_return_lines: [{ delivery_line_id: 'DL2', qty: 2, unit_ids: [], product_name: 'Cable', line_no: 0 }] },
+      { id: 'R2', delivery_id: 'D1', status: 'confirmed', return_code: 'RTN-2026-00002', created_at: '2026-09-25',
+        customer_return_lines: [{ delivery_line_id: 'DL2', qty: 1, unit_ids: [], product_name: 'Cable', line_no: 0 }] },
+    ]
+    renderPanel()
+    fireEvent.click(await screen.findByRole('button', { name: 'salesDocuments.rtnConfirm' }))
+    expect(rtn.confirm).not.toHaveBeenCalled()
+    await screen.findByText('salesDocuments.rtnConfirmMsg')
+    const buttons = screen.getAllByRole('button', { name: 'salesDocuments.rtnConfirm' })
+    fireEvent.click(buttons[buttons.length - 1]) // the dialog's, rendered last
+    await waitFor(() => expect(rtn.confirm).toHaveBeenCalledWith('R1', 'mgr@x'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'salesDocuments.rtnCreditNote' }))
+    await waitFor(() => expect(rtn.creditNote).toHaveBeenCalledWith('R2', 'mgr@x'))
+    expect(navigateTo).toHaveBeenCalledWith('/sales/credit_note/CN-NEW')
+  })
+
+  it('a return that already has its credit note links to it instead', async () => {
+    deliveriesData = [SHIPPED]
+    invoicesData = [{ id: 'I1', delivery_id: 'D1', doc_status: 'posted', inv_code: 'INV-2026-00001' }]
+    returnsData = [{ id: 'R2', delivery_id: 'D1', status: 'confirmed', return_code: 'RTN-2026-00002', created_at: '2026-09-25',
+      customer_return_lines: [{ delivery_line_id: 'DL2', qty: 1, unit_ids: [], product_name: 'Cable', line_no: 0 }] }]
+    returnNotes = [{ id: 'CN1', cn_code: null, status: 'draft', customer_return_id: 'R2' }]
+    renderPanel()
+    const link = await screen.findByRole('link', { name: 'salesDocuments.rtnCreditNoteDraft' })
+    expect(link.getAttribute('href')).toBe('/sales/credit_note/CN1')
+    expect(screen.queryByRole('button', { name: 'salesDocuments.rtnCreditNote' })).toBeNull()
   })
 })

@@ -16,6 +16,7 @@ import { RecordVendorPaymentModal } from '../Purchasing/_modals'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { AGING_BUCKETS, emptyAgingTotals } from '../../lib/aging'
 import { SearchInput } from '../../components/SearchInput'
+import RefundsTab from './RefundsTab'
 
 const METHOD_LABEL_KEY = {
   cash: 'accounting.methodCash',
@@ -215,7 +216,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
           canRecord ? (
             <Button onClick={() => setShowRecordVendorModal(true)}>+ {t('purchasing.recordPayment')}</Button>
           ) : null
-        ) : tab !== 'ap_aging' ? (
+        ) : tab !== 'ap_aging' && tab !== 'refunds' ? (
           canRecord ? (
             <Button onClick={() => setShowRecordModal(true)}>+ {t('accounting.recordPayment')}</Button>
           ) : null
@@ -260,6 +261,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
           { id: 'aging', label: t('accounting.tabAging') },
           { id: 'vendor_payments', label: t('accounting.tabVendorPayments') },
           { id: 'ap_aging', label: t('accounting.tabApAging') },
+          { id: 'refunds', label: t('accounting.tabRefunds') },
         ].map((tb) => (
           <button
             key={tb.id}
@@ -344,6 +346,10 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
             <Pagination total={paymentsCount} page={paymentsPage} itemsPerPage={perPage} setItemsPerPage={setPerPage} onPage={setPaymentsPage} />
           )}
         </>
+      )}
+
+      {tab === 'refunds' && (
+        <RefundsTab currentUserEmail={currentUserEmail} currentUserRole={currentUserRole} perPage={perPage} setPerPage={setPerPage} />
       )}
 
       {tab === 'aging' && (
