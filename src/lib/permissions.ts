@@ -479,6 +479,23 @@ export function canDo(
 }
 
 /**
+ * The permission the database checks when an approval-pool document is
+ * approved (permission_catalog, 20260914): approving a sales order runs
+ * approve_sales_order (`sales.approve`), a credit note issue_credit_note
+ * (`sales.issue_credit`), an invoice post_invoice (`sales.post`). Purchase
+ * documents need `purchasing.approve`, which no role default grants.
+ */
+export function approvalPermission(docType: string): [string, string] {
+  switch (docType) {
+    case 'purchase_order':
+    case 'vendor_invoice': return ['purchasing', 'approve']
+    case 'sales_order':    return ['sales', 'approve']
+    case 'credit_note':    return ['sales', 'issue_credit']
+    default:               return ['sales', 'post']
+  }
+}
+
+/**
  * ownershipScope — the email a role is restricted to, or null for "sees all".
  *
  * A sales rep must only see their own work: their quotations, their sales

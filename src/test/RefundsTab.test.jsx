@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, waitFor, fireEvent, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
+import { resolvePermissions } from '../lib/permissions'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key, vars) => (vars ? `${key}:${JSON.stringify(vars)}` : key) }),
@@ -55,7 +56,9 @@ function renderTab(props = {}) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
-      <RefundsTab currentUserEmail="mgr2@x" currentUserRole="manager" perPage={25} setPerPage={() => {}} {...props} />
+      {/* the app always passes the role's resolved permissions */}
+      <RefundsTab currentUserEmail="mgr2@x" currentUserRole="manager" perPage={25} setPerPage={() => {}}
+        currentUserPermissions={resolvePermissions(props.currentUserRole ?? 'manager', null)} {...props} />
     </QueryClientProvider>,
   )
 }
@@ -95,6 +98,29 @@ describe('RefundsTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'accounting.rfRecordSubmit' }))
     expect((await screen.findByRole('alert')).textContent).toBe('accounting.rfErrTooMuch:{"balance":"200.00"}')
     expect(api.record).not.toHaveBeenCalled()
+  })
+
+  // S-01: a per-user override the database enforces (20260914) hides the button
+  const withOff = (action) => {
+    const perms = resolvePermissions('manager', null)
+    return { ...perms, accounting: { ...perms.accounting, [action]: false } }
+  }
+
+  it('a manager with refunds switched off cannot record or reject, but may still approve', async () => {
+    rows = [WAITING]
+    renderTab({ currentUserPermissions: withOff('refund') })
+    const row = (await screen.findByText('Acme')).closest('tr')
+    expect(within(row).getByRole('button', { name: 'accounting.rfApprove' })).toBeTruthy()
+    expect(within(row).queryByRole('button', { name: 'accounting.rfReject' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '+ accounting.rfRecord' })).toBeNull()
+  })
+
+  it('a manager with refund approval switched off is not offered Approve', async () => {
+    rows = [WAITING]
+    renderTab({ currentUserPermissions: withOff('approve_refund') })
+    const row = (await screen.findByText('Acme')).closest('tr')
+    expect(within(row).queryByRole('button', { name: 'accounting.rfApprove' })).toBeNull()
+    expect(within(row).getByRole('button', { name: 'accounting.rfReject' })).toBeTruthy()
   })
 
   it('another manager approves a waiting refund', async () => {

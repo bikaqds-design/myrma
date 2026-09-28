@@ -896,7 +896,8 @@ Permission catalog (2026-09-28, `next` line, W6 / S-01, `20260914_permission_cat
 - Reference scripts:
   - `supabase/tests/permission_catalog.sql`: 23 checks, 23/23 on staging before and after the apply, including "a manager with post but not void cannot void".
   - Rep refusal expectations updated in `deliveries.sql`, `customer_refunds.sql`, `customer_returns.sql`, `goods_receipts.sql` and `return_credit_notes.sql`. Deliveries and refunds were re-run on staging; the whole manager and accountant flow passes.
-- **Applied to `mycrm-staging` only.** Not done yet: screens hiding a button a per-user override removes (the database refuses and the screen shows the message).
+- **Applied to `mycrm-staging` only.**
+- **The screens follow (S-01 part 2, client only).** Each button for a catalogued action checks the user's own permission beside the role, so an override switched off hides or disables it instead of failing on click. Approvals use `approvalPermission(docType)` in `permissions.ts` (a sales order `sales.approve`, a credit note `sales.issue_credit`, an invoice `sales.post`, purchase documents `purchasing.approve`). Void on an invoice or credit note now follows `sales.void` (it followed `sales.cancel`), and issuing a credit note follows `sales.issue_credit` (it followed `sales.post`). Deliveries, returns, goods receipts, refunds, supplier-payment approval, month-end close, PO amend and the stock transfer / adjust / receive buttons each check their own action. `src/test/permissionScreens.test.js` fails CI if a catalogued action is checked by no screen. **Not verified in a browser** (it needs a second, non-admin login).
 
 Authenticated-role probes (2026-09-16, BUG-061):
 

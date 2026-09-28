@@ -62,6 +62,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
   // A supplier payment waiting for a second person (20260901) is approved by a
   // manager other than the one who recorded it; the database enforces both.
   const isManager = [ROLES.MANAGER, ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(currentUserRole)
+  const canApproveVendorPayment = isManager && canDo(currentUserRole, currentUserPermissions, 'accounting', 'approve_payment')
   const queryClient = useQueryClient()
   const [tab, setTab] = useURLTab('tab', 'payments')
   // The ledger is readable by managers and accountants (rma_can_handle_cash);
@@ -390,12 +391,12 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
 
       {tab === 'journal' && canSeeLedger && <JournalTab perPage={perPage} setPerPage={setPerPage} />}
       {tab === 'trial_balance' && canSeeLedger && <TrialBalanceTab />}
-      {tab === 'periods' && canSeeLedger && <PeriodsTab currentUserEmail={currentUserEmail} currentUserRole={currentUserRole} />}
+      {tab === 'periods' && canSeeLedger && <PeriodsTab currentUserEmail={currentUserEmail} currentUserRole={currentUserRole} currentUserPermissions={currentUserPermissions} />}
       {tab === 'tax' && canSeeLedger && <TaxTab currentUserRole={currentUserRole} />}
       {tab === 'rates' && canSeeLedger && <ExchangeRatesTab currentUserRole={currentUserRole} />}
 
       {tab === 'refunds' && (
-        <RefundsTab currentUserEmail={currentUserEmail} currentUserRole={currentUserRole} perPage={perPage} setPerPage={setPerPage} />
+        <RefundsTab currentUserEmail={currentUserEmail} currentUserRole={currentUserRole} currentUserPermissions={currentUserPermissions} perPage={perPage} setPerPage={setPerPage} />
       )}
 
       {tab === 'aging' && (
@@ -516,7 +517,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
                         {p.status === 'pending_approval' && (
                           <div className="flex justify-end gap-2">
                             {/* the recorder cannot approve their own payment */}
-                            {isManager && (p.created_by || '').toLowerCase() !== (currentUserEmail || '').toLowerCase() ? (
+                            {canApproveVendorPayment && (p.created_by || '').toLowerCase() !== (currentUserEmail || '').toLowerCase() ? (
                               <Button size="sm" onClick={() => handleApproveVendorPayment(p.id)}>{t('accounting.vpApprove')}</Button>
                             ) : (
                               <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2] italic self-center">{t('accounting.vpAwaitingOther')}</span>

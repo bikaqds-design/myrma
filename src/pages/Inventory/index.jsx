@@ -25,6 +25,10 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
       ? true
       : userPermissions?.inventory?.[a] === true
   const isManagerOrAbove = MANAGER_OR_ABOVE.includes(userRole)
+  // what the database checks for each stock action (permission_catalog, 20260914)
+  const canTransferStock = isManagerOrAbove && canDo('transfer')
+  const canAdjustStock = isManagerOrAbove && canDo('adjust')
+  const canReceiveStock = isManagerOrAbove && canDo('receive')
   const [breakdownProductId, setBreakdownProductId] = useState(null)
   const [showReceiveStock, setShowReceiveStock] = useState(false)
 
@@ -138,7 +142,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
   return (
     <div className="space-y-6">
       <PageHeader title={t('inventory.title')} subtitle={t('inventory.subtitle')}>
-        {isManagerOrAbove && (
+        {canReceiveStock && (
           <Button variant="primary" size="sm" onClick={() => setShowReceiveStock(true)}>
             {t('inventory.receiveStockButton')}
           </Button>
@@ -182,6 +186,8 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
           warehouses={warehouses}
           userEmail={userEmail}
           isManagerOrAbove={isManagerOrAbove}
+          canTransfer={canTransferStock}
+          canAdjust={canAdjustStock}
           onRefresh={invalidateInventory}
           onNavigateToTicket={onNavigateToTicket}
         />
@@ -191,7 +197,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
           brands={brands}
           warehouses={warehouses}
           canResolve={canDo('resolve_units')}
-          canTransfer={canDo('transfer')}
+          canTransfer={canTransferStock}
           userEmail={userEmail}
           onReload={invalidateInventory}
           onNavigateToTicket={onNavigateToTicket}
@@ -207,7 +213,7 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
           whMissing={whMissing}
           userEmail={userEmail}
           canManage={canDo('manage_warehouses')}
-          canTransfer={canDo('transfer')}
+          canTransfer={canTransferStock}
           onReload={invalidateInventory}
         />
       )}
@@ -219,6 +225,8 @@ export default function Inventory({ userRole, userEmail, userPermissions, onNavi
         warehouses={warehouses}
         userEmail={userEmail}
         isManagerOrAbove={isManagerOrAbove}
+        canTransfer={canTransferStock}
+        canAdjust={canAdjustStock}
         onRefresh={invalidateInventory}
       />
 

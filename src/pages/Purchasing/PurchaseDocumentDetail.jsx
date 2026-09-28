@@ -106,6 +106,7 @@ export default function PurchaseDocumentDetail({
   const canCancelPurchase = canDo(currentUserRole, currentUserPermissions, 'purchasing', 'cancel')
   const canCreatePurchase = canDo(currentUserRole, currentUserPermissions, 'purchasing', 'create')
   const canReceive        = canDo(currentUserRole, currentUserPermissions, 'purchasing', 'receive')
+  const canAmend          = canDo(currentUserRole, currentUserPermissions, 'purchasing', 'amend')
   const { t } = useTranslation()
   const baseCurrency = useBaseCurrency()
   const { confirm, confirmDialog } = useConfirm()
@@ -373,7 +374,7 @@ export default function PurchaseDocumentDetail({
                 <Button disabled={!canCreatePurchase} size="sm" onClick={handleConvertToVI} loading={busy}>{t('purchasing.createVendorInvoice')}</Button>
               )}
               {!poIsConverted && !hasReceipts && !receiptsLoading && doc.status === 'confirmed' && (
-                <Button disabled={!canEditPurchase} variant="secondary" size="sm" onClick={() => setShowAmend(true)}>{t('purchasing.amendOrder')}</Button>
+                <Button disabled={!canEditPurchase || !canAmend} variant="secondary" size="sm" onClick={() => setShowAmend(true)}>{t('purchasing.amendOrder')}</Button>
               )}
               {!poIsConverted && ['draft', 'sent', 'confirmed'].includes(doc.status) && (
                 <Button disabled={!canCancelPurchase} variant="danger" size="sm" onClick={handlePOCancel} loading={busy}>{t('common.cancel')}</Button>
@@ -683,6 +684,7 @@ export default function PurchaseDocumentDetail({
           po={doc}
           vendor={vendor}
           isManager={isManager}
+          canReceive={isManager && canReceive}
           currentUserEmail={currentUserEmail}
           onInvoiceCreated={(vi) => {
             logPO('po_invoiced_from_receipts')

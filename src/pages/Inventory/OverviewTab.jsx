@@ -36,6 +36,9 @@ export function OverviewTab({
   warehouses,
   userEmail,
   isManagerOrAbove,
+  // the user's own inventory.transfer / inventory.adjust (20260914)
+  canTransfer = isManagerOrAbove,
+  canAdjust = isManagerOrAbove,
   onRefresh,
   onNavigateToTicket,
 }) {
@@ -194,18 +197,22 @@ export function OverviewTab({
           </button>
           {isManagerOrAbove && (
             <>
-              <button
-                onClick={() => setBulkAction('transfer')}
-                className="text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg px-2 py-1.5 bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230]"
-              >
-                {t('inventory.bulkTransfer')}
-              </button>
-              <button
-                onClick={() => setBulkAction('adjust')}
-                className="text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg px-2 py-1.5 bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230]"
-              >
-                {t('inventory.bulkAdjust')}
-              </button>
+              {canTransfer && (
+                <button
+                  onClick={() => setBulkAction('transfer')}
+                  className="text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg px-2 py-1.5 bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230]"
+                >
+                  {t('inventory.bulkTransfer')}
+                </button>
+              )}
+              {canAdjust && (
+                <button
+                  onClick={() => setBulkAction('adjust')}
+                  className="text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg px-2 py-1.5 bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230]"
+                >
+                  {t('inventory.bulkAdjust')}
+                </button>
+              )}
               <button
                 onClick={() => setBulkAction('recalculate')}
                 className="text-sm border border-[#e6e9ef] dark:border-[#212a38] rounded-lg px-2 py-1.5 bg-white dark:bg-[#121823] text-[#211f1b] dark:text-[#e8ebf0] hover:bg-[#f4f6f9] dark:hover:bg-[#1a2230]"
@@ -415,6 +422,8 @@ export function OverviewTab({
         productSummary={liveRow(branchesTarget)}
         warehouses={warehouses}
         isManagerOrAbove={isManagerOrAbove}
+        canTransfer={canTransfer}
+        canAdjust={canAdjust}
         userEmail={userEmail}
         onRefresh={onRefresh}
       />
