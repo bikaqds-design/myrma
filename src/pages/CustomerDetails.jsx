@@ -16,6 +16,7 @@ import { EMPTY_ARRAY } from '../lib/stableEmpty'
 import { safeAttachmentHref } from '../lib/attachmentUrl'
 import { formatMoney } from '../lib/money'
 import { useBaseCurrency } from '../hooks/useBaseCurrency'
+import { EXCHANGE_DIFFERENCE, statementBalance, statementLines } from '../lib/statementLines'
 import Pagination from '../components/Pagination'
 import { safeStorage } from '../lib/safeStorage'
 import { TAX_STATUSES } from './Accounting/_tax'
@@ -1408,21 +1409,22 @@ export default function CustomerDetails({
           {activeTab === 'billing' && (
             <div className="space-y-4">
               {(() => {
-                const balance = ledger.reduce((sum, e) => sum + (Number(e.amount) || 0), 0)
+                // in the base currency: invoices, payments and credit notes may each be in another (20260913)
+                const balance = statementBalance(ledger)
                 const overLimit = customer?.credit_limit != null && balance > Number(customer.credit_limit)
                 return (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="bg-gray-50 dark:bg-[#0f1520] rounded-xl border border-gray-200 dark:border-[#212a38] p-4">
                       <div className="text-xs uppercase text-gray-500 dark:text-[#9aa4b2] mb-1">{t('customerDetails.outstandingBalance')}</div>
                       <div className="text-xl font-bold text-gray-900 dark:text-[#e8ebf0]">
-                        {balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatMoney(balance, baseCurrency)}
                       </div>
                     </div>
                     {customer?.credit_limit != null && (
                       <div className={`rounded-xl border p-4 ${overLimit ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-gray-50 dark:bg-[#0f1520] border-gray-200 dark:border-[#212a38]'}`}>
                         <div className={`text-xs uppercase mb-1 ${overLimit ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-[#9aa4b2]'}`}>{t('customerDetails.creditLimit')}</div>
                         <div className={`text-xl font-bold ${overLimit ? 'text-red-700 dark:text-red-400' : 'text-gray-900 dark:text-[#e8ebf0]'}`}>
-                          {Number(customer.credit_limit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatMoney(customer.credit_limit, baseCurrency)}
                         </div>
                         {overLimit && (
                           <div className="text-xs text-red-600 dark:text-red-400 mt-1">{t('customerDetails.overCreditLimit')}</div>
@@ -1450,34 +1452,35 @@ export default function CustomerDetails({
                         <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerType')}</th>
                         <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerCode')}</th>
                         <th className="px-4 py-3 text-end text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerAmount')}</th>
-                        <th className="px-4 py-3 text-end text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerBalance')}</th>
+                        <th className="px-4 py-3 text-end text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerBalanceIn', { currency: baseCurrency })}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-[#1a2230]">
                       {(() => {
-                        let running = 0
-                        return ledger.map((entry) => {
-                          running += Number(entry.amount) || 0
-                          const TYPE_LABEL_KEY = {
-                            invoice: 'customerDetails.ledgerTypeInvoice',
-                            credit_note: 'customerDetails.ledgerTypeCreditNote',
-                            payment: 'customerDetails.ledgerTypePayment',
-                            refund: 'customerDetails.ledgerTypeRefund',
-                          }
-                          return (
-                            <tr key={entry.id} className="bg-white dark:bg-[#121823]">
-                              <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2]">{formatDate(entry.entry_date)}</td>
-                              <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{t(TYPE_LABEL_KEY[entry.entry_type] ?? entry.entry_type)}</td>
-                              <td className="px-4 py-3 font-mono text-xs text-gray-900 dark:text-[#e8ebf0]">{entry.entry_code || '—'}</td>
-                              <td className={`px-4 py-3 text-end font-medium ${entry.amount >= 0 ? 'text-gray-900 dark:text-[#e8ebf0]' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                {entry.amount >= 0 ? '+' : ''}{Number(entry.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </td>
-                              <td className="px-4 py-3 text-end text-gray-500 dark:text-[#9aa4b2]">
-                                {running.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </td>
-                            </tr>
-                          )
-                        })
+                        const TYPE_LABEL_KEY = {
+                          invoice: 'customerDetails.ledgerTypeInvoice',
+                          credit_note: 'customerDetails.ledgerTypeCreditNote',
+                          payment: 'customerDetails.ledgerTypePayment',
+                          refund: 'customerDetails.ledgerTypeRefund',
+                          [EXCHANGE_DIFFERENCE]: 'customerDetails.ledgerTypeExchangeDifference',
+                        }
+                        // Each entry in its own currency; the balance in base (statementLines).
+                        return statementLines(ledger, baseCurrency).map((entry) => (
+                          <tr key={entry.id} className="bg-white dark:bg-[#121823]">
+                            <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2]">{formatDate(entry.entry_date)}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">{t(TYPE_LABEL_KEY[entry.entry_type] ?? entry.entry_type)}</td>
+                            <td className="px-4 py-3 font-mono text-xs text-gray-900 dark:text-[#e8ebf0]">{entry.entry_code || '—'}</td>
+                            <td className={`px-4 py-3 text-end font-medium ${entry.shown.value >= 0 ? 'text-gray-900 dark:text-[#e8ebf0]' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                              {entry.shown.value >= 0 ? '+' : ''}{entry.shown.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {entry.shown.currency !== baseCurrency && (
+                                <span className="ms-1 text-xs font-semibold text-amber-600 dark:text-amber-400">{entry.shown.currency}</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-end text-gray-500 dark:text-[#9aa4b2]">
+                              {entry.running.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        ))
                       })()}
                     </tbody>
                   </table>

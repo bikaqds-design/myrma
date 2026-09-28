@@ -8,7 +8,7 @@
 -- #      or later is not_due; 1, 30 | 31, 60 | 61, 90 | 91+; no date;
 -- #    - rma_ar_aging and rma_ap_aging equal an independent per-invoice
 -- #      computation over the live invoices, on eight different "today"s chosen
--- #      so every invoice crosses bucket edges — AP in the base currency;
+-- #      so every invoice crosses bucket edges — both in the base currency;
 -- #    - the payment views keep one row per payment with the counterpart name;
 -- #    - nothing is readable or callable by anon.
 -- #
@@ -44,12 +44,13 @@ BEGIN
     v_failures := array_append(v_failures, 'CHECK 1: rma_aging_bucket does not match src/lib/aging.js at the boundaries');
   END IF;
 
-  -- ── CHECK 2: receivables aging = per-invoice computation, on many days ──────
+  -- ── CHECK 2: receivables aging = per-invoice computation in base currency ───
+  -- (each invoice's remaining balance at its own rate, since 20260913)
   v_checks := v_checks + 1;
   FOREACH v_off IN ARRAY v_offsets LOOP
     v_today := v_base + v_off;
     WITH expected AS (
-      SELECT customer_id, bucket, sum(remaining) AS amt
+      SELECT customer_id, bucket, sum(round(remaining * rate, 2)) AS amt
         FROM (
           SELECT i.customer_id,
                  CASE WHEN i.due_date IS NULL THEN 'no_due_date'
@@ -58,7 +59,8 @@ BEGIN
                       WHEN v_today - i.due_date <= 60 THEN 'd31_60'
                       WHEN v_today - i.due_date <= 90 THEN 'd61_90'
                       ELSE 'd90_plus' END AS bucket,
-                 round(coalesce(i.total, 0) - coalesce(i.amount_paid, 0), 2) AS remaining
+                 round(coalesce(i.total, 0) - coalesce(i.amount_paid, 0), 2) AS remaining,
+                 coalesce(nullif(i.exchange_rate, 0), 1) AS rate
             FROM public.crm_invoices i
            WHERE i.doc_status = 'posted'
         ) x

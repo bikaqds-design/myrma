@@ -5,18 +5,25 @@ import { todayLocalISO } from '../../lib/dates.js'
 // ── Row types ─────────────────────────────────────────────────────────────────
 
 // refund: money paid back to the customer (20260904), shown as a positive entry
-export type LedgerEntryType = 'invoice' | 'credit_note' | 'payment' | 'refund'
+// exchange_difference: realised when an invoice is settled at another rate
+// (20260913) — only a base-currency amount; `amount` is 0
+export type LedgerEntryType = 'invoice' | 'credit_note' | 'payment' | 'refund' | 'exchange_difference'
 
 export interface LedgerEntryRow {
   id: string
   entry_type: LedgerEntryType
   entry_code: string | null
   customer_id: string
+  /** in the entry's own currency, signed (what the customer owes: +) */
   amount: number
   status: string
   due_date: string | null
   entry_date: string
   created_at: string
+  currency: string | null
+  exchange_rate: number | null
+  /** the same at the entry's rate, in the base currency — what the balance adds (src/lib/statementLines.js) */
+  amount_base: number
 }
 
 // See src/lib/aging.js for what each bucket means and why 'current' is gone.
@@ -45,8 +52,8 @@ export const customerLedger = {
    * list: the full signed transaction feed for one customer (invoices,
    * credit notes, payments), reading v_customer_ledger
    * (20260730_crm_customer_ledger_view.sql). Powers the Customer Details
-   * "Billing" tab statement — sort by entry_date and cumulative-sum `amount`
-   * for a running balance.
+   * "Billing" tab statement — sort by entry_date and cumulative-sum
+   * `amount_base` for a running balance in the base currency.
    */
   async list(customerId: string): Promise<LedgerEntryRow[]> {
     // A statement needs every entry — read past the Data API's row cap. (BUG-066.)

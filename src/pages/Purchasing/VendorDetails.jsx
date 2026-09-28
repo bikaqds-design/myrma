@@ -8,6 +8,7 @@ import Pagination from '../../components/Pagination'
 import { Button, Ltr } from '../../components/ui'
 import { DOC_TYPE_BADGE, docTypeLabel, statusLabel, statusPillCls, summarizeBuckets } from './_shared'
 import { useBaseCurrency } from '../../hooks/useBaseCurrency'
+import { EXCHANGE_DIFFERENCE, statementBalance, statementLines } from '../../lib/statementLines'
 import { safeStorage } from '../../lib/safeStorage'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 
@@ -125,8 +126,9 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
   // The ledger is signed: invoices positive, payments negative. The sum is what
   // is still owed, which is why it needs no separate query.
   const outstanding = useMemo(
-    // Signed and in base currency, for the same reason as spend above.
-    () => ledger.reduce((sum, e) => sum + (Number(e.amount_base ?? e.amount) || 0), 0),
+    // Signed and in base currency, for the same reason as spend above; the
+    // exchange differences realised on payment are rows of their own (20260913).
+    () => statementBalance(ledger),
     [ledger]
   )
 
@@ -146,6 +148,7 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
   const LEDGER_TYPE_LABEL_KEY = {
     vendor_invoice: 'purchasing.ledgerTypeVendorInvoice',
     vendor_payment: 'purchasing.ledgerTypeVendorPayment',
+    [EXCHANGE_DIFFERENCE]: 'customerDetails.ledgerTypeExchangeDifference',
   }
 
   return (
@@ -288,35 +291,29 @@ export default function VendorDetails({ vendorId, onBack, onOpenDocument, onEdit
                   <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerType')}</th>
                   <th className="px-4 py-3 text-start text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerCode')}</th>
                   <th className="px-4 py-3 text-end text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerAmount')}</th>
-                  <th className="px-4 py-3 text-end text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerBalance')}</th>
+                  <th className="px-4 py-3 text-end text-xs font-semibold text-gray-500 dark:text-[#9aa4b2] uppercase">{t('customerDetails.colLedgerBalanceIn', { currency: baseCurrency })}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-[#1a2230]">
-                {(() => {
-                  let running = 0
-                  return ledger.map((entry) => {
-                    // The balance adds every entry, so it can only be in base
-                    // currency; the entry beside it stays in the currency it
-                    // was actually recorded in.
-                    running += Number(entry.amount_base ?? entry.amount) || 0
-                    return (
-                      <tr key={entry.id}>
-                        <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2]">{fmtDate(entry.entry_date)}</td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">
-                          {t(LEDGER_TYPE_LABEL_KEY[entry.entry_type] ?? entry.entry_type)}
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs text-gray-900 dark:text-[#e8ebf0]">{entry.entry_code || '—'}</td>
-                        <td className={`px-4 py-3 text-end font-medium ${entry.amount >= 0 ? 'text-gray-900 dark:text-[#e8ebf0]' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                          {entry.amount >= 0 ? '+' : ''}{fmtMoney(entry.amount)}
-                          {entry.currency && entry.currency !== baseCurrency && (
-                            <span className="ms-1 text-xs font-semibold text-amber-600 dark:text-amber-400">{entry.currency}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-end text-gray-500 dark:text-[#9aa4b2]">{fmtMoney(running)}</td>
-                      </tr>
-                    )
-                  })
-                })()}
+                {/* The balance adds every entry, so it can only be in base
+                    currency; the entry beside it stays in the currency it was
+                    actually recorded in (statementLines). */}
+                {statementLines(ledger, baseCurrency).map((entry) => (
+                  <tr key={entry.id}>
+                    <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2]">{fmtDate(entry.entry_date)}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-[#9aa4b2]">
+                      {t(LEDGER_TYPE_LABEL_KEY[entry.entry_type] ?? entry.entry_type)}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-900 dark:text-[#e8ebf0]">{entry.entry_code || '—'}</td>
+                    <td className={`px-4 py-3 text-end font-medium ${entry.shown.value >= 0 ? 'text-gray-900 dark:text-[#e8ebf0]' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                      {entry.shown.value >= 0 ? '+' : ''}{fmtMoney(entry.shown.value)}
+                      {entry.shown.currency !== baseCurrency && (
+                        <span className="ms-1 text-xs font-semibold text-amber-600 dark:text-amber-400">{entry.shown.currency}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-end text-gray-500 dark:text-[#9aa4b2]">{fmtMoney(entry.running)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

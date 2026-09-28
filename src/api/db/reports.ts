@@ -108,6 +108,11 @@ export interface ReportInvoiceRow {
   amount_paid: number | null
   due_date: string | null
   created_at: string
+  /** the invoice's own currency and rate; total_base / amount_paid_base at that rate (20260913) */
+  currency: string | null
+  exchange_rate: number | null
+  total_base: number | null
+  amount_paid_base: number | null
 }
 
 const n = (v: unknown) => Number(v) || 0
