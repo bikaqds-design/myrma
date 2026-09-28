@@ -100,7 +100,7 @@ BEGIN
   RAISE NOTICE '--- 1. create_delivery ---';
   v_out := pg_temp.call(v_rep, format($q$SELECT public.create_delivery(%L, %L::jsonb, NULL, %L)$q$, v_so.id,
     jsonb_build_array(jsonb_build_object('sales_order_line_id', v_l_ser, 'qty', 1)), v_rep));
-  RAISE NOTICE '%', pg_temp.check('a sales rep cannot prepare a delivery', v_out LIKE 'err:P0001%manager%', '-> ' || v_out);
+  RAISE NOTICE '%', pg_temp.check('a sales rep cannot prepare a delivery', v_out LIKE 'err:42501%permission to ship deliveries%', '-> ' || v_out);
   v_out := pg_temp.call(v_mgr, format($q$SELECT public.create_delivery(%L, %L::jsonb, NULL, %L)$q$, v_so.id,
     jsonb_build_array(jsonb_build_object('sales_order_line_id', v_l_svc, 'qty', 1)), v_mgr));
   RAISE NOTICE '%', pg_temp.check('a service line is not delivered from stock', v_out LIKE 'err:P0001%service%', '-> ' || v_out);
@@ -123,7 +123,7 @@ BEGIN
   -- ══ 2. confirming it: the goods leave ═════════════════════════════════════
   RAISE NOTICE '--- 2. confirm_delivery ---';
   v_out := pg_temp.call(v_rep, format('SELECT public.confirm_delivery(%L, %L)', v_d.id, v_rep));
-  RAISE NOTICE '%', pg_temp.check('a sales rep cannot confirm a delivery (owner decision: managers only)', v_out LIKE 'err:P0001%manager%', '-> ' || v_out);
+  RAISE NOTICE '%', pg_temp.check('a sales rep cannot confirm a delivery (owner decision: managers only)', v_out LIKE 'err:42501%permission to ship deliveries%', '-> ' || v_out);
   PERFORM pg_temp.as_user(v_mgr);
   v_d := public.confirm_delivery(v_d.id, v_mgr);
   PERFORM pg_temp.as_owner();
@@ -225,7 +225,7 @@ BEGIN
   PERFORM pg_temp.as_owner();
   UPDATE public.sales_orders SET assigned_rep = NULL WHERE id = v_so4.id;
   v_out := pg_temp.call(v_rep2, format('SELECT public.cancel_sales_order(%L, %L)', v_so4.id, v_rep2));
-  RAISE NOTICE '%', pg_temp.check('a sales rep cannot cancel another rep''s unassigned order', v_out LIKE 'err:P0001%Not authorized%', '-> ' || v_out);
+  RAISE NOTICE '%', pg_temp.check('a sales rep cannot cancel another rep''s unassigned order', v_out LIKE 'err:42501%Not authorized%', '-> ' || v_out);
 
   -- ══ 5. access ═════════════════════════════════════════════════════════════
   v_out := pg_temp.call(v_mgr, format($q$INSERT INTO public.deliveries (sales_order_id, customer_id, created_by) VALUES (%L, %L, 'x')$q$, v_so.id, v_cust));

@@ -4,7 +4,7 @@ import Modal from '../../components/Modal'
 import { ROLES } from '../../lib/constants'
 import { ROLE_DEFAULT_PERMISSIONS, roleDefaults, resolvePermissions } from '../../lib/permissions'
 import { RoleBadge } from './_shared'
-import { getDefaultPermissions, getRoleTemplates } from './_utils'
+import { getDefaultPermissions, getRoleTemplates, permissionOverrides } from './_utils'
 import {
   permissionGroups,
   MODULE_LABEL_KEYS,
@@ -38,6 +38,7 @@ const ALL_STAFF = [
 const STAFF_NOT_VIEWER = ALL_STAFF.filter((r) => r !== ROLES.VIEWER)
 const MGR_PLUS   = [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER]
 const ADMIN_ONLY = [ROLES.SUPER_ADMIN, ROLES.ADMIN]
+const FINANCE    = [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.ACCOUNTANT]
 
 const SERVER_ALLOWS = {
   // ── products / customers: staff_read, manager_insert, manager_update,
@@ -65,7 +66,12 @@ const SERVER_ALLOWS = {
   //    (20260526 section 7): write is staff except viewer, delete is admin.
   'inventory.create':       STAFF_NOT_VIEWER,
   'inventory.edit':         STAFF_NOT_VIEWER,
-  'inventory.transfer':     STAFF_NOT_VIEWER,
+  // transfer_stock / transfer_units / adjust_stock / receive_stock /
+  // archive_warehouse are manager and above (permission_catalog, 20260914)
+  'inventory.transfer':          MGR_PLUS,
+  'inventory.adjust':            MGR_PLUS,
+  'inventory.receive':           MGR_PLUS,
+  'inventory.manage_warehouses': MGR_PLUS,
   'inventory.delete':       ADMIN_ONLY,
   'parts.create':           STAFF_NOT_VIEWER,
   'parts.edit':             STAFF_NOT_VIEWER,
@@ -90,10 +96,21 @@ const SERVER_ALLOWS = {
   'sales.delete': ADMIN_ONLY,
   'sales.post':   MGR_PLUS,
   'sales.cancel': MGR_PLUS,
+  // the functions permission_catalog (20260914) lists, each manager and above
+  'sales.void':         MGR_PLUS,
+  'sales.approve':      MGR_PLUS,
+  'sales.issue_credit': MGR_PLUS,
+  'sales.deliver':      MGR_PLUS,
+  'sales.return':       MGR_PLUS,
 
   // ── rma_can_handle_cash() = manager_or_above OR accountant (20260780)
   'accounting.record_payment':  [...MGR_PLUS, ROLES.ACCOUNTANT],
   'accounting.reverse_payment': [...MGR_PLUS, ROLES.ACCOUNTANT],
+  'accounting.refund':          MGR_PLUS,
+  'accounting.approve_refund':  MGR_PLUS,
+  'accounting.approve_payment': MGR_PLUS,
+  // rma_is_finance() = admin or accountant (20260910)
+  'accounting.close_period':    FINANCE,
 
   // ── manager_write_purchase_orders / manager_write_vendor_invoices
   'purchasing.create':         MGR_PLUS,
@@ -102,6 +119,7 @@ const SERVER_ALLOWS = {
   'purchasing.cancel':         MGR_PLUS,
   'purchasing.manage_vendors': MGR_PLUS,
   'purchasing.approve':        ADMIN_ONLY,
+  'purchasing.amend':          MGR_PLUS,
 
   // ── pipelines write is admin-only at the RLS layer
   'pipelines.manage': ADMIN_ONLY,
@@ -457,7 +475,8 @@ export function PermissionsModal({ user, customRoles, onSave, onClose }) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await onSave(perms)
+      // only what differs from the role, so a changed default still reaches this user
+      await onSave(permissionOverrides(perms, roleBaseline))
     } catch {
       // parent handles error toast
     } finally {

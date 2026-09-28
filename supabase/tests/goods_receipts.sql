@@ -88,7 +88,7 @@ BEGIN
   RAISE NOTICE '--- 1. create_goods_receipt ---';
   v_out := pg_temp.call(v_rep, format($q$SELECT public.create_goods_receipt(%L, %L::jsonb, '{}'::jsonb, %L)$q$, v_po.id,
     jsonb_build_array(pg_temp.gr_line(v_l_blk, '1', v_wh)), v_rep));
-  RAISE NOTICE '%', pg_temp.check('a sales rep cannot receive goods', v_out LIKE 'err:P0001%managers%', '-> ' || v_out);
+  RAISE NOTICE '%', pg_temp.check('a sales rep cannot receive goods', v_out LIKE 'err:42501%permission to receive goods%', '-> ' || v_out);
   v_out := pg_temp.call(v_mgr, format($q$SELECT public.create_goods_receipt(%L, %L::jsonb, '{}'::jsonb, %L)$q$, v_po.id,
     jsonb_build_array(pg_temp.gr_line(v_l_blk, '11', v_wh)), v_mgr));
   RAISE NOTICE '%', pg_temp.check('more than was ordered is refused', v_out LIKE 'err:P0001%only 10 left%', '-> ' || v_out);
@@ -130,7 +130,7 @@ BEGIN
   -- ══ 2. confirming: the goods arrive ═══════════════════════════════════════
   RAISE NOTICE '--- 2. confirm_goods_receipt ---';
   v_out := pg_temp.call(v_rep, format('SELECT public.confirm_goods_receipt(%L, %L)', v_gr.id, v_rep));
-  RAISE NOTICE '%', pg_temp.check('a sales rep cannot confirm a receipt', v_out LIKE 'err:P0001%managers%', '-> ' || v_out);
+  RAISE NOTICE '%', pg_temp.check('a sales rep cannot confirm a receipt', v_out LIKE 'err:42501%permission to receive goods%', '-> ' || v_out);
   PERFORM pg_temp.as_user(v_mgr);
   v_gr := public.confirm_goods_receipt(v_gr.id, v_mgr);
   PERFORM pg_temp.as_owner();
