@@ -23,7 +23,9 @@ const rows = [...sql.matchAll(ROW)].map((m) => ({
 }))
 // 20260909 moves roles in the seeded templates (cash / bank split); apply its
 // UPDATE statements so the charts are checked as they stand after it.
-const split = readFileSync('supabase/migrations/20260909_cash_and_bank.sql', 'utf8')
+// ... and 20260912 gives the exchange gain / loss accounts their roles
+const split = ['20260909_cash_and_bank.sql', '20260912_multi_currency_sales.sql']
+  .map((f) => readFileSync('supabase/migrations/' + f, 'utf8')).join(' ')
 for (const [, role, code] of split.matchAll(/UPDATE public\.gl_chart_templates SET role = '([a-z_]+)' WHERE code = '(\d+)'/g)) {
   for (const r of rows) if (r.code === code) r.role = role
 }

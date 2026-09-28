@@ -110,6 +110,8 @@ export const POSTING_ROLES = [
   'retained_earnings',
   'opening_balance_equity',
   'rounding',
+  'fx_gain',
+  'fx_loss',
 ]
 
 // ── A-02: country templates and importing a chart ────────────────────────────

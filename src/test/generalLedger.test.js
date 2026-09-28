@@ -74,7 +74,7 @@ describe('general ledger (A-01a)', () => {
     expect(tables.indexOf('journal_entries')).toBe(tables.indexOf('customer_refunds') + 1)
     expect(tables.indexOf('journal_lines')).toBe(tables.indexOf('journal_entries') + 1)
     expect(BACKUP_MODULES.find((m) => m.id === 'ledger').tables).toEqual([
-      'gl_accounts', 'posting_rules', 'tax_codes', 'tax_code_rates', 'journal_entries', 'journal_lines',
+      'gl_accounts', 'posting_rules', 'tax_codes', 'tax_code_rates', 'exchange_rates', 'journal_entries', 'journal_lines',
       'accounting_periods', 'period_reopen_requests', // A-03 (20260910)
     ])
   })

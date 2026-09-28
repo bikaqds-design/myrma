@@ -131,6 +131,8 @@ export const BACKUP_TABLES = [
   // A-04 (20260911): before the products and document lines that name them
   { table: 'tax_codes' },
   { table: 'tax_code_rates' },
+  // A-05 (20260912): after the currencies they name
+  { table: 'exchange_rates' },
   { table: 'brands' },
   { table: 'categories' },
   { table: 'subcategories' },
@@ -363,7 +365,7 @@ export const BACKUP_MODULES = [
   },
   {
     id: 'ledger',
-    tables: ['gl_accounts', 'posting_rules', 'tax_codes', 'tax_code_rates', 'journal_entries', 'journal_lines', 'accounting_periods', 'period_reopen_requests'],
+    tables: ['gl_accounts', 'posting_rules', 'tax_codes', 'tax_code_rates', 'exchange_rates', 'journal_entries', 'journal_lines', 'accounting_periods', 'period_reopen_requests'],
   },
   {
     id: 'comms',
