@@ -8,7 +8,7 @@ import { AdjustStockModal } from './AdjustStockModal'
 // (Warehouse Module R1). Built on the shared Modal, same as StockBreakdownModal
 // — a centered dialog, not a bespoke slide-over, matching every other detail
 // overlay already in this codebase.
-export function BranchesDrawer({ open, onClose, productSummary, warehouses, isManagerOrAbove, userEmail, onRefresh }) {
+export function BranchesDrawer({ open, onClose, productSummary, warehouses, isManagerOrAbove, canTransfer = isManagerOrAbove, canAdjust = isManagerOrAbove, userEmail, onRefresh }) {
   const { t } = useTranslation()
   const [transferTarget, setTransferTarget] = useState(null)
   const [adjustTarget, setAdjustTarget] = useState(null)
@@ -36,18 +36,22 @@ export function BranchesDrawer({ open, onClose, productSummary, warehouses, isMa
                   <span className="font-medium text-[#211f1b] dark:text-[#e8ebf0]">{b.qty}</span>
                   {isBulk && isManagerOrAbove && (
                     <>
-                      <button
-                        onClick={() => setTransferTarget({ warehouseId: b.warehouse_id, unitId: null })}
-                        className="text-xs text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
-                      >
-                        {t('inventory.actionTransfer')}
-                      </button>
-                      <button
-                        onClick={() => setAdjustTarget({ warehouseId: b.warehouse_id, unit: null })}
-                        className="text-xs text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
-                      >
-                        {t('inventory.actionAdjust')}
-                      </button>
+                      {canTransfer && (
+                        <button
+                          onClick={() => setTransferTarget({ warehouseId: b.warehouse_id, unitId: null })}
+                          className="text-xs text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
+                        >
+                          {t('inventory.actionTransfer')}
+                        </button>
+                      )}
+                      {canAdjust && (
+                        <button
+                          onClick={() => setAdjustTarget({ warehouseId: b.warehouse_id, unit: null })}
+                          className="text-xs text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
+                        >
+                          {t('inventory.actionAdjust')}
+                        </button>
+                      )}
                     </>
                   )}
                 </div>

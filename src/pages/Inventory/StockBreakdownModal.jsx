@@ -28,6 +28,9 @@ export function StockBreakdownModal({
   warehouses,
   userEmail,
   isManagerOrAbove,
+  // the user's own inventory.transfer / inventory.adjust (20260914)
+  canTransfer = isManagerOrAbove,
+  canAdjust = isManagerOrAbove,
   onRefresh,
 }) {
   const { t } = useTranslation()
@@ -190,20 +193,24 @@ export function StockBreakdownModal({
                     <span className="font-medium text-[#211f1b] dark:text-[#e8ebf0]">{w.quantity}</span>
                     {isBulk && isManagerOrAbove && w.warehouseId && (
                       <>
-                        <button
-                          onClick={() =>
-                            setTransferTarget({ warehouseId: w.warehouseId, unitId: null })
-                          }
-                          className="text-xs text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
-                        >
-                          {t('inventory.actionTransfer')}
-                        </button>
-                        <button
-                          onClick={() => setAdjustTarget({ warehouseId: w.warehouseId, unit: null })}
-                          className="text-xs text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
-                        >
-                          {t('inventory.actionAdjust')}
-                        </button>
+                        {canTransfer && (
+                          <button
+                            onClick={() =>
+                              setTransferTarget({ warehouseId: w.warehouseId, unitId: null })
+                            }
+                            className="text-xs text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
+                          >
+                            {t('inventory.actionTransfer')}
+                          </button>
+                        )}
+                        {canAdjust && (
+                          <button
+                            onClick={() => setAdjustTarget({ warehouseId: w.warehouseId, unit: null })}
+                            className="text-xs text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
+                          >
+                            {t('inventory.actionAdjust')}
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
@@ -228,20 +235,24 @@ export function StockBreakdownModal({
                       {u.serial_number || t('inventory.noSerial')}
                     </span>
                     <div className="flex items-center gap-3">
-                      <button
-                        onClick={() =>
-                          setTransferTarget({ warehouseId: u.warehouse_id, unitId: u.id })
-                        }
-                        className="text-xs text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
-                      >
-                        {t('inventory.actionTransfer')}
-                      </button>
-                      <button
-                        onClick={() => setAdjustTarget({ warehouseId: u.warehouse_id, unit: u })}
-                        className="text-xs text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
-                      >
-                        {t('inventory.actionAdjust')}
-                      </button>
+                      {canTransfer && (
+                        <button
+                          onClick={() =>
+                            setTransferTarget({ warehouseId: u.warehouse_id, unitId: u.id })
+                          }
+                          className="text-xs text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
+                        >
+                          {t('inventory.actionTransfer')}
+                        </button>
+                      )}
+                      {canAdjust && (
+                        <button
+                          onClick={() => setAdjustTarget({ warehouseId: u.warehouse_id, unit: u })}
+                          className="text-xs text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
+                        >
+                          {t('inventory.actionAdjust')}
+                        </button>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -265,12 +276,14 @@ export function StockBreakdownModal({
                     {u.serial_number || t('inventory.noSerial')}
                     <span className="ms-2 text-xs text-[#6c6760] dark:text-[#9aa4b2]">{u.status}</span>
                   </span>
-                  <button
-                    onClick={() => setAdjustTarget({ warehouseId: u.warehouse_id, unit: u })}
-                    className="text-xs text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
-                  >
-                    {t('inventory.actionAdjust')}
-                  </button>
+                  {canAdjust && (
+                    <button
+                      onClick={() => setAdjustTarget({ warehouseId: u.warehouse_id, unit: u })}
+                      className="text-xs text-[#4338ca] dark:text-[#a5b4fc] hover:underline"
+                    >
+                      {t('inventory.actionAdjust')}
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

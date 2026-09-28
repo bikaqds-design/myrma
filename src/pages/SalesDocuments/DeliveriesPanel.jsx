@@ -29,7 +29,10 @@ const DLV_PILL = {
   cancelled: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
 }
 
-export default function DeliveriesPanel({ so, customer, isManager, canInvoice, currentUserEmail, onInvoiceCreated }) {
+// canDeliver / canTakeReturn are the user's own sales.deliver / sales.return
+// (20260914); they default to the role, so a manager with an override set off
+// is not offered what the database would refuse.
+export default function DeliveriesPanel({ so, customer, isManager, canDeliver = isManager, canTakeReturn = isManager, canInvoice, currentUserEmail, onInvoiceCreated }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { confirm, confirmDialog } = useConfirm()
@@ -74,7 +77,7 @@ export default function DeliveriesPanel({ so, customer, isManager, canInvoice, c
   // Goods come back only from a delivery whose invoice is posted (goods
   // first: the return's credit note credits that invoice), with something left.
   const canReturn = (d, inv) =>
-    isManager && d.status === 'confirmed' && inv?.doc_status === 'posted'
+    canTakeReturn && d.status === 'confirmed' && inv?.doc_status === 'posted'
     && returnableByLine(d, returns).some((r) => r.left > 0)
 
   const refresh = () => {
@@ -170,7 +173,7 @@ export default function DeliveriesPanel({ so, customer, isManager, canInvoice, c
         {so.status === 'confirmed' && openTotal > 0 && (
           <Button
             size="sm"
-            disabled={!isManager || busy}
+            disabled={!canDeliver || busy}
             onClick={() => setShowCreate(true)}
           >
             {t('salesDocuments.dlvNew')}
@@ -204,8 +207,8 @@ export default function DeliveriesPanel({ so, customer, isManager, canInvoice, c
       )}
 
       <div className="px-4 py-3 space-y-2">
-        {!isManager && so.status === 'confirmed' && (
-          <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.dlvManagersOnly')}</p>
+        {!canDeliver && so.status === 'confirmed' && (
+          <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t(isManager ? 'salesDocuments.dlvNoPermission' : 'salesDocuments.dlvManagersOnly')}</p>
         )}
         {hasServiceLines && (
           <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.dlvServicesNote')}</p>
@@ -234,7 +237,7 @@ export default function DeliveriesPanel({ so, customer, isManager, canInvoice, c
                     {d.notes && <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2] mt-0.5">{d.notes}</div>}
                   </div>
                   <div className="flex items-center gap-2">
-                    {d.status === 'draft' && isManager && (
+                    {d.status === 'draft' && canDeliver && (
                       <>
                         <Button size="sm" onClick={() => handleConfirm(d)} loading={busy}>
                           {t('salesDocuments.dlvConfirm')}
@@ -306,7 +309,7 @@ export default function DeliveriesPanel({ so, customer, isManager, canInvoice, c
                     {r.reason && <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2] mt-0.5">{r.reason}</div>}
                   </div>
                   <div className="flex items-center gap-2">
-                    {r.status === 'draft' && isManager && (
+                    {r.status === 'draft' && canTakeReturn && (
                       <>
                         <Button size="sm" onClick={() => handleConfirmReturn(r)} loading={busy}>{t('salesDocuments.rtnConfirm')}</Button>
                         <Button size="sm" variant="secondary" onClick={() => handleCancelReturn(r)} loading={busy}>{t('salesDocuments.rtnCancel')}</Button>
@@ -329,7 +332,7 @@ export default function DeliveriesPanel({ so, customer, isManager, canInvoice, c
                         {cn.cn_code ? t('salesDocuments.rtnViewCreditNote', { code: cn.cn_code }) : t('salesDocuments.rtnCreditNoteDraft')}
                       </Link>
                     )}
-                    {r.status === 'confirmed' && !cn && isManager && (
+                    {r.status === 'confirmed' && !cn && canTakeReturn && (
                       <Button size="sm" variant="secondary" onClick={() => handleCreditNote(r)} loading={busy}>
                         {t('salesDocuments.rtnCreditNote')}
                       </Button>

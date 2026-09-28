@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, waitFor, fireEvent, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React from 'react'
+import { resolvePermissions } from '../lib/permissions'
 import { readFileSync } from 'node:fs'
 import { monthsToShow, periodActions, validateReopenReason } from '../pages/Accounting/_periods'
 
@@ -141,7 +142,7 @@ const { default: PeriodsTab } = await import('../pages/Accounting/PeriodsTab.jsx
 
 const renderTab = (role, email = 'me@x.com') => render(
   <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-    <PeriodsTab currentUserRole={role} currentUserEmail={email} />
+    <PeriodsTab currentUserRole={role} currentUserEmail={email} currentUserPermissions={resolvePermissions(role, null)} />
   </QueryClientProvider>
 )
 const row = async (label) => (await screen.findByText(label)).closest('tr')

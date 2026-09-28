@@ -7,6 +7,7 @@ import { useCustomerSearch, useCustomer } from '../../lib/useLookups'
 import { ModalOverlay, ModalCard, Button, Label, Input, Select, Textarea } from '../../components/ui'
 import Pagination from '../../components/Pagination'
 import { ROLES } from '../../lib/constants'
+import { canDo } from '../../lib/permissions'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { canApproveRefund, validateRefund } from './_refunds'
 
@@ -29,10 +30,14 @@ const PILL = {
 }
 const fmtMoney = (n) => (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export default function RefundsTab({ currentUserEmail, currentUserRole, perPage, setPerPage }) {
+export default function RefundsTab({ currentUserEmail, currentUserRole, currentUserPermissions, perPage, setPerPage }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const isManager = [ROLES.MANAGER, ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(currentUserRole)
+  // recording / rejecting and approving are separate permissions in the
+  // database (accounting.refund, accounting.approve_refund; 20260914)
+  const canRecordRefund = isManager && canDo(currentUserRole, currentUserPermissions, 'accounting', 'refund')
+  const canApproveRefunds = isManager && canDo(currentUserRole, currentUserPermissions, 'accounting', 'approve_refund')
   const [page, setPage] = useState(1)
   const [showRecord, setShowRecord] = useState(false)
   const [rejecting, setRejecting] = useState(null)
@@ -83,7 +88,7 @@ export default function RefundsTab({ currentUserEmail, currentUserRole, perPage,
     <>
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-[#6c6760] dark:text-[#9aa4b2]">{t('accounting.rfHint')}</p>
-        {isManager && <Button onClick={() => setShowRecord(true)}>+ {t('accounting.rfRecord')}</Button>}
+        {canRecordRefund && <Button onClick={() => setShowRecord(true)}>+ {t('accounting.rfRecord')}</Button>}
       </div>
 
       <div className="bg-white dark:bg-[#121823] rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-x-auto">
@@ -123,9 +128,9 @@ export default function RefundsTab({ currentUserEmail, currentUserRole, perPage,
                     )}
                   </td>
                   <td className="px-4 py-3 text-end">
-                    {r.status === 'pending_approval' && isManager && (
+                    {r.status === 'pending_approval' && (canRecordRefund || canApproveRefunds) && (
                       <div className="flex justify-end gap-2">
-                        {canApproveRefund(r, currentUserEmail) ? (
+                        {canApproveRefunds && canApproveRefund(r, currentUserEmail) ? (
                           <Button size="sm" loading={busy}
                             onClick={() => run(() => db.customerRefunds.approve(r.id, currentUserEmail), 'accounting.rfApprovedToast')}>
                             {t('accounting.rfApprove')}
@@ -133,9 +138,11 @@ export default function RefundsTab({ currentUserEmail, currentUserRole, perPage,
                         ) : (
                           <span className="text-xs italic text-[#6c6760] dark:text-[#9aa4b2] self-center">{t('accounting.rfAwaitingOther')}</span>
                         )}
-                        <Button size="sm" variant="secondary" disabled={busy} onClick={() => setRejecting(r)}>
-                          {t('accounting.rfReject')}
-                        </Button>
+                        {canRecordRefund && (
+                          <Button size="sm" variant="secondary" disabled={busy} onClick={() => setRejecting(r)}>
+                            {t('accounting.rfReject')}
+                          </Button>
+                        )}
                       </div>
                     )}
                   </td>

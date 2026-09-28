@@ -32,9 +32,11 @@ const same = (a, b) => String(a || '').toLowerCase() === String(b || '').toLower
  *   soft_close · close · reopen (a soft-closed month) · request_reopen ·
  *   approve · reject (an administrator) · withdraw (the one who asked) ·
  *   waiting (a request someone else must decide).
+ * `canClose` is the user's own accounting.close_period (20260914): the
+ * closing, reopening and request actions check it in the database.
  */
-export function periodActions({ month, status, today = new Date(), role, me, pending }) {
-  const finance = isFinanceRole(role)
+export function periodActions({ month, status, today = new Date(), role, me, pending, canClose = true }) {
+  const finance = isFinanceRole(role) && canClose
   const admin = isAdminRole(role)
   const ended = month < monthKey(today)
   const out = []

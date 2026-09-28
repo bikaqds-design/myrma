@@ -275,6 +275,26 @@ describe('DeliveriesPanel', () => {
     ],
   }
 
+  // S-01: sales.deliver / sales.return switched off for one manager (20260914)
+  it('a manager with deliveries switched off is told so and offered no delivery action', async () => {
+    deliveriesData = [
+      { id: 'D1', delivery_code: null, status: 'draft', created_at: '2026-09-24', delivery_lines: [{ sales_order_line_id: 'L1', qty: 1, product_name: 'Router', line_no: 1 }] },
+    ]
+    renderPanel({ canDeliver: false })
+    const btn = await screen.findByRole('button', { name: 'salesDocuments.dlvNew' })
+    expect(btn.disabled).toBe(true)
+    expect(screen.getByText('salesDocuments.dlvNoPermission')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'salesDocuments.dlvConfirm' })).toBeNull()
+  })
+
+  it('a manager with returns switched off is not offered a return', async () => {
+    deliveriesData = [SHIPPED]
+    invoicesData = [{ id: 'I1', delivery_id: 'D1', doc_status: 'posted', inv_code: 'INV-2026-00001' }]
+    renderPanel({ canTakeReturn: false })
+    await waitFor(() => expect(screen.getByText('salesDocuments.dlvViewInvoice:{"code":"INV-2026-00001"}')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'salesDocuments.rtnRecord' })).toBeNull()
+  })
+
   it('goods come back only from a delivery whose invoice is posted, and only for a manager', async () => {
     deliveriesData = [SHIPPED]
     invoicesData = [{ id: 'I1', delivery_id: 'D1', doc_status: 'draft', inv_code: null }]

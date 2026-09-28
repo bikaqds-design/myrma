@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { canDo } from '../lib/permissions'
+import { canDo, approvalPermission } from '../lib/permissions'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { db, storage, supabase } from '../api/supabaseClient'
@@ -23,8 +23,6 @@ const TYPE_ICON = {
 // Approval pool format: approval|docType|docId|code|total|customer
 // Purchase-side approvals. Everything else in the approval pool is a sales
 // document — see APPROVAL_DOC_TYPE_LABEL_KEY.
-const PURCHASE_APPROVAL_DOC_TYPES = new Set(['purchase_order', 'vendor_invoice'])
-
 function parseApprovalTitle(title) {
   const parts = (title || '').split('|')
   return {
@@ -110,9 +108,8 @@ export function ActivityChatter({ relatedType, relatedId, currentUserEmail, sale
    */
   const canApproveDoc = (activity) => {
     const { docType } = parseApprovalTitle(activity.title)
-    return PURCHASE_APPROVAL_DOC_TYPES.has(docType)
-      ? canDo(currentUserRole, currentUserPermissions, 'purchasing', 'approve')
-      : canDo(currentUserRole, currentUserPermissions, 'sales', 'post')
+    // the permission the database checks for this document type (20260914)
+    return canDo(currentUserRole, currentUserPermissions, ...approvalPermission(docType))
   }
 
   const [internalTab, setInternalTab] = useState('note')

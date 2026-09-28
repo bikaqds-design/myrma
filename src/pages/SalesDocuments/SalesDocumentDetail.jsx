@@ -134,6 +134,10 @@ export default function SalesDocumentDetail({
   const baseCurrency = useBaseCurrency()
   const canCancelDoc = canDo(currentUserRole, currentUserPermissions, 'sales', 'cancel')
   const canPostDoc   = canDo(currentUserRole, currentUserPermissions, 'sales', 'post')
+  // voiding and issuing credit are their own permissions in the database
+  // (void_invoice / void_credit_note, issue_credit_note; 20260914)
+  const canVoidDoc      = canDo(currentUserRole, currentUserPermissions, 'sales', 'void')
+  const canIssueCredit  = canDo(currentUserRole, currentUserPermissions, 'sales', 'issue_credit')
   // Recording a payment against an invoice is a cash action, not a sales one —
   // it is the accountant's job and not a rep's, so it follows the accounting
   // module rather than `sales`.
@@ -665,7 +669,7 @@ export default function SalesDocumentDetail({
                 </Button>
               )}
               {n.status === 'posted' && (
-                <Button disabled={!canCancelDoc} variant="danger" size="sm" onClick={() => setShowVoidModal(true)}>
+                <Button disabled={!canVoidDoc} variant="danger" size="sm" onClick={() => setShowVoidModal(true)}>
                   {t('salesDocuments.voidInvoice')}
                 </Button>
               )}
@@ -681,21 +685,21 @@ export default function SalesDocumentDetail({
           {isCreditNote && !doc.archived && (
             <>
               {n.status === 'draft' && (
-                <Button disabled={!canPostDoc} size="sm" onClick={handleIssueCN} loading={busy}>
+                <Button disabled={!canIssueCredit} size="sm" onClick={handleIssueCN} loading={busy}>
                   {t('salesDocuments.issueCN')}
                 </Button>
               )}
               {n.status === 'pending_approval' && (
                 <>
                   <Button
-                    disabled={!canPostDoc || currentUserEmail?.toLowerCase() === doc.created_by?.toLowerCase()}
+                    disabled={!canIssueCredit || currentUserEmail?.toLowerCase() === doc.created_by?.toLowerCase()}
                     size="sm"
                     onClick={handleIssueCN}
                     loading={busy}
                   >
                     {t('salesDocuments.cnApproveIssue')}
                   </Button>
-                  <Button disabled={!canPostDoc} variant="secondary" size="sm" onClick={handleReturnCN}>
+                  <Button disabled={!canIssueCredit} variant="secondary" size="sm" onClick={handleReturnCN}>
                     {t('salesDocuments.cnReturnToDraft')}
                   </Button>
                   <span className="text-xs text-[#6c6760] dark:text-[#9aa4b2] italic self-center">
@@ -704,7 +708,7 @@ export default function SalesDocumentDetail({
                 </>
               )}
               {['draft', 'pending_approval', 'issued'].includes(n.status) && (
-                <Button disabled={!canCancelDoc} variant="danger" size="sm" onClick={() => setShowVoidModal(true)}>
+                <Button disabled={!canVoidDoc} variant="danger" size="sm" onClick={() => setShowVoidModal(true)}>
                   {t('salesDocuments.voidCN')}
                 </Button>
               )}
@@ -896,6 +900,8 @@ export default function SalesDocumentDetail({
           so={doc}
           customer={customer}
           isManager={isManager}
+          canDeliver={isManager && canDo(currentUserRole, currentUserPermissions, 'sales', 'deliver')}
+          canTakeReturn={isManager && canDo(currentUserRole, currentUserPermissions, 'sales', 'return')}
           canInvoice={canInvoiceDelivery}
           currentUserEmail={currentUserEmail}
           onInvoiceCreated={handleDeliveryInvoiced}

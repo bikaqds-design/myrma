@@ -24,7 +24,9 @@ const GRN_PILL = {
   cancelled: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400',
 }
 
-export default function GoodsReceiptsPanel({ po, vendor, isManager, currentUserEmail, onInvoiceCreated }) {
+// canReceive is the user's own purchasing.receive (20260914); it defaults to the
+// role, so a manager with that permission set off is not offered receipts.
+export default function GoodsReceiptsPanel({ po, vendor, isManager, canReceive = isManager, currentUserEmail, onInvoiceCreated }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { confirm, confirmDialog } = useConfirm()
@@ -131,7 +133,7 @@ export default function GoodsReceiptsPanel({ po, vendor, isManager, currentUserE
             </Button>
           )}
           {canReceiveMore && (
-            <Button size="sm" disabled={!isManager || busy} onClick={() => setShowCreate(true)}>
+            <Button size="sm" disabled={!canReceive || busy} onClick={() => setShowCreate(true)}>
               {t('purchasing.grnNew')}
             </Button>
           )}
@@ -164,8 +166,8 @@ export default function GoodsReceiptsPanel({ po, vendor, isManager, currentUserE
       )}
 
       <div className="px-4 py-3 space-y-2">
-        {!isManager && canReceiveMore && (
-          <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('purchasing.grnManagersOnly')}</p>
+        {!canReceive && canReceiveMore && (
+          <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t(isManager ? 'purchasing.grnNoPermission' : 'purchasing.grnManagersOnly')}</p>
         )}
         {hasServiceLines && (
           <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('purchasing.grnServicesNote')}</p>
@@ -197,7 +199,7 @@ export default function GoodsReceiptsPanel({ po, vendor, isManager, currentUserE
                     {r.notes && <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2] mt-0.5">{r.notes}</div>}
                   </div>
                   <div className="flex items-center gap-2">
-                    {r.status === 'draft' && isManager && (
+                    {r.status === 'draft' && canReceive && (
                       <>
                         <Button size="sm" onClick={() => handleConfirm(r)} loading={busy}>{t('purchasing.grnConfirm')}</Button>
                         <Button size="sm" variant="secondary" onClick={() => handleCancel(r)} loading={busy}>{t('purchasing.grnCancel')}</Button>

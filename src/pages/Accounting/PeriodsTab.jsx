@@ -7,6 +7,7 @@ import { ModalOverlay, ModalCard, Button, Label, Textarea } from '../../componen
 import { useConfirm } from '../../hooks/useConfirm'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { monthsToShow, periodActions, validateReopenReason, REOPEN_REASON_MIN } from './_periods'
+import { canDo } from '../../lib/permissions'
 
 // Accounting › Periods (A-03 over 20260910). A month is open, soft closed
 // (only an accountant or administrator may post dated in it) or closed
@@ -26,7 +27,8 @@ const STATUS_CLS = {
 const MONEY_ITEMS = new Set(['draft_sales_invoices', 'unissued_credit_notes', 'unapproved_supplier_invoices',
   'pending_supplier_payments', 'pending_refunds', 'grni_balance'])
 
-export default function PeriodsTab({ currentUserEmail, currentUserRole }) {
+export default function PeriodsTab({ currentUserEmail, currentUserRole, currentUserPermissions }) {
+  const canClose = canDo(currentUserRole, currentUserPermissions, 'accounting', 'close_period')
   const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()
   const { confirm, confirmDialog } = useConfirm()
@@ -149,7 +151,7 @@ export default function PeriodsTab({ currentUserEmail, currentUserRole }) {
                 const p = byMonth.get(m)
                 const status = p?.status || 'open'
                 const pending = pendingByMonth.get(m) || null
-                const actions = periodActions({ month: m, status, role: currentUserRole, me: currentUserEmail, pending })
+                const actions = periodActions({ month: m, status, role: currentUserRole, me: currentUserEmail, pending, canClose })
                 const by = status === 'closed' ? p?.closed_by : status === 'soft_closed' ? p?.soft_closed_by : p?.reopened_by
                 return (
                   <React.Fragment key={m}>

@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
 import { useDebouncedValue } from '../../lib/useDebouncedValue'
 import { useURLTab } from '../../hooks/useURLTab'
-import { canDo, ownershipScope } from '../../lib/permissions'
+import { canDo, approvalPermission, ownershipScope } from '../../lib/permissions'
 import { PageHeader } from '../../components/ui'
 import { safeStorage } from '../../lib/safeStorage'
 import { useUrlState, useResetOnFilterChange } from '../../lib/useUrlState'
@@ -75,8 +75,6 @@ const PURCHASE_DOC_TYPES = new Set(['purchase_order', 'vendor_invoice'])
 // Approval pool format: approval|docType|docId|code|total|customer
 // Approval requests raised by the purchasing side. Everything else in
 // APPROVAL_DOC_TYPE_LABEL_KEY is a sales document.
-const PURCHASE_APPROVAL_DOC_TYPES = new Set(['purchase_order', 'vendor_invoice'])
-
 function parseApprovalTitle(title) {
   const parts = (title || '').split('|')
   return {
@@ -259,15 +257,15 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
    * orders and vendor invoices alike. A manager approving their own purchase
    * order is the separation-of-duties problem that list could not express.
    *
-   * Sales documents route to `sales.post`; purchase documents route to
-   * `purchasing.approve`, which no role default grants, so approval of spend
-   * lands with admin/super_admin (who bypass canDo).
+   * Each document type needs the permission the database checks when it is
+   * approved (approvalPermission): purchase documents `purchasing.approve`,
+   * which no role default grants, so approval of spend lands with
+   * admin/super_admin (who bypass canDo).
    */
   const canApproveDoc = (activity) => {
     const { docType } = parseApprovalTitle(activity.title)
-    return PURCHASE_APPROVAL_DOC_TYPES.has(docType)
-      ? canDo(currentUserRole, currentUserPermissions, 'purchasing', 'approve')
-      : canDo(currentUserRole, currentUserPermissions, 'sales', 'post')
+    // the permission the database checks for this document type (20260914)
+    return canDo(currentUserRole, currentUserPermissions, ...approvalPermission(docType))
   }
 
   // ── Pagination ────────────────────────────────────────────────────────────
