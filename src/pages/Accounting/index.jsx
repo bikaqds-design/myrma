@@ -19,6 +19,8 @@ import { SearchInput } from '../../components/SearchInput'
 import RefundsTab from './RefundsTab'
 import JournalTab from './JournalTab'
 import TrialBalanceTab from './TrialBalanceTab'
+import ProfitLossTab from './ProfitLossTab'
+import BalanceSheetTab from './BalanceSheetTab'
 import PeriodsTab from './PeriodsTab'
 import TaxTab from './TaxTab'
 import ExchangeRatesTab from './ExchangeRatesTab'
@@ -248,7 +250,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
           canRecord ? (
             <Button onClick={() => setShowRecordVendorModal(true)}>+ {t('purchasing.recordPayment')}</Button>
           ) : null
-        ) : !['ap_aging', 'refunds', 'journal', 'trial_balance', 'periods', 'tax', 'rates'].includes(tab) ? (
+        ) : !['ap_aging', 'refunds', 'journal', 'trial_balance', 'profit_loss', 'balance_sheet', 'periods', 'tax', 'rates'].includes(tab) ? (
           canRecord ? (
             <Button onClick={() => setShowRecordModal(true)}>+ {t('accounting.recordPayment')}</Button>
           ) : null
@@ -298,6 +300,8 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
             ? [
                 { id: 'journal', label: t('accounting.tabJournal') },
                 { id: 'trial_balance', label: t('accounting.tabTrialBalance') },
+                { id: 'profit_loss', label: t('accounting.tabProfitLoss') },
+                { id: 'balance_sheet', label: t('accounting.tabBalanceSheet') },
                 { id: 'periods', label: t('accounting.tabPeriods') },
                 { id: 'tax', label: t('accounting.tabTax') },
                 { id: 'rates', label: t('accounting.tabRates') },
@@ -391,6 +395,8 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
 
       {tab === 'journal' && canSeeLedger && <JournalTab perPage={perPage} setPerPage={setPerPage} />}
       {tab === 'trial_balance' && canSeeLedger && <TrialBalanceTab />}
+      {tab === 'profit_loss' && canSeeLedger && <ProfitLossTab />}
+      {tab === 'balance_sheet' && canSeeLedger && <BalanceSheetTab />}
       {tab === 'periods' && canSeeLedger && <PeriodsTab currentUserEmail={currentUserEmail} currentUserRole={currentUserRole} currentUserPermissions={currentUserPermissions} />}
       {tab === 'tax' && canSeeLedger && <TaxTab currentUserRole={currentUserRole} />}
       {tab === 'rates' && canSeeLedger && <ExchangeRatesTab currentUserRole={currentUserRole} />}

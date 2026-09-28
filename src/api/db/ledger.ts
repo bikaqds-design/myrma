@@ -63,6 +63,52 @@ export interface TrialBalanceRow {
   balance: number
 }
 
+/** A line of the profit and loss (rma_profit_and_loss, 20260916). */
+export interface ProfitLossRow {
+  account_id: string
+  code: string
+  name: string
+  name_ar: string | null
+  account_type: 'income' | 'expense'
+  parent_id: string | null
+  parent_code: string | null
+  parent_name: string | null
+  parent_name_ar: string | null
+  amount: number
+}
+
+/** A line of the balance sheet (rma_balance_sheet, 20260916). */
+export interface BalanceSheetRow {
+  kind: 'account' | 'prior_years_earnings' | 'current_year_earnings'
+  section: 'asset' | 'liability' | 'equity'
+  account_id: string | null
+  code: string | null
+  name: string | null
+  name_ar: string | null
+  parent_id: string | null
+  parent_code: string | null
+  parent_name: string | null
+  parent_name_ar: string | null
+  amount: number
+}
+
+/** One journal line on an account, with its running balance (rma_account_activity). */
+export interface AccountActivityRow {
+  entry_id: string
+  entry_no: string
+  entry_date: string
+  source_type: string
+  source_id: string | null
+  source_code: string | null
+  event: string
+  memo: string | null
+  debit: number
+  credit: number
+  running_balance: number
+  opening_balance: number
+  total_count: number
+}
+
 export interface JournalFilters {
   from?: string | null
   to?: string | null
@@ -102,6 +148,38 @@ export const ledger = {
   },
 
   /** Debits, credits and normal-side balance per account over the dates (either may be empty). */
+  /** Profit and loss for a period (both dates required). */
+  async profitAndLoss(from: string, to: string): Promise<ProfitLossRow[]> {
+    const { data, error } = await supabase.rpc('rma_profit_and_loss', { p_from: from, p_to: to })
+    if (error) throw error
+    return (data ?? []) as ProfitLossRow[]
+  },
+
+  /** Balance sheet at a date, with the profit or loss not yet closed as equity. */
+  async balanceSheet(asOf: string): Promise<BalanceSheetRow[]> {
+    const { data, error } = await supabase.rpc('rma_balance_sheet', { p_as_of: asOf })
+    if (error) throw error
+    return (data ?? []) as BalanceSheetRow[]
+  },
+
+  /**
+   * One page of an account's lines in date order, paged in the database
+   * (BUG-066). `opening` is the balance before `from`; `count` all lines.
+   */
+  async accountActivity(accountId: string, from: string | null, to: string, page: number, pageSize: number) {
+    const { data, error } = await supabase.rpc('rma_account_activity', {
+      p_account_id: accountId, p_from: from || null, p_to: to,
+      p_limit: pageSize, p_offset: (Math.max(page, 1) - 1) * pageSize,
+    })
+    if (error) throw error
+    const rows = (data ?? []) as AccountActivityRow[]
+    return {
+      data: rows,
+      count: rows.length ? Number(rows[0].total_count) : null,
+      opening: rows.length ? Number(rows[0].opening_balance) : null,
+    }
+  },
+
   async trialBalance(from: string | null, to: string | null): Promise<TrialBalanceRow[]> {
     const { data, error } = await supabase.rpc('rma_trial_balance', { p_from: from || null, p_to: to || null })
     if (error) throw error
