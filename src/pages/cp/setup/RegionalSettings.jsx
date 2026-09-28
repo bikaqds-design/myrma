@@ -7,6 +7,7 @@ import { Button, Label, Input, Select } from '../../../components/ui'
 import { captureException } from '../../../lib/sentry'
 import { SetupCard } from './_shared'
 import { useConfigValue, saveConfig } from './_config'
+import SeparationOfDuties from './SeparationOfDuties'
 
 /**
  * Tax, fiscal year, timezone, and the email typo warning.
@@ -51,6 +52,8 @@ export default function RegionalSettings({ currentUserEmail }) {
 
   const priceTolerance = useConfigValue('purchase_price_tolerance_pct', null)
   const paymentApproval = useConfigValue('vendor_payment_approval', false)
+  const sodSetting = useConfigValue('separation_of_duties', false)
+  const sodOn = sodSetting === true || sodSetting === 'true'
 
   const [draftTax, setDraftTax] = useState(null)
   const [draftCredit, setDraftCredit] = useState(null)
@@ -214,6 +217,8 @@ export default function RegionalSettings({ currentUserEmail }) {
           </button>
         </div>
       </SetupCard>
+
+      <SeparationOfDuties enabled={sodOn} busy={busy} onToggle={() => write('separation_of_duties', !sodOn)} />
 
       <SetupCard title={t('cp.setup.fiscalTitle')}>
         <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mb-3">

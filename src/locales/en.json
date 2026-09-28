@@ -3346,7 +3346,16 @@
       "tolerancePct": "Tolerance (%)",
       "toleranceInvalid": "Enter a number from 0 to 100, or leave it blank.",
       "vpApprovalTitle": "Supplier payments need a second manager",
-      "vpApprovalHint": "When on, a supplier payment waits until a manager who did not record it approves it; only then does it get its number and settle bills. Leave off if only one person handles payments."
+      "vpApprovalHint": "When on, a supplier payment waits until a manager who did not record it approves it; only then does it get its number and settle bills. Leave off if only one person handles payments.",
+      "sodTitle": "The creator cannot approve their own document",
+      "sodHint": "When on, the person who created a quotation, sales order, invoice, purchase order or supplier invoice cannot accept, confirm, post or approve it; another manager must. Administrators are exempt. Leave off while only one person approves.",
+      "sodConflictsTitle": "Who can create and approve the same kind of document",
+      "sodConflictsOff": "While this is off, these people can approve documents they created themselves.",
+      "sodConflictsOn": "These people can create and approve, but the database now stops them approving their own documents.",
+      "sodNone": "Nobody besides administrators can both create and approve.",
+      "sodPair_quotations": "Quotations",
+      "sodPair_sales_orders": "Sales orders",
+      "sodPair_invoices": "Invoices"
     }
   },
   "notifications": {
