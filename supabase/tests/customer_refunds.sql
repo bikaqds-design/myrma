@@ -82,7 +82,7 @@ BEGIN
 
   -- ══ 1. recording ══════════════════════════════════════════════════════════
   v_out := pg_temp.refund(v_rep, 'payment', v_pay, 50);
-  PERFORM pg_temp.check('a sales rep cannot record a refund', v_out LIKE 'err:P0001%managers%', '-> ' || v_out);
+  PERFORM pg_temp.check('a sales rep cannot record a refund', v_out LIKE 'err:42501%permission to record refunds%', '-> ' || v_out);
   v_out := pg_temp.refund(v_mgr, 'payment', v_pay, 250);
   PERFORM pg_temp.check('never more than the payment has left (250 of 200)', v_out LIKE 'err:P0001%Only 200.00 is left%', '-> ' || v_out);
   v_out := pg_temp.refund(v_mgr, 'payment', v_pay, 0.001);
@@ -99,7 +99,7 @@ BEGIN
   v_out := pg_temp.call(v_mgr, format('SELECT public.approve_customer_refund(%L, %L)', v_rf, v_mgr));
   PERFORM pg_temp.check('the manager who recorded it cannot approve it', v_out LIKE 'err:P0001%recorded a refund cannot approve%', '-> ' || v_out);
   v_out := pg_temp.call(v_acct, format('SELECT public.approve_customer_refund(%L, %L)', v_rf, v_acct));
-  PERFORM pg_temp.check('an accountant cannot approve it (a second MANAGER)', v_out LIKE 'err:P0001%managers%', '-> ' || v_out);
+  PERFORM pg_temp.check('an accountant cannot approve it (a second MANAGER)', v_out LIKE 'err:42501%permission to approve refunds%', '-> ' || v_out);
   v_out := pg_temp.call(v_mgr2, format('SELECT public.approve_customer_refund(%L, %L)', v_rf, v_mgr2));
   PERFORM pg_temp.check('another manager approves it: numbered RF-, approver recorded, the payment has 50 left',
     v_out = 'ok' AND (SELECT status = 'approved' AND refund_code LIKE 'RF-%' AND approved_by = v_mgr2 FROM public.customer_refunds WHERE id = v_rf)

@@ -94,3 +94,25 @@ export function getRoleTemplates() {
     permissions: ROLE_DEFAULT_PERMISSIONS[m.key] || buildUniform(true),
   }))
 }
+
+/**
+ * What a user's permission editor should store: only the actions that differ
+ * from what their role grants (`baseline`), or null when nothing does.
+ *
+ * The editor used to store the whole matrix, which froze every role default at
+ * the day it was saved: a manager saved while `inventory.transfer` defaulted to
+ * false kept false after the default changed, and since 20260914 the database
+ * enforces what is stored. Storing only the differences lets a changed default
+ * reach everyone who was not deliberately set apart from it.
+ */
+export function permissionOverrides(perms, baseline) {
+  const out = {}
+  for (const [section, actions] of Object.entries(perms || {})) {
+    for (const [action, value] of Object.entries(actions || {})) {
+      if (typeof value !== 'boolean') continue
+      if (value === (baseline?.[section]?.[action] === true)) continue
+      ;(out[section] ||= {})[action] = value
+    }
+  }
+  return Object.keys(out).length ? out : null
+}

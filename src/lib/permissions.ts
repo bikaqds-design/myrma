@@ -78,8 +78,12 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
       manage_batches: true,
       delete: false,
       export: true,
-      manage_warehouses: false,
-      transfer: false,
+      // The stock actions the database checks (permission_catalog, 20260914).
+      // The screens already offered them to managers and above.
+      manage_warehouses: true,
+      transfer: true,
+      adjust: true,
+      receive: true,
     },
     dashboard: {
       view_dashboard: true,
@@ -119,14 +123,19 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
       view_all: true,
       view: true, create: true, edit: true, delete: false,
       post: true, cancel: true, export: true,
+      void: true, approve: true, issue_credit: true, deliver: true, return: true,
     },
-    accounting: { view: true, record_payment: true, reverse_payment: true, export: true },
+    // Closing a period is finance's (rma_is_finance: admin or accountant).
+    accounting: {
+      view: true, record_payment: true, reverse_payment: true, export: true,
+      refund: true, approve_refund: true, approve_payment: true, close_period: false,
+    },
     // No `approve`: a manager can raise and receive a purchase order but not
     // approve their own spend. admin/super_admin bypass canDo, so approval
     // lands with them.
     purchasing: {
       view: true, create: true, edit: true, approve: false, receive: true,
-      cancel: true, manage_vendors: true, export: true,
+      cancel: true, manage_vendors: true, export: true, amend: true,
     },
   },
   /**
@@ -143,15 +152,21 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
    * an admin approves the spend, the accountant settles and reconciles it.
    */
   [ROLES.ACCOUNTANT]: {
-    accounting: { view: true, record_payment: true, reverse_payment: true, export: true },
+    // Refunds are recorded and approved by managers (two of them); the
+    // accountant closes the books.
+    accounting: {
+      view: true, record_payment: true, reverse_payment: true, export: true,
+      refund: false, approve_refund: false, approve_payment: false, close_period: true,
+    },
     // Read-only on both document sides — needed to reconcile, not to originate.
     sales: {
       view: true, view_all: true, create: false, edit: false, delete: false,
       post: false, cancel: false, export: true,
+      void: false, approve: false, issue_credit: false, deliver: false, return: false,
     },
     purchasing: {
       view: true, create: false, edit: false, approve: false, receive: false,
-      cancel: false, manage_vendors: false, export: true,
+      cancel: false, manage_vendors: false, export: true, amend: false,
     },
     // Chasing collections needs the customer record and its history.
     customers: {
@@ -214,6 +229,8 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
       export: false,
       manage_warehouses: false,
       transfer: false,
+      adjust: false,
+      receive: false,
     },
     dashboard: {
       view_dashboard: true,
@@ -236,11 +253,17 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
     parts: { view: true, create: false, edit: false, delete: false, adjust_stock: true },
     calendar: { view: true },
     reports: { view: false, export: false },
-    sales: { view: false, create: false, edit: false, delete: false, post: false, cancel: false, export: false },
-    accounting: { view: false, record_payment: false, reverse_payment: false, export: false },
+    sales: {
+      view: false, create: false, edit: false, delete: false, post: false, cancel: false, export: false,
+      void: false, approve: false, issue_credit: false, deliver: false, return: false,
+    },
+    accounting: {
+      view: false, record_payment: false, reverse_payment: false, export: false,
+      refund: false, approve_refund: false, approve_payment: false, close_period: false,
+    },
     purchasing: {
       view: false, create: false, edit: false, approve: false, receive: false,
-      cancel: false, manage_vendors: false, export: false,
+      cancel: false, manage_vendors: false, export: false, amend: false,
     },
   },
   [ROLES.VIEWER]: {
@@ -287,6 +310,8 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
       export: true,
       manage_warehouses: false,
       transfer: false,
+      adjust: false,
+      receive: false,
     },
     dashboard: {
       view_dashboard: true,
@@ -309,11 +334,17 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
     parts: { view: true, create: false, edit: false, delete: false },
     calendar: { view: true },
     reports: { view: false, export: false },
-    sales: { view: false, create: false, edit: false, delete: false, post: false, cancel: false, export: false },
-    accounting: { view: false, record_payment: false, reverse_payment: false, export: false },
+    sales: {
+      view: false, create: false, edit: false, delete: false, post: false, cancel: false, export: false,
+      void: false, approve: false, issue_credit: false, deliver: false, return: false,
+    },
+    accounting: {
+      view: false, record_payment: false, reverse_payment: false, export: false,
+      refund: false, approve_refund: false, approve_payment: false, close_period: false,
+    },
     purchasing: {
       view: false, create: false, edit: false, approve: false, receive: false,
-      cancel: false, manage_vendors: false, export: false,
+      cancel: false, manage_vendors: false, export: false, amend: false,
     },
   },
   // sales_rep: CRM-focused role, RLS-scoped to "own" rows on leads/deals/
@@ -355,6 +386,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Partial<Record<Role, UserPermissions>> = 
       view_all: false,
       view: true, create: true, edit: true, delete: false,
       post: false, cancel: false, export: true,
+      void: false, approve: false, issue_credit: false, deliver: false, return: false,
     },
     // Deliberately absent: accounting and purchasing. A sales_rep can reach
     // both today only because they borrow deals.view, which was never an

@@ -115,7 +115,7 @@ BEGIN
   v_r := public.confirm_customer_return(v_r.id, v_mgr);
   PERFORM pg_temp.as_owner();
   v_out := pg_temp.call(v_rep, format('SELECT public.create_credit_note_from_return(%L, %L)', v_r.id, v_rep));
-  PERFORM pg_temp.check('a sales rep cannot credit a return (managers and above)', v_out LIKE 'err:P0001%managers%', '-> ' || v_out);
+  PERFORM pg_temp.check('a sales rep cannot credit a return (managers and above)', v_out LIKE 'err:42501%permission to take customer returns%', '-> ' || v_out);
 
   -- ══ 2. the note is what came back ═════════════════════════════════════════
   PERFORM pg_temp.as_user(v_mgr);

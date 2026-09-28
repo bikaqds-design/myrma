@@ -118,7 +118,7 @@ BEGIN
   PERFORM pg_temp.as_owner();
   v_out := pg_temp.call(v_rep, format($q$SELECT public.create_customer_return(%L, %L::jsonb, NULL, %L)$q$, v_d.id,
     jsonb_build_array(jsonb_build_object('delivery_line_id', v_dl_blk, 'qty', 1, 'warehouse_id', v_wh))::text, v_rep));
-  PERFORM pg_temp.check('a sales rep cannot record a return (managers and above)', v_out LIKE 'err:P0001%managers%', '-> ' || v_out);
+  PERFORM pg_temp.check('a sales rep cannot record a return (managers and above)', v_out LIKE 'err:42501%permission to take customer returns%', '-> ' || v_out);
 
   -- ══ 2. what may come back ═════════════════════════════════════════════════
   v_out := pg_temp.call(v_mgr, format($q$SELECT public.create_customer_return(%L, %L::jsonb, NULL, %L)$q$, v_d.id,
