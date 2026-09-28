@@ -11,6 +11,9 @@ import { PhoneNote, EmailNote } from '../../components/ContactValidation'
 import { useContactValidation } from '../../hooks/useContactValidation'
 import { useCountryOptions } from '../../hooks/useCountryRules'
 import TaxCodeSelect from '../../components/TaxCodeSelect'
+import { TAX_STATUSES, proposeTaxCode } from '../Accounting/_tax'
+import { useTaxCodes } from '../../lib/useTaxCodes'
+import { useQuery } from '@tanstack/react-query'
 
 // Shared modal header — mirrors ModalHeader in SalesDocuments/_modals.jsx so
 // every Purchasing modal has the same title bar/close-button chrome.
@@ -81,6 +84,9 @@ function computeLineTotals(lines) {
 // catalogue and filter it here, and the Data API caps that load. No vendor
 // chosen, no suggestions, as before. (BUG-066.)
 function LineItemsEditor({ lines, setLines, vendorId, t }) {
+  // the product's usual code, unless the supplier's tax status decides (A-04b)
+  const taxCodes = useTaxCodes()
+  const { data: vendor } = useQuery({ queryKey: ['brands', 'one', vendorId], queryFn: () => db.brands.get(vendorId), enabled: Boolean(vendorId), staleTime: 60_000 })
   function addLine() {
     setLines([...lines, { product_id: '', product_name: '', qty_ordered: 1, unit_cost: 0, discount_pct: 0, tax_pct: 0, tax_code: null }])
   }
@@ -106,7 +112,11 @@ function LineItemsEditor({ lines, setLines, vendorId, t }) {
               <ProductSearchInput
                 value={line.product_name}
                 onChange={(v) => updateLine(i, { product_name: v })}
-                onSelectProduct={(p) => updateLine(i, { product_id: p.id, product_name: p.product_name })}
+                onSelectProduct={(p) => updateLine(i, {
+                  product_id: p.id,
+                  product_name: p.product_name,
+                  ...(proposeTaxCode(taxCodes, { productCode: p.tax_code, partyStatus: vendor?.tax_status, side: 'purchase' }) || {}),
+                })}
                 brandId={vendorId || undefined}
                 searchEnabled={Boolean(vendorId)}
                 placeholder={t('inventory.typeProductName')}
@@ -203,6 +213,14 @@ export function VendorFieldsSection({ values, onChange, t, editing = false }) {
         <Label>{t('purchasing.taxId')}</Label>
         <Input aria-label={t('purchasing.taxId')} value={values.tax_id || ''} onChange={(e) => onChange({ tax_id: e.target.value })} className="w-full" />
       </div>
+      {/* proposes each line's tax code on this supplier's documents (A-04b) */}
+      <div>
+        <Label>{t('customerModal.taxStatus')}</Label>
+        <Select aria-label={t('customerModal.taxStatus')} value={values.tax_status || ''} onChange={(e) => onChange({ tax_status: e.target.value || null })} className="w-full">
+          <option value="">{t('customerModal.taxStatusNone')}</option>
+          {TAX_STATUSES.map((s) => <option key={s} value={s}>{t(`customerModal.taxStatus_${s}`)}</option>)}
+        </Select>
+      </div>
       <div>
         <Label>{t('purchasing.paymentTerms')}</Label>
         <Input aria-label={t('purchasing.paymentTerms')} value={values.payment_terms || ''} onChange={(e) => onChange({ payment_terms: e.target.value })} className="w-full" />
@@ -264,7 +282,7 @@ export function VendorEditModal({ vendor, onClose, userEmail, onSuccess }) {
   const [name, setName] = useState(vendor.brand_name || '')
   const [vendorFields, setVendorFields] = useState({
     contact_person: vendor.contact_person, email: vendor.email,
-    phone: vendor.phone, tax_id: vendor.tax_id, payment_terms: vendor.payment_terms,
+    phone: vendor.phone, tax_id: vendor.tax_id, tax_status: vendor.tax_status || null, payment_terms: vendor.payment_terms,
     // NULL means "use the system default country" — which is what almost every
     // vendor is, and why nothing had to be backfilled when the column arrived.
     country_code: vendor.country_code || null,

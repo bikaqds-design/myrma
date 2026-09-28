@@ -69,3 +69,29 @@ export function lastMonth(today = new Date()) {
   const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
   return { from: iso(first), to: iso(last) }
 }
+
+// ── Proposing a line's code (A-04b part 2) ───────────────────────────────────
+// A customer's or supplier's tax status (customers.tax_status /
+// brands.tax_status, 20260911); empty means "not set".
+export const TAX_STATUSES = ['registered', 'unregistered', 'exempt', 'foreign']
+
+const firstActive = (codes, kind) => {
+  const list = (codes || []).filter((c) => c.kind === kind && c.is_active)
+  return list.find((c) => c.is_default) || list[0] || null
+}
+
+/**
+ * The code to propose for a line when a product is picked: the party's status
+ * decides first (an exempt customer or supplier → an exempt code; a foreign
+ * customer → zero-rated, an export; a foreign supplier → out of scope, the tax
+ * is paid at customs), then the product's usual code if it is active; else
+ * nothing, and the line keeps its rate. Returns the line fields to merge, or
+ * null. A proposal only; the person can change it on the line.
+ */
+export function proposeTaxCode(codes, { productCode = null, partyStatus = null, side = 'sales' } = {}) {
+  let pick = null
+  if (partyStatus === 'exempt') pick = firstActive(codes, 'exempt')
+  else if (partyStatus === 'foreign') pick = firstActive(codes, side === 'purchase' ? 'out_of_scope' : 'zero')
+  if (!pick && productCode) pick = (codes || []).find((c) => c.code === productCode && c.is_active) || null
+  return pick ? { tax_code: pick.code, tax_pct: Number(pick.rate) } : null
+}

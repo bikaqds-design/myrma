@@ -101,6 +101,7 @@ export async function downloadQuotationPDF({ quotation, customer, relatedType, r
       address: customer?.address || null,
       mobile: customer?.mobile || null,
       email: customer?.email || null,
+      taxId: customer?.tax_id || null,
     },
     metaRows: [
       { label: 'Date', value: new Date().toLocaleDateString() },

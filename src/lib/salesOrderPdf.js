@@ -126,6 +126,7 @@ export async function downloadSOPDF({ salesOrder, customer, relatedType, related
       address: customer?.address || null,
       mobile: customer?.mobile || null,
       email: customer?.email || null,
+      taxId: customer?.tax_id || null,
     },
     metaRows: [
       { label: 'Date',           value: new Date().toLocaleDateString() },

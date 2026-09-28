@@ -10,6 +10,7 @@ import { PageHeader, Button } from '../../components/ui'
 import EmptyState from '../../components/EmptyState'
 import { downloadQuotationPDF } from '../../lib/quotationPdf'
 import { downloadSOPDF } from '../../lib/salesOrderPdf'
+import { downloadTaxDocumentPDF, isPrintable } from '../../lib/taxInvoicePdf'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { useConfirm } from '../../hooks/useConfirm'
 import { DetailSkeleton } from '../../components/Skeleton'
@@ -659,6 +660,11 @@ export default function SalesDocumentDetail({
                   {t('salesDocuments.voidInvoice')}
                 </Button>
               )}
+              {isPrintable('invoice', doc) && (
+                <Button variant="secondary" size="sm" onClick={() => downloadTaxDocumentPDF({ kind: 'invoice', doc, customer })}>
+                  {t('salesDocuments.downloadPDF')}
+                </Button>
+              )}
             </>
           )}
 
@@ -691,6 +697,11 @@ export default function SalesDocumentDetail({
               {['draft', 'pending_approval', 'issued'].includes(n.status) && (
                 <Button disabled={!canCancelDoc} variant="danger" size="sm" onClick={() => setShowVoidModal(true)}>
                   {t('salesDocuments.voidCN')}
+                </Button>
+              )}
+              {isPrintable('credit_note', doc) && (
+                <Button variant="secondary" size="sm" onClick={() => downloadTaxDocumentPDF({ kind: 'credit_note', doc, customer })}>
+                  {t('salesDocuments.downloadPDF')}
                 </Button>
               )}
             </>

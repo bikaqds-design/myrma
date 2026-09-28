@@ -1545,7 +1545,10 @@
     "deleteCategoryWithProducts_one": "Delete category \"{{name}}\"? {{count}} product will be left with no category. It stays in the catalog but disappears from category views.",
     "deleteCategoryWithProducts_other": "Delete category \"{{name}}\"? {{count}} products will be left with no category. They stay in the catalog but disappear from category views.",
     "failedExport": "Could not prepare the export: {{error}}",
-    "showMoreProducts": "Show more ({{shown}} of {{total}})"
+    "showMoreProducts": "Show more ({{shown}} of {{total}})",
+    "taxCode": "Usual tax code",
+    "taxCodeNone": "None (the line's rate decides)",
+    "taxCodeHint": "Given to this product's lines when it is picked. An exempt or foreign customer or supplier overrides it."
   },
   "calendar": {
     "showMoreUnscheduled": "Show {{count}} more",
@@ -2079,7 +2082,13 @@
     "dragAndDrop": "or drag and drop",
     "bulkUploadWarning": "Each imported customer will get a unique CB-XXXXXXXX code generated automatically.",
     "country": "Country",
-    "countryDefault": "System default"
+    "countryDefault": "System default",
+    "taxStatus": "Tax status",
+    "taxStatusNone": "Not set",
+    "taxStatus_registered": "VAT registered",
+    "taxStatus_unregistered": "Not VAT registered",
+    "taxStatus_exempt": "Exempt from VAT",
+    "taxStatus_foreign": "Foreign (outside the country)"
   },
   "leadModal": {
     "editTitle": "Edit Lead",

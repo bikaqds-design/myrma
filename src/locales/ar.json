@@ -1657,7 +1657,10 @@
     "deleteCategoryWithProducts_many": "هل تريد حذف الفئة \"{{name}}\"؟ سيبقى {{count}} منتجاً بلا فئة. يظل في الكتالوج لكنه يختفي من عروض الفئات.",
     "deleteCategoryWithProducts_other": "هل تريد حذف الفئة \"{{name}}\"؟ سيبقى {{count}} منتج بلا فئة. تظل في الكتالوج لكنها تختفي من عروض الفئات.",
     "failedExport": "تعذّر تجهيز التصدير: {{error}}",
-    "showMoreProducts": "عرض المزيد ({{shown}} من {{total}})"
+    "showMoreProducts": "عرض المزيد ({{shown}} من {{total}})",
+    "taxCode": "رمز الضريبة المعتاد",
+    "taxCodeNone": "لا شيء (تحدده نسبة البند)",
+    "taxCodeHint": "يُعطى لبنود هذا المنتج عند اختياره. يتقدم عليه العميل أو المورد المعفى أو الأجنبي."
   },
   "calendar": {
     "showMoreUnscheduled": "عرض {{count}} أخرى",
@@ -2191,7 +2194,13 @@
     "dragAndDrop": "أو اسحب وأفلت",
     "bulkUploadWarning": "سيحصل كل عميل مستورد تلقائياً على رمز فريد CB-XXXXXXXX.",
     "country": "الدولة",
-    "countryDefault": "الافتراضي للنظام"
+    "countryDefault": "الافتراضي للنظام",
+    "taxStatus": "الوضع الضريبي",
+    "taxStatusNone": "غير محدد",
+    "taxStatus_registered": "مسجل في ضريبة القيمة المضافة",
+    "taxStatus_unregistered": "غير مسجل في ضريبة القيمة المضافة",
+    "taxStatus_exempt": "معفى من ضريبة القيمة المضافة",
+    "taxStatus_foreign": "أجنبي (خارج البلد)"
   },
   "leadModal": {
     "editTitle": "تعديل العميل المحتمل",
