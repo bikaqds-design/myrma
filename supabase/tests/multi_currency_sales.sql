@@ -87,6 +87,9 @@ BEGIN
   INSERT INTO public.products (sku, product_name, product_type) VALUES ('A05-S1', 'A05 support', 'service') RETURNING id INTO v_svc;
   INSERT INTO public.brands (brand_name) VALUES ('A05 Supplier') RETURNING id INTO v_vend;
   ar := pg_temp.rule('accounts_receivable');
+  -- the checks below expect only their own rates: clear any USD / GBP rates
+  -- staging already holds (a browser check saved one); rolled back at the end
+  DELETE FROM public.exchange_rates WHERE currency IN ('USD', 'GBP');
 
   -- ══ 1. rates ═══════════════════════════════════════════════════════════════
   v_out := pg_temp.call(v_mgr, format('INSERT INTO public.exchange_rates (currency, rate_date, rate) VALUES (''USD'', %L, 50)', v_d - 27));
