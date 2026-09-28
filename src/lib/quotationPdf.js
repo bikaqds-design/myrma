@@ -18,7 +18,8 @@ export async function downloadQuotationPDF({ quotation, customer, relatedType, r
   if (!quotation) return
 
   const { layout, logoUrl } = await getPdfLayout()
-  const currency = layout.currency || 'EGP'
+  // the quotation's own currency (A-05); the base currency otherwise
+  const currency = quotation.currency || layout.currency || 'EGP'
 
   const customerName = customer?.company_name || customer?.contact_person || '—'
   const validityStr = quotation.validity_until ? new Date(quotation.validity_until).toLocaleDateString() : 'N/A'

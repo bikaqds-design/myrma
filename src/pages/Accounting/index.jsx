@@ -21,6 +21,7 @@ import JournalTab from './JournalTab'
 import TrialBalanceTab from './TrialBalanceTab'
 import PeriodsTab from './PeriodsTab'
 import TaxTab from './TaxTab'
+import ExchangeRatesTab from './ExchangeRatesTab'
 import { ROLES } from '../../lib/constants'
 
 const METHOD_LABEL_KEY = {
@@ -246,7 +247,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
           canRecord ? (
             <Button onClick={() => setShowRecordVendorModal(true)}>+ {t('purchasing.recordPayment')}</Button>
           ) : null
-        ) : !['ap_aging', 'refunds', 'journal', 'trial_balance', 'periods', 'tax'].includes(tab) ? (
+        ) : !['ap_aging', 'refunds', 'journal', 'trial_balance', 'periods', 'tax', 'rates'].includes(tab) ? (
           canRecord ? (
             <Button onClick={() => setShowRecordModal(true)}>+ {t('accounting.recordPayment')}</Button>
           ) : null
@@ -298,6 +299,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
                 { id: 'trial_balance', label: t('accounting.tabTrialBalance') },
                 { id: 'periods', label: t('accounting.tabPeriods') },
                 { id: 'tax', label: t('accounting.tabTax') },
+                { id: 'rates', label: t('accounting.tabRates') },
               ]
             : []),
         ].map((tb) => (
@@ -390,6 +392,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
       {tab === 'trial_balance' && canSeeLedger && <TrialBalanceTab />}
       {tab === 'periods' && canSeeLedger && <PeriodsTab currentUserEmail={currentUserEmail} currentUserRole={currentUserRole} />}
       {tab === 'tax' && canSeeLedger && <TaxTab currentUserRole={currentUserRole} />}
+      {tab === 'rates' && canSeeLedger && <ExchangeRatesTab currentUserRole={currentUserRole} />}
 
       {tab === 'refunds' && (
         <RefundsTab currentUserEmail={currentUserEmail} currentUserRole={currentUserRole} perPage={perPage} setPerPage={setPerPage} />

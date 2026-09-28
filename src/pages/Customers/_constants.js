@@ -11,6 +11,7 @@ export const EMPTY_FORM = {
   cr_number: '',
   tax_id: '',
   tax_status: '',
+  currency: '',
   notes: '',
   attachments: [],
 }

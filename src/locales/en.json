@@ -2088,7 +2088,9 @@
     "taxStatus_registered": "VAT registered",
     "taxStatus_unregistered": "Not VAT registered",
     "taxStatus_exempt": "Exempt from VAT",
-    "taxStatus_foreign": "Foreign (outside the country)"
+    "taxStatus_foreign": "Foreign (outside the country)",
+    "currency": "Default currency",
+    "currencyBase": "{{base}} (base currency)"
   },
   "leadModal": {
     "editTitle": "Edit Lead",
@@ -3911,7 +3913,14 @@
     "rtnWarehouseMissing": "{{product}}: choose the warehouse the goods go back into.",
     "rtnNothing": "Choose at least one item that is coming back.",
     "dlvChip": "Delivery:",
-    "dlvQtyInvalidLine": "{{product}}: enter a whole number from 0 to {{open}}."
+    "dlvQtyInvalidLine": "{{product}}: enter a whole number from 0 to {{open}}.",
+    "fxPanel": "Currency",
+    "fxCurrency": "Currency",
+    "fxRateValue": "1 {{currency}} = {{rate}} {{base}}",
+    "fxTotalInBase": "Total in base currency: {{amount}}",
+    "fxChange": "Change currency or rate",
+    "fxSavedToast": "Currency and rate saved",
+    "fxPaymentHint": "The payment is in {{currency}}, at this rate. A different rate from the invoice's posts an exchange gain or loss."
   },
   "accounting": {
     "title": "Accounting",
@@ -4197,7 +4206,33 @@
     "taxErrZeroRate": "Zero-rated, exempt and out-of-scope codes have a rate of 0.",
     "taxErrPositiveRate": "A standard or reduced code has a rate above 0.",
     "glRole_fx_gain": "Foreign exchange gains",
-    "glRole_fx_loss": "Foreign exchange losses"
+    "glRole_fx_loss": "Foreign exchange losses",
+    "tabRates": "Exchange rates",
+    "fxTitle": "Exchange rates",
+    "fxHint": "How many {{base}} one unit of each currency is worth, from a date. A document takes the latest rate on or before its date; whoever edits it can change the rate until it is posted.",
+    "fxLatest": "{{currency}} now",
+    "fxSince": "since {{date}}",
+    "fxAdd": "Add a rate",
+    "fxCurrency": "Currency",
+    "fxChoose": "Choose…",
+    "fxDate": "From",
+    "fxRate": "Rate ({{base}})",
+    "fxNote": "Note",
+    "fxSave": "Save rate",
+    "fxSaveHint": "Saving a rate for a date that already has one replaces it.",
+    "fxPreview": "1 {{currency}} = {{rate}} {{base}}",
+    "fxHistory": "All rates",
+    "fxAllCurrencies": "All currencies",
+    "fxNone": "No rates yet.",
+    "fxDelete": "Delete",
+    "fxDeleteTitle": "Delete the {{currency}} rate of {{date}}?",
+    "fxDeleteConfirm": "Documents already priced keep their rate. New documents take the next latest rate.",
+    "fxSavedToast": "Rate saved",
+    "fxDeletedToast": "Rate deleted",
+    "fxErrCurrency": "Choose a currency.",
+    "fxErrBase": "{{base}} is the base currency: its rate is always 1.",
+    "fxErrDate": "Choose the date the rate applies from.",
+    "fxErrRate": "The rate is a positive number."
   },
   "purchasing": {
     "title": "Purchasing",

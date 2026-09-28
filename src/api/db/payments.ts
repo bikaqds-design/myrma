@@ -108,6 +108,9 @@ export const payments = {
     notes?: string | null
     created_by: string
     allocations?: { invoice_id: string; amount: number }[]
+    // A-05: the payment's currency and rate; left out, the customer's default at the table's rate
+    currency?: string | null
+    exchange_rate?: number | null
   }): Promise<PaymentRow> {
     const allocations = (input.allocations ?? []).filter((a) => a.amount > 0)
     const { data: paymentId, error } = await supabase.rpc('record_payment', {
@@ -125,6 +128,8 @@ export const payments = {
       // "cannot extract elements from a scalar" — which killed every payment
       // recorded from an invoice (docs/archive/WAREHOUSE_R1_TEST_CHECKLIST.md funnel row 43).
       p_allocations: allocations,
+      p_currency: input.currency ?? null,
+      p_exchange_rate: input.exchange_rate ?? null,
     })
     if (error) throw error
     const payment = await payments.get(paymentId as string)

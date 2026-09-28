@@ -12,7 +12,8 @@ export async function downloadSOPDF({ salesOrder, customer, relatedType, related
   if (!salesOrder) return
 
   const { layout, logoUrl } = await getPdfLayout()
-  const currency = layout.currency || 'EGP'
+  // the order's own currency (A-05); the base currency otherwise
+  const currency = salesOrder.currency || layout.currency || 'EGP'
 
   const customerName = customer?.company_name || customer?.contact_person || '—'
   const deliveryStr = salesOrder.delivery_date

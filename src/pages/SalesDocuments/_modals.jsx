@@ -8,6 +8,7 @@ import SalesDocumentForm from './SalesDocumentForm'
 import { ProductSearchInput } from '../Pipeline/_shared'
 import { computeLineTotal } from '../../api/db/_documentTotals'
 import { CREDIT_NOTE_REASON_CODES } from '../../api/db/creditNotes'
+import { useBaseCurrency } from '../../hooks/useBaseCurrency'
 
 // ── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -87,9 +88,22 @@ export function RecordPaymentModal({ invoice, onClose, onConfirm }) {
   const remaining = Math.max(total - alreadyPaid, 0)
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState('bank_transfer')
+  // A-05b: a foreign-currency invoice is paid in its currency at today's rate
+  // from the table, which the person can change before recording
+  const baseCurrency = useBaseCurrency()
+  const foreign = Boolean(invoice.currency) && invoice.currency !== baseCurrency
+  const [rate, setRate] = useState('')
+  useEffect(() => {
+    if (!foreign) return
+    let live = true
+    db.exchangeRates.rateFor(invoice.currency).then((r) => { if (live && r) setRate((prev) => prev || String(r)) }).catch(() => {})
+    return () => { live = false }
+  }, [foreign, invoice.currency])
+  const rateNum = Number(rate)
+  const rateOk = !foreign || (Number.isFinite(rateNum) && rateNum > 0)
 
   const num = parseFloat(amount) || 0
-  const isValid = num > 0 && num <= remaining + 0.001
+  const isValid = num > 0 && num <= remaining + 0.001 && rateOk
 
   return (
     <ModalOverlay onClose={onClose}>
@@ -144,9 +158,21 @@ export function RecordPaymentModal({ invoice, onClose, onConfirm }) {
             </select>
           </div>
 
+          {foreign && (
+            <div>
+              <label htmlFor="pay-rate" className="block text-xs font-semibold text-[#6c6760] dark:text-[#9aa4b2] uppercase mb-1.5">
+                {t('purchasing.exchangeRate', { currency: invoice.currency, base: baseCurrency })}
+              </label>
+              <input id="pay-rate" type="number" step="0.00000001" min="0" value={rate} onChange={(e) => setRate(e.target.value)}
+                aria-invalid={!rateOk}
+                className="w-full px-3 py-2 border border-[#e6e9ef] dark:border-[#212a38] bg-white dark:bg-[#0f1520] text-[#211f1b] dark:text-[#e8ebf0] rounded-lg text-sm focus:ring-2 focus:ring-[#4338ca] focus:border-transparent outline-none" />
+              <p className="text-xs text-[#6c6760] dark:text-[#9aa4b2] mt-1">{t('salesDocuments.fxPaymentHint', { currency: invoice.currency })}</p>
+            </div>
+          )}
+
           <div className="flex gap-2 justify-end pt-2">
             <Button variant="secondary" size="sm" onClick={onClose}>{t('common.cancel')}</Button>
-            <Button size="sm" disabled={!isValid} onClick={() => onConfirm(num, method)}>
+            <Button size="sm" disabled={!isValid} onClick={() => onConfirm(num, method, foreign ? rateNum : null)}>
               {t('salesDocuments.recordPayment')}
             </Button>
           </div>

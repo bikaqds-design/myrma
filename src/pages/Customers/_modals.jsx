@@ -8,6 +8,8 @@ import AttachmentsField from '../../components/AttachmentsField'
 import { Button } from '../../components/ui'
 import { associateFieldId } from '../../lib/fieldAssociation'
 import { TAX_STATUSES } from '../Accounting/_tax'
+import { useBaseCurrency } from '../../hooks/useBaseCurrency'
+import { useCurrencyOptions } from '../../hooks/useCurrencyOptions'
 
 // ─── SHARED HELPERS ────────────────────────────────────────────────────────────
 
@@ -57,6 +59,8 @@ export function AddCustomerModal({
   onClose,
 }) {
   const { t } = useTranslation()
+  const baseCurrency = useBaseCurrency()
+  const currencyOptions = useCurrencyOptions(baseCurrency)
   const isB2B = form.customer_type === 'B2B'
   const set = (key, val) => setForm((prev) => ({ ...prev, [key]: val }))
 
@@ -270,6 +274,14 @@ export function AddCustomerModal({
             <select value={form.tax_status || ''} onChange={(e) => set('tax_status', e.target.value)} className={inp} aria-label={t('customerModal.taxStatus')}>
               <option value="">{t('customerModal.taxStatusNone')}</option>
               {TAX_STATUSES.map((s) => <option key={s} value={s}>{t(`customerModal.taxStatus_${s}`)}</option>)}
+            </select>
+          </Field>
+
+          {/* Default currency: a new quote, order, invoice or payment starts in it (A-05b) */}
+          <Field label={t('customerModal.currency')}>
+            <select value={form.currency || ''} onChange={(e) => set('currency', e.target.value)} className={inp} aria-label={t('customerModal.currency')}>
+              <option value="">{t('customerModal.currencyBase', { base: baseCurrency })}</option>
+              {currencyOptions.filter((c) => c.code !== baseCurrency).map((c) => <option key={c.code} value={c.code}>{`${c.code} — ${c.name}`}</option>)}
             </select>
           </Field>
 

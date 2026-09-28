@@ -19,6 +19,7 @@ import { useBaseCurrency } from '../hooks/useBaseCurrency'
 import Pagination from '../components/Pagination'
 import { safeStorage } from '../lib/safeStorage'
 import { TAX_STATUSES } from './Accounting/_tax'
+import { useCurrencyOptions } from '../hooks/useCurrencyOptions'
 
 const EMPTY_TICKET_COUNTS = { total: 0, open: 0 }
 
@@ -36,6 +37,7 @@ export default function CustomerDetails({
   // Deal values are base-currency amounts; they used to render with a '$'.
   // (Audit finding BUG-037, a fourth site the finding did not list.)
   const baseCurrency = useBaseCurrency()
+  const currencyOptions = useCurrencyOptions(baseCurrency)
   const { data: customerPageData, isLoading: loading } = useQuery({
     queryKey: ['customer-details', customerId],
     queryFn: async () => {
@@ -206,6 +208,7 @@ export default function CustomerDetails({
         cr_number: editForm.cr_number || null,
         tax_id: editForm.tax_id || null,
         tax_status: editForm.tax_status || null,
+        currency: editForm.currency || null,
         credit_limit: editForm.credit_limit === '' || editForm.credit_limit == null ? null : Number(editForm.credit_limit),
         notes: editForm.notes || null,
         attachments: allAttachments,
@@ -705,6 +708,19 @@ export default function CustomerDetails({
                           >
                             <option value="">{t('customerModal.taxStatusNone')}</option>
                             {TAX_STATUSES.map((s) => <option key={s} value={s}>{t(`customerModal.taxStatus_${s}`)}</option>)}
+                          </select>
+                        </div>
+                        {/* a new document for this customer starts in this currency (A-05b) */}
+                        <div>
+                          <label htmlFor="cd-currency" className={labelClass}>{t('customerModal.currency')}</label>
+                          <select
+                            id="cd-currency"
+                            value={editForm.currency || ''}
+                            onChange={(e) => setEditForm({ ...editForm, currency: e.target.value })}
+                            className={inputClass}
+                          >
+                            <option value="">{t('customerModal.currencyBase', { base: baseCurrency })}</option>
+                            {currencyOptions.filter((c) => c.code !== baseCurrency).map((c) => <option key={c.code} value={c.code}>{`${c.code} — ${c.name}`}</option>)}
                           </select>
                         </div>
                       </div>

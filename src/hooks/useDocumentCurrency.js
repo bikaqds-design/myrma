@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { db } from '../api/supabaseClient'
 import { useBaseCurrency } from './useBaseCurrency'
 import { useCurrencyOptions } from './useCurrencyOptions'
 
@@ -51,6 +52,16 @@ export function useDocumentCurrency(initial) {
         // as though they were already base currency.
         return prev === '1' || !prev ? '' : prev
       })
+      // A-05: fill an empty rate from the rate table (the latest on or before
+      // today); a rate already typed is kept, and it stays editable.
+      if (next && next !== baseCurrency) {
+        db.exchangeRates
+          .rateFor(next)
+          .then((rate) => {
+            if (rate) setExchangeRate((prev) => (prev ? prev : String(rate)))
+          })
+          .catch(() => {})
+      }
     },
     [baseCurrency]
   )

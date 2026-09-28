@@ -43,6 +43,7 @@ import { customerRefunds } from './customerRefunds.js'
 import { ledger } from './ledger.js'
 import { periods } from './periods.js'
 import { taxCodes } from './taxCodes.js'
+import { exchangeRates } from './exchangeRates.js'
 import { crmInvoices } from './crmInvoices.js'
 import { creditNotes } from './creditNotes.js'
 import { salesDocuments } from './salesDocuments.js'
@@ -139,6 +140,7 @@ export const db = {
   ledger,
   periods,
   taxCodes,
+  exchangeRates,
   crmInvoices,
   creditNotes,
   salesDocuments,
@@ -199,6 +201,7 @@ export type { GlAccountRow, PostingRuleRow, JournalEntryRow, JournalLineRow, Tri
 } from './ledger.js'
 export type { AccountingPeriodRow, PeriodReopenRequestRow, PeriodStatus, CloseChecklistRow } from './periods.js'
 export type { TaxCodeRow, TaxKind, VatReturnRow, VatLedgerRow } from './taxCodes.js'
+export type { ExchangeRateRow, CurrencyDocType } from './exchangeRates.js'
 export type { CrmInvoiceRow, CrmInvoiceLine, CrmInvoiceLineRow } from './crmInvoices.js'
 export type { CreditNoteRow, CreditNoteLine, CreditNoteLineRow, CreditNoteApplicationRow } from './creditNotes.js'
 export type { SalesDocumentRow, SalesDocType } from './salesDocuments.js'
