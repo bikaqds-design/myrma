@@ -1292,6 +1292,8 @@
     "kpiOutstanding": "Outstanding",
     "colDocStatus": "Document",
     "colPaymentStatus": "Payment",
+    "colCurrency": "Currency",
+    "colTotalIn": "Total ({{currency}})",
     "colPaid": "Paid",
     "dateFrom": "From date",
     "dateTo": "To date",
@@ -1350,6 +1352,7 @@
     "marginCustomer": "Customer",
     "marginInvoices": "Invoices",
     "marginRevenue": "Revenue",
+    "marginRevenueHint": "Before tax, each invoice at its own exchange rate",
     "marginCostedRevenue": "Costed revenue",
     "marginCostedRevenueHint": "The part with a known cost of goods",
     "marginCogs": "Cost of goods",
@@ -2487,7 +2490,9 @@
     "ledgerTypeInvoice": "Invoice",
     "ledgerTypeCreditNote": "Credit Note",
     "ledgerTypePayment": "Payment",
-    "ledgerTypeRefund": "Refund"
+    "ledgerTypeRefund": "Refund",
+    "ledgerTypeExchangeDifference": "Exchange difference",
+    "colLedgerBalanceIn": "Balance ({{currency}})"
   },
   "branding": {
     "title": "Branding & Settings",

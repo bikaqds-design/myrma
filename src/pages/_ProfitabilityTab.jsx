@@ -84,7 +84,7 @@ export default function ProfitabilityTab() {
     <div className="space-y-6">
       {/* ── Totals ─────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <Tile label={t('reports.marginRevenue')} value={fmt(totals.revenueBase)} />
+        <Tile label={t('reports.marginRevenue')} value={fmt(totals.revenueBase)} hint={t('reports.marginRevenueHint')} />
         <Tile
           label={t('reports.marginCostedRevenue')}
           value={fmt(totals.costedRevenueBase)}

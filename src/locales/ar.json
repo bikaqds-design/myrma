@@ -1388,6 +1388,8 @@
     "kpiOutstanding": "المبالغ المستحقة",
     "colDocStatus": "المستند",
     "colPaymentStatus": "الدفع",
+    "colCurrency": "العملة",
+    "colTotalIn": "الإجمالي ({{currency}})",
     "colPaid": "المدفوع",
     "dateFrom": "من تاريخ",
     "dateTo": "إلى تاريخ",
@@ -1446,6 +1448,7 @@
     "marginCustomer": "العميل",
     "marginInvoices": "الفواتير",
     "marginRevenue": "الإيراد",
+    "marginRevenueHint": "قبل الضريبة، وكل فاتورة بسعر صرفها",
     "marginCostedRevenue": "الإيراد المُكلَّف",
     "marginCostedRevenueHint": "الجزء الذي تُعرف تكلفة بضاعته",
     "marginCogs": "تكلفة البضاعة",
@@ -2611,7 +2614,9 @@
     "ledgerTypeInvoice": "فاتورة",
     "ledgerTypeCreditNote": "إشعار دائن",
     "ledgerTypePayment": "دفعة",
-    "ledgerTypeRefund": "استرداد"
+    "ledgerTypeRefund": "استرداد",
+    "ledgerTypeExchangeDifference": "فرق سعر الصرف",
+    "colLedgerBalanceIn": "الرصيد ({{currency}})"
   },
   "branding": {
     "title": "العلامة التجارية والإعدادات",

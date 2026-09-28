@@ -8,7 +8,7 @@ import { todayLocalISO } from '../../lib/dates.js'
 // AP mirror of customerLedger.ts — reads v_vendor_ledger
 // (20260761_vendor_ledger_view.sql).
 
-export type VendorLedgerEntryType = 'vendor_invoice' | 'vendor_payment'
+export type VendorLedgerEntryType = 'vendor_invoice' | 'vendor_payment' | 'exchange_difference' // realised on payment at another rate (20260913)
 
 export interface VendorLedgerEntryRow {
   id: string

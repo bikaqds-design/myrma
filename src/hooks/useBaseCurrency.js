@@ -5,10 +5,11 @@ import { FALLBACK_CURRENCY } from '../lib/money'
 /**
  * The installation's base currency.
  *
- * Every money value in this system is in the base currency — sales documents
- * and customer payments never carry FX, and foreign purchases are converted to
- * base at the rate stored on their own document. So one code answers "what
- * currency is this number" for almost the whole UI.
+ * Totals, balances and reports are in the base currency; a single document
+ * (sales since 20260912, purchasing before that) may be in another and states
+ * its own currency and rate, and anything that adds documents together converts
+ * each at its own rate first (20260913). So one code answers "what currency is
+ * this total" for the whole UI.
  *
  * Cached for the session rather than per-component: it is installation config
  * that cannot change once any document exists (20260791 enforces that), so
