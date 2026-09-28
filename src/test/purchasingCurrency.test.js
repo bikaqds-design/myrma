@@ -130,8 +130,10 @@ describe('screens aggregate in base currency', () => {
 
   // A running balance is a sum, so it has to use the base column too.
   it('runs the vendor statement balance in base currency', () => {
+    // since 20260913 through the shared statement helper (src/lib/statementLines.js)
     const src = readFileSync(files['VendorDetails.jsx'], 'utf8')
-    expect(src).toMatch(/running \+= Number\(entry\.amount_base \?\? entry\.amount\)/)
+    expect(src).toContain('statementLines(ledger, baseCurrency)')
+    expect(readFileSync('src/lib/statementLines.js', 'utf8')).toContain('return entry?.amount_base ?? entry?.amount ?? 0')
   })
 })
 

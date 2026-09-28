@@ -1322,14 +1322,18 @@ function FinancialTab({ range, formatDate }) {
   const baseCurrency = useBaseCurrency()
   const fmtMoney = (v) => formatMoney(Number(v) || 0, baseCurrency)
 
+  // Each invoice in its own currency; the base amount beside it is what the
+  // totals above add (20260913).
   const exportColumns = [
-    { key: 'invoice_number', label: 'Invoice #' },
-    { key: 'customer_name', label: 'Customer' },
-    { key: 'doc_status', label: 'Document' },
-    { key: 'payment_status', label: 'Payment' },
-    { key: 'amount', label: 'Total' },
-    { key: 'paid', label: 'Paid' },
-    { key: 'due_date', label: 'Due Date' },
+    { key: 'invoice_number', label: t('invoices.colInvoiceNum') },
+    { key: 'customer_name', label: t('reports.colCustomer') },
+    { key: 'doc_status', label: t('reports.colDocStatus') },
+    { key: 'payment_status', label: t('reports.colPaymentStatus') },
+    { key: 'currency', label: t('reports.colCurrency') },
+    { key: 'amount', label: t('reports.colTotal') },
+    { key: 'paid', label: t('reports.colPaid') },
+    { key: 'amount_base', label: t('reports.colTotalIn', { currency: baseCurrency }) },
+    { key: 'due_date', label: t('reports.colDueDate') },
   ]
   // Every invoice in the range, read when exported — not the page on screen.
   const exportRows = async () =>
@@ -1338,8 +1342,10 @@ function FinancialTab({ range, formatDate }) {
       customer_name: customerName(i),
       doc_status: i.doc_status || '',
       payment_status: i.payment_status || '',
+      currency: i.currency || baseCurrency,
       amount: Number(i.total) || 0,
       paid: Number(i.amount_paid) || 0,
+      amount_base: Number(i.total_base ?? i.total) || 0,
       due_date: formatDate(i.due_date),
     }))
   const handleExport = async () => {
@@ -1438,10 +1444,10 @@ function FinancialTab({ range, formatDate }) {
                       </span>
                     </td>
                     <td className="px-4 py-3 font-semibold text-gray-900 dark:text-[#e8ebf0] tabular-nums">
-                      {fmtMoney(inv.total)}
+                      {formatMoney(Number(inv.total) || 0, inv.currency || baseCurrency)}
                     </td>
                     <td className="px-4 py-3 text-gray-700 dark:text-[#e8ebf0] tabular-nums">
-                      {fmtMoney(inv.amount_paid)}
+                      {formatMoney(Number(inv.amount_paid) || 0, inv.currency || baseCurrency)}
                     </td>
                     <td className="px-4 py-3 text-gray-500 dark:text-[#9aa4b2] text-xs whitespace-nowrap">
                       {inv.due_date ? (

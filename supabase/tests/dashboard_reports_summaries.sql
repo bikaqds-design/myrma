@@ -211,7 +211,7 @@ BEGIN
             JOIN quotations q ON q.id = o.quotation_id AND q.created_at BETWEEN v_from AND v_to
            WHERE coalesce(i.doc_status, '') <> 'cancelled')
      OR (v_j->'collected'->>'value')::numeric <> (
-          SELECT coalesce(sum(coalesce(amount, 0)), 0) FROM payments
+          SELECT coalesce(sum(round(coalesce(amount, 0) * coalesce(nullif(exchange_rate, 0), 1), 2)), 0) FROM payments
            WHERE coalesce(status, '') <> 'voided'
              AND coalesce(payment_date::timestamp AT TIME ZONE 'UTC', created_at) BETWEEN v_from AND v_to)
      OR (v_j->>'standalone_orders')::bigint + (v_j->'funnel_orders'->>'count')::bigint
@@ -225,10 +225,12 @@ BEGIN
   -- ── CHECK 12: Reports financial ────────────────────────────────────────────
   v_checks := v_checks + 1;
   v_j := public.rma_report_financial(v_from, v_to);
-  IF (v_j->>'invoices')::bigint <> (SELECT count(*) FROM crm_invoices WHERE created_at BETWEEN v_from AND v_to)
-     OR (v_j->>'total_invoiced')::numeric <> (SELECT coalesce(sum(coalesce(total, 0)), 0) FROM crm_invoices WHERE created_at BETWEEN v_from AND v_to AND coalesce(doc_status, '') <> 'cancelled')
-     OR (v_j->>'outstanding')::numeric <> (SELECT coalesce(sum(greatest(coalesce(total, 0) - coalesce(amount_paid, 0), 0)), 0) FROM crm_invoices
-                                             WHERE created_at BETWEEN v_from AND v_to AND coalesce(doc_status, '') <> 'cancelled')
+  -- posted invoices by posted_at (20260875), in the base currency at each invoice's rate (20260913)
+  IF (v_j->>'invoices')::bigint <> (SELECT count(*) FROM crm_invoices WHERE doc_status = 'posted' AND posted_at BETWEEN v_from AND v_to)
+     OR (v_j->>'total_invoiced')::numeric <> (SELECT coalesce(sum(round(coalesce(total, 0) * coalesce(nullif(exchange_rate, 0), 1), 2)), 0)
+                                                FROM crm_invoices WHERE doc_status = 'posted' AND posted_at BETWEEN v_from AND v_to)
+     OR (v_j->>'outstanding')::numeric <> (SELECT coalesce(sum(round(greatest(coalesce(total, 0) - coalesce(amount_paid, 0), 0) * coalesce(nullif(exchange_rate, 0), 1), 2)), 0)
+                                             FROM crm_invoices WHERE doc_status = 'posted' AND posted_at BETWEEN v_from AND v_to)
      OR (SELECT count(*) FROM v_report_invoices) <> (SELECT count(*) FROM crm_invoices)
      OR EXISTS (SELECT 1 FROM v_report_invoices r JOIN customers c ON c.id = r.customer_id
                  WHERE r.customer_name IS DISTINCT FROM coalesce(nullif(c.company_name, ''), nullif(c.contact_person, ''))) THEN
