@@ -4195,7 +4195,9 @@
     "taxErrKind": "Choose a kind.",
     "taxErrRate": "The rate is a number from 0 to 100.",
     "taxErrZeroRate": "Zero-rated, exempt and out-of-scope codes have a rate of 0.",
-    "taxErrPositiveRate": "A standard or reduced code has a rate above 0."
+    "taxErrPositiveRate": "A standard or reduced code has a rate above 0.",
+    "glRole_fx_gain": "Foreign exchange gains",
+    "glRole_fx_loss": "Foreign exchange losses"
   },
   "purchasing": {
     "title": "Purchasing",

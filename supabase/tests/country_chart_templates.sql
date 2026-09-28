@@ -98,7 +98,8 @@ BEGIN
   PERFORM pg_temp.check('the posting rules follow the template (receivables 1210, cash 1110, bank 1130, VAT out 2210, rounding 6990)',
     pg_temp.rule('accounts_receivable') = '1210' AND pg_temp.rule('cash') = '1110' AND pg_temp.rule('bank') = '1130'  -- 20260909
     AND pg_temp.rule('sales_tax_payable') = '2210' AND pg_temp.rule('rounding') = '6990'
-    AND (SELECT count(*) FROM public.posting_rules) = 17);  -- 20260909 adds bank
+    AND pg_temp.rule('fx_gain') = '4910' AND pg_temp.rule('fx_loss') = '6520'  -- 20260912
+    AND (SELECT count(*) FROM public.posting_rules) = 19);  -- 20260909 adds bank, 20260912 the two exchange roles
   PERFORM pg_temp.check('the default chart''s 1200 (receivables) became the Receivables header; Egypt''s own accounts are there',
     (SELECT NOT is_postable AND name = 'Receivables' FROM public.gl_accounts WHERE code = '1200')
     AND EXISTS (SELECT 1 FROM public.gl_accounts WHERE code = '2230' AND name = 'Salary tax payable')
