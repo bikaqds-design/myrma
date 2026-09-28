@@ -19,15 +19,15 @@ describe('withRowLines', () => {
       id: 'q1',
       line_items: [{ product_name: 'stale copy', qty: 99 }],
       quotation_lines: [
-        { line_no: 1, product_id: 'p2', product_name: 'B', description: null, qty: 1, unit_price: '5.0000', discount_pct: '0.00', tax_pct: '14.00' },
+        { line_no: 1, product_id: 'p2', product_name: 'B', description: null, qty: 1, unit_price: '5.0000', discount_pct: '0.00', tax_pct: '14.00', tax_code: 'VAT14' },
         { line_no: 0, product_id: 'p1', product_name: 'A', description: 'x', qty: 2, unit_price: 10, discount_pct: 10, tax_pct: 0 },
       ],
     }
     const out = withRowLines(doc, ROW_LINES.quotation)
     expect(out).not.toHaveProperty('quotation_lines')
     expect(out.line_items).toEqual([
-      { product_id: 'p1', product_name: 'A', description: 'x', qty: 2, unit_price: 10, discount_pct: 10, tax_pct: 0 },
-      { product_id: 'p2', product_name: 'B', description: null, qty: 1, unit_price: 5, discount_pct: 0, tax_pct: 14 },
+      { product_id: 'p1', product_name: 'A', description: 'x', qty: 2, unit_price: 10, discount_pct: 10, tax_pct: 0, tax_code: null },
+      { product_id: 'p2', product_name: 'B', description: null, qty: 1, unit_price: 5, discount_pct: 0, tax_pct: 14, tax_code: 'VAT14' },
     ])
   })
 
@@ -42,16 +42,18 @@ describe('withRowLines', () => {
     const cn = withRowLines({ credit_note_lines: [{ line_no: 0, product_name: 'x', qty: 1, unit_price: 1, discount_pct: 0, tax_pct: 0, restock: true, warehouse_id: 'w1' }] }, ROW_LINES.creditNote)
     expect(cn.line_items[0]).toMatchObject({ restock: true, warehouse_id: 'w1' })
     const vi_ = withRowLines({ vendor_invoice_lines: [{ line_no: 0, product_id: 'p', product_name: 'x', qty_ordered: 3, qty_received: 2, unit_cost: '7.5000', discount_pct: 0, tax_pct: 0 }] }, ROW_LINES.vendorInvoice)
-    expect(vi_.line_items[0]).toEqual({ product_id: 'p', product_name: 'x', description: null, qty_ordered: 3, qty_received: 2, unit_cost: 7.5, discount_pct: 0, tax_pct: 0 })
+    expect(vi_.line_items[0]).toEqual({ product_id: 'p', product_name: 'x', description: null, qty_ordered: 3, qty_received: 2, unit_cost: 7.5, discount_pct: 0, tax_pct: 0, tax_code: null })
     const po = withRowLines({ purchase_order_lines: [{ line_no: 0, product_id: 'p', product_name: 'x', qty_ordered: 3, unit_cost: 2, discount_pct: 0, tax_pct: 0 }] }, ROW_LINES.purchaseOrder)
     expect(po.line_items[0]).not.toHaveProperty('qty_received')
   })
 
-  it('builds exactly the keys the database writers put in the copy', () => {
+  // plus tax_code (20260911): the writers' copy predates it, and the screens need
+  // it on each line so that saving a document keeps its lines' codes
+  it('builds exactly the keys the database writers put in the copy, and the tax code', () => {
     const keys = (sqlFile, marker) => {
       const m = readFileSync('supabase/migrations/' + sqlFile, 'utf8')
       const at = m.indexOf(marker)
-      return [...m.slice(at, m.indexOf('ORDER BY l.line_no', at)).matchAll(/'([a-z_]+)', l\./g)].map((x) => x[1]).sort()
+      return [...[...m.slice(at, m.indexOf('ORDER BY l.line_no', at)).matchAll(/'([a-z_]+)', l\./g)].map((x) => x[1]), 'tax_code'].sort()
     }
     const mk = (src, line) => Object.keys(withRowLines({ [src.embed]: [line] }, src).line_items[0]).sort()
     const base = { line_no: 0, product_id: 'p', product_name: 'x', qty: 1, unit_price: 1, discount_pct: 0, tax_pct: 0, qty_ordered: 1, qty_received: 0, unit_cost: 1, restock: false, warehouse_id: null }

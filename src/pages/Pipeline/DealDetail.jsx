@@ -17,6 +17,7 @@ import { useURLTab } from '../../hooks/useURLTab'
 import { downloadQuotationPDF } from '../../lib/quotationPdf'
 import { dealValueFor, canMarkDealWon } from '../../lib/dealValue'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
+import TaxCodeSelect from '../../components/TaxCodeSelect'
 
 const CARD = 'bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-[18px]'
 
@@ -45,7 +46,7 @@ function Detail({ label, value }) {
   )
 }
 
-const EMPTY_QT_LINE = { product_id: null, product_name: '', qty: 1, unit_price: 0, discount_pct: null, tax_pct: null }
+const EMPTY_QT_LINE = { product_id: null, product_name: '', qty: 1, unit_price: 0, discount_pct: null, tax_pct: null, tax_code: null }
 
 function qtStatusCls(status) {
   const map = {
@@ -734,7 +735,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
   // open at a time (editingQtId), so a single node is enough.
   const quotationEditorNode = (
     <div>
-      <div className="grid grid-cols-[1fr_40px_80px_50px_50px_24px] gap-1.5 text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase mb-1.5 px-1">
+      <div className="grid grid-cols-[1fr_40px_80px_50px_120px_24px] gap-1.5 text-xs font-medium text-gray-500 dark:text-[#9aa4b2] uppercase mb-1.5 px-1">
         <span>{t('salesDocs.lineProduct')}</span>
         <span className="text-center">{t('salesDocs.lineQty')}</span>
         <span className="text-end">{t('salesDocs.lineUnitPrice')}</span>
@@ -744,7 +745,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
       </div>
       <div className="space-y-1.5">
         {qtLines.map((l, i) => (
-          <div key={i} className="grid grid-cols-[1fr_40px_80px_50px_50px_24px] gap-1.5 items-center">
+          <div key={i} className="grid grid-cols-[1fr_40px_80px_50px_120px_24px] gap-1.5 items-center">
             <ProductSearchInput
               value={l.product_name}
               onChange={(text) => updateQtLine(i, 'product_name', text)}
@@ -756,7 +757,7 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
             <Input type="number" min="1" value={l.qty} onChange={(e) => updateQtLine(i, 'qty', e.target.value)} className="w-10 text-sm text-center !px-1" />
             <Input type="number" min="0" value={l.unit_price} onChange={(e) => updateQtLine(i, 'unit_price', e.target.value)} className="w-20 text-sm text-end !px-1.5" />
             <Input type="number" min="0" max="100" value={l.discount_pct ?? ''} onChange={(e) => updateQtLine(i, 'discount_pct', e.target.value !== '' ? Number(e.target.value) : null)} placeholder="0" className="w-12 text-sm text-center !px-1" />
-            <Input type="number" min="0" max="100" value={l.tax_pct ?? ''} onChange={(e) => updateQtLine(i, 'tax_pct', e.target.value !== '' ? Number(e.target.value) : null)} placeholder="0" className="w-12 text-sm text-center !px-1" />
+            <TaxCodeSelect value={l.tax_code} rate={l.tax_pct} onChange={(patch) => setQtLines((prev) => prev.map((x, idx) => (idx === i ? { ...x, ...patch } : x)))} className="text-xs !px-1" label={t('salesDocs.lineTax')} />
             <button onClick={() => removeQtLine(i)} className="w-6 h-6 flex items-center justify-center text-red-400 hover:text-red-600 text-base">×</button>
           </div>
         ))}

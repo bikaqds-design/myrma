@@ -39,11 +39,11 @@ tax snapshots, VAT return report — posted tax unchanged when a rate later chan
 `ZERO` (default for 0 %), `EXEMPT`, `OOS`, and a code for any other rate existing
 lines already use. **Existing 0 % lines were given `ZERO` (zero-rated).**
 
-## Defaults to confirm
+## Defaults
 
-1. Existing and new 0 % lines default to **zero-rated**, not exempt. Exempt must
-   be chosen on the line (A-04b screens). Zero-rated and exempt sit in different
-   boxes of a VAT return.
+1. **Confirmed by the owner (2026-09-28):** existing and new 0 % lines default to
+   **zero-rated**, not exempt. Exempt must be chosen on the line. Zero-rated and
+   exempt sit in different boxes of a VAT return.
 2. Tax codes are configured by **administrators and accountants** (BL-15:
    "tax.configure (finance)").
 3. A posting is **refused** while a line has no code (BL-15), rather than posted
@@ -54,9 +54,25 @@ lines already use. **Existing 0 % lines were given `ZERO` (zero-rated).**
 Withholding tax (Egypt's WHT deducted by the customer) — a separate mechanism, not
 a VAT code. Tax by customer / supplier reports. E-invoicing (W5).
 
-## A-04b — screens (next)
+## A-04b — screens
 
-Control Panel › Tax codes; a code on every document line (proposed from the
-product and the customer's / supplier's status); tax status on customers and
-suppliers; Accounting › VAT return with the ledger check; the tax registration
-number on printed invoices.
+**Done (part 1):**
+
+- A tax code picker on every document line: quotes, orders and invoices, deal
+  quotation lines, and purchase orders and supplier bills (`TaxCodeSelect`,
+  `useTaxCodes`). Picking a code sets the line's rate. Left empty, the line keeps
+  its rate and the database gives it the default code for that rate.
+- Lines read from the database carry their `tax_code` (`withRowLines`), so
+  saving a document keeps every line's code. A credit note made from an invoice
+  keeps each line's code.
+- **Accounting › Tax**, for managers, administrators and accountants:
+  - the VAT return for a period (last month by default): output and input by
+    code and rate, VAT payable or refundable, and whether it ties to the ledger's
+    VAT accounts (or by how much it does not);
+  - the tax codes. Administrators and accountants add and edit them; a rate
+    change asks first. Codes live here rather than in Control Panel because
+    accountants maintain them and cannot open Control Panel.
+
+**Next (part 2):** propose a line's code from the product's usual code and the
+customer's / supplier's tax status; edit those on the product, customer and
+supplier screens; print the tax registration number on invoices.
