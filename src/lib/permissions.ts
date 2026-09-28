@@ -479,6 +479,39 @@ export function canDo(
 }
 
 /**
+ * Separation-of-duties conflicts (S-02, 20260915): who could create a document
+ * and also approve one of the same kind. With rma_config
+ * 'separation_of_duties' on, the database stops them approving their OWN
+ * document; with it off, nothing does. Only the approvals that setting governs
+ * and a non-admin can reach are listed — confirming a purchase order and
+ * approving a supplier bill are administrators' (who are exempt, owner
+ * decision), and refunds / supplier payments always need a second person.
+ */
+export const SOD_PAIRS: { key: string; make: [string, string]; approve: [string, string] | 'manager' }[] = [
+  { key: 'quotations', make: ['sales', 'create'], approve: 'manager' },
+  { key: 'sales_orders', make: ['sales', 'create'], approve: ['sales', 'approve'] },
+  { key: 'invoices', make: ['sales', 'create'], approve: ['sales', 'post'] },
+]
+const MANAGER_ROLES: string[] = [ROLES.MANAGER]
+
+export function sodConflicts(
+  users: { user_email: string; role: string; status?: string | null; permissions?: unknown }[]
+): { email: string; role: string; pairs: string[] }[] {
+  return (users || [])
+    .filter((u) => u.status === 'active' && u.role !== ROLES.ADMIN && u.role !== ROLES.SUPER_ADMIN)
+    .map((u) => {
+      const perms = resolvePermissions(u.role, u.permissions as UserPermissions | null)
+      const pairs = SOD_PAIRS.filter((p) =>
+        canDo(u.role, perms, ...p.make)
+        && (p.approve === 'manager' ? MANAGER_ROLES.includes(u.role) : canDo(u.role, perms, ...p.approve))
+      ).map((p) => p.key)
+      return { email: u.user_email, role: u.role, pairs }
+    })
+    .filter((c) => c.pairs.length > 0)
+    .sort((a, b) => a.email.localeCompare(b.email))
+}
+
+/**
  * The permission the database checks when an approval-pool document is
  * approved (permission_catalog, 20260914): approving a sales order runs
  * approve_sales_order (`sales.approve`), a credit note issue_credit_note
