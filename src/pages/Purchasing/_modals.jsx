@@ -10,6 +10,7 @@ import { CurrencyRateFields } from '../../components/CurrencyRateFields'
 import { PhoneNote, EmailNote } from '../../components/ContactValidation'
 import { useContactValidation } from '../../hooks/useContactValidation'
 import { useCountryOptions } from '../../hooks/useCountryRules'
+import TaxCodeSelect from '../../components/TaxCodeSelect'
 
 // Shared modal header — mirrors ModalHeader in SalesDocuments/_modals.jsx so
 // every Purchasing modal has the same title bar/close-button chrome.
@@ -81,7 +82,7 @@ function computeLineTotals(lines) {
 // chosen, no suggestions, as before. (BUG-066.)
 function LineItemsEditor({ lines, setLines, vendorId, t }) {
   function addLine() {
-    setLines([...lines, { product_id: '', product_name: '', qty_ordered: 1, unit_cost: 0, discount_pct: 0, tax_pct: 0 }])
+    setLines([...lines, { product_id: '', product_name: '', qty_ordered: 1, unit_cost: 0, discount_pct: 0, tax_pct: 0, tax_code: null }])
   }
   function updateLine(i, patch) {
     setLines(lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
@@ -128,8 +129,10 @@ function LineItemsEditor({ lines, setLines, vendorId, t }) {
                 onChange={(v) => updateLine(i, { unit_cost: parseFloat(v) || 0 })} />
               <NumCell label={t('salesDocuments.fDiscount')} min="0" max="100" value={line.discount_pct ?? ''}
                 onChange={(v) => updateLine(i, { discount_pct: parseFloat(v) || 0 })} />
-              <NumCell label={t('salesDocuments.fTax')} min="0" max="100" value={line.tax_pct ?? ''}
-                onChange={(v) => updateLine(i, { tax_pct: parseFloat(v) || 0 })} />
+              <div>
+                <div className="text-[10px] uppercase text-[#6c6760] dark:text-[#9aa4b2] mb-1">{t('salesDocuments.fTax')}</div>
+                <TaxCodeSelect value={line.tax_code} rate={line.tax_pct} onChange={(patch) => updateLine(i, patch)} className="text-sm" label={t('salesDocuments.fTax')} />
+              </div>
               <div className="text-end">
                 <div className="text-[10px] uppercase text-[#6c6760] dark:text-[#9aa4b2] mb-1">{t('salesDocuments.fLineTotal')}</div>
                 <div className="text-sm font-semibold text-[#211f1b] dark:text-[#e8ebf0] py-2">

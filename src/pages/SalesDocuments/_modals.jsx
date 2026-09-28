@@ -301,6 +301,8 @@ export function CreateCreditNoteModal({ invoice, onClose, onConfirm }) {
         // leaving the invoice 26.00 outstanding.
         discount_pct: Number(l.discount_pct) || 0,
         tax_pct: Number(l.tax_pct) || 0,
+        // the invoice line's own code: a credit follows what it credits (BL-15)
+        tax_code: l.tax_code ?? null,
         restock: false,
       }))
     onConfirm({ type: cnType, reason: reason.trim(), lines: included })

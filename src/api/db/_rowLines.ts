@@ -18,6 +18,8 @@ function salesItem(l: Row): Row {
     unit_price: num(l.unit_price),
     discount_pct: num(l.discount_pct),
     tax_pct: num(l.tax_pct),
+    // the line's tax code (20260911): kept on the screen so a save keeps it
+    tax_code: l.tax_code ?? null,
   }
 }
 
@@ -30,6 +32,8 @@ function purchaseItem(l: Row): Row {
     unit_cost: num(l.unit_cost),
     discount_pct: num(l.discount_pct),
     tax_pct: num(l.tax_pct),
+    // the line's tax code (20260911): kept on the screen so a save keeps it
+    tax_code: l.tax_code ?? null,
   }
 }
 

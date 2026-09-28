@@ -6,8 +6,9 @@ import { useCustomerSearch, useCustomer } from '../../lib/useLookups'
 import { computeDocumentTotals } from '../../api/db/_documentTotals'
 import { Button, Input, Select, Textarea, Label } from '../../components/ui'
 import { ProductSearchInput } from '../Pipeline/_shared'
+import TaxCodeSelect from '../../components/TaxCodeSelect'
 
-const EMPTY_LINE = { product_id: null, product_name: '', description: '', qty: 1, unit_price: 0, discount_pct: null, tax_pct: null }
+const EMPTY_LINE = { product_id: null, product_name: '', description: '', qty: 1, unit_price: 0, discount_pct: null, tax_pct: null, tax_code: null }
 
 // Type-specific date field per document type (see the shared layout in the plan).
 const DATE_FIELD = {
@@ -124,6 +125,7 @@ export default function SalesDocumentForm({ docType, initial = null, salesReps =
       unit_price: Number(l.unit_price) || 0,
       discount_pct: l.discount_pct === '' || l.discount_pct == null ? null : Number(l.discount_pct),
       tax_pct: l.tax_pct === '' || l.tax_pct == null ? null : Number(l.tax_pct),
+      tax_code: l.tax_code || null,
     }))
 
     const datePatch = { [dateField.key]: typeDate || null }
@@ -279,7 +281,10 @@ export default function SalesDocumentForm({ docType, initial = null, salesReps =
                 <NumCell label={t('salesDocuments.fQty')} value={l.qty} onChange={(v) => updateLine(i, { qty: v })} />
                 <NumCell label={t('salesDocuments.fUnitPrice')} value={l.unit_price} onChange={(v) => updateLine(i, { unit_price: v })} />
                 <NumCell label={t('salesDocuments.fDiscount')} value={l.discount_pct ?? ''} onChange={(v) => updateLine(i, { discount_pct: v })} />
-                <NumCell label={t('salesDocuments.fTax')} value={l.tax_pct ?? ''} onChange={(v) => updateLine(i, { tax_pct: v })} />
+                <div>
+                  <div className="text-[10px] uppercase text-[#6c6760] dark:text-[#9aa4b2] mb-1">{t('salesDocuments.fTax')}</div>
+                  <TaxCodeSelect value={l.tax_code} rate={l.tax_pct} onChange={(patch) => updateLine(i, patch)} className="text-sm" label={t('salesDocuments.fTax')} />
+                </div>
                 <div className="text-end">
                   <div className="text-[10px] uppercase text-[#6c6760] dark:text-[#9aa4b2] mb-1">{t('salesDocuments.fLineTotal')}</div>
                   <div className="text-sm font-semibold text-[#211f1b] dark:text-[#e8ebf0] py-2">
