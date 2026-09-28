@@ -56,7 +56,12 @@ export async function downloadTaxDocumentPDF({ kind, doc, customer }) {
     getPdfLayout(),
     db.taxCodes.list().catch(() => []),
   ])
-  const currency = layout.currency || 'EGP'
+  // the document's own currency; a foreign one also states its rate and the
+  // tax in the base currency, as a VAT invoice must (A-05)
+  const baseCurrency = layout.currency || 'EGP'
+  const currency = doc.currency || baseCurrency
+  const rate = Number(doc.exchange_rate) || 1
+  const foreign = currency !== baseCurrency
   const names = Object.fromEntries((codes || []).map((c) => [c.code, c.name]))
   const lines = doc.line_items || []
   const isInvoice = kind === 'invoice'
@@ -111,7 +116,7 @@ export async function downloadTaxDocumentPDF({ kind, doc, customer }) {
   </table>
   <table class="lines" style="margin-top:18px">
     <thead><tr><th>Tax summary</th><th class="center">Rate</th><th class="right">Net</th><th class="right">Tax</th></tr></thead>
-    <tbody>${summaryRows}</tbody>
+    <tbody>${summaryRows}${foreign ? `<tr class="sub"><td colspan="3" class="right muted">Tax in ${esc(baseCurrency)} at ${esc(rate)}</td><td class="right muted">${formatMoney(Math.round((Number(doc.tax_amount) || 0) * rate * 100) / 100, baseCurrency)}</td></tr>` : ''}</tbody>
   </table>`
 
   const notes = isInvoice ? doc.notes : [doc.reason, doc.notes].filter(Boolean).join('\n')
@@ -119,16 +124,19 @@ export async function downloadTaxDocumentPDF({ kind, doc, customer }) {
     ? `<div class="notes"><div class="nl">${isInvoice ? 'Notes &amp; Terms' : 'Reason'}</div><div class="nt">${esc(notes)}</div></div>`
     : ''
 
+  const rateRow = foreign ? [{ label: 'Exchange rate', value: `1 ${currency} = ${rate} ${baseCurrency}` }] : []
   const metaRows = isInvoice
     ? [
         { label: 'Invoice date', value: dateOf(doc.posted_at) },
         { label: 'Due date', value: dateOf(doc.due_date) },
         { label: 'Payment Terms', value: doc.payment_terms || 'N/A' },
         { label: 'PO Number', value: doc.reference_po || 'N/A' },
+        ...rateRow,
       ]
     : [
         { label: 'Date', value: dateOf(doc.issued_at) },
         { label: 'Against invoice', value: doc.source_invoice_number || 'N/A' },
+        ...rateRow,
       ]
 
   const html = buildDocumentHTML({

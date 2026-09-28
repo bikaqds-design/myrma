@@ -4,6 +4,8 @@ import toast from 'react-hot-toast'
 import { db } from '../../api/supabaseClient'
 import { useCustomerSearch, useCustomer } from '../../lib/useLookups'
 import { ModalOverlay, ModalCard, Button, Label, Input, Select, Textarea } from '../../components/ui'
+import { CurrencyRateFields } from '../../components/CurrencyRateFields'
+import { useDocumentCurrency } from '../../hooks/useDocumentCurrency'
 
 function ModalHeader({ title, onClose }) {
   const { t } = useTranslation()
@@ -70,6 +72,17 @@ export function RecordPaymentModal({ currentUserEmail, initialCustomerId = '', l
 
   const selectedCustomer = useCustomer(customerId)
 
+  // A-05b: the payment's currency starts as the customer's default; it settles
+  // only invoices in its own currency, at the rate below (filled from the table)
+  const cx = useDocumentCurrency()
+  const { selectCurrency, baseCurrency } = cx
+  useEffect(() => {
+    if (selectedCustomer?.id) selectCurrency(selectedCustomer.currency || baseCurrency)
+  }, [selectedCustomer?.id, selectedCustomer?.currency, baseCurrency, selectCurrency])
+  const payCurrency = cx.payload.currency
+  useEffect(() => { setAllocations({}) }, [payCurrency])
+  const inCurrency = openInvoices.filter((inv) => (inv.currency || baseCurrency) === payCurrency)
+
   useEffect(() => {
     setOpenInvoices([])
     setAllocations({})
@@ -96,7 +109,7 @@ export function RecordPaymentModal({ currentUserEmail, initialCustomerId = '', l
   const handleAutoAllocate = () => {
     let remaining = totalAmount
     const next = {}
-    for (const inv of openInvoices) {
+    for (const inv of inCurrency) {
       if (remaining <= 0.001) break
       const due = Math.round(((inv.total ?? 0) - (inv.amount_paid ?? 0)) * 100) / 100
       const give = Math.min(due, remaining)
@@ -110,7 +123,7 @@ export function RecordPaymentModal({ currentUserEmail, initialCustomerId = '', l
 
   const updateAllocation = (invoiceId, value) => setAllocations((prev) => ({ ...prev, [invoiceId]: value }))
 
-  const isValid = !!customerId && totalAmount > 0 && allocatedTotal <= totalAmount + 0.001
+  const isValid = !!customerId && totalAmount > 0 && allocatedTotal <= totalAmount + 0.001 && cx.rateValid
 
   const handleSubmit = async () => {
     if (!isValid) return
@@ -127,12 +140,15 @@ export function RecordPaymentModal({ currentUserEmail, initialCustomerId = '', l
         allocations: Object.entries(allocations)
           .map(([invoice_id, v]) => ({ invoice_id, amount: parseFloat(v) || 0 }))
           .filter((a) => a.amount > 0),
+        currency: cx.payload.currency,
+        exchange_rate: cx.isForeign ? cx.payload.exchangeRate : null,
       })
       toast.success(t('accounting.recordedToast'))
       onRecorded?.()
     } catch (err) {
       console.error('Record payment failed', err)
-      toast.error(t('accounting.recordFailed'))
+      // the database says why (e.g. no exchange rate on file for the currency)
+      toast.error(err?.message || t('accounting.recordFailed'), { duration: 7000 })
     } finally {
       setSaving(false)
     }
@@ -196,6 +212,7 @@ export function RecordPaymentModal({ currentUserEmail, initialCustomerId = '', l
               <Label>{t('accounting.colDate')}</Label>
               <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
             </div>
+            <CurrencyRateFields cx={cx} />
             <div className="sm:col-span-2">
               <Label>{t('salesDocuments.fNotes')}</Label>
               <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
@@ -206,7 +223,7 @@ export function RecordPaymentModal({ currentUserEmail, initialCustomerId = '', l
             <div>
               <div className="flex items-center justify-between mb-2">
                 <Label className="mb-0">{t('accounting.applyToInvoices')}</Label>
-                {openInvoices.length > 0 && (
+                {inCurrency.length > 0 && (
                   <button onClick={handleAutoAllocate} className="text-xs font-medium text-[#4338ca] dark:text-[#a5b4fc] hover:underline">
                     {t('accounting.autoAllocate')}
                   </button>
@@ -214,7 +231,7 @@ export function RecordPaymentModal({ currentUserEmail, initialCustomerId = '', l
               </div>
               {loadingInvoices ? (
                 <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('common.loading')}</div>
-              ) : openInvoices.length === 0 ? (
+              ) : inCurrency.length === 0 ? (
                 <div className="text-xs text-[#6c6760] dark:text-[#9aa4b2]">{t('salesDocuments.cnNoOpenInvoices')}</div>
               ) : (
                 <div className="rounded-xl border border-[#e6e9ef] dark:border-[#212a38] overflow-hidden">
@@ -228,7 +245,7 @@ export function RecordPaymentModal({ currentUserEmail, initialCustomerId = '', l
                       </tr>
                     </thead>
                     <tbody>
-                      {openInvoices.map((inv) => {
+                      {inCurrency.map((inv) => {
                         const remaining = Math.round(((inv.total ?? 0) - (inv.amount_paid ?? 0)) * 100) / 100
                         return (
                           <tr key={inv.id} className="border-b border-[#f0f2f6] dark:border-[#1a2230] last:border-0">

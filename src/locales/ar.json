@@ -2200,7 +2200,9 @@
     "taxStatus_registered": "مسجل في ضريبة القيمة المضافة",
     "taxStatus_unregistered": "غير مسجل في ضريبة القيمة المضافة",
     "taxStatus_exempt": "معفى من ضريبة القيمة المضافة",
-    "taxStatus_foreign": "أجنبي (خارج البلد)"
+    "taxStatus_foreign": "أجنبي (خارج البلد)",
+    "currency": "العملة الافتراضية",
+    "currencyBase": "{{base}} (العملة الأساسية)"
   },
   "leadModal": {
     "editTitle": "تعديل العميل المحتمل",
@@ -4095,7 +4097,14 @@
     "rtnWarehouseMissing": "{{product}}: اختر المخزن الذي تعود إليه البضائع.",
     "rtnNothing": "اختر بندًا واحدًا على الأقل مرتجعًا.",
     "dlvChip": "التسليم:",
-    "dlvQtyInvalidLine": "{{product}}: أدخل عددًا صحيحًا من 0 إلى {{open}}."
+    "dlvQtyInvalidLine": "{{product}}: أدخل عددًا صحيحًا من 0 إلى {{open}}.",
+    "fxPanel": "العملة",
+    "fxCurrency": "العملة",
+    "fxRateValue": "1 {{currency}} = {{rate}} {{base}}",
+    "fxTotalInBase": "الإجمالي بالعملة الأساسية: {{amount}}",
+    "fxChange": "تغيير العملة أو السعر",
+    "fxSavedToast": "تم حفظ العملة والسعر",
+    "fxPaymentHint": "الدفعة بعملة {{currency}} وبهذا السعر. أي سعر مختلف عن سعر الفاتورة يرحّل ربحًا أو خسارة في فروق العملة."
   },
   "accounting": {
     "title": "الحسابات",
@@ -4381,7 +4390,33 @@
     "taxErrZeroRate": "نسبة الرموز الخاضعة بنسبة صفر والمعفاة وخارج النطاق هي 0.",
     "taxErrPositiveRate": "نسبة الرمز الأساسي أو المخفّض أكبر من 0.",
     "glRole_fx_gain": "أرباح فروق العملة",
-    "glRole_fx_loss": "خسائر فروق العملة"
+    "glRole_fx_loss": "خسائر فروق العملة",
+    "tabRates": "أسعار الصرف",
+    "fxTitle": "أسعار الصرف",
+    "fxHint": "كم تساوي الوحدة الواحدة من كل عملة بـ {{base}} ابتداءً من تاريخ. يأخذ المستند آخر سعر في تاريخه أو قبله، ويمكن لمن يعدّله تغيير السعر حتى يُرحّل.",
+    "fxLatest": "{{currency}} الآن",
+    "fxSince": "منذ {{date}}",
+    "fxAdd": "إضافة سعر",
+    "fxCurrency": "العملة",
+    "fxChoose": "اختر…",
+    "fxDate": "من تاريخ",
+    "fxRate": "السعر ({{base}})",
+    "fxNote": "ملاحظة",
+    "fxSave": "حفظ السعر",
+    "fxSaveHint": "حفظ سعر لتاريخ له سعر بالفعل يستبدله.",
+    "fxPreview": "1 {{currency}} = {{rate}} {{base}}",
+    "fxHistory": "كل الأسعار",
+    "fxAllCurrencies": "كل العملات",
+    "fxNone": "لا توجد أسعار بعد.",
+    "fxDelete": "حذف",
+    "fxDeleteTitle": "حذف سعر {{currency}} بتاريخ {{date}}؟",
+    "fxDeleteConfirm": "تحتفظ المستندات المسعّرة بسعرها. تأخذ المستندات الجديدة آخر سعر تالٍ.",
+    "fxSavedToast": "تم حفظ السعر",
+    "fxDeletedToast": "تم حذف السعر",
+    "fxErrCurrency": "اختر عملة.",
+    "fxErrBase": "{{base}} هي العملة الأساسية: سعرها دائمًا 1.",
+    "fxErrDate": "اختر التاريخ الذي يسري منه السعر.",
+    "fxErrRate": "السعر رقم موجب."
   },
   "purchasing": {
     "title": "المشتريات",

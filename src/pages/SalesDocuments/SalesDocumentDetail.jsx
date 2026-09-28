@@ -11,6 +11,8 @@ import EmptyState from '../../components/EmptyState'
 import { downloadQuotationPDF } from '../../lib/quotationPdf'
 import { downloadSOPDF } from '../../lib/salesOrderPdf'
 import { downloadTaxDocumentPDF, isPrintable } from '../../lib/taxInvoicePdf'
+import DocCurrencyPanel from './DocCurrencyPanel'
+import { useBaseCurrency } from '../../hooks/useBaseCurrency'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { useConfirm } from '../../hooks/useConfirm'
 import { DetailSkeleton } from '../../components/Skeleton'
@@ -129,6 +131,7 @@ export default function SalesDocumentDetail({
    * the button was an error waiting to be clicked.
    */
   const canEditDoc   = canDo(currentUserRole, currentUserPermissions, 'sales', 'edit')
+  const baseCurrency = useBaseCurrency()
   const canCancelDoc = canDo(currentUserRole, currentUserPermissions, 'sales', 'cancel')
   const canPostDoc   = canDo(currentUserRole, currentUserPermissions, 'sales', 'post')
   // Recording a payment against an invoice is a cash action, not a sales one —
@@ -411,7 +414,9 @@ export default function SalesDocumentDetail({
   // so every payment made from the invoice page also lands in the payments
   // ledger — otherwise the Accounting page / customer statement would be
   // incomplete for payments recorded here.
-  const handleRecordPayment = (amount, method) => {
+  // A payment from the invoice page is in the invoice's currency (it may settle
+  // only invoices in its own), at the rate the person confirmed (A-05b).
+  const handleRecordPayment = (amount, method, rate) => {
     setShowPaymentModal(false)
     runAction(async () => {
       await db.payments.record({
@@ -420,6 +425,8 @@ export default function SalesDocumentDetail({
         method,
         created_by: currentUserEmail,
         allocations: [{ invoice_id: doc.id, amount }],
+        currency: doc.currency || null,
+        exchange_rate: rate ?? null,
       })
       toast.success(t('salesDocuments.paymentRecorded'))
     })
@@ -503,7 +510,9 @@ export default function SalesDocumentDetail({
     return label === key ? s : label
   }
   const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : '—')
-  const fmtMoney = (n) => (Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })
+  // a foreign-currency document shows its code on every amount (A-05b)
+  const docCurrencyPrefix = doc?.currency && doc.currency !== baseCurrency ? doc.currency + ' ' : ''
+  const fmtMoney = (n) => docCurrencyPrefix + (Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })
 
   // ── Guards ────────────────────────────────────────────────────────────────
 
@@ -822,6 +831,9 @@ export default function SalesDocumentDetail({
               <Field label={t('salesDocuments.remainingBalance')} value={fmtMoney((doc.total ?? 0) - (doc.amount_paid ?? 0))} />
             </>
           )}
+        </div>
+        <div className="mt-3 pt-3 border-t border-[#f0f2f6] dark:border-[#1a2230]">
+          <DocCurrencyPanel docType={docType} doc={doc} status={n.status} canEdit={canEditDoc} onChanged={refresh} />
         </div>
       </div>
 
