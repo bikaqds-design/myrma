@@ -455,6 +455,7 @@ export default function Customers({
       address: customerForm.address || null,
       cr_number: customerForm.cr_number || null,
       tax_id: customerForm.tax_id || null,
+      tax_status: customerForm.tax_status || null,
       notes: customerForm.notes || null,
       attachments: allAttachments,
       updated_by: currentUserEmail,
@@ -560,6 +561,7 @@ export default function Customers({
       address: customer.address || '',
       cr_number: customer.cr_number || '',
       tax_id: customer.tax_id || '',
+      tax_status: customer.tax_status || '',
       notes: customer.notes || '',
       attachments: customer.attachments || [],
     })

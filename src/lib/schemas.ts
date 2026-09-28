@@ -109,6 +109,7 @@ export const customerSchema = z
     address: z.string().max(500).optional().nullable(),
     cr_number: z.string().max(100).optional().nullable(),
     tax_id: z.string().max(100).optional().nullable(),
+    tax_status: z.union([z.enum(['registered', 'unregistered', 'exempt', 'foreign']), z.literal(''), z.null()]).optional(),
     notes: z.string().max(2000).optional().nullable(),
   })
   .superRefine((data, ctx) => {

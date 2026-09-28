@@ -4,7 +4,8 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-const sql = readFileSync('supabase/migrations/20260911_tax_codes.sql', 'utf8')
+// line endings normalised: a Windows checkout stores the file with CRLF
+const sql = readFileSync('supabase/migrations/20260911_tax_codes.sql', 'utf8').replace(/\r\n/g, '\n')
 const fn = (name) => {
   const at = sql.indexOf(`FUNCTION public.${name}(`)
   return sql.slice(at, sql.indexOf('$fn$;', sql.indexOf('$fn$', at) + 4))

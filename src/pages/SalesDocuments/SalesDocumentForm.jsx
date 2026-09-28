@@ -7,6 +7,8 @@ import { computeDocumentTotals } from '../../api/db/_documentTotals'
 import { Button, Input, Select, Textarea, Label } from '../../components/ui'
 import { ProductSearchInput } from '../Pipeline/_shared'
 import TaxCodeSelect from '../../components/TaxCodeSelect'
+import { useTaxCodes } from '../../lib/useTaxCodes'
+import { proposeTaxCode } from '../Accounting/_tax'
 
 const EMPTY_LINE = { product_id: null, product_name: '', description: '', qty: 1, unit_price: 0, discount_pct: null, tax_pct: null, tax_code: null }
 
@@ -61,7 +63,13 @@ export default function SalesDocumentForm({ docType, initial = null, salesReps =
   const selectedCustomer = useCustomer(customerId)
 
   const updateLine = (i, patch) => setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
-  const selectProduct = (i, product) => updateLine(i, { product_id: product.id, product_name: product.product_name })
+  const taxCodes = useTaxCodes()
+  // the product's usual code, unless the customer's tax status decides (A-04b)
+  const selectProduct = (i, product) => updateLine(i, {
+    product_id: product.id,
+    product_name: product.product_name,
+    ...(proposeTaxCode(taxCodes, { productCode: product.tax_code, partyStatus: selectedCustomer?.tax_status, side: 'sales' }) || {}),
+  })
   const addLine = () => setLines((prev) => [...prev, { ...EMPTY_LINE }])
   const removeLine = (i) => setLines((prev) => (prev.length === 1 ? prev : prev.filter((_, idx) => idx !== i)))
 

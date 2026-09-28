@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import AttachmentsField from '../../components/AttachmentsField'
 import { Button } from '../../components/ui'
 import { associateFieldId } from '../../lib/fieldAssociation'
+import { TAX_STATUSES } from '../Accounting/_tax'
 
 // ─── SHARED HELPERS ────────────────────────────────────────────────────────────
 
@@ -263,6 +264,14 @@ export function AddCustomerModal({
               </Field>
             </div>
           )}
+
+          {/* Tax status: proposes each line's tax code on this customer's documents (A-04b) */}
+          <Field label={t('customerModal.taxStatus')}>
+            <select value={form.tax_status || ''} onChange={(e) => set('tax_status', e.target.value)} className={inp} aria-label={t('customerModal.taxStatus')}>
+              <option value="">{t('customerModal.taxStatusNone')}</option>
+              {TAX_STATUSES.map((s) => <option key={s} value={s}>{t(`customerModal.taxStatus_${s}`)}</option>)}
+            </select>
+          </Field>
 
           {/* Notes */}
           <Field label={t('customerModal.notes')}>

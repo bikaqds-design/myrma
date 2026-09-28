@@ -4,6 +4,8 @@ import toast from 'react-hot-toast'
 import Modal from '../../components/Modal'
 import { Button } from '../../components/ui'
 import { VendorFieldsSection } from '../Purchasing/_modals'
+import { useTaxCodes } from '../../lib/useTaxCodes'
+import { codeOptions, fmtRate, taxCodeName } from '../Accounting/_tax'
 
 export function AddProductModal({
   productForm,
@@ -18,7 +20,8 @@ export function AddProductModal({
   editingProduct,
   trackingModeLocked = false,
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const taxCodes = useTaxCodes()
   const filteredCategories = categories.filter((c) => c.brand_id === productForm.brand_id)
   const filteredSubcategories = subcategories.filter(
     (s) => s.category_id === productForm.category_id
@@ -205,6 +208,25 @@ export function AddProductModal({
               </p>
             </div>
           )}
+
+          {/* The code this product's document lines are given (A-04b); a
+              customer's or supplier's tax status can override it on a line. */}
+          <div>
+            <label htmlFor="product-tax-code" className="block text-sm font-medium text-gray-700 mb-2">
+              {t('products.taxCode')}
+            </label>
+            <select id="product-tax-code"
+              value={productForm.tax_code || ''}
+              onChange={(e) => setProductForm({ ...productForm, tax_code: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
+            >
+              <option value="">{t('products.taxCodeNone')}</option>
+              {codeOptions(taxCodes, productForm.tax_code).map((c) => (
+                <option key={c.code} value={c.code}>{`${c.code} · ${taxCodeName(c, i18n.language)} (${fmtRate(c.rate)}%)`}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">{t('products.taxCodeHint')}</p>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

@@ -18,6 +18,8 @@ import { downloadQuotationPDF } from '../../lib/quotationPdf'
 import { dealValueFor, canMarkDealWon } from '../../lib/dealValue'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import TaxCodeSelect from '../../components/TaxCodeSelect'
+import { useTaxCodes } from '../../lib/useTaxCodes'
+import { proposeTaxCode } from '../Accounting/_tax'
 
 const CARD = 'bg-white dark:bg-[#121823] border border-[#e6e9ef] dark:border-[#212a38] rounded-[14px] p-[18px]'
 
@@ -510,11 +512,16 @@ export default function DealDetail({ dealId, currentUserRole, currentUserEmail, 
 
   const updateQtLine = (i, field, val) =>
     setQtLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, [field]: val } : l)))
+  const taxCodes = useTaxCodes()
   const selectQtProduct = (i, product) =>
     setQtLines((prev) =>
       prev.map((l, idx) =>
         idx === i
-          ? { ...l, product_id: product.id, product_name: product.product_name, unit_price: product.unit_price ?? l.unit_price }
+          ? {
+              ...l, product_id: product.id, product_name: product.product_name, unit_price: product.unit_price ?? l.unit_price,
+              // the product's usual code, unless the customer's tax status decides (A-04b)
+              ...(proposeTaxCode(taxCodes, { productCode: product.tax_code, partyStatus: customer?.tax_status, side: 'sales' }) || {}),
+            }
           : l
       )
     )

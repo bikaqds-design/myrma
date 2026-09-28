@@ -11,6 +11,7 @@ export const PDF_LAYOUT_DEFAULT = {
   companyName: '',        // filled once in Control Panel (falls back to branding)
   companyAddress: '',     // the address line under the company name
   companyPhone: '',       // the phone line under the address
+  taxNumber: '',          // the company's tax registration number (Control Panel › Business identity)
   currency: 'EGP',        // default currency code shown on money values
   primaryColor: '#4338ca',
   font: 'Arial, sans-serif',
@@ -46,6 +47,10 @@ export async function getPdfLayout() {
       const cur = cfgResult.data.find((r) => r.config_key === 'default_currency')
       const code = typeof cur?.config_value === 'string' ? cur.config_value : cur?.config_value?.toString?.()
       if (code) layout.currency = code
+      // A-04b: printed under the company on every document once it is set
+      const trn = cfgResult.data.find((r) => r.config_key === 'tax_registration_number')
+      const trnValue = typeof trn?.config_value === 'string' ? trn.config_value : ''
+      if (trnValue.trim()) layout.taxNumber = trnValue.trim()
     }
     if (brd) {
       logoUrl = brd.logo_url || null
@@ -93,7 +98,7 @@ export function buildDocumentHTML({
     .map((r) => `<tr><td class="ml">${esc(r.label)}:</td><td class="mv">${esc(r.value)}</td></tr>`)
     .join('')
 
-  const identityLines = [layout.companyAddress, layout.companyPhone]
+  const identityLines = [layout.companyAddress, layout.companyPhone, layout.taxNumber ? `Tax Reg. No. ${layout.taxNumber}` : '']
     .filter(Boolean)
     .map((l) => `<div class="cl">${esc(l)}</div>`)
     .join('')
@@ -157,6 +162,7 @@ export function buildDocumentHTML({
       ${billToDetails?.address ? `<div class="cl">${esc(billToDetails.address)}</div>` : ''}
       ${billToDetails?.mobile ? `<div class="cl">Tel: ${esc(billToDetails.mobile)}</div>` : ''}
       ${billToDetails?.email ? `<div class="cl">Email: ${esc(billToDetails.email)}</div>` : ''}
+      ${billToDetails?.taxId ? `<div class="cl">Tax ID: ${esc(billToDetails.taxId)}</div>` : ''}
     </div>` : ''}
   </div>
   <div class="head-right">

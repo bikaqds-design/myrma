@@ -73,6 +73,19 @@ a VAT code. Tax by customer / supplier reports. E-invoicing (W5).
     change asks first. Codes live here rather than in Control Panel because
     accountants maintain them and cannot open Control Panel.
 
-**Next (part 2):** propose a line's code from the product's usual code and the
-customer's / supplier's tax status; edit those on the product, customer and
-supplier screens; print the tax registration number on invoices.
+**Done (part 2):**
+
+- Customers and suppliers have a **tax status** (VAT registered, not registered,
+  exempt, foreign), edited on the customer form, the customer page and both
+  supplier forms. Products have a **usual tax code**.
+- Picking a product on a line **proposes its code** (`proposeTaxCode`): an exempt
+  customer or supplier → an exempt code; a foreign customer → zero-rated (an
+  export); a foreign supplier → out of scope (tax paid at customs); otherwise the
+  product's usual code. Only a proposal: the line's picker can change it.
+- Every printed document shows the company's **tax registration number** (from
+  Control Panel › Business identity) and the buyer's **tax ID**.
+- **Tax invoice and tax credit note PDFs** (`src/lib/taxInvoicePdf.js`): there was
+  no invoice or credit-note print before. A posted invoice or an issued credit
+  note prints each line's code and rate, totals before and after tax, and a tax
+  summary by code and rate; titled "Tax Invoice" / "Tax Credit Note" once the
+  company's tax number is set.

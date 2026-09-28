@@ -18,6 +18,7 @@ import { formatMoney } from '../lib/money'
 import { useBaseCurrency } from '../hooks/useBaseCurrency'
 import Pagination from '../components/Pagination'
 import { safeStorage } from '../lib/safeStorage'
+import { TAX_STATUSES } from './Accounting/_tax'
 
 const EMPTY_TICKET_COUNTS = { total: 0, open: 0 }
 
@@ -204,6 +205,7 @@ export default function CustomerDetails({
         address: editForm.address || null,
         cr_number: editForm.cr_number || null,
         tax_id: editForm.tax_id || null,
+        tax_status: editForm.tax_status || null,
         credit_limit: editForm.credit_limit === '' || editForm.credit_limit == null ? null : Number(editForm.credit_limit),
         notes: editForm.notes || null,
         attachments: allAttachments,
@@ -692,6 +694,19 @@ export default function CustomerDetails({
                             className={inputClass}
                           />
                         </div>
+                        {/* proposes each line's tax code on this customer's documents (A-04b) */}
+                        <div>
+                          <label htmlFor="cd-tax-status" className={labelClass}>{t('customerModal.taxStatus')}</label>
+                          <select
+                            id="cd-tax-status"
+                            value={editForm.tax_status || ''}
+                            onChange={(e) => setEditForm({ ...editForm, tax_status: e.target.value })}
+                            className={inputClass}
+                          >
+                            <option value="">{t('customerModal.taxStatusNone')}</option>
+                            {TAX_STATUSES.map((s) => <option key={s} value={s}>{t(`customerModal.taxStatus_${s}`)}</option>)}
+                          </select>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -899,6 +914,9 @@ export default function CustomerDetails({
                           <DetailRow icon="🏢" label={t('customerModal.companyName')} value={customer.company_name} />
                           <DetailRow icon="📄" label={t('customerModal.crNumber')} value={customer.cr_number} />
                           <DetailRow icon="🧾" label={t('customerModal.taxId')} value={customer.tax_id} />
+                          {customer.tax_status && (
+                            <DetailRow icon="🏷️" label={t('customerModal.taxStatus')} value={t(`customerModal.taxStatus_${customer.tax_status}`)} />
+                          )}
                         </div>
                       </div>
                     )}

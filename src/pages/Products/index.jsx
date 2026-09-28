@@ -158,6 +158,7 @@ export default function Products({
     product_type: 'hardware',
     status: 'active',
     stock_tracking_mode: 'serialized',
+    tax_code: '',
     warranty_months: 12,
     product_description: '',
     product_link: '',
@@ -181,6 +182,7 @@ export default function Products({
     email: '',
     phone: '',
     tax_id: '',
+    tax_status: '',
     payment_terms: '',
   })
 
@@ -734,6 +736,8 @@ export default function Products({
         ...(productForm.product_type === 'service'
           ? {}
           : { stock_tracking_mode: productForm.stock_tracking_mode }),
+        // the code its lines are given unless the customer's status decides (A-04b)
+        tax_code: productForm.tax_code || null,
         warranty_months: productForm.warranty_months,
         product_description: productForm.product_description,
         product_link: productForm.product_link,
@@ -837,6 +841,7 @@ export default function Products({
         email: brandForm.email || null,
         phone: brandForm.phone || null,
         tax_id: brandForm.tax_id || null,
+        tax_status: brandForm.tax_status || null,
         payment_terms: brandForm.payment_terms || null,
         created_by: currentUserEmail,
         updated_by: currentUserEmail,
@@ -1094,6 +1099,7 @@ export default function Products({
       product_type: product.product_type || 'hardware',
       status: product.status || 'active',
       stock_tracking_mode: product.stock_tracking_mode || 'serialized',
+      tax_code: product.tax_code || '',
       warranty_months: product.warranty_months || 12,
       product_description: product.product_description || '',
       product_link: product.product_link || '',
@@ -1120,6 +1126,7 @@ export default function Products({
       email: brand.email || '',
       phone: brand.phone || '',
       tax_id: brand.tax_id || '',
+      tax_status: brand.tax_status || '',
       payment_terms: brand.payment_terms || '',
     })
     setLogoPreview(brand.brand_logo_url)
@@ -1155,6 +1162,7 @@ export default function Products({
       product_type: 'hardware',
       status: 'active',
       stock_tracking_mode: 'serialized',
+      tax_code: '',
       warranty_months: 12,
       product_description: '',
       product_link: '',
@@ -1176,6 +1184,7 @@ export default function Products({
       email: '',
       phone: '',
       tax_id: '',
+      tax_status: '',
       payment_terms: '',
     })
     setLogoFile(null)
