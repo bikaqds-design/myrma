@@ -5,6 +5,8 @@ import { db } from '../../api/supabaseClient'
 import { Input, Label } from '../../components/ui'
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { accountName, trialBalanceTotals } from './_ledger'
+import { todayIso } from './_reports'
+import AccountActivityModal from './AccountActivityModal'
 
 // Accounting › Trial balance (A-01c) over rma_trial_balance(from, to):
 // debits, credits and each account's balance on its normal side. Empty dates
@@ -17,6 +19,7 @@ export default function TrialBalanceTab() {
   const { t, i18n } = useTranslation()
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
+  const [open, setOpen] = useState(null)
 
   const { data: rows = EMPTY_ARRAY, isLoading, error } = useQuery({
     queryKey: ['ledger', 'trial-balance', from, to],
@@ -61,8 +64,11 @@ export default function TrialBalanceTab() {
             ) : (
               rows.map((r) => (
                 <tr key={r.account_id} className="border-b border-[#f0f2f6] dark:border-[#1a2230]">
-                  <td className="px-4 py-3 text-[#211f1b] dark:text-[#e8ebf0]">
-                    <span className="font-mono text-xs">{r.code}</span> {accountName(r, i18n.language)}
+                  <td className="px-4 py-3">
+                    {/* A-08a: open the account's entries for the same period */}
+                    <button type="button" onClick={() => setOpen(r)} className="text-start text-[#4338ca] dark:text-[#a5b4fc] hover:underline">
+                      <span className="font-mono text-xs">{r.code}</span> {accountName(r, i18n.language)}
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-[#6c6760] dark:text-[#9aa4b2]">{t(`accounting.glType_${r.account_type}`)}</td>
                   <td className="px-4 py-3 text-end text-[#211f1b] dark:text-[#e8ebf0]">{fmtMoney(r.debit)}</td>
@@ -90,6 +96,11 @@ export default function TrialBalanceTab() {
           )}
         </table>
       </div>
+
+      {open && (
+        <AccountActivityModal account={{ id: open.account_id, code: open.code, name: open.name, name_ar: open.name_ar }}
+          from={from || null} to={to || todayIso()} onClose={() => setOpen(null)} />
+      )}
     </div>
   )
 }
