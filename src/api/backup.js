@@ -283,6 +283,12 @@ export const BACKUP_TABLES = [
   // A-07 (20260920): bank statements, after the journal lines they clear
   { table: 'bank_statements' },
   { table: 'bank_statement_lines' },
+  // B-03a (20260921): opening balances, after the invoices, bills, stock and
+  // journal they point at
+  { table: 'opening_balance_batches' },
+  { table: 'opening_balance_accounts' },
+  { table: 'opening_balance_documents' },
+  { table: 'opening_balance_stock' },
 
   // ── Tier 7: history. activities is polymorphic — related_id points at a
   //    deal, lead, customer, purchase order or vendor invoice depending on
@@ -371,7 +377,7 @@ export const BACKUP_MODULES = [
   },
   {
     id: 'ledger',
-    tables: ['gl_accounts', 'posting_rules', 'tax_codes', 'tax_code_rates', 'exchange_rates', 'journal_entries', 'journal_lines', 'accounting_periods', 'period_reopen_requests', 'fx_revaluations', 'fx_revaluation_lines', 'bank_statements', 'bank_statement_lines'],
+    tables: ['gl_accounts', 'posting_rules', 'tax_codes', 'tax_code_rates', 'exchange_rates', 'journal_entries', 'journal_lines', 'accounting_periods', 'period_reopen_requests', 'fx_revaluations', 'fx_revaluation_lines', 'bank_statements', 'bank_statement_lines', 'opening_balance_batches', 'opening_balance_accounts', 'opening_balance_documents', 'opening_balance_stock'],
   },
   {
     id: 'comms',

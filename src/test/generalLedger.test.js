@@ -78,6 +78,7 @@ describe('general ledger (A-01a)', () => {
       'accounting_periods', 'period_reopen_requests', // A-03 (20260910)
       'fx_revaluations', 'fx_revaluation_lines', // A-08c (20260918)
       'bank_statements', 'bank_statement_lines', // A-07 (20260920)
+      'opening_balance_batches', 'opening_balance_accounts', 'opening_balance_documents', 'opening_balance_stock', // B-03a (20260921)
     ])
   })
 })
