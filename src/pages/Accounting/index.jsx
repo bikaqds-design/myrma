@@ -27,6 +27,7 @@ import TaxTab from './TaxTab'
 import ExchangeRatesTab from './ExchangeRatesTab'
 import FxRevaluationTab from './FxRevaluationTab'
 import BankReconciliationTab from './BankReconciliationTab'
+import OpeningBalancesTab from './OpeningBalancesTab'
 import { ROLES } from '../../lib/constants'
 
 const METHOD_LABEL_KEY = {
@@ -253,7 +254,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
           canRecord ? (
             <Button onClick={() => setShowRecordVendorModal(true)}>+ {t('purchasing.recordPayment')}</Button>
           ) : null
-        ) : !['ap_aging', 'refunds', 'journal', 'trial_balance', 'profit_loss', 'balance_sheet', 'ledger_checks', 'periods', 'tax', 'rates', 'revaluation', 'bank'].includes(tab) ? (
+        ) : !['ap_aging', 'refunds', 'journal', 'trial_balance', 'profit_loss', 'balance_sheet', 'ledger_checks', 'periods', 'tax', 'rates', 'revaluation', 'bank', 'opening'].includes(tab) ? (
           canRecord ? (
             <Button onClick={() => setShowRecordModal(true)}>+ {t('accounting.recordPayment')}</Button>
           ) : null
@@ -311,6 +312,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
                 { id: 'rates', label: t('accounting.tabRates') },
                 { id: 'revaluation', label: t('accounting.tabRevaluation') },
                 { id: 'bank', label: t('accounting.tabBank') },
+                { id: 'opening', label: t('accounting.tabOpening') },
               ]
             : []),
         ].map((tb) => (
@@ -409,6 +411,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
       {tab === 'rates' && canSeeLedger && <ExchangeRatesTab currentUserRole={currentUserRole} />}
       {tab === 'revaluation' && canSeeLedger && <FxRevaluationTab currentUserRole={currentUserRole} currentUserPermissions={currentUserPermissions} />}
       {tab === 'bank' && canSeeLedger && <BankReconciliationTab currentUserRole={currentUserRole} />}
+      {tab === 'opening' && canSeeLedger && <OpeningBalancesTab currentUserRole={currentUserRole} />}
 
       {tab === 'refunds' && (
         <RefundsTab currentUserEmail={currentUserEmail} currentUserRole={currentUserRole} currentUserPermissions={currentUserPermissions} perPage={perPage} setPerPage={setPerPage} />

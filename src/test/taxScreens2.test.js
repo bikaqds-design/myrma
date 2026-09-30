@@ -141,7 +141,8 @@ describe('printed documents', () => {
 
   it('the invoice and credit note pages offer the print for those', () => {
     const page = read('src/pages/SalesDocuments/SalesDocumentDetail.jsx')
-    expect(page).toContain("isPrintable('invoice', doc) && (")
+    // an opening-balance invoice (20260921) has no lines to print
+    expect(page).toContain("isPrintable('invoice', doc) && !doc.is_opening && (")
     expect(page).toContain("isPrintable('credit_note', doc) && (")
   })
 })

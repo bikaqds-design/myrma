@@ -97,7 +97,8 @@ describe('the pages', () => {
   })
   it('an invoice from receipts offers no receive, and no cancel once approved', () => {
     const receive = page.indexOf('setShowReceive(true)')
-    expect(page.lastIndexOf("{!isReceiptInvoice && ['approved', 'partially_received'].includes(doc.status) && (", receive)).toBeGreaterThan(receive - 200)
+    // (and an opening-balance bill, 20260921, receives nothing either)
+    expect(page.lastIndexOf("{!isReceiptInvoice && !doc.is_opening && ['approved', 'partially_received'].includes(doc.status) && (", receive)).toBeGreaterThan(receive - 200)
     expect(page).toContain("(isReceiptInvoice ? ['draft', 'pending_approval'] : ['draft', 'pending_approval', 'approved']).includes(doc.status)")
   })
 })
