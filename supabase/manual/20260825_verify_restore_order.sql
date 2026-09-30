@@ -106,11 +106,13 @@ WITH manifest(ord, tbl) AS (
     (87, 'period_reopen_requests'),
     (88, 'fx_revaluations'),
     (89, 'fx_revaluation_lines'),
-    (90, 'activities'),
-    (91, 'notifications'),
-    (92, 'user_activity_log'),
-    (93, 'notification_logs'),
-    (94, 'notification_queue')
+    (90, 'bank_statements'),
+    (91, 'bank_statement_lines'),
+    (92, 'activities'),
+    (93, 'notifications'),
+    (94, 'user_activity_log'),
+    (95, 'notification_logs'),
+    (96, 'notification_queue')
 ),
 fk AS (
   SELECT c.relname  AS child,

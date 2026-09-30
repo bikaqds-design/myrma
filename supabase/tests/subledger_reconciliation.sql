@@ -108,8 +108,9 @@ BEGIN
   SELECT sum(x.difference) INTO v_sum FROM public._rma_subledger_rows('receivables') x;
   res := res || pg_temp.check('receivables: the difference is the sum of the documents''', v_sum = s2.difference, v_sum || ' vs ' || s2.difference);
   SELECT sum(l.debit - l.credit) INTO v_led FROM public.journal_lines l
-   WHERE l.account_id = (SELECT account_id FROM public.posting_rules WHERE role = 'accounts_receivable');
-  res := res || pg_temp.check('receivables: the ledger balance is the account''s', v_led = s2.ledger_balance, v_led || ' vs ' || s2.ledger_balance);
+   WHERE l.account_id IN (SELECT account_id FROM public.posting_rules WHERE role IN ('accounts_receivable', 'customer_deposits'));
+  -- since 20260919 receivables are counted together with customer deposits
+  res := res || pg_temp.check('receivables: the ledger balance is receivables + customer deposits', v_led = s2.ledger_balance, v_led || ' vs ' || s2.ledger_balance);
 
   p := pg_temp.summary('payables');
   SELECT sum(x.difference), sum(x.subledger_amount) INTO v_sum, v_led FROM public._rma_subledger_rows('payables') x;

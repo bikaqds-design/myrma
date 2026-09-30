@@ -193,8 +193,8 @@ BEGIN
   -- ══ 6. the checklist ═══════════════════════════════════════════════════════
   PERFORM set_config('request.jwt.claims', json_build_object('email', v_acct, 'role', 'authenticated')::text, true);
   SELECT count(*) INTO v_n FROM public.rma_period_close_checklist('2026-08-01');
-  PERFORM pg_temp.check('the checklist lists nine items (bank reconciliation not available yet; 20260918 adds foreign balances not revalued)',
-    v_n = 9 AND EXISTS (SELECT 1 FROM public.rma_period_close_checklist('2026-08-01') WHERE item = 'bank_reconciliation' AND item_count IS NULL));
+  PERFORM pg_temp.check('the checklist lists nine items (20260918 adds foreign balances not revalued; 20260920 makes bank reconciliation a real count)',
+    v_n = 9 AND EXISTS (SELECT 1 FROM public.rma_period_close_checklist('2026-08-01') WHERE item = 'bank_reconciliation' AND item_count IS NOT NULL));  -- 20260920 counts unreconciled bank accounts
   PERFORM set_config('request.jwt.claims', '', true);
   v_out := pg_temp.call(v_acct, $s$SELECT * FROM public.rma_period_close_checklist('2026-08-01')$s$);
   PERFORM pg_temp.check('an accountant reads it', v_out = 'ok', '-> ' || v_out);

@@ -280,6 +280,9 @@ export const BACKUP_TABLES = [
   // A-08c (20260918): month-end revaluations, after the journal they point at
   { table: 'fx_revaluations' },
   { table: 'fx_revaluation_lines' },
+  // A-07 (20260920): bank statements, after the journal lines they clear
+  { table: 'bank_statements' },
+  { table: 'bank_statement_lines' },
 
   // ── Tier 7: history. activities is polymorphic — related_id points at a
   //    deal, lead, customer, purchase order or vendor invoice depending on
@@ -368,7 +371,7 @@ export const BACKUP_MODULES = [
   },
   {
     id: 'ledger',
-    tables: ['gl_accounts', 'posting_rules', 'tax_codes', 'tax_code_rates', 'exchange_rates', 'journal_entries', 'journal_lines', 'accounting_periods', 'period_reopen_requests', 'fx_revaluations', 'fx_revaluation_lines'],
+    tables: ['gl_accounts', 'posting_rules', 'tax_codes', 'tax_code_rates', 'exchange_rates', 'journal_entries', 'journal_lines', 'accounting_periods', 'period_reopen_requests', 'fx_revaluations', 'fx_revaluation_lines', 'bank_statements', 'bank_statement_lines'],
   },
   {
     id: 'comms',
