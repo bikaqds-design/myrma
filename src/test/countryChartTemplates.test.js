@@ -6,7 +6,9 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { CHART_COUNTRIES, CHART_IMPORT_MAX, POSTING_ROLES, parseChartCsv, summarizeImport } from '../pages/Accounting/_ledger'
 
-const sql = readFileSync('supabase/migrations/20260908_country_chart_templates.sql', 'utf8')
+// 20260918 adds the two unrealised exchange accounts to every template, in the same row format
+const sql = ['20260908_country_chart_templates.sql', '20260918_fx_revaluation.sql']
+  .map((f) => readFileSync('supabase/migrations/' + f, 'utf8')).join(String.fromCharCode(10))
 
 // ('EG', '1130', 'Bank – current account', 'البنك – حساب جاري', 'asset', '1100', true, 'cash'),
 const q = "'((?:[^']|'')*)'"
@@ -35,7 +37,7 @@ describe('country chart templates (migration seed)', () => {
   it('seeds Egypt, the UAE and Saudi Arabia, and nothing else', () => {
     expect([...new Set(rows.map((r) => r.country))].sort()).toEqual([...CHART_COUNTRIES].sort())
     const count = (c) => rows.filter((r) => r.country === c).length
-    expect([count('EG'), count('AE'), count('SA')]).toEqual([95, 92, 95])
+    expect([count('EG'), count('AE'), count('SA')]).toEqual([97, 94, 97])
   })
 
   for (const country of ['EG', 'AE', 'SA']) {

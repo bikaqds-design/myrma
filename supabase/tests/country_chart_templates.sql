@@ -67,9 +67,9 @@ BEGIN
     (v_admin, 'admin', 'active'), (v_mgr, 'manager', 'active'), (v_tech, 'technician', 'active');
 
   -- ══ 1. the templates ═══════════════════════════════════════════════════════
-  PERFORM pg_temp.check('three templates: Egypt 95, UAE 92, Saudi Arabia 95 accounts',
+  PERFORM pg_temp.check('three templates: Egypt 97, UAE 94, Saudi Arabia 97 accounts',  -- 20260918 adds the two unrealised FX accounts
     (SELECT string_agg(country_code || ':' || n, ',' ORDER BY country_code)
-       FROM (SELECT country_code, count(*) n FROM public.gl_chart_templates GROUP BY 1) x) = 'AE:92,EG:95,SA:95');
+       FROM (SELECT country_code, count(*) n FROM public.gl_chart_templates GROUP BY 1) x) = 'AE:94,EG:97,SA:97');
   PERFORM pg_temp.check('every template account has an Arabic name',
     NOT EXISTS (SELECT 1 FROM public.gl_chart_templates WHERE btrim(name_ar) = ''));
   v_out := pg_temp.call(v_tech, 'SELECT count(*) FROM public.gl_chart_templates');
@@ -86,7 +86,7 @@ BEGIN
   v_res := pg_temp.json_as(v_admin, $s$SELECT public.rma_apply_chart_template('eg')$s$);
   PERFORM pg_temp.check('Egypt applied: the chart is exactly the template',
     v_res ->> 'country' = 'EG'
-    AND (SELECT count(*) FROM public.gl_accounts) = 95
+    AND (SELECT count(*) FROM public.gl_accounts) = 97
     AND NOT EXISTS (SELECT 1 FROM public.gl_accounts a WHERE NOT EXISTS
           (SELECT 1 FROM public.gl_chart_templates t WHERE t.country_code = 'EG' AND t.code = a.code
               AND t.name = a.name AND t.account_type = a.account_type AND t.is_postable = a.is_postable)),
@@ -99,7 +99,8 @@ BEGIN
     pg_temp.rule('accounts_receivable') = '1210' AND pg_temp.rule('cash') = '1110' AND pg_temp.rule('bank') = '1130'  -- 20260909
     AND pg_temp.rule('sales_tax_payable') = '2210' AND pg_temp.rule('rounding') = '6990'
     AND pg_temp.rule('fx_gain') = '4910' AND pg_temp.rule('fx_loss') = '6520'  -- 20260912
-    AND (SELECT count(*) FROM public.posting_rules) = 19);  -- 20260909 adds bank, 20260912 the two exchange roles
+    AND pg_temp.rule('fx_unrealised_gain') = '4915' AND pg_temp.rule('fx_unrealised_loss') = '6525'  -- 20260918
+    AND (SELECT count(*) FROM public.posting_rules) = 21);  -- 20260909 adds bank, 20260912 the two exchange roles, 20260918 the two unrealised ones
   PERFORM pg_temp.check('the default chart''s 1200 (receivables) became the Receivables header; Egypt''s own accounts are there',
     (SELECT NOT is_postable AND name = 'Receivables' FROM public.gl_accounts WHERE code = '1200')
     AND EXISTS (SELECT 1 FROM public.gl_accounts WHERE code = '2230' AND name = 'Salary tax payable')
@@ -112,7 +113,7 @@ BEGIN
   -- another country, still before anything is posted
   v_res := pg_temp.json_as(v_admin, $s$SELECT public.rma_apply_chart_template('SA')$s$);
   PERFORM pg_temp.check('then Saudi Arabia: Egypt-only accounts go, shared codes take the Saudi meaning',
-    (SELECT count(*) FROM public.gl_accounts) = 95
+    (SELECT count(*) FROM public.gl_accounts) = 97
     AND NOT EXISTS (SELECT 1 FROM public.gl_accounts WHERE code = '1420')
     AND (SELECT name FROM public.gl_accounts WHERE code = '2240') = 'Zakat payable'
     AND (SELECT name FROM public.gl_accounts WHERE code = '3200') = 'Statutory reserve',

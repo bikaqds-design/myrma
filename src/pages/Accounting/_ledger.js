@@ -112,6 +112,9 @@ export const POSTING_ROLES = [
   'rounding',
   'fx_gain',
   'fx_loss',
+  // A-08c (20260918): month-end revaluation, reversed on the 1st
+  'fx_unrealised_gain',
+  'fx_unrealised_loss',
 ]
 
 // ── A-02: country templates and importing a chart ────────────────────────────

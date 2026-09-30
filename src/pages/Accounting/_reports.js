@@ -110,3 +110,45 @@ export function differenceReason(row) {
 export function areaMatches(row) {
   return cents(row?.difference) === 0
 }
+
+// ── Month-end revaluation (A-08c over 20260918) ──────────────────────────────
+
+/** The first day of the last month that has ended, e.g. '2026-08-01' on 30 Sep. */
+export function lastEndedMonth(today = new Date()) {
+  const d = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+}
+
+/** Whether the month (its first day) has ended by `today`. */
+export function monthHasEnded(month, today = new Date()) {
+  return typeof month === 'string' && /^\d{4}-\d{2}-01$/.test(month) && month <= lastEndedMonth(today)
+}
+
+/**
+ * Totals of a revaluation's items, in cents: gains, losses, the net, each
+ * side's effect, and the currencies with no month-end rate (the run refuses
+ * while there are any).
+ */
+export function revaluationSummary(items) {
+  let gain = 0
+  let loss = 0
+  let receivable = 0
+  let payable = 0
+  const missing = new Set()
+  for (const i of items || []) {
+    if (i.rate === null || i.rate === undefined) { missing.add(i.currency); continue }
+    const c = cents(i.effect)
+    if (c > 0) gain += c
+    else loss -= c
+    if (i.side === 'receivable') receivable += c
+    else payable += c
+  }
+  return {
+    gain: units(gain),
+    loss: units(loss),
+    net: units(gain - loss),
+    receivable: units(receivable),
+    payable: units(payable),
+    missingCurrencies: [...missing].sort(),
+  }
+}

@@ -76,6 +76,7 @@ describe('general ledger (A-01a)', () => {
     expect(BACKUP_MODULES.find((m) => m.id === 'ledger').tables).toEqual([
       'gl_accounts', 'posting_rules', 'tax_codes', 'tax_code_rates', 'exchange_rates', 'journal_entries', 'journal_lines',
       'accounting_periods', 'period_reopen_requests', // A-03 (20260910)
+      'fx_revaluations', 'fx_revaluation_lines', // A-08c (20260918)
     ])
   })
 })
