@@ -395,7 +395,9 @@ export default function PurchaseDocumentDetail({
               )}
               {/* An invoice raised from goods receipts bills goods already in
                   stock: it is never received itself (the database refuses). */}
-              {!isReceiptInvoice && ['approved', 'partially_received'].includes(doc.status) && (
+              {/* An opening-balance bill (20260921) has nothing to receive, print or cancel:
+                  it is paid, or its batch reversed. */}
+              {!isReceiptInvoice && !doc.is_opening && ['approved', 'partially_received'].includes(doc.status) && (
                 <Button size="sm" onClick={() => setShowReceive(true)}>{t('purchasing.confirmAndReceive')}</Button>
               )}
               {['approved', 'partially_received', 'received'].includes(doc.status) && (
@@ -403,12 +405,12 @@ export default function PurchaseDocumentDetail({
               )}
               {/* Offered from approval onward, matching when a VI becomes a real
                   payable. A draft has no committed figures worth printing. */}
-              {['approved', 'partially_received', 'received'].includes(doc.status) && (
+              {!doc.is_opening && ['approved', 'partially_received', 'received'].includes(doc.status) && (
                 <Button variant="secondary" size="sm" onClick={handleDownloadVIPDF}>{t('purchasing.downloadPDF')}</Button>
               )}
               {/* Once approved, an invoice from receipts has booked its cost into
                   the stock and cannot be cancelled (20260898). */}
-              {(isReceiptInvoice ? ['draft', 'pending_approval'] : ['draft', 'pending_approval', 'approved']).includes(doc.status) && (
+              {!doc.is_opening && (isReceiptInvoice ? ['draft', 'pending_approval'] : ['draft', 'pending_approval', 'approved']).includes(doc.status) && (
                 <Button disabled={!canCancelPurchase} variant="danger" size="sm" onClick={handleVICancel} loading={busy}>{t('common.cancel')}</Button>
               )}
             </>
@@ -500,6 +502,11 @@ export default function PurchaseDocumentDetail({
           <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${statusPillCls(doc.status)}`}>
             {statusLabel(doc.status, t)}
           </span>
+          {doc.is_opening && (
+            <span className="px-2 py-0.5 text-xs rounded-full font-medium bg-[#f0f2f6] dark:bg-[#1a2230] text-[#6c6760] dark:text-[#9aa4b2]">
+              {t('salesDocuments.openingBadge')}
+            </span>
+          )}
           {doc.archived && (
             <span className="px-2 py-0.5 text-xs rounded-full font-medium bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
               {t('purchasing.archivedBadge')}
@@ -695,7 +702,7 @@ export default function PurchaseDocumentDetail({
 
       {isVI && <BillMatch vendorInvoice={doc} fmtMoney={fmtMoney} />}
 
-      {isVI && (
+      {isVI && !doc.is_opening && (
         <LandedCharges
           vendorInvoiceId={doc.id}
           currency={docCurrency}

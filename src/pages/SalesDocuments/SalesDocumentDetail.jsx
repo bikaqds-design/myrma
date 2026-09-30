@@ -677,12 +677,13 @@ export default function SalesDocumentDetail({
                   {t('salesDocuments.apOpen')}
                 </Button>
               )}
-              {n.status === 'posted' && (
+              {/* an opening-balance invoice is credited or its batch reversed, never voided alone (20260921) */}
+              {n.status === 'posted' && !doc.is_opening && (
                 <Button disabled={!canVoidDoc} variant="danger" size="sm" onClick={() => setShowVoidModal(true)}>
                   {t('salesDocuments.voidInvoice')}
                 </Button>
               )}
-              {isPrintable('invoice', doc) && (
+              {isPrintable('invoice', doc) && !doc.is_opening && (
                 <Button variant="secondary" size="sm" onClick={() => downloadTaxDocumentPDF({ kind: 'invoice', doc, customer })}>
                   {t('salesDocuments.downloadPDF')}
                 </Button>
@@ -798,6 +799,11 @@ export default function SalesDocumentDetail({
               {statusLabel(n.paymentStatus)}
             </span>
           )}
+          {doc.is_opening && (
+            <span className="px-2 py-0.5 text-xs rounded-full font-medium bg-[#f0f2f6] dark:bg-[#1a2230] text-[#6c6760] dark:text-[#9aa4b2]">
+              {t('salesDocuments.openingBadge')}
+            </span>
+          )}
           {doc.archived && (
             <span className="px-2 py-0.5 text-xs rounded-full font-medium bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 inline-flex items-center gap-1">
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -881,7 +887,7 @@ export default function SalesDocumentDetail({
             {lines.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-6 text-center text-sm text-[#6c6760] dark:text-[#9aa4b2]">
-                  {t('salesDocuments.errNoLines')}
+                  {doc.is_opening ? t('salesDocuments.openingNoLines') : t('salesDocuments.errNoLines')}
                 </td>
               </tr>
             ) : lines.map((l, i) => (
