@@ -46,6 +46,7 @@ import { taxCodes } from './taxCodes.js'
 import { exchangeRates } from './exchangeRates.js'
 import { fxRevaluation } from './fxRevaluation.js'
 import { creditControl } from './creditControl.js'
+import { bankRec } from './bankRec.js'
 import { crmInvoices } from './crmInvoices.js'
 import { creditNotes } from './creditNotes.js'
 import { salesDocuments } from './salesDocuments.js'
@@ -145,6 +146,7 @@ export const db = {
   exchangeRates,
   fxRevaluation,
   creditControl,
+  bankRec,
   crmInvoices,
   creditNotes,
   salesDocuments,
@@ -208,6 +210,7 @@ export type { TaxCodeRow, TaxKind, VatReturnRow, VatLedgerRow } from './taxCodes
 export type { ExchangeRateRow, CurrencyDocType } from './exchangeRates.js'
 export type { FxRevaluationItemRow, FxRevaluationRunRow } from './fxRevaluation.js'
 export type { CreditStatusRow, CreditOverrideDocType } from './creditControl.js'
+export type { BankAccountRow, BankStatementRow, BankStatementLineRow, BankMatchCandidateRow, BankStatementSummaryRow, BankStatementLineInput } from './bankRec.js'
 export type { CrmInvoiceRow, CrmInvoiceLine, CrmInvoiceLineRow } from './crmInvoices.js'
 export type { CreditNoteRow, CreditNoteLine, CreditNoteLineRow, CreditNoteApplicationRow } from './creditNotes.js'
 export type { SalesDocumentRow, SalesDocType } from './salesDocuments.js'
