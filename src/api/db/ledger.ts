@@ -109,6 +109,37 @@ export interface AccountActivityRow {
   total_count: number
 }
 
+/** One area of the ledger checks (rma_subledger_reconciliation, 20260917). */
+export interface ReconciliationRow {
+  area: 'receivables' | 'payables' | 'inventory'
+  account_id: string | null
+  account_code: string | null
+  account_name: string | null
+  account_name_ar: string | null
+  ledger_balance: number
+  subledger_balance: number
+  difference: number
+  documents_differing: number | null
+  documents_before_ledger: number | null
+  uncosted_units: number | null
+}
+
+/** A document whose statement amount and ledger amount differ. */
+export interface ReconciliationDifferenceRow {
+  doc_type: string
+  doc_id: string
+  doc_code: string | null
+  party_id: string | null
+  party_name: string | null
+  doc_date: string | null
+  subledger_amount: number
+  ledger_amount: number
+  difference: number
+  in_ledger: boolean
+  before_ledger: boolean
+  total_count: number
+}
+
 export interface JournalFilters {
   from?: string | null
   to?: string | null
@@ -178,6 +209,23 @@ export const ledger = {
       count: rows.length ? Number(rows[0].total_count) : null,
       opening: rows.length ? Number(rows[0].opening_balance) : null,
     }
+  },
+
+  /** The ledger against the statements and the stock, as things stand now. */
+  async reconciliation(): Promise<ReconciliationRow[]> {
+    const { data, error } = await supabase.rpc('rma_subledger_reconciliation')
+    if (error) throw error
+    return (data ?? []) as ReconciliationRow[]
+  },
+
+  /** A page of the documents that differ, largest difference first (BUG-066). */
+  async reconciliationDifferences(area: 'receivables' | 'payables', page: number, pageSize: number) {
+    const { data, error } = await supabase.rpc('rma_subledger_differences', {
+      p_area: area, p_limit: pageSize, p_offset: (Math.max(page, 1) - 1) * pageSize,
+    })
+    if (error) throw error
+    const rows = (data ?? []) as ReconciliationDifferenceRow[]
+    return { data: rows, count: rows.length ? Number(rows[0].total_count) : 0 }
   },
 
   async trialBalance(from: string | null, to: string | null): Promise<TrialBalanceRow[]> {
