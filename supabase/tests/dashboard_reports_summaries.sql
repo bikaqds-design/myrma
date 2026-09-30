@@ -225,13 +225,14 @@ BEGIN
   -- ── CHECK 12: Reports financial ────────────────────────────────────────────
   v_checks := v_checks + 1;
   v_j := public.rma_report_financial(v_from, v_to);
-  -- posted invoices by posted_at (20260875), in the base currency at each invoice's rate (20260913)
-  IF (v_j->>'invoices')::bigint <> (SELECT count(*) FROM crm_invoices WHERE doc_status = 'posted' AND posted_at BETWEEN v_from AND v_to)
+  -- posted invoices by posted_at (20260875), in the base currency at each invoice's rate (20260913);
+  -- opening-balance invoices are not revenue of the new books (20260921)
+  IF (v_j->>'invoices')::bigint <> (SELECT count(*) FROM crm_invoices WHERE doc_status = 'posted' AND NOT is_opening AND posted_at BETWEEN v_from AND v_to)
      OR (v_j->>'total_invoiced')::numeric <> (SELECT coalesce(sum(round(coalesce(total, 0) * coalesce(nullif(exchange_rate, 0), 1), 2)), 0)
-                                                FROM crm_invoices WHERE doc_status = 'posted' AND posted_at BETWEEN v_from AND v_to)
+                                                FROM crm_invoices WHERE doc_status = 'posted' AND NOT is_opening AND posted_at BETWEEN v_from AND v_to)
      OR (v_j->>'outstanding')::numeric <> (SELECT coalesce(sum(round(greatest(coalesce(total, 0) - coalesce(amount_paid, 0), 0) * coalesce(nullif(exchange_rate, 0), 1), 2)), 0)
-                                             FROM crm_invoices WHERE doc_status = 'posted' AND posted_at BETWEEN v_from AND v_to)
-     OR (SELECT count(*) FROM v_report_invoices) <> (SELECT count(*) FROM crm_invoices)
+                                             FROM crm_invoices WHERE doc_status = 'posted' AND NOT is_opening AND posted_at BETWEEN v_from AND v_to)
+     OR (SELECT count(*) FROM v_report_invoices) <> (SELECT count(*) FROM crm_invoices WHERE NOT is_opening)
      OR EXISTS (SELECT 1 FROM v_report_invoices r JOIN customers c ON c.id = r.customer_id
                  WHERE r.customer_name IS DISTINCT FROM coalesce(nullif(c.company_name, ''), nullif(c.contact_person, ''))) THEN
     v_failures := array_append(v_failures, format('CHECK 12: report financial figures are wrong: %s', v_j));

@@ -46,6 +46,9 @@ DECLARE
   res text[] := '{}';
 BEGIN
   INSERT INTO public.user_roles (user_email, role, status) VALUES (acc, 'accountant', 'active'), (mgr, 'manager', 'active');
+  -- statements staging already holds (a browser check completed one on the
+  -- bank account) would be "later" than this script's; clear them here, rolled back
+  DELETE FROM public.bank_statements;
 
   e1 := public._gl_post('a07_test', gen_random_uuid(), 'in', '2023-03-02', 'A07-1', 'receipt', jsonb_build_array(
           jsonb_build_object('role', 'bank', 'debit', 1000), jsonb_build_object('role', 'accounts_receivable', 'credit', 1000)));
