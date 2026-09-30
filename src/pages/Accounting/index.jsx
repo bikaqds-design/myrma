@@ -25,6 +25,7 @@ import LedgerChecksTab from './LedgerChecksTab'
 import PeriodsTab from './PeriodsTab'
 import TaxTab from './TaxTab'
 import ExchangeRatesTab from './ExchangeRatesTab'
+import FxRevaluationTab from './FxRevaluationTab'
 import { ROLES } from '../../lib/constants'
 
 const METHOD_LABEL_KEY = {
@@ -251,7 +252,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
           canRecord ? (
             <Button onClick={() => setShowRecordVendorModal(true)}>+ {t('purchasing.recordPayment')}</Button>
           ) : null
-        ) : !['ap_aging', 'refunds', 'journal', 'trial_balance', 'profit_loss', 'balance_sheet', 'ledger_checks', 'periods', 'tax', 'rates'].includes(tab) ? (
+        ) : !['ap_aging', 'refunds', 'journal', 'trial_balance', 'profit_loss', 'balance_sheet', 'ledger_checks', 'periods', 'tax', 'rates', 'revaluation'].includes(tab) ? (
           canRecord ? (
             <Button onClick={() => setShowRecordModal(true)}>+ {t('accounting.recordPayment')}</Button>
           ) : null
@@ -307,6 +308,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
                 { id: 'periods', label: t('accounting.tabPeriods') },
                 { id: 'tax', label: t('accounting.tabTax') },
                 { id: 'rates', label: t('accounting.tabRates') },
+                { id: 'revaluation', label: t('accounting.tabRevaluation') },
               ]
             : []),
         ].map((tb) => (
@@ -403,6 +405,7 @@ export default function Accounting({ currentUserEmail, currentUserRole, currentU
       {tab === 'periods' && canSeeLedger && <PeriodsTab currentUserEmail={currentUserEmail} currentUserRole={currentUserRole} currentUserPermissions={currentUserPermissions} />}
       {tab === 'tax' && canSeeLedger && <TaxTab currentUserRole={currentUserRole} />}
       {tab === 'rates' && canSeeLedger && <ExchangeRatesTab currentUserRole={currentUserRole} />}
+      {tab === 'revaluation' && canSeeLedger && <FxRevaluationTab currentUserRole={currentUserRole} currentUserPermissions={currentUserPermissions} />}
 
       {tab === 'refunds' && (
         <RefundsTab currentUserEmail={currentUserEmail} currentUserRole={currentUserRole} currentUserPermissions={currentUserPermissions} perPage={perPage} setPerPage={setPerPage} />
