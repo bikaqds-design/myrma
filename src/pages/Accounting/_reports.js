@@ -80,3 +80,33 @@ export function validatePeriod(from, to) {
   if (!from || !to) return 'accounting.repErrPeriod'
   return from > to ? 'accounting.repErrPeriod' : null
 }
+
+// ── Ledger checks (A-08b over 20260917) ──────────────────────────────────────
+
+/** The page of a document named on a statement or in the ledger, if it has one. */
+export function reconDocLink(row) {
+  if (!row?.doc_id) return null
+  switch (row.doc_type) {
+    case 'invoice':
+    case 'crm_invoice':
+      return `/sales/invoice/${row.doc_id}`
+    case 'credit_note':
+      return `/sales/credit_note/${row.doc_id}`
+    case 'vendor_invoice':
+      return `/purchasing/vendor_invoice/${row.doc_id}`
+    default:
+      return null // payments, refunds, exchange differences: shown by code
+  }
+}
+
+/** Why a document differs: never posted before the ledger started, never posted, or posted differently. */
+export function differenceReason(row) {
+  if (!row.in_ledger) return row.before_ledger ? 'accounting.recReasonBeforeLedger' : 'accounting.recReasonNotPosted'
+  if (Number(row.subledger_amount) === 0) return 'accounting.recReasonNoDocument'
+  return 'accounting.recReasonAmounts'
+}
+
+/** Whether an area agrees, to the cent. */
+export function areaMatches(row) {
+  return cents(row?.difference) === 0
+}
