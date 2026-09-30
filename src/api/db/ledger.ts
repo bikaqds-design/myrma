@@ -18,6 +18,8 @@ export interface GlAccountRow {
   is_postable: boolean
   is_active: boolean
   description: string | null
+  // A-07 (20260920): a bank or cash account that can be reconciled
+  is_bank?: boolean
 }
 
 export interface PostingRuleRow {
@@ -239,7 +241,7 @@ export const ledger = {
     return fetchAllRows<GlAccountRow>((from, to) =>
       supabase
         .from('gl_accounts')
-        .select('id, code, name, name_ar, account_type, parent_id, is_postable, is_active, description')
+        .select('id, code, name, name_ar, account_type, parent_id, is_postable, is_active, description, is_bank')
         .order('code', { ascending: true })
         .order('id', { ascending: true })
         .range(from, to)
@@ -269,7 +271,7 @@ export const ledger = {
   /** Rename an account, or make it active / inactive (administrators). */
   async updateAccount(
     id: string,
-    fields: Partial<Pick<GlAccountRow, 'name' | 'name_ar' | 'is_active' | 'description'>>
+    fields: Partial<Pick<GlAccountRow, 'name' | 'name_ar' | 'is_active' | 'description' | 'is_bank'>>
   ): Promise<GlAccountRow> {
     const { data, error } = await supabase.from('gl_accounts').update(fields).eq('id', id).select().single()
     if (error) throw error

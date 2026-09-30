@@ -297,7 +297,7 @@ export default function ChartOfAccounts() {
                     )}
                   </td>
                   <td className="px-4 py-2.5 text-[#6c6760] dark:text-[#9aa4b2]">
-                    {t(`accounting.glType_${a.account_type}`)}{!a.is_postable && ` · ${t('accounting.glHeader')}`}
+                    {t(`accounting.glType_${a.account_type}`)}{!a.is_postable && ` · ${t('accounting.glHeader')}`}{a.is_bank && ` · ${t('accounting.bankBadge')}`}
                   </td>
                   <td className="px-4 py-2.5 text-[#6c6760] dark:text-[#9aa4b2]">
                     {a.is_active ? t('accounting.glActive') : t('accounting.glInactive')}
@@ -321,6 +321,20 @@ export default function ChartOfAccounts() {
                         >
                           {a.is_active ? t('accounting.glDeactivate') : t('accounting.glActivate')}
                         </Button>
+                        {/* A-07: a bank or cash account can be reconciled against a statement */}
+                        {a.is_postable && a.account_type === 'asset' && (
+                          <>
+                            {' '}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy}
+                              onClick={() => run(() => db.ledger.updateAccount(a.id, { is_bank: !a.is_bank }), 'accounting.glAccountSaved')}
+                            >
+                              {a.is_bank ? t('accounting.bankUnmark') : t('accounting.bankMark')}
+                            </Button>
+                          </>
+                        )}
                       </>
                     )}
                   </td>
