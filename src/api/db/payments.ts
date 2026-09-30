@@ -22,6 +22,11 @@ export interface PaymentRow {
   voided_at: string | null
   voided_by: string | null
   void_reason: string | null
+  // A-06 (20260919): money taken before invoicing, booked to Customer deposits until applied
+  is_deposit?: boolean
+  sales_order_id?: string | null
+  currency?: string
+  exchange_rate?: number
 }
 
 export interface PaymentApplicationRow {
@@ -135,6 +140,72 @@ export const payments = {
     const payment = await payments.get(paymentId as string)
     if (!payment) throw new Error('Payment not found after creation')
     return payment
+  },
+
+  /**
+   * A deposit (A-06, 20260919): a payment booked to Customer deposits until it
+   * is applied to an invoice, optionally on a sales order (then in its
+   * currency). record_customer_deposit goes through record_payment, so the
+   * same permission and rules apply.
+   */
+  async recordDeposit(input: {
+    customer_id: string
+    amount: number
+    method: PaymentRow['method']
+    reference_number?: string | null
+    payment_date?: string | null
+    notes?: string | null
+    sales_order_id?: string | null
+    currency?: string | null
+    exchange_rate?: number | null
+    created_by: string
+  }): Promise<PaymentRow> {
+    const { data: paymentId, error } = await supabase.rpc('record_customer_deposit', {
+      p_customer_id: input.customer_id,
+      p_amount: input.amount,
+      p_method: input.method,
+      p_reference_number: input.reference_number ?? null,
+      p_payment_date: input.payment_date ?? null,
+      p_notes: input.notes ?? null,
+      p_sales_order_id: input.sales_order_id ?? null,
+      p_currency: input.currency ?? null,
+      p_exchange_rate: input.exchange_rate ?? null,
+      p_actor_email: input.created_by,
+    })
+    if (error) throw error
+    const payment = await payments.get(paymentId as string)
+    if (!payment) throw new Error('Deposit not found after creation')
+    return payment
+  },
+
+  /** The deposits taken on one sales order (a handful; read in chunks all the same). */
+  async depositsForOrder(salesOrderId: string): Promise<PaymentRow[]> {
+    return fetchAllRows<PaymentRow>((from, to) =>
+      supabase
+        .from('payments')
+        .select('*')
+        .eq('sales_order_id', salesOrderId)
+        .eq('is_deposit', true)
+        .order('payment_date', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to),
+    )
+  },
+
+  /** A customer's payments and deposits with money left to apply, in one currency. */
+  async unappliedForCustomer(customerId: string, currency: string): Promise<PaymentRow[]> {
+    const { data, error } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('customer_id', customerId)
+      .eq('status', 'active')
+      .eq('currency', currency)
+      .gt('unapplied_amount', 0)
+      .order('payment_date', { ascending: true })
+      .order('id', { ascending: true })
+      .range(0, 99)
+    if (error) throw error
+    return (data ?? []) as PaymentRow[]
   },
 
   /**

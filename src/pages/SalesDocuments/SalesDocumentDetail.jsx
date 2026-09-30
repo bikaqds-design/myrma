@@ -18,6 +18,8 @@ import { useConfirm } from '../../hooks/useConfirm'
 import { DetailSkeleton } from '../../components/Skeleton'
 import { ROLES } from '../../lib/constants'
 import DeliveriesPanel from './DeliveriesPanel'
+import OrderDepositsPanel from './OrderDepositsPanel'
+import ApplyPaymentModal from './ApplyPaymentModal'
 import { raiseDeliveryInvoiceApproval } from './_deliveries'
 import {
   DocumentFormModal,
@@ -161,6 +163,8 @@ export default function SalesDocumentDetail({
   const [showVoidModal, setShowVoidModal] = useState(false)
   const [showConvertModal, setShowConvertModal] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
+  // A-06: use a deposit or a payment left unapplied against this invoice
+  const [showApplyModal, setShowApplyModal] = useState(false)
 
   // ── Data ──────────────────────────────────────────────────────────────────
 
@@ -668,6 +672,11 @@ export default function SalesDocumentDetail({
                   {t('salesDocuments.recordPayment')}
                 </Button>
               )}
+              {n.status === 'posted' && canTakePayment && Number(doc.total) - Number(doc.amount_paid || 0) > 0.004 && (
+                <Button variant="secondary" size="sm" onClick={() => setShowApplyModal(true)}>
+                  {t('salesDocuments.apOpen')}
+                </Button>
+              )}
               {n.status === 'posted' && (
                 <Button disabled={!canVoidDoc} variant="danger" size="sm" onClick={() => setShowVoidModal(true)}>
                   {t('salesDocuments.voidInvoice')}
@@ -738,6 +747,20 @@ export default function SalesDocumentDetail({
           currentUserEmail={currentUserEmail}
           onClose={() => setEditing(false)}
           onSaved={() => { setEditing(false); refresh() }}
+        />
+      )}
+      {showApplyModal && (
+        <ApplyPaymentModal
+          invoice={doc}
+          currency={doc.currency || baseCurrency}
+          currentUserEmail={currentUserEmail}
+          onClose={() => setShowApplyModal(false)}
+          onApplied={() => {
+            setShowApplyModal(false)
+            refresh()
+            queryClient.invalidateQueries({ queryKey: ['unapplied-payments'] })
+            queryClient.invalidateQueries({ queryKey: ['credit-status', doc.customer_id] })
+          }}
         />
       )}
       {showPaymentModal && (
@@ -905,6 +928,15 @@ export default function SalesDocumentDetail({
           canInvoice={canInvoiceDelivery}
           currentUserEmail={currentUserEmail}
           onInvoiceCreated={handleDeliveryInvoiced}
+        />
+      )}
+
+      {/* ── Deposits (A-06): money taken on this order before it is invoiced ── */}
+      {isSO && !doc.archived && (
+        <OrderDepositsPanel
+          so={doc}
+          canRecord={canTakePayment}
+          currentUserEmail={currentUserEmail}
         />
       )}
 

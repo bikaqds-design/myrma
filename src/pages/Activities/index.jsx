@@ -15,6 +15,9 @@ import { APPROVAL_DOC_TYPE_LABEL_KEY, approvalRequestLabel } from '../../lib/app
 import { EMPTY_ARRAY } from '../../lib/stableEmpty'
 import { useConfirm } from '../../hooks/useConfirm'
 import { SearchInput } from '../../components/SearchInput'
+import CreditOverrideModal from '../../components/CreditOverrideModal'
+import { ROLES } from '../../lib/constants'
+import { isCreditLimitError, overrideDocType } from '../SalesDocuments/_credit'
 
 // ── Type icons + colors ────────────────────────────────────────────────────
 const TYPE_ICON_PATHS = {
@@ -152,6 +155,8 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
 
   // Inline reschedule (parent-level: only one row open at a time)
   const [reschedulingId, setReschedulingId] = useState(null)
+  // A-06: an approval refused for the customer's credit limit, waiting for a manager's reason
+  const [creditOverride, setCreditOverride] = useState(null)
   const [rescheduleDate, setRescheduleDate] = useState('')
 
   // Sorting
@@ -427,6 +432,12 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
       toast.success(t('activities.approvedToast'))
     } catch (err) {
       console.error('Approve failed', err)
+      // over the credit limit: a manager may approve it with a reason, then it is retried (A-06)
+      if (isCreditLimitError(err) && overrideDocType(docType)
+          && [ROLES.MANAGER, ROLES.ADMIN, ROLES.SUPER_ADMIN].includes(currentUserRole)) {
+        setCreditOverride({ activity, docType, docId, message: err.message })
+        return
+      }
       // The database explains a refusal ("the person who created a credit note
       // cannot approve it"); a bare "Error" leaves the person guessing.
       toast.error(err?.code === 'P0001' && err?.message ? err.message : t('common.error'))
@@ -995,6 +1006,18 @@ export default function Activities({ currentUserRole, currentUserEmail, currentU
         )}
       </div>
       {confirmDialog}
+      {creditOverride && (
+        <CreditOverrideModal
+          message={creditOverride.message}
+          onCancel={() => setCreditOverride(null)}
+          onApprove={async (reason) => {
+            await db.creditControl.approveOverride(overrideDocType(creditOverride.docType), creditOverride.docId, reason)
+            const { activity } = creditOverride
+            setCreditOverride(null)
+            await handleApproveActivity(activity)
+          }}
+        />
+      )}
     </div>
   )
 }

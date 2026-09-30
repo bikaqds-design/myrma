@@ -45,6 +45,7 @@ import { periods } from './periods.js'
 import { taxCodes } from './taxCodes.js'
 import { exchangeRates } from './exchangeRates.js'
 import { fxRevaluation } from './fxRevaluation.js'
+import { creditControl } from './creditControl.js'
 import { crmInvoices } from './crmInvoices.js'
 import { creditNotes } from './creditNotes.js'
 import { salesDocuments } from './salesDocuments.js'
@@ -143,6 +144,7 @@ export const db = {
   taxCodes,
   exchangeRates,
   fxRevaluation,
+  creditControl,
   crmInvoices,
   creditNotes,
   salesDocuments,
@@ -205,6 +207,7 @@ export type { AccountingPeriodRow, PeriodReopenRequestRow, PeriodStatus, CloseCh
 export type { TaxCodeRow, TaxKind, VatReturnRow, VatLedgerRow } from './taxCodes.js'
 export type { ExchangeRateRow, CurrencyDocType } from './exchangeRates.js'
 export type { FxRevaluationItemRow, FxRevaluationRunRow } from './fxRevaluation.js'
+export type { CreditStatusRow, CreditOverrideDocType } from './creditControl.js'
 export type { CrmInvoiceRow, CrmInvoiceLine, CrmInvoiceLineRow } from './crmInvoices.js'
 export type { CreditNoteRow, CreditNoteLine, CreditNoteLineRow, CreditNoteApplicationRow } from './creditNotes.js'
 export type { SalesDocumentRow, SalesDocType } from './salesDocuments.js'
