@@ -21,6 +21,7 @@ import Pagination from '../components/Pagination'
 import { safeStorage } from '../lib/safeStorage'
 import { TAX_STATUSES } from './Accounting/_tax'
 import { useCurrencyOptions } from '../hooks/useCurrencyOptions'
+import CreditStatusPanel from '../components/CreditStatusPanel'
 
 const EMPTY_TICKET_COUNTS = { total: 0, open: 0 }
 
@@ -1411,7 +1412,6 @@ export default function CustomerDetails({
               {(() => {
                 // in the base currency: invoices, payments and credit notes may each be in another (20260913)
                 const balance = statementBalance(ledger)
-                const overLimit = customer?.credit_limit != null && balance > Number(customer.credit_limit)
                 return (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="bg-gray-50 dark:bg-[#0f1520] rounded-xl border border-gray-200 dark:border-[#212a38] p-4">
@@ -1420,17 +1420,8 @@ export default function CustomerDetails({
                         {formatMoney(balance, baseCurrency)}
                       </div>
                     </div>
-                    {customer?.credit_limit != null && (
-                      <div className={`rounded-xl border p-4 ${overLimit ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-gray-50 dark:bg-[#0f1520] border-gray-200 dark:border-[#212a38]'}`}>
-                        <div className={`text-xs uppercase mb-1 ${overLimit ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-[#9aa4b2]'}`}>{t('customerDetails.creditLimit')}</div>
-                        <div className={`text-xl font-bold ${overLimit ? 'text-red-700 dark:text-red-400' : 'text-gray-900 dark:text-[#e8ebf0]'}`}>
-                          {formatMoney(customer.credit_limit, baseCurrency)}
-                        </div>
-                        {overLimit && (
-                          <div className="text-xs text-red-600 dark:text-red-400 mt-1">{t('customerDetails.overCreditLimit')}</div>
-                        )}
-                      </div>
-                    )}
+                    {/* A-06: the credit limit as the database enforces it (base currency) */}
+                    {customer?.id && <CreditStatusPanel customerId={customer.id} />}
                   </div>
                 )
               })()}
