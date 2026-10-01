@@ -5,6 +5,7 @@ import { resolveMfaGate } from './lib/mfaGate'
 import { Toaster, toast } from 'react-hot-toast'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { auth, db, branding as brandingAPI, supabase } from './api/supabaseClient'
+import { shouldOpenWizard } from './pages/SetupWizard/_steps'
 import { useAppearance } from './contexts/AppearanceContext'
 import { resolvePermissions, canDo, roleDefaults, accessDenialReason, ACCESS_DENIED } from './lib/permissions'
 import { ROLES, ROLE_LIST } from './lib/constants'
@@ -141,6 +142,7 @@ const Purchasing = lazyWithReload(() => import('./pages/Purchasing'))
 const PurchaseDocumentDetail = lazyWithReload(() => import('./pages/Purchasing/PurchaseDocumentDetail'))
 const VendorDetails = lazyWithReload(() => import('./pages/Purchasing/VendorDetails'))
 const NotFoundPage = lazyWithReload(() => import('./pages/NotFoundPage'))
+const SetupWizard = lazyWithReload(() => import('./pages/SetupWizard'))
 import CommandPalette from './components/CommandPalette'
 
 const PageSpinner = () => <RouteSkeleton />
@@ -831,6 +833,31 @@ export default function App() {
     enabled: !!currentUser,
   })
 
+  // ── First-run setup wizard (B-03c, 20260922) ─────────────────────────────
+  // A new company's first administrator lands on /setup once per session until
+  // the wizard is finished or skipped. Uses the real role, not a preview: a
+  // previewed user never sets the company up. Existing databases were marked
+  // finished by the migration, so they are never redirected.
+  const isRealAdmin = currentUserRole === ROLES.ADMIN || currentUserRole === ROLES.SUPER_ADMIN
+  const { data: setupWizardValue, isSuccess: setupWizardLoaded } = useQuery({
+    queryKey: ['rma-config', 'setup_wizard'],
+    queryFn: async () => {
+      const r = await db.rmaConfig.getAll()
+      if (r.missing) return null
+      return r.data.find((row) => row.config_key === 'setup_wizard')?.config_value ?? null
+    },
+    staleTime: 5 * 60_000,
+    enabled: !!currentUser && isRealAdmin,
+  })
+  const setupRedirectedRef = useRef(false)
+  useEffect(() => {
+    if (setupRedirectedRef.current || pathname === '/setup') return
+    if (shouldOpenWizard({ isAdmin: isRealAdmin && !previewUser, loaded: setupWizardLoaded, value: setupWizardValue })) {
+      setupRedirectedRef.current = true
+      navigate('/setup')
+    }
+  }, [isRealAdmin, previewUser, setupWizardLoaded, setupWizardValue, pathname, navigate])
+
   // ── Active state derived from URL ─────────────────────────────────────────
   const isProductsActive = pathname === '/products' || pathname.startsWith('/products/')
   const isCustomersActive = pathname === '/customers' || pathname.startsWith('/customers/')
@@ -1053,6 +1080,7 @@ export default function App() {
       '/inventory': t('nav.inventory'),
       '/account': t('nav.accountSettings'),
       '/control-panel': t('nav.controlPanel'),
+      '/setup': t('setupWizard.title'),
       '/calendar': t('nav.calendar'),
       '/reports': t('nav.reports'),
     }
@@ -1763,6 +1791,22 @@ export default function App() {
                     currentUserPermissions={currentUserPermissions}
                     onProfileUpdate={handleProfileUpdate}
                   />
+                }
+              />
+
+              <Route
+                path="/setup"
+                element={
+                  isRealAdmin && !previewUser ? (
+                    <SetupWizard
+                      currentUserRole={currentUserRole}
+                      currentUserEmail={currentUser?.email}
+                      currentUserPermissions={currentUserPermissions}
+                      onStartPreview={startPreview}
+                    />
+                  ) : (
+                    <NoModuleAccess role={effectiveUserRole} />
+                  )
                 }
               />
 
