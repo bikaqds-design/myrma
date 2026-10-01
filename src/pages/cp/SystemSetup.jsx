@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
+import { Button } from '../../components/ui'
 import CurrencySettings from './CurrencySettings'
 import CountrySetup from './setup/CountrySetup'
 import BusinessIdentity from './setup/BusinessIdentity'
@@ -32,16 +34,23 @@ const SECTIONS = [
 export default function SystemSetup({ currentUserEmail }) {
   const { t } = useTranslation()
   const [tab, setTab] = useState('currency')
+  const navigate = useNavigate()
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-[#e8ebf0]">
-          {t('cp.setup.header')}
-        </h2>
-        <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-0.5">
-          {t('cp.setup.subtitle')}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-[#e8ebf0]">
+            {t('cp.setup.header')}
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-[#9aa4b2] mt-0.5">
+            {t('cp.setup.subtitle')}
+          </p>
+        </div>
+        {/* the first-run wizard (B-03c) walks through these and the rest of a new company's setup */}
+        <Button variant="secondary" size="sm" onClick={() => navigate('/setup')}>
+          {t('setupWizard.open')}
+        </Button>
       </div>
 
       <div className="flex gap-1 border-b border-gray-200 dark:border-[#212a38] overflow-x-auto">
